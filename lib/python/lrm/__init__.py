@@ -73,25 +73,45 @@ def _compute_ranges(
     return result
 
 
+def _has_numbered_subclauses(
+    clause: str, toc: dict[str, tuple[int, int]],
+) -> bool:
+    """Return True iff ``clause`` is in ``toc`` and another TOC entry
+    sits directly under it as ``clause.<digits>...``.
+    """
+    if clause not in toc:
+        return False
+    prefix = clause + "."
+    return any(other.startswith(prefix) for other in toc)
+
+
 def is_top_level_aggregate(
     clause: str, toc: dict[str, tuple[int, int]],
 ) -> bool:
     """Return True iff ``clause`` is a top-level entry that has at least
     one numbered subclause in ``toc``.
 
-    The dependency graph treats such clauses as aggregates: the
-    enumeration root for a list of numbered subclauses, with no
-    individual satisfaction work of its own. They are skipped by the
-    walker and rejected as dependency-list entries by the oracle.
-    Top-level singletons like §2, §41, and Annex B remain non-aggregate
-    and are walked as ordinary satisfaction units.
+    Such clauses are aggregates: the enumeration root for a list of
+    numbered subclauses, with no individual satisfaction work of their
+    own. They are skipped by the walker and rejected as dependency-list
+    entries. Top-level singletons like §2, §41, and Annex B remain
+    non-aggregate and are walked as ordinary satisfaction units.
     """
-    if clause not in toc:
-        return False
-    if "." in clause:
-        return False
-    prefix = clause + "."
-    return any(other.startswith(prefix) for other in toc)
+    return "." not in clause and _has_numbered_subclauses(clause, toc)
+
+
+def is_sub_level_parent(
+    clause: str, toc: dict[str, tuple[int, int]],
+) -> bool:
+    """Return True iff ``clause`` is a sub-level entry that has at
+    least one numbered subclause directly under it in ``toc``.
+
+    A sub-level parent carries its own preamble rules and contains
+    named numbered subclauses. The dependency oracle queries it for
+    the deps of the preamble alone, since the named numbered subclauses
+    are queried separately as their own targets.
+    """
+    return "." in clause and _has_numbered_subclauses(clause, toc)
 
 
 def load_toc(lrm_path: str) -> dict[str, tuple[int, int]]:

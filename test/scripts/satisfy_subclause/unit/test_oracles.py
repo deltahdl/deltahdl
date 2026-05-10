@@ -510,6 +510,71 @@ def test_build_dependency_prompt_avoids_lowercase_do_not() -> None:
     assert "do not" not in prompt
 
 
+# --- build_dependency_prompt: sub-level-parent branch -----------------------
+
+
+_PARENT_TOC: dict[str, tuple[int, int]] = {
+    "33.4": (100, 200), "33.4.1": (100, 110),
+}
+
+
+def test_build_dependency_prompt_sub_level_parent_mentions_preamble() -> None:
+    """A sub-level parent's prompt anchors the rules in the parent's preamble."""
+    with patch("satisfy_subclause.oracles.load_toc", return_value=_PARENT_TOC):
+        prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
+    assert "preamble" in prompt
+
+
+def test_build_dependency_prompt_sub_level_parent_signals_subclauses_separate() -> None:
+    """A sub-level parent's prompt names that numbered subclauses are queried separately."""
+    with patch("satisfy_subclause.oracles.load_toc", return_value=_PARENT_TOC):
+        prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
+    assert "queried separately" in prompt
+
+
+def test_build_dependency_prompt_sub_level_parent_grounds_in_normative_rule() -> None:
+    """A sub-level parent's prompt still requires a normative-rule grounding."""
+    with patch("satisfy_subclause.oracles.load_toc", return_value=_PARENT_TOC):
+        prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
+    assert "normative rule" in prompt
+
+
+def test_build_dependency_prompt_sub_level_parent_keeps_machinery_anchor() -> None:
+    """A sub-level parent's prompt keeps the §Y-machinery prerequisite anchor."""
+    with patch("satisfy_subclause.oracles.load_toc", return_value=_PARENT_TOC):
+        prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
+    assert "machinery" in prompt
+
+
+def test_build_dependency_prompt_sub_level_parent_keeps_json_array() -> None:
+    """A sub-level parent's prompt still requests a JSON array."""
+    with patch("satisfy_subclause.oracles.load_toc", return_value=_PARENT_TOC):
+        prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
+    assert "JSON array" in prompt
+
+
+def test_build_dependency_prompt_sub_level_parent_avoids_do_not() -> None:
+    """A sub-level parent's prompt avoids the 'do not' phrasing."""
+    with patch("satisfy_subclause.oracles.load_toc", return_value=_PARENT_TOC):
+        prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
+    assert "do not" not in prompt
+
+
+def test_build_dependency_prompt_leaf_omits_preamble() -> None:
+    """A leaf target's prompt does not branch into the preamble framing."""
+    with patch("satisfy_subclause.oracles.load_toc", return_value={}):
+        prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "preamble" not in prompt
+
+
+def test_build_dependency_prompt_top_level_singleton_omits_preamble() -> None:
+    """A top-level singleton like §2 is not a parent and gets the leaf prompt."""
+    singleton_toc = {"2": (10, 12)}
+    with patch("satisfy_subclause.oracles.load_toc", return_value=singleton_toc):
+        prompt = build_dependency_prompt("2", "~/LRM.pdf")
+    assert "preamble" not in prompt
+
+
 # --- run_oracle_call: retry-helper wiring -----------------------------------
 
 

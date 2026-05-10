@@ -7,7 +7,11 @@ from typing import Any
 import pytest
 from pypdf import PdfReader
 
-from lib.python.lrm import is_top_level_aggregate, load_toc
+from lib.python.lrm import (
+    is_sub_level_parent,
+    is_top_level_aggregate,
+    load_toc,
+)
 
 PdfBuilder = Callable[[str, int, Sequence[tuple[int, str, int]]], str]
 
@@ -261,3 +265,48 @@ def test_is_top_level_aggregate_does_not_match_prefix_substring() -> None:
     """``2`` is not an aggregate when only ``20.1`` is present (not ``2.x``)."""
     toc = {"2": (10, 12), "20": (100, 130), "20.1": (100, 105)}
     assert is_top_level_aggregate("2", toc) is False
+
+
+# --- is_sub_level_parent ----------------------------------------------------
+
+
+def test_is_sub_level_parent_with_subclauses_true() -> None:
+    """A sub-level entry that has at least one numbered subclause is a parent."""
+    toc = {"23.2": (110, 129), "23.2.1": (110, 111)}
+    assert is_sub_level_parent("23.2", toc) is True
+
+
+def test_is_sub_level_parent_leaf_false() -> None:
+    """A sub-level entry with no descendants in the TOC is not a parent."""
+    toc = {"23.2.1": (110, 111)}
+    assert is_sub_level_parent("23.2.1", toc) is False
+
+
+def test_is_sub_level_parent_top_level_with_children_false() -> None:
+    """A top-level entry with children is an aggregate, not a sub-level parent."""
+    toc = {"23": (100, 129), "23.2": (110, 129)}
+    assert is_sub_level_parent("23", toc) is False
+
+
+def test_is_sub_level_parent_top_level_singleton_false() -> None:
+    """A top-level singleton is neither aggregate nor sub-level parent."""
+    toc = {"2": (10, 12)}
+    assert is_sub_level_parent("2", toc) is False
+
+
+def test_is_sub_level_parent_missing_clause_false() -> None:
+    """A clause not in the TOC is not a sub-level parent."""
+    toc = {"23.2": (110, 129)}
+    assert is_sub_level_parent("99.9", toc) is False
+
+
+def test_is_sub_level_parent_does_not_match_prefix_substring() -> None:
+    """``23.2`` is not a parent when only ``23.20.1`` exists (not ``23.2.x``)."""
+    toc = {"23.2": (110, 119), "23.20": (200, 210), "23.20.1": (200, 205)}
+    assert is_sub_level_parent("23.2", toc) is False
+
+
+def test_is_sub_level_parent_annex_subclause_with_children_true() -> None:
+    """An annex sub-level entry with numbered children is a sub-level parent."""
+    toc = {"A.1": (900, 920), "A.1.1": (900, 905)}
+    assert is_sub_level_parent("A.1", toc) is True

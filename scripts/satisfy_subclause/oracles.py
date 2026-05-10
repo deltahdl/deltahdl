@@ -16,6 +16,7 @@ from typing import TypeAlias
 
 from lib.python.lrm import (
     build_lrm_read_instruction,
+    is_sub_level_parent,
     is_top_level_aggregate,
     load_toc,
 )
@@ -104,17 +105,39 @@ def _extract_dependency_array(text: str) -> str:
 
 
 def build_dependency_prompt(subclause: str, lrm: str) -> str:
-    """Return the single-call dependency-oracle prompt for ``subclause``."""
+    """Return the single-call dependency-oracle prompt for ``subclause``.
+
+    For a sub-level parent — a target that has its own preamble rules
+    and contains named numbered subclauses below it — the prompt
+    anchors the dependency answer in the preamble alone, since the
+    numbered subclauses are queried separately as their own targets.
+    For every other target the prompt asks about the subclause's own
+    rules directly.
+    """
     read_ctx = build_lrm_read_instruction(subclause, lrm)
+    toc = load_toc(lrm)
+    if is_sub_level_parent(subclause, toc):
+        builder = f"§{subclause}'s preamble"
+        citation = f"§{subclause}'s preamble"
+        scope_note = (
+            f"§{subclause} contains named numbered subclauses below it;"
+            " those numbered subclauses are queried separately, so"
+            " anchor your answer in the normative rules stated by"
+            f" §{subclause}'s own preamble.\n\n"
+        )
+    else:
+        builder = f"§{subclause}'s implementation"
+        citation = f"§{subclause}"
+        scope_note = ""
     return (
         f"You are the read-only dependency oracle for §{subclause}.\n\n"
         f"{read_ctx}\n\n"
-        f"List the subclauses §{subclause}'s implementation builds on"
-        f" top of. A subclause §Y belongs on the list when"
-        f" §{subclause} states a normative rule whose implementation"
-        " needs §Y's machinery to already be in place. For each"
-        " subclause you list, you can quote the sentence in"
-        f" §{subclause} that states the rule and name the §Y"
+        f"{scope_note}"
+        f"List the subclauses {builder} builds on top of. A subclause"
+        f" §Y belongs on the list when {citation} states a normative"
+        " rule whose implementation needs §Y's machinery to already be"
+        " in place. For each subclause you list, you can quote the"
+        f" sentence in {citation} that states the rule and name the §Y"
         " machinery the rule needs.\n\n"
         "Order the list foundations-first: subclauses that define the"
         " most general machinery come before subclauses that build on"
@@ -123,7 +146,7 @@ def build_dependency_prompt(subclause: str, lrm: str) -> str:
         "Output a single JSON array of subclause-identifier strings"
         " in the same shape as --subclause input (digit-or-letter"
         ' heads, dotted decimal parts), e.g. ["33.6.1", "33.4.1.5"].'
-        f" An empty array [] means §{subclause}'s normative rules"
+        f" An empty array [] means {citation}'s normative rules"
         " implement on top of code already in the tree."
     )
 
