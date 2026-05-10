@@ -506,6 +506,79 @@ def test_main_each_checkpoint_includes_order(
     assert all("order" in snap for snap in snapshots)
 
 
+# --- Leaf-only walk ---------------------------------------------------------
+
+
+_PARENT_TOC: dict[str, tuple[int, int]] = {
+    "6": (10, 100),
+    "6.1": (10, 50),
+    "6.2": (50, 100),
+}
+
+
+def test_main_skips_parent_clauses_in_toc(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+) -> None:
+    """build_subclause_record runs once per leaf, never on a parent clause."""
+    _, mock_record, _ = run_main(toc=_PARENT_TOC)
+    walked = [c.args[0] for c in mock_record.call_args_list]
+    assert sorted(walked) == ["6.1", "6.2"]
+
+
+def test_main_writes_records_for_leaves_only(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+    make_output: Path,
+) -> None:
+    """The records section omits parent clauses entirely."""
+    run_main(toc=_PARENT_TOC)
+    payload = json.loads(make_output.read_text())
+    assert set(payload["records"]) == {"6.1", "6.2"}
+
+
+def test_main_passes_leaves_set_to_record_builder(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+) -> None:
+    """The leaves kwarg handed to build_subclause_record contains all and only TOC leaves."""
+    _, mock_record, _ = run_main(toc=_PARENT_TOC)
+    assert mock_record.call_args_list[0].kwargs["leaves"] == {"6.1", "6.2"}
+
+
+def test_main_commit_message_progress_uses_leaf_count(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+) -> None:
+    """Per-leaf checkpoint commit messages count over leaves, not the full TOC."""
+    _, _, mock_commit = run_main(
+        toc=_PARENT_TOC, extra_argv=["--commit"],
+    )
+    messages = [c.kwargs["message"] for c in mock_commit.call_args_list]
+    assert all("/2)" in m for m in messages)
+
+
+def test_main_resume_drops_cached_parent_records(
+    make_lrm: Path, make_output: Path,
+) -> None:
+    """A pre-existing cached parent-clause record is dropped from the output."""
+    _seed_checkpoint(make_output, {"6": _CACHED_RECORD, "6.1": _CACHED_RECORD})
+    with _stub_walk(_PARENT_TOC, return_value=_FRESH_RECORD):
+        _run_main(make_lrm, make_output, resume=True)
+    payload = json.loads(make_output.read_text())
+    assert "6" not in payload["records"]
+
+
+def test_main_resume_skips_oracle_for_cached_leaf(
+    make_lrm: Path, make_output: Path,
+) -> None:
+    """A cached leaf record is reused; only the missing leaves are walked."""
+    _seed_checkpoint(make_output, {"6.1": _CACHED_RECORD})
+    with _stub_walk(_PARENT_TOC, return_value=_FRESH_RECORD) as mock_record:
+        _run_main(make_lrm, make_output, resume=True)
+    walked = [c.args[0] for c in mock_record.call_args_list]
+    assert walked == ["6.2"]
+
+
+# --- Resume helpers ---------------------------------------------------------
+
+
 def test_main_resume_first_checkpoint_has_full_cached_records(
     make_lrm: Path, make_output: Path,
 ) -> None:

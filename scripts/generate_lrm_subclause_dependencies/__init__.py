@@ -97,21 +97,40 @@ def _checkpoint_message(subclause: str, index: int, total: int) -> str:
     )
 
 
+def _toc_leaves(toc: dict[str, tuple[int, int]]) -> list[str]:
+    """Return the TOC entries that have no descendants in *toc*, in TOC order.
+
+    Aggregate parent clauses (e.g. the bare ``6`` that owns ``6.1`` and
+    ``6.2``) make poor oracle inputs: asking ``what does §6 depend
+    on?`` produces a sprawling cross-chapter list that creates large
+    cycles with other chapters' aggregates. Walking only leaves keeps
+    each oracle call focused on a single normative passage.
+    """
+    keys = set(toc)
+    return [
+        sub for sub in toc
+        if not any(child.startswith(sub + ".") for child in keys)
+    ]
+
+
 def main(argv: list[str] | None = None) -> None:
-    """Run the dependency oracles for every subclause and write the graph."""
+    """Run the dependency oracles for every leaf subclause and write the graph."""
     args = parse_args(argv)
     toc = load_toc(str(args.lrm))
     cached = _load_checkpoint(args.output) if args.resume else {}
     if args.commit:
         assert_clean_tree()
+    leaves_in_order = _toc_leaves(toc)
+    leaves = set(leaves_in_order)
     records: dict[str, Any] = {
-        sub: cached[sub] for sub in toc if sub in cached
+        sub: cached[sub] for sub in leaves_in_order if sub in cached
     }
-    total = len(toc)
-    for index, subclause in enumerate(toc, start=1):
+    total = len(leaves_in_order)
+    for index, subclause in enumerate(leaves_in_order, start=1):
         if subclause not in records:
             records[subclause] = build_subclause_record(
-                subclause, str(args.lrm), model=args.model, effort=args.effort,
+                subclause, str(args.lrm),
+                model=args.model, effort=args.effort, leaves=leaves,
             )
         _write_checkpoint(args.output, records)
         if args.commit:
