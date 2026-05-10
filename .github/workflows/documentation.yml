@@ -9,7 +9,7 @@ jobs:
         ${{ steps.check.outputs.workflow_changed }}
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - id: check
@@ -42,7 +42,7 @@ jobs:
       - yamllint
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install tools
         run: npm install -g jsonlint
       - name: Lint JSON
@@ -56,9 +56,9 @@ jobs:
       - yamllint
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-${{ github.job }}-${{
@@ -91,9 +91,9 @@ jobs:
     needs: detect
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-${{ github.job }}-${{
