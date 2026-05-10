@@ -135,9 +135,10 @@ def parse_dependencies(
 
     Rejects identifiers that name an aggregate top-level entry in
     ``toc`` (a chapter or annex with at least one numbered subclause).
-    Such entries are enumeration roots, not satisfiable subclauses, and
-    accepting them as deps was the original source of the cross-chapter
-    cycle in ``docs/dependency_graph.json``.
+    Such entries are enumeration roots for a list of numbered
+    subclauses, not satisfiable subclauses themselves, so a dep on one
+    has no satisfaction work attached and would mislead any caller that
+    treats a dep list as a queue of satisfaction prerequisites.
     """
     body = _extract_dependency_array(text)
     payload = json.loads(body)
