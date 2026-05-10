@@ -284,18 +284,6 @@ def test_build_dependency_prompt_says_empty_if_none() -> None:
     assert "[]" in build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
 
 
-def test_build_dependency_prompt_requires_leaf_identifiers() -> None:
-    """Prompt names the leaf-only constraint so the oracle does not return aggregates."""
-    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
-    assert "leaf" in prompt
-
-
-def test_build_dependency_prompt_defines_leaf() -> None:
-    """Prompt explains what 'leaf' means so the oracle can self-filter."""
-    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
-    assert "no further sub-numbering" in prompt
-
-
 # --- parse_dependencies -----------------------------------------------------
 
 

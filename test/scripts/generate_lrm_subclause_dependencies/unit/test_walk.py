@@ -13,17 +13,15 @@ def _run_record(
     deps: list[str],
     model: str = "opus",
     effort: str = "medium",
-    leaves: set[str] | None = None,
 ) -> tuple[dict[str, Any], MagicMock]:
     """Patch the dependency oracle, run build_subclause_record, return mock+record."""
-    leaf_set = set(deps) if leaves is None else leaves
     deps_patch = patch(
         "generate_lrm_subclause_dependencies.walk.compute_subclause_dependencies",
         return_value=deps,
     )
     with deps_patch as mock_deps:
         record = build_subclause_record(
-            "4.4", str(make_lrm), model=model, effort=effort, leaves=leaf_set,
+            "4.4", str(make_lrm), model=model, effort=effort,
         )
     return record, mock_deps
 
@@ -50,21 +48,3 @@ def test_record_forwards_effort_to_dependency_oracle(make_lrm: Path) -> None:
     """The effort argument flows to compute_subclause_dependencies."""
     _, mock_deps = _run_record(make_lrm, deps=[], effort="high")
     assert mock_deps.call_args[1]["effort"] == "high"
-
-
-def test_record_drops_non_leaf_dependencies(make_lrm: Path) -> None:
-    """A dep identifier outside the leaves set is filtered out of the record."""
-    record, _ = _run_record(
-        make_lrm, deps=["3.14.3", "10"], leaves={"3.14.3"},
-    )
-    assert record["dependencies"] == ["3.14.3"]
-
-
-def test_record_preserves_oracle_order_after_filter(make_lrm: Path) -> None:
-    """Filtering keeps the surviving deps in the oracle's original order."""
-    record, _ = _run_record(
-        make_lrm,
-        deps=["10", "3.14.3", "11", "10.4.1"],
-        leaves={"3.14.3", "10.4.1"},
-    )
-    assert record["dependencies"] == ["3.14.3", "10.4.1"]
