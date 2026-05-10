@@ -30,11 +30,25 @@ jobs:
           fi
           CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
           if echo "$CHANGED" \
-              | grep -qE '^\.github/workflows/markdownlint\.yml$'; then
+              | grep -qE '^\.github/workflows/documentation\.yml$'; then
             echo "workflow_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "workflow_changed=false" >> "$GITHUB_OUTPUT"
           fi
+  jsonlint:
+    if: "!failure() && !cancelled()"
+    needs:
+      - detect
+      - yamllint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: npm install -g jsonlint
+      - name: Lint JSON
+        run: |
+          find docs -name '*.json' -print0 \
+            | xargs -0 -n1 jsonlint --quiet
   markdownlint:
     if: "!failure() && !cancelled()"
     needs:
@@ -116,10 +130,12 @@ on:
   pull_request:
     paths:
       - '**/*.md'
+      - docs/**/*.json
       - .github/workflows/documentation.yml
   push:
     branches: [main]
     paths:
       - '**/*.md'
+      - docs/**/*.json
       - .github/workflows/documentation.yml
   workflow_dispatch:
