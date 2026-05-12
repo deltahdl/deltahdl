@@ -80,7 +80,13 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
                             rhs->text, r.num_unpacked_dims));
     return;
   }
-  if (l.elem_type != r.elem_type) {
+  // §7.6: "The element types of source and target shall be equivalent."
+  // §7.6 routes faster-varying dimensions through §6.22.2 type equivalence,
+  // so the kind comparison delegates to ElementTypesEquivalent rather than a
+  // strict kind+identity check.
+  if (!ElementTypesEquivalent(l.elem_type, l.elem_width, l.elem_is_signed,
+                              l.elem_is_4state, r.elem_type, r.elem_width,
+                              r.elem_is_signed, r.elem_is_4state)) {
     diag_.Error(loc,
                 std::format("array element type mismatch in assignment "
                             "('{}' vs '{}')",

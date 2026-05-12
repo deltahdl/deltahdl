@@ -701,11 +701,16 @@ class Elaborator {
   ScopeMap cu_param_scope_;  // §3.12.1
 
   /// §7.6: Per-variable array metadata for assignment compatibility checks.
+  /// elem_is_signed and elem_is_4state describe the resolved element type so
+  /// the assignment check can ask §6.22.2 whether faster-varying dimensions
+  /// have equivalent element types.
   struct VarArrayInfo {
     DataTypeKind elem_type = DataTypeKind::kImplicit;
     uint32_t unpacked_size = 0;  // 0 = scalar or dynamic
     uint32_t num_unpacked_dims = 0;
     uint32_t elem_width = 0;
+    bool elem_is_signed = false;
+    bool elem_is_4state = true;
     bool is_dynamic = false;
     bool is_assoc = false;
     std::string_view assoc_index_type;  // §7.9.9: e.g. "int", "string", "*"

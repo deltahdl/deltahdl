@@ -109,4 +109,29 @@ TEST(EquivalentTypesParsing, EquivalentIsSymmetric) {
   EXPECT_EQ(TypesEquivalent(a, b), TypesEquivalent(b, a));
 }
 
+// §6.22.2(c): Two integral element types are equivalent when they have the
+// same width, same signedness, and same 2-state/4-state class, even if their
+// kinds differ. This is the entry point §7.6 uses for faster-varying array
+// element equivalence.
+TEST(EquivalentTypesParsing, ElementTypesEquivalentIntAndBitSigned32) {
+  EXPECT_TRUE(ElementTypesEquivalent(DataTypeKind::kInt, 32, true, false,
+                                     DataTypeKind::kBit, 32, true, false));
+}
+
+TEST(EquivalentTypesParsing, ElementTypesNotEquivalentDifferentState) {
+  EXPECT_FALSE(ElementTypesEquivalent(DataTypeKind::kInt, 32, true, false,
+                                      DataTypeKind::kLogic, 32, false, true));
+}
+
+TEST(EquivalentTypesParsing, ElementTypesNotEquivalentDifferentWidth) {
+  EXPECT_FALSE(ElementTypesEquivalent(DataTypeKind::kByte, 8, true, false,
+                                      DataTypeKind::kShortint, 16, true,
+                                      false));
+}
+
+TEST(EquivalentTypesParsing, ElementTypesEquivalentLogicAndReg) {
+  EXPECT_TRUE(ElementTypesEquivalent(DataTypeKind::kLogic, 8, false, true,
+                                     DataTypeKind::kReg, 8, false, true));
+}
+
 }  // namespace

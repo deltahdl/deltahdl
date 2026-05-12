@@ -346,6 +346,24 @@ bool TypesEquivalent(const DataType& a, const DataType& b) {
   return Is4stateForEquivalence(a) == Is4stateForEquivalence(b);
 }
 
+bool ElementTypesEquivalent(DataTypeKind a_kind, uint32_t a_width, bool a_signed,
+                            bool a_4state, DataTypeKind b_kind,
+                            uint32_t b_width, bool b_signed, bool b_4state) {
+  // §6.22.2(a): Matching types are equivalent. For element kinds we treat
+  // logic/reg as the same canonical kind, mirroring TypesMatch.
+  if (CanonKind(a_kind) == CanonKind(b_kind) && a_signed == b_signed &&
+      a_width == b_width && a_4state == b_4state) {
+    return true;
+  }
+  // §6.22.2(c): Built-in integral types are equivalent if they have the same
+  // total bit width, same signedness, and same 2-state/4-state class.
+  if (IsIntegralType(a_kind) && IsIntegralType(b_kind)) {
+    return a_width == b_width && a_width > 0 && a_signed == b_signed &&
+           a_4state == b_4state;
+  }
+  return false;
+}
+
 bool IsAssignmentCompatible(const DataType& a, const DataType& b) {
   if (TypesEquivalent(a, b)) return true;
   // §6.22.3: All integral types are assignment compatible with each other.

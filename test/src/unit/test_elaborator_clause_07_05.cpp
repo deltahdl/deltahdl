@@ -56,4 +56,13 @@ TEST(DynamicArrayValidation, LeftmostDynamicDimMakesArrayDynamic) {
   EXPECT_TRUE(mod->variables[0].is_dynamic);
 }
 
+// §7.5: "Dynamic arrays support all variable data types as element types,
+// including arrays." Verify a dynamic array of dynamic arrays elaborates.
+TEST(DynamicArrayValidation, DynamicArrayOfArraysElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int d[][];\n"
+             "endmodule\n"));
+}
+
 }  // namespace

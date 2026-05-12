@@ -70,6 +70,14 @@ bool TypesMatch(const DataType& a, const DataType& b);
 /// Return true if two types are equivalent (IEEE §6.22.2).
 bool TypesEquivalent(const DataType& a, const DataType& b);
 
+/// §6.22.2: Element-type equivalence for §7.6 array assignment compatibility.
+/// Two integral element types are equivalent under rules (a) and (c) when they
+/// have the same width, same signedness, and same 2-state/4-state class. For
+/// non-integral kinds equivalence reduces to kind+signedness equality.
+bool ElementTypesEquivalent(DataTypeKind a_kind, uint32_t a_width, bool a_signed,
+                            bool a_4state, DataTypeKind b_kind,
+                            uint32_t b_width, bool b_signed, bool b_4state);
+
 /// Return true if type a is assignment compatible with type b (IEEE §6.22.3).
 bool IsAssignmentCompatible(const DataType& a, const DataType& b);
 

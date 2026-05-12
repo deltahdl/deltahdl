@@ -114,4 +114,32 @@ TEST(ArrayAssignmentValidation, AssocCannotAssignToNonAssoc) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §7.6: "The element types of source and target shall be equivalent."
+// §7.6 defers element equivalence to §6.22.2 rule (c): integral elements with
+// the same width, signedness, and state are equivalent even when their kinds
+// differ. `int` and `bit signed [31:0]` both denote a 32-bit, signed, 2-state
+// element, so element-wise array assignment shall elaborate.
+TEST(ArrayAssignmentValidation, ElementTypesEquivalentViaClause62202) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int a[4];\n"
+             "  bit signed [31:0] b[4];\n"
+             "  initial a = b;\n"
+             "endmodule\n"));
+}
+
+// §7.6: "for two arrays to be assignment compatible it is necessary that they
+// have the same number of unpacked dimensions."
+TEST(ArrayAssignmentValidation, ArrayAssignDimensionCountMismatch) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[4];\n"
+      "  int b[4][3];\n"
+      "  initial a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace
