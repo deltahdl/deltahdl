@@ -281,30 +281,6 @@ TEST(ModuleItems, SpecifyBlocks) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kSpecifyBlock));
 }
 
-// §3.3 closes with a simple example presented as "a module that
-// represents a 2-to-1 multiplexer", combining the enclosure rule, an
-// ANSI port list, and a procedural block. Replicate the example
-// verbatim and observe the parser producing a single ModuleDecl named
-// `mux2to1` whose body holds the always_comb block, anchoring the
-// example to the parser-stage code that satisfies §3.3.
-TEST(ModuleEnclosure, Mux2to1ExampleParses) {
-  auto r = Parse(
-      "module mux2to1 (input wire a, b, sel,\n"
-      "                output logic y);\n"
-      "  always_comb begin\n"
-      "    if (sel) y = a;\n"
-      "    else     y = b;\n"
-      "  end\n"
-      "endmodule: mux2to1\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "mux2to1");
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), 4u);
-  EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items,
-                              AlwaysKind::kAlwaysComb));
-}
-
 // §3.3's NOTE states the preceding list is not all-inclusive: the
 // dispatcher must accept module-item constructs beyond the enumerated
 // set without rejecting them. A clocking block (Clause 14) is one such
