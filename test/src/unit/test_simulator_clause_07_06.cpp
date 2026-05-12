@@ -128,6 +128,26 @@ TEST(ArrayAssignmentSimulation, AssignmentPatternEndToEnd) {
   EXPECT_EQ(v, 15u);
 }
 
+// §7.6: "An assignment where the left-hand side contains a slice is treated as
+// a single assignment to the entire slice." The four-element b[3:0] = a[3:0]
+// assignment must copy every element in the slice in one statement.
+TEST(ArrayAssignmentSimulation, SliceLhsTreatedAsSingleAssignment) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int a[8];\n"
+      "  int b[8];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    a[0] = 10; a[1] = 20; a[2] = 30; a[3] = 40;\n"
+      "    a[4] = 50; a[5] = 60; a[6] = 70; a[7] = 80;\n"
+      "    b[3:0] = a[3:0];\n"
+      "    result = b[2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 30u);
+}
+
 // §7.6: "An attempt to copy a dynamic array or queue into a fixed-size array
 // target having a different number of elements shall result in a run-time
 // error and no operation shall be performed."
