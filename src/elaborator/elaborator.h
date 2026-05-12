@@ -719,6 +719,10 @@ class Elaborator {
   std::unordered_map<std::string_view, SourceLoc> proc_assign_targets_;
   std::unordered_map<std::string_view, DataTypeKind> var_types_;
   std::unordered_map<std::string_view, VarArrayInfo> var_array_info_;
+  /// §7.6: Names of variables/nets that are packed arrays (packed dims, no
+  /// unpacked dims). Used to enforce "A packed array cannot be directly
+  /// assigned to an unpacked array without an explicit cast."
+  std::unordered_set<std::string_view> packed_array_vars_;
   std::unordered_set<std::string_view> specparam_names_;
   std::unordered_set<std::string_view> enum_var_names_;
   std::unordered_set<std::string_view> enum_member_names_;

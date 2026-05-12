@@ -44,8 +44,18 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
   if (rhs->kind != ExprKind::kIdentifier) return;
   auto lhs_it = var_array_info_.find(lhs->text);
   auto rhs_it = var_array_info_.find(rhs->text);
-  if (lhs_it == var_array_info_.end() || rhs_it == var_array_info_.end())
+  if (lhs_it == var_array_info_.end() || rhs_it == var_array_info_.end()) {
+    // §7.6: A packed array cannot be directly assigned to an unpacked array
+    // without an explicit cast.
+    if (lhs_it != var_array_info_.end() &&
+        packed_array_vars_.count(rhs->text)) {
+      diag_.Error(loc,
+                  std::format("packed array '{}' cannot be directly assigned "
+                              "to unpacked array '{}' without an explicit cast",
+                              rhs->text, lhs->text));
+    }
     return;
+  }
   const auto& l = lhs_it->second;
   const auto& r = rhs_it->second;
   // §7.9.9
@@ -58,6 +68,16 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
   if (l.is_assoc && r.is_assoc &&
       l.assoc_index_type != r.assoc_index_type) {
     diag_.Error(loc, "associative array index type mismatch in assignment");
+    return;
+  }
+  // §7.6: for two arrays to be assignment compatible it is necessary that
+  // they have the same number of unpacked dimensions.
+  if (l.num_unpacked_dims != r.num_unpacked_dims) {
+    diag_.Error(loc,
+                std::format("array assignment requires the same number of "
+                            "unpacked dimensions ('{}' has {}, '{}' has {})",
+                            lhs->text, l.num_unpacked_dims,
+                            rhs->text, r.num_unpacked_dims));
     return;
   }
   if (l.elem_type != r.elem_type) {

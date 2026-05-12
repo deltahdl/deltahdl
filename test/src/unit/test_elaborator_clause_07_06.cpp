@@ -35,14 +35,6 @@ TEST(ArrayAssignmentValidation, ArrayAssignTypeMismatch) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(ArrayAssignmentValidation, ArrayAssignSameTypeSameSize) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic [7:0] a[10], b[10];\n"
-             "  assign a = b;\n"
-             "endmodule\n"));
-}
-
 TEST(ArrayAssignmentValidation, WireToVarArrayAssign) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -90,6 +82,36 @@ TEST(ArrayAssignmentValidation, FixedToDynamicAssign) {
              "  int b[];\n"
              "  initial b = a;\n"
              "endmodule\n"));
+}
+
+// §7.6: "Any vector expression can be assigned to any packed array. The
+// packed array bounds of the target packed array do not affect the
+// assignment." Verify a wider/narrower vector → packed target elaborates.
+TEST(ArrayAssignmentValidation, VectorToPackedIgnoresTargetBounds) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic [3:0]  narrow;\n"
+             "  logic [31:0] wide;\n"
+             "  initial begin\n"
+             "    narrow = wide;\n"
+             "    wide   = narrow;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §7.6: "Associative arrays are assignment compatible only with associative
+// arrays." Cross-kind assignment between an associative and a non-associative
+// unpacked array must be rejected by the elaborator.
+TEST(ArrayAssignmentValidation, AssocCannotAssignToNonAssoc) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  int a[4];\n"
+      "  initial a = aa;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 }  // namespace

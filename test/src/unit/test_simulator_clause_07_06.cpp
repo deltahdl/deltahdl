@@ -128,4 +128,34 @@ TEST(ArrayAssignmentSimulation, AssignmentPatternEndToEnd) {
   EXPECT_EQ(v, 15u);
 }
 
+// §7.6: "An attempt to copy a dynamic array or queue into a fixed-size array
+// target having a different number of elements shall result in a run-time
+// error and no operation shall be performed."
+TEST(ArrayAssignmentSimulation, DynamicToFixedSizeMismatchRuntimeError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int src[] = '{10, 20, 30};\n"
+      "  int dst[2];\n"
+      "  initial begin\n"
+      "    dst[0] = 99;\n"
+      "    dst[1] = 99;\n"
+      "    dst = src;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_TRUE(f.diag.HasErrors());
+  // §7.6: "no operation shall be performed" — dst must be unchanged.
+  auto* d0 = f.ctx.FindVariable("dst[0]");
+  auto* d1 = f.ctx.FindVariable("dst[1]");
+  ASSERT_NE(d0, nullptr);
+  ASSERT_NE(d1, nullptr);
+  EXPECT_EQ(d0->value.ToUint64(), 99u);
+  EXPECT_EQ(d1->value.ToUint64(), 99u);
+}
+
 }  // namespace

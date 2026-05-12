@@ -16,29 +16,6 @@ TEST(DynamicArrayParsing, UnsizedDimDynamicArray) {
   EXPECT_EQ(item->unpacked_dims[0], nullptr);
 }
 
-TEST(DynamicArrayParsing, DynamicArrayDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  int dyn[];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "dyn");
-  EXPECT_FALSE(item->unpacked_dims.empty());
-}
-
-TEST(DynamicArrayParsing, DynamicArrayMultiDim) {
-  auto r = Parse(
-      "module t;\n"
-      "  integer mem[2][];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "mem");
-}
-
 TEST(DynamicArrayParsing, PackedElementDynamicArray) {
   auto r = Parse(
       "module t;\n"
@@ -52,17 +29,35 @@ TEST(DynamicArrayParsing, PackedElementDynamicArray) {
   EXPECT_EQ(item->unpacked_dims[0], nullptr);
 }
 
-TEST(DynamicArrayParsing, LogicElementDynamicArray) {
+// §7.5: "Any unpacked dimension in an array declaration may be a dynamic
+// dimension." Verify [] is accepted in a non-leftmost position.
+TEST(DynamicArrayParsing, InnerDynamicDimension) {
   auto r = Parse(
       "module t;\n"
-      "  logic [7:0] bytes[];\n"
+      "  integer mem[2][];\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "bytes");
-  ASSERT_EQ(item->unpacked_dims.size(), 1u);
-  EXPECT_EQ(item->unpacked_dims[0], nullptr);
+  ASSERT_EQ(item->unpacked_dims.size(), 2u);
+  EXPECT_NE(item->unpacked_dims[0], nullptr);  // [2]
+  EXPECT_EQ(item->unpacked_dims[1], nullptr);  // []
+}
+
+// §7.5: Leftmost dynamic dim with inner fixed dim parses cleanly.
+TEST(DynamicArrayParsing, LeftmostDynamicWithInnerFixed) {
+  auto r = Parse(
+      "module t;\n"
+      "  integer mem[][2];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->unpacked_dims.size(), 2u);
+  EXPECT_EQ(item->unpacked_dims[0], nullptr);  // []
+  EXPECT_NE(item->unpacked_dims[1], nullptr);  // [2]
 }
 
 }  // namespace

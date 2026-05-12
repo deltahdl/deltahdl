@@ -2422,6 +2422,8 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   var_types_[item->name] = item->data_type.kind;
   if (!item->data_type.packed_dim_left)
     scalar_var_names_.insert(item->name);
+  else if (item->unpacked_dims.empty())
+    packed_array_vars_.insert(item->name);
   RtlirNet net;
   net.name = ScopedName(item->name);
   // §6.6.8: interconnect nets are typeless generic nets.
@@ -2708,6 +2710,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   var_types_[item->name] = item->data_type.kind;
   if (!item->data_type.packed_dim_left)
     scalar_var_names_.insert(item->name);
+  else if (item->unpacked_dims.empty())
+    packed_array_vars_.insert(item->name);
   if (item->data_type.kind == DataTypeKind::kNamed)
     var_named_types_[item->name] = item->data_type.type_name;
   if (item->data_type.kind == DataTypeKind::kVirtualInterface) {
