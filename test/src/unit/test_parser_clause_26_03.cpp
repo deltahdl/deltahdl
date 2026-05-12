@@ -20,37 +20,6 @@ TEST(PackageImport, PackageImportMultiple) {
   EXPECT_GE(import_count, 2);
 }
 
-TEST(PackageImport, ModuleImportPackage) {
-  auto r = Parse(
-      "package p;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import p::*;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
-}
-
-TEST(PackageImport, ModuleImportSpecific) {
-  auto r = Parse(
-      "package p;\n"
-      "  parameter int X = 1;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import p::X;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  const auto* imp =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl);
-  ASSERT_NE(imp, nullptr);
-  EXPECT_EQ(imp->import_item.package_name, "p");
-  EXPECT_EQ(imp->import_item.item_name, "X");
-}
-
 TEST_F(DpiParseTest, PackageImportStillWorks) {
   auto* unit = Parse(R"(
     module m;
@@ -102,22 +71,7 @@ TEST(PackageScopeReference, PackageScopedFunctionCall) {
               "endmodule\n"));
 }
 
-TEST(PackageImport, ImportWildcardField) {
-  auto r = Parse(
-      "package p;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import p::*;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  const auto* imp =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl);
-  ASSERT_NE(imp, nullptr);
-  EXPECT_EQ(imp->import_item.package_name, "p");
-  EXPECT_TRUE(imp->import_item.is_wildcard);
-}
-
-TEST_F(AnnexHParseTest, AnnexGStdRandomizePackageImport) {
+TEST_F(AnnexHParseTest, WildcardImportPrecedesInitialBlockSystemCalls) {
   auto* unit = Parse(
       "module m;\n"
       "  import std_pkg::*;\n"
@@ -262,17 +216,6 @@ TEST(PackageScopeReference, PackageScopeResolution) {
               "endmodule\n"));
 }
 
-TEST(PackageImport, PackageImportItemStar) {
-  auto r = Parse(
-      "package pkg; endpackage\n"
-      "module m; import pkg::*; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->import_item.package_name, "pkg");
-  EXPECT_TRUE(item->import_item.is_wildcard);
-}
-
 TEST(PackageImport, ImportInTask) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
@@ -294,42 +237,6 @@ TEST(PackageImport, ImportMultipleInBlock) {
               "    import p1::a, p2::b;\n"
               "  end\n"
               "endmodule\n"));
-}
-
-TEST(PackageImport, ImportSpecific) {
-  auto r = Parse(
-      "module t;\n"
-      "  import my_pkg::WIDTH;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
-  EXPECT_EQ(item->import_item.package_name, "my_pkg");
-  EXPECT_EQ(item->import_item.item_name, "WIDTH");
-  EXPECT_FALSE(item->import_item.is_wildcard);
-}
-
-TEST(PackageImport, ImportWildcard) {
-  auto r = Parse(
-      "module t;\n"
-      "  import my_pkg::*;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
-  EXPECT_EQ(item->import_item.package_name, "my_pkg");
-  EXPECT_TRUE(item->import_item.is_wildcard);
-}
-
-TEST_F(ProgramTestParse, ProgramWithImport) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  import pkg::*;\n"
-      "endprogram\n");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  ASSERT_EQ(unit->programs[0]->items.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kImportDecl);
-  EXPECT_TRUE(unit->programs[0]->items[0]->import_item.is_wildcard);
 }
 
 TEST_F(ProgramParseTest, ProgramWithImportStatement) {

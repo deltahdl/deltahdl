@@ -271,6 +271,21 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
   // declarations visible here without an explicit import.
   wildcard_packages_.push_back("std");
 
+  // §26.3 opens by requiring that the compilation of a package precede the
+  // compilation of scopes in which the package is imported.  In a single
+  // compilation unit that maps to: an `import pkg::*` or `import pkg::x`
+  // referring to a package name that has not been declared anywhere in the
+  // unit cannot bind to any compiled package and must be rejected here.
+  // The built-in `std` package is exempt because §26.7 makes it implicitly
+  // available without a user-visible declaration.
+  auto package_declared = [&](std::string_view pkg_name) {
+    if (pkg_name == "std") return true;
+    for (const auto* pkg : unit_->packages) {
+      if (pkg->name == pkg_name) return true;
+    }
+    return false;
+  };
+
   auto provides = [&](std::string_view pkg_name,
                       std::string_view name) -> bool {
     auto it = pkg_provided_names_.find(pkg_name);
@@ -337,6 +352,15 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
     switch (item->kind) {
       case ModuleItemKind::kImportDecl: {
         auto pkg_name = item->import_item.package_name;
+        if (!package_declared(pkg_name)) {
+          diag_.Error(
+              item->loc,
+              std::format("import from unknown package '{}'; the package "
+                          "must be declared before any scope that imports "
+                          "from it",
+                          pkg_name));
+          break;
+        }
         if (item->import_item.is_wildcard) {
           if (std::find(wildcard_packages_.begin(),
                         wildcard_packages_.end(),

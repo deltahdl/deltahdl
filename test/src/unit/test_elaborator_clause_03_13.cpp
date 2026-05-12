@@ -251,4 +251,24 @@ TEST(DesignBuildingBlockElaboration, BlockNameSpaceDuplicateDeclarationError) {
              "endmodule\n"));
 }
 
+// §3.13(g): "A port name introduced in the port name space can be
+// reintroduced in the module name space by declaring a variable or a net
+// with the same name."  The reintroduction must survive elaboration, not
+// just parsing.
+TEST(DesignBuildingBlockElaboration, PortReintroducedAsVariableElaboratesOk) {
+  EXPECT_TRUE(
+      ElabOk("module m(data);\n"
+             "  input data;\n"
+             "  logic data;\n"
+             "endmodule\n"));
+}
+
+TEST(DesignBuildingBlockElaboration, PortReintroducedAsNetElaboratesOk) {
+  EXPECT_TRUE(
+      ElabOk("module m(data);\n"
+             "  input data;\n"
+             "  wire data;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

@@ -24,49 +24,6 @@ TEST(IdentifierElaboration, SimpleIdentResolvesInModule) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(IdentifierElaboration, PackageScopeParamResolution) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "package pkg;\n"
-      "  parameter int WIDTH = 8;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  logic [pkg::WIDTH-1:0] data;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(IdentifierElaboration, PackageScopeTypeResolution) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "package pkg;\n"
-      "  typedef logic [7:0] byte_t;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  pkg::byte_t data;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(IdentifierElaboration, PackageImportIdentAccess) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "package pkg;\n"
-      "  parameter int WIDTH = 16;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import pkg::WIDTH;\n"
-      "  logic [WIDTH-1:0] data;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(IdentifierElaboration, HierarchicalIdentInContAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(

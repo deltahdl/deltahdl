@@ -18,19 +18,6 @@ TEST(IdentifierSimulation, SimpleIdentVariableResolves) {
   EXPECT_EQ(val, 42u);
 }
 
-TEST(IdentifierSimulation, PackageScopeParamResolves) {
-  auto val = RunAndGet(
-      "package pkg;\n"
-      "  parameter int WIDTH = 16;\n"
-      "endpackage\n"
-      "module t;\n"
-      "  logic [31:0] y;\n"
-      "  initial y = pkg::WIDTH;\n"
-      "endmodule\n",
-      "y");
-  EXPECT_EQ(val, 16u);
-}
-
 TEST(IdentifierSimulation, SystemCallIdentExecutes) {
   SimFixture f;
   auto* design = ElaborateSrc(

@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -19,6 +20,38 @@ TEST(PackageImportSim, WildcardImportParameter) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 99u);
+}
+
+// §26.3: a package parameter referenced via the scope resolution operator
+// `pkg::WIDTH` must deliver the package's value at runtime.
+TEST(PackageScopeReferenceSim, PackageScopeParamResolves) {
+  auto val = RunAndGet(
+      "package pkg;\n"
+      "  parameter int WIDTH = 16;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  logic [31:0] y;\n"
+      "  initial y = pkg::WIDTH;\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(val, 16u);
+}
+
+// §26.3: an explicitly-imported identifier (`import pkg::VAL;`) is directly
+// visible by its unqualified name in the importing scope and must carry the
+// package's value into simulation.
+TEST(PackageImportSim, ExplicitImportParameter) {
+  auto val = RunAndGet(
+      "package pkg;\n"
+      "  parameter int VAL = 77;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import pkg::VAL;\n"
+      "  logic [31:0] y;\n"
+      "  initial y = VAL;\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(val, 77u);
 }
 
 }  // namespace

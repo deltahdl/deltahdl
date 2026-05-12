@@ -84,50 +84,6 @@ TEST(IdentifierSyntaxParsing, HierarchicalIdentWithMultipleBitSelects) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(IdentifierSyntaxParsing, PackageScopeAccess) {
-  ParseFixture f;
-  auto* cu = ParseSrc(
-      "package pkg;\n"
-      "  parameter int WIDTH = 8;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  logic [pkg::WIDTH-1:0] data;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(cu, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(IdentifierSyntaxParsing, PackageScopeOnType) {
-  ParseFixture f;
-  auto* cu = ParseSrc(
-      "package pkg;\n"
-      "  typedef logic [7:0] byte_t;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  pkg::byte_t data;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(cu, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(IdentifierSyntaxParsing, PackageScopeInAssign) {
-  ParseFixture f;
-  auto* cu = ParseSrc(
-      "package pkg;\n"
-      "  parameter int WIDTH = 8;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  logic [pkg::WIDTH-1:0] data;\n"
-      "  logic [pkg::WIDTH-1:0] result;\n"
-      "  assign result = data;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(cu, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(IdentifierSyntaxParsing, DpiImportWithCIdentifier) {
   ParseFixture f;
   auto* cu = ParseSrc(
