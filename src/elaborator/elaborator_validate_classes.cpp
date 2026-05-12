@@ -100,6 +100,26 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
                             "'{}' has {}",
                             lhs->text, l.unpacked_size,
                             rhs->text, r.unpacked_size));
+    return;
+  }
+  // §7.6: "Any faster-varying dimensions shall meet the requirements for
+  // equivalence (see 6.22.2)." For two fixed-size leftmost arrays the
+  // dim_sizes vector is leftmost-first; the slowest-varying entry was
+  // checked above, so any divergence in the remaining (faster-varying)
+  // entries means the arrays are not assignment compatible.
+  if (!l.is_dynamic && !r.is_dynamic && !l.is_assoc && !r.is_assoc &&
+      l.dim_sizes.size() == r.dim_sizes.size() && l.dim_sizes.size() > 1) {
+    for (size_t i = 1; i < l.dim_sizes.size(); ++i) {
+      if (l.dim_sizes[i] != r.dim_sizes[i]) {
+        diag_.Error(
+            loc,
+            std::format("faster-varying array dimension size mismatch in "
+                        "assignment ('{}' dim {} is {}, '{}' dim {} is {})",
+                        lhs->text, i, l.dim_sizes[i], rhs->text, i,
+                        r.dim_sizes[i]));
+        return;
+      }
+    }
   }
 }
 

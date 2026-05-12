@@ -142,6 +142,32 @@ TEST(ArrayAssignmentValidation, ArrayAssignDimensionCountMismatch) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §7.6: "Any faster-varying dimensions shall meet the requirements for
+// equivalence (see 6.22.2)." The slowest-varying dim is fine at [2] on both
+// sides, but the faster-varying dim differs ([3] vs [4]) and must be
+// rejected per §6.22.2(d) "equal size" applied to the faster-varying axis.
+TEST(ArrayAssignmentValidation, FasterVaryingDimSizeMismatchRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[2][3];\n"
+      "  int b[2][4];\n"
+      "  initial a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §7.6: Multi-dim arrays whose faster-varying dim matches shall elaborate.
+TEST(ArrayAssignmentValidation, FasterVaryingDimSizeMatchAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int a[2][3];\n"
+             "  int b[2][3];\n"
+             "  initial a = b;\n"
+             "endmodule\n"));
+}
+
 // §7.6: "A packed array cannot be directly assigned to an unpacked array
 // without an explicit cast." Assigning the bare packed source `p` to the
 // unpacked target `u` shall be rejected at elaboration.
