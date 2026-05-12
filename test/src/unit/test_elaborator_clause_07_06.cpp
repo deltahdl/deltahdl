@@ -142,4 +142,19 @@ TEST(ArrayAssignmentValidation, ArrayAssignDimensionCountMismatch) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §7.6: "A packed array cannot be directly assigned to an unpacked array
+// without an explicit cast." Assigning the bare packed source `p` to the
+// unpacked target `u` shall be rejected at elaboration.
+TEST(ArrayAssignmentValidation, PackedToUnpackedWithoutCastRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] p;\n"
+      "  int u[4];\n"
+      "  initial u = p;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace
