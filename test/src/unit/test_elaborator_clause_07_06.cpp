@@ -119,7 +119,7 @@ TEST(ArrayAssignmentValidation, AssocCannotAssignToNonAssoc) {
 // the same width, signedness, and state are equivalent even when their kinds
 // differ. `int` and `bit signed [31:0]` both denote a 32-bit, signed, 2-state
 // element, so element-wise array assignment shall elaborate.
-TEST(ArrayAssignmentValidation, ElementTypesEquivalentViaClause62202) {
+TEST(ArrayAssignmentValidation, IntAndBitSignedArrayAssignmentAccepted) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  int a[4];\n"
