@@ -459,4 +459,78 @@ TEST(SignedAndUnsigned, UnsignedVector) {
   EXPECT_EQ(item->name, "uv");
 }
 
+// "The data types time, bit, reg, and logic default to unsigned, as do arrays
+// of these types." A packed array of an unsigned-by-default integer type must
+// still carry the unsigned default with no explicit keyword.
+
+TEST(SignedAndUnsigned, BitPackedArrayDefaultUnsigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  bit [7:0] arr;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
+  EXPECT_FALSE(item->data_type.is_signed);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+}
+
+TEST(SignedAndUnsigned, LogicPackedArrayDefaultUnsigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [15:0] data;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
+  EXPECT_FALSE(item->data_type.is_signed);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+}
+
+TEST(SignedAndUnsigned, RegPackedArrayDefaultUnsigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  reg [3:0] nibble;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
+  EXPECT_FALSE(item->data_type.is_signed);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+}
+
+TEST(SignedAndUnsigned, TimeUnpackedArrayDefaultUnsigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  time stamps[10];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTime);
+  EXPECT_FALSE(item->data_type.is_signed);
+  EXPECT_FALSE(item->unpacked_dims.empty());
+}
+
+TEST(SignedAndUnsigned, BitMultiDimPackedDefaultUnsigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  bit [3:0][7:0] matrix;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
+  EXPECT_FALSE(item->data_type.is_signed);
+  EXPECT_FALSE(item->data_type.extra_packed_dims.empty());
+}
+
 }  // namespace

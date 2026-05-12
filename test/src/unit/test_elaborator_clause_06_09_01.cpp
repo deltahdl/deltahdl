@@ -44,24 +44,6 @@ TEST(VectorSpecification, NetAndVarSameWidth) {
   EXPECT_EQ(mod->variables[0].width, 16u);
 }
 
-TEST(VectorSpecification, VectorDefaultUnsigned) {
-  ElabFixture f;
-  auto* design = Elaborate("module m; logic [7:0] data; endmodule\n", f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->variables.size(), 1u);
-  EXPECT_FALSE(mod->variables[0].is_signed);
-}
-
-TEST(VectorSpecification, ExplicitlySigned) {
-  ElabFixture f;
-  auto* design = Elaborate("module m; logic signed [7:0] sv; endmodule\n", f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->variables.size(), 1u);
-  EXPECT_TRUE(mod->variables[0].is_signed);
-}
-
 TEST(VectorSpecification, NegativeRangeWidth) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic [-1:4] b; endmodule\n", f);
@@ -90,24 +72,6 @@ TEST(VectorSpecification, BitVectorWidth) {
   auto* mod = design->top_modules[0];
   ASSERT_GE(mod->variables.size(), 1u);
   EXPECT_EQ(mod->variables[0].width, 8u);
-}
-
-TEST(VectorSpecification, RegVectorUnsigned) {
-  ElabFixture f;
-  auto* design = Elaborate("module m; reg [7:0] r; endmodule\n", f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->variables.size(), 1u);
-  EXPECT_FALSE(mod->variables[0].is_signed);
-}
-
-TEST(VectorSpecification, BitVectorUnsigned) {
-  ElabFixture f;
-  auto* design = Elaborate("module m; bit [7:0] b; endmodule\n", f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->variables.size(), 1u);
-  EXPECT_FALSE(mod->variables[0].is_signed);
 }
 
 TEST(VectorSpecification, XInRangeIsError) {

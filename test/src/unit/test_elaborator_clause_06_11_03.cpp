@@ -157,4 +157,27 @@ TEST(SignedAndUnsigned, IntDefaultSignedVsUnsignedOverride) {
   EXPECT_FALSE(vu->is_signed) << "int unsigned is unsigned";
 }
 
+// "...as do arrays of these types." A packed or unpacked array of an
+// unsigned-by-default integer type must inherit the unsigned default at
+// elaboration time.
+TEST(SignedAndUnsigned, ArraysOfUnsignedTypesDefaultUnsigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  bit [7:0] ba;\n"
+      "  logic [15:0] la;\n"
+      "  reg [3:0] ra;\n"
+      "  time stamps[4];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 4u);
+  EXPECT_FALSE(mod->variables[0].is_signed) << "bit [7:0]";
+  EXPECT_FALSE(mod->variables[1].is_signed) << "logic [15:0]";
+  EXPECT_FALSE(mod->variables[2].is_signed) << "reg [3:0]";
+  EXPECT_FALSE(mod->variables[3].is_signed) << "time stamps[4]";
+}
+
 }  // namespace

@@ -30,12 +30,18 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs);
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
                         const ScopeMap& scope);
 
-/// Return true if the type kind uses 4-state values (0, 1, x, z).
+// The integer data types from §6.11 Table 6-8 (logic, reg, bit, byte,
+// shortint, int, longint, integer, time) are classified along two orthogonal
+// axes — Is4stateType (§6.11.2) and IsImplicitlySigned (§6.11.3) — kept
+// adjacent here so a change to the Table 6-8 set touches both predicates.
+
+/// §6.11.2: Return true if the type kind uses 4-state values (0, 1, x, z).
 /// logic, reg, integer, time are 4-state.  bit, int, byte, etc. are 2-state.
 bool Is4stateType(DataTypeKind kind);
 
-/// §6.8: Return true if the type kind is implicitly signed.
-/// integer, int, shortint, longint, byte are implicitly signed.
+/// §6.11.3: Return true if the type kind is signed by default per Table 6-8.
+/// byte, shortint, int, longint, integer default to signed; the unsigned-by-
+/// default integer types are time, bit, reg, and logic (and arrays thereof).
 bool IsImplicitlySigned(DataTypeKind kind);
 
 /// Overload that resolves kNamed types via the typedef map.
