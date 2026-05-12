@@ -91,4 +91,34 @@ TEST(ScalarAndVectorDeclaration, BitRangeProducesDimensions) {
   EXPECT_NE(item->data_type.packed_dim_right, nullptr);
 }
 
+// §6.9: An object declared implicitly as logic without a range is a scalar.
+// The parser shall leave the packed-dimension fields null for `var v;`.
+TEST(ScalarAndVectorDeclaration, ImplicitLogicScalarHasNoPackedDims) {
+  auto r = Parse(
+      "module t;\n"
+      "  var v;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_right, nullptr);
+}
+
+// §6.9: The multibit-vector rule applies to implicit logic; a `var [7:0] v;`
+// declaration shall carry a packed range and parse as a vector.
+TEST(ScalarAndVectorDeclaration, ImplicitLogicVectorHasPackedDims) {
+  auto r = Parse(
+      "module t;\n"
+      "  var [7:0] v;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
+  EXPECT_NE(item->data_type.packed_dim_right, nullptr);
+}
+
 }  // namespace

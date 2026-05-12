@@ -100,6 +100,113 @@ TEST(ScalarAndVectorDeclaration, ImplicitLogicScalarWidth) {
   EXPECT_EQ(mod->variables[0].width, 1u);
 }
 
+// §6.9: "A multibit data object of one of these types shall be declared by
+// specifying a range and is known as a vector." A `logic [7:0]` declaration
+// is the canonical §6.9 vector and shall elaborate to an 8-bit variable.
+TEST(ScalarAndVectorDeclaration, MultibitRangeProducesVectorWidth) {
+  ElabFixture f;
+  auto* design = Elaborate("module m; logic [7:0] v; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 8u);
+}
+
+// §6.9: The multibit-vector rule applies to reg the same way it applies to
+// logic; a packed range on reg produces a vector of the range's width.
+TEST(ScalarAndVectorDeclaration, RegMultibitVectorWidth) {
+  ElabFixture f;
+  auto* design = Elaborate("module m; reg [3:0] r; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 4u);
+}
+
+// §6.9: The multibit-vector rule applies to bit; a packed range on bit
+// produces a vector of the range's width.
+TEST(ScalarAndVectorDeclaration, BitMultibitVectorWidth) {
+  ElabFixture f;
+  auto* design = Elaborate("module m; bit [7:0] b; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 8u);
+}
+
+// §6.9: The multibit-vector rule applies to a matching user-defined type
+// of logic; the typedef carries the packed range and the use-site elaborates
+// to the typedef's width.
+TEST(ScalarAndVectorDeclaration, LogicTypedefVectorWidth) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  byte_t b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 8u);
+}
+
+// §6.9: The multibit-vector rule applies to a matching user-defined type
+// of reg.
+TEST(ScalarAndVectorDeclaration, RegTypedefVectorWidth) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  typedef reg [3:0] nib_t;\n"
+      "  nib_t n;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 4u);
+}
+
+// §6.9: The multibit-vector rule applies to a matching user-defined type
+// of bit.
+TEST(ScalarAndVectorDeclaration, BitTypedefVectorWidth) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  typedef bit [7:0] byte_t;\n"
+      "  byte_t b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 8u);
+}
+
+// §6.9: The multibit-vector rule applies to an object whose type is
+// implicit logic. A `var [7:0] v;` declaration omits the base type, defaults
+// to logic, and carries a packed range; it shall elaborate to an 8-bit
+// vector.
+TEST(ScalarAndVectorDeclaration, ImplicitLogicVectorWidth) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  var [7:0] v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 8u);
+}
+
 // §6.9: Each variable in a multi-name declaration without a range is its
 // own 1-bit scalar.
 TEST(ScalarAndVectorDeclaration, MultipleScalarsHaveUnitWidth) {
