@@ -195,33 +195,20 @@ def test_validate_subclause_rejects_garbage() -> None:
         validate_subclause(parser, args)
 
 
-def test_validate_subclause_rejects_top_level_numeric() -> None:
-    """Calls parser.error for a depth-0 numeric clause."""
+def test_validate_subclause_accepts_top_level_numeric() -> None:
+    """Returns without error for a depth-0 numeric clause (e.g. leaf §33)."""
     parser = argparse.ArgumentParser()
     args = argparse.Namespace(subclause="33")
-    with pytest.raises(SystemExit):
-        validate_subclause(parser, args)
+    validate_subclause(parser, args)
+    assert args.subclause == "33"
 
 
-def test_validate_subclause_rejects_top_level_annex() -> None:
-    """Calls parser.error for a depth-0 annex letter."""
+def test_validate_subclause_accepts_top_level_annex() -> None:
+    """Returns without error for a depth-0 annex letter (e.g. leaf Annex B)."""
     parser = argparse.ArgumentParser()
-    args = argparse.Namespace(subclause="A")
-    with pytest.raises(SystemExit):
-        validate_subclause(parser, args)
-
-
-def test_validate_subclause_error_routes_to_satisfy_clause(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """Depth-0 rejection message names ``satisfy_clause``."""
-    parser = argparse.ArgumentParser()
-    args = argparse.Namespace(subclause="33")
-    try:
-        validate_subclause(parser, args)
-    except SystemExit:
-        pass
-    assert "satisfy_clause" in capsys.readouterr().err
+    args = argparse.Namespace(subclause="B")
+    validate_subclause(parser, args)
+    assert args.subclause == "B"
 
 
 # ---- parse_and_validate_subclause -------------------------------------------
@@ -545,10 +532,9 @@ def test_parse_subclauses_strips_whitespace() -> None:
     assert parse_subclauses(" 33.1 , 33.4 ") == ["33.1", "33.4"]
 
 
-def test_parse_subclauses_rejects_top_level_entry() -> None:
-    """A depth-0 entry raises ArgumentTypeError."""
-    with pytest.raises(argparse.ArgumentTypeError):
-        parse_subclauses("33.1,33")
+def test_parse_subclauses_accepts_top_level_entry() -> None:
+    """A depth-0 entry (e.g. leaf Annex 'B') is accepted alongside subclauses."""
+    assert parse_subclauses("33.1,B") == ["33.1", "B"]
 
 
 def test_parse_subclauses_rejects_garbage_entry() -> None:

@@ -80,14 +80,14 @@ def test_parse_args_requires_lrm() -> None:
         ])
 
 
-def test_parse_args_rejects_top_level_in_list(make_lrm: Path) -> None:
-    """A depth-0 entry within --subclauses is rejected at parse time."""
-    with pytest.raises(SystemExit):
-        satisfy_subclauses.parse_args([
-            "--lrm", str(make_lrm),
-            "--subclauses", "33.1,33",
-            "--labels", "IEEE 1800-2023",
-        ])
+def test_parse_args_accepts_top_level_in_list(make_lrm: Path) -> None:
+    """A depth-0 entry within --subclauses is accepted (e.g. leaf Annex B)."""
+    args = satisfy_subclauses.parse_args([
+        "--lrm", str(make_lrm),
+        "--subclauses", "33.1,B",
+        "--labels", "IEEE 1800-2023",
+    ])
+    assert args.subclauses == ["33.1", "B"]
 
 
 def test_parse_args_usage_names_package(
@@ -97,7 +97,7 @@ def test_parse_args_usage_names_package(
     try:
         satisfy_subclauses.parse_args([
             "--lrm", str(make_lrm),
-            "--subclauses", "33.1,33",
+            "--subclauses", "33.1,garbage",
             "--labels", "IEEE 1800-2023",
         ])
     except SystemExit:

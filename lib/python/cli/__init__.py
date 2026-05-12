@@ -9,7 +9,7 @@ from typing import Any, Callable, TypeVar
 
 _T = TypeVar("_T")
 
-SUBCLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){1,4}$")
+SUBCLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
 CLAUSE_ONLY_RE = re.compile(r"^(\d+|[A-Z])$")
 
 
@@ -40,10 +40,9 @@ def validate_subclause(
     if not SUBCLAUSE_RE.match(args.subclause):
         parser.error(
             f"Invalid subclause format '{args.subclause}'. "
-            "Expected V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z "
+            "Expected V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z "
             "(V is a number or uppercase letter; "
-            "remaining parts are numbers). "
-            "For a top-level clause, use satisfy_clause --clause instead."
+            "remaining parts are numbers)."
         )
 
 
@@ -172,7 +171,7 @@ def parse_subclauses(raw: str) -> list[str]:
         if not SUBCLAUSE_RE.match(part):
             raise argparse.ArgumentTypeError(
                 f"Invalid subclause format '{part}'. "
-                "Expected V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z."
+                "Expected V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z."
             )
     return parts
 
@@ -212,7 +211,7 @@ def add_subclauses_arg(parser: argparse.ArgumentParser) -> None:
         "--subclauses",
         type=parse_subclauses,
         required=True,
-        help="Comma-separated subclauses (e.g. '33.1,33.4,A.5').",
+        help="Comma-separated subclauses (e.g. '33.1,33.4,A.5,B').",
     )
 
 
