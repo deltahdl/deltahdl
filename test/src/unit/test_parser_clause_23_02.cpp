@@ -6,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §3.1 — Error: missing end-keyword.
-TEST(ModuleDefinitions, MissingEndmoduleIsError) {
-  EXPECT_FALSE(ParseOk("module m;"));
-}
-
 TEST(ModuleDeclarations, MacromoduleKeywordIntroducesModule) {
   auto r = Parse("macromodule mm; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -18,10 +13,6 @@ TEST(ModuleDeclarations, MacromoduleKeywordIntroducesModule) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->decl_kind, ModuleDeclKind::kModule);
   EXPECT_EQ(r.cu->modules[0]->name, "mm");
-}
-
-TEST(ModuleDefinition, MismatchedEndKeyword) {
-  EXPECT_FALSE(ParseOk("module m; endprogram"));
 }
 
 TEST(ModuleDeclarations, ModuleNameMatchesIdentifier) {

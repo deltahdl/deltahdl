@@ -49,11 +49,6 @@ TEST(DesignBuildingBlockParsing, SyntaxErrorDetectedDuringCompilation) {
                         "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockParsing, MissingEndKeywordIsError) {
-  EXPECT_FALSE(ParseOk("module m;\n"
-                        "  logic x;\n"));
-}
-
 TEST(DesignBuildingBlockParsing, PrimitiveDesignElementCompiles) {
   auto r = Parse(
       "primitive udp_or(output y, input a, b);\n"

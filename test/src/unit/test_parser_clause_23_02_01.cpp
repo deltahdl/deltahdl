@@ -392,10 +392,6 @@ TEST(ModuleHeaderDefinition, WildcardPortsEndLabel) {
   EXPECT_TRUE(r.cu->modules[0]->has_wildcard_ports);
 }
 
-TEST(ModuleHeaderDefinition, ErrorMissingEndmodule) {
-  EXPECT_FALSE(ParseOk("module m;\n"));
-}
-
 TEST(ModuleHeaderDefinition, ErrorMissingModuleName) {
   EXPECT_FALSE(ParseOk("module ; endmodule\n"));
 }

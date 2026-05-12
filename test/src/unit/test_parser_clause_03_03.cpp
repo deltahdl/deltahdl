@@ -55,6 +55,17 @@ TEST(ModuleEnclosure, BodyContentDoesNotSubstituteForEndmodule) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §3.3's enclosure names the specific keyword pair `module` / `endmodule`;
+// no other end keyword closes a module. Drive the parser at a source that
+// opens `module m;` and tries to close with `endprogram`. The
+// Expect(kKwEndmodule) call in ParseModuleDecl sees the wrong keyword
+// and raises a diagnostic, observing that the §3.3 bracket is keyword-
+// specific rather than any-end-keyword.
+TEST(ModuleEnclosure, MismatchedEndKeywordIsRejected) {
+  auto r = Parse("module m; endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 // §3.3 lists "Ports, with port declarations" as a module construct.
 // ParseModuleDecl calls ParseParamsPortsAndSemicolon, which fills
 // ModuleDecl::ports from the ANSI port list. Observe the parser
