@@ -63,4 +63,32 @@ TEST(ScalarAndVectorDeclaration, RangeProducesDimensions) {
   EXPECT_NE(item->data_type.packed_dim_right, nullptr);
 }
 
+TEST(ScalarAndVectorDeclaration, RegRangeProducesDimensions) {
+  auto r = Parse(
+      "module t;\n"
+      "  reg [3:0] r;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
+  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
+  EXPECT_NE(item->data_type.packed_dim_right, nullptr);
+}
+
+TEST(ScalarAndVectorDeclaration, BitRangeProducesDimensions) {
+  auto r = Parse(
+      "module t;\n"
+      "  bit [3:0] b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
+  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
+  EXPECT_NE(item->data_type.packed_dim_right, nullptr);
+}
+
 }  // namespace

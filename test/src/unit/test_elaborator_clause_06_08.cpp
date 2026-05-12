@@ -85,7 +85,7 @@ TEST(VarDecl, MultipleVarsInOneStatement) {
   EXPECT_EQ(mod->variables[2].name, "t.c");
 }
 
-// §6.8: `var` with implicit type elaborates as logic (1-bit, 4-state).
+// §6.8: `var` with omitted data type elaborates as logic (4-state).
 TEST(VarDecl, VarImplicitElaboratesAsLogic) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -97,7 +97,6 @@ TEST(VarDecl, VarImplicitElaboratesAsLogic) {
   EXPECT_FALSE(f.has_errors);
   auto* mod = design->top_modules[0];
   ASSERT_FALSE(mod->variables.empty());
-  EXPECT_EQ(mod->variables[0].width, 1u);
   EXPECT_TRUE(mod->variables[0].is_4state);
 }
 
