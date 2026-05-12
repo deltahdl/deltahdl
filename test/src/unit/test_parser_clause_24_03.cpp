@@ -13,27 +13,6 @@ TEST_F(ProgramTestParse, ProgramAutomaticLifetime) {
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
 }
 
-static int CountItemsOfKind(const std::vector<ModuleItem*>& items,
-                            ModuleItemKind kind) {
-  int count = 0;
-  for (const auto* item : items) {
-    if (item->kind == kind) ++count;
-  }
-  return count;
-}
-
-TEST_F(ProgramTestParse, ProgramWithMultipleInitialBlocks) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  initial $display(\"init1\");\n"
-      "  initial $display(\"init2\");\n"
-      "endprogram\n");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  EXPECT_EQ(
-      CountItemsOfKind(unit->programs[0]->items, ModuleItemKind::kInitialBlock),
-      2);
-}
-
 TEST_F(ProgramTestParse, MultipleProgramsCoexist) {
   auto* unit = Parse(
       "program p1; endprogram\n"
@@ -43,26 +22,6 @@ TEST_F(ProgramTestParse, MultipleProgramsCoexist) {
   EXPECT_EQ(unit->modules.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p1");
   EXPECT_EQ(unit->programs[1]->name, "p2");
-}
-
-TEST_F(ProgramTestParse, ProgramWithVariableDecls) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  logic [31:0] data;\n"
-      "  logic [7:0] addr;\n"
-      "endprogram\n");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  EXPECT_GE(unit->programs[0]->items.size(), 2u);
-}
-
-TEST_F(ProgramParseTest, EmptyProgram) {
-  auto* unit = Parse("program p; endprogram");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->name, "p");
-  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-  EXPECT_TRUE(unit->programs[0]->ports.empty());
-  EXPECT_TRUE(unit->programs[0]->params.empty());
-  EXPECT_TRUE(unit->programs[0]->items.empty());
 }
 
 TEST_F(ProgramParseTest, ProgramWithEndLabel) {
@@ -99,20 +58,6 @@ TEST_F(ProgramParseTest, ProgramWithParameters) {
   EXPECT_EQ(unit->programs[0]->ports[0].name, "clk");
 }
 
-TEST_F(ProgramParseTest, ProgramWithInitialBlock) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  initial begin\n"
-      "    $display(\"hello\");\n"
-      "  end\n"
-      "endprogram\n");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->name, "p");
-  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-  ASSERT_EQ(unit->programs[0]->items.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
-}
-
 TEST_F(ProgramParseTest, ProgramWithMultipleItems) {
   auto* unit = Parse(
       "program p;\n"
@@ -126,73 +71,6 @@ TEST_F(ProgramParseTest, ProgramWithMultipleItems) {
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
   ASSERT_GE(unit->programs[0]->items.size(), 3u);
-}
-
-TEST_F(ProgramParseTest, ProgramWithTaskDecl) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  task run;\n"
-      "    $display(\"running\");\n"
-      "  endtask\n"
-      "endprogram\n");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->name, "p");
-  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-  ASSERT_GE(unit->programs[0]->items.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_EQ(unit->programs[0]->items[0]->name, "run");
-}
-
-TEST_F(ProgramParseTest, ProgramWithFunctionDecl) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  function int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endprogram\n");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->name, "p");
-  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-  ASSERT_GE(unit->programs[0]->items.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(unit->programs[0]->items[0]->name, "add");
-}
-
-TEST_F(ProgramParseTest, ProgramWithTaskAndFunction) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  task run;\n"
-      "    $display(\"running\");\n"
-      "  endtask\n"
-      "  function int get_val;\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "endprogram\n");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->name, "p");
-  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-  ASSERT_GE(unit->programs[0]->items.size(), 2u);
-  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_EQ(unit->programs[0]->items[1]->kind, ModuleItemKind::kFunctionDecl);
-}
-
-TEST(ProgramDeclaration, MissingEndprogramIsError) {
-  EXPECT_FALSE(ParseOk("program p;"));
-}
-
-TEST(ProgramDeclaration, SampleDeclaration) {
-  auto r = Parse(
-      "program test (input clk, input [16:1] addr, inout [7:0] data);\n"
-      "  initial begin\n"
-      "  end\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->name, "test");
-  EXPECT_EQ(r.cu->programs[0]->ports.size(), 3u);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
 }
 
 TEST(ProgramDeclaration, WildcardPorts) {
@@ -272,17 +150,6 @@ TEST(ProgramItemsParsing, ProgramContinuousAssign) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kContAssign));
-}
-
-TEST(ProgramItemsParsing, ProgramFinal) {
-  auto r = Parse(
-      "program test_prg;\n"
-      "  final $display(\"done\");\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
 }
 
 TEST(ProgramItemsParsing, ProgramTimeunits) {
@@ -390,160 +257,6 @@ TEST(ProgramItemsParsing, ProgramModuleOrGenerateItemDecl) {
   EXPECT_TRUE(
       HasItemKindNamed(items, ModuleItemKind::kFunctionDecl, "compute"));
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kTaskDecl, "run"));
-}
-
-TEST(ProgramItemsParsing, WithClassDefinition) {
-  auto r = Parse(
-      "program p;\n"
-      "  class my_trans;\n"
-      "    int data;\n"
-      "  endclass\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kClassDecl));
-}
-
-TEST(ProgramItemsParsing, CannotContainAlways) {
-  auto r = Parse(
-      "program p;\n"
-      "  logic clk, d, q;\n"
-      "  always @(posedge clk) q <= d;\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ProgramItemsParsing, CannotContainAlwaysComb) {
-  auto r = Parse(
-      "program p;\n"
-      "  logic a, b;\n"
-      "  always_comb b = a;\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ProgramItemsParsing, CannotContainAlwaysFF) {
-  auto r = Parse(
-      "program p;\n"
-      "  logic clk, d, q;\n"
-      "  always_ff @(posedge clk) q <= d;\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ProgramItemsParsing, CannotContainAlwaysLatch) {
-  auto r = Parse(
-      "program p;\n"
-      "  logic en, d, q;\n"
-      "  always_latch if (en) q <= d;\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ProgramItemsParsing, CannotContainModuleInst) {
-  auto r = Parse(
-      "module sub; endmodule\n"
-      "program p;\n"
-      "  sub u0();\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ProgramItemsParsing, CannotContainGateInst) {
-  auto r = Parse(
-      "program p;\n"
-      "  wire a, b, y;\n"
-      "  nand g1(y, a, b);\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ProgramItemsParsing, CannotContainUdpInst) {
-  auto r = Parse(
-      "primitive udp_buf (output out, input in);\n"
-      "  table 0 : 0; 1 : 1; endtable\n"
-      "endprimitive\n"
-      "program p;\n"
-      "  wire a, b;\n"
-      "  udp_buf u1(a, b);\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ProgramItemsParsing, CannotContainInterfaceInst) {
-  auto r = Parse(
-      "interface ifc; endinterface\n"
-      "program p;\n"
-      "  ifc i0();\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ProgramItemsParsing, CannotContainProgramInst) {
-  auto r = Parse(
-      "program other; endprogram\n"
-      "program p;\n"
-      "  other o0();\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ProgramItemsParsing, CannotContainNestedModuleDecl) {
-  auto r = Parse(
-      "program p;\n"
-      "  module inner; endmodule\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ProgramItemsParsing, CannotContainNestedInterfaceDecl) {
-  auto r = Parse(
-      "program p;\n"
-      "  interface inner; endinterface\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ProgramItemsParsing, CannotContainNestedProgramDecl) {
-  auto r = Parse(
-      "program p;\n"
-      "  program inner; endprogram\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ProgramItemsParsing, GenerateRegionCannotContainAlways) {
-  auto r = Parse(
-      "program p;\n"
-      "  logic clk, d, q;\n"
-      "  generate\n"
-      "    always @(posedge clk) q <= d;\n"
-      "  endgenerate\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ProgramItemsParsing, LoopGenerateCannotContainAlways) {
-  auto r = Parse(
-      "program p;\n"
-      "  genvar i;\n"
-      "  for (i = 0; i < 2; i = i + 1) begin : gen\n"
-      "    always @* begin end\n"
-      "  end\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ProgramItemsParsing, ConditionalGenerateCannotContainModuleInst) {
-  auto r = Parse(
-      "module sub; endmodule\n"
-      "program p;\n"
-      "  if (1) begin : gen\n"
-      "    sub u0();\n"
-      "  end\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
 }
 
 TEST(ProgramItemsParsing, BareSemicolonsIgnored) {
@@ -664,6 +377,293 @@ TEST(ProgramItemsParsing, ImportDeclInProgram) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kImportDecl));
+}
+
+TEST(ProgramItemsParsing, CannotContainNestedModuleDecl) {
+  auto r = Parse(
+      "program p;\n"
+      "  module inner; endmodule\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramItemsParsing, CannotContainNestedInterfaceDecl) {
+  auto r = Parse(
+      "program p;\n"
+      "  interface inner; endinterface\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramItemsParsing, CannotContainNestedProgramDecl) {
+  auto r = Parse(
+      "program p;\n"
+      "  program inner; endprogram\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramItemsParsing, GenerateRegionCannotContainAlways) {
+  auto r = Parse(
+      "program p;\n"
+      "  logic clk, d, q;\n"
+      "  generate\n"
+      "    always @(posedge clk) q <= d;\n"
+      "  endgenerate\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramItemsParsing, LoopGenerateCannotContainAlways) {
+  auto r = Parse(
+      "program p;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 2; i = i + 1) begin : gen\n"
+      "    always @* begin end\n"
+      "  end\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramItemsParsing, ConditionalGenerateCannotContainModuleInst) {
+  auto r = Parse(
+      "module sub; endmodule\n"
+      "program p;\n"
+      "  if (1) begin : gen\n"
+      "    sub u0();\n"
+      "  end\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+static int CountItemsOfKind(const std::vector<ModuleItem*>& items,
+                            ModuleItemKind kind) {
+  int count = 0;
+  for (const auto* item : items) {
+    if (item->kind == kind) ++count;
+  }
+  return count;
+}
+
+TEST_F(ProgramTestParse, ProgramWithMultipleInitialBlocks) {
+  auto* unit = Parse(
+      "program p;\n"
+      "  initial $display(\"init1\");\n"
+      "  initial $display(\"init2\");\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(
+      CountItemsOfKind(unit->programs[0]->items, ModuleItemKind::kInitialBlock),
+      2);
+}
+
+TEST_F(ProgramTestParse, ProgramWithVariableDecls) {
+  auto* unit = Parse(
+      "program p;\n"
+      "  logic [31:0] data;\n"
+      "  logic [7:0] addr;\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_GE(unit->programs[0]->items.size(), 2u);
+}
+
+TEST_F(ProgramParseTest, EmptyProgram) {
+  auto* unit = Parse("program p; endprogram");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "p");
+  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  EXPECT_TRUE(unit->programs[0]->ports.empty());
+  EXPECT_TRUE(unit->programs[0]->params.empty());
+  EXPECT_TRUE(unit->programs[0]->items.empty());
+}
+
+TEST_F(ProgramParseTest, ProgramWithInitialBlock) {
+  auto* unit = Parse(
+      "program p;\n"
+      "  initial begin\n"
+      "    $display(\"hello\");\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "p");
+  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  ASSERT_EQ(unit->programs[0]->items.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
+}
+
+TEST_F(ProgramParseTest, ProgramWithTaskDecl) {
+  auto* unit = Parse(
+      "program p;\n"
+      "  task run;\n"
+      "    $display(\"running\");\n"
+      "  endtask\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "p");
+  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  ASSERT_GE(unit->programs[0]->items.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_EQ(unit->programs[0]->items[0]->name, "run");
+}
+
+TEST_F(ProgramParseTest, ProgramWithFunctionDecl) {
+  auto* unit = Parse(
+      "program p;\n"
+      "  function int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "p");
+  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  ASSERT_GE(unit->programs[0]->items.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(unit->programs[0]->items[0]->name, "add");
+}
+
+TEST_F(ProgramParseTest, ProgramWithTaskAndFunction) {
+  auto* unit = Parse(
+      "program p;\n"
+      "  task run;\n"
+      "    $display(\"running\");\n"
+      "  endtask\n"
+      "  function int get_val;\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "p");
+  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  ASSERT_GE(unit->programs[0]->items.size(), 2u);
+  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_EQ(unit->programs[0]->items[1]->kind, ModuleItemKind::kFunctionDecl);
+}
+
+TEST(ProgramDeclaration, MissingEndprogramIsError) {
+  EXPECT_FALSE(ParseOk("program p;"));
+}
+
+TEST(ProgramDeclaration, SampleDeclaration) {
+  auto r = Parse(
+      "program test (input clk, input [16:1] addr, inout [7:0] data);\n"
+      "  initial begin\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "test");
+  EXPECT_EQ(r.cu->programs[0]->ports.size(), 3u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
+}
+
+TEST(ProgramItemsParsing, ProgramFinal) {
+  auto r = Parse(
+      "program test_prg;\n"
+      "  final $display(\"done\");\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
+}
+
+TEST(ProgramItemsParsing, WithClassDefinition) {
+  auto r = Parse(
+      "program p;\n"
+      "  class my_trans;\n"
+      "    int data;\n"
+      "  endclass\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kClassDecl));
+}
+
+TEST(ProgramItemsParsing, CannotContainAlways) {
+  auto r = Parse(
+      "program p;\n"
+      "  logic clk, d, q;\n"
+      "  always @(posedge clk) q <= d;\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramItemsParsing, CannotContainAlwaysComb) {
+  auto r = Parse(
+      "program p;\n"
+      "  logic a, b;\n"
+      "  always_comb b = a;\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramItemsParsing, CannotContainAlwaysFF) {
+  auto r = Parse(
+      "program p;\n"
+      "  logic clk, d, q;\n"
+      "  always_ff @(posedge clk) q <= d;\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramItemsParsing, CannotContainAlwaysLatch) {
+  auto r = Parse(
+      "program p;\n"
+      "  logic en, d, q;\n"
+      "  always_latch if (en) q <= d;\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramItemsParsing, CannotContainModuleInst) {
+  auto r = Parse(
+      "module sub; endmodule\n"
+      "program p;\n"
+      "  sub u0();\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramItemsParsing, CannotContainGateInst) {
+  auto r = Parse(
+      "program p;\n"
+      "  wire a, b, y;\n"
+      "  nand g1(y, a, b);\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramItemsParsing, CannotContainUdpInst) {
+  auto r = Parse(
+      "primitive udp_buf (output out, input in);\n"
+      "  table 0 : 0; 1 : 1; endtable\n"
+      "endprimitive\n"
+      "program p;\n"
+      "  wire a, b;\n"
+      "  udp_buf u1(a, b);\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramItemsParsing, CannotContainInterfaceInst) {
+  auto r = Parse(
+      "interface ifc; endinterface\n"
+      "program p;\n"
+      "  ifc i0();\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramItemsParsing, CannotContainProgramInst) {
+  auto r = Parse(
+      "program other; endprogram\n"
+      "program p;\n"
+      "  other o0();\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }  // namespace
