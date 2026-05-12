@@ -346,8 +346,8 @@ bool TypesEquivalent(const DataType& a, const DataType& b) {
   return Is4stateForEquivalence(a) == Is4stateForEquivalence(b);
 }
 
-bool ElementTypesEquivalent(DataTypeKind a_kind, uint32_t a_width, bool a_signed,
-                            bool a_4state, DataTypeKind b_kind,
+bool ElementTypesEquivalent(DataTypeKind a_kind, uint32_t a_width,
+                            bool a_signed, bool a_4state, DataTypeKind b_kind,
                             uint32_t b_width, bool b_signed, bool b_4state) {
   // §6.22.2(a): Matching types are equivalent. For element kinds we treat
   // logic/reg as the same canonical kind, mirroring TypesMatch.
