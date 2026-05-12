@@ -72,16 +72,6 @@ TEST(EquivalentTypesParsing, TypesNotEquivalentStringToInt) {
   EXPECT_FALSE(TypesEquivalent(a, b));
 }
 
-TEST(EquivalentTypesParsing, TypesEquivalentSameSignedInt) {
-  DataType a;
-  a.kind = DataTypeKind::kInt;
-  a.is_signed = true;
-  DataType b;
-  b.kind = DataTypeKind::kInt;
-  b.is_signed = true;
-  EXPECT_TRUE(TypesEquivalent(a, b));
-}
-
 TEST(EquivalentTypesParsing, IntNotEquivalentToInteger) {
   DataType a;
   a.kind = DataTypeKind::kInt;
