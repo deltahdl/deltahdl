@@ -157,4 +157,54 @@ TEST(ArrayAssignmentValidation, PackedToUnpackedWithoutCastRejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §7.6: "Associative arrays are assignment compatible only with associative
+// arrays." Each cross-kind direction must be rejected by the elaborator.
+TEST(ArrayAssignmentValidation, AssocToFixedArrayAssignRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa[string];\n"
+      "  int fa[4];\n"
+      "  assign fa = aa;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ArrayAssignmentValidation, FixedArrayToAssocAssignRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa[string];\n"
+      "  int fa[4];\n"
+      "  assign aa = fa;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ArrayAssignmentValidation, AssocToDynamicArrayAssignRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa[int];\n"
+      "  int da[];\n"
+      "  assign da = aa;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ArrayAssignmentValidation, DynamicArrayToAssocAssignRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa[int];\n"
+      "  int da[];\n"
+      "  assign aa = da;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace

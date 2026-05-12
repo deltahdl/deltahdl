@@ -16,30 +16,6 @@ TEST(Elaboration, AssocAssignSameTypeOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elaboration, AssocToFixedArrayAssign_Rejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  int aa[string];\n"
-      "  int fa[4];\n"
-      "  assign fa = aa;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(Elaboration, FixedArrayToAssocAssign_Rejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  int aa[string];\n"
-      "  int fa[4];\n"
-      "  assign aa = fa;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(Elaboration, AssocAssignIndexTypeMismatch_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -107,30 +83,6 @@ TEST(Elaboration, AssocAssignClassIndex_MixedTypeRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(Elaboration, AssocToDynamicArrayAssign_Rejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  int aa[int];\n"
-      "  int da[];\n"
-      "  assign da = aa;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(Elaboration, DynamicArrayToAssocAssign_Rejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  int aa[int];\n"
-      "  int da[];\n"
-      "  assign aa = da;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
 }
 
 TEST(Elaboration, AssocAssignElementTypeMismatch_Rejected) {
