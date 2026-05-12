@@ -132,31 +132,37 @@ def _patched_streaming_body() -> Any:
 def test_generate_commit_body_returns_runner_result() -> None:
     """generate_commit_body returns whatever the streaming runner returned."""
     with _patched_streaming_body():
-        body = generate_commit_body(
-            ["6.3"], ["foo.cpp"], [], [], model="opus",
-        )
+        body = generate_commit_body(["6.3"], ["foo.cpp"], [], [])
     assert body == "- Added `foo.cpp` because reasons."
 
 
-def test_generate_commit_body_passes_model() -> None:
-    """generate_commit_body forwards --model to the Claude CLI."""
+def test_generate_commit_body_uses_haiku() -> None:
+    """generate_commit_body runs the commit-body call on Haiku regardless of pipeline model."""
     with _patched_streaming_body() as mock_run:
-        generate_commit_body(["6.3"], ["foo.cpp"], [], [], model="haiku")
+        generate_commit_body(["6.3"], ["foo.cpp"], [], [])
     cmd = mock_run.call_args[0][0]
     assert cmd[cmd.index("--model") + 1] == "haiku"
 
 
-def test_generate_commit_body_uses_continue() -> None:
-    """generate_commit_body resumes the eight-step session via --continue."""
+def test_generate_commit_body_uses_low_effort() -> None:
+    """generate_commit_body asks for low thinking effort — summarisation, not reasoning."""
     with _patched_streaming_body() as mock_run:
-        generate_commit_body(["6.3"], ["foo.cpp"], [], [], model="opus")
-    assert "--continue" in mock_run.call_args[0][0]
+        generate_commit_body(["6.3"], ["foo.cpp"], [], [])
+    cmd = mock_run.call_args[0][0]
+    assert cmd[cmd.index("--effort") + 1] == "low"
+
+
+def test_generate_commit_body_starts_fresh_session() -> None:
+    """generate_commit_body opens its own session, not --continue on the pipeline's."""
+    with _patched_streaming_body() as mock_run:
+        generate_commit_body(["6.3"], ["foo.cpp"], [], [])
+    assert "--continue" not in mock_run.call_args[0][0]
 
 
 def test_generate_commit_body_uses_commit_disallowed_tools() -> None:
     """generate_commit_body forbids editing tools (Write/Edit/...)."""
     with _patched_streaming_body() as mock_run:
-        generate_commit_body(["6.3"], ["foo.cpp"], [], [], model="opus")
+        generate_commit_body(["6.3"], ["foo.cpp"], [], [])
     cmd = mock_run.call_args[0][0]
     assert cmd[cmd.index("--disallowedTools") + 1] == COMMIT_BODY_DISALLOWED_TOOLS
 
@@ -164,23 +170,21 @@ def test_generate_commit_body_uses_commit_disallowed_tools() -> None:
 def test_generate_commit_body_passes_prompt_with_paths() -> None:
     """The prompt fed to the runner lists the porcelain paths."""
     with _patched_streaming_body() as mock_run:
-        generate_commit_body(
-            ["6.3"], ["src/foo.cpp"], [], [], model="opus",
-        )
+        generate_commit_body(["6.3"], ["src/foo.cpp"], [], [])
     assert "src/foo.cpp" in mock_run.call_args[0][1]
 
 
 def test_generate_commit_body_uses_commit_body_role() -> None:
     """The retry helper sees the 'Commit body' role for content-filter logs."""
     with _patched_streaming_body() as mock_run:
-        generate_commit_body(["6.3"], ["foo.cpp"], [], [], model="opus")
+        generate_commit_body(["6.3"], ["foo.cpp"], [], [])
     assert mock_run.call_args[1]["role"] == "Commit body"
 
 
 def test_generate_commit_body_retry_cmd_uses_continue() -> None:
-    """The retry_cmd handed to the helper also keeps --continue."""
+    """The retry_cmd resumes the (fresh) session started by this call."""
     with _patched_streaming_body() as mock_run:
-        generate_commit_body(["6.3"], ["foo.cpp"], [], [], model="opus")
+        generate_commit_body(["6.3"], ["foo.cpp"], [], [])
     assert "--continue" in mock_run.call_args[1]["retry_cmd"]
 
 

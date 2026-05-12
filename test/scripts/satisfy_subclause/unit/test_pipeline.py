@@ -737,6 +737,41 @@ def test_inner_logs_subclause_to_stderr(capsys: pytest.CaptureFixture[str]) -> N
     assert "§33.4.1.5" in capsys.readouterr().err
 
 
+def _run_inner_capturing_dep_oracle(mutator_model: str) -> Any:
+    """Run the inner orchestrator and return the dep-oracle mock."""
+    mock_deps, mock_satisfy = _patched_inner([])
+    with mock_deps as mock_dep:
+        with mock_satisfy:
+            with patch(
+                "satisfy_subclause.pipeline"
+                ".satisfy_unsatisfied_subclause_without_dependencies",
+            ):
+                satisfy_unsatisfied_subclause(
+                    _target("33.4.1.5"), "~/LRM.pdf",
+                    model=mutator_model, labels=_LABELS,
+                    in_progress=frozenset({"33.4.1.5"}),
+                )
+    return mock_dep
+
+
+def test_inner_calls_dep_oracle_with_sonnet_when_mutator_opus() -> None:
+    """Dep oracle runs on sonnet even when the mutator runs on opus."""
+    mock_dep = _run_inner_capturing_dep_oracle("opus")
+    assert mock_dep.call_args.kwargs["model"] == "sonnet"
+
+
+def test_inner_calls_dep_oracle_with_sonnet_when_mutator_haiku() -> None:
+    """Dep-oracle model is independent of the mutator model — sonnet either way."""
+    mock_dep = _run_inner_capturing_dep_oracle("haiku")
+    assert mock_dep.call_args.kwargs["model"] == "sonnet"
+
+
+def test_inner_calls_dep_oracle_with_medium_effort() -> None:
+    """Dep oracle runs at medium thinking effort — focused read-and-list judgment."""
+    mock_dep = _run_inner_capturing_dep_oracle("opus")
+    assert mock_dep.call_args.kwargs["effort"] == "medium"
+
+
 # --- satisfy_subclause -----------------------------------------------------
 
 

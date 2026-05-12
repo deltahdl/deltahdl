@@ -39,6 +39,14 @@ from .mutators import (
 )
 
 
+# The dependency oracle is a read-only single-call judgment that maps
+# §X's preamble onto a foundations-first list of subclauses. Sonnet at
+# medium effort is enough; pinning here means the mutator's Opus budget
+# is not spent on each recursion's dep query.
+DEP_ORACLE_MODEL = "sonnet"
+DEP_ORACLE_EFFORT = "medium"
+
+
 # ---------------------------------------------------------------------------
 # GitHub issue handling
 # ---------------------------------------------------------------------------
@@ -275,7 +283,10 @@ def satisfy_unsatisfied_subclause(
         file=sys.stderr,
     )
 
-    deps = compute_subclause_dependencies(target.subclause, lrm, model=model)
+    deps = compute_subclause_dependencies(
+        target.subclause, lrm,
+        model=DEP_ORACLE_MODEL, effort=DEP_ORACLE_EFFORT,
+    )
     cycle_members = [d for d in deps if d in in_progress]
     if cycle_members:
         return _cycle_marker(
