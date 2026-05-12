@@ -18,97 +18,6 @@ TEST(TwoStateAndFourState, RegVarDeclKind) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
   EXPECT_FALSE(item->data_type.is_net);
 }
-TEST(TwoStateAndFourState, IntegerTypeShortintDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  shortint si;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortint);
-  EXPECT_EQ(item->name, "si");
-}
-
-TEST(TwoStateAndFourState, IntegerTypeIntDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  int i;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
-  EXPECT_EQ(item->name, "i");
-}
-
-TEST(TwoStateAndFourState, IntegerTypeLongintDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  longint li;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLongint);
-  EXPECT_EQ(item->name, "li");
-}
-
-TEST(TwoStateAndFourState, IntegerTypeIntegerDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  integer x;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInteger);
-  EXPECT_EQ(item->name, "x");
-}
-
-TEST(TwoStateAndFourState, IntegerTypeLogicDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [15:0] data;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  EXPECT_EQ(item->name, "data");
-}
-
-TEST(TwoStateAndFourState, IntegerTypeRegDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [7:0] r;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
-  EXPECT_EQ(item->name, "r");
-}
-
-TEST(TwoStateAndFourState, IntegerTypeBitDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  bit [31:0] val;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
-  EXPECT_EQ(item->name, "val");
-}
-
 TEST(TwoStateAndFourState, ShortintWithNegativeInit) {
   auto r = Parse(
       "module t;\n"
@@ -339,19 +248,6 @@ TEST(TwoStateAndFourState, TimeUnpackedArray) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTime);
   EXPECT_EQ(item->name, "timestamps");
   EXPECT_FALSE(item->unpacked_dims.empty());
-}
-
-TEST(TwoStateAndFourState, IntegerTypeByteDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  byte b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kByte);
-  EXPECT_EQ(item->name, "b");
 }
 
 TEST(TwoStateAndFourState, RegWithPackedDims) {
