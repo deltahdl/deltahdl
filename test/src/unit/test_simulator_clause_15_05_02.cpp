@@ -147,6 +147,36 @@ TEST(IpcSync, WaitWithBodyExecutesAfterTrigger) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
+// §15.5.2: The bare-form syntax `@ hierarchical_event_identifier;` (without
+// parentheses) is the same wait mechanism as `@(ev)` and likewise blocks
+// the calling process until the event is triggered.
+TEST(IpcSync, BareAtSyntaxBlocksUntilTrigger) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    @ev;\n"
+      "    result = 99;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #3 ->ev;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
 // §15.5.2: Repeated @ in a loop catches successive triggers.
 TEST(IpcSync, RepeatedWaitCatchesSuccessiveTriggers) {
   LowerFixture f;

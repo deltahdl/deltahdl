@@ -89,6 +89,11 @@ struct EventAwaiter {
           var = ctx.FindVariable(hier_name);
         }
       } else {
+        // §9.4.2: Compound event expression (e.g. @(a|b)). An event fires
+        // only when the *result* of the expression changes; a change in
+        // any operand that leaves the result unchanged shall not be
+        // detected as an event.
+        AttachCompoundWatchers(ev, h, proc);
         continue;
       }
       if (!var) continue;
@@ -163,6 +168,108 @@ struct EventAwaiter {
     }
     ResumeMaybeReactive(h, proc, ctx);
     return true;
+  }
+
+  // §9.4.2: Walk a compound event expression and append the identifier
+  // names of every variable operand it reads.
+  static void CollectExprIdentifiers(const Expr* e,
+                                     std::vector<std::string_view>& out) {
+    if (!e) return;
+    if (e->kind == ExprKind::kIdentifier) {
+      out.push_back(e->text);
+      return;
+    }
+    CollectExprIdentifiers(e->lhs, out);
+    CollectExprIdentifiers(e->rhs, out);
+    CollectExprIdentifiers(e->condition, out);
+    CollectExprIdentifiers(e->true_expr, out);
+    CollectExprIdentifiers(e->false_expr, out);
+    CollectExprIdentifiers(e->base, out);
+    CollectExprIdentifiers(e->index, out);
+    CollectExprIdentifiers(e->index_end, out);
+    for (auto* a : e->args) CollectExprIdentifiers(a, out);
+    for (auto* el : e->elements) CollectExprIdentifiers(el, out);
+  }
+
+  // Bit-exact equality on aval/bval words; used to detect whether an
+  // expression's result has changed since the last evaluation.
+  static bool Logic4VecBitsEqual(const Logic4Vec& a, const Logic4Vec& b) {
+    if (a.nwords != b.nwords) return false;
+    for (uint32_t i = 0; i < a.nwords; ++i) {
+      if (a.words[i].aval != b.words[i].aval ||
+          a.words[i].bval != b.words[i].bval)
+        return false;
+    }
+    return true;
+  }
+
+  // §9.4.2 Table 9-2: edge detection on the LSB of an expression result.
+  static bool CheckEdgeOnValues(const Logic4Vec& prev, const Logic4Vec& cur,
+                                Edge edge) {
+    uint64_t pa = 0, pb = 0, ca = 0, cb = 0;
+    if (prev.nwords > 0) {
+      pa = prev.words[0].aval & 1;
+      pb = prev.words[0].bval & 1;
+    }
+    if (cur.nwords > 0) {
+      ca = cur.words[0].aval & 1;
+      cb = cur.words[0].bval & 1;
+    }
+    bool prev_is_0 = (pa == 0 && pb == 0);
+    bool prev_is_1 = (pa == 1 && pb == 0);
+    bool prev_is_xz = (pb == 1);
+    bool cur_is_0 = (ca == 0 && cb == 0);
+    bool cur_is_1 = (ca == 1 && cb == 0);
+    bool pos = (prev_is_0 && !cur_is_0) || (prev_is_xz && cur_is_1);
+    bool neg = (prev_is_1 && !cur_is_1) || (prev_is_xz && cur_is_0);
+    if (edge == Edge::kPosedge) return pos;
+    if (edge == Edge::kNegedge) return neg;
+    return pos || neg;  // Edge::kEdge
+  }
+
+  // §9.4.2: Attach a watcher to each operand variable in a compound event
+  // expression. On any operand write the expression is re-evaluated; the
+  // process resumes only when the result actually changes (and any edge
+  // qualifier or iff guard agrees).
+  void AttachCompoundWatchers(const EventExpr& ev, std::coroutine_handle<> h,
+                              Process* proc) {
+    std::vector<std::string_view> names;
+    CollectExprIdentifiers(ev.signal, names);
+    if (names.empty()) return;
+    auto prev = std::make_shared<Logic4Vec>(
+        EvalExpr(ev.signal, ctx, ctx.GetArena()));
+    auto consumed = std::make_shared<bool>(false);
+    auto* ctx_ptr = &ctx;
+    const Expr* signal = ev.signal;
+    const Expr* iff_cond = ev.iff_condition;
+    Edge edge = ev.edge;
+    for (auto name : names) {
+      Variable* op_var = ctx.FindVariable(name);
+      if (!op_var) continue;
+      op_var->AddWatcher(
+          [h, prev, consumed, signal, edge, iff_cond, ctx_ptr, proc]() mutable {
+            if (*consumed) return true;
+            if (proc && !proc->active) return true;
+            auto cur = EvalExpr(signal, *ctx_ptr, ctx_ptr->GetArena());
+            if (Logic4VecBitsEqual(cur, *prev)) {
+              // Operand changed but result did not — not an event.
+              return false;
+            }
+            if (edge != Edge::kNone &&
+                !CheckEdgeOnValues(*prev, cur, edge)) {
+              *prev = cur;
+              return false;
+            }
+            *prev = cur;
+            if (iff_cond) {
+              auto val = EvalExpr(iff_cond, *ctx_ptr, ctx_ptr->GetArena());
+              if (val.ToUint64() == 0) return false;
+            }
+            *consumed = true;
+            ResumeMaybeReactive(h, proc, *ctx_ptr);
+            return true;
+          });
+    }
   }
 
   static void ResumeMaybeReactive(std::coroutine_handle<> h, Process* proc,

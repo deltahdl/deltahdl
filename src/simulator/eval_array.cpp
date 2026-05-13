@@ -10,6 +10,7 @@
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -602,20 +603,40 @@ static bool DispatchQueueDelete(std::string_view method, QueueObject* q,
   return true;
 }
 
+// §9.4.2: Method calls that change the size of a dynamically sized array or
+// queue shall cause event expressions referencing it to be reevaluated.
+// Surface the mutation as a watcher notification on the owning variable so
+// that compound event-control awaiters (e.g. @(q.size())) re-evaluate.
+static bool IsQueueMutator(std::string_view method) {
+  return method == "push_back" || method == "push_front" ||
+         method == "pop_back" || method == "pop_front" ||
+         method == "insert" || method == "delete";
+}
+
+static void NotifyOwningVar(SimContext& ctx, std::string_view var_name) {
+  if (auto* v = ctx.FindVariable(var_name)) v->NotifyWatchers();
+}
+
 bool TryEvalQueueMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             Logic4Vec& out) {
   MethodCallParts parts;
   if (!ExtractMethodCallParts(expr, parts)) return false;
   auto* q = ctx.FindQueue(parts.var_name);
   if (!q) return false;
-  if (DispatchQueueEval(parts.method_name, q, arena, out)) return true;
+  if (DispatchQueueEval(parts.method_name, q, arena, out)) {
+    if (IsQueueMutator(parts.method_name))
+      NotifyOwningVar(ctx, parts.var_name);
+    return true;
+  }
   // Mutating methods also return via out (e.g., pop used in expression).
   if (DispatchQueuePush(parts.method_name, q, expr, ctx, arena)) {
     out = MakeLogic4VecVal(arena, 1, 0);
+    NotifyOwningVar(ctx, parts.var_name);
     return true;
   }
   if (DispatchQueueDelete(parts.method_name, q, expr, ctx, arena)) {
     out = MakeLogic4VecVal(arena, 1, 0);
+    NotifyOwningVar(ctx, parts.var_name);
     return true;
   }
   return false;
@@ -626,8 +647,15 @@ bool TryExecQueueMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (!ExtractMethodCallParts(expr, parts)) return false;
   auto* q = ctx.FindQueue(parts.var_name);
   if (!q) return false;
-  if (DispatchQueuePush(parts.method_name, q, expr, ctx, arena)) return true;
-  return DispatchQueueDelete(parts.method_name, q, expr, ctx, arena);
+  if (DispatchQueuePush(parts.method_name, q, expr, ctx, arena)) {
+    NotifyOwningVar(ctx, parts.var_name);
+    return true;
+  }
+  if (DispatchQueueDelete(parts.method_name, q, expr, ctx, arena)) {
+    NotifyOwningVar(ctx, parts.var_name);
+    return true;
+  }
+  return false;
 }
 
 bool TryEvalQueueProperty(std::string_view var_name, std::string_view prop,

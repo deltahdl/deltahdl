@@ -499,4 +499,90 @@ TEST(EventControlSim, NamedEventControlWakesProcess) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
+// §9.4.2: A non-edge implicit event is detected on a change in the value
+// of the expression — including compound expressions whose operands are
+// individual variables. Drives the @(a|b) result transitioning 0->1.
+TEST(EventControlSim, CompoundExprResultChangeFiresEvent) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, b;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    a = 0; b = 0;\n"
+      "    x = 8'd0;\n"
+      "    #5 a = 1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "  initial @(a | b) x = 8'd99;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+// §9.4.2: "If the event expression is a reference to a simple object handle
+// or chandle variable, an event is created when a write to that variable is
+// not equal to its previous value." A null-to-null write leaves the chandle
+// bit-pattern unchanged, so @(h) shall not fire.
+TEST(EventControlSim, ChandleSameValueWriteIsNotEvent) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  chandle h;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    #5 h = null;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "  initial @(h) x = 8'd99;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// §9.4.2: "A change of value in any operand of the expression without a
+// change in the result of the expression shall not be detected as an event."
+// First @(a|b) skips a's 1->0 transition (operand changed, but a|b stays 1),
+// then fires when b's 1->0 transition makes a|b change 1->0.
+TEST(EventControlSim, CompoundExprOperandChangeWithoutResultChangeIsNotEvent) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, b;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    a = 1; b = 1;\n"
+      "    x = 8'd0;\n"
+      "    #5 a = 0;\n"
+      "    #5 b = 0;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(a | b) x = 8'd99;\n"
+      "    @(a | b) x = 8'd55;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
 }  // namespace
