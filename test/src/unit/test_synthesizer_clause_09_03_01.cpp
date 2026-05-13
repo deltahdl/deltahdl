@@ -39,4 +39,21 @@ TEST(SequentialBlockSynthesis, SeqBlockInAlwaysFfSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
+TEST(SequentialBlockSynthesis, EmptySeqBlockInAlwaysCombSynthesizes) {
+  SynthFixture f;
+  auto* mod = ElaborateSrc(f,
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always_comb begin\n"
+      "    a = b;\n"
+      "    begin\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  auto* aig = synth.Lower(mod);
+  ASSERT_NE(aig, nullptr);
+}
+
 }  // namespace

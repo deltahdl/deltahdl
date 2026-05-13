@@ -142,4 +142,57 @@ TEST(SequentialBlockSimulation, BlockLocalVarDecl) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
+TEST(SequentialBlockSimulation, RelativeDelaysComposeAcrossManyStatements) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] r;\n"
+      "  logic [7:0] snap1, snap2, snap3;\n"
+      "  initial begin\n"
+      "    #5 r = 8'd1;\n"
+      "    #5 r = 8'd2;\n"
+      "    #5 r = 8'd3;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #7 snap1 = r;\n"
+      "    #5 snap2 = r;\n"
+      "    #5 snap3 = r;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("snap1")->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("snap2")->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("snap3")->value.ToUint64(), 3u);
+}
+
+TEST(SequentialBlockSimulation, ControlPassesOutAfterLastStatement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] inside_last, after_block;\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      inside_last = 8'd1;\n"
+      "      inside_last = 8'd55;\n"
+      "    end\n"
+      "    after_block = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* inside = f.ctx.FindVariable("inside_last");
+  ASSERT_NE(inside, nullptr);
+  EXPECT_EQ(inside->value.ToUint64(), 55u);
+  auto* after = f.ctx.FindVariable("after_block");
+  ASSERT_NE(after, nullptr);
+  EXPECT_EQ(after->value.ToUint64(), 99u);
+}
+
 }  // namespace

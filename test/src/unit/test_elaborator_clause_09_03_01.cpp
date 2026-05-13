@@ -82,4 +82,19 @@ TEST(SequentialBlockElaboration, SeqBlockInAlwaysFf) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(SequentialBlockElaboration, SeqBlockInAlwaysLatch) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic en;\n"
+      "  logic [7:0] q, d;\n"
+      "  always_latch begin\n"
+      "    if (en) q = d;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

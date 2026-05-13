@@ -25,24 +25,6 @@ TEST(SequentialBlockParsing, StatementsWithDelaysAndEventControl) {
   EXPECT_EQ(stmts[3]->kind, StmtKind::kEventControl);
 }
 
-TEST(SequentialBlockParsing, SequentialBlockWithLocalVarDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int x;\n"
-      "    x = 5;\n"
-      "    $display(\"%0d\", x);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-}
-
 TEST(SequentialBlockParsing, SequentialBlockMultipleLocalVars) {
   auto r = Parse(
       "module m;\n"
@@ -314,6 +296,15 @@ TEST(SequentialBlockParsing, NullStatementInSeqBlock) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SequentialBlockParsing, MissingEndKeywordProducesParseError) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }  // namespace
