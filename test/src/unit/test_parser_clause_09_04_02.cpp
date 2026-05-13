@@ -199,6 +199,63 @@ TEST(EventControlParsing, EdgeKeywordInProceduralContext) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kEdge);
 }
 
+// Moved from test_parser_clause_09_04.cpp: §9.4.2 owns the rule that
+// `@(posedge clk) ;` parses with a null body statement.
+TEST(EventControlParsing, ProceduralTimingControlEventNull) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk) ;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  EXPECT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kNull);
+}
+
+// Moved from test_parser_clause_09_04.cpp: §9.4.2 owns the rule that
+// `@(posedge clk) begin ... end` parses with a block body.
+TEST(EventControlParsing, ProceduralTimingControlEventBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk) begin\n"
+      "      x = 1;\n"
+      "      y = 2;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
+}
+
+// Moved from test_parser_annex_a_06_05.cpp: §9.4.2's posedge keyword
+// applies to hierarchical signal references.
+TEST(EventControlParsing, EventControlHierarchicalSignal) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge top.u1.clk) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+}
+
 TEST(EventControlParsing, MemberAccessInEventExpression) {
   auto r = Parse(
       "module m;\n"

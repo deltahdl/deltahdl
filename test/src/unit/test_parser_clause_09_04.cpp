@@ -38,37 +38,9 @@ TEST(TimingControlSyntaxParsing, ProceduralTimingControlDelayNull) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kNull);
 }
 
-TEST(TimingControlSyntaxParsing, ProceduralTimingControlEvent) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  EXPECT_FALSE(stmt->events.empty());
-  EXPECT_NE(stmt->body, nullptr);
-}
-
-TEST(TimingControlSyntaxParsing, ProceduralTimingControlEventNull) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk) ;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  EXPECT_NE(stmt->body, nullptr);
-  EXPECT_EQ(stmt->body->kind, StmtKind::kNull);
-}
+// Tests of @(posedge clk) and @(posedge clk) ; — covering §9.4.2's event
+// control with body and null body — were moved to
+// test_parser_clause_09_04_02.cpp as §9.4.2 owns those rules.
 
 TEST(TimingControlSyntaxParsing, ProceduralTimingControlDelayBlock) {
   auto r = Parse(
@@ -89,24 +61,7 @@ TEST(TimingControlSyntaxParsing, ProceduralTimingControlDelayBlock) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-TEST(TimingControlSyntaxParsing, ProceduralTimingControlEventBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk) begin\n"
-      "      x = 1;\n"
-      "      y = 2;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_NE(stmt->body, nullptr);
-  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
-}
+// @(posedge clk) begin ... end was moved to test_parser_clause_09_04_02.cpp.
 
 TEST(TimingControlSyntaxParsing, NestedDelayWrappingEventControl) {
   auto r = Parse(

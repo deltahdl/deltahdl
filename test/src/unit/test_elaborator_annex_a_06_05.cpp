@@ -74,20 +74,12 @@ TEST(TimingControlElaboration, DelayInFunctionError) {
 }
 
 // --- event_control elaboration ---
-
-TEST(TimingControlElaboration, EventControlInInitialElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic clk, x;\n"
-      "  initial begin\n"
-      "    @(posedge clk) x = 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
+//
+// `@(posedge clk)` elaborating in an initial / always block is governed
+// by §9.4.2 (posedge keyword) and is covered by
+// test_elaborator_clause_09_04_02.cpp::PosedgeEventControlElaborates and
+// peers. Only host-subclause rules (always_comb / always_latch / function
+// body restrictions) remain here.
 
 TEST(TimingControlElaboration, EventControlStarInAlwaysElaborates) {
   ElabFixture f;

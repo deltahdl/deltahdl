@@ -91,26 +91,8 @@ TEST(TimingControlSyntaxParsing, DelayControlMintypmax) {
   EXPECT_EQ(stmt->delay->kind, ExprKind::kMinTypMax);
 }
 
-TEST(TimingControlSyntaxParsing, EventControlPosedge) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r, ModuleItemKind::kAlwaysBlock);
-  ASSERT_NE(item, nullptr);
-  EXPECT_NE(item->body, nullptr);
-}
-
-TEST(TimingControlSyntaxParsing, EventControlNegedge) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(negedge clk) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
+// posedge / negedge event-control AST encoding is governed by §9.4.2;
+// canonical coverage lives in test_parser_clause_09_04_02.cpp.
 
 TEST(TimingControlSyntaxParsing, EventControlStar) {
   auto r = Parse(
@@ -160,37 +142,9 @@ TEST(TimingControlSyntaxParsing, EventControlAtStarParen) {
   EXPECT_TRUE(stmt->is_star_event);
 }
 
-TEST(TimingControlSyntaxParsing, EventControlBareIdentifier) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @r x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
-  EXPECT_NE(stmt->events[0].signal, nullptr);
-}
-
-TEST(TimingControlSyntaxParsing, EventControlParenthesized) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(clk) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_EQ(stmt->events.size(), 1u);
-}
+// `@id` (§15.5.2 named-event wait) and `@(any-signal)` (§9.4.2 any-change)
+// AST encoding are tested in test_parser_clause_15_05_02.cpp and
+// test_parser_clause_09_04_02.cpp respectively.
 
 TEST(TimingControlSyntaxParsing, EdgeIdentifiers) {
   auto r = Parse(
@@ -209,65 +163,9 @@ TEST(TimingControlSyntaxParsing, EdgeIdentifiers) {
   EXPECT_EQ(stmt->events[2].edge, Edge::kEdge);
 }
 
-TEST(TimingControlSyntaxParsing, ClockingEventPosedge) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-}
-
-TEST(TimingControlSyntaxParsing, ClockingEventNegedge) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(negedge clk) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
-}
-
-TEST(TimingControlSyntaxParsing, EventExprEdge) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(edge clk) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kEdge);
-}
-
-TEST(TimingControlSyntaxParsing, EventExprAnyChange) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(a) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
-}
+// posedge / negedge / edge / any-change AST-encoding tests for the
+// event-control form belong to §9.4.2 and live in
+// test_parser_clause_09_04_02.cpp.
 
 TEST(TimingControlSyntaxParsing, WaitOrder) {
   auto r = Parse(
@@ -394,21 +292,8 @@ TEST(TimingControlSyntaxParsing, IntraAssignCycleDelayNonblocking) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(TimingControlSyntaxParsing, EventControlHierarchicalSignal) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge top.u1.clk) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-}
+// `@(posedge top.u1.clk)` moved to test_parser_clause_09_04_02.cpp as
+// EventControlHierarchicalSignal — §9.4.2 owns the posedge rule.
 
 TEST(TimingControlSyntaxParsing, WaitOrderWithActionBlock) {
   auto r = Parse(

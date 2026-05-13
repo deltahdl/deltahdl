@@ -45,4 +45,16 @@ TEST(EventWaitElaborator, WaitInsideBeginEndElaborates) {
       "endmodule\n"));
 }
 
+// §15.5.2 builds on §9.4.2's event control operator. A task call used in
+// place of a hierarchical_event_identifier in an @-wait is therefore
+// rejected for the same reason §9.4.2 rejects task calls in event
+// expressions.
+TEST(EventWaitElaborator, WaitOnTaskCallRejected) {
+  EXPECT_FALSE(ElabOk(
+      "module m;\n"
+      "  task t; endtask\n"
+      "  initial @(t());\n"
+      "endmodule\n"));
+}
+
 }  // namespace

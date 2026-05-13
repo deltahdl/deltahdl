@@ -316,6 +316,166 @@ TEST(EventControlSim, NoEventOnSameValueWrite) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §9.4.2 Table 9-2: a posedge shall be detected on the transition from 0
+// to x. Exercises the production CheckEdge path through @(posedge clk),
+// complementing the existing reference-model EdgeDetection unit tests.
+TEST(EventControlSim, PosedgeFiresOnZeroToX) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "    #5 clk = 1'bx;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(posedge clk) x = 8'd11;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 11u);
+}
+
+// §9.4.2 Table 9-2: a posedge shall be detected on the transition from x
+// to 1.
+TEST(EventControlSim, PosedgeFiresOnXToOne) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 1'bx;\n"
+      "    #5 clk = 1;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(posedge clk) x = 8'd22;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 22u);
+}
+
+// §9.4.2 Table 9-2: a negedge shall be detected on the transition from 1
+// to x.
+TEST(EventControlSim, NegedgeFiresOnOneToX) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 1;\n"
+      "    #5 clk = 1'bx;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(negedge clk) x = 8'd33;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 33u);
+}
+
+// §9.4.2 Table 9-2: a negedge shall be detected on the transition from x
+// to 0.
+TEST(EventControlSim, NegedgeFiresOnXToZero) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 1'bx;\n"
+      "    #5 clk = 0;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(negedge clk) x = 8'd44;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 44u);
+}
+
+// §9.4.2: "An edge event shall be detected only on the LSB of the
+// expression." Symmetric to PosedgeDetectsOnlyLsb: a non-LSB-only change
+// in a multi-bit signal must not fire negedge.
+TEST(EventControlSim, NegedgeDetectsOnlyLsb) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] wide;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    wide = 8'd3;\n"
+      "    #5 wide = 8'd1;\n"
+      "    #5 wide = 8'd0;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(negedge wide) x = 8'd55;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 55u);
+}
+
+// §9.4.2: "An edge event shall be detected only on the LSB of the
+// expression." Same rule for the `edge` keyword.
+TEST(EventControlSim, EdgeDetectsOnlyLsb) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] wide;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    wide = 8'd0;\n"
+      "    #5 wide = 8'd2;\n"
+      "    #5 wide = 8'd3;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(edge wide) x = 8'd66;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 66u);
+}
+
 TEST(EventControlSim, NamedEventControlWakesProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(

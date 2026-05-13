@@ -63,42 +63,11 @@ TEST(TimingControlSimulation, DelayControlSequentialDelays) {
 }
 
 // --- event_control simulation ---
-
-TEST(TimingControlSimulation, EventControlPosedgeWaits) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic clk, x;\n"
-      "  initial begin\n"
-      "    clk = 0;\n"
-      "    x = 0;\n"
-      "    #5 clk = 1;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    @(posedge clk) x = 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"x", 1u}});
-}
-
-TEST(TimingControlSimulation, EventControlNegedgeWaits) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic clk, x;\n"
-      "  initial begin\n"
-      "    clk = 1;\n"
-      "    x = 0;\n"
-      "    #5 clk = 0;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    @(negedge clk) x = 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"x", 1u}});
-}
+//
+// Runtime wakeup behavior for posedge/negedge event control is governed
+// by §9.4.2 (Table 9-2). The corresponding simulator tests live in the
+// canonical file test_simulator_clause_09_04_02.cpp; only @(*) implicit
+// sensitivity (§9.4.2.2) remains here.
 
 TEST(TimingControlSimulation, EventControlStarWaitsAnyChange) {
   SimFixture f;
