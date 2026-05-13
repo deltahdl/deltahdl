@@ -1,4 +1,4 @@
-"""Unit tests for satisfy_subclause.pipeline._list_issues_for.
+"""Unit tests for lib.python.github._list_issues_for.
 
 The §X master-list / legacy-audit issues for a heavily-subdivided clause
 (e.g. §23, with §23.x.y.z descendants) easily exceed the 30-result default
@@ -10,20 +10,20 @@ These tests guard the limit by inspecting the gh argv.
 """
 
 from collections.abc import Callable
-from typing import cast
 from unittest.mock import MagicMock, patch
 
-from satisfy_subclause.pipeline import _list_issues_for
+from lib.python.github import _list_issues_for
 
 
 def _gh_argv_for(stub_completed: Callable[..., MagicMock]) -> list[str]:
     """Run _list_issues_for with a stubbed gh and return its argv."""
     with patch(
-        "satisfy_subclause.pipeline.subprocess.run",
+        "lib.python.github.subprocess.run",
         return_value=stub_completed(stdout="[]"),
     ) as mock_run:
         _list_issues_for("23")
-    return cast(list[str], mock_run.call_args_list[0][0][0])
+    argv: list[str] = mock_run.call_args_list[0][0][0]
+    return argv
 
 
 def test_list_issues_for_passes_limit_flag(

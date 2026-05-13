@@ -4,6 +4,7 @@ import json
 import re
 import subprocess
 import sys
+from typing import Any
 
 
 def format_subclause_label(subclause: str) -> str:
@@ -313,3 +314,175 @@ def remove_test_row(body: str, test_name: str) -> str:
             f"Row for {test_name!r} not found in issue body",
         )
     return body[:match.start()] + body[match.end():]
+
+
+# ---------------------------------------------------------------------------
+# Subclause-issue find-or-create
+# ---------------------------------------------------------------------------
+#
+# Consumed by multiple satisfaction scripts (satisfy_subclause,
+# satisfy_clause, satisfy_subclauses), so the find-or-create surface
+# lives here rather than inside any one script.
+
+
+def issue_title_for(subclause: str) -> str:
+    """Return the canonical GitHub issue title for *subclause*."""
+    return f"Satisfy IEEE 1800-2023 §{subclause}"
+
+
+def _ensure_audit_title(subclause_marker: str) -> str:
+    """Return the ``Ensure IEEE 1800-2023 …`` audit title for the given marker."""
+    return (
+        f"Ensure IEEE 1800-2023 {subclause_marker} functionalities and tests"
+        " are implemented and properly named"
+    )
+
+
+def legacy_issue_title_for(subclause: str) -> str:
+    """Return the legacy audit-style ``Ensure …`` title (numeric-form, with §)."""
+    return _ensure_audit_title(f"§{subclause}")
+
+
+def _legacy_audit_annex_title_for(subclause: str) -> str:
+    """Return the legacy audit-style ``Ensure …`` title (annex-form, no §)."""
+    return _ensure_audit_title(subclause)
+
+
+def _title_matches(title: str, subclause: str) -> bool:
+    """Return True if *title* matches any recognised shape for *subclause*."""
+    master_prefix = f"Implement IEEE 1800-2023 §{subclause}"
+    if title in {
+        issue_title_for(subclause),
+        f"Satisfy §{subclause}",
+        legacy_issue_title_for(subclause),
+        _legacy_audit_annex_title_for(subclause),
+        master_prefix,
+    }:
+        return True
+    return title.startswith(master_prefix + " ")
+
+
+def parse_issue_number_from_create_output(output: str) -> int:
+    """Extract the issue number from a ``gh issue create`` URL."""
+    url = output.strip().splitlines()[-1].strip()
+    return int(url.rsplit("/", 1)[-1])
+
+
+def _list_issues_for(subclause: str) -> list[dict[str, Any]]:
+    """Return the gh-issue-list payload for *subclause* (loud-fatal on error).
+
+    ``gh issue list`` defaults to 30 results. A heavily-subdivided clause
+    (e.g. §23 with §23.x.y.z descendants) easily exceeds that, pushing
+    the master-list issue past the cutoff so the matcher can't see it
+    and silently opens a duplicate. Raise the limit well above any
+    realistic per-clause result count.
+    """
+    completed = subprocess.run(
+        [
+            "gh", "issue", "list",
+            "--state", "all",
+            "--search", f"§{subclause}",
+            "--json", "number,title,state",
+            "--limit", "1000",
+        ],
+        capture_output=True, text=True, check=False,
+    )
+    if completed.returncode != 0:
+        print(completed.stderr, file=sys.stderr)
+        sys.exit(completed.returncode)
+    return json.loads(completed.stdout) if completed.stdout.strip() else []
+
+
+def _label_create_args(labels: list[str]) -> list[str]:
+    """Return ``["--label", L1, "--label", L2, …]`` for ``gh issue create``."""
+    args: list[str] = []
+    for label in labels:
+        args.extend(["--label", label])
+    return args
+
+
+def _create_new_issue(subclause: str, labels: list[str]) -> int:
+    """Create a fresh issue for *subclause* and return its number."""
+    completed = subprocess.run(
+        [
+            "gh", "issue", "create",
+            "--title", issue_title_for(subclause),
+            *_label_create_args(labels),
+            "--body", (
+                f"Track satisfying §{subclause} via the satisfaction"
+                " pipeline (#1265)."
+            ),
+        ],
+        capture_output=True, text=True, check=False,
+    )
+    if completed.returncode != 0:
+        print(completed.stderr, file=sys.stderr)
+        sys.exit(completed.returncode)
+    return parse_issue_number_from_create_output(completed.stdout)
+
+
+def _apply_labels(number: int, labels: list[str]) -> None:
+    """Add *labels* to issue *number*.
+
+    ``gh issue edit --add-label`` accepts a comma-separated list and is
+    idempotent, so this is safe to call on issues that already carry
+    any of the labels.
+    """
+    subprocess.run(
+        [
+            "gh", "issue", "edit", str(number),
+            "--add-label", ",".join(labels),
+        ],
+        check=False,
+    )
+
+
+def find_or_create_issue(subclause: str, *, labels: list[str]) -> int:
+    """Return the issue number for *subclause*.
+
+    Searches for any pre-existing issue whose title matches one of the
+    recognised shapes — current canonical (``Satisfy IEEE 1800-2023
+    §X``), deprecated short canonical (``Satisfy §X``), legacy audit
+    forms (``Ensure IEEE 1800-2023 [§]X functionalities …``), or
+    master-list form (``Implement IEEE 1800-2023 §X …``) — and reuses
+    it. When multiple matches exist (e.g. a master-list issue plus a
+    recently-created duplicate), the issue with the smallest number is
+    retained and the others are hard-deleted via ``gh issue delete
+    --yes``. The retained issue is renamed to the new canonical (and
+    any descriptive trailing text from the master-list form is
+    dropped), reopened if closed, and tagged with every label in
+    *labels*. Creates a fresh issue (carrying the same labels) when no
+    match exists.
+    """
+    matches = [
+        entry for entry in _list_issues_for(subclause)
+        if _title_matches(entry.get("title", "") or "", subclause)
+    ]
+    if not matches:
+        return _create_new_issue(subclause, labels)
+
+    matches.sort(key=lambda entry: int(entry["number"]))
+    oldest, *duplicates = matches
+    for dup_entry in duplicates:
+        subprocess.run(
+            [
+                "gh", "issue", "delete",
+                str(int(dup_entry["number"])), "--yes",
+            ],
+            check=False,
+        )
+
+    number = int(oldest["number"])
+    canonical = issue_title_for(subclause)
+    if oldest.get("title") != canonical:
+        subprocess.run(
+            ["gh", "issue", "edit", str(number), "--title", canonical],
+            check=False,
+        )
+    if oldest.get("state", "").lower() == "closed":
+        subprocess.run(
+            ["gh", "issue", "reopen", str(number)],
+            check=False,
+        )
+    _apply_labels(number, labels)
+    return number

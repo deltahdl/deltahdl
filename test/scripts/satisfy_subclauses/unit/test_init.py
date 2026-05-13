@@ -2,6 +2,7 @@
 
 import runpy
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -62,11 +63,52 @@ def test_parse_args_requires_labels(make_lrm: Path) -> None:
         ])
 
 
-def test_parse_args_requires_subclauses(make_lrm: Path) -> None:
-    """--subclauses is required."""
+def test_parse_args_requires_one_of_subclauses_or_issue(make_lrm: Path) -> None:
+    """At least one of --subclauses or --issue is required."""
     with pytest.raises(SystemExit):
         satisfy_subclauses.parse_args([
             "--lrm", str(make_lrm),
+            "--labels", "IEEE 1800-2023",
+        ])
+
+
+def test_parse_args_rejects_both_subclauses_and_issue(make_lrm: Path) -> None:
+    """--subclauses and --issue are mutually exclusive."""
+    with pytest.raises(SystemExit):
+        satisfy_subclauses.parse_args([
+            "--lrm", str(make_lrm),
+            "--subclauses", "33.1",
+            "--issue", "1",
+            "--labels", "IEEE 1800-2023",
+        ])
+
+
+def test_parse_args_issue_value_int(make_lrm: Path) -> None:
+    """--issue parses as an int and --subclauses stays unset."""
+    args = satisfy_subclauses.parse_args([
+        "--lrm", str(make_lrm),
+        "--issue", "1",
+        "--labels", "IEEE 1800-2023",
+    ])
+    assert args.issue == 1 and args.subclauses is None
+
+
+def test_parse_args_subclauses_mode_leaves_issue_unset(make_lrm: Path) -> None:
+    """--subclauses mode leaves args.issue as None."""
+    args = satisfy_subclauses.parse_args([
+        "--lrm", str(make_lrm),
+        "--subclauses", "33.1",
+        "--labels", "IEEE 1800-2023",
+    ])
+    assert args.issue is None
+
+
+def test_parse_args_issue_must_be_int(make_lrm: Path) -> None:
+    """--issue value must parse as int."""
+    with pytest.raises(SystemExit):
+        satisfy_subclauses.parse_args([
+            "--lrm", str(make_lrm),
+            "--issue", "foo",
             "--labels", "IEEE 1800-2023",
         ])
 
@@ -140,6 +182,65 @@ def test_main_passes_labels_to_pipeline(make_lrm: Path) -> None:
             "--labels", "IEEE 1800-2023,bug",
         ])
     assert mock_pipeline.call_args[1]["labels"] == ["IEEE 1800-2023", "bug"]
+
+
+def test_main_issue_mode_dispatches_via_from_issue(make_lrm: Path) -> None:
+    """main() with --issue routes through satisfy_subclauses_from_issue."""
+    with patch(
+        "satisfy_subclauses.satisfy_subclauses_from_issue",
+    ) as mock_from_issue:
+        satisfy_subclauses.main([
+            "--lrm", str(make_lrm),
+            "--issue", "1",
+            "--labels", "IEEE 1800-2023",
+        ])
+    assert mock_from_issue.call_args[0][0] == 1
+
+
+def _capture_from_issue_call(make_lrm: Path) -> Any:
+    """Run main() with --issue and return the captured call object."""
+    with patch(
+        "satisfy_subclauses.satisfy_subclauses_from_issue",
+    ) as mock_from_issue:
+        satisfy_subclauses.main([
+            "--lrm", str(make_lrm),
+            "--issue", "1",
+            "--model", "haiku",
+            "--labels", "IEEE 1800-2023,bug",
+        ])
+    return mock_from_issue.call_args
+
+
+def test_main_issue_mode_forwards_lrm(make_lrm: Path) -> None:
+    """main() with --issue forwards the resolved --lrm path."""
+    call = _capture_from_issue_call(make_lrm)
+    assert call[0][1] == str(make_lrm)
+
+
+def test_main_issue_mode_forwards_model(make_lrm: Path) -> None:
+    """main() with --issue forwards the --model value."""
+    call = _capture_from_issue_call(make_lrm)
+    assert call[1]["model"] == "haiku"
+
+
+def test_main_issue_mode_forwards_labels(make_lrm: Path) -> None:
+    """main() with --issue forwards the parsed labels list."""
+    call = _capture_from_issue_call(make_lrm)
+    assert call[1]["labels"] == ["IEEE 1800-2023", "bug"]
+
+
+def test_main_subclauses_mode_does_not_call_from_issue(make_lrm: Path) -> None:
+    """main() with --subclauses does not invoke the --issue entry point."""
+    with patch(
+        "satisfy_subclauses.satisfy_subclauses_from_issue",
+    ) as mock_from_issue:
+        with patch("satisfy_subclauses.satisfy_subclauses"):
+            satisfy_subclauses.main([
+                "--lrm", str(make_lrm),
+                "--subclauses", "33.1",
+                "--labels", "IEEE 1800-2023",
+            ])
+    assert not mock_from_issue.called
 
 
 # --- __main__ guard --------------------------------------------------------

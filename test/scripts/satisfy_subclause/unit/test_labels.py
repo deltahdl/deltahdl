@@ -1,98 +1,22 @@
 """Unit tests for the --labels thread through satisfy_subclause.pipeline.
 
-Covers:
-  - ``find_or_create_issue`` passing every label into ``gh issue create``.
-  - ``find_or_create_issue`` joining labels for ``gh issue edit
-    --add-label`` on existing matches.
-  - ``dispatch_cycle``, ``satisfy_unsatisfied_subclause``, and
-    ``satisfy_subclause`` forwarding labels into their downstream calls.
+Covers ``dispatch_cycle``, ``satisfy_unsatisfied_subclause``, and
+``satisfy_subclause`` forwarding labels into their downstream calls.
+(The corresponding label-shape tests for ``find_or_create_issue`` itself
+now live in ``test/lib/python/github/unit/test_find_or_create.py``.)
 """
 
-import json
-from collections.abc import Callable
-from typing import Any, cast
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from satisfy_subclause.mutators import CycleMember
 from satisfy_subclause.pipeline import (
     dispatch_cycle,
-    find_or_create_issue,
     satisfy_subclause,
     satisfy_unsatisfied_subclause,
 )
 
 
-_NEW_CANONICAL = "Satisfy IEEE 1800-2023 §33.4.1.5"
 _LABELS_THREE = ["IEEE 1800-2023", "bug", "needs-triage"]
-
-
-def _patched_run_create(
-    stub_completed: Callable[..., MagicMock],
-) -> Any:
-    """Patch subprocess.run with a (no-match list, create-success) sequence."""
-    list_done = stub_completed(stdout="[]")
-    create_done = stub_completed(stdout="https://github.com/o/r/issues/501")
-    return patch(
-        "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[list_done, create_done],
-    )
-
-
-def _patched_run_with_match(
-    stub_completed: Callable[..., MagicMock], *, number: int, title: str,
-) -> Any:
-    """Patch subprocess.run with a one-entry OPEN list match (no extra calls)."""
-    body = json.dumps([
-        {"number": number, "title": title, "state": "OPEN"},
-    ])
-    return patch(
-        "satisfy_subclause.pipeline.subprocess.run",
-        return_value=stub_completed(stdout=body),
-    )
-
-
-def _label_create_values(create_cmd: list[str]) -> list[str]:
-    """Return every ``--label`` value in *create_cmd* in input order."""
-    return [
-        create_cmd[i + 1]
-        for i, token in enumerate(create_cmd) if token == "--label"
-    ]
-
-
-def _add_label_value(mock_run: MagicMock) -> str:
-    """Return the single ``--add-label`` value captured by *mock_run*."""
-    for call in mock_run.call_args_list:
-        cmd = call[0][0]
-        if cmd[:3] == ["gh", "issue", "edit"] and "--add-label" in cmd:
-            return cast(str, cmd[cmd.index("--add-label") + 1])
-    raise AssertionError("no --add-label call recorded")
-
-
-# --- find_or_create_issue: gh issue create label arguments -----------------
-
-
-def test_create_passes_every_label_in_order(
-    stub_completed: Callable[..., MagicMock],
-) -> None:
-    """gh issue create includes every --labels-supplied label in order."""
-    with _patched_run_create(stub_completed) as mock_run:
-        find_or_create_issue("33.4.1.5", labels=_LABELS_THREE)
-    create_cmd = mock_run.call_args_list[1][0][0]
-    assert _label_create_values(create_cmd) == _LABELS_THREE
-
-
-# --- find_or_create_issue: --add-label on existing matches -----------------
-
-
-def test_add_label_joins_labels_with_commas(
-    stub_completed: Callable[..., MagicMock],
-) -> None:
-    """Multiple labels collapse into a single comma-separated --add-label arg."""
-    with _patched_run_with_match(
-        stub_completed, number=99, title=_NEW_CANONICAL,
-    ) as mock_run:
-        find_or_create_issue("33.4.1.5", labels=_LABELS_THREE)
-    assert _add_label_value(mock_run) == ",".join(_LABELS_THREE)
 
 
 # --- labels threaded through orchestration ---------------------------------

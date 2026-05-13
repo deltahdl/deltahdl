@@ -7,6 +7,17 @@ from unittest.mock import MagicMock
 import pytest
 
 
+def make_stub_completed(
+    stdout: str = "", returncode: int = 0, stderr: str = "",
+) -> MagicMock:
+    """Return a stubbed ``CompletedProcess``-shaped MagicMock."""
+    completed = MagicMock()
+    completed.returncode = returncode
+    completed.stdout = stdout
+    completed.stderr = stderr
+    return completed
+
+
 def stub_subprocess_success(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
     """Stub subprocess.run to succeed; return list of captured commands."""
     captured: list[list[str]] = []

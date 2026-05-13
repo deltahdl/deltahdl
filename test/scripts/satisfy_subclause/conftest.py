@@ -6,21 +6,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from lib.python.test_fixtures.subprocess_stubs import make_stub_completed
+
 
 @pytest.fixture()
 def stub_completed() -> Callable[..., MagicMock]:
     """Return a factory building stubbed ``CompletedProcess`` mocks."""
-
-    def _make(
-        stdout: str = "", returncode: int = 0, stderr: str = "",
-    ) -> MagicMock:
-        completed = MagicMock()
-        completed.returncode = returncode
-        completed.stdout = stdout
-        completed.stderr = stderr
-        return completed
-
-    return _make
+    return make_stub_completed
 
 
 @pytest.fixture()

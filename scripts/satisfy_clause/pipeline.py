@@ -8,9 +8,9 @@ surface the mismatch.
 
 import sys
 
-from satisfy_subclause.pipeline import find_or_create_issue
 from satisfy_subclauses.pipeline import satisfy_subclauses
 
+from lib.python.github import find_or_create_issue
 from lib.python.lrm import load_toc
 
 
