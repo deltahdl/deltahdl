@@ -221,6 +221,35 @@ bool IsSignedType(const DataType& dtype, const TypedefMap& typedefs) {
                   : (dtype.is_signed || IsImplicitlySigned(dtype.kind));
 }
 
+// --- §6.9: Vector predicate ---
+
+// §6.9 normatively defines a vector as a multibit reg/logic/bit (or
+// implicitly logic) declared with a range, and states that "Vectors are
+// packed arrays of scalars". The predicate therefore requires exactly one
+// packed dimension over a single-bit element kind.
+bool IsVector(const DataType& dtype) {
+  if (!dtype.packed_dim_left || !dtype.packed_dim_right) return false;
+  if (!dtype.extra_packed_dims.empty()) return false;
+  switch (dtype.kind) {
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+    case DataTypeKind::kBit:
+    case DataTypeKind::kImplicit:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §6.9 enumerates "reg, logic, or bit (or as a matching user-defined type
+// or implicitly as logic)" as the types that participate in the scalar /
+// vector distinction. Resolve named types through the typedef map so a
+// `typedef logic [7:0] byte_t` is recognised as a §6.9 vector when used.
+bool IsVector(const DataType& dtype, const TypedefMap& typedefs) {
+  const auto* resolved = ResolveNamed(dtype, typedefs);
+  return resolved ? IsVector(*resolved, typedefs) : IsVector(dtype);
+}
+
 // --- §6.4: Singular and aggregate types ---
 
 bool IsAggregateType(const DataType& dtype) {

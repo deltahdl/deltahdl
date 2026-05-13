@@ -53,6 +53,19 @@ bool IsSignedType(const DataType& dtype, const TypedefMap& typedefs);
 // Forward declarations
 struct Expr;
 
+/// §6.9: Return true if the type denotes a *vector*. §6.9 normatively
+/// defines a vector as a multibit reg/logic/bit (or implicitly logic)
+/// declared with a range, and states that "Vectors are packed arrays of
+/// scalars" — so the predicate requires exactly one packed dimension (no
+/// extra_packed_dims) and an element kind in {logic, reg, bit, implicit}.
+bool IsVector(const DataType& dtype);
+
+/// §6.9: Overload that resolves *matching user-defined types* through the
+/// typedef map. §6.9's enumeration of vector element types explicitly
+/// includes "a matching user-defined type", so a typedef whose underlying
+/// type is a one-dimensional packed reg/logic/bit is itself a §6.9 vector.
+bool IsVector(const DataType& dtype, const TypedefMap& typedefs);
+
 /// §6.4: Return true if the data type is singular (not an unpacked struct,
 /// unpacked union, or unpacked array).  Packed structs/unions are singular.
 bool IsSingularType(const DataType& dtype);

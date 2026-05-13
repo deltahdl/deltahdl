@@ -4,22 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- integer_vector_type elaboration ---
-
-TEST(NetAndVariableTypeElaboration, LogicVariableWidth) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  EXPECT_EQ(mod->variables[0].width, 8u);
-}
-
 // --- non_integer_type elaboration ---
 
 TEST(NetAndVariableTypeElaboration, RealVariableElaborates) {

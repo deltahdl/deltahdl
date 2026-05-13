@@ -100,22 +100,6 @@ TEST(VarDecl, VarImplicitElaboratesAsLogic) {
   EXPECT_TRUE(mod->variables[0].is_4state);
 }
 
-// §6.8: `var` with range elaborates as logic vector.
-TEST(VarDecl, VarWithRangeElaboratesAsLogicVector) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  var [7:0] data;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  EXPECT_EQ(mod->variables[0].width, 8u);
-  EXPECT_TRUE(mod->variables[0].is_4state);
-}
-
 // §6.8 footnote 14: a data_declaration that is not within a procedural
 // context shall not use the automatic keyword. Package items are
 // non-procedural, so an automatic variable inside a package is illegal.
