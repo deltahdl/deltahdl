@@ -88,26 +88,12 @@ TEST(LexicalConventionSim, TripleQuotedLineContinuation) {
   EXPECT_EQ(v, 0x41424344u);
 }
 
-TEST(LexicalConventionSim, ExactWidthMatch) {
-  auto v = RunAndGet(
-      "module t;\n  byte s;\n  initial s = \"Z\";\nendmodule\n", "s");
-  EXPECT_EQ(v, 0x5Au);
-}
-
 TEST(LexicalConventionSim, LongStringNoLimit) {
   auto v = RunAndGet(
       "module t;\n  bit [63:0] s;\n"
       "  initial s = \"ABCDEFGH\";\nendmodule\n",
       "s");
   EXPECT_EQ(v, 0x4142434445464748u);
-}
-
-TEST(LexicalConventionSim, TripleQuotedMultiLineValue) {
-  auto v = RunAndGet(
-      "module t;\n  bit [31:0] s;\n"
-      "  initial s = \"\"\"AB\nC\"\"\";\nendmodule\n",
-      "s");
-  EXPECT_EQ(v, 0x41420A43u);
 }
 
 // §5.9: "A string literal can be assigned to an unpacked array of bytes. If

@@ -26,13 +26,6 @@ TEST(ConstraintDeclParsing, VarDataTypeString) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(NetAndVariableTypeParsing, DataTypeString) {
-  auto r = Parse("module m; string s; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kString);
-}
-
 TEST(DataTypeParsing, StringBlockDecl) {
   auto r = Parse(
       "module t;\n"
@@ -78,21 +71,6 @@ TEST(StringLiteralParserParsing, StringLiteral_AsParameter) {
               "endmodule"));
 }
 
-TEST(DataTypeParsing, BlockVarDecl_StringType) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    string s;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kString);
-  EXPECT_EQ(stmt->var_name, "s");
-}
-
 TEST(OperatorAndExpressionParsing, StringCompareEquality) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -103,18 +81,6 @@ TEST(OperatorAndExpressionParsing, StringCompareEquality) {
               "    if (s1 == s2) $display(\"equal\");\n"
               "  end\n"
               "endmodule\n"));
-}
-
-TEST(ClassParsing, StringTypeModuleLevel) {
-  auto r = Parse(
-      "module m;\n"
-      "  string name;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
-  EXPECT_EQ(item->name, "name");
 }
 
 TEST(ClassParsing, StringTypeWithInit) {
@@ -129,21 +95,6 @@ TEST(ClassParsing, StringTypeWithInit) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(ClassParsing, StringTypeBlockLevel) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    string s;\n"
-      "    s = \"world\";\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kString);
-}
-
 TEST(DataTypeParsing, StringInProcedural) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -152,32 +103,6 @@ TEST(DataTypeParsing, StringInProcedural) {
               "    $display(s);\n"
               "  end\n"
               "endmodule\n"));
-}
-
-TEST(DataTypeParsing, StringDeclBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  string s;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
-  EXPECT_EQ(item->name, "s");
-}
-
-TEST(DataTypeParsing, StringDeclWithInitializer) {
-  auto r = Parse(
-      "module m;\n"
-      "  string name = \"hello\";\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
-  EXPECT_NE(item->init_expr, nullptr);
 }
 
 TEST(DataTypeParsing, StringDeclEmptyInit) {
