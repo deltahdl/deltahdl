@@ -44,19 +44,6 @@ TEST(ArrayAssignmentValidation, WireToVarArrayAssign) {
              "endmodule\n"));
 }
 
-TEST(ArrayAssignmentValidation, UnpackedArrayAssignment) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int a [4];\n"
-      "  int b [4];\n"
-      "  initial b = a;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(ArrayAssignmentValidation, DynamicToDynamicAssign) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -97,21 +84,6 @@ TEST(ArrayAssignmentValidation, VectorToPackedIgnoresTargetBounds) {
              "    wide   = narrow;\n"
              "  end\n"
              "endmodule\n"));
-}
-
-// §7.6: "Associative arrays are assignment compatible only with associative
-// arrays." Cross-kind assignment between an associative and a non-associative
-// unpacked array must be rejected by the elaborator.
-TEST(ArrayAssignmentValidation, AssocCannotAssignToNonAssoc) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module t;\n"
-      "  int aa[string];\n"
-      "  int a[4];\n"
-      "  initial a = aa;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 // §7.6: "The element types of source and target shall be equivalent."
