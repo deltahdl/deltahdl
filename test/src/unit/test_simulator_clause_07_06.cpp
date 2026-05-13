@@ -148,6 +148,29 @@ TEST(ArrayAssignmentSimulation, SliceLhsTreatedAsSingleAssignment) {
   EXPECT_EQ(v, 30u);
 }
 
+// §7.5: "The size of a dynamic array is set by the new constructor or array
+// assignment, described in 7.5.1 and 7.6, respectively." §7.6: "If the target
+// of the assignment is a queue or dynamic array, it shall be resized to have
+// the same number of elements as the source expression." Mirrors the §7.6
+// example `int A[100:1]; int B[]; B = A; // OK. B has 100 elements`: a
+// fixed-size source must extend the dynamic target's size from zero to the
+// source's element count.
+TEST(ArrayAssignmentSimulation, FixedSourceResizesDynamicTarget) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int src[5];\n"
+      "  int dst[];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    src[0] = 11; src[1] = 22; src[2] = 33; src[3] = 44; src[4] = 55;\n"
+      "    dst = src;\n"
+      "    result = dst.size();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 5u);
+}
+
 // §7.6: "An attempt to copy a dynamic array or queue into a fixed-size array
 // target having a different number of elements shall result in a run-time
 // error and no operation shall be performed."
