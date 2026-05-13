@@ -137,4 +137,122 @@ TEST(ClockingBlockEventSim, EventFiresInObservedRegion) {
   EXPECT_EQ(order[1], "observed");
 }
 
+TEST(SyncEventSim, WaitForClockingBlockEvent) {
+  ClockingSimFixture f;
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kPosedge;
+  block.default_input_skew = SimTime{0};
+  block.default_output_skew = SimTime{0};
+  cmgr.Register(block);
+
+  // Create block event variable and register it.
+  auto* ev_var = f.ctx.CreateVariable("cb", 1);
+  ev_var->is_event = true;
+  cmgr.SetBlockEventVar("cb", ev_var);
+  cmgr.Attach(f.ctx, f.scheduler);
+
+  // Track if watcher fires.
+  bool event_fired = false;
+  ev_var->AddWatcher([&event_fired]() {
+    event_fired = true;
+    return true;
+  });
+
+  SchedulePosedge(f, clk, 10);
+  f.scheduler.Run();
+  EXPECT_TRUE(event_fired);
+}
+
+TEST(ClockingBlockEventSim, NegedgeBlockTriggersOnNegedge) {
+  ClockingSimFixture f;
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 1);
+
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kNegedge;
+  block.default_input_skew = SimTime{0};
+  block.default_output_skew = SimTime{0};
+  cmgr.Register(block);
+
+  auto* cb_event = f.ctx.CreateVariable("__cb_event", 1);
+  cb_event->is_event = true;
+  cmgr.SetBlockEventVar("cb", cb_event);
+
+  cmgr.Attach(f.ctx, f.scheduler);
+
+  bool triggered = false;
+  cb_event->AddWatcher([&triggered]() {
+    triggered = true;
+    return true;
+  });
+
+  ScheduleNegedge(f, clk, 10);
+  f.scheduler.Run();
+
+  EXPECT_TRUE(triggered);
+}
+
+TEST(ClockingBlockEventSim, MultipleBlocksTriggerIndependentEvents) {
+  ClockingSimFixture f;
+  auto* clk1 = f.ctx.CreateVariable("clk1", 1);
+  clk1->value = MakeLogic4VecVal(f.arena, 1, 0);
+  auto* clk2 = f.ctx.CreateVariable("clk2", 1);
+  clk2->value = MakeLogic4VecVal(f.arena, 1, 0);
+
+  ClockingManager cmgr;
+
+  ClockingBlock b1;
+  b1.name = "cb1";
+  b1.clock_signal = "clk1";
+  b1.clock_edge = Edge::kPosedge;
+  b1.default_input_skew = SimTime{0};
+  b1.default_output_skew = SimTime{0};
+  cmgr.Register(b1);
+
+  ClockingBlock b2;
+  b2.name = "cb2";
+  b2.clock_signal = "clk2";
+  b2.clock_edge = Edge::kPosedge;
+  b2.default_input_skew = SimTime{0};
+  b2.default_output_skew = SimTime{0};
+  cmgr.Register(b2);
+
+  auto* ev1 = f.ctx.CreateVariable("__cb1_event", 1);
+  ev1->is_event = true;
+  cmgr.SetBlockEventVar("cb1", ev1);
+
+  auto* ev2 = f.ctx.CreateVariable("__cb2_event", 1);
+  ev2->is_event = true;
+  cmgr.SetBlockEventVar("cb2", ev2);
+
+  cmgr.Attach(f.ctx, f.scheduler);
+
+  bool ev1_fired = false;
+  bool ev2_fired = false;
+  ev1->AddWatcher([&ev1_fired]() {
+    ev1_fired = true;
+    return true;
+  });
+  ev2->AddWatcher([&ev2_fired]() {
+    ev2_fired = true;
+    return true;
+  });
+
+  // Posedge only on clk1 — only cb1's named event should trigger.
+  SchedulePosedge(f, clk1, 10);
+  f.scheduler.Run();
+
+  EXPECT_TRUE(ev1_fired);
+  EXPECT_FALSE(ev2_fired);
+}
+
 }  // namespace
