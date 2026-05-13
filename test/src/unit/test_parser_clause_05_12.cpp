@@ -90,32 +90,6 @@ TEST(LexicalConventionParsing, AttrOnContAssign) {
   EXPECT_EQ(item->attrs[0].name, "synthesis_on");
 }
 
-TEST(LexicalConventionParsing, MultipleAttrSpecs) {
-  auto r = Parse(
-      "module m;\n"
-      "  (* full_case, parallel_case *)\n"
-      "  wire a;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_GE(item->attrs.size(), 2u);
-  EXPECT_EQ(item->attrs[0].name, "full_case");
-  EXPECT_EQ(item->attrs[1].name, "parallel_case");
-}
-
-TEST(LexicalConventionParsing, MixedAttrWithAndWithoutValue) {
-  auto r = Parse(
-      "module m;\n"
-      "  (* full_case, parallel_case = 1 *)\n"
-      "  wire a;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_GE(item->attrs.size(), 2u);
-  EXPECT_EQ(item->attrs[0].value, nullptr);
-  EXPECT_NE(item->attrs[1].value, nullptr);
-}
-
 TEST(LexicalConventionParsing, MultipleSeparateInstances) {
   auto r = Parse(
       "module m;\n"
@@ -223,28 +197,6 @@ TEST(LexicalConventionParsing, AttrOnFunctionCallNoArgs) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, AttrValueConstExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  (* depth = 3 + 1 *)\n"
-      "  logic [7:0] mem;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->attrs.size(), 1u);
-  EXPECT_NE(item->attrs[0].value, nullptr);
-  EXPECT_EQ(item->attrs[0].value->kind, ExprKind::kBinary);
-}
-
-TEST(LexicalConventionParsing, AttrValueString) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  (* tool_purpose = \"synthesis\" *)\n"
-              "  logic x;\n"
-              "endmodule\n"));
-}
-
 TEST(LexicalConventionParsing, NestedAttributeError) {
   EXPECT_FALSE(
       ParseOk("module m;\n"
@@ -266,27 +218,6 @@ TEST(LexicalConventionParsing, AttrOnPortConnection) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(LexicalConventionParsing, AttrNamePreserved) {
-  auto r = Parse(
-      "(* my_long_attribute_name *) module m;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules[0]->attrs.empty());
-  EXPECT_EQ(r.cu->modules[0]->attrs[0].name, "my_long_attribute_name");
-}
-
-TEST(LexicalConventionParsing, AttrValueNullWhenNoEquals) {
-  auto r = Parse(
-      "module m;\n"
-      "  (* synthesis *) logic x;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->attrs.size(), 1u);
-  EXPECT_EQ(item->attrs[0].name, "synthesis");
-  EXPECT_EQ(item->attrs[0].value, nullptr);
 }
 
 TEST(LexicalConventionParsing, AttributeOnModuleParses) {
@@ -320,14 +251,6 @@ TEST(LexicalConventionParsing, MultipleAttributesOnModule) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_GE(r.cu->modules[0]->attrs.size(), 2u);
-}
-
-TEST(LexicalConventionParsing, UnterminatedAttributeIsError) {
-  EXPECT_FALSE(ParseOk("(* missing_end module t; endmodule"));
-}
-
-TEST(LexicalConventionParsing, EmptyAttributeIsError) {
-  EXPECT_FALSE(ParseOk("(* *) module t; endmodule"));
 }
 
 }  // namespace

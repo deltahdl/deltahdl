@@ -152,12 +152,42 @@ TEST(AttributeSyntaxParsing, AttrValueStringLiteral) {
   EXPECT_TRUE(ParseOk("(* tool = \"synplify\" *) module m; endmodule\n"));
 }
 
+TEST(AttributeSyntaxParsing, AttrNameEscapedIdentifier) {
+  // §A.9.1: attr_name ::= identifier; §A.9.3:
+  // identifier ::= simple_identifier | escaped_identifier
+  auto r = Parse(
+      "(* \\full-case *)\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->attrs.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->attrs[0].name, "full-case");
+}
+
 TEST(AttributeSyntaxParsing, ErrorUnterminatedAttribute) {
   EXPECT_FALSE(ParseOk("(* missing_end module m; endmodule\n"));
 }
 
 TEST(AttributeSyntaxParsing, ErrorEmptyAttribute) {
   EXPECT_FALSE(ParseOk("(* *) module m; endmodule\n"));
+}
+
+TEST(AttributeSyntaxParsing, ErrorTrailingComma) {
+  // §A.9.1: attribute_instance ::= (* attr_spec { , attr_spec } *) — every
+  // comma must be followed by another attr_spec; a trailing comma is invalid.
+  EXPECT_FALSE(ParseOk("(* full_case, *) module m; endmodule\n"));
+}
+
+TEST(AttributeSyntaxParsing, ErrorMissingCommaBetweenSpecs) {
+  // §A.9.1: consecutive attr_specs must be separated by ',' — adjacent
+  // attr_names with no comma do not match the BNF.
+  EXPECT_FALSE(ParseOk("(* full_case parallel_case *) module m; endmodule\n"));
+}
+
+TEST(AttributeSyntaxParsing, ErrorMissingValueAfterEquals) {
+  // §A.9.1: attr_spec ::= attr_name [ = constant_expression ] — when '='
+  // is present, a constant_expression must follow.
+  EXPECT_FALSE(ParseOk("(* depth = *) module m; endmodule\n"));
 }
 
 }  // namespace

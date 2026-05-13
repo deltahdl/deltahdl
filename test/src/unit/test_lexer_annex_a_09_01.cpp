@@ -66,4 +66,26 @@ TEST(AttributeTokenLexing, ParenStarParenNotAttribute) {
   EXPECT_NE(tokens[0].kind, TokenKind::kAttrStart);
 }
 
+TEST(AttributeTokenLexing, AttrWithStringValue) {
+  // §A.9.1: attr_spec ::= attr_name [ = constant_expression ] — value may
+  // be a string-literal constant_expression.
+  auto tokens = Lex("(* mode = \"cla\" *)");
+  ASSERT_GE(tokens.size(), 5u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kStringLiteral);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kAttrEnd);
+}
+
+TEST(AttributeTokenLexing, AttrWithExprValueTokens) {
+  // §A.9.1: attr_spec ::= attr_name [ = constant_expression ] — value may
+  // be a multi-token arithmetic constant_expression.
+  auto tokens = Lex("(* depth = 3 + 1 *)");
+  ASSERT_GE(tokens.size(), 7u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kPlus);
+  EXPECT_EQ(tokens[5].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[6].kind, TokenKind::kAttrEnd);
+}
+
 }  // namespace

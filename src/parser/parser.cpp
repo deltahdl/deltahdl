@@ -88,7 +88,9 @@ std::vector<Attribute> Parser::ParseAttributes() {
     Consume();  // skip (*
     do {
       Attribute attr;
-      auto tok = Expect(TokenKind::kIdentifier);
+      // §A.9.1: attr_name ::= identifier; §A.9.3 admits both
+      // simple_identifier and escaped_identifier.
+      auto tok = ExpectIdentifier();
       attr.name = tok.text;
       attr.loc = tok.loc;
       if (Match(TokenKind::kEq)) {
