@@ -551,9 +551,11 @@ void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
 }
 
 void Lowerer::LowerVar(const RtlirVariable& var) {
-  // §8: Class handles are 64-bit. §6.12: Real/shortreal store as 64-bit double.
+  // §8: Class handles are 64-bit. §6.12: real and realtime store as C double
+  // (64 bits); shortreal stores as C float (32 bits). The elaborator already
+  // assigns 64 to real/realtime and 32 to shortreal in var.width, so just
+  // preserve it.
   uint32_t width = var.class_type_name.empty() ? var.width : 64;
-  if (var.is_real && width < 64) width = 64;
   auto* v = ctx_.CreateVariable(var.name, width);
   // §6.8 Table 6-7: 2-state types default to 0, real/shortreal to 0.0.
   if (!var.is_4state && !var.is_event && !var.is_string && !var.is_chandle) {

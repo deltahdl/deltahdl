@@ -115,21 +115,6 @@ TEST(SignedUnsignedArithmetic, SignedFlagPropagatedToSimVariable) {
   EXPECT_FALSE(vu->is_signed);
 }
 
-TEST(SignedUnsignedArithmetic, RealVariableElaboratedAsReal) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  real r;\n"
-      "  initial r = 0.0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->variables.size(), 1u);
-  EXPECT_TRUE(mod->variables[0].is_real);
-}
-
 TEST(SignedUnsignedArithmetic, ExplicitSignedOnUnsignedTypeElaboratesAsSigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(

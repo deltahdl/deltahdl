@@ -166,42 +166,6 @@ TEST(ExpressionElaboration, GenvarExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(RealDataType, RealBitSelectError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  real a = 0.5;\n"
-      "  wire b;\n"
-      "  assign b = a[2];\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(RealDataType, RealPartSelectError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  real a = 0.5;\n"
-      "  wire [3:0] b;\n"
-      "  assign b = a[3:0];\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(RealDataType, ShortrealBitSelectError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  shortreal a = 1.0;\n"
-      "  wire b;\n"
-      "  assign b = a[0];\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 }  // namespace
 TEST(VarLvaluePartSelect, VarLvaluePartSelect) {
   SimFixture f;

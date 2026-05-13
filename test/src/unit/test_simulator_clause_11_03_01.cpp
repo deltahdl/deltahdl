@@ -201,4 +201,33 @@ TEST(RealOperandResult, E2eUnaryMinusOnReal) {
   EXPECT_DOUBLE_EQ(v, -3.5);
 }
 
+// §11.3.1: "The result of using ... the inside operator on real operands
+// shall be a single-bit value."
+TEST(RealOperandResult, E2eInsideOnRealIsSingleBit) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  real a;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = 2.0;\n"
+      "    r = a inside {1.0, 2.0, 3.0};\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 1u);
+}
+
+// §11.3.1: "For other operators, if any operand, except before the ? in the
+// conditional operator, is real, the result is real." A real-and-integer
+// arithmetic expression must preserve fractional precision.
+TEST(RealOperandResult, E2eMixedRealIntArithResultIsReal) {
+  auto v = RunAndGetReal(
+      "module t;\n"
+      "  real x;\n"
+      "  initial x = 1.5 + 2;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_DOUBLE_EQ(v, 3.5);
+}
+
 }  // namespace

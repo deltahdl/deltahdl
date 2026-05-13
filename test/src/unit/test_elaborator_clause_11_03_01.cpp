@@ -400,4 +400,103 @@ TEST(RealOps, LegalOpOnRealInContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §11.3.1: "The result of using ... the inside operator on real operands
+// shall be a single-bit value." inside operator is therefore legal on real.
+TEST(RealOps, InsideOnRealIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real a;\n"
+      "  logic c;\n"
+      "  initial c = a inside {1.0, 2.0, 3.0};\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §11.3.1 Table 11-1: increment operator ++ is listed with operand type
+// "Integral, real, shortreal" — legal on real.
+TEST(RealOps, IncrementOnRealIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real a;\n"
+      "  initial begin a = 1.0; a++; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §11.3.1 Table 11-1: decrement operator -- has operand type
+// "Integral, real, shortreal" — legal on real.
+TEST(RealOps, DecrementOnRealIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real a;\n"
+      "  initial begin a = 1.0; a--; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §11.3.1 Table 11-1: the binary logical operators include -> with operand
+// type "Integral, real, shortreal"; -> on real shall not be rejected and
+// shall (per §11.3.1) yield a single-bit result.
+TEST(RealOps, ImplicationOnRealIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real a, b;\n"
+      "  logic c;\n"
+      "  initial c = a -> b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §11.3.1 Table 11-1: <-> is a binary logical operator accepting real
+// operands.
+TEST(RealOps, EquivalenceOnRealIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real a, b;\n"
+      "  logic c;\n"
+      "  initial c = a <-> b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §11.3.1: "Real operands can also be used in the following expressions:
+// str.realval // structure or union member"
+TEST(RealOps, StructMemberRealAccessIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { real realval; } S;\n"
+      "  S s;\n"
+      "  real v;\n"
+      "  initial v = s.realval;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §11.3.1: "Real operands can also be used in the following expressions:
+// realarray[intval] // array element"
+TEST(RealOps, RealArrayElementAccessIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real arr[4];\n"
+      "  real v;\n"
+      "  int i;\n"
+      "  initial begin i = 0; v = arr[i]; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

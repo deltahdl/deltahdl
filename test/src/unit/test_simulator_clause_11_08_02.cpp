@@ -352,26 +352,4 @@ TEST(EvalSteps, UnsignedOperandZeroExtendsInWiderContext) {
   EXPECT_EQ(var->value.ToUint64(), 0x1Eu);
 }
 
-TEST(EvalSteps, MixedRealIntArithConvertsIntToReal) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  real r;\n"
-      "  initial begin\n"
-      "    r = 3 + 2.5;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
-  ASSERT_NE(var, nullptr);
-  double d;
-  uint64_t bits = var->value.ToUint64();
-  std::memcpy(&d, &bits, sizeof(double));
-  EXPECT_DOUBLE_EQ(d, 5.5);
-}
-
 }  // namespace

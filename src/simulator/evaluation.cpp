@@ -206,9 +206,16 @@ static Logic4Vec EvalSignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   result.is_signed = true;
   return result;
 }
-// §11.3.1: Convert Logic4Vec to double (real if is_real, else cast uint64).
+// §6.12: real holds C double bits (width 64); shortreal holds C float bits
+// (width 32). Convert either representation to double for computation.
 static double ToDouble(const Logic4Vec& v) {
   if (v.is_real) {
+    if (v.width == 32) {
+      float f = 0.0f;
+      auto bits = static_cast<uint32_t>(v.ToUint64());
+      std::memcpy(&f, &bits, sizeof(float));
+      return static_cast<double>(f);
+    }
     double d = 0.0;
     uint64_t bits = v.ToUint64();
     std::memcpy(&d, &bits, sizeof(double));
@@ -216,33 +223,54 @@ static double ToDouble(const Logic4Vec& v) {
   }
   return static_cast<double>(v.ToUint64());
 }
-// §11.3.1: Wrap a double result into a real Logic4Vec.
-static Logic4Vec MakeRealResult(Arena& arena, double val) {
+// §11.3.1: Wrap a double result into a real Logic4Vec at the requested
+// precision. result_width==32 stores the value in C-float precision per §6.12.
+static Logic4Vec MakeRealResult(Arena& arena, double val,
+                                uint32_t result_width = 64) {
+  if (result_width == 32) {
+    auto f = static_cast<float>(val);
+    uint32_t bits = 0;
+    std::memcpy(&bits, &f, sizeof(float));
+    auto r = MakeLogic4VecVal(arena, 32, bits);
+    r.is_real = true;
+    return r;
+  }
   uint64_t bits = 0;
   std::memcpy(&bits, &val, sizeof(double));
   auto r = MakeLogic4VecVal(arena, 64, bits);
   r.is_real = true;
   return r;
 }
-// §11.3.1: Real binary arithmetic — both operands converted to double.
+// §11.3.1: "if any operand … is real, the result is real. Otherwise, if any
+// operand … is shortreal, the result is shortreal." real operands are tagged
+// is_real with width 64; shortreal operands are tagged is_real with width 32.
+static uint32_t RealResultWidth(const Logic4Vec& lhs, const Logic4Vec& rhs) {
+  bool lhs_real64 = lhs.is_real && lhs.width == 64;
+  bool rhs_real64 = rhs.is_real && rhs.width == 64;
+  if (lhs_real64 || rhs_real64) return 64;
+  return 32;
+}
+// §11.3.1: Real binary arithmetic — both operands converted to double,
+// result precision selected by RealResultWidth.
 static Logic4Vec EvalRealArith(TokenKind op, const Logic4Vec& lhs,
                                const Logic4Vec& rhs, Arena& arena) {
   double lv = ToDouble(lhs);
   double rv = ToDouble(rhs);
+  uint32_t w = RealResultWidth(lhs, rhs);
   switch (op) {
     case TokenKind::kPlus:
-      return MakeRealResult(arena, lv + rv);
+      return MakeRealResult(arena, lv + rv, w);
     case TokenKind::kMinus:
-      return MakeRealResult(arena, lv - rv);
+      return MakeRealResult(arena, lv - rv, w);
     case TokenKind::kStar:
-      return MakeRealResult(arena, lv * rv);
+      return MakeRealResult(arena, lv * rv, w);
     case TokenKind::kSlash:
-      if (rv == 0.0) return MakeAllX(arena, 64);
-      return MakeRealResult(arena, lv / rv);
+      if (rv == 0.0) return MakeAllX(arena, w);
+      return MakeRealResult(arena, lv / rv, w);
     case TokenKind::kPower:
-      return MakeRealResult(arena, std::pow(lv, rv));
+      return MakeRealResult(arena, std::pow(lv, rv), w);
     default:
-      return MakeRealResult(arena, 0.0);
+      return MakeRealResult(arena, 0.0, w);
   }
 }
 static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,

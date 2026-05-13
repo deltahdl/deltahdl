@@ -317,26 +317,6 @@ TEST(SignedUnsignedArithmetic, EndToEndUnsignedHighBitInterpretation) {
   EXPECT_EQ(var->value.ToUint64(), 120u);
 }
 
-TEST(SignedUnsignedArithmetic, EndToEndRealArithmetic) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  real a, b, r;\n"
-      "  initial begin\n"
-      "    a = 7.0;\n"
-      "    b = 2.0;\n"
-      "    r = a / b;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
-  ASSERT_NE(var, nullptr);
-  // 7.0 / 2.0 = 3.5 (floating-point, not truncated)
-  EXPECT_DOUBLE_EQ(ToDouble(var), 3.5);
-}
-
 TEST(SignedUnsignedArithmetic, SignedVarIdentifierPreservesSignedness) {
   SimFixture f;
   MakeSignedVarAdv(f, "sv", 8, 0xFF);

@@ -634,7 +634,24 @@ static std::string_view LhsIdentName(const Expr* lhs) {
   return {};
 }
 
-// §6.12.1: Implicit real↔integer conversion on assignment.
+// §6.12: decode a real-tagged Logic4Vec into a host double, honoring shortreal
+// (width 32, C-float bits) vs real/realtime (width 64, C-double bits).
+static double RealVecToDouble(const Logic4Vec& v) {
+  if (v.width == 32) {
+    float f = 0.0f;
+    auto bits = static_cast<uint32_t>(v.ToUint64());
+    std::memcpy(&f, &bits, sizeof(float));
+    return static_cast<double>(f);
+  }
+  double d = 0.0;
+  uint64_t bits = v.ToUint64();
+  std::memcpy(&d, &bits, sizeof(double));
+  return d;
+}
+
+// §6.12: real↔integer conversion (§6.12.1) plus real precision conversion
+// when assigning across real/shortreal/realtime declarations of different
+// widths (§6.12: shortreal = C float, real/realtime = C double).
 static Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
                                      uint32_t target_width, SimContext& ctx,
                                      Arena& arena) {
@@ -642,9 +659,7 @@ static Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
   if (name.empty()) return ResizeToWidth(rhs_val, target_width, arena);
   bool lhs_is_real = ctx.IsRealVariable(name);
   if (rhs_val.is_real && !lhs_is_real) {
-    double d = 0.0;
-    uint64_t bits = rhs_val.ToUint64();
-    std::memcpy(&d, &bits, sizeof(double));
+    double d = RealVecToDouble(rhs_val);
     auto ival = static_cast<uint64_t>(
         static_cast<int64_t>(std::llround(d)));
     auto result = MakeLogic4VecVal(arena, target_width, ival);
@@ -657,6 +672,30 @@ static Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
             ? (rhs_val.words[0].aval & ~rhs_val.words[0].bval)
             : 0;
     auto d = static_cast<double>(raw);
+    if (target_width == 32) {
+      auto f = static_cast<float>(d);
+      uint32_t fbits = 0;
+      std::memcpy(&fbits, &f, sizeof(float));
+      auto result = MakeLogic4VecVal(arena, 32, fbits);
+      result.is_real = true;
+      return result;
+    }
+    uint64_t dbits = 0;
+    std::memcpy(&dbits, &d, sizeof(double));
+    auto result = MakeLogic4VecVal(arena, 64, dbits);
+    result.is_real = true;
+    return result;
+  }
+  if (rhs_val.is_real && lhs_is_real && rhs_val.width != target_width) {
+    double d = RealVecToDouble(rhs_val);
+    if (target_width == 32) {
+      auto f = static_cast<float>(d);
+      uint32_t fbits = 0;
+      std::memcpy(&fbits, &f, sizeof(float));
+      auto result = MakeLogic4VecVal(arena, 32, fbits);
+      result.is_real = true;
+      return result;
+    }
     uint64_t dbits = 0;
     std::memcpy(&dbits, &d, sizeof(double));
     auto result = MakeLogic4VecVal(arena, 64, dbits);
