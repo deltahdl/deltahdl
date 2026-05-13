@@ -21,6 +21,35 @@ static void CollectPathComponents(const Expr* expr,
   }
 }
 
+// §23.10.1: "The expression on the right-hand side of defparam assignments
+// shall be a constant expression involving only numbers and references to
+// parameters. The referenced parameters (on the right-hand side of the
+// defparam) shall be declared in the same module as the defparam statement."
+// A hierarchical reference (member-access chain) or a packaged/$unit-scoped
+// identifier reaches outside the local scope and is rejected as a violation
+// of the same-module constraint.
+static bool RhsContainsHierarchicalRef(const Expr* e) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kMemberAccess) return true;
+  if (e->kind == ExprKind::kIdentifier && !e->scope_prefix.empty()) return true;
+  if (RhsContainsHierarchicalRef(e->lhs)) return true;
+  if (RhsContainsHierarchicalRef(e->rhs)) return true;
+  if (RhsContainsHierarchicalRef(e->base)) return true;
+  if (RhsContainsHierarchicalRef(e->index)) return true;
+  if (RhsContainsHierarchicalRef(e->index_end)) return true;
+  if (RhsContainsHierarchicalRef(e->condition)) return true;
+  if (RhsContainsHierarchicalRef(e->true_expr)) return true;
+  if (RhsContainsHierarchicalRef(e->false_expr)) return true;
+  if (RhsContainsHierarchicalRef(e->repeat_count)) return true;
+  for (const auto* a : e->args) {
+    if (RhsContainsHierarchicalRef(a)) return true;
+  }
+  for (const auto* elem : e->elements) {
+    if (RhsContainsHierarchicalRef(elem)) return true;
+  }
+  return false;
+}
+
 RtlirParamDecl* Elaborator::ResolveDefparamPath(RtlirModule* root,
                                                 const Expr* path_expr,
                                                 RtlirModule** out_mod) {
@@ -86,6 +115,13 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
       }
       if (param->is_localparam) {
         diag_.Error(item->loc, "defparam cannot override a local parameter");
+        applied_defparams_.insert(key);
+        continue;
+      }
+      if (RhsContainsHierarchicalRef(val_expr)) {
+        diag_.Error(item->loc,
+                    "defparam right-hand side may only reference parameters "
+                    "declared in the same module");
         applied_defparams_.insert(key);
         continue;
       }

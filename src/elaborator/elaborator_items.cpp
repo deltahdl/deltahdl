@@ -815,6 +815,32 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
 }
 
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
+  // §6.18: A `typedef enum|struct|union IDENT;` forward declaration records
+  // the basic data type the name is later required to resolve to. The actual
+  // typedef definition that follows must conform. The forward declaration
+  // itself has typedef_type.kind == kImplicit so it does not overwrite a
+  // previously elaborated definition.
+  if (item->typedef_type.kind == DataTypeKind::kImplicit &&
+      item->forward_type_kind != DataTypeKind::kImplicit) {
+    forward_typedef_kinds_[item->name] = item->forward_type_kind;
+  } else if (item->typedef_type.kind != DataTypeKind::kImplicit) {
+    auto it = forward_typedef_kinds_.find(item->name);
+    if (it != forward_typedef_kinds_.end() &&
+        it->second != item->typedef_type.kind) {
+      static const auto kind_name = [](DataTypeKind k) -> std::string_view {
+        switch (k) {
+          case DataTypeKind::kEnum:   return "enum";
+          case DataTypeKind::kStruct: return "struct";
+          case DataTypeKind::kUnion:  return "union";
+          default:                    return "type";
+        }
+      };
+      diag_.Error(item->loc,
+                  std::format("typedef '{}' does not conform to its forward "
+                              "declaration as {}",
+                              item->name, kind_name(it->second)));
+    }
+  }
   typedefs_[item->name] = item->typedef_type;
   if (item->typedef_type.kind == DataTypeKind::kStruct ||
       item->typedef_type.kind == DataTypeKind::kUnion) {

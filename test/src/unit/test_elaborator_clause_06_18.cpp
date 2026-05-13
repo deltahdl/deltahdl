@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaborator, TypedefNamedResolution) {
+TEST(UserDefinedTypeElaboration, TypedefNamedResolution) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -30,7 +30,7 @@ TEST(Elaborator, TypedefNamedResolution) {
   EXPECT_TRUE(found);
 }
 
-TEST(Elaborator, TypedefChain) {
+TEST(UserDefinedTypeElaboration, TypedefChain) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -53,7 +53,7 @@ TEST(Elaborator, TypedefChain) {
   EXPECT_TRUE(found);
 }
 
-TEST(Elaborator, TypedefChain4State) {
+TEST(UserDefinedTypeElaboration, TypedefChain4State) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -71,7 +71,7 @@ TEST(Elaborator, TypedefChain4State) {
   }
 }
 
-TEST(Elaborator, TypedefChainSigned) {
+TEST(UserDefinedTypeElaboration, TypedefChainSigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -89,7 +89,7 @@ TEST(Elaborator, TypedefChainSigned) {
   }
 }
 
-TEST(Elaborator, TypedefStructWidth) {
+TEST(UserDefinedTypeElaboration, TypedefStructWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -106,7 +106,7 @@ TEST(Elaborator, TypedefStructWidth) {
   }
 }
 
-TEST(Elaborator, ForwardTypedefThenDefinition) {
+TEST(UserDefinedTypeElaboration, ForwardTypedefThenDefinition) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -119,7 +119,7 @@ TEST(Elaborator, ForwardTypedefThenDefinition) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaborator, BareForwardTypedefThenDefinition) {
+TEST(UserDefinedTypeElaboration, BareForwardTypedefThenDefinition) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -132,7 +132,7 @@ TEST(Elaborator, BareForwardTypedefThenDefinition) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaborator, TypedefChain2State) {
+TEST(UserDefinedTypeElaboration, TypedefChain2State) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -151,7 +151,7 @@ TEST(Elaborator, TypedefChain2State) {
   }
 }
 
-TEST(Elaborator, MultipleForwardTypedefsElaborate) {
+TEST(UserDefinedTypeElaboration, MultipleForwardTypedefsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -161,6 +161,33 @@ TEST(Elaborator, MultipleForwardTypedefsElaborate) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.18: "It shall be an error if a basic data type was specified by the
+// forward type declaration and the actual type definition does not conform
+// to the specified basic data type."
+TEST(UserDefinedTypeElaboration, ForwardEnumWithStructDefinition_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef enum my_t;\n"
+      "  typedef struct packed { int A; int B; } my_t;\n"
+      "  my_t x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(UserDefinedTypeElaboration, ForwardStructWithEnumDefinition_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef struct my_t;\n"
+      "  typedef enum {RED, GREEN, BLUE} my_t;\n"
+      "  my_t x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 }  // namespace

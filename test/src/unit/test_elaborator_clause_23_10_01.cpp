@@ -143,4 +143,26 @@ TEST(DefparamElaboration, DefparamInGenerateBlockCannotEscapeScope) {
   EXPECT_NE(u->params[0].resolved_value, 99);
 }
 
+// §23.10.1: "The expression on the right-hand side of defparam assignments
+// shall be a constant expression involving only numbers and references to
+// parameters. The referenced parameters (on the right-hand side of the
+// defparam) shall be declared in the same module as the defparam statement."
+// A hierarchical reference on the RHS violates both clauses of this rule.
+TEST(DefparamElaboration, RhsRejectsHierarchicalReference) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child #(parameter int P = 0)();\n"
+      "endmodule\n"
+      "module other;\n"
+      "  parameter int OUT = 100;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  other o();\n"
+      "  child u();\n"
+      "  defparam u.P = o.OUT;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace

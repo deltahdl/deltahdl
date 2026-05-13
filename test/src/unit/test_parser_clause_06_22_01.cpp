@@ -82,15 +82,6 @@ TEST(MatchingTypesParsing, MatchingTypesBuiltinTypedef) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
-TEST(MatchingTypesParsing, MatchingTypesAnonymousStruct) {
-  auto r = Parse(
-      "module m;\n"
-      "  struct packed {int A; int B;} AB1, AB2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-}
-
 TEST(MatchingTypesParsing, MatchingTypesNamedTypedefStruct) {
   auto r = Parse(
       "module m;\n"

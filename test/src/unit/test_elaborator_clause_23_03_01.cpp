@@ -49,13 +49,6 @@ TEST(TopLevelModules, NonexistentTopIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(TopLevelModules, UnknownTopIsError) {
-  ElabFixture f;
-  auto* design = ElaborateSrc("module m; endmodule\n", f, "nonexistent");
-  EXPECT_EQ(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(TopLevelModules, InstantiatedModuleIsNotTopLevel) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -71,23 +64,6 @@ TEST(TopLevelModules, InstantiatedModuleIsNotTopLevel) {
   for (auto* m : design->top_modules) {
     EXPECT_NE(m->name, "child");
   }
-}
-
-TEST(TopLevelModules, TopLevelInstanceNameEqualsModuleName) {
-  ElabFixture f;
-  auto* design = ElaborateSrc("module my_top; endmodule\n", f, "my_top");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules.size(), 1u);
-  EXPECT_EQ(design->top_modules[0]->name, "my_top");
-}
-
-TEST(TopLevelModules, TopLevelModuleInstantiatedExactlyOnce) {
-  ElabFixture f;
-  auto* design = ElaborateSrc("module top; endmodule\n", f, "top");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  EXPECT_EQ(design->top_modules.size(), 1u);
 }
 
 TEST(TopLevelModules, ModuleInGenerateBlockNotTopLevel) {

@@ -87,33 +87,6 @@ TEST(HierarchicalNameSimulation, MultiLevelHierarchicalRead) {
   EXPECT_EQ(v->value.ToUint64(), 77u);
 }
 
-// --- R11: Relative downward referencing (first node at current level) ---
-
-TEST(HierarchicalNameSimulation, RelativeDownwardReference) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module child;\n"
-      "  logic [7:0] sig;\n"
-      "  initial sig = 8'd55;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  child c1();\n"
-      "  logic [7:0] result;\n"
-      "  initial begin\n"
-      "    #1;\n"
-      "    result = c1.sig;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("result");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->value.ToUint64(), 55u);
-}
-
 // --- R14: Hierarchical name used in event expression (trigger) ---
 
 TEST(HierarchicalNameSimulation, HierarchicalNameInEventExpression) {

@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Lowerer, SpecparamValue) {
+TEST(ParameterConstantSimulation, SpecparamValue) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -28,7 +28,7 @@ TEST(Lowerer, SpecparamValue) {
 }
 
 // "Constants are named data objects" — parameter value readable at runtime.
-TEST(Lowerer, ParameterValueAccessibleAtRuntime) {
+TEST(ParameterConstantSimulation, ParameterValueAccessibleAtRuntime) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -48,7 +48,7 @@ TEST(Lowerer, ParameterValueAccessibleAtRuntime) {
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
 
-TEST(Lowerer, LocalparamValueAccessibleAtRuntime) {
+TEST(ParameterConstantSimulation, LocalparamValueAccessibleAtRuntime) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

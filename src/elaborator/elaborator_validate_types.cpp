@@ -98,6 +98,66 @@ static bool ExprContainsXZ(const Expr* e) {
   return ExprContainsXZ(e->repeat_count);
 }
 
+// §6.19: enum named constants "...can include references to parameters, local
+// parameters, genvars, other enum named constants, and constant functions of
+// these. Hierarchical names and const variables are not allowed." A
+// hierarchical reference manifests as kMemberAccess or a non-empty scope
+// prefix on an identifier (the latter being §3.12.1 $unit::/pkg:: form);
+// either shape is rejected here regardless of whether the path would have
+// resolved.
+static bool ExprContainsHierarchicalRef(const Expr* e) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kMemberAccess) return true;
+  if (e->kind == ExprKind::kIdentifier && !e->scope_prefix.empty()) return true;
+  if (ExprContainsHierarchicalRef(e->lhs)) return true;
+  if (ExprContainsHierarchicalRef(e->rhs)) return true;
+  if (ExprContainsHierarchicalRef(e->base)) return true;
+  if (ExprContainsHierarchicalRef(e->index)) return true;
+  if (ExprContainsHierarchicalRef(e->index_end)) return true;
+  if (ExprContainsHierarchicalRef(e->condition)) return true;
+  if (ExprContainsHierarchicalRef(e->true_expr)) return true;
+  if (ExprContainsHierarchicalRef(e->false_expr)) return true;
+  if (ExprContainsHierarchicalRef(e->repeat_count)) return true;
+  for (const auto* a : e->args) {
+    if (ExprContainsHierarchicalRef(a)) return true;
+  }
+  for (const auto* elem : e->elements) {
+    if (ExprContainsHierarchicalRef(elem)) return true;
+  }
+  return false;
+}
+
+// §6.19 + §6.20.6: walk an enum initializer expression looking for plain
+// identifier references to const variables declared in the enclosing scope.
+// Returns the offending name, or empty if none are present. Parameters and
+// localparams (§6.20) and other enum named constants (§6.19) are allowed
+// references and are not stored in const_names_.
+static std::string_view FindConstVarRef(
+    const Expr* e, const std::unordered_set<std::string_view>& const_names) {
+  if (!e) return {};
+  if (e->kind == ExprKind::kIdentifier && e->scope_prefix.empty() &&
+      const_names.count(e->text)) {
+    return e->text;
+  }
+  auto walk = [&](const Expr* sub) { return FindConstVarRef(sub, const_names); };
+  if (auto n = walk(e->lhs); !n.empty()) return n;
+  if (auto n = walk(e->rhs); !n.empty()) return n;
+  if (auto n = walk(e->base); !n.empty()) return n;
+  if (auto n = walk(e->index); !n.empty()) return n;
+  if (auto n = walk(e->index_end); !n.empty()) return n;
+  if (auto n = walk(e->condition); !n.empty()) return n;
+  if (auto n = walk(e->true_expr); !n.empty()) return n;
+  if (auto n = walk(e->false_expr); !n.empty()) return n;
+  if (auto n = walk(e->repeat_count); !n.empty()) return n;
+  for (const auto* a : e->args) {
+    if (auto n = walk(a); !n.empty()) return n;
+  }
+  for (const auto* elem : e->elements) {
+    if (auto n = walk(elem); !n.empty()) return n;
+  }
+  return {};
+}
+
 bool Elaborator::ValidateEnumLiteral(const EnumMember& member,
                                      uint32_t base_width, bool is_2state) {
   if (member.value->kind == ExprKind::kIntegerLiteral) {
@@ -140,6 +200,23 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
       if (!seen_names.insert(member.name).second) {
         diag_.Error(loc,
                     std::format("duplicate enum member name '{}'", member.name));
+      }
+    }
+
+    // §6.19: "Hierarchical names and const variables are not allowed" in the
+    // value of an enum named constant.
+    if (member.value) {
+      if (ExprContainsHierarchicalRef(member.value)) {
+        diag_.Error(member.value->range.start,
+                    "hierarchical name not allowed in enum named constant "
+                    "value");
+      }
+      auto const_name = FindConstVarRef(member.value, const_names_);
+      if (!const_name.empty()) {
+        diag_.Error(member.value->range.start,
+                    std::format("const variable '{}' not allowed in enum named "
+                                "constant value",
+                                const_name));
       }
     }
 

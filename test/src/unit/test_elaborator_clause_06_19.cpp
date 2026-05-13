@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, EnumSizedLiteralMismatch_Error) {
+TEST(EnumerationElaboration, EnumSizedLiteralMismatch_Error) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -21,7 +21,7 @@ TEST(Elaboration, EnumSizedLiteralMismatch_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, EnumXZin2State_Error) {
+TEST(EnumerationElaboration, EnumXZin2State_Error) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -31,7 +31,7 @@ TEST(Elaboration, EnumXZin2State_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, EnumUnassignedAfterXZ_Error) {
+TEST(EnumerationElaboration, EnumUnassignedAfterXZ_Error) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -41,7 +41,7 @@ TEST(Elaboration, EnumUnassignedAfterXZ_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, EnumDuplicateValue_Error) {
+TEST(EnumerationElaboration, EnumDuplicateValue_Error) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -51,7 +51,7 @@ TEST(Elaboration, EnumDuplicateValue_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, EnumDefaultWidthInt) {
+TEST(EnumerationElaboration, EnumDefaultWidthInt) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -67,7 +67,7 @@ TEST(Elaboration, EnumDefaultWidthInt) {
   }
 }
 
-TEST(Elaboration, EnumExplicitBaseWidth) {
+TEST(EnumerationElaboration, EnumExplicitBaseWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -78,7 +78,7 @@ TEST(Elaboration, EnumExplicitBaseWidth) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, EnumDuplicateName_Error) {
+TEST(EnumerationElaboration, EnumDuplicateName_Error) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -88,7 +88,7 @@ TEST(Elaboration, EnumDuplicateName_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, EnumAutoIncrementOverflow_Error) {
+TEST(EnumerationElaboration, EnumAutoIncrementOverflow_Error) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -96,6 +96,69 @@ TEST(Elaboration, EnumAutoIncrementOverflow_Error) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.19: "Hierarchical names and const variables are not allowed."
+TEST(EnumerationElaboration, EnumHierarchicalNameInitializer_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter int X = 1;\n"
+      "  enum integer {A = top.X, B} v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(EnumerationElaboration, EnumConstVariableInitializer_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  const int K = 7;\n"
+      "  enum integer {A = K, B} v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.19: "If the first name is not assigned a value, it is given the initial
+// value of 0." + "A name without a value is automatically assigned an
+// increment of the value of the previous name."
+TEST(EnumerationElaboration, EnumAutoIncrementValues) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {A, B=5, C} color_t;\n"
+      "  color_t x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  auto it = mod->enum_types.find("color_t");
+  ASSERT_NE(it, mod->enum_types.end());
+  ASSERT_EQ(it->second.size(), 3u);
+  EXPECT_EQ(it->second[0].name, "A");
+  EXPECT_EQ(it->second[0].value, 0);
+  EXPECT_EQ(it->second[1].name, "B");
+  EXPECT_EQ(it->second[1].value, 5);
+  EXPECT_EQ(it->second[2].name, "C");
+  EXPECT_EQ(it->second[2].value, 6);
+}
+
+// §6.19 + §6.20: "...can include references to parameters, local parameters,
+// genvars, other enum named constants, and constant functions of these."
+// Sanity that a parameter reference is still accepted as the spec intends.
+TEST(EnumerationElaboration, EnumParameterInitializer_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  parameter int X = 3;\n"
+      "  enum integer {A = X, B} v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

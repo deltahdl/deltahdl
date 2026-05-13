@@ -168,6 +168,15 @@ ModuleItem* Parser::ParseTypedef() {
   if (Check(TokenKind::kKwEnum) || Check(TokenKind::kKwStruct) ||
       Check(TokenKind::kKwUnion)) {
     auto saved = lexer_.SavePos();
+    // §6.18: record which basic data type the forward declaration specified;
+    // a later definition with a non-conforming kind is an error.
+    DataTypeKind fwd_kind = DataTypeKind::kImplicit;
+    switch (CurrentToken().kind) {
+      case TokenKind::kKwEnum:   fwd_kind = DataTypeKind::kEnum;   break;
+      case TokenKind::kKwStruct: fwd_kind = DataTypeKind::kStruct; break;
+      case TokenKind::kKwUnion:  fwd_kind = DataTypeKind::kUnion;  break;
+      default: break;
+    }
     Consume();  // enum/struct/union
     if (CheckIdentifier()) {
       auto id_saved = lexer_.SavePos();
@@ -175,6 +184,7 @@ ModuleItem* Parser::ParseTypedef() {
       if (Check(TokenKind::kSemicolon)) {
         // Forward declaration: typedef enum/struct/union IDENT ;
         item->name = id_tok.text;
+        item->forward_type_kind = fwd_kind;
         known_types_.insert(item->name);
         Expect(TokenKind::kSemicolon);
         return item;

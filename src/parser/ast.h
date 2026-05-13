@@ -564,7 +564,9 @@ struct ModuleItem {
   // §A.2.1.1: local_parameter_declaration vs parameter_declaration
   bool is_localparam = false;
 
-  // §6.20.3: forward_type restriction for type parameters.
+  // §6.20.3 forward_type restriction for type parameters; §6.18 basic data
+  // type specified on a forward typedef (`typedef enum|struct|union IDENT;`).
+  // kImplicit means the item placed no constraint on the resolved type.
   DataTypeKind forward_type_kind = DataTypeKind::kImplicit;
 
   // checker_or_generate_item_declaration (A.1.8)

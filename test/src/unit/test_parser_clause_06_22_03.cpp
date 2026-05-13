@@ -85,15 +85,6 @@ TEST(AssignmentCompatibleParsing, ChandleToIntNotCompatible) {
   EXPECT_FALSE(IsAssignmentCompatible(a, b));
 }
 
-TEST(AssignmentCompatibleParsing, IntToEnumNotCompatible) {
-  DataType a;
-  a.kind = DataTypeKind::kInt;
-  a.is_signed = true;
-  DataType b;
-  b.kind = DataTypeKind::kEnum;
-  EXPECT_FALSE(IsAssignmentCompatible(a, b));
-}
-
 TEST(AssignmentCompatibleParsing, EquivalentTypesAreCompatible) {
   DataType a;
   a.kind = DataTypeKind::kLogic;

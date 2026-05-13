@@ -732,6 +732,9 @@ class Elaborator {
   std::unordered_set<std::string_view> enum_var_names_;
   std::unordered_set<std::string_view> enum_member_names_;
   std::unordered_set<std::string_view> const_names_;
+  // §6.18: forward typedef "basic data type" specified for each name. A
+  // subsequent typedef of the same name must resolve to the recorded kind.
+  std::unordered_map<std::string_view, DataTypeKind> forward_typedef_kinds_;
   std::unordered_set<std::string_view> class_names_;
   std::unordered_set<std::string_view> parameterized_class_names_;  // §8.25.1
   std::unordered_set<std::string_view> class_var_names_;  // §8.4
