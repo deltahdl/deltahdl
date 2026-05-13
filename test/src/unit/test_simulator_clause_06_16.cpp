@@ -242,4 +242,73 @@ TEST(StringDataType, AssignZeroToStringCharIgnored) {
   EXPECT_EQ(VecToStr(s->value), "abc");
 }
 
+// §6.16 Table 6-9: "If given an index out of range, returns 0."
+TEST(StringDataType, IndexOutOfRangeReturnsZero) {
+  SimFixture f;
+  MakeStringVar(f, "s", "abc");
+  auto* sel = MakeSelectExpr(f.arena, MakeId(f.arena, "s"), MakeInt(f.arena, 10));
+  auto result = EvalExpr(sel, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+// §6.16: "Indexing an empty string variable shall be an out-of-bounds access."
+// Out-of-bounds returns 0 per Table 6-9's Indexing entry.
+TEST(StringDataType, IndexEmptyStringIsOutOfBounds) {
+  SimFixture f;
+  MakeStringVar(f, "s", "");
+  auto* sel = MakeSelectExpr(f.arena, MakeId(f.arena, "s"), MakeInt(f.arena, 0));
+  auto result = EvalExpr(sel, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+// §6.16: "Casting an integral value to a string variable proceeds:
+// — If the size (in bits) of the integral value is not a multiple of 8, the
+//   integral value is left extended and filled with zeros until its bit size
+//   is a multiple of 8.  The extended value is then treated the same as a
+//   string literal, where each successive 8 bits represent a character.
+// — The steps described previously for string literal conversion are then
+//   applied to the extended value."  The LRM example assigns
+// `string'(b)` with `b = 12'ha41` and expects the result to hold the two
+// bytes 0x0a, 0x41 — \0 stripping removes the high zero pad.
+TEST(StringDataType, IntegralCastToStringZeroPadsThenStripsZeros) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  bit [11:0] b = 12'ha41;\n"
+      "  string s2;\n"
+      "  initial s2 = string'(b);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* s2 = f.ctx.FindVariable("s2");
+  ASSERT_NE(s2, nullptr);
+  EXPECT_EQ(VecToStr(s2->value), "\nA");
+}
+
+// §6.16 Table 6-9: Concatenation of two operands of `string` type yields a
+// string-typed result holding the byte sequence of the two operands.
+TEST(StringDataType, StringConcatenationProducesStringResult) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string a, b, c;\n"
+      "  initial begin\n"
+      "    a = \"foo\";\n"
+      "    b = \"bar\";\n"
+      "    c = {a, b};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(VecToStr(c->value), "foobar");
+}
+
 }  // namespace
