@@ -20,7 +20,7 @@ TEST(TypeEval, StringNot4State) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kString));
 }
 
-TEST(ConstraintDeclParsing, VarDataTypeString) {
+TEST(StringDataTypeParsing, VarDataTypeString) {
   auto r = Parse("module m(input string name); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -83,7 +83,7 @@ TEST(OperatorAndExpressionParsing, StringCompareEquality) {
               "endmodule\n"));
 }
 
-TEST(ClassParsing, StringTypeWithInit) {
+TEST(StringDataTypeParsing, StringTypeWithInit) {
   auto r = Parse(
       "module m;\n"
       "  string greeting = \"hello\";\n"
