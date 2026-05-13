@@ -114,6 +114,29 @@ TEST(ArrayAssignmentSimulation, LeftToRightCorrespondence) {
   EXPECT_EQ(v, 100u);
 }
 
+// §7.6: "Correspondence between elements is determined by the left-to-right
+// order of elements in each array. For example, if array A is declared as
+// int A[7:0] and array B is declared as int B[1:8], the assignment A = B;
+// will assign element B[1] to element A[7], and so on." Mirrors the LRM
+// example exactly: a descending-range target and ascending-range source must
+// map leftmost-to-leftmost regardless of declared bounds direction.
+TEST(ArrayAssignmentSimulation, LeftToRightCorrespondenceCrossRangeDirection) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int A[7:0];\n"
+      "  int B[1:8];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    B[1] = 11; B[2] = 22; B[3] = 33; B[4] = 44;\n"
+      "    B[5] = 55; B[6] = 66; B[7] = 77; B[8] = 88;\n"
+      "    A = B;\n"
+      "    result = A[7];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 11u);
+}
+
 TEST(ArrayAssignmentSimulation, AssignmentPatternEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
@@ -146,6 +169,30 @@ TEST(ArrayAssignmentSimulation, SliceLhsTreatedAsSingleAssignment) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 30u);
+}
+
+// §7.6: "If the target of the assignment is a queue or dynamic array, it
+// shall be resized to have the same number of elements as the source
+// expression and assignment shall then follow the same left-to-right element
+// correspondence as previously described." The sibling
+// FixedSourceResizesDynamicTarget covers the dynamic-target half of the
+// "queue or dynamic array" disjunction; this test covers the queue-target
+// half — assigning a fixed-size source to a queue must resize the queue to
+// the source's element count.
+TEST(ArrayAssignmentSimulation, FixedSourceResizesQueueTarget) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int src[3];\n"
+      "  int q[$];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    src[0] = 100; src[1] = 200; src[2] = 300;\n"
+      "    q = src;\n"
+      "    result = q.size();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 3u);
 }
 
 // §7.5: "The size of a dynamic array is set by the new constructor or array

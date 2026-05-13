@@ -44,6 +44,21 @@ TEST(ArrayAssignmentValidation, WireToVarArrayAssign) {
              "endmodule\n"));
 }
 
+// §7.6: "An array of wires can be assigned to an array of variables, and
+// vice versa, if the source and target arrays' data types are assignment
+// compatible." The sibling WireToVarArrayAssign test exercises the vice-versa
+// direction (`assign w = v`, var → wire); this test exercises the primary
+// direction (wire → var) by reading the wire array `w` into the variable
+// array `v` through a procedural blocking assignment.
+TEST(ArrayAssignmentValidation, WireSourceToVarTargetArrayAssign) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  wire [7:0] w[4];\n"
+             "  logic [7:0] v[4];\n"
+             "  initial v = w;\n"
+             "endmodule\n"));
+}
+
 TEST(ArrayAssignmentValidation, DynamicToDynamicAssign) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
