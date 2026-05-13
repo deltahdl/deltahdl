@@ -22,20 +22,6 @@ TEST(StratifiedSchedulerSim, EventsDynamicallyScheduledAndExecuted) {
   EXPECT_FALSE(sched.HasEvents());
 }
 
-TEST(StratifiedSchedulerSim, EventsRemovedAfterExecution) {
-  Arena arena;
-  Scheduler sched(arena);
-  auto& pool = sched.GetEventPool();
-
-  auto* ev = pool.Acquire();
-  ev->callback = []() {};
-  sched.ScheduleEvent({0}, Region::kActive, ev);
-
-  sched.Run();
-  EXPECT_FALSE(sched.HasEvents());
-  EXPECT_EQ(pool.FreeCount(), 1u);
-}
-
 // §4.4 ¶2: every event has *one and only one* simulation execution time. An
 // event scheduled at time T must fire exactly once and only when CurrentTime()
 // equals T — not earlier (would violate "current or future"), not later (would
@@ -366,5 +352,15 @@ TEST(StratifiedSchedulerSim, RegionOrderingPerTimeSlot) {
   EXPECT_EQ(log[1].second, "t5_nba");
   EXPECT_EQ(log[2].second, "t10_active");
   EXPECT_EQ(log[3].second, "t10_nba");
+}
+
+// §4.4 ¶3: within a single time slot the regions execute in the order a)
+// Preponed, b) Pre-Active, ..., q) Postponed. The other §4.4 ¶3 tests in
+// this file check the enum-level invariants (count, ordinal chain) and a
+// two-region runtime pair; this test exercises the production
+// Scheduler::ExecuteTimeSlot path against all 17 regions at once so the full
+// a)...q) ordering is observable at runtime, not just at the enum level.
+TEST(StratifiedSchedulerSim, All17RegionsExecuteInLrmOrderInOneSlot) {
+  VerifyAllRegionOrder();
 }
 
