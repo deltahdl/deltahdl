@@ -146,26 +146,10 @@ TEST(TimingControlSyntaxParsing, EventControlAtStarParen) {
 // AST encoding are tested in test_parser_clause_15_05_02.cpp and
 // test_parser_clause_09_04_02.cpp respectively.
 
-TEST(TimingControlSyntaxParsing, EdgeIdentifiers) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge a or negedge b or edge c) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 3u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
-  EXPECT_EQ(stmt->events[2].edge, Edge::kEdge);
-}
-
 // posedge / negedge / edge / any-change AST-encoding tests for the
 // event-control form belong to §9.4.2 and live in
-// test_parser_clause_09_04_02.cpp.
+// test_parser_clause_09_04_02.cpp. The multi-edge `or` / `,` combinations
+// belong to §9.4.2.1 and live in test_parser_clause_09_04_02_01.cpp.
 
 TEST(TimingControlSyntaxParsing, WaitOrder) {
   auto r = Parse(
