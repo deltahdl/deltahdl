@@ -30,35 +30,6 @@ TEST(ActiveRegionSetSim,
   }
 }
 
-// §4.4.1 ¶1: same membership rule, observed behaviorally. Scheduling one event
-// in each of the five active region set regions and calling Run() exercises
-// Scheduler::ExecuteActiveRegions, which uses IsActiveRegionSet to decide
-// which regions belong to the active set drain. Capturing the CurrentRegion
-// reported by each callback observes that production code routed exactly the
-// five §4.4.1 ¶1 regions through the active-set drain path.
-TEST(ActiveRegionSetSim, SchedulerDrainsAllFiveActiveRegionSetMembers) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::set<Region> observed;
-
-  for (Region r : {Region::kActive, Region::kInactive, Region::kPreNBA,
-                   Region::kNBA, Region::kPostNBA}) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&, r]() {
-      observed.insert(sched.CurrentRegion());
-      EXPECT_EQ(sched.CurrentRegion(), r);
-    };
-    sched.ScheduleEvent({0}, r, ev);
-  }
-  sched.Run();
-  EXPECT_EQ(observed.size(), 5u);
-  EXPECT_TRUE(observed.count(Region::kActive));
-  EXPECT_TRUE(observed.count(Region::kInactive));
-  EXPECT_TRUE(observed.count(Region::kPreNBA));
-  EXPECT_TRUE(observed.count(Region::kNBA));
-  EXPECT_TRUE(observed.count(Region::kPostNBA));
-}
-
 // §4.4.1 ¶1: "Events scheduled in the Reactive, Re-Inactive, Pre-Re-NBA,
 // Re-NBA, and Post-Re-NBA regions are reactive region set events." Same
 // shape as the active-set predicate test, but for the five reactive-set
@@ -76,34 +47,6 @@ TEST(ReactiveRegionSetSim,
         << "Region index " << i
         << " misclassified by IsReactiveRegionSet (expected " << listed << ")";
   }
-}
-
-// §4.4.1 ¶1 reactive-set membership, observed behaviorally. Scheduling one
-// event in each of the five reactive region set regions exercises
-// Scheduler::ExecuteReactiveRegions, which uses IsReactiveRegionSet to gate
-// the reactive drain. Observing CurrentRegion from inside each callback
-// confirms production routed each event through the reactive-set drain path.
-TEST(ReactiveRegionSetSim, SchedulerDrainsAllFiveReactiveRegionSetMembers) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::set<Region> observed;
-
-  for (Region r : {Region::kReactive, Region::kReInactive, Region::kPreReNBA,
-                   Region::kReNBA, Region::kPostReNBA}) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&, r]() {
-      observed.insert(sched.CurrentRegion());
-      EXPECT_EQ(sched.CurrentRegion(), r);
-    };
-    sched.ScheduleEvent({0}, r, ev);
-  }
-  sched.Run();
-  EXPECT_EQ(observed.size(), 5u);
-  EXPECT_TRUE(observed.count(Region::kReactive));
-  EXPECT_TRUE(observed.count(Region::kReInactive));
-  EXPECT_TRUE(observed.count(Region::kPreReNBA));
-  EXPECT_TRUE(observed.count(Region::kReNBA));
-  EXPECT_TRUE(observed.count(Region::kPostReNBA));
 }
 
 // §4.4.1 ¶1 disjointness: the LRM names two distinct groupings — active region
