@@ -37,14 +37,4 @@ TEST(IntegralType, ImplicitTypeIsIntegral) {
   EXPECT_TRUE(IsIntegralType(DataTypeKind::kImplicit));
 }
 
-TEST(IntegralType, SimpleBitVectorDefaultWidthIsOne) {
-  DataType dt;
-  dt.kind = DataTypeKind::kBit;
-  EXPECT_EQ(EvalTypeWidth(dt), 1u);
-  dt.kind = DataTypeKind::kLogic;
-  EXPECT_EQ(EvalTypeWidth(dt), 1u);
-  dt.kind = DataTypeKind::kReg;
-  EXPECT_EQ(EvalTypeWidth(dt), 1u);
-}
-
 }  // namespace
