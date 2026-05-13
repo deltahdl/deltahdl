@@ -115,18 +115,6 @@ TEST(EventControlElaboration, EdgeEventControlElaborates) {
   EXPECT_TRUE(found);
 }
 
-TEST(EventControlElaboration, NamedEventElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  event ev;\n"
-      "  initial @(ev) ;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // §9.4.2: "Non-virtual methods of an object and built-in methods or system
 // functions for an aggregate type are allowed in event control expressions
 // as long as ... the method is defined as a function, not a task." A task

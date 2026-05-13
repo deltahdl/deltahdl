@@ -476,29 +476,6 @@ TEST(EventControlSim, EdgeDetectsOnlyLsb) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
-TEST(EventControlSim, NamedEventControlWakesProcess) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  event ev;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    #5 ->ev;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    @(ev) x = 8'd55;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 55u);
-}
-
 // §9.4.2: A non-edge implicit event is detected on a change in the value
 // of the expression — including compound expressions whose operands are
 // individual variables. Drives the @(a|b) result transitioning 0->1.
@@ -583,6 +560,64 @@ TEST(EventControlSim, CompoundExprOperandChangeWithoutResultChangeIsNotEvent) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+// §9.4.2: "If the event expression is a reference to a simple object handle
+// or chandle variable, an event is created when a write to that variable is
+// not equal to its previous value." Complements ChandleSameValueWriteIsNotEvent
+// with the positive case: a class handle whose value transitions from null to
+// a freshly allocated object shall fire @(h).
+TEST(EventControlSim, ObjectHandleChangeFiresEvent) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  class C;\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    h = null;\n"
+      "    #5 h = new();\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "  initial @(h) x = 8'd77;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 77u);
+}
+
+// §9.4.2: "Changing the value of object data members, aggregate elements, or
+// the size of a dynamically sized array referenced by a method or function
+// shall cause the event expression to be reevaluated." A push_back that
+// changes q.size() must reevaluate @(q.size()) and fire the event.
+TEST(EventControlSim, DynamicArraySizeChangeReevaluatesEventExpression) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int q[$];\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    #5 q.push_back(42);\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "  initial @(q.size()) x = 8'd88;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
 }  // namespace

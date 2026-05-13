@@ -57,4 +57,18 @@ TEST(EventWaitElaborator, WaitOnTaskCallRejected) {
       "endmodule\n"));
 }
 
+// §15.5.2: The wait syntax is "@ hierarchical_event_identifier;" — a
+// hierarchical reference to a named event in another instance is a legal
+// waited-on identifier and must elaborate.
+TEST(EventWaitElaborator, HierarchicalEventWaitElaborates) {
+  EXPECT_TRUE(ElabOk(
+      "module child;\n"
+      "  event ev;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child c1();\n"
+      "  initial @(c1.ev);\n"
+      "endmodule\n"));
+}
+
 }  // namespace

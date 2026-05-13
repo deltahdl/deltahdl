@@ -186,10 +186,16 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
       auto* declared_type = ctx.FindClassType(declared);
       if (declared_type) {
         obj->SetPropertyForType(field_name, declared_type, rhs_val);
+        // §9.4.2: Changing the value of object data members shall cause the
+        // event expression to be reevaluated. Notify watchers on the handle
+        // variable so @(c.method()) re-runs the method when c.field changes.
+        base_var->NotifyWatchers();
         return true;
       }
     }
     obj->SetProperty(std::string(field_name), rhs_val);
+    // §9.4.2: Same rule for the un-declared-type write path.
+    base_var->NotifyWatchers();
     return true;
   }
   return false;

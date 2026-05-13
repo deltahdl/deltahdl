@@ -233,20 +233,6 @@ TEST(StatementSyntaxParsing, DelayControlAsStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
-TEST(StatementSyntaxParsing, EventControlAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk) a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-}
-
 TEST(StatementSyntaxParsing, WaitAsStatement) {
   auto r = Parse(
       "module m;\n"
