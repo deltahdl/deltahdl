@@ -49,14 +49,6 @@ TEST(ReactiveRegionSim, ReactiveExecutesBeforeReInactive) {
                        {Region::kReInactive, "reinactive"});
 }
 
-TEST(ReactiveRegionSim, ReactiveIsWithinReactiveRegionSet) {
-  auto reactive_ord = static_cast<int>(Region::kReactive);
-  auto post_observed_ord = static_cast<int>(Region::kPostObserved);
-  auto pre_postponed_ord = static_cast<int>(Region::kPrePostponed);
-  EXPECT_GT(reactive_ord, post_observed_ord);
-  EXPECT_LT(reactive_ord, pre_postponed_ord);
-}
-
 TEST(ReactiveRegionSim, ReactiveExecutesAfterObservedAndPostObserved) {
   VerifyThreeRegionOrder({Region::kObserved, "observed"},
                          {Region::kPostObserved, "post_observed"},

@@ -121,14 +121,6 @@ TEST(ReInactiveRegionSim, ChainedZeroDelayIteration) {
   EXPECT_EQ(order, expected);
 }
 
-TEST(ReInactiveRegionSim, ReInactiveIsWithinReactiveRegionSet) {
-  auto reinactive_ord = static_cast<int>(Region::kReInactive);
-  auto reactive_ord = static_cast<int>(Region::kReactive);
-  auto pre_postponed_ord = static_cast<int>(Region::kPrePostponed);
-  EXPECT_GT(reinactive_ord, reactive_ord);
-  EXPECT_LT(reinactive_ord, pre_postponed_ord);
-}
-
 TEST(ReInactiveRegionSim, ReInactiveExecutesBeforeReNBA) {
   VerifyTwoRegionOrder({Region::kReInactive, "reinactive"},
                        {Region::kReNBA, "renba"});

@@ -98,14 +98,6 @@ TEST(InactiveRegionSim, ChainedZeroDelayIteration) {
   EXPECT_EQ(order, expected);
 }
 
-TEST(InactiveRegionSim, InactiveIsWithinActiveRegionSet) {
-  auto inactive_ord = static_cast<int>(Region::kInactive);
-  auto active_ord = static_cast<int>(Region::kActive);
-  auto post_nba_ord = static_cast<int>(Region::kPostNBA);
-  EXPECT_GT(inactive_ord, active_ord);
-  EXPECT_LT(inactive_ord, post_nba_ord);
-}
-
 TEST(InactiveRegionSim, InactiveExecutesBeforeNBA) {
   VerifyTwoRegionOrder({Region::kInactive, "inactive"}, {Region::kNBA, "nba"});
 }
@@ -193,5 +185,3 @@ TEST(InactiveRegionSim, ZeroDelaySuspendsProcessAndResumesViaInactive) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 9u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
-
-

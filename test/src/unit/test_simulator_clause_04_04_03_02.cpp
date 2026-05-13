@@ -88,14 +88,6 @@ TEST(PliPreActiveSim, PreActiveExecutesAfterPreponedBeforeActive) {
                          {Region::kActive, "active"});
 }
 
-TEST(PliPreActiveSim, PreActiveIsWithinActiveRegionSet) {
-  auto pre_active_ord = static_cast<int>(Region::kPreActive);
-  auto preponed_ord = static_cast<int>(Region::kPreponed);
-  auto active_ord = static_cast<int>(Region::kActive);
-  EXPECT_GT(pre_active_ord, preponed_ord);
-  EXPECT_LT(pre_active_ord, active_ord);
-}
-
 TEST(PliPreActiveSim, PreActiveRegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);

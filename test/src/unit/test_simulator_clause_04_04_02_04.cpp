@@ -90,14 +90,6 @@ TEST(NbaRegionSim, NBAExecutesAfterActiveAndInactiveBeforeObserved) {
                         {Region::kObserved, "observed"});
 }
 
-TEST(NbaRegionSim, NBAIsWithinActiveRegionSet) {
-  auto nba_ord = static_cast<int>(Region::kNBA);
-  auto inactive_ord = static_cast<int>(Region::kInactive);
-  auto post_nba_ord = static_cast<int>(Region::kPostNBA);
-  EXPECT_GT(nba_ord, inactive_ord);
-  EXPECT_LT(nba_ord, post_nba_ord);
-}
-
 TEST(NbaRegionSim, NBAEventsAcrossMultipleTimeSlots) {
   VerifyEventsAcrossTimeSlots(Region::kNBA);
 }

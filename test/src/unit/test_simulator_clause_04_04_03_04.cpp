@@ -91,14 +91,6 @@ TEST(PliPostNbaSim, PostNBAExecutesAfterNBABeforePreObserved) {
                          {Region::kPreObserved, "pre_observed"});
 }
 
-TEST(PliPostNbaSim, PostNBAIsWithinActiveRegionSet) {
-  auto post_nba_ord = static_cast<int>(Region::kPostNBA);
-  auto nba_ord = static_cast<int>(Region::kNBA);
-  auto pre_observed_ord = static_cast<int>(Region::kPreObserved);
-  EXPECT_GT(post_nba_ord, nba_ord);
-  EXPECT_LT(post_nba_ord, pre_observed_ord);
-}
-
 TEST(PliPostNbaSim, PostNBARegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);

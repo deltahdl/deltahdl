@@ -73,14 +73,6 @@ TEST(PliPreReNbaSim, PreReNBAExecutesAfterReInactiveBeforeReNBA) {
                          {Region::kReNBA, "re_nba"});
 }
 
-TEST(PliPreReNbaSim, PreReNBAIsWithinReactiveRegionSet) {
-  auto pre_re_nba_ord = static_cast<int>(Region::kPreReNBA);
-  auto re_inactive_ord = static_cast<int>(Region::kReInactive);
-  auto re_nba_ord = static_cast<int>(Region::kReNBA);
-  EXPECT_GT(pre_re_nba_ord, re_inactive_ord);
-  EXPECT_LT(pre_re_nba_ord, re_nba_ord);
-}
-
 TEST(PliPreReNbaSim, PreReNBARegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);

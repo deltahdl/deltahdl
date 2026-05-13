@@ -73,14 +73,6 @@ TEST(PliPostReNbaSim, PostReNBAExecutesAfterReNBABeforePrePostponed) {
                          {Region::kPrePostponed, "pre_postponed"});
 }
 
-TEST(PliPostReNbaSim, PostReNBAIsWithinReactiveRegionSet) {
-  auto post_re_nba_ord = static_cast<int>(Region::kPostReNBA);
-  auto re_nba_ord = static_cast<int>(Region::kReNBA);
-  auto pre_postponed_ord = static_cast<int>(Region::kPrePostponed);
-  EXPECT_GT(post_re_nba_ord, re_nba_ord);
-  EXPECT_LT(post_re_nba_ord, pre_postponed_ord);
-}
-
 TEST(PliPostReNbaSim, PostReNBARegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);

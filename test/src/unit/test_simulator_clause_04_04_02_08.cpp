@@ -89,14 +89,6 @@ TEST(ReNbaRegionSim, ReNBAExecutesAfterReactiveAndReInactiveBeforePostReNBA) {
       {Region::kReNBA, "renba"}, {Region::kPostReNBA, "post_renba"});
 }
 
-TEST(ReNbaRegionSim, ReNBAIsWithinReactiveRegionSet) {
-  auto renba_ord = static_cast<int>(Region::kReNBA);
-  auto reinactive_ord = static_cast<int>(Region::kReInactive);
-  auto post_renba_ord = static_cast<int>(Region::kPostReNBA);
-  EXPECT_GT(renba_ord, reinactive_ord);
-  EXPECT_LT(renba_ord, post_renba_ord);
-}
-
 TEST(ReNbaRegionSim, ReNBAEventsAcrossMultipleTimeSlots) {
   VerifyEventsAcrossTimeSlots(Region::kReNBA);
 }
