@@ -134,10 +134,10 @@ TEST(RegionSetSim, ActiveAndReactiveRegionSetsAreDisjointAcrossAllRegions) {
 TEST(IterativeRegionsSim,
      IterativeRegionPredicateAcceptsExactlyTheFourteenListedRegions) {
   const std::set<Region> kListed = {
-      Region::kActive,     Region::kInactive,    Region::kPreNBA,
-      Region::kNBA,        Region::kPostNBA,     Region::kPreObserved,
+      Region::kActive,     Region::kInactive,     Region::kPreNBA,
+      Region::kNBA,        Region::kPostNBA,      Region::kPreObserved,
       Region::kObserved,   Region::kPostObserved, Region::kReactive,
-      Region::kReInactive, Region::kPreReNBA,    Region::kReNBA,
+      Region::kReInactive, Region::kPreReNBA,     Region::kReNBA,
       Region::kPostReNBA,  Region::kPrePostponed};
   for (size_t i = 0; i < kRegionCount; ++i) {
     auto r = static_cast<Region>(i);
@@ -222,8 +222,7 @@ TEST(IterativeRegionsSim,
 // 4.4.3. Walking every region and asserting IsSimulationRegion(r) ||
 // IsPliRegion(r) is true observes that production code's category predicates
 // jointly cover all 17 regions, satisfying the §4.4.1 ¶3 existence rule.
-TEST(RegionPartitionSim,
-     EveryRegionIsCategorizedAsSimulationOrPliRegion) {
+TEST(RegionPartitionSim, EveryRegionIsCategorizedAsSimulationOrPliRegion) {
   for (size_t i = 0; i < kRegionCount; ++i) {
     auto r = static_cast<Region>(i);
     EXPECT_TRUE(IsSimulationRegion(r) || IsPliRegion(r))
