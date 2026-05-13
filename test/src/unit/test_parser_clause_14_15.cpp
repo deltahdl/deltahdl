@@ -4,16 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SyncEventParse, WaitForClockingBlockEvent) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  clocking ram_bus @(posedge clk);\n"
-              "    input data;\n"
-              "  endclocking\n"
-              "  initial @(ram_bus) $display(\"tick\");\n"
-              "endmodule\n"));
-}
-
 TEST(SyncEventParse, WaitForClockingSignalChange) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -73,18 +63,6 @@ TEST(SyncEventParse, EdgeKeywordOnClockingSignal) {
               "  endclocking\n"
               "  initial @(edge dom.sig1) $display(\"edge\");\n"
               "endmodule\n"));
-}
-
-TEST(SyncEventParse, EventControlInAlwaysBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(negedge clk);\n"
-      "    input v;\n"
-      "  endclocking\n"
-      "  always @(cb) $display(cb.v);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(SyncEventParse, InoutSignalSyncEvent) {

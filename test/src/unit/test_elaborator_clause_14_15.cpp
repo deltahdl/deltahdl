@@ -4,16 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SyncEventElab, WaitForClockingBlockEventElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
-             "    input data;\n"
-             "  endclocking\n"
-             "  initial @(cb) $display(cb.data);\n"
-             "endmodule\n"));
-}
-
 TEST(SyncEventElab, WaitForClockingSignalChangeElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
