@@ -311,4 +311,72 @@ TEST(StringDataType, StringConcatenationProducesStringResult) {
   EXPECT_EQ(VecToStr(c->value), "foobar");
 }
 
+// §6.16 Table 6-9 Replication: `{n{Str}}` replicates a string operand n times.
+// With a string-typed target and a string-literal inner operand, the result is
+// the literal repeated n times.
+TEST(StringDataType, StringReplicationOperator) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string s;\n"
+      "  initial s = {3{\"ab\"}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* s = f.ctx.FindVariable("s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(VecToStr(s->value), "ababab");
+}
+
+// §6.16: "If an initial value is not specified, the variable is initialized to
+// "", the empty string."  Combined with "Indexing an empty string variable
+// shall be an out-of-bounds access" (and Table 6-9 Indexing returns 0 out of
+// range), reading byte 0 of a defaulted string variable yields 0.  This
+// exercises the lowerer's default-init path, not a fixture helper.
+TEST(StringDataType, DefaultStringVariableIndexingReturnsZero) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string s;\n"
+      "  byte b;\n"
+      "  initial b = s[0];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->value.ToUint64() & 0xFFu, 0u);
+}
+
+// §5.9 / §6.16: "String literals are implicitly converted to the `string` type
+// when assigned to a `string` type or used in an expression involving `string`
+// type operands."  Equality of a `string`-typed variable against a raw string
+// literal must observe lexicographic equality, not bit equality.
+TEST(StringDataType, StringLiteralImplicitlyConvertedInEquality) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string a;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = \"hello\";\n"
+      "    r = (a == \"hello\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 1u);
+}
+
 }  // namespace
