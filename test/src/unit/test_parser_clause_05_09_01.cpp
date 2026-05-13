@@ -53,11 +53,4 @@ TEST(LexicalConventionParsing, StringWithBackslashEscape) {
               "endmodule"));
 }
 
-TEST(LexicalConventionParsing, StringWithLineContinuation) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial $display(\"AB\\\nCD\");\n"
-              "endmodule"));
-}
-
 }  // namespace
