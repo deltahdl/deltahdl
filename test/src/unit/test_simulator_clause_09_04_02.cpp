@@ -769,4 +769,110 @@ TEST(EventControlSim, DynamicArraySizeChangeReevaluatesEventExpression) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
+// §9.4.2: "An edge shall be detected whenever negedge or posedge is detected."
+// Table 9-2 classifies x->z as "No edge", so the `edge` keyword shall stay
+// blocked on this transition (since neither posedge nor negedge fires).
+TEST(EventControlSim, NoEdgeOnXToZ) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 1'bx;\n"
+      "    #5 clk = 1'bz;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    @(edge clk) x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// §9.4.2 Table 9-2: z->x is "No edge"; the `edge` keyword shall stay blocked.
+TEST(EventControlSim, NoEdgeOnZToX) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 1'bz;\n"
+      "    #5 clk = 1'bx;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    @(edge clk) x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// §9.4.2: "An edge shall be detected whenever negedge or posedge is detected."
+// Table 9-2 classifies x->1 as a posedge, so the `edge` keyword shall fire.
+TEST(EventControlSim, EdgeFiresOnXToOne) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 1'bx;\n"
+      "    #5 clk = 1;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(edge clk) x = 8'd33;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 33u);
+}
+
+// §9.4.2: Table 9-2 classifies z->0 as a negedge, so the `edge` keyword
+// shall fire (per "edge whenever negedge or posedge is detected").
+TEST(EventControlSim, EdgeFiresOnZToZero) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 1'bz;\n"
+      "    #5 clk = 0;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(edge clk) x = 8'd44;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 44u);
+}
+
 }  // namespace

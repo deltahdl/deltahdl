@@ -242,4 +242,79 @@ TEST(IpcSync, HierarchicalEventWaitBlocksUntilTrigger) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
+// §15.5.2: The wait syntax is literally "@ hierarchical_event_identifier;"
+// — a bare @ (no parentheses) followed by a hierarchical reference to a
+// named event in another instance. Combines the bare-form syntax with a
+// hierarchical reference; the @ operator must block until the trigger
+// fires on the referenced named event.
+TEST(IpcSync, BareAtSyntaxWithHierarchicalEventBlocksUntilTrigger) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module child;\n"
+      "  event ev;\n"
+      "  initial begin\n"
+      "    #5 -> ev;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child c1();\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    @c1.ev;\n"
+      "    result = 32'd77;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 77u);
+}
+
+// §15.5.2 ↔ §9.4.2 cross-reference: §9.4.2 lists "the occurrence of a named
+// event (see 15.5.2)" as one of the synchronization sources for the same @
+// event control operator that handles posedge / negedge / value-change.
+// A single procedural block that uses both forms back-to-back must
+// dispatch each correctly: @(posedge clk) resumes on a 0->1 edge (the
+// §9.4.2 implicit-event/edge path) and @(ev) resumes on ->ev (the §15.5.2
+// named-event path).
+TEST(IpcSync, EventControlOperatorDispatchesEdgeAndNamedEvent) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic clk;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "    #5 clk = 1;\n"
+      "    #5 -> ev;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(posedge clk) a = 8'd11;\n"
+      "    @(ev) b = 8'd22;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.ToUint64(), 11u);
+  EXPECT_EQ(vb->value.ToUint64(), 22u);
+}
+
 }  // namespace
