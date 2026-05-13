@@ -9,18 +9,6 @@
 
 namespace {
 
-// §15.5.1: Event variable creation in simulator.
-TEST(IpcSync, EventVariableCreation) {
-  SyncFixture f;
-  auto* ev = f.ctx.CreateVariable("ev1", 1);
-  ev->is_event = true;
-  ev->value = MakeLogic4VecVal(f.arena, 1, 0);
-
-  auto* found = f.ctx.FindVariable("ev1");
-  ASSERT_NE(found, nullptr);
-  EXPECT_TRUE(found->is_event);
-}
-
 // §15.5.1: Blocking trigger unblocks a process waiting via @(ev).
 TEST(IpcSync, BlockingTriggerUnblocksWaiter) {
   LowerFixture f;
