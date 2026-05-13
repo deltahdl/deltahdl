@@ -2304,13 +2304,16 @@ static void CheckNoTaskCallInExpr(
 }
 
 // §9.4.2: Walk an event expression and flag any bare identifier that
-// names an unpacked-array variable. "Event expressions shall return
-// singular values"; aggregate types are illegal unless the expression
-// reduces to a singular value, which a bare reference to an unpacked
-// aggregate does not.
+// names an unpacked-array variable, or any function call whose declared
+// return type is non-singular. "Event expressions shall return singular
+// values"; aggregate types are illegal unless the expression reduces to a
+// singular value. R16 narrows this further for callees: a function is
+// allowed in an event expression only when "the type of the return value
+// is singular".
 static void CheckEventExprSingular(
     const Expr* expr,
     const std::unordered_set<std::string_view>& non_singular_vars,
+    const std::unordered_set<std::string_view>& non_singular_funcs,
     DiagEngine& diag) {
   if (!expr) return;
   if (expr->kind == ExprKind::kIdentifier && !expr->text.empty()) {
@@ -2322,14 +2325,29 @@ static void CheckEventExprSingular(
                              expr->text));
     }
   }
-  CheckEventExprSingular(expr->lhs, non_singular_vars, diag);
-  CheckEventExprSingular(expr->rhs, non_singular_vars, diag);
-  CheckEventExprSingular(expr->condition, non_singular_vars, diag);
-  CheckEventExprSingular(expr->true_expr, non_singular_vars, diag);
-  CheckEventExprSingular(expr->false_expr, non_singular_vars, diag);
-  for (auto* a : expr->args) CheckEventExprSingular(a, non_singular_vars, diag);
+  if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
+    if (non_singular_funcs.count(expr->callee) != 0) {
+      diag.Error(expr->range.start,
+                 std::format("event expression calls function '{}' whose "
+                             "return type is non-singular; event expressions "
+                             "shall return singular values",
+                             expr->callee));
+    }
+  }
+  CheckEventExprSingular(expr->lhs, non_singular_vars, non_singular_funcs,
+                         diag);
+  CheckEventExprSingular(expr->rhs, non_singular_vars, non_singular_funcs,
+                         diag);
+  CheckEventExprSingular(expr->condition, non_singular_vars,
+                         non_singular_funcs, diag);
+  CheckEventExprSingular(expr->true_expr, non_singular_vars,
+                         non_singular_funcs, diag);
+  CheckEventExprSingular(expr->false_expr, non_singular_vars,
+                         non_singular_funcs, diag);
+  for (auto* a : expr->args)
+    CheckEventExprSingular(a, non_singular_vars, non_singular_funcs, diag);
   for (auto* e : expr->elements)
-    CheckEventExprSingular(e, non_singular_vars, diag);
+    CheckEventExprSingular(e, non_singular_vars, non_singular_funcs, diag);
 }
 
 // §9.4.2: Recursively walk statements; apply CheckEventExprSingular to
@@ -2337,26 +2355,34 @@ static void CheckEventExprSingular(
 static void WalkStmtForEventSingular(
     const Stmt* s,
     const std::unordered_set<std::string_view>& non_singular_vars,
+    const std::unordered_set<std::string_view>& non_singular_funcs,
     DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kEventControl) {
     for (const auto& ev : s->events) {
-      CheckEventExprSingular(ev.signal, non_singular_vars, diag);
-      CheckEventExprSingular(ev.iff_condition, non_singular_vars, diag);
+      CheckEventExprSingular(ev.signal, non_singular_vars, non_singular_funcs,
+                             diag);
+      CheckEventExprSingular(ev.iff_condition, non_singular_vars,
+                             non_singular_funcs, diag);
     }
   }
   for (auto* sub : s->stmts)
-    WalkStmtForEventSingular(sub, non_singular_vars, diag);
-  WalkStmtForEventSingular(s->then_branch, non_singular_vars, diag);
-  WalkStmtForEventSingular(s->else_branch, non_singular_vars, diag);
-  WalkStmtForEventSingular(s->body, non_singular_vars, diag);
+    WalkStmtForEventSingular(sub, non_singular_vars, non_singular_funcs, diag);
+  WalkStmtForEventSingular(s->then_branch, non_singular_vars,
+                           non_singular_funcs, diag);
+  WalkStmtForEventSingular(s->else_branch, non_singular_vars,
+                           non_singular_funcs, diag);
+  WalkStmtForEventSingular(s->body, non_singular_vars, non_singular_funcs,
+                           diag);
   for (auto* fi : s->for_inits)
-    WalkStmtForEventSingular(fi, non_singular_vars, diag);
-  WalkStmtForEventSingular(s->for_body, non_singular_vars, diag);
+    WalkStmtForEventSingular(fi, non_singular_vars, non_singular_funcs, diag);
+  WalkStmtForEventSingular(s->for_body, non_singular_vars, non_singular_funcs,
+                           diag);
   for (auto* fs : s->for_steps)
-    WalkStmtForEventSingular(fs, non_singular_vars, diag);
+    WalkStmtForEventSingular(fs, non_singular_vars, non_singular_funcs, diag);
   for (auto& ci : s->case_items)
-    WalkStmtForEventSingular(ci.body, non_singular_vars, diag);
+    WalkStmtForEventSingular(ci.body, non_singular_vars, non_singular_funcs,
+                             diag);
 }
 
 // §13.4: Walk an expression and flag any function call that uses
@@ -2491,6 +2517,22 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
     if (unpacked_array || unpacked_aggregate)
       non_singular_vars.insert(item->name);
   }
+  // §9.4.2 R16: A function may be called in an event expression only when
+  // "the type of the return value is singular". Collect functions whose
+  // declared return type is an unpacked aggregate so calls to them in
+  // event expressions can be flagged.
+  std::unordered_set<std::string_view> non_singular_funcs;
+  auto add_if_non_singular_return = [&](const ModuleItem* item) {
+    if (item->kind != ModuleItemKind::kFunctionDecl) return;
+    const auto& rt = item->return_type;
+    bool unpacked_aggregate =
+        (rt.kind == DataTypeKind::kStruct ||
+         rt.kind == DataTypeKind::kUnion) &&
+        !rt.is_packed;
+    if (unpacked_aggregate) non_singular_funcs.insert(item->name);
+  };
+  for (const auto* item : decl->items) add_if_non_singular_return(item);
+  for (const auto& [name, item] : func_decls_) add_if_non_singular_return(item);
   for (const auto* item : decl->items) {
     bool is_proc_block = item->kind == ModuleItemKind::kInitialBlock ||
                          item->kind == ModuleItemKind::kAlwaysBlock ||
@@ -2502,7 +2544,8 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
       WalkStmtForCallArgs(item->body, all_decls, diag_);
       // §9.4.2: event expressions shall return singular values; walk the
       // body for any @(unpacked-aggregate-var) references.
-      WalkStmtForEventSingular(item->body, non_singular_vars, diag_);
+      WalkStmtForEventSingular(item->body, non_singular_vars,
+                               non_singular_funcs, diag_);
       // §13.4: Sensitivity-list event expressions are not within a procedural
       // statement; function calls with output / inout / non-const ref args
       // are illegal here.
@@ -2515,8 +2558,10 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
         CheckNoTaskCallInExpr(ev.signal, all_decls, diag_);
         CheckNoTaskCallInExpr(ev.iff_condition, all_decls, diag_);
         // §9.4.2: sensitivity event expressions must also be singular.
-        CheckEventExprSingular(ev.signal, non_singular_vars, diag_);
-        CheckEventExprSingular(ev.iff_condition, non_singular_vars, diag_);
+        CheckEventExprSingular(ev.signal, non_singular_vars,
+                               non_singular_funcs, diag_);
+        CheckEventExprSingular(ev.iff_condition, non_singular_vars,
+                               non_singular_funcs, diag_);
       }
     }
     // Also check function/task bodies.

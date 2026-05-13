@@ -132,46 +132,6 @@ EdgeKind DetectEdge(Logic4 from, Logic4 to) {
   return EdgeKind::kNone;
 }
 
-TEST(EdgeDetection, Posedge0To1) {
-  EXPECT_EQ(DetectEdge(Logic4::kVal0, Logic4::kVal1), EdgeKind::kPosedge);
-}
-
-TEST(EdgeDetection, Posedge0ToX) {
-  EXPECT_EQ(DetectEdge(Logic4::kVal0, Logic4::kX), EdgeKind::kPosedge);
-}
-
-TEST(EdgeDetection, Posedge0ToZ) {
-  EXPECT_EQ(DetectEdge(Logic4::kVal0, Logic4::kZ), EdgeKind::kPosedge);
-}
-
-TEST(EdgeDetection, PosedgeXTo1) {
-  EXPECT_EQ(DetectEdge(Logic4::kX, Logic4::kVal1), EdgeKind::kPosedge);
-}
-
-TEST(EdgeDetection, PosedgeZTo1) {
-  EXPECT_EQ(DetectEdge(Logic4::kZ, Logic4::kVal1), EdgeKind::kPosedge);
-}
-
-TEST(EdgeDetection, Negedge1To0) {
-  EXPECT_EQ(DetectEdge(Logic4::kVal1, Logic4::kVal0), EdgeKind::kNegedge);
-}
-
-TEST(EdgeDetection, Negedge1ToX) {
-  EXPECT_EQ(DetectEdge(Logic4::kVal1, Logic4::kX), EdgeKind::kNegedge);
-}
-
-TEST(EdgeDetection, Negedge1ToZ) {
-  EXPECT_EQ(DetectEdge(Logic4::kVal1, Logic4::kZ), EdgeKind::kNegedge);
-}
-
-TEST(EdgeDetection, NegedgeXTo0) {
-  EXPECT_EQ(DetectEdge(Logic4::kX, Logic4::kVal0), EdgeKind::kNegedge);
-}
-
-TEST(EdgeDetection, NegedgeZTo0) {
-  EXPECT_EQ(DetectEdge(Logic4::kZ, Logic4::kVal0), EdgeKind::kNegedge);
-}
-
 TEST(EdgeDetection, NoEdge0To0) {
   EXPECT_EQ(DetectEdge(Logic4::kVal0, Logic4::kVal0), EdgeKind::kNone);
 }
@@ -194,27 +154,6 @@ TEST(EdgeDetection, NoEdgeZToX) {
 
 TEST(EdgeDetection, NoEdgeZToZ) {
   EXPECT_EQ(DetectEdge(Logic4::kZ, Logic4::kZ), EdgeKind::kNone);
-}
-
-bool IsEdge(Logic4 from, Logic4 to) {
-  EdgeKind e = DetectEdge(from, to);
-  return e == EdgeKind::kPosedge || e == EdgeKind::kNegedge;
-}
-
-TEST(EdgeDetection, EdgeDetectedOnPosedge) {
-  EXPECT_TRUE(IsEdge(Logic4::kVal0, Logic4::kVal1));
-}
-
-TEST(EdgeDetection, EdgeDetectedOnNegedge) {
-  EXPECT_TRUE(IsEdge(Logic4::kVal1, Logic4::kVal0));
-}
-
-TEST(EdgeDetection, NoEdgeDetectedOnSame) {
-  EXPECT_FALSE(IsEdge(Logic4::kVal0, Logic4::kVal0));
-}
-
-TEST(EdgeDetection, NoEdgeDetectedXToZ) {
-  EXPECT_FALSE(IsEdge(Logic4::kX, Logic4::kZ));
 }
 
 TEST(EventControlSim, EdgeEventFiresOnPosedge) {
@@ -314,6 +253,110 @@ TEST(EventControlSim, NoEventOnSameValueWrite) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §9.4.2 Table 9-2: a posedge shall be detected on the transition from 0
+// to z. Exercises the production CheckEdge path through @(posedge clk).
+TEST(EventControlSim, PosedgeFiresOnZeroToZ) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "    #5 clk = 1'bz;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(posedge clk) x = 8'd55;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 55u);
+}
+
+// §9.4.2 Table 9-2: a posedge shall be detected on the transition from z
+// to 1.
+TEST(EventControlSim, PosedgeFiresOnZToOne) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 1'bz;\n"
+      "    #5 clk = 1;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(posedge clk) x = 8'd66;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 66u);
+}
+
+// §9.4.2 Table 9-2: a negedge shall be detected on the transition from 1
+// to z.
+TEST(EventControlSim, NegedgeFiresOnOneToZ) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 1;\n"
+      "    #5 clk = 1'bz;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(negedge clk) x = 8'd77;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 77u);
+}
+
+// §9.4.2 Table 9-2: a negedge shall be detected on the transition from z
+// to 0.
+TEST(EventControlSim, NegedgeFiresOnZToZero) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 1'bz;\n"
+      "    #5 clk = 0;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(negedge clk) x = 8'd88;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
 // §9.4.2 Table 9-2: a posedge shall be detected on the transition from 0
@@ -474,6 +517,112 @@ TEST(EventControlSim, EdgeDetectsOnlyLsb) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 66u);
+}
+
+// §9.4.2 Table 9-2: x -> z is "No edge" — @(posedge clk) shall stay blocked.
+// Exercises the production CheckEdge returning false on a value change that
+// the LRM table classifies as non-firing.
+TEST(EventControlSim, NoPosedgeOnXToZ) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 1'bx;\n"
+      "    #5 clk = 1'bz;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    @(posedge clk) x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// §9.4.2 Table 9-2: z -> x is "No edge" — @(posedge clk) shall stay blocked.
+TEST(EventControlSim, NoPosedgeOnZToX) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 1'bz;\n"
+      "    #5 clk = 1'bx;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    @(posedge clk) x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// §9.4.2 Table 9-2: x -> z is "No edge" — @(negedge clk) shall stay blocked.
+TEST(EventControlSim, NoNegedgeOnXToZ) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 1'bx;\n"
+      "    #5 clk = 1'bz;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    @(negedge clk) x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// §9.4.2 Table 9-2: z -> x is "No edge" — @(negedge clk) shall stay blocked.
+TEST(EventControlSim, NoNegedgeOnZToX) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    clk = 1'bz;\n"
+      "    #5 clk = 1'bx;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    @(negedge clk) x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 // §9.4.2: A non-edge implicit event is detected on a change in the value

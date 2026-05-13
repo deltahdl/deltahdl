@@ -67,33 +67,6 @@ TEST(EventControlElaboration, EdgeSensitivityPreservedInRtlir) {
   }
 }
 
-TEST(EventControlLowering, PosedgeWakeup) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic clk;\n"
-      "  logic [31:0] count;\n"
-      "  initial begin\n"
-      "    clk = 0;\n"
-      "    count = 0;\n"
-      "    #1 clk = 1;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "  always @(posedge clk)\n"
-      "    count = count + 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* count = f.ctx.FindVariable("count");
-  ASSERT_NE(count, nullptr);
-  EXPECT_EQ(count->value.ToUint64(), 1u);
-}
-
 TEST(EventControlElaboration, EdgeEventControlElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -218,6 +191,24 @@ TEST(EventControlElaboration, FunctionCallInEventExpressionAccepted) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §9.4.2 R16: "...allowed in event control expressions as long as the type
+// of the return value is singular...". A function whose declared return
+// type is an unpacked struct does not reduce to a singular value and must
+// be rejected when called inside an event expression.
+TEST(EventControlElaboration,
+     FunctionReturningUnpackedStructInEventExpressionRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function struct { int a; int b; } f;\n"
+      "    f.a = 0;\n"
+      "  endfunction\n"
+      "  initial @(f()) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace
