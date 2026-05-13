@@ -480,13 +480,39 @@ bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->rhs->kind == ExprKind::kIdentifier) {
     auto* dst = ctx.FindArrayInfo(stmt->lhs->text);
     auto* src = ctx.FindArrayInfo(stmt->rhs->text);
-    if (dst && src) {
-      // §7.6: Copying a dynamic array or queue into a fixed-size array with a
-      // different number of elements is a run-time error.
-      if (!dst->is_dynamic && !dst->is_queue &&
-          (src->is_dynamic || src->is_queue) && dst->size != src->size) {
+    // §7.6: A queue source has no ArrayInfo record; resolve through the queue
+    // store so the "dynamic array or queue" disjunction in the rule both
+    // applies to and copies from queue sources.
+    auto* src_q = ctx.FindQueue(stmt->rhs->text);
+    if (dst) {
+      bool src_is_aggregate = (src != nullptr) || (src_q != nullptr);
+      if (!src_is_aggregate) return false;
+      bool src_resizable = src_q != nullptr;
+      uint32_t src_size = src_resizable
+                              ? static_cast<uint32_t>(src_q->elements.size())
+                              : src->size;
+      // §7.6: "An attempt to copy a dynamic array or queue into a fixed-size
+      // array target having a different number of elements shall result in a
+      // run-time error and no operation shall be performed."
+      if (!dst->is_dynamic && !dst->is_queue && src_resizable &&
+          dst->size != src_size) {
         ctx.GetDiag().Error(
             {}, "array size mismatch in assignment to fixed-size array");
+        return true;
+      }
+      if (src_resizable) {
+        uint32_t n = std::min(dst->size, src_size);
+        for (uint32_t i = 0; i < n; ++i) {
+          uint32_t di = dst->is_descending ? (dst->lo + dst->size - 1 - i)
+                                            : (dst->lo + i);
+          auto dn =
+              std::string(stmt->lhs->text) + "[" + std::to_string(di) + "]";
+          auto* dv = ctx.FindVariable(dn);
+          if (dv) {
+            dv->value = src_q->elements[i];
+            dv->NotifyWatchers();
+          }
+        }
         return true;
       }
       CopyArrayElements(stmt->lhs->text, *dst, stmt->rhs->text, *src, ctx);

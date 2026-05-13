@@ -218,6 +218,54 @@ TEST(ArrayAssignmentSimulation, FixedSourceResizesDynamicTarget) {
   EXPECT_EQ(v, 5u);
 }
 
+// §7.6: A dynamic source whose runtime element count matches the fixed-size
+// target's element count shall copy element-by-element with no error. The
+// stale-ArrayInfo-size lookup would erroneously trigger the §7.6 run-time
+// error here; the queue-runtime-size path makes the matching-size positive
+// case work and applies the element copy through queue storage.
+TEST(ArrayAssignmentSimulation, DynamicSourceMatchingFixedSizeCopies) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int src[] = '{11, 22, 33};\n"
+      "  int dst[3];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    dst = src;\n"
+      "    result = dst[1];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 22u);
+}
+
+// §7.6: "An attempt to copy a dynamic array or queue into a fixed-size array
+// target having a different number of elements shall result in a run-time
+// error and no operation shall be performed." Covers the queue half of the
+// "dynamic array or queue" disjunction (sibling
+// DynamicToFixedSizeMismatchRuntimeError covers the dynamic half).
+TEST(ArrayAssignmentSimulation, QueueToFixedSizeMismatchRuntimeError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int src[$];\n"
+      "  int dst[2];\n"
+      "  initial begin\n"
+      "    dst[0] = 99;\n"
+      "    dst[1] = 99;\n"
+      "    src.push_back(10);\n"
+      "    src.push_back(20);\n"
+      "    src.push_back(30);\n"
+      "    dst = src;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 // §7.6: "An attempt to copy a dynamic array or queue into a fixed-size array
 // target having a different number of elements shall result in a run-time
 // error and no operation shall be performed."
