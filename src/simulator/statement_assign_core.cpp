@@ -13,12 +13,26 @@
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 
 namespace delta {
+
+// §6.12.1: Get the base identifier name from an LHS expression.
+static std::string_view LhsIdentName(const Expr* lhs) {
+  while (lhs) {
+    if (lhs->kind == ExprKind::kIdentifier) return lhs->text;
+    if (lhs->kind == ExprKind::kSelect && lhs->base) {
+      lhs = lhs->base;
+      continue;
+    }
+    break;
+  }
+  return {};
+}
 
 // Clear x/z bits when writing to a 2-state variable.
 static void CoerceTo2State(Logic4Vec& v) {
@@ -49,6 +63,23 @@ static bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
     return true;
   }
   auto* var = ResolveLhsVariable(lhs, ctx);
+  // §6.16: s[i] = x replaces character i of the string variable.  A zero
+  // byte is dropped per "Assigning the value 0 to a string character shall
+  // be ignored."  The dot-form putc(j,x) is the same operation per §6.16.2.
+  if (var && lhs->kind == ExprKind::kSelect && lhs->base && !lhs->index_end) {
+    auto base_name = LhsIdentName(lhs->base);
+    if (!base_name.empty() && ctx.IsStringVariable(base_name)) {
+      auto idx_val = EvalExpr(lhs->index, ctx, arena);
+      if (!HasUnknownBits(idx_val)) {
+        StringWriteByte(var,
+                        static_cast<uint32_t>(idx_val.ToUint64()),
+                        static_cast<uint8_t>(rhs_val.ToUint64() & 0xFF),
+                        arena);
+        var->NotifyWatchers();
+      }
+      return true;
+    }
+  }
   if (var) {
     WriteBitSelect(var, lhs, rhs_val, ctx, arena);
     var->NotifyWatchers();
@@ -621,18 +652,6 @@ static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   }
 }
 
-// §6.12.1: Get the base identifier name from an LHS expression.
-static std::string_view LhsIdentName(const Expr* lhs) {
-  while (lhs) {
-    if (lhs->kind == ExprKind::kIdentifier) return lhs->text;
-    if (lhs->kind == ExprKind::kSelect && lhs->base) {
-      lhs = lhs->base;
-      continue;
-    }
-    break;
-  }
-  return {};
-}
 
 // §6.12: decode a real-tagged Logic4Vec into a host double, honoring shortreal
 // (width 32, C-float bits) vs real/realtime (width 64, C-double bits).
@@ -711,6 +730,15 @@ static void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val,
   if (var) {
     // §10.6.2: While forced, procedural assigns do not change the value.
     if (var->is_forced) return;
+    // §6.16: Storing a value into a string variable runs the string-literal
+    // conversion: '\0' bytes are dropped and the storage grows or shrinks to
+    // match the resulting byte count, no width-resize occurs.
+    auto lhs_name = LhsIdentName(stmt->lhs);
+    if (!lhs_name.empty() && ctx.IsStringVariable(lhs_name)) {
+      var->value = StripStringZeros(rhs_val, arena);
+      var->NotifyWatchers();
+      return;
+    }
     rhs_val = ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width, ctx,
                                   arena);
     var->value = rhs_val;

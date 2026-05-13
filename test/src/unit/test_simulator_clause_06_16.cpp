@@ -161,4 +161,85 @@ TEST(StringDataType, StringAssignFromString) {
   EXPECT_EQ(VecToStr(var_b->value), "test");
 }
 
+// §6.16: "A string literal assigned to a string variable is converted ...
+// All '\0' characters in the string literal are ignored."
+TEST(StringDataType, StringLiteralEmbeddedZeroStrippedInInit) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string s1 = \"hello\\0world\";\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* s1 = f.ctx.FindVariable("s1");
+  ASSERT_NE(s1, nullptr);
+  EXPECT_EQ(VecToStr(s1->value), "helloworld");
+}
+
+// §6.16: same rule applied through a procedural assignment, not just an
+// initializer.  The string literal is converted before the value is stored.
+TEST(StringDataType, StringLiteralEmbeddedZeroStrippedInProceduralAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string s;\n"
+      "  initial s = \"foo\\0bar\";\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* s = f.ctx.FindVariable("s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(VecToStr(s->value), "foobar");
+}
+
+// §6.16: "A single character of a string variable may be selected for
+// reading or writing by indexing the variable."  s[1] = "B" overwrites the
+// middle byte of "abc" to yield "aBc".
+TEST(StringDataType, StringIndexedWriteUpdatesByte) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    s = \"abc\";\n"
+      "    s[1] = \"B\";\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* s = f.ctx.FindVariable("s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(VecToStr(s->value), "aBc");
+}
+
+// §6.16: "Assigning the value 0 to a string character shall be ignored."
+TEST(StringDataType, AssignZeroToStringCharIgnored) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    s = \"abc\";\n"
+      "    s[1] = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* s = f.ctx.FindVariable("s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(VecToStr(s->value), "abc");
+}
+
 }  // namespace

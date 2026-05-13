@@ -14,6 +14,7 @@
 #include "parser/ast.h"
 #include "simulator/awaiters.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
@@ -340,11 +341,32 @@ static void RegisterStructInfo(const RtlirVariable& var, SimContext& ctx) {
   ctx.SetVariableStructType(var.name, var.name);
 }
 
+// §5.9: Read the i-th source byte (counted from the left) of a string-literal
+// value evaluated as a packed array, returning 0 once the source is exhausted.
+static uint8_t StringLiteralByteAt(const Logic4Vec& packed, uint32_t i) {
+  uint32_t nbytes = packed.width / 8;
+  if (i >= nbytes) return 0;
+  uint32_t byte_idx = nbytes - 1 - i;
+  uint32_t word = (byte_idx * 8) / 64;
+  uint32_t bit = (byte_idx * 8) % 64;
+  if (word >= packed.nwords) return 0;
+  return static_cast<uint8_t>((packed.words[word].aval >> bit) & 0xFF);
+}
+
 // §7.4: Initialize an individual array element, optionally from init pattern.
 static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
                              Variable* elem, SimContext& ctx, Arena& arena) {
   if (!var.init_expr) {
     elem->value = MakeLogic4VecVal(arena, var.width, 0);
+    return;
+  }
+  // §5.9: "A string literal can be assigned to an unpacked array of bytes.
+  // If the size differs, it is left justified."  Place byte i of the literal
+  // into element i and zero-fill any trailing slots beyond the source length.
+  if (var.init_expr->kind == ExprKind::kStringLiteral) {
+    auto packed = EvalExpr(var.init_expr, ctx, arena);
+    auto b = StringLiteralByteAt(packed, elem_idx);
+    elem->value = MakeLogic4VecVal(arena, var.width, b);
     return;
   }
   auto& elements = var.init_expr->elements;
@@ -615,6 +637,9 @@ void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
   auto val = EvalExpr(var.init_expr, ctx_, arena_);
   if (val.width != width && !var.is_real && !var.is_string)
     val = MakeLogic4VecVal(arena_, width, val.ToUint64());
+  // §6.16: When a string literal (or any byte-packed value) is the source of
+  // an initializer for a string variable, drop every '\0' byte before storing.
+  if (var.is_string) val = StripStringZeros(val, arena_);
   v->value = val;
 }
 

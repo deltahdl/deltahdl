@@ -2,18 +2,76 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 namespace delta {
+
+// §6.16: Decode byte at character index `i` (leftmost = 0) of a byte-packed
+// Logic4Vec.  Storage holds the leftmost character in the most-significant
+// byte position, so the raw byte index is mirrored.
+static uint8_t ByteAtChar(const Logic4Vec& packed, uint32_t i) {
+  uint32_t nbytes = packed.width / 8;
+  if (i >= nbytes) return 0;
+  uint32_t byte_idx = nbytes - 1 - i;
+  uint32_t word = (byte_idx * 8) / 64;
+  uint32_t bit = (byte_idx * 8) % 64;
+  if (word >= packed.nwords) return 0;
+  return static_cast<uint8_t>((packed.words[word].aval >> bit) & 0xFF);
+}
+
+// §6.16: Re-pack a byte vector into a Logic4Vec, leftmost byte first.  An
+// empty input yields a one-byte zero vector so the result remains indexable.
+static Logic4Vec PackBytes(const std::vector<uint8_t>& bytes, Arena& arena) {
+  uint32_t width = static_cast<uint32_t>(bytes.size()) * 8;
+  if (width == 0) width = 8;
+  auto out = MakeLogic4Vec(arena, width);
+  for (size_t i = 0; i < bytes.size(); ++i) {
+    auto byte_idx = static_cast<uint32_t>(bytes.size() - 1 - i);
+    uint32_t word = (byte_idx * 8) / 64;
+    uint32_t bit = (byte_idx * 8) % 64;
+    out.words[word].aval |= static_cast<uint64_t>(bytes[i]) << bit;
+  }
+  return out;
+}
+
+// §6.16: Drop every '\0' byte from a byte-packed value.
+Logic4Vec StripStringZeros(const Logic4Vec& packed, Arena& arena) {
+  uint32_t nbytes = packed.width / 8;
+  std::vector<uint8_t> kept;
+  kept.reserve(nbytes);
+  for (uint32_t i = 0; i < nbytes; ++i) {
+    uint8_t b = ByteAtChar(packed, i);
+    if (b != 0) kept.push_back(b);
+  }
+  return PackBytes(kept, arena);
+}
+
+// §6.16: Overwrite character `idx` of a string variable with `byte_val`,
+// silently dropping a zero byte and silently ignoring an out-of-range index.
+void StringWriteByte(Variable* var, uint32_t idx, uint8_t byte_val,
+                     Arena& arena) {
+  if (!var) return;
+  if (byte_val == 0) return;
+  uint32_t nbytes = var->value.width / 8;
+  if (idx >= nbytes) return;
+  std::vector<uint8_t> bytes;
+  bytes.reserve(nbytes);
+  for (uint32_t i = 0; i < nbytes; ++i) bytes.push_back(ByteAtChar(var->value, i));
+  bytes[idx] = byte_val;
+  var->value = PackBytes(bytes, arena);
+}
 
 // --- String <-> Logic4Vec helpers ---
 

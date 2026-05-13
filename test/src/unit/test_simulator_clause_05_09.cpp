@@ -1,8 +1,20 @@
+#include <cstdint>
+#include <cstring>
+#include <string>
+
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
 
 namespace {
+
+static std::string ElemChar(SimFixture& f, const std::string& name) {
+  auto* v = f.ctx.FindVariable(name);
+  if (!v) return "";
+  auto val = static_cast<char>(v->value.ToUint64() & 0xFF);
+  return std::string(1, val);
+}
 
 TEST(LexicalConventionSim, SingleCharValue) {
   auto v =
@@ -96,6 +108,54 @@ TEST(LexicalConventionSim, TripleQuotedMultiLineValue) {
       "  initial s = \"\"\"AB\nC\"\"\";\nendmodule\n",
       "s");
   EXPECT_EQ(v, 0x41420A43u);
+}
+
+// §5.9: "A string literal can be assigned to an unpacked array of bytes. If
+// the size differs, it is left justified."  byte c3[0:12] = "hello world\n";
+// has 12 source bytes and 13 destination slots, so c3[0..11] hold the literal
+// and c3[12] is zero-padded on the right.
+TEST(LexicalConventionSim, UnpackedByteArrayLeftJustifiedFirst) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte c3 [0:12] = \"hello world\\n\";\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(ElemChar(f, "c3[0]"), "h");
+}
+
+TEST(LexicalConventionSim, UnpackedByteArrayLeftJustifiedLast) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte c3 [0:12] = \"hello world\\n\";\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(ElemChar(f, "c3[11]"), "\n");
+}
+
+TEST(LexicalConventionSim, UnpackedByteArrayLeftJustifiedPadding) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte c3 [0:12] = \"hello world\\n\";\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* v = f.ctx.FindVariable("c3[12]");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 0u);
 }
 
 }  // namespace
