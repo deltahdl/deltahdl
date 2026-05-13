@@ -25,7 +25,7 @@ TEST(Elaboration, StringVarIsString) {
   EXPECT_TRUE(found) << "string variable 's' not found";
 }
 
-TEST(Elaboration, StringDefaultEmpty_Ok) {
+TEST(Elaboration, StringDefaultEmptyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -36,7 +36,7 @@ TEST(Elaboration, StringDefaultEmpty_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, StringWithInit_Ok) {
+TEST(Elaboration, StringWithLiteralInitElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"

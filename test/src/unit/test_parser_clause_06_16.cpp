@@ -64,7 +64,7 @@ TEST(DataTypeParsing, StringVarDecl) {
   EXPECT_EQ(item->name, "msg");
 }
 
-TEST(StringLiteralParserParsing, StringLiteral_AsParameter) {
+TEST(StringLiteralParserParsing, StringLiteralAsParameter) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  parameter string MSG = \"default message\";\n"
