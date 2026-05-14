@@ -479,4 +479,57 @@ TEST(IdentifierSyntaxParsing, SequenceIdentifier) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// --- package_scope ::= package_identifier :: | $unit :: ---
+
+TEST(IdentifierSyntaxParsing, PackageScopeUnit) {
+  // package_scope ::= ... | $unit ::  — the compilation-unit scope form
+  // (cross-link with A.8.3 expression: a $unit::name reference inside an
+  // initial-block assignment).
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "int cu_var = 0;\n"
+      "module m;\n"
+      "  int x;\n"
+      "  initial x = $unit::cu_var;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, PackageScopeNamed) {
+  // package_scope ::= package_identifier :: — the named-package form.
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "package pkg;\n"
+      "  int v = 0;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  int x;\n"
+      "  initial x = pkg::v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// --- identifier ::= simple_identifier | escaped_identifier ---
+
+TEST(IdentifierSyntaxParsing, EscapedIdentifierInExpr) {
+  // escaped_identifier ::= \ {any_printable_ASCII_character_except_white_space}
+  //                          white_space
+  // Parser-level test that an escaped identifier survives the lexer and is
+  // treated as an identifier in the AST (cross-link with A.9.4 white_space
+  // terminator and the lexer-stage rule in test_lexer_annex_a_09_03.cpp).
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m;\n"
+      "  logic \\busy-signal ;\n"
+      "  assign \\busy-signal = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

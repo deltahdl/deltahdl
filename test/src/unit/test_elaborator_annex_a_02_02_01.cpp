@@ -256,4 +256,107 @@ TEST(NetAndVariableTypeElaboration, UnsignedVariableElaborates) {
   EXPECT_FALSE(mod->variables[0].is_signed);
 }
 
+// --- net_type elaboration coverage for remaining variants ---
+
+TEST(NetAndVariableTypeElaboration, TriandNetElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  triand t;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->nets.empty());
+  EXPECT_EQ(mod->nets[0].net_type, NetType::kTriand);
+}
+
+TEST(NetAndVariableTypeElaboration, TriorNetElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  trior t;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->nets.empty());
+  EXPECT_EQ(mod->nets[0].net_type, NetType::kTrior);
+}
+
+TEST(NetAndVariableTypeElaboration, Tri0NetElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  tri0 t;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->nets.empty());
+  EXPECT_EQ(mod->nets[0].net_type, NetType::kTri0);
+}
+
+TEST(NetAndVariableTypeElaboration, Tri1NetElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  tri1 t;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->nets.empty());
+  EXPECT_EQ(mod->nets[0].net_type, NetType::kTri1);
+}
+
+TEST(NetAndVariableTypeElaboration, UwireNetElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  uwire u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->nets.empty());
+  EXPECT_EQ(mod->nets[0].net_type, NetType::kUwire);
+}
+
+// --- struct_union ::= union ... elaboration (struct is covered above) ---
+
+TEST(NetAndVariableTypeElaboration, UnionTypedefElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  typedef union packed { logic [7:0] a; logic [7:0] b; } u_t;\n"
+      "  u_t u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// --- error path: enum constant_expression value must be evaluable ---
+
+TEST(NetAndVariableTypeElaboration, EnumNameUnresolvedConstantIsError) {
+  // §A.2.2.1: enum_name_declaration ::= enum_identifier
+  //     [ [ integral_number [ : integral_number ] ] ]
+  //     [ = constant_expression ]
+  // The constant_expression must resolve at elaboration time; a reference
+  // to an undeclared identifier is rejected by the constant evaluator.
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef enum int { A = nope } e_t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace

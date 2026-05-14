@@ -43,16 +43,85 @@ TEST(ExpressionParsing, InsideExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ExpressionParsing, TaggedUnionExpression) {
+// §A.8.3: tagged_union_expression ::= tagged member_identifier [ primary ]
+//     — with-value form
+TEST(ExpressionParsing, TaggedUnionWithValue) {
+  auto r = Parse("module m; initial x = tagged Valid 42; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTagged);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->text, "Valid");
+  ASSERT_NE(rhs->lhs, nullptr);
+}
+
+// §A.8.3: tagged_union_expression — both forms together (with and without
+// primary) round-trip through the parser inside one block.
+TEST(ExpressionParsing, TaggedUnionExpr) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    int a;\n"
+      "    a = tagged Invalid;\n"
+      "    a = tagged Valid (42);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §A.8.3: tagged_union_expression with primary being an assignment_pattern
+TEST(ExpressionParsing, TaggedUnionWithAssignmentPattern) {
   auto r = Parse(
       "module m;\n"
-      "  initial x = tagged Valid 42;\n"
+      "  initial begin\n"
+      "    x = tagged Add '{ 1, 2, 3 };\n"
+      "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTagged);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->text, "Add");
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kAssignmentPattern);
+}
+
+// §A.8.3: tagged_union_expression nested as the primary of an outer
+// tagged_union_expression.
+TEST(ExpressionParsing, NestedTaggedUnionExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = tagged Jmp (tagged JmpU 239);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTagged);
+  EXPECT_EQ(rhs->rhs->text, "Jmp");
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kTagged);
+  EXPECT_EQ(rhs->lhs->rhs->text, "JmpU");
+}
+
+// §A.8.3: tagged_union_expression with a parenthesized expression as primary
+TEST(ExpressionParsing, TaggedUnionParenthesizedExpr) {
+  auto r = Parse("module m; initial x = tagged Valid (23+34); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTagged);
+  EXPECT_EQ(rhs->rhs->text, "Valid");
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kBinary);
 }
 
 TEST(ExpressionParsing, MintypMaxExpression) {
@@ -308,29 +377,17 @@ TEST(ExpressionParsing, ModulePathMintypMaxMultipleDelays) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.3: inside_expression with open_value_range
-TEST(ExpressionParsing, InsideExpressionWithRanges) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    if (x inside {[0:5], [10:20], 42}) a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// §A.8.3: tagged_union_expression without inner expression
-TEST(ExpressionParsing, TaggedUnionExpressionVoid) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = tagged Invalid;\n"
-      "endmodule\n");
+// §A.8.3: tagged_union_expression — without-primary (void tag) form
+TEST(ExpressionParsing, TaggedUnionWithoutValue) {
+  auto r = Parse("module m; initial x = tagged Invalid; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTagged);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->text, "Invalid");
+  EXPECT_EQ(rhs->lhs, nullptr);
 }
 
 // §A.8.3: expression — all binary operators parse

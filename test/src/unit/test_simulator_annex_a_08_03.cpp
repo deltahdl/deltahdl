@@ -167,4 +167,58 @@ TEST(ExpressionSim, NestedTernarySimulates) {
       "x"), 2u);
 }
 
+// §A.8.3: inside_expression — value hits the set, simulator yields 1.
+TEST(ExpressionSim, InsideExpressionHitSimulates) {
+  EXPECT_EQ(RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic hit;\n"
+      "  initial begin\n"
+      "    x = 8'd5;\n"
+      "    hit = x inside {1, 2, [4:6], 9};\n"
+      "  end\n"
+      "endmodule\n",
+      "hit"), 1u);
+}
+
+// §A.8.3: inside_expression — value misses the set, simulator yields 0.
+TEST(ExpressionSim, InsideExpressionMissSimulates) {
+  EXPECT_EQ(RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic hit;\n"
+      "  initial begin\n"
+      "    x = 8'd99;\n"
+      "    hit = x inside {1, 2, [4:6], 9};\n"
+      "  end\n"
+      "endmodule\n",
+      "hit"), 0u);
+}
+
+// §A.8.3: inc_or_dec_expression — prefix increment simulates.
+TEST(ExpressionSim, PrefixIncrementSimulates) {
+  EXPECT_EQ(RunAndGet(
+      "module t;\n"
+      "  integer i;\n"
+      "  initial begin\n"
+      "    i = 5;\n"
+      "    ++i;\n"
+      "  end\n"
+      "endmodule\n",
+      "i"), 6u);
+}
+
+// §A.8.3: inc_or_dec_expression — postfix decrement simulates.
+TEST(ExpressionSim, PostfixDecrementSimulates) {
+  EXPECT_EQ(RunAndGet(
+      "module t;\n"
+      "  integer i;\n"
+      "  initial begin\n"
+      "    i = 5;\n"
+      "    i--;\n"
+      "  end\n"
+      "endmodule\n",
+      "i"), 4u);
+}
+
 }  // namespace

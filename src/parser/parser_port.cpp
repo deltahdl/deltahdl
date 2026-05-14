@@ -525,6 +525,17 @@ PortDecl Parser::ParsePortDecl() {
   } else if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
     port.data_type = ParseStructOrUnionType();
     ParsePackedDims(port.data_type);
+  } else if (Match(TokenKind::kKwInterconnect)) {
+    // A.2.2.1: net_port_type ::= ... | interconnect implicit_data_type
+    port.data_type.kind = DataTypeKind::kWire;
+    port.data_type.is_net = true;
+    port.data_type.is_interconnect = true;
+    if (Match(TokenKind::kKwSigned)) {
+      port.data_type.is_signed = true;
+    } else {
+      Match(TokenKind::kKwUnsigned);
+    }
+    ParsePackedDims(port.data_type);
   } else {
     port.data_type = ParseDataType();
   }

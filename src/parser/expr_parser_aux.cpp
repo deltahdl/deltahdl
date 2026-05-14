@@ -85,6 +85,21 @@ Expr* Parser::ParseParenExpr() {
     lhs = bin;
   }
   Expect(TokenKind::kRParen);
+  // §A.2.2.1: casting_type ::= ... | constant_primary | ...
+  // After a parenthesized expression, accept '(value) as a cast where the
+  // parenthesized inner expression supplies the casting_type's
+  // constant_primary (e.g. (WIDTH)'(value)).
+  if (Check(TokenKind::kApostrophe)) {
+    Consume();  // '
+    Expect(TokenKind::kLParen);
+    auto* cast = arena_.Create<Expr>();
+    cast->kind = ExprKind::kCast;
+    cast->range.start = lhs->range.start;
+    cast->lhs = ParseExpr();
+    cast->rhs = lhs;
+    Expect(TokenKind::kRParen);
+    return cast;
+  }
   return lhs;
 }
 

@@ -122,4 +122,32 @@ TEST(ExpressionElaboration, PartSelectAndIndexedRangeElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §A.8.3: mintypmax_expression — a (min:typ:max) triple in a specify path
+// delay must survive elaboration without diagnostics.
+TEST(ExpressionElaboration, MintypMaxExpressionElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    (a => b) = (1:2:3);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §A.8.3: constant_param_expression with $ (queue bound) elaborates as a
+// queue dimension on a variable.
+TEST(ExpressionElaboration, ConstantParamExpressionDollarElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int q[$];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
