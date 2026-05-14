@@ -243,6 +243,57 @@ TEST(NumberTokenLexing, SignedUpperS) {
   EXPECT_EQ(r.token.text, "4'Sb1010");
 }
 
+// §A.8.7: decimal_number/binary_number/octal_number/hex_number — the
+// [size] prefix is optional, so the signed-base form `'[s|S]<base>` is
+// itself a valid number with no leading size.
+
+TEST(NumberTokenLexing, UnsizedSignedDecimalBase) {
+  auto r = LexOne("'sd42 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "'sd42");
+}
+
+TEST(NumberTokenLexing, UnsizedSignedBinaryBase) {
+  auto r = LexOne("'sb1010 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "'sb1010");
+}
+
+TEST(NumberTokenLexing, UnsizedSignedOctalBase) {
+  auto r = LexOne("'so77 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "'so77");
+}
+
+TEST(NumberTokenLexing, UnsizedSignedHexBase) {
+  auto r = LexOne("'shFF ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "'shFF");
+}
+
+// §A.8.7: size ::= unsigned_number, and unsigned_number permits underscores
+// between digits — the size prefix may therefore contain `_`.
+TEST(NumberTokenLexing, SizeWithUnderscoreDigits) {
+  auto r = LexOne("1_2'b0 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "1_2'b0");
+}
+
+// §A.8.7: decimal_number's x_digit and z_digit forms are
+// `[ size ] decimal_base x_digit { _ }` and the z_digit equivalent —
+// trailing underscores after the lone x_digit or z_digit are permitted.
+TEST(NumberTokenLexing, DecimalBaseXDigitWithTrailingUnderscore) {
+  auto r = LexOne("8'dx_ ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "8'dx_");
+}
+
+TEST(NumberTokenLexing, DecimalBaseZDigitWithTrailingUnderscore) {
+  auto r = LexOne("8'dz_ ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "8'dz_");
+}
+
 // §A.8.7: real_number — fixed_point_number
 
 TEST(NumberTokenLexing, FixedPointNumber) {
@@ -315,6 +366,38 @@ TEST(NumberTokenLexing, UnbasedUnsizedUpperZ) {
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
+// §A.8.7: real_number — exp [ sign ] unsigned_number; the unsigned_number
+// after the exponent marker must start with decimal_digit, so a bare
+// 'e'/'E' (no digit) must not extend the integer into a real literal.
+
+TEST(NumberTokenLexing, RealExponentBareENotConsumed) {
+  auto tokens = Lex("1e ");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "1");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "e");
+}
+
+TEST(NumberTokenLexing, RealExponentBodyNotStartingWithDigit) {
+  auto tokens = Lex("1e_5 ");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "1");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "e_5");
+}
+
+TEST(NumberTokenLexing, RealExponentSignWithoutDigit) {
+  auto tokens = Lex("1e+ ");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "1");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "e");
+  EXPECT_EQ(tokens[2].kind, TokenKind::kPlus);
+}
+
 // §A.8.7: error — invalid digits for base
 
 TEST(NumberTokenLexing, ErrorBinaryDigitOutOfRange) {
@@ -335,6 +418,87 @@ TEST(NumberTokenLexing, ErrorHexDigitOutOfRange) {
 TEST(NumberTokenLexing, ErrorUnderscoreLeadingDigitValue) {
   auto [tokens, errors] = LexWithDiag("4'b_1 ");
   EXPECT_TRUE(errors);
+}
+
+// §A.8.7: unbased_unsized_literal is a single contiguous token —
+// `'0`/`'1`/`'z_or_x` with no whitespace allowed between the apostrophe
+// and the value character.
+TEST(NumberTokenLexing, WhitespaceAfterApostropheNotUnbasedUnsized) {
+  auto tokens = Lex("' 1 ");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_NE(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
+}
+
+// §A.8.7: hex_value ::= hex_digit { _ | hex_digit } — an underscore at the
+// first position of the value is rejected (the value must start with a
+// hex_digit). Covers the hex base; the binary base is covered by
+// ErrorUnderscoreLeadingDigitValue above.
+TEST(NumberTokenLexing, ErrorUnderscoreLeadingDigitValueHex) {
+  auto [tokens, errors] = LexWithDiag("8'h_FF ");
+  EXPECT_TRUE(errors);
+}
+
+// §A.8.7: decimal_number with x_digit/z_digit — the BNF only allows
+// `[ size ] decimal_base x_digit { _ }` or `[ size ] decimal_base z_digit { _ }`,
+// so an x/z digit must be the sole value digit and may not be mixed with
+// regular decimal digits or another x/z digit.
+TEST(NumberTokenLexing, ErrorDecimalNoValueDigits) {
+  auto [tokens, errors] = LexWithDiag("8'd-6");
+  EXPECT_TRUE(errors);
+}
+
+TEST(NumberTokenLexing, ErrorDecimalXZMixedWithDigit) {
+  auto [tokens, errors] = LexWithDiag("8'd1x");
+  EXPECT_TRUE(errors);
+}
+
+TEST(NumberTokenLexing, ErrorDecimalMultipleXZDigits) {
+  auto [tokens, errors] = LexWithDiag("8'dxz");
+  EXPECT_TRUE(errors);
+}
+
+// §A.8.7: binary_digit ::= x_digit | z_digit | 0 | 1, with z_digit ::= z | Z | ?.
+// Covers the binary base path for `?`.
+TEST(NumberTokenLexing, BinaryValueWithQuestion) {
+  auto r = LexOne("4'b? ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+// §A.8.7: fixed_point_number ::= unsigned_number . unsigned_number — the
+// production requires an unsigned_number on both sides of the dot. A bare
+// leading or trailing dot must not extend the integer into a real literal,
+// and a dot without fractional digits before the exponent marker likewise
+// must not.
+TEST(NumberTokenLexing, RealLeadingDotNotRealLiteral) {
+  auto tokens = Lex(".12 ");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kDot);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
+}
+
+TEST(NumberTokenLexing, RealTrailingDotNotRealLiteral) {
+  auto tokens = Lex("9.; ");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "9");
+}
+
+TEST(NumberTokenLexing, RealDotBeforeExponentNotRealLiteral) {
+  auto tokens = Lex("4.E3 ");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "4");
+}
+
+TEST(NumberTokenLexing, RealLeadingDotWithExponentNotRealLiteral) {
+  auto tokens = Lex(".2e-7 ");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kDot);
+}
+
+// §A.8.7: unsigned_number ::= decimal_digit { _ | decimal_digit } — a
+// trailing underscore is allowed inside an unsigned_number, including
+// immediately before the exponent marker.
+TEST(NumberTokenLexing, RealTrailingUnderscoreBeforeExponent) {
+  auto r = LexOne("236.123_763_e-12 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
 }
 
 }  // namespace

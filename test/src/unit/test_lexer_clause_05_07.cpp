@@ -6,37 +6,16 @@ using namespace delta;
 
 namespace {
 
-TEST(NumberLexing, WhitespaceAfterApostropheNotUnbasedUnsized) {
-  auto tokens = Lex("' 1 ");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_NE(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
-}
-
+// §5.7.1: whitespace is permitted between the size and the apostrophe and
+// between the apostrophe and the base specifier — a main-text rule that
+// the §A.8.7 BNF does not itself express. The lexer's enforcement of the
+// stricter rule (no whitespace between the apostrophe and base letter)
+// surfaces here as the apostrophe breaking the token.
 TEST(NumberLexing, WhitespaceBetweenApostropheAndBase) {
   auto tokens = Lex("8' hFF ");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
   EXPECT_EQ(tokens[0].text, "8");
-}
-
-TEST(NumberLexing, IllegalBinaryDigit) {
-  auto [tokens, errors] = LexWithDiag("4'b3 ");
-  EXPECT_TRUE(errors);
-}
-
-TEST(NumberLexing, IllegalOctalDigit) {
-  auto [tokens, errors] = LexWithDiag("8'o9 ");
-  EXPECT_TRUE(errors);
-}
-
-TEST(NumberLexing, UnderscoreFirstInHexValue) {
-  auto [tokens, errors] = LexWithDiag("8'h_FF ");
-  EXPECT_TRUE(errors);
-}
-
-TEST(NumberLexing, UnderscoreFirstInBinaryValue) {
-  auto [tokens, errors] = LexWithDiag("4'b_1010 ");
-  EXPECT_TRUE(errors);
 }
 
 }  // namespace

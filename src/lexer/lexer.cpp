@@ -341,6 +341,19 @@ void Lexer::LexFractionalPart() {
 void Lexer::LexExponentPart() {
   if (AtEnd()) return;
   if (Current() != 'e' && Current() != 'E') return;
+  // §A.8.7: real_number ::= ... exp [ sign ] unsigned_number, and
+  // unsigned_number ::= decimal_digit { _ | decimal_digit }. The body
+  // following exp [sign] must therefore begin with a decimal_digit;
+  // peek before consuming so a bare 'e' or 'e+' stays out of the number.
+  uint32_t look = pos_ + 1;
+  if (look < source_.size() &&
+      (source_[look] == '+' || source_[look] == '-')) {
+    ++look;
+  }
+  if (look >= source_.size() ||
+      !std::isdigit(static_cast<unsigned char>(source_[look]))) {
+    return;
+  }
   Advance();
   if (!AtEnd() && (Current() == '+' || Current() == '-')) {
     Advance();
