@@ -65,6 +65,9 @@ void Lexer::SkipBlockComment(SourceLoc start_loc) {
 
 void Lexer::SkipWhitespaceAndComments() {
   while (!AtEnd()) {
+    // §A.9.4: white_space ::= space | tab | newline | formfeed | eof.
+    // eof is handled by the !AtEnd() loop guard; std::isspace covers the four
+    // listed characters (and tolerates additional ASCII whitespace).
     if (std::isspace(static_cast<unsigned char>(Current()))) {
       Advance();
       continue;

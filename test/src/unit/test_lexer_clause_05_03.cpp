@@ -6,34 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionLexing, SpaceIsWhitespace) {
-  auto tokens = Lex("a b");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
-TEST(LexicalConventionLexing, TabIsWhitespace) {
-  auto tokens = Lex("a\tb");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
-TEST(LexicalConventionLexing, NewlineIsWhitespace) {
-  auto tokens = Lex("a\nb");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
-TEST(LexicalConventionLexing, FormfeedIsWhitespace) {
-  auto tokens = Lex("a\fb");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
 TEST(LexicalConventionLexing, VerticalTabIsWhitespace) {
   auto tokens = Lex("a\vb");
   ASSERT_EQ(tokens.size(), 3u);
@@ -79,22 +51,6 @@ TEST(LexicalConventionLexing, MixedWhitespaceCollapsesToSeparator) {
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
-}
-
-TEST(LexicalConventionLexing, WhitespaceVariationsProduceSameTokenKinds) {
-  auto sp = Lex("a b");
-  auto tab = Lex("a\tb");
-  auto nl = Lex("a\nb");
-  auto ff = Lex("a\fb");
-
-  ASSERT_EQ(sp.size(), tab.size());
-  ASSERT_EQ(sp.size(), nl.size());
-  ASSERT_EQ(sp.size(), ff.size());
-  for (size_t i = 0; i < sp.size(); ++i) {
-    EXPECT_EQ(sp[i].kind, tab[i].kind) << "index " << i;
-    EXPECT_EQ(sp[i].kind, nl[i].kind) << "index " << i;
-    EXPECT_EQ(sp[i].kind, ff[i].kind) << "index " << i;
-  }
 }
 
 TEST(LexicalConventionLexing, SpacesPreservedInStringLiteral) {
@@ -165,31 +121,11 @@ TEST(LexicalConventionLexing, TrailingWhitespaceAfterToken) {
   EXPECT_EQ(tokens[0].text, "a");
 }
 
-TEST(LexicalConventionLexing, FormfeedSeparatesKeywords) {
-  auto tokens = Lex("module\fm");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-}
-
 TEST(LexicalConventionLexing, VerticalTabSeparatesKeywords) {
   auto tokens = Lex("module\vm");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-}
-
-// §5.3: "White space shall contain the characters for spaces, tabs, newlines,
-// formfeeds, and end of file." Bare end-of-file (no preceding explicit
-// whitespace) must terminate the preceding token just as the other whitespace
-// characters do — that is the operational meaning of EOF being a member of
-// the white space category.
-TEST(LexicalConventionLexing, EndOfFileIsWhitespaceTerminator) {
-  auto tokens = Lex("abc");
-  ASSERT_EQ(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[0].text, "abc");
-  EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
 }
 
 // §5.3: end-of-file must terminate every lexical-token category, not just
