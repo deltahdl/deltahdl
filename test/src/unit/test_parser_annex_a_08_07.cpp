@@ -65,6 +65,66 @@ TEST(NumberParsing, SignedBaseHex) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
+// §A.8.7: decimal_number — [size] decimal_base x_digit { _ }
+TEST(NumberParsing, DecimalBaseXDigit) {
+  auto r = Parse("module m; initial x = 8'dx; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+// §A.8.7: decimal_number — [size] decimal_base z_digit { _ }
+TEST(NumberParsing, DecimalBaseZDigit) {
+  auto r = Parse("module m; initial x = 8'dz; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+// §A.8.7: z_digit — z | Z | ?
+TEST(NumberParsing, DecimalBaseQuestion) {
+  auto r = Parse("module m; initial x = 8'd?; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+// §A.8.7: binary_digit — x_digit | z_digit | 0 | 1
+TEST(NumberParsing, BinaryValueWithXZ) {
+  auto r = Parse("module m; initial x = 4'b1xz0; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+// §A.8.7: octal_digit — x_digit | z_digit | 0..7
+TEST(NumberParsing, OctalValueWithXZ) {
+  auto r = Parse("module m; initial x = 8'o7x; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+// §A.8.7: hex_digit — x_digit | z_digit | 0..9 | a..f | A..F
+TEST(NumberParsing, HexValueWithXZ) {
+  auto r = Parse("module m; initial x = 8'h1xZ; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
 // §A.8.7: unsigned_number with underscores
 TEST(NumberParsing, UnsignedNumberWithUnderscores) {
   auto r = Parse("module m; initial x = 1_000_000; endmodule\n");

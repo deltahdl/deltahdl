@@ -140,6 +140,26 @@ TEST(NumberTokenLexing, OctalValueWithUnderscore) {
   EXPECT_EQ(r.token.text, "12'o77_77");
 }
 
+// §A.8.7: octal_digit — x_digit | z_digit | 0..7
+
+TEST(NumberTokenLexing, OctalValueWithXDigit) {
+  auto r = LexOne("8'o7x ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "8'o7x");
+}
+
+TEST(NumberTokenLexing, OctalValueWithZDigit) {
+  auto r = LexOne("8'o7Z ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "8'o7Z");
+}
+
+TEST(NumberTokenLexing, OctalValueWithQuestion) {
+  auto r = LexOne("8'o? ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "8'o?");
+}
+
 // §A.8.7: hex_number — [size] hex_base hex_value
 
 TEST(NumberTokenLexing, HexBaseUnsized) {
@@ -169,6 +189,26 @@ TEST(NumberTokenLexing, HexValueWithUnderscore) {
 TEST(NumberTokenLexing, HexValueAllDigits) {
   auto r = LexOne("'h0123456789abcdefABCDEF ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+// §A.8.7: hex_digit — x_digit | z_digit | 0..9 | a..f | A..F
+
+TEST(NumberTokenLexing, HexValueWithXDigit) {
+  auto r = LexOne("8'h1x ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "8'h1x");
+}
+
+TEST(NumberTokenLexing, HexValueWithZDigit) {
+  auto r = LexOne("8'h1Z ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "8'h1Z");
+}
+
+TEST(NumberTokenLexing, HexValueWithQuestion) {
+  auto r = LexOne("8'h? ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "8'h?");
 }
 
 // §A.8.7: signed bases — 'sd, 'sb, 'so, 'sh
