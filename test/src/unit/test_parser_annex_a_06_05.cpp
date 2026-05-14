@@ -29,21 +29,6 @@ TEST(TimingControlSyntaxParsing, DelayControlParenExpr) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
-TEST(TimingControlSyntaxParsing, DelayControlNumeric) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #10 x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
-  EXPECT_NE(stmt->delay, nullptr);
-}
-
 TEST(TimingControlSyntaxParsing, DelayControlIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -58,21 +43,6 @@ TEST(TimingControlSyntaxParsing, DelayControlIdentifier) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
   EXPECT_EQ(stmt->delay->kind, ExprKind::kIdentifier);
-}
-
-TEST(TimingControlSyntaxParsing, DelayControlParenthesized) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #(10) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
-  EXPECT_NE(stmt->delay, nullptr);
 }
 
 TEST(TimingControlSyntaxParsing, DelayControlMintypmax) {
@@ -364,6 +334,192 @@ TEST(TimingControlSyntaxParsing, DelayControlRealLiteral) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
+}
+
+// --- delay_or_event_control ::= repeat ( expression ) event_control ---
+//
+// The repeat form attaches to the RHS of an assignment as intra-assignment
+// timing: `lhs = repeat (N) @(event_control) rhs;` (§A.6.5 / §10.4.2).
+
+TEST(TimingControlSyntaxParsing, RepeatEventControlInAssignment) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = repeat(3) @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+}
+
+TEST(TimingControlSyntaxParsing, RepeatEventControlNonblocking) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a <= repeat(5) @(negedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
+}
+
+// --- jump_statement ::= return [ expression ] ; | break ; | continue ; ---
+
+TEST(JumpStatementSyntaxParsing, BreakStatementBnf) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    break;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBreak);
+}
+
+TEST(JumpStatementSyntaxParsing, ContinueStatementBnf) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    continue;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kContinue);
+}
+
+TEST(JumpStatementSyntaxParsing, ReturnStatementBnf) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    return;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kReturn);
+  EXPECT_EQ(stmt->expr, nullptr);
+}
+
+TEST(JumpStatementSyntaxParsing, ReturnWithExpressionBnf) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int f();\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* ret = FindReturnStmt(r);
+  ASSERT_NE(ret, nullptr);
+  EXPECT_EQ(ret->kind, StmtKind::kReturn);
+  EXPECT_NE(ret->expr, nullptr);
+}
+
+TEST(JumpStatementSyntaxParsing, ReturnMissingSemicolonBnf) {
+  EXPECT_TRUE(Parse(
+      "module m;\n"
+      "  function int f();\n"
+      "    return 42\n"
+      "  endfunction\n"
+      "endmodule\n").has_errors);
+}
+
+TEST(JumpStatementSyntaxParsing, BreakMissingSemicolonBnf) {
+  EXPECT_TRUE(Parse(
+      "module m;\n"
+      "  initial forever begin break end\n"
+      "endmodule\n").has_errors);
+}
+
+TEST(JumpStatementSyntaxParsing, ContinueMissingSemicolonBnf) {
+  EXPECT_TRUE(Parse(
+      "module m;\n"
+      "  initial forever begin continue end\n"
+      "endmodule\n").has_errors);
+}
+
+// --- wait_statement ::= wait ( expression ) statement_or_null
+//                      | wait fork ;
+//                      | wait_order ( ... ) action_block ---
+// (wait_order tests above; here we cover the bare wait and wait fork forms.)
+
+TEST(WaitStatementSyntaxParsing, WaitExpressionStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait (done) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWait);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+TEST(WaitStatementSyntaxParsing, WaitExpressionNullStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait (done) ;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWait);
+}
+
+TEST(WaitStatementSyntaxParsing, WaitForkStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait fork;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWaitFork);
+}
+
+TEST(WaitStatementSyntaxParsing, WaitMissingLParenErrors) {
+  EXPECT_TRUE(Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait done) a = 1;\n"
+      "  end\n"
+      "endmodule\n").has_errors);
+}
+
+TEST(WaitStatementSyntaxParsing, WaitForkMissingSemicolonErrors) {
+  EXPECT_TRUE(Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait fork\n"
+      "  end\n"
+      "endmodule\n").has_errors);
 }
 
 // --- Parenthesized event_expression (§A.6.5) ---

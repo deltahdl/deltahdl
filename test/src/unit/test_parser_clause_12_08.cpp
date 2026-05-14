@@ -5,59 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(JumpStatementSyntaxParsing, BreakStatement) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    break;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBreak);
-}
-
-TEST(JumpStatementSyntaxParsing, ContinueStatement) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    continue;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kContinue);
-}
-
-TEST(JumpStatementSyntaxParsing, ReturnStatement) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    return;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kReturn);
-}
-
-TEST(JumpStatementSyntaxParsing, ReturnWithValue) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    return 42;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kReturn);
-  EXPECT_NE(stmt->expr, nullptr);
-}
-
 TEST(JumpStatementSyntaxParsing, BreakInsideWhile) {
   auto r = Parse(
       "module t;\n"
@@ -258,29 +205,6 @@ TEST(JumpStatementSyntaxParsing, ContinueStatementInBody) {
   auto* if_stmt = body->stmts[0];
   EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);
-}
-
-TEST(JumpStatementSyntaxParsing, ReturnMissingSemicolon) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  function int f();\n"
-      "    return 42\n"
-      "  endfunction\n"
-      "endmodule\n").has_errors);
-}
-
-TEST(JumpStatementSyntaxParsing, BreakMissingSemicolon) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial forever begin break end\n"
-      "endmodule\n").has_errors);
-}
-
-TEST(JumpStatementSyntaxParsing, ContinueMissingSemicolon) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial forever begin continue end\n"
-      "endmodule\n").has_errors);
 }
 
 }  // namespace

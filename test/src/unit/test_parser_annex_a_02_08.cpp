@@ -314,4 +314,46 @@ TEST(BlockItemDeclParsing, LetDeclNoArgsInBlock) {
   EXPECT_EQ(stmt->decl_item->kind, ModuleItemKind::kLetDecl);
 }
 
+// --- { attribute_instance } prefix supports multiple attributes ---
+
+TEST(BlockItemDeclParsing, MultipleAttributeInstancesOnDataDecl) {
+  // §A.2.8: `{ attribute_instance }` allows zero or more attribute_instance.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    (* a *) (* b *) int x;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  EXPECT_GE(stmt->attrs.size(), 2u);
+}
+
+// --- error: missing semicolon on local_parameter_declaration alternative ---
+
+TEST(BlockItemDeclParsing, ErrorBlockItemLocalparamMissingSemicolon) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    localparam int W = 8\n"
+      "    $display(\"%0d\", W);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(BlockItemDeclParsing, ErrorBlockItemParameterMissingSemicolon) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    parameter int D = 4\n"
+      "    $display(\"%0d\", D);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace

@@ -139,3 +139,140 @@ TEST(FormalSyntaxParsing, ParamDecl) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kParamDecl);
   EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kParamDecl);
 }
+
+// --- parameter_declaration ::= parameter type_parameter_declaration ---
+
+TEST(ParameterDeclParsing, ParameterTypeDecl) {
+  auto r = Parse("module m; parameter type T = int; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_FALSE(item->is_localparam);
+  EXPECT_EQ(item->name, "T");
+}
+
+// --- local_parameter_declaration ::= localparam type_parameter_declaration ---
+
+TEST(ParameterDeclParsing, LocalparamTypeDecl) {
+  auto r = Parse("module m; localparam type T = int; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_TRUE(item->is_localparam);
+  EXPECT_EQ(item->name, "T");
+}
+
+// --- type_parameter_declaration ::= type [ forward_type ] list_of_type_assignments ---
+
+TEST(ParameterDeclParsing, TypeParamForwardEnum) {
+  auto r = Parse("module m; parameter type enum T = my_enum_t; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->name, "T");
+}
+
+TEST(ParameterDeclParsing, TypeParamForwardStruct) {
+  auto r = Parse("module m; parameter type struct T = my_struct_t; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->name, "T");
+}
+
+TEST(ParameterDeclParsing, TypeParamForwardUnion) {
+  auto r = Parse("module m; parameter type union T = my_union_t; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->name, "T");
+}
+
+TEST(ParameterDeclParsing, TypeParamForwardClass) {
+  auto r = Parse("module m; parameter type class T = my_class_t; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->name, "T");
+}
+
+TEST(ParameterDeclParsing, TypeParamForwardInterfaceClass) {
+  auto r = Parse(
+      "module m; parameter type interface class T = my_ic_t; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->name, "T");
+}
+
+TEST(ParameterDeclParsing, ErrorTypeParamWithoutDefault) {
+  // §A.2.1.1: a type_parameter_declaration outside a parameter port list must
+  // carry a default type; the parser flags the missing `= type` form.
+  auto r = Parse("module m; parameter type T; endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ParameterDeclParsing, ErrorSpecparamMissingSemicolon) {
+  auto r = Parse(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    specparam tpd = 1.5\n"
+      "  endspecify\n"
+      "endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ParameterDeclParsing, TypeParamCommaSeparatedList) {
+  auto r =
+      Parse("module m; parameter type T1 = int, T2 = real; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  size_t param_count = 0;
+  for (auto* it : r.cu->modules[0]->items) {
+    if (it->kind == ModuleItemKind::kParamDecl) ++param_count;
+  }
+  EXPECT_GE(param_count, 2u);
+}
+
+// --- specparam_declaration ::= specparam [ packed_dimension ]
+//     list_of_specparam_assignments ; ---
+
+TEST(ParameterDeclParsing, SpecparamDeclaration) {
+  auto r = Parse(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    specparam tpd = 1.5;\n"
+      "  endspecify\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParameterDeclParsing, SpecparamWithPackedDimension) {
+  auto r = Parse(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    specparam [7:0] DELAY = 8'd5;\n"
+      "  endspecify\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParameterDeclParsing, SpecparamListOfAssignments) {
+  auto r = Parse(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    specparam t1 = 1.0, t2 = 2.0;\n"
+      "  endspecify\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}

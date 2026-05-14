@@ -59,13 +59,4 @@ TEST(WaitForkParsing, ForkJoinNoneThenWaitFork) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kWaitFork);
 }
 
-TEST(WaitForkParsing, WaitForkMissingSemicolon) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait fork\n"
-      "  end\n"
-      "endmodule\n").has_errors);
-}
-
 }  // namespace

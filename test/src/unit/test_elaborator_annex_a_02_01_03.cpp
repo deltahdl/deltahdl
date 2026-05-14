@@ -195,6 +195,47 @@ TEST(TypeDeclElaboration, PackageImportElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// --- nettype_declaration elaborates ---
+
+TEST(TypeDeclElaboration, NettypeDeclElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  nettype real real_net;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// --- package_export_declaration elaborates ---
+
+TEST(TypeDeclElaboration, PackageExportElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "package src; endpackage\n"
+      "package dst;\n"
+      "  import src::*;\n"
+      "  export src::*;\n"
+      "endpackage\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// --- net_declaration interconnect alternative elaborates ---
+
+TEST(TypeDeclElaboration, NetDeclInterconnectElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  interconnect [3:0] bus;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 // --- Error conditions ---
 
 TEST(TypeDeclElaboration, ErrorRedeclarationDetected) {
