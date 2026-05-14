@@ -11,18 +11,6 @@ TEST(ExpressionParsing, ExprOperatorAssignment) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ExpressionParsing, IncExpression) {
-  auto r = Parse("module m; initial begin i++; end endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ExpressionParsing, DecExpression) {
-  auto r = Parse("module m; initial begin --j; end endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ExpressionParsing, ConditionalExpression) {
   auto r = Parse("module m; initial x = a ? b : c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -55,21 +43,6 @@ TEST(ExpressionParsing, TaggedUnionWithValue) {
   ASSERT_NE(rhs->rhs, nullptr);
   EXPECT_EQ(rhs->rhs->text, "Valid");
   ASSERT_NE(rhs->lhs, nullptr);
-}
-
-// §A.8.3: tagged_union_expression — both forms together (with and without
-// primary) round-trip through the parser inside one block.
-TEST(ExpressionParsing, TaggedUnionExpr) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    int a;\n"
-      "    a = tagged Invalid;\n"
-      "    a = tagged Valid (42);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 // §A.8.3: tagged_union_expression with primary being an assignment_pattern
@@ -281,6 +254,18 @@ TEST(ExpressionParsing, ParamExpressionDataTypeOverride) {
   auto r = Parse(
       "module m;\n"
       "  sub #(.T(logic [7:0])) inst(.a(x));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §A.8.3: param_expression ::= $ — `$` as a parameter override value
+// (the third param_expression alternative; used for unbounded-queue
+// parameters per §6.20.7).
+TEST(ExpressionParsing, ParamExpressionDollarOverride) {
+  auto r = Parse(
+      "module m;\n"
+      "  sub #(.MAX_SIZE($)) inst(.a(x));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

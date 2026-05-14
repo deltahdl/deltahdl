@@ -359,4 +359,77 @@ TEST(NetAndVariableTypeElaboration, EnumNameUnresolvedConstantIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// --- §A.2.2.1 → §A.8.3 cross-link: enum_name_declaration's optional
+//     `= constant_expression` shares §A.8.3's constant_expression. The
+//     elaborator must fold that expression and record the resulting member
+//     value, then auto-increment for subsequent unset members. ---
+
+TEST(NetAndVariableTypeElaboration, EnumNameConstantExpressionFoldsValue) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  typedef enum int { A = 5 + 3, B, C = 20 } e_t;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_TRUE(mod->enum_types.count("e_t"));
+  const auto& members = mod->enum_types.at("e_t");
+  ASSERT_EQ(members.size(), 3u);
+  EXPECT_EQ(members[0].value, 8);   // 5 + 3
+  EXPECT_EQ(members[1].value, 9);   // auto-increment
+  EXPECT_EQ(members[2].value, 20);  // explicit constant
+}
+
+// --- §A.2.2.1: data_type ::= virtual [interface] interface_identifier
+//     [parameter_value_assignment] [. modport_identifier] — the elaborator
+//     must accept a virtual interface variable without diagnostics. ---
+
+TEST(NetAndVariableTypeElaboration, VirtualInterfaceVariableElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "interface ifc; logic d; endinterface\n"
+      "module m; virtual ifc v; endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// --- enum_base_type ::= type_identifier [ packed_dimension ] — the
+//     elaborator must resolve the typedef to its underlying width and
+//     register the enum members against it. ---
+
+TEST(NetAndVariableTypeElaboration, EnumBaseTypeIdentifierElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "typedef logic [3:0] nibble_t;\n"
+      "module m;\n"
+      "  typedef enum nibble_t { A, B, C } e_t;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_TRUE(mod->enum_types.count("e_t"));
+  EXPECT_EQ(mod->enum_types.at("e_t").size(), 3u);
+}
+
+// --- §A.2.2.1 → §A.8.3 cross-link: data_type ::= type_reference, and
+//     type_reference ::= type ( expression ) embeds §A.8.3's expression.
+//     A `var type(x) y;` declaration must elaborate to a variable whose
+//     type follows x's. ---
+
+TEST(NetAndVariableTypeElaboration, TypeReferenceVariableElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  int x;\n"
+      "  var type(x) y;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

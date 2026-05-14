@@ -150,4 +150,39 @@ TEST(ExpressionElaboration, ConstantParamExpressionDollarElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §A.8.3 → §A.2.2.1 cross-link: tagged_union_expression names a member of
+// a tagged union (§A.2.2.1: struct_union ::= union [tagged]). Both halves
+// of the cross-link appear in one design: the tagged union type is
+// declared, and a value is built with the tagged member expression.
+TEST(ExpressionElaboration, TaggedUnionExpressionElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef union tagged { int v; void i; } u_t;\n"
+      "  u_t u;\n"
+      "  initial u = tagged v 42;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §A.8.3 → §A.2.2.1 cross-link: param_expression ::= data_type — a named
+// type-parameter override drives §A.2.2.1's data_type into the parameter
+// slot. The elaborator must accept the override and elaborate the child
+// without diagnostics.
+TEST(ExpressionElaboration, ParamExpressionDataTypeOverrideElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module sub #(parameter type T = int);\n"
+      "  T data;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  sub #(.T(logic [7:0])) inst();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

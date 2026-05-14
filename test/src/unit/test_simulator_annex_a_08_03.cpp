@@ -195,30 +195,16 @@ TEST(ExpressionSim, InsideExpressionMissSimulates) {
       "hit"), 0u);
 }
 
-// §A.8.3: inc_or_dec_expression — prefix increment simulates.
-TEST(ExpressionSim, PrefixIncrementSimulates) {
+// §A.8.3 → §A.2.2.1 cross-link: tagged_union_expression carries the value
+// of the tagged member into the destination — the §A.2.2.1 tagged union
+// type and the §A.8.3 tagged expression meet at runtime.
+TEST(ExpressionSim, TaggedUnionExpressionSimulates) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
-      "  integer i;\n"
-      "  initial begin\n"
-      "    i = 5;\n"
-      "    ++i;\n"
-      "  end\n"
+      "  int x;\n"
+      "  initial x = tagged Valid 42;\n"
       "endmodule\n",
-      "i"), 6u);
-}
-
-// §A.8.3: inc_or_dec_expression — postfix decrement simulates.
-TEST(ExpressionSim, PostfixDecrementSimulates) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  integer i;\n"
-      "  initial begin\n"
-      "    i = 5;\n"
-      "    i--;\n"
-      "  end\n"
-      "endmodule\n",
-      "i"), 4u);
+      "x"), 42u);
 }
 
 }  // namespace

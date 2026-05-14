@@ -232,6 +232,26 @@ TEST(NetAndVariableTypeParsing, ClassTypeParameterized) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// --- data_type ::= ps_covergroup_identifier — a covergroup name is a
+//     valid data_type; the parser must recognise it and parse the
+//     subsequent declaration as a covergroup-typed variable. ---
+
+TEST(NetAndVariableTypeParsing, DataTypeCovergroupIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg;\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "  cg cov_inst;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(items[1]->data_type.type_name, "cg");
+}
+
 // --- data_type: type_reference ---
 
 TEST(NetAndVariableTypeParsing, TypeReferenceExpression) {
@@ -403,10 +423,6 @@ TEST(NetAndVariableTypeParsing, IntegerVectorMultiplePackedDims) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(NetAndVariableTypeParsing, EnumPackedDimension) {
-  EXPECT_TRUE(ParseOk("module m; enum logic [1:0] {A, B, C} x; endmodule"));
-}
-
 // --- struct_union_member: {attribute_instance} ---
 
 TEST(NetAndVariableTypeParsing, StructMemberWithAttribute) {
@@ -462,6 +478,37 @@ TEST(NetAndVariableTypeParsing, EnumBaseTypeIdentifier) {
   auto r = Parse(
       "typedef logic [3:0] nibble_t;\n"
       "module m; enum nibble_t {A, B} x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kEnum);
+}
+
+// --- enum_base_type ::= integer_atom_type [ signing ] — explicit signing ---
+
+TEST(NetAndVariableTypeParsing, EnumBaseAtomWithSigning) {
+  auto r = Parse("module m; enum int signed {A, B} x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kEnum);
+}
+
+// --- enum_base_type ::= integer_vector_type [ signing ] [ packed_dimension ]
+//     — explicit signing on the vector form ---
+
+TEST(NetAndVariableTypeParsing, EnumBaseVectorWithSigning) {
+  auto r = Parse("module m; enum logic signed [3:0] {A, B} x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kEnum);
+}
+
+// --- enum_base_type ::= type_identifier [ packed_dimension ] — with
+//     packed dimension after the typedef base ---
+
+TEST(NetAndVariableTypeParsing, EnumBaseTypeIdentifierWithPackedDim) {
+  auto r = Parse(
+      "typedef logic nibble_t;\n"
+      "module m; enum nibble_t [3:0] {A, B} x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kEnum);

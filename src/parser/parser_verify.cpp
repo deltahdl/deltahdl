@@ -359,6 +359,9 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwCovergroup);
   item->name = Expect(TokenKind::kIdentifier).text;
+  // §A.2.2.1: data_type ::= ps_covergroup_identifier — register the
+  // covergroup name so a later `cg my_inst;` parses with `cg` as data_type.
+  known_types_.insert(item->name);
 
   // Optional extends (§19.3).
   if (Match(TokenKind::kKwExtends)) {

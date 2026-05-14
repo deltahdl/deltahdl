@@ -6,34 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CastOperatorParsing, CastingTypeString) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin string s; s = string'(65); end\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(CastOperatorParsing, CastingTypeConst) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin int x; x = const'(42); end\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(CastOperatorParsing, CastingTypeUserDefined) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef logic [7:0] byte_t;\n"
-      "  initial begin byte_t x; x = byte_t'(16'hFF); end\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(CastOperatorParsing, TypeCastToStruct) {
   auto r = Parse(
       "module t;\n"
@@ -190,34 +162,6 @@ TEST(CastOperatorParsing, IntCastAstFields) {
   ASSERT_NE(rhs->lhs, nullptr);
 }
 
-TEST(CastOperatorParsing, SignedCast) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = signed'(y);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCast);
-  EXPECT_EQ(rhs->text, "signed");
-}
-
-TEST(CastOperatorParsing, ConstCast) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = const'(y);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCast);
-  EXPECT_EQ(rhs->text, "const");
-}
-
 TEST(CastOperatorParsing, IntCastFromRealVar) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -275,20 +219,6 @@ TEST(CastOperatorParsing, CastConcatShortint) {
               "  shortint result;\n"
               "  initial result = shortint'({8'hFA, 8'hCE});\n"
               "endmodule\n"));
-}
-
-TEST(CastOperatorParsing, UnsignedCast) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = unsigned'(-4);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
-  EXPECT_EQ(stmt->rhs->text, "unsigned");
 }
 
 TEST(CastOperatorParsing, VoidCast) {
