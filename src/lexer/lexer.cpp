@@ -45,13 +45,18 @@ SourceLoc Lexer::MakeLoc() const { return {file_id_, line_, column_}; }
 // ---------------------------------------------------------------------------
 
 void Lexer::SkipLineComment() {
+  // §A.9.2: one_line_comment ::= // comment_text \n — comment_text is any
+  // ASCII character sequence terminated by the newline. EOF acts as a
+  // terminator too (§A.9.4 lists eof as white_space).
   while (!AtEnd() && Current() != '\n') {
     Advance();
   }
 }
 
 void Lexer::SkipBlockComment(SourceLoc start_loc) {
-  // Caller has already consumed '/' and '*'.
+  // §A.9.2: block_comment ::= /* comment_text */ — caller has already
+  // consumed '/' and '*'. comment_text is any ASCII character sequence
+  // greedily consumed until the first '*/' terminator (no nesting per BNF).
   while (!AtEnd()) {
     if (Current() == '*' && PeekChar() == '/') {
       Advance();
@@ -76,6 +81,7 @@ void Lexer::SkipWhitespaceAndComments() {
       ConsumeKeywordMarker();
       continue;
     }
+    // §A.9.2: comment ::= one_line_comment | block_comment.
     if (Current() == '/' && PeekChar() == '/') {
       SkipLineComment();
       continue;
