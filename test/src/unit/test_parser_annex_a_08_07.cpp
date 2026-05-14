@@ -55,7 +55,67 @@ TEST(NumberParsing, SizedHexNumber) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// §A.8.7: signed bases
+// §A.8.7: binary_number — [size] binary_base binary_value (unsized form)
+TEST(NumberParsing, UnsizedBinaryNumber) {
+  auto r = Parse("module m; initial x = 'b1010; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+// §A.8.7: octal_number — [size] octal_base octal_value (unsized form)
+TEST(NumberParsing, UnsizedOctalNumber) {
+  auto r = Parse("module m; initial x = 'o77; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+// §A.8.7: hex_number — [size] hex_base hex_value (unsized form)
+TEST(NumberParsing, UnsizedHexNumber) {
+  auto r = Parse("module m; initial x = 'hFF; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+// §A.8.7: decimal_base — '[s|S]d | '[s|S]D
+TEST(NumberParsing, SignedBaseDecimal) {
+  auto r = Parse("module m; initial x = 8'sd99; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+// §A.8.7: binary_base — '[s|S]b | '[s|S]B
+TEST(NumberParsing, SignedBaseBinary) {
+  auto r = Parse("module m; initial x = 4'sb1010; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+// §A.8.7: octal_base — '[s|S]o | '[s|S]O
+TEST(NumberParsing, SignedBaseOctal) {
+  auto r = Parse("module m; initial x = 8'so77; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+// §A.8.7: hex_base — '[s|S]h | '[s|S]H
 TEST(NumberParsing, SignedBaseHex) {
   auto r = Parse("module m; initial x = 8'shFF; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

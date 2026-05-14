@@ -327,6 +327,11 @@ TEST(NumberTokenLexing, ErrorOctalDigitOutOfRange) {
   EXPECT_TRUE(errors);
 }
 
+TEST(NumberTokenLexing, ErrorHexDigitOutOfRange) {
+  auto [tokens, errors] = LexWithDiag("8'hG ");
+  EXPECT_TRUE(errors);
+}
+
 TEST(NumberTokenLexing, ErrorUnderscoreLeadingDigitValue) {
   auto [tokens, errors] = LexWithDiag("4'b_1 ");
   EXPECT_TRUE(errors);
