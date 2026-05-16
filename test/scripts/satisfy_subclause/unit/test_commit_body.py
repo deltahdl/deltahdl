@@ -201,9 +201,16 @@ def test_commit_body_disallowed_tools_blocks_edit() -> None:
     assert "Edit" in COMMIT_BODY_DISALLOWED_TOOLS
 
 
-def test_commit_body_disallowed_tools_blocks_git() -> None:
-    """Commit-body generation must not run git directly."""
-    assert "Bash(git *)" in COMMIT_BODY_DISALLOWED_TOOLS
+def test_commit_body_disallowed_tools_allows_git() -> None:
+    """Commit-body must read git state (e.g. ``git diff``) to narrate the diff.
+
+    The orchestrator owns commit/push in ``commit_mutator_result``, so
+    the Haiku session is not asked to land a commit — but it needs the
+    ``git`` tool to inspect what the eight-step pass changed, so it
+    can write a meaningful ``- {Verb} `path` because reason.`` bullet
+    per change instead of degenerating into a request for permission.
+    """
+    assert "Bash(git *)" not in COMMIT_BODY_DISALLOWED_TOOLS
 
 
 def test_commit_body_disallowed_tools_blocks_rm() -> None:

@@ -39,14 +39,13 @@ from lib.python.github import format_subclause_label
 from lib.python.lrm import build_lrm_read_instruction
 
 
-# Mutators may edit, create, delete, and rename source and test files
-# but must never run git, gh, or build/test tools directly. The
-# orchestrator owns the commit and the CI-equivalent gates: it reads
-# git status --porcelain after the eight-step pass and translates the
-# deleted set into git rm at commit time, so on-disk rm/mv by the
-# mutator is the supported path for Steps 4 and 6.
-MUTATOR_DISALLOWED_TOOLS = (
-    "Bash(git *) Bash(gh *)"
+# Tools both sub-Claude contexts must never reach: `gh` (the orchestrator
+# owns issue closure), the build/test tools (the CI-equivalent gates
+# belong to the orchestrator, not the model), and the PDF readers (the
+# LRM is supplied through the read-instruction helper, not by ad-hoc
+# scraping).
+_SHARED_DISALLOWED_TOOLS = (
+    "Bash(gh *)"
     " Bash(cmake *) Bash(make *) Bash(ninja *)"
     " Bash(ctest *) Bash(pytest *)"
     " Bash(pdftotext *) Bash(pdfgrep *) Bash(pdftohtml *)"
@@ -54,15 +53,26 @@ MUTATOR_DISALLOWED_TOOLS = (
 )
 
 
-# The commit-body generator must not write, edit, or run anything; it
-# just narrates what the eight-step session already did. Block every
-# editing tool, plus the on-disk shell mutators that the mutator list
-# intentionally permits — without these the editing-tool ban has a
-# Bash escape hatch (rm/mv/cp/touch/mkdir).
+# Mutators may edit, create, delete, and rename source and test files
+# but must never run git, gh, or build/test tools directly. The
+# orchestrator owns the commit and the CI-equivalent gates: it reads
+# git status --porcelain after the eight-step pass and translates the
+# deleted set into git rm at commit time, so on-disk rm/mv by the
+# mutator is the supported path for Steps 4 and 6.
+MUTATOR_DISALLOWED_TOOLS = "Bash(git *) " + _SHARED_DISALLOWED_TOOLS
+
+
+# The commit-body generator narrates what the eight-step session
+# already did, so `git diff` / `git log` / `git show` are exactly the
+# tools it needs to describe each porcelain entry in its own words —
+# `Bash(git *)` is therefore NOT carried over from the shared base.
+# Editing tools (Write/Edit/...) and the on-disk shell mutators
+# (rm/mv/cp/touch/mkdir) stay blocked so the narrator cannot touch
+# the working tree the orchestrator is about to commit.
 COMMIT_BODY_DISALLOWED_TOOLS = (
     "Write Edit MultiEdit NotebookEdit"
     " Bash(rm *) Bash(mv *) Bash(cp *) Bash(touch *) Bash(mkdir *)"
-    " " + MUTATOR_DISALLOWED_TOOLS
+    " " + _SHARED_DISALLOWED_TOOLS
 )
 
 
