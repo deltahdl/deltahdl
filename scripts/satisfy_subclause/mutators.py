@@ -23,6 +23,7 @@ working tree changed — empty diff means §X already satisfied (or now
 does); non-empty diff is committed with a ``Closes #N`` trailer.
 """
 
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -33,24 +34,24 @@ from lib.python.claude_cli_streaming import (
     build_env,
     build_streaming_cmd,
     run_claude_streaming_with_retry,
+    write_deny_hook_settings,
 )
 from lib.python.git import commit_and_push, get_porcelain_changes
 from lib.python.github import format_subclause_label
 from lib.python.lrm import build_lrm_read_instruction
 
 
-# Tools both sub-Claude contexts must never reach: `gh` (the orchestrator
-# owns issue closure), the build/test tools (the CI-equivalent gates
-# belong to the orchestrator, not the model), and the PDF readers (the
-# LRM is supplied through the read-instruction helper, not by ad-hoc
-# scraping).
-_SHARED_DISALLOWED_TOOLS = (
-    "Bash(gh *)"
-    " Bash(cmake *) Bash(make *) Bash(ninja *)"
-    " Bash(ctest *) Bash(pytest *)"
-    " Bash(pdftotext *) Bash(pdfgrep *) Bash(pdftohtml *)"
-    " Bash(pdftoppm *) Bash(mutool *)"
-)
+# Bare-command patterns the PreToolUse hook denies for both sub-Claude
+# contexts. `gh` is the orchestrator's tool for issue closure; the
+# build/test tools are the orchestrator's CI-equivalent gate; the PDF
+# readers are unnecessary because the LRM is supplied through the
+# read-instruction helper.
+_SHARED_DENY_PATTERNS = [
+    "gh",
+    "cmake", "make", "ninja",
+    "ctest", "pytest",
+    "pdftotext", "pdfgrep", "pdftohtml", "pdftoppm", "mutool",
+]
 
 
 # Mutators may edit, create, delete, and rename source and test files
@@ -59,21 +60,14 @@ _SHARED_DISALLOWED_TOOLS = (
 # git status --porcelain after the eight-step pass and translates the
 # deleted set into git rm at commit time, so on-disk rm/mv by the
 # mutator is the supported path for Steps 4 and 6.
-MUTATOR_DISALLOWED_TOOLS = "Bash(git *) " + _SHARED_DISALLOWED_TOOLS
+MUTATOR_DENY_PATTERNS = ["git", *_SHARED_DENY_PATTERNS]
 
 
 # The commit-body generator narrates what the eight-step session
 # already did, so `git diff` / `git log` / `git show` are exactly the
 # tools it needs to describe each porcelain entry in its own words —
-# `Bash(git *)` is therefore NOT carried over from the shared base.
-# Editing tools (Write/Edit/...) and the on-disk shell mutators
-# (rm/mv/cp/touch/mkdir) stay blocked so the narrator cannot touch
-# the working tree the orchestrator is about to commit.
-COMMIT_BODY_DISALLOWED_TOOLS = (
-    "Write Edit MultiEdit NotebookEdit"
-    " Bash(rm *) Bash(mv *) Bash(cp *) Bash(touch *) Bash(mkdir *)"
-    " " + _SHARED_DISALLOWED_TOOLS
-)
+# `git` is therefore NOT carried over from the shared base.
+COMMIT_BODY_DENY_PATTERNS = list(_SHARED_DENY_PATTERNS)
 
 
 # The commit body is a pure summarisation of an already-known porcelain
@@ -113,25 +107,36 @@ def run_step(
     most recent Claude session so the steps share an audit context;
     when false the call opens a fresh session.
 
+    A fresh ``settings.json`` is written for each call wiring the
+    PreToolUse Bash deny hook with ``MUTATOR_DENY_PATTERNS``; the
+    file is removed once the call returns. The hook is the only
+    runtime enforcer of the deny list — ``--dangerously-skip-permissions``
+    bypasses ``--disallowedTools`` and PreToolUse hooks are the
+    documented way around that.
+
     Wraps each call in a content-filter retry loop (max two retries)
     using the recovery prompt from ``streaming``; the retry call
     appends ``--continue`` so it resumes the same Claude session.
     Loud-fatal on a non-zero exit code or after the retry budget is
     exhausted.
     """
-    cmd = build_streaming_cmd(
-        model=model,
-        disallowed_tools=MUTATOR_DISALLOWED_TOOLS,
-        continue_session=continue_session,
-    )
-    retry_cmd = build_streaming_cmd(
-        model=model,
-        disallowed_tools=MUTATOR_DISALLOWED_TOOLS,
-        continue_session=True,
-    )
-    run_claude_streaming_with_retry(
-        cmd, prompt, env=build_env(), retry_cmd=retry_cmd, role="Step",
-    )
+    settings_path = write_deny_hook_settings(MUTATOR_DENY_PATTERNS)
+    try:
+        cmd = build_streaming_cmd(
+            model=model,
+            settings_path=settings_path,
+            continue_session=continue_session,
+        )
+        retry_cmd = build_streaming_cmd(
+            model=model,
+            settings_path=settings_path,
+            continue_session=True,
+        )
+        run_claude_streaming_with_retry(
+            cmd, prompt, env=build_env(), retry_cmd=retry_cmd, role="Step",
+        )
+    finally:
+        os.unlink(settings_path)
 
 
 def run_steps(
@@ -267,22 +272,27 @@ def generate_commit_body(
     ``build_action_summary`` when the result is blank.
     """
     prompt = build_commit_prompt(subclauses, added, modified, deleted)
-    cmd = build_streaming_cmd(
-        model=COMMIT_BODY_MODEL,
-        disallowed_tools=COMMIT_BODY_DISALLOWED_TOOLS,
-        continue_session=False,
-        effort=COMMIT_BODY_EFFORT,
-    )
-    retry_cmd = build_streaming_cmd(
-        model=COMMIT_BODY_MODEL,
-        disallowed_tools=COMMIT_BODY_DISALLOWED_TOOLS,
-        continue_session=True,
-        effort=COMMIT_BODY_EFFORT,
-    )
-    print("\nGenerating commit message", flush=True)
-    return run_claude_streaming_with_retry(
-        cmd, prompt, env=build_env(), retry_cmd=retry_cmd, role="Commit body",
-    )
+    settings_path = write_deny_hook_settings(COMMIT_BODY_DENY_PATTERNS)
+    try:
+        cmd = build_streaming_cmd(
+            model=COMMIT_BODY_MODEL,
+            settings_path=settings_path,
+            continue_session=False,
+            effort=COMMIT_BODY_EFFORT,
+        )
+        retry_cmd = build_streaming_cmd(
+            model=COMMIT_BODY_MODEL,
+            settings_path=settings_path,
+            continue_session=True,
+            effort=COMMIT_BODY_EFFORT,
+        )
+        print("\nGenerating commit message", flush=True)
+        return run_claude_streaming_with_retry(
+            cmd, prompt, env=build_env(),
+            retry_cmd=retry_cmd, role="Commit body",
+        )
+    finally:
+        os.unlink(settings_path)
 
 
 def _close_satisfied_issue(subclause: str, issue: int) -> None:

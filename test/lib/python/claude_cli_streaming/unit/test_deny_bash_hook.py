@@ -5,40 +5,17 @@ import json
 from lib.python.claude_cli_streaming import deny_bash_hook as hook
 
 
-# --- _first_token -----------------------------------------------------------
-
-
-def test_first_token_simple_command() -> None:
-    """A simple command returns its first word."""
-    assert hook._first_token("cmake .") == "cmake"
-
-
-def test_first_token_with_leading_whitespace() -> None:
-    """Leading whitespace is stripped before tokenising."""
-    assert hook._first_token("   cmake .") == "cmake"
-
-
-def test_first_token_empty_segment() -> None:
-    """An empty segment returns None."""
-    assert hook._first_token("") is None
-
-
-def test_first_token_whitespace_only_segment() -> None:
-    """A whitespace-only segment returns None."""
-    assert hook._first_token("   \t  ") is None
-
-
-def test_first_token_unclosed_quote() -> None:
-    """A shlex-malformed segment (unclosed quote) returns None."""
-    assert hook._first_token('cmake "unclosed') is None
-
-
 # --- first_tokens -----------------------------------------------------------
 
 
 def test_first_tokens_empty_command() -> None:
     """An empty command returns an empty list."""
-    assert hook.first_tokens("") == []
+    assert not hook.first_tokens("")
+
+
+def test_first_tokens_whitespace_only_command() -> None:
+    """A whitespace-only command returns an empty list."""
+    assert not hook.first_tokens("   \t  ")
 
 
 def test_first_tokens_single_command() -> None:

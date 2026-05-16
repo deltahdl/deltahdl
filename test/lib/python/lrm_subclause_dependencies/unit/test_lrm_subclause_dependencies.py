@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from lib.python.lrm_subclause_dependencies import (
-    DISALLOWED_TOOLS,
+    ORACLE_DENY_PATTERNS,
     build_dependency_prompt,
     compute_subclause_dependencies,
     parse_dependencies,
@@ -14,80 +14,85 @@ from lib.python.lrm_subclause_dependencies import (
 )
 
 
-# --- DISALLOWED_TOOLS -------------------------------------------------------
+# --- ORACLE_DENY_PATTERNS ---------------------------------------------------
 
 
-def test_disallowed_tools_blocks_write() -> None:
-    """The disallowed-tools list blocks the Write tool."""
-    assert "Write" in DISALLOWED_TOOLS
+def test_deny_patterns_blocks_git() -> None:
+    """The oracle deny list blocks git — the oracle is read-only by intent."""
+    assert "git" in ORACLE_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_edit() -> None:
-    """The disallowed-tools list blocks the Edit tool."""
-    assert "Edit" in DISALLOWED_TOOLS
+def test_deny_patterns_blocks_gh() -> None:
+    """The oracle deny list blocks gh."""
+    assert "gh" in ORACLE_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_multiedit() -> None:
-    """The disallowed-tools list blocks MultiEdit."""
-    assert "MultiEdit" in DISALLOWED_TOOLS
+def test_deny_patterns_blocks_rm() -> None:
+    """The oracle deny list blocks rm."""
+    assert "rm" in ORACLE_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_notebookedit() -> None:
-    """The disallowed-tools list blocks NotebookEdit."""
-    assert "NotebookEdit" in DISALLOWED_TOOLS
+def test_deny_patterns_blocks_mv() -> None:
+    """The oracle deny list blocks mv."""
+    assert "mv" in ORACLE_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_git_commit() -> None:
-    """The disallowed-tools list blocks Bash(git commit *)."""
-    assert "git commit" in DISALLOWED_TOOLS
+def test_deny_patterns_blocks_cp() -> None:
+    """The oracle deny list blocks cp."""
+    assert "cp" in ORACLE_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_rm() -> None:
-    """The disallowed-tools list blocks Bash(rm *)."""
-    assert "rm *" in DISALLOWED_TOOLS
+def test_deny_patterns_blocks_touch() -> None:
+    """The oracle deny list blocks touch."""
+    assert "touch" in ORACLE_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_pdftotext() -> None:
-    """The disallowed-tools list blocks Bash(pdftotext *)."""
-    assert "pdftotext" in DISALLOWED_TOOLS
+def test_deny_patterns_blocks_mkdir() -> None:
+    """The oracle deny list blocks mkdir."""
+    assert "mkdir" in ORACLE_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_pdfgrep() -> None:
-    """The disallowed-tools list blocks Bash(pdfgrep *)."""
-    assert "pdfgrep" in DISALLOWED_TOOLS
+def test_deny_patterns_blocks_pdftotext() -> None:
+    """The oracle deny list blocks pdftotext."""
+    assert "pdftotext" in ORACLE_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_pdftohtml() -> None:
-    """The disallowed-tools list blocks Bash(pdftohtml *)."""
-    assert "pdftohtml" in DISALLOWED_TOOLS
+def test_deny_patterns_blocks_pdfgrep() -> None:
+    """The oracle deny list blocks pdfgrep."""
+    assert "pdfgrep" in ORACLE_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_pdftoppm() -> None:
-    """The disallowed-tools list blocks Bash(pdftoppm *)."""
-    assert "pdftoppm" in DISALLOWED_TOOLS
+def test_deny_patterns_blocks_pdftohtml() -> None:
+    """The oracle deny list blocks pdftohtml."""
+    assert "pdftohtml" in ORACLE_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_mutool() -> None:
-    """The disallowed-tools list blocks Bash(mutool *)."""
-    assert "mutool" in DISALLOWED_TOOLS
+def test_deny_patterns_blocks_pdftoppm() -> None:
+    """The oracle deny list blocks pdftoppm."""
+    assert "pdftoppm" in ORACLE_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_python3() -> None:
-    """The disallowed-tools list blocks Bash(python3 *).
+def test_deny_patterns_blocks_mutool() -> None:
+    """The oracle deny list blocks mutool."""
+    assert "mutool" in ORACLE_DENY_PATTERNS
+
+
+def test_deny_patterns_blocks_python3() -> None:
+    """The oracle deny list blocks python3.
 
     Closes the wrapper-evasion hole where sub-Claude routed a banned
     pdftotext invocation through ``python3 -c "subprocess.run(...)"``.
     """
-    assert "python3 *" in DISALLOWED_TOOLS
+    assert "python3" in ORACLE_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_python() -> None:
-    """The disallowed-tools list blocks Bash(python *).
+def test_deny_patterns_blocks_python() -> None:
+    """The oracle deny list blocks python.
 
     Same wrapper hole as ``python3``, via the unsuffixed ``python``
     binary that some environments expose.
     """
-    assert "python *" in DISALLOWED_TOOLS
+    assert "python" in ORACLE_DENY_PATTERNS
 
 
 # --- run_oracle_call --------------------------------------------------------
@@ -160,11 +165,11 @@ def test_run_oracle_call_uses_verbose() -> None:
     assert "--verbose" in mock_stream.call_args[0][0]
 
 
-def test_run_oracle_call_passes_disallowed_tools() -> None:
-    """Passes --disallowedTools to the Claude CLI."""
+def test_run_oracle_call_passes_settings_path() -> None:
+    """Writes a temp deny-hook settings file and forwards it via --settings."""
     with _patched_streaming() as mock_stream:
         run_oracle_call("prompt", model="opus")
-    assert "--disallowedTools" in mock_stream.call_args[0][0]
+    assert "--settings" in mock_stream.call_args[0][0]
 
 
 def test_run_oracle_call_uses_dangerously_skip_permissions() -> None:

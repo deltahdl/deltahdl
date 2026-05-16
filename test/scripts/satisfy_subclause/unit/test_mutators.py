@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from satisfy_subclause.mutators import (
-    MUTATOR_DISALLOWED_TOOLS,
+    MUTATOR_DENY_PATTERNS,
     CycleMember,
     build_commit_message,
     build_steps,
@@ -20,67 +20,82 @@ from satisfy_subclause.mutators import (
 )
 
 
-# --- MUTATOR_DISALLOWED_TOOLS -----------------------------------------------
+# --- MUTATOR_DENY_PATTERNS --------------------------------------------------
 
 
-def test_disallowed_tools_blocks_git() -> None:
-    """The mutator disallowed-tools list blocks all git invocations."""
-    assert "Bash(git *)" in MUTATOR_DISALLOWED_TOOLS
+def test_deny_patterns_blocks_git() -> None:
+    """The mutator deny-pattern list blocks all git invocations."""
+    assert "git" in MUTATOR_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_gh() -> None:
-    """The mutator disallowed-tools list blocks all gh invocations."""
-    assert "Bash(gh *)" in MUTATOR_DISALLOWED_TOOLS
+def test_deny_patterns_blocks_gh() -> None:
+    """The mutator deny-pattern list blocks all gh invocations."""
+    assert "gh" in MUTATOR_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_pytest() -> None:
-    """The mutator disallowed-tools list blocks pytest."""
-    assert "Bash(pytest *)" in MUTATOR_DISALLOWED_TOOLS
+def test_deny_patterns_blocks_pytest() -> None:
+    """The mutator deny-pattern list blocks pytest."""
+    assert "pytest" in MUTATOR_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_cmake() -> None:
-    """The mutator disallowed-tools list blocks cmake."""
-    assert "Bash(cmake *)" in MUTATOR_DISALLOWED_TOOLS
+def test_deny_patterns_blocks_cmake() -> None:
+    """The mutator deny-pattern list blocks cmake."""
+    assert "cmake" in MUTATOR_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_pdftotext() -> None:
-    """The mutator disallowed-tools list blocks Bash(pdftotext *)."""
-    assert "pdftotext" in MUTATOR_DISALLOWED_TOOLS
+def test_deny_patterns_blocks_make() -> None:
+    """The mutator deny-pattern list blocks make."""
+    assert "make" in MUTATOR_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_pdfgrep() -> None:
-    """The mutator disallowed-tools list blocks Bash(pdfgrep *)."""
-    assert "pdfgrep" in MUTATOR_DISALLOWED_TOOLS
+def test_deny_patterns_blocks_ninja() -> None:
+    """The mutator deny-pattern list blocks ninja."""
+    assert "ninja" in MUTATOR_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_pdftohtml() -> None:
-    """The mutator disallowed-tools list blocks Bash(pdftohtml *)."""
-    assert "pdftohtml" in MUTATOR_DISALLOWED_TOOLS
+def test_deny_patterns_blocks_ctest() -> None:
+    """The mutator deny-pattern list blocks ctest."""
+    assert "ctest" in MUTATOR_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_pdftoppm() -> None:
-    """The mutator disallowed-tools list blocks Bash(pdftoppm *)."""
-    assert "pdftoppm" in MUTATOR_DISALLOWED_TOOLS
+def test_deny_patterns_blocks_pdftotext() -> None:
+    """The mutator deny-pattern list blocks pdftotext."""
+    assert "pdftotext" in MUTATOR_DENY_PATTERNS
 
 
-def test_disallowed_tools_blocks_mutool() -> None:
-    """The mutator disallowed-tools list blocks Bash(mutool *)."""
-    assert "mutool" in MUTATOR_DISALLOWED_TOOLS
+def test_deny_patterns_blocks_pdfgrep() -> None:
+    """The mutator deny-pattern list blocks pdfgrep."""
+    assert "pdfgrep" in MUTATOR_DENY_PATTERNS
 
 
-def test_disallowed_tools_allows_rm() -> None:
+def test_deny_patterns_blocks_pdftohtml() -> None:
+    """The mutator deny-pattern list blocks pdftohtml."""
+    assert "pdftohtml" in MUTATOR_DENY_PATTERNS
+
+
+def test_deny_patterns_blocks_pdftoppm() -> None:
+    """The mutator deny-pattern list blocks pdftoppm."""
+    assert "pdftoppm" in MUTATOR_DENY_PATTERNS
+
+
+def test_deny_patterns_blocks_mutool() -> None:
+    """The mutator deny-pattern list blocks mutool."""
+    assert "mutool" in MUTATOR_DENY_PATTERNS
+
+
+def test_deny_patterns_allows_rm() -> None:
     """Steps 4 and 6 require deleting files on disk; rm must not be blocked."""
-    assert "Bash(rm *)" not in MUTATOR_DISALLOWED_TOOLS
+    assert "rm" not in MUTATOR_DENY_PATTERNS
 
 
-def test_disallowed_tools_allows_mv() -> None:
+def test_deny_patterns_allows_mv() -> None:
     """Step 4 (Moving misplaced tests) needs mv; it must not be blocked."""
-    assert "Bash(mv *)" not in MUTATOR_DISALLOWED_TOOLS
+    assert "mv" not in MUTATOR_DENY_PATTERNS
 
 
-def test_disallowed_tools_allows_cp() -> None:
+def test_deny_patterns_allows_cp() -> None:
     """cp is not destructive and is dropped for symmetry with rm/mv."""
-    assert "Bash(cp *)" not in MUTATOR_DISALLOWED_TOOLS
+    assert "cp" not in MUTATOR_DENY_PATTERNS
 
 
 # --- run_step ---------------------------------------------------------------
@@ -109,15 +124,15 @@ def test_run_step_passes_model() -> None:
     assert cmd[cmd.index("--model") + 1] == "haiku"
 
 
-def test_run_step_passes_disallowed_tools() -> None:
-    """run_step passes --disallowedTools."""
+def test_run_step_passes_settings_path() -> None:
+    """run_step writes a temp settings file and forwards it via --settings."""
     with _patched_streaming() as mock_stream:
         run_step("prompt", model="opus", continue_session=False)
-    assert "--disallowedTools" in mock_stream.call_args[0][0]
+    assert "--settings" in mock_stream.call_args[0][0]
 
 
 def test_run_step_uses_dangerously_skip_permissions() -> None:
-    """run_step passes --dangerously-skip-permissions."""
+    """run_step still passes --dangerously-skip-permissions so non-Bash tools auto-approve."""
     with _patched_streaming() as mock_stream:
         run_step("prompt", model="opus", continue_session=False)
     assert "--dangerously-skip-permissions" in mock_stream.call_args[0][0]
@@ -956,11 +971,11 @@ def test_run_step_retry_cmd_uses_continue() -> None:
     assert "--continue" in mock_stream.call_args[1]["retry_cmd"]
 
 
-def test_run_step_retry_cmd_carries_disallowed_tools() -> None:
-    """The retry_cmd carries the mutator disallowed-tools string."""
+def test_run_step_retry_cmd_carries_settings_path() -> None:
+    """The retry_cmd carries the same temp settings path."""
     with _patched_streaming() as mock_stream:
         run_step("prompt", model="opus", continue_session=False)
-    assert "--disallowedTools" in mock_stream.call_args[1]["retry_cmd"]
+    assert "--settings" in mock_stream.call_args[1]["retry_cmd"]
 
 
 # --- build_steps: copyright wording + positive instructions -----------------

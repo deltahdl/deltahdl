@@ -4,7 +4,7 @@ Covers ``build_action_summary`` (the porcelain-derived fallback bullet
 list), ``build_commit_prompt`` (the Claude prompt that asks for ``-
 {Verb} `path` because reason.`` bullets), ``generate_commit_body`` (the
 ``--continue`` Claude call that produces them), and the
-``COMMIT_BODY_DISALLOWED_TOOLS`` allow-list. The integration with
+``COMMIT_BODY_DENY_PATTERNS`` deny-pattern list. The integration with
 ``commit_mutator_result`` lives in ``test_mutators.py``.
 """
 
@@ -12,7 +12,7 @@ from typing import Any
 from unittest.mock import patch
 
 from satisfy_subclause.mutators import (
-    COMMIT_BODY_DISALLOWED_TOOLS,
+    COMMIT_BODY_DENY_PATTERNS,
     build_action_summary,
     build_commit_prompt,
     generate_commit_body,
@@ -159,12 +159,12 @@ def test_generate_commit_body_starts_fresh_session() -> None:
     assert "--continue" not in mock_run.call_args[0][0]
 
 
-def test_generate_commit_body_uses_commit_disallowed_tools() -> None:
-    """generate_commit_body forbids editing tools (Write/Edit/...)."""
+def test_generate_commit_body_passes_settings_path() -> None:
+    """generate_commit_body writes a temp settings file and forwards it via --settings."""
     with _patched_streaming_body() as mock_run:
         generate_commit_body(["6.3"], ["foo.cpp"], [], [])
     cmd = mock_run.call_args[0][0]
-    assert cmd[cmd.index("--disallowedTools") + 1] == COMMIT_BODY_DISALLOWED_TOOLS
+    assert "--settings" in cmd
 
 
 def test_generate_commit_body_passes_prompt_with_paths() -> None:
@@ -188,20 +188,25 @@ def test_generate_commit_body_retry_cmd_uses_continue() -> None:
     assert "--continue" in mock_run.call_args[1]["retry_cmd"]
 
 
-# --- COMMIT_BODY_DISALLOWED_TOOLS -------------------------------------------
+# --- COMMIT_BODY_DENY_PATTERNS ----------------------------------------------
 
 
-def test_commit_body_disallowed_tools_blocks_write() -> None:
-    """Commit-body generation must not write files."""
-    assert "Write" in COMMIT_BODY_DISALLOWED_TOOLS
+def test_commit_body_deny_patterns_blocks_cmake() -> None:
+    """The commit-body deny list blocks cmake."""
+    assert "cmake" in COMMIT_BODY_DENY_PATTERNS
 
 
-def test_commit_body_disallowed_tools_blocks_edit() -> None:
-    """Commit-body generation must not edit files."""
-    assert "Edit" in COMMIT_BODY_DISALLOWED_TOOLS
+def test_commit_body_deny_patterns_blocks_gh() -> None:
+    """The commit-body deny list blocks gh — the orchestrator owns issue closure."""
+    assert "gh" in COMMIT_BODY_DENY_PATTERNS
 
 
-def test_commit_body_disallowed_tools_allows_git() -> None:
+def test_commit_body_deny_patterns_blocks_pytest() -> None:
+    """The commit-body deny list blocks pytest."""
+    assert "pytest" in COMMIT_BODY_DENY_PATTERNS
+
+
+def test_commit_body_deny_patterns_allows_git() -> None:
     """Commit-body must read git state (e.g. ``git diff``) to narrate the diff.
 
     The orchestrator owns commit/push in ``commit_mutator_result``, so
@@ -210,29 +215,4 @@ def test_commit_body_disallowed_tools_allows_git() -> None:
     can write a meaningful ``- {Verb} `path` because reason.`` bullet
     per change instead of degenerating into a request for permission.
     """
-    assert "Bash(git *)" not in COMMIT_BODY_DISALLOWED_TOOLS
-
-
-def test_commit_body_disallowed_tools_blocks_rm() -> None:
-    """Commit-body must not delete files via rm even though mutator allows it."""
-    assert "Bash(rm *)" in COMMIT_BODY_DISALLOWED_TOOLS
-
-
-def test_commit_body_disallowed_tools_blocks_mv() -> None:
-    """Commit-body must not move files via mv even though mutator allows it."""
-    assert "Bash(mv *)" in COMMIT_BODY_DISALLOWED_TOOLS
-
-
-def test_commit_body_disallowed_tools_blocks_cp() -> None:
-    """Commit-body must not copy files via cp even though mutator allows it."""
-    assert "Bash(cp *)" in COMMIT_BODY_DISALLOWED_TOOLS
-
-
-def test_commit_body_disallowed_tools_blocks_touch() -> None:
-    """Commit-body must not create empty files via touch."""
-    assert "Bash(touch *)" in COMMIT_BODY_DISALLOWED_TOOLS
-
-
-def test_commit_body_disallowed_tools_blocks_mkdir() -> None:
-    """Commit-body must not create directories via mkdir."""
-    assert "Bash(mkdir *)" in COMMIT_BODY_DISALLOWED_TOOLS
+    assert "git" not in COMMIT_BODY_DENY_PATTERNS

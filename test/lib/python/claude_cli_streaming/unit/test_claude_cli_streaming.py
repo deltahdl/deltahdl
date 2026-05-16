@@ -1,9 +1,8 @@
 """Unit tests for the subprocess runner in lib.python.claude_cli_streaming."""
 
 import io
-import json
 import os
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from types import ModuleType
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -119,31 +118,6 @@ def test_build_streaming_cmd_appends_continue(streaming: ModuleType) -> None:
 
 
 # --- write_deny_hook_settings -----------------------------------------------
-
-
-@pytest.fixture()
-def make_settings(
-    streaming: ModuleType,
-) -> Iterator[Callable[[list[str]], dict[str, Any]]]:
-    """Return a factory that writes settings, parses them, and cleans up.
-
-    Each call writes a fresh temp file and registers it for cleanup
-    at fixture teardown, so test bodies stay one-assert and don't
-    repeat try/finally.
-    """
-    paths: list[str] = []
-
-    def _make(patterns: list[str]) -> dict[str, Any]:
-        path = streaming.write_deny_hook_settings(patterns)
-        paths.append(path)
-        with open(path, encoding="utf-8") as handle:
-            data: dict[str, Any] = json.load(handle)
-        return data
-
-    yield _make
-
-    for path in paths:
-        os.unlink(path)
 
 
 def _first_hook_cmd(settings: dict[str, Any]) -> str:

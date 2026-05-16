@@ -9,6 +9,7 @@ mutating tool and ``run_oracle_call`` exits non-zero on any failure.
 """
 
 import json
+import os
 import re
 import sys
 from typing import TypeAlias
@@ -18,6 +19,7 @@ from lib.python.claude_cli_streaming import (
     build_streaming_cmd,
     exit_with_error,
     run_claude_streaming_with_retry,
+    write_deny_hook_settings,
 )
 from lib.python.lrm import (
     build_lrm_read_instruction,
@@ -34,15 +36,19 @@ SubclauseDependencies: TypeAlias = list[str]
 # Claude-CLI plumbing
 # ---------------------------------------------------------------------------
 
-DISALLOWED_TOOLS = (
-    "Write Edit MultiEdit NotebookEdit"
-    " Bash(git commit *) Bash(git push *)"
-    " Bash(git rm *) Bash(git mv *)"
-    " Bash(rm *) Bash(mv *) Bash(cp *) Bash(touch *) Bash(mkdir *)"
-    " Bash(pdftotext *) Bash(pdfgrep *) Bash(pdftohtml *)"
-    " Bash(pdftoppm *) Bash(mutool *)"
-    " Bash(python3 *) Bash(python *)"
-)
+# Bare-command patterns the PreToolUse hook denies for oracle sessions.
+# The oracle is read-only by intent — every mutating Bash entry point
+# is on this list (`git` covers commit/push/rm/mv; the on-disk shell
+# mutators cover rm/mv/cp/touch/mkdir). Python interpreters are denied
+# so the oracle cannot execute scripts to bypass the deny list. PDF
+# readers are denied because the LRM is supplied through the read-
+# instruction helper, not by ad-hoc scraping.
+ORACLE_DENY_PATTERNS = [
+    "git", "gh",
+    "rm", "mv", "cp", "touch", "mkdir",
+    "pdftotext", "pdfgrep", "pdftohtml", "pdftoppm", "mutool",
+    "python", "python3",
+]
 
 
 def run_oracle_call(
@@ -70,18 +76,26 @@ def run_oracle_call(
     parse-retry loop in ``compute_subclause_dependencies`` to feed
     corrective feedback into the same session that produced the
     rejected response.
+
+    A fresh ``settings.json`` is written for each call wiring the
+    PreToolUse Bash deny hook with ``ORACLE_DENY_PATTERNS``; the file
+    is removed once the call returns.
     """
-    cmd = build_streaming_cmd(
-        model=model, disallowed_tools=DISALLOWED_TOOLS,
-        continue_session=continue_session, effort=effort,
-    )
-    retry_cmd = build_streaming_cmd(
-        model=model, disallowed_tools=DISALLOWED_TOOLS,
-        continue_session=True, effort=effort,
-    )
-    return run_claude_streaming_with_retry(
-        cmd, prompt, env=build_env(), retry_cmd=retry_cmd, role="Oracle",
-    )
+    settings_path = write_deny_hook_settings(ORACLE_DENY_PATTERNS)
+    try:
+        cmd = build_streaming_cmd(
+            model=model, settings_path=settings_path,
+            continue_session=continue_session, effort=effort,
+        )
+        retry_cmd = build_streaming_cmd(
+            model=model, settings_path=settings_path,
+            continue_session=True, effort=effort,
+        )
+        return run_claude_streaming_with_retry(
+            cmd, prompt, env=build_env(), retry_cmd=retry_cmd, role="Oracle",
+        )
+    finally:
+        os.unlink(settings_path)
 
 
 # ---------------------------------------------------------------------------
