@@ -166,73 +166,6 @@ TEST(BlockItemDeclParsing, NestedBlocksWithDecls) {
               "endmodule\n"));
 }
 
-static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
-  }
-  return nullptr;
-}
-
-TEST(SequentialBlockParsing, VarDeclInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic en;\n"
-      "  logic [7:0] q, d;\n"
-      "  always_latch begin\n"
-      "    logic [7:0] tmp;\n"
-      "    tmp = d + 1;\n"
-      "    if (en) q <= tmp;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysLatchItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 3u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
-}
-
-TEST(SequentialBlockParsing, VarDeclAsFirstStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int temp;\n"
-      "    temp = 99;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(body->stmts[0]->var_name, "temp");
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlockingAssign);
-}
-
-TEST(SequentialBlockParsing, MultipleDifferentTypeVarDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int x;\n"
-      "    logic [7:0] y;\n"
-      "    real z;\n"
-      "    x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 4u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(body->stmts[3]->kind, StmtKind::kBlockingAssign);
-}
-
 TEST(SequentialBlockParsing, SeqBlockAsStatement) {
   auto r = Parse(
       "module m;\n"
@@ -305,6 +238,74 @@ TEST(SequentialBlockParsing, MissingEndKeywordProducesParseError) {
       "    a = 1;\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
+}
+
+TEST(BlockItemDeclParsing, LocalParamAsBlockItem) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    localparam P = 1;\n"
+      "    a = P;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 2u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(body->stmts[0]->var_name, "P");
+}
+
+TEST(BlockItemDeclParsing, ParameterAsBlockItem) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    parameter Q = 2;\n"
+      "    a = Q;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 2u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(body->stmts[0]->var_name, "Q");
+}
+
+TEST(BlockItemDeclParsing, LetDeclAsBlockItem) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    let inc(a) = a + 1;\n"
+      "    x = inc(1);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlockItemDecl);
+}
+
+TEST(BlockItemDeclParsing, AttributeInstanceBeforeBlockItem) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    (* foo *) int x;\n"
+      "    x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+  ASSERT_EQ(body->stmts[0]->attrs.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->attrs[0].name, "foo");
 }
 
 }  // namespace

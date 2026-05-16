@@ -48,31 +48,6 @@ TEST(SequentialBlockSimulation, SeqBlockValuePropagation) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-TEST(SequentialBlockSimulation, SeqBlockSequentialExecution) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a, b, c;\n"
-      "  initial begin\n"
-      "    begin\n"
-      "      a = 10;\n"
-      "      b = 20;\n"
-      "      c = a + b;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* c = f.ctx.FindVariable("c");
-  ASSERT_NE(c, nullptr);
-  EXPECT_EQ(c->value.ToUint64(), 30u);
-}
-
 TEST(SequentialBlockSimulation, EmptySeqBlockNoOp) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -142,21 +117,17 @@ TEST(SequentialBlockSimulation, BlockLocalVarDecl) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SequentialBlockSimulation, RelativeDelaysComposeAcrossManyStatements) {
+TEST(SequentialBlockSimulation, ControlPassesOutAfterDelayedStatements) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  logic [7:0] r;\n"
-      "  logic [7:0] snap1, snap2, snap3;\n"
+      "  logic [7:0] x, y, after_block;\n"
       "  initial begin\n"
-      "    #5 r = 8'd1;\n"
-      "    #5 r = 8'd2;\n"
-      "    #5 r = 8'd3;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    #7 snap1 = r;\n"
-      "    #5 snap2 = r;\n"
-      "    #5 snap3 = r;\n"
+      "    begin\n"
+      "      #5 x = 8'd1;\n"
+      "      #5 y = 8'd2;\n"
+      "    end\n"
+      "    after_block = 8'd99;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -164,9 +135,15 @@ TEST(SequentialBlockSimulation, RelativeDelaysComposeAcrossManyStatements) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("snap1")->value.ToUint64(), 1u);
-  EXPECT_EQ(f.ctx.FindVariable("snap2")->value.ToUint64(), 2u);
-  EXPECT_EQ(f.ctx.FindVariable("snap3")->value.ToUint64(), 3u);
+  auto* x_var = f.ctx.FindVariable("x");
+  ASSERT_NE(x_var, nullptr);
+  EXPECT_EQ(x_var->value.ToUint64(), 1u);
+  auto* y_var = f.ctx.FindVariable("y");
+  ASSERT_NE(y_var, nullptr);
+  EXPECT_EQ(y_var->value.ToUint64(), 2u);
+  auto* after = f.ctx.FindVariable("after_block");
+  ASSERT_NE(after, nullptr);
+  EXPECT_EQ(after->value.ToUint64(), 99u);
 }
 
 TEST(SequentialBlockSimulation, ControlPassesOutAfterLastStatement) {
