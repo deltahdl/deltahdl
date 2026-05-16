@@ -82,6 +82,31 @@ def test_deny_patterns_blocks_mutool() -> None:
     assert "mutool" in MUTATOR_DENY_PATTERNS
 
 
+def test_deny_patterns_blocks_clang() -> None:
+    """The mutator deny-pattern list blocks the clang compiler driver."""
+    assert "clang" in MUTATOR_DENY_PATTERNS
+
+
+def test_deny_patterns_blocks_clangpp() -> None:
+    """The mutator deny-pattern list blocks clang++."""
+    assert "clang++" in MUTATOR_DENY_PATTERNS
+
+
+def test_deny_patterns_blocks_clang_format() -> None:
+    """The mutator deny-pattern list blocks clang-format."""
+    assert "clang-format" in MUTATOR_DENY_PATTERNS
+
+
+def test_deny_patterns_blocks_clang_tidy() -> None:
+    """The mutator deny-pattern list blocks clang-tidy."""
+    assert "clang-tidy" in MUTATOR_DENY_PATTERNS
+
+
+def test_deny_patterns_blocks_clangd() -> None:
+    """The mutator deny-pattern list blocks clangd."""
+    assert "clangd" in MUTATOR_DENY_PATTERNS
+
+
 def test_deny_patterns_allows_rm() -> None:
     """Steps 4 and 6 require deleting files on disk; rm must not be blocked."""
     assert "rm" not in MUTATOR_DENY_PATTERNS

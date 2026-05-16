@@ -54,11 +54,14 @@ from lib.python.lrm import build_lrm_read_instruction
 # contexts. `gh` is the orchestrator's tool for issue closure; the
 # build/test tools are the orchestrator's CI-equivalent gate; the PDF
 # readers are unnecessary because the LRM is supplied through the
-# read-instruction helper.
+# read-instruction helper. The clang variants are listed individually
+# because the deny hook matches on first-token equality, so `clang`
+# alone would not block `clang-format` or `clang++`.
 _SHARED_DENY_PATTERNS = [
     "gh",
     "cmake", "make", "ninja",
     "ctest", "pytest",
+    "clang", "clang++", "clang-format", "clang-tidy", "clangd",
     "pdftotext", "pdfgrep", "pdftohtml", "pdftoppm", "mutool",
 ]
 
