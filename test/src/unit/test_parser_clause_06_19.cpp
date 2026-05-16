@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(NetAndVariableTypeParsing, EnumBaseAtomType) {
-  auto r = Parse("module m; enum int {A, B} x; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
-}
-
-TEST(NetAndVariableTypeParsing, EnumNameBasic) {
-  auto r = Parse("module m; enum {RED, GREEN, BLUE} color; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.enum_members.size(), 3u);
-}
-
 TEST(EnumerationParsing, EnumAnonymousDeclMembers) {
   auto r = Parse(
       "module m;\n"
@@ -56,31 +41,6 @@ TEST(EnumerationParsing, InlineEnumVar) {
   EXPECT_EQ(item->name, "my_var");
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
   ASSERT_EQ(item->data_type.enum_members.size(), 2);
-}
-
-TEST(NetAndVariableTypeParsing, DataTypeEnum) {
-  auto r = Parse("module m; enum logic [1:0] {A, B, C} x; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
-}
-
-TEST(NetAndVariableTypeParsing, EnumBaseVectorWithDim) {
-  auto r = Parse("module m; enum logic [7:0] {A=0, B=255} x; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_NE(r.cu->modules[0]->items[0]->data_type.packed_dim_left, nullptr);
-}
-
-TEST(NetAndVariableTypeParsing, EnumBaseTypeIdentifier) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef logic [3:0] nibble_t;\n"
-      "  enum nibble_t {A, B} x;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(DataTypeParsing, EnumIsIntegral) {

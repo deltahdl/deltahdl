@@ -6,13 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ChandleDataType, DataTypeChandle) {
-  auto r = Parse("module m; chandle h; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kChandle);
-}
-
 TEST(ChandleDataType, ChandleVarDecl) {
   auto r = Parse(
       "module t;\n"

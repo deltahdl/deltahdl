@@ -84,6 +84,21 @@ TEST(IdentifierSyntaxParsing, HierarchicalIdentWithMultipleBitSelects) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §A.9.3: hierarchical_identifier ::= [ $root . ] { identifier
+// constant_bit_select . } identifier — the optional `$root .` prefix
+// reaches the top-level scope regardless of the current instance.
+TEST(IdentifierSyntaxParsing, HierarchicalIdentWithRoot) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  assign x = $root.top.signal;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 TEST(IdentifierSyntaxParsing, DpiImportWithCIdentifier) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -511,6 +526,35 @@ TEST(IdentifierSyntaxParsing, PackageScopeNamed) {
       f);
   ASSERT_NE(cu, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// --- c_identifier ::= [ a-zA-Z_ ] { [ a-zA-Z0-9_ ] } ---
+//
+// §A.9.3 defines c_identifier with a *narrower* lexical class than
+// simple_identifier: the body alphabet is [a-zA-Z0-9_], so `$` is not
+// permitted.  The DPI import/export rules in §A.2.6 use c_identifier (the
+// `c_identifier =` prefix); the parser must reject a `$`-bearing token in
+// that slot even though the lexer happily forms it as a simple_identifier.
+
+TEST(IdentifierSyntaxParsing, DpiImportCIdentifierWithDollarIsError) {
+  ParseFixture f;
+  ParseSrc(
+      "module m;\n"
+      "  import \"DPI-C\" bad$name = function void sv_func();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, DpiExportCIdentifierWithDollarIsError) {
+  ParseFixture f;
+  ParseSrc(
+      "module m;\n"
+      "  function void sv_func(); endfunction\n"
+      "  export \"DPI-C\" bad$name = function sv_func;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 // --- identifier ::= simple_identifier | escaped_identifier ---

@@ -4,17 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(NetAndVariableTypeParsing, DataTypeVirtualInterface) {
-  auto r = Parse(
-      "interface my_ifc; endinterface\n"
-      "module m; virtual interface my_ifc vif; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kVirtualInterface);
-  EXPECT_EQ(item->data_type.type_name, "my_ifc");
-}
-
 TEST(InterfaceParsing, VirtualInterfaceDecl) {
   auto r = Parse(
       "module top;\n"
@@ -91,47 +80,6 @@ TEST(InterfaceParsing, VirtualInterfaceMultipleDecls) {
   EXPECT_EQ(mod->items[0]->name, "a_if");
   EXPECT_EQ(mod->items[1]->data_type.kind, DataTypeKind::kVirtualInterface);
   EXPECT_EQ(mod->items[1]->name, "b_if");
-}
-
-TEST(NetAndVariableTypeParsing, VirtualInterfaceWithModport) {
-  auto r = Parse(
-      "interface my_ifc;\n"
-      "  logic a;\n"
-      "  modport mp(input a);\n"
-      "endinterface\n"
-      "module m; virtual my_ifc.mp vif; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& dt = r.cu->modules[0]->items[0]->data_type;
-  EXPECT_EQ(dt.kind, DataTypeKind::kVirtualInterface);
-  EXPECT_EQ(dt.modport_name, "mp");
-}
-
-TEST(NetAndVariableTypeParsing, VirtualInterfaceWithParams) {
-  auto r = Parse(
-      "interface my_ifc #(parameter W = 8);\n"
-      "endinterface\n"
-      "module m; virtual my_ifc#(16) vif; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& dt = r.cu->modules[0]->items[0]->data_type;
-  EXPECT_EQ(dt.kind, DataTypeKind::kVirtualInterface);
-  EXPECT_FALSE(dt.type_params.empty());
-}
-
-TEST(NetAndVariableTypeParsing, VirtualInterfaceWithParamsAndModport) {
-  auto r = Parse(
-      "interface my_ifc #(parameter W = 8);\n"
-      "  logic [W-1:0] a;\n"
-      "  modport mp(input a);\n"
-      "endinterface\n"
-      "module m; virtual my_ifc#(16).mp vif; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& dt = r.cu->modules[0]->items[0]->data_type;
-  EXPECT_EQ(dt.kind, DataTypeKind::kVirtualInterface);
-  EXPECT_FALSE(dt.type_params.empty());
-  EXPECT_EQ(dt.modport_name, "mp");
 }
 
 TEST(InterfaceParsing, VirtualInterfaceAsTaskArgument) {

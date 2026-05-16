@@ -54,18 +54,6 @@ TEST(IdentifierElaboration, InstanceNameIsIdentifier) {
   EXPECT_EQ(mod->children[0].inst_name, "my_instance");
 }
 
-TEST(IdentifierElaboration, GenvarIdentifier) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  parameter int N = 4;\n"
-      "  logic [N-1:0] bus;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(IdentifierElaboration, ParamIdentInExpression) {
   ElabFixture f;
   auto* design = ElaborateSrc(

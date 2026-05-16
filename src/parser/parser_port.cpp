@@ -1,10 +1,27 @@
+#include <cctype>
 #include <format>
 #include <optional>
+#include <string_view>
 
 #include "common/types.h"
 #include "parser/parser.h"
 
 namespace delta {
+
+// §A.9.3: c_identifier ::= [ a-zA-Z_ ] { [ a-zA-Z0-9_ ] }
+// Narrower than simple_identifier; `$` is not part of the c_identifier
+// alphabet, even though the lexer admits `$` while forming an identifier
+// token under simple_identifier rules.
+static bool IsValidCIdentifier(std::string_view text) {
+  if (text.empty()) return false;
+  unsigned char first = static_cast<unsigned char>(text.front());
+  if (!std::isalpha(first) && first != '_') return false;
+  for (char ch : text.substr(1)) {
+    unsigned char c = static_cast<unsigned char>(ch);
+    if (!std::isalnum(c) && c != '_') return false;
+  }
+  return true;
+}
 
 static Direction TokenToDirection(TokenKind kind) {
   switch (kind) {
@@ -133,6 +150,10 @@ ModuleItem* Parser::ParseDpiImport() {
     auto saved = lexer_.SavePos();
     auto tok = Consume();
     if (Match(TokenKind::kEq)) {
+      if (!IsValidCIdentifier(tok.text)) {
+        diag_.Error(tok.loc,
+                    "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*");
+      }
       item->dpi_c_name = tok.text;
     } else {
       lexer_.RestorePos(saved);
@@ -172,6 +193,10 @@ ModuleItem* Parser::ParseDpiExport(SourceLoc loc) {
     auto saved = lexer_.SavePos();
     auto tok = Consume();
     if (Match(TokenKind::kEq)) {
+      if (!IsValidCIdentifier(tok.text)) {
+        diag_.Error(tok.loc,
+                    "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*");
+      }
       item->dpi_c_name = tok.text;
     } else {
       lexer_.RestorePos(saved);

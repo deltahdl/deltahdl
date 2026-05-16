@@ -110,6 +110,7 @@ TEST(NetAndVariableTypeParsing, DataTypeEnum) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kEnum);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.enum_members.size(), 3u);
 }
 
 // --- data_type: struct_union ---
@@ -536,6 +537,18 @@ TEST(NetAndVariableTypeParsing, EnumEmptyBodyIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §A.2.2.1: struct_union [...] { struct_union_member { struct_union_member } }
+// requires at least one member — an empty `{}` body is a grammar violation.
+TEST(NetAndVariableTypeParsing, StructEmptyBodyIsError) {
+  auto r = Parse("module m; struct {} s; endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(NetAndVariableTypeParsing, UnionEmptyBodyIsError) {
+  auto r = Parse("module m; union {} u; endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
 // --- named type with packed dimensions ---
 
 TEST(NetAndVariableTypeParsing, NamedTypeWithPackedDim) {
@@ -686,6 +699,22 @@ TEST(NetAndVariableTypeParsing, DataTypeVirtualInterface) {
   EXPECT_EQ(dt.type_name, "ifc");
 }
 
+// Bare `virtual interface interface_identifier` — the `interface` keyword
+// is present but no parameter_value_assignment or .modport_identifier
+// follows. Covers the simplest enabled-`interface`-keyword combination.
+TEST(NetAndVariableTypeParsing, DataTypeVirtualInterfaceWithKeyword) {
+  auto r = Parse(
+      "interface ifc; logic d; endinterface\n"
+      "module m; virtual interface ifc v; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& dt = r.cu->modules[0]->items[0]->data_type;
+  EXPECT_EQ(dt.kind, DataTypeKind::kVirtualInterface);
+  EXPECT_EQ(dt.type_name, "ifc");
+  EXPECT_TRUE(dt.modport_name.empty());
+  EXPECT_TRUE(dt.type_params.empty());
+}
+
 TEST(NetAndVariableTypeParsing, DataTypeVirtualInterfaceWithModport) {
   auto r = Parse(
       "interface ifc; logic d; modport mp(input d); endinterface\n"
@@ -694,6 +723,35 @@ TEST(NetAndVariableTypeParsing, DataTypeVirtualInterfaceWithModport) {
   EXPECT_FALSE(r.has_errors);
   auto& dt = r.cu->modules[0]->items[0]->data_type;
   EXPECT_EQ(dt.kind, DataTypeKind::kVirtualInterface);
+  EXPECT_EQ(dt.modport_name, "mp");
+}
+
+// The `interface` keyword in `virtual [interface] interface_identifier` is
+// optional; observe the bare form combined with `. modport_identifier`.
+TEST(NetAndVariableTypeParsing, DataTypeVirtualInterfaceNoKeywordWithModport) {
+  auto r = Parse(
+      "interface ifc; logic a; modport mp(input a); endinterface\n"
+      "module m; virtual ifc.mp vif; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& dt = r.cu->modules[0]->items[0]->data_type;
+  EXPECT_EQ(dt.kind, DataTypeKind::kVirtualInterface);
+  EXPECT_EQ(dt.modport_name, "mp");
+}
+
+// Exercise every optional production tail together: bare form (no
+// `interface` keyword) + parameter_value_assignment + . modport_identifier.
+TEST(NetAndVariableTypeParsing, DataTypeVirtualInterfaceParamsAndModport) {
+  auto r = Parse(
+      "interface ifc #(parameter int W = 8);\n"
+      "  logic [W-1:0] a; modport mp(input a);\n"
+      "endinterface\n"
+      "module m; virtual ifc #(16).mp vif; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& dt = r.cu->modules[0]->items[0]->data_type;
+  EXPECT_EQ(dt.kind, DataTypeKind::kVirtualInterface);
+  EXPECT_FALSE(dt.type_params.empty());
   EXPECT_EQ(dt.modport_name, "mp");
 }
 

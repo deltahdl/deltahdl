@@ -103,6 +103,11 @@ DataType Parser::ParseStructOrUnionBody(TokenKind kw) {
 }
 
 void Parser::ParseStructMembers(DataType& dtype) {
+  // §A.2.2.1: struct_union ::= ... { struct_union_member { struct_union_member } } ...
+  // The body must hold one or more members — the first struct_union_member
+  // is required, the `{ struct_union_member }` repetition adds zero-or-more
+  // additional members.
+  auto open_brace_loc = CurrentLoc();
   Expect(TokenKind::kLBrace);
   while (!Check(TokenKind::kRBrace) && !AtEnd()) {
     // A.2.2.1: {attribute_instance} [random_qualifier] data_type_or_void ...
@@ -142,6 +147,12 @@ void Parser::ParseStructMembers(DataType& dtype) {
       dtype.struct_members.push_back(member);
     } while (Match(TokenKind::kComma));
     Expect(TokenKind::kSemicolon);
+  }
+  if (dtype.struct_members.empty()) {
+    diag_.Error(open_brace_loc,
+                dtype.kind == DataTypeKind::kStruct
+                    ? "struct body must contain at least one member"
+                    : "union body must contain at least one member");
   }
   Expect(TokenKind::kRBrace);
 }
