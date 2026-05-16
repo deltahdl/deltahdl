@@ -501,4 +501,67 @@ TEST(NumberTokenLexing, RealTrailingUnderscoreBeforeExponent) {
   EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
 }
 
+// §A.8.7: real_number ::= unsigned_number [ . unsigned_number ] exp [ sign ]
+// unsigned_number — the [ . unsigned_number ] is optional, so a real with
+// no fractional part but an explicit + or - sign on the exponent is valid.
+TEST(NumberTokenLexing, RealExpNoFracPosSign) {
+  auto r = LexOne("1e+5 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(r.token.text, "1e+5");
+}
+
+TEST(NumberTokenLexing, RealExpNoFracNegSign) {
+  auto r = LexOne("1e-5 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(r.token.text, "1e-5");
+}
+
+// §A.8.7: real_number with fractional part and exponent but no explicit
+// sign — the [ sign ] is optional even when [ . unsigned_number ] is present.
+TEST(NumberTokenLexing, RealFracExpNoSign) {
+  auto r = LexOne("1.5e10 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(r.token.text, "1.5e10");
+}
+
+// §A.8.7: unbased_unsized_literal ::= '0 | '1 | 'z_or_x, where
+// z_or_x ::= x | X | z | Z (no '?'). The apostrophe-question form must not
+// tokenize as an unbased_unsized_literal.
+TEST(NumberTokenLexing, ApostropheQuestionNotUnbasedUnsized) {
+  auto tokens = Lex("'? ");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_NE(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
+}
+
+// §A.8.7: octal_value ::= octal_digit { _ | octal_digit } — the first
+// character must be an octal_digit, not an underscore.
+TEST(NumberTokenLexing, ErrorOctalValueLeadingUnderscore) {
+  auto [tokens, errors] = LexWithDiag("8'o_77 ");
+  EXPECT_TRUE(errors);
+}
+
+// §A.8.7: decimal_number ::= [ size ] decimal_base unsigned_number, and
+// unsigned_number ::= decimal_digit { _ | decimal_digit } — the first
+// character of the value must be a decimal_digit, not an underscore.
+TEST(NumberTokenLexing, ErrorDecimalValueLeadingUnderscore) {
+  auto [tokens, errors] = LexWithDiag("8'd_42 ");
+  EXPECT_TRUE(errors);
+}
+
+// §A.8.7: octal_base ::= '[s|S]o | '[s|S]O — the uppercase 'S' signed
+// specifier must be accepted on the octal base.
+TEST(NumberTokenLexing, UnsizedSignedOctalBaseUpperS) {
+  auto r = LexOne("'So77 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "'So77");
+}
+
+// §A.8.7: hex_base ::= '[s|S]h | '[s|S]H — the uppercase 'S' signed
+// specifier must be accepted on the hex base.
+TEST(NumberTokenLexing, UnsizedSignedHexBaseUpperS) {
+  auto r = LexOne("'Sh1F ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "'Sh1F");
+}
+
 }  // namespace

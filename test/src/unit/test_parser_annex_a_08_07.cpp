@@ -269,4 +269,38 @@ TEST(NumberParsing, RealWithPosExponent) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
+// §A.8.7: real_number's second form is
+// unsigned_number [ . unsigned_number ] exp [ sign ] unsigned_number — the
+// fractional bracket is optional, so a literal with explicit + or - sign
+// on the exponent and no fractional part is a valid real_number.
+TEST(NumberParsing, RealExpNoFracPosSign) {
+  auto r = Parse("module m; initial x = 1e+5; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+}
+
+TEST(NumberParsing, RealExpNoFracNegSign) {
+  auto r = Parse("module m; initial x = 1e-5; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+}
+
+// §A.8.7: the [ sign ] bracket in real_number's second form is optional —
+// a literal with fractional part and exponent but no explicit sign is a
+// valid real_number.
+TEST(NumberParsing, RealFracExpNoSign) {
+  auto r = Parse("module m; initial x = 1.5e10; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+}
+
 }  // namespace

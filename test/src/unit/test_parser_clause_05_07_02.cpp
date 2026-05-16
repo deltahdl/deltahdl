@@ -25,22 +25,6 @@ TEST(RealLiteralParsing, LeadingZeroDecimal) {
               "endmodule\n"));
 }
 
-TEST(RealLiteralParsing, FixedPointValue) {
-  auto r = Parse("module m; real x; initial x = 2.718; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
-TEST(RealLiteralParsing, PointFive) {
-  auto r = Parse("module m; real x; initial x = 0.5; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
 TEST(RealLiteralParsing, ScientificNotation) {
   auto r = Parse(
       "module m;\n"
@@ -51,54 +35,6 @@ TEST(RealLiteralParsing, ScientificNotation) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
   EXPECT_DOUBLE_EQ(rhs->real_val, 0.013);
-}
-
-TEST(RealLiteralParsing, ExponentOnly) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r;\n"
-              "  initial r = 39e8;\n"
-              "endmodule"));
-}
-
-TEST(RealLiteralParsing, ExponentPositiveSign) {
-  auto r = Parse("module m; real x; initial x = 1.0e+2; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
-TEST(RealLiteralParsing, ExponentNegativeSign) {
-  auto r = Parse("module m; real x; initial x = 1.0e-2; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
-TEST(RealLiteralParsing, ScientificWithPositiveSign) {
-  auto r = Parse("module m; real x; initial x = 1.5e+3; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
-TEST(RealLiteralParsing, ExpLowercase) {
-  auto r = Parse("module m; real x; initial x = 2.5e2; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
-TEST(RealLiteralParsing, ExpUppercase) {
-  auto r = Parse("module m; real x; initial x = 2.5E2; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
 TEST(RealLiteralParsing, UnderscoresInValue) {
@@ -201,14 +137,6 @@ TEST(RealLiteralParsing, RealLiteralAddition) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kRealLiteral);
-}
-
-TEST(RealLiteralParsing, RealLiteralInExpression) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  real r;\n"
-              "  initial r = 3.14;\n"
-              "endmodule\n"));
 }
 
 }  // namespace
