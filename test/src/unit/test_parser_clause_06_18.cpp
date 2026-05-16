@@ -125,31 +125,6 @@ TEST(DesignBuildingBlockParsing, TypedefInPackageScope) {
   EXPECT_EQ(typedef_count, 2);
 }
 
-TEST(PackageParsing, PackageWithTypedef) {
-  auto r = Parse(
-      "package types_pkg;\n"
-      "  typedef logic [7:0] byte_t;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  ASSERT_FALSE(r.cu->packages[0]->items.empty());
-  EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kTypedef);
-}
-
-TEST(ClassParsing, TypedefSimpleBuiltin) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef int my_int;\n"
-      "  my_int x;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_GE(items.size(), 2u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kTypedef);
-  EXPECT_EQ(items[0]->name, "my_int");
-}
-
 TEST(DataTypeParsing, TypedefInt) {
   auto r = Parse(
       "module t;\n"
@@ -161,21 +136,6 @@ TEST(DataTypeParsing, TypedefInt) {
   auto* item = r.cu->modules[0]->items[1];
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kNamed);
   EXPECT_EQ(item->data_type.type_name, "myint");
-}
-
-static bool ParseOk5(const std::string& src) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
-}
-
-TEST(DataObjectParsing, TypedefUnpackedDim) {
-  EXPECT_TRUE(ParseOk5("module m; typedef int triple[1:3]; endmodule"));
 }
 
 TEST(DataTypeParsing, BareForwardTypedef) {
@@ -243,6 +203,60 @@ TEST(DataTypeParsing, TypedefEnum) {
   auto* var = r.cu->modules[0]->items[1];
   EXPECT_EQ(var->data_type.kind, DataTypeKind::kNamed);
   EXPECT_EQ(var->data_type.type_name, "my_enum");
+}
+
+// §6.18: "hierarchical references to type identifiers shall not be allowed".
+// The parser only recognizes a typedef name as a data type when it appears
+// as a simple identifier in the active known_types_ set, so a dotted form
+// like `inst.my_type x;` cannot be parsed as a variable declaration.
+TEST(DataTypeParsing, HierarchicalTypeReferenceRejected) {
+  auto r = Parse(
+      "module inner;\n"
+      "  typedef int data_t;\n"
+      "endmodule\n"
+      "module outer;\n"
+      "  inner i();\n"
+      "  i.data_t x;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §6.18 Syntax 6-4 form 2: a typedef whose source type is qualified by an
+// interface port — `typedef interface_port_identifier . type_identifier
+// new_identifier ;` — declares an interface-based typedef.
+TEST(DataTypeParsing, InterfacePortTypedef) {
+  auto r = Parse(
+      "interface intf_i;\n"
+      "  typedef int data_t;\n"
+      "endinterface\n"
+      "module sub(intf_i p);\n"
+      "  typedef p.data_t my_data_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ModuleItem* td = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kTypedef && item->name == "my_data_t") {
+      td = item;
+      break;
+    }
+  }
+  ASSERT_NE(td, nullptr);
+  EXPECT_EQ(td->typedef_ifc_port, "p");
+  EXPECT_EQ(td->typedef_type.type_name, "data_t");
+}
+
+// §6.18: "The declaration of a user-defined data type shall precede any
+// reference to its type_identifier." A name not yet in the parser's known
+// types cannot be recognized as a type in a variable declaration.
+TEST(DataTypeParsing, TypeReferenceBeforeDeclarationRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  my_type x;\n"
+      "  typedef int my_type;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }  // namespace

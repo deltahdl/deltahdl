@@ -815,31 +815,51 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
 }
 
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
-  // §6.18: A `typedef enum|struct|union IDENT;` forward declaration records
+  // §6.18: A `typedef [forward_type] IDENT;` forward declaration records
   // the basic data type the name is later required to resolve to. The actual
-  // typedef definition that follows must conform. The forward declaration
-  // itself has typedef_type.kind == kImplicit so it does not overwrite a
-  // previously elaborated definition.
-  if (item->typedef_type.kind == DataTypeKind::kImplicit &&
-      item->forward_type_kind != DataTypeKind::kImplicit) {
-    forward_typedef_kinds_[item->name] = item->forward_type_kind;
-  } else if (item->typedef_type.kind != DataTypeKind::kImplicit) {
-    auto it = forward_typedef_kinds_.find(item->name);
-    if (it != forward_typedef_kinds_.end() &&
-        it->second != item->typedef_type.kind) {
-      static const auto kind_name = [](DataTypeKind k) -> std::string_view {
-        switch (k) {
-          case DataTypeKind::kEnum:   return "enum";
-          case DataTypeKind::kStruct: return "struct";
-          case DataTypeKind::kUnion:  return "union";
-          default:                    return "type";
-        }
-      };
-      diag_.Error(item->loc,
-                  std::format("typedef '{}' does not conform to its forward "
-                              "declaration as {}",
-                              item->name, kind_name(it->second)));
+  // typedef definition that follows must conform.
+  static const auto kind_name = [](DataTypeKind k) -> std::string_view {
+    switch (k) {
+      case DataTypeKind::kEnum:   return "enum";
+      case DataTypeKind::kStruct: return "struct";
+      case DataTypeKind::kUnion:  return "union";
+      default:                    return "type";
     }
+  };
+  bool is_forward = item->typedef_type.kind == DataTypeKind::kImplicit;
+  if (is_forward) {
+    if (item->forward_type_kind != DataTypeKind::kImplicit) {
+      // §6.18: "It shall be legal to have a forward type declaration in the
+      // same scope, either before or after the final type definition." If the
+      // real definition has already been elaborated, verify the basic kind
+      // conforms; do not overwrite the existing entry with a kImplicit.
+      auto td_it = typedefs_.find(item->name);
+      if (td_it != typedefs_.end() &&
+          td_it->second.kind != DataTypeKind::kImplicit &&
+          td_it->second.kind != item->forward_type_kind) {
+        diag_.Error(item->loc,
+                    std::format("forward typedef '{}' as {} does not conform "
+                                "to its existing definition",
+                                item->name, kind_name(item->forward_type_kind)));
+      }
+      forward_typedef_kinds_[item->name] = item->forward_type_kind;
+    }
+    // §6.18: A forward declaration that follows the final type definition
+    // shall not erase the real type. Only insert a placeholder if no entry
+    // is present yet.
+    typedefs_.try_emplace(item->name, item->typedef_type);
+    return;
+  }
+  auto it = forward_typedef_kinds_.find(item->name);
+  if (it != forward_typedef_kinds_.end() &&
+      it->second != item->typedef_type.kind) {
+    // §6.18: "It shall be an error if a basic data type was specified by the
+    // forward type declaration and the actual type definition does not
+    // conform to the specified basic data type."
+    diag_.Error(item->loc,
+                std::format("typedef '{}' does not conform to its forward "
+                            "declaration as {}",
+                            item->name, kind_name(it->second)));
   }
   typedefs_[item->name] = item->typedef_type;
   if (item->typedef_type.kind == DataTypeKind::kStruct ||
@@ -917,6 +937,76 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   mod->enum_types[item->name] = std::move(members);
 }
 
+// §6.18: After all items in a scope have been elaborated, every forward
+// typedef declared in that scope must resolve to a real definition. A bare
+// forward (`typedef NAME;`) resolves only to a typedef with a non-implicit
+// type in the same scope; a kind-specific forward (`typedef enum NAME;`
+// etc.) may also resolve to a class with that name visible in the current
+// scope, supporting the `typedef class C;` pattern.
+void Elaborator::ValidateForwardTypedefsInScope(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kTypedef) continue;
+    if (item->typedef_type.kind != DataTypeKind::kImplicit) continue;
+    bool resolved = false;
+    for (const auto* other : decl->items) {
+      if (other == item) continue;
+      if (other->kind == ModuleItemKind::kTypedef &&
+          other->name == item->name &&
+          other->typedef_type.kind != DataTypeKind::kImplicit) {
+        resolved = true;
+        break;
+      }
+      if (other->kind == ModuleItemKind::kClassDecl && other->class_decl &&
+          other->class_decl->name == item->name) {
+        resolved = true;
+        break;
+      }
+    }
+    if (!resolved && class_names_.count(item->name) > 0) {
+      resolved = true;
+    }
+    if (!resolved) {
+      diag_.Error(item->loc,
+                  std::format("forward typedef '{}' is never resolved by a "
+                              "definition in the same scope",
+                              item->name));
+    }
+  }
+}
+
+// §6.18: "It shall be an error if the prefix does not resolve to a class."
+// When a typedef in this scope sources its type from `prefix::T` and `prefix`
+// was declared via a forward typedef in the same scope, `prefix` must resolve
+// to a class declaration visible from this scope; otherwise the elaborator
+// rejects the typedef.
+void Elaborator::ValidateForwardTypedefScopePrefix(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kTypedef) continue;
+    if (item->typedef_type.kind != DataTypeKind::kNamed) continue;
+    if (item->typedef_type.scope_name.empty()) continue;
+    auto scope = item->typedef_type.scope_name;
+    bool is_forward_in_scope = false;
+    bool resolves_to_class = class_names_.count(scope) > 0;
+    for (const auto* other : decl->items) {
+      if (other->kind == ModuleItemKind::kTypedef && other->name == scope &&
+          other->typedef_type.kind == DataTypeKind::kImplicit) {
+        is_forward_in_scope = true;
+      }
+      if (other->kind == ModuleItemKind::kClassDecl && other->class_decl &&
+          other->class_decl->name == scope) {
+        resolves_to_class = true;
+      }
+    }
+    if (!is_forward_in_scope) continue;
+    if (!resolves_to_class) {
+      diag_.Error(item->loc,
+                  std::format("scope-resolution prefix '{}' of a typedef does "
+                              "not resolve to a class",
+                              scope));
+    }
+  }
+}
+
 // §6.6.7: Register a user-defined nettype so declarations using it create nets.
 void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* /*mod*/) {
   typedefs_[item->name] = item->typedef_type;
@@ -979,6 +1069,9 @@ void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
 
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ReclassifyForwardUdpInstances(decl);
+  // §6.18: Forward typedef kind tracking is scoped to one module's item list,
+  // so reset it before elaborating a new scope.
+  forward_typedef_kinds_.clear();
   declared_names_.clear();
   net_names_.clear();
   cont_assign_targets_.clear();
@@ -1154,6 +1247,8 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ValidateProgramSubroutineCall(decl);
   ValidateHierRefToAutomatic(decl);
   ValidateHierRefToImportedName(decl, mod);
+  ValidateForwardTypedefsInScope(decl);
+  ValidateForwardTypedefScopePrefix(decl);
 }
 
 namespace {

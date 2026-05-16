@@ -533,6 +533,16 @@ class Elaborator {
 
   /// §8.27: Validate forward class typedefs are resolved.
   void ValidateForwardClassTypedefs();
+
+  /// §6.18: Validate that every forward typedef in a module-scope item list
+  /// is resolved by a real definition in the same scope (or by a class with
+  /// the same name visible in this scope).
+  void ValidateForwardTypedefsInScope(const ModuleDecl* decl);
+
+  /// §6.18: When a typedef in this scope sources its type from `prefix::T`
+  /// and `prefix` was forward-declared in the same scope, `prefix` must
+  /// resolve to a class.
+  void ValidateForwardTypedefScopePrefix(const ModuleDecl* decl);
   void ValidateInterfaceClassMembers(const ClassDecl* cls);
   void ValidateInterfaceClassInheritance(const ClassDecl* cls);
   void ValidateRegularClassInheritance(const ClassDecl* cls);

@@ -47,28 +47,11 @@ TEST(UserDefinedTypeElaboration, TypedefChain) {
   for (const auto& v : mod->variables) {
     if (v.name == "val") {
       EXPECT_EQ(v.width, 8u);
+      EXPECT_TRUE(v.is_4state);
       found = true;
     }
   }
   EXPECT_TRUE(found);
-}
-
-TEST(UserDefinedTypeElaboration, TypedefChain4State) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  typedef logic [7:0] byte_t;\n"
-      "  typedef byte_t octet_t;\n"
-      "  octet_t val;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  for (const auto& v : mod->variables) {
-    if (v.name == "val") {
-      EXPECT_TRUE(v.is_4state);
-    }
-  }
 }
 
 TEST(UserDefinedTypeElaboration, TypedefChainSigned) {
@@ -151,12 +134,17 @@ TEST(UserDefinedTypeElaboration, TypedefChain2State) {
   }
 }
 
+// §6.18: "It shall be legal to have multiple forward type declarations for
+// the same type identifier in the same scope." The forward declarations are
+// resolved by the matching class declaration that follows.
 TEST(UserDefinedTypeElaboration, MultipleForwardTypedefsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef class myclass;\n"
       "  typedef class myclass;\n"
+      "  class myclass;\n"
+      "  endclass\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -188,6 +176,122 @@ TEST(UserDefinedTypeElaboration, ForwardStructWithEnumDefinition_Error) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(UserDefinedTypeElaboration, ForwardUnionWithEnumDefinition_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef union my_t;\n"
+      "  typedef enum {A, B} my_t;\n"
+      "  my_t x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.18: "It shall be legal to have multiple forward type declarations for
+// the same type identifier in the same scope." This case exercises the
+// kind-keyword form (`typedef enum NAME;`) with multiple forwards, all
+// resolved by a single final enum definition.
+TEST(UserDefinedTypeElaboration, MultipleForwardEnumDeclarations) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef enum color_e;\n"
+      "  typedef enum color_e;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_e;\n"
+      "  color_e c;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.18: "It shall be legal to have a forward type declaration in the same
+// scope, either before or after the final type definition." The forward
+// declaration appearing after the real definition must not corrupt the
+// existing type so that subsequent variable declarations still resolve.
+TEST(UserDefinedTypeElaboration, ForwardTypedefAfterFinalDefinition) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  typedef struct pair_t;\n"
+      "  pair_t p;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "p") {
+      EXPECT_EQ(v.width, 16u);
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+// §6.18: "It shall be an error if the type_identifier does not resolve to a
+// data type." A forward enum/struct/union declaration with no matching real
+// definition in the same scope is unresolved.
+TEST(UserDefinedTypeElaboration, UnresolvedForwardTypedefInModule_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef enum color_e;\n"
+      "  color_e c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.18: A bare forward typedef (`typedef NAME;`) with no matching real
+// definition in the same scope is similarly unresolved.
+TEST(UserDefinedTypeElaboration, UnresolvedBareForwardTypedefInModule_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef my_type;\n"
+      "  my_type x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.18: "It shall be an error if the prefix does not resolve to a class."
+// `T_fwd` is forward-declared and then resolved as `int`, so using it as a
+// class scope-resolution prefix in `T_fwd::Inner` is an error.
+TEST(UserDefinedTypeElaboration, ForwardTypedefScopePrefixNotClass_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef T_fwd;\n"
+      "  typedef int T_fwd;\n"
+      "  typedef T_fwd::Inner inner_t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.18 positive companion to the above: when the forward-declared prefix
+// resolves to a class, using it as a scope-resolution prefix in a typedef
+// declaration is legal.
+TEST(UserDefinedTypeElaboration, ForwardTypedefScopePrefixClass_Legal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef class C;\n"
+      "  class C;\n"
+      "    typedef int T;\n"
+      "  endclass\n"
+      "  typedef C::T t_alias;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
