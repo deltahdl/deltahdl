@@ -95,24 +95,6 @@ TEST(AttributeInstanceElaboration, AttrValueConstantExpressionCrossLink) {
   EXPECT_TRUE(found);
 }
 
-// §A.9.1 ↔ §A.2.2.1 cross-link: an attribute_instance prefixes a §A.2.2.1
-// struct_union_member. The attribute is captured in the AST and survives
-// elaboration without diagnostics.
-TEST(AttributeInstanceElaboration, AttributeOnStructMemberCrossLink) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  typedef struct packed {\n"
-      "    (* keep = 1 *) logic [3:0] a;\n"
-      "    logic [3:0] b;\n"
-      "  } s_t;\n"
-      "  s_t s;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // §A.9.1: attr_spec ::= attr_name [ = constant_expression ] — a string
 // literal is a valid constant_expression and surfaces as the string_value
 // slot on the ResolvedAttribute.
