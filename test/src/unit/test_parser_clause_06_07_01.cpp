@@ -73,34 +73,6 @@ TEST(StrengthParsing, DriveStrengthOnWand) {
   EXPECT_EQ(item->drive_strength1, 3u);
 }
 
-TEST(DelayParsing, DelayValuePsIdentifier) {
-  auto r = Parse(
-      "module m;\n"
-      "  parameter delay_val = 5;\n"
-      "  wire #delay_val w;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-
-  auto* item = r.cu->modules[0]->items[1];
-  ASSERT_NE(item->net_delay, nullptr);
-  EXPECT_EQ(item->net_delay->kind, ExprKind::kIdentifier);
-}
-
-TEST(DelayParsing, Delay3NetSingleValue) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire #5 w;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_NE(item->net_delay, nullptr);
-  EXPECT_EQ(item->net_delay->int_val, 5u);
-  EXPECT_EQ(item->net_delay_fall, nullptr);
-  EXPECT_EQ(item->net_delay_decay, nullptr);
-}
-
 TEST(DeclarationListParsing, ListOfNetDeclAssignmentsSingle) {
   auto r = Parse("module m; wire [7:0] data; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -832,20 +804,6 @@ TEST(DataTypeParsing, TriregRegDirectlyIsError) {
       ParseOk("module t;\n"
               "  trireg reg r;\n"
               "endmodule\n"));
-}
-
-TEST(DataTypeParsing, Delay3RiseFallDecay) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire #(1, 2, 3) w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_NE(item->net_delay, nullptr);
-  EXPECT_NE(item->net_delay_fall, nullptr);
-  EXPECT_NE(item->net_delay_decay, nullptr);
 }
 
 TEST(StrengthParsing, DriveStrengthSupply0Weak1) {

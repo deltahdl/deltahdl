@@ -128,6 +128,23 @@ TEST(DelayParsing, Delay2ParenTwoValues) {
   EXPECT_EQ(item->gate_delay_fall->int_val, 20u);
 }
 
+// delay2 ::= # delay_value (non-paren single value on a delay2-context gate)
+TEST(DelayParsing, Delay2NonParenDelayValue) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  xor #7 g1(y, a, b);\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[3];
+  ASSERT_NE(item->gate_delay, nullptr);
+  EXPECT_EQ(item->gate_delay->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(item->gate_delay->int_val, 7u);
+  EXPECT_EQ(item->gate_delay_fall, nullptr);
+  EXPECT_EQ(item->gate_delay_decay, nullptr);
+}
+
 TEST(DelayParsing, Delay3ParenSingleValue) {
   auto r = Parse(
       "module m;\n"
@@ -243,6 +260,44 @@ TEST(DelayParsing, Delay3MintypMaxThreeValues) {
   EXPECT_EQ(item->net_delay_fall->kind, ExprKind::kMinTypMax);
   ASSERT_NE(item->net_delay_decay, nullptr);
   EXPECT_EQ(item->net_delay_decay->kind, ExprKind::kMinTypMax);
+}
+
+TEST(DelayParsing, Delay3NetSingleValue) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire #5 w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item->net_delay, nullptr);
+  EXPECT_EQ(item->net_delay->int_val, 5u);
+  EXPECT_EQ(item->net_delay_fall, nullptr);
+  EXPECT_EQ(item->net_delay_decay, nullptr);
+}
+
+TEST(DelayParsing, Delay3RiseFallDecay) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire #(1, 2, 3) w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_NE(item->net_delay, nullptr);
+  EXPECT_NE(item->net_delay_fall, nullptr);
+  EXPECT_NE(item->net_delay_decay, nullptr);
+}
+
+// delay3 form 2 caps the mintypmax list at three; a fourth slot has no
+// production in §A.2.2.3 and must be rejected.
+TEST(DelayParsing, Delay3OverArityRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire #(1, 2, 3, 4) w;\n"
+      "endmodule");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }  // namespace

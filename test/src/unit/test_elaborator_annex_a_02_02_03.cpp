@@ -59,4 +59,41 @@ TEST(DelayElaboration, ContAssignTimeLiteralDelay) {
   EXPECT_EQ(mod->assigns[0].delay->kind, ExprKind::kTimeLiteral);
 }
 
+// --- delay_value: unsigned_number elaboration ---
+
+TEST(DelayElaboration, DelayValueUnsignedNumberElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign #5 w = 1'b0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->assigns.empty());
+  ASSERT_NE(mod->assigns[0].delay, nullptr);
+  EXPECT_EQ(mod->assigns[0].delay->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(mod->assigns[0].delay->int_val, 5u);
+}
+
+// --- delay_value: 1step elaboration ---
+
+TEST(DelayElaboration, DelayValueOneStepElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign #1step w = 1'b0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->assigns.empty());
+  ASSERT_NE(mod->assigns[0].delay, nullptr);
+  EXPECT_EQ(mod->assigns[0].delay->text, "1step");
+}
+
 }  // namespace
