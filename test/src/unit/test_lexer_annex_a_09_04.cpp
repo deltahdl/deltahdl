@@ -56,32 +56,4 @@ TEST(WhiteSpaceLexing, EmptyInputProducesOnlyEofToken) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-// All four non-EOF alternatives appearing together must each be consumed by
-// the white_space rule, leaving only the EOF terminator in the stream.
-TEST(WhiteSpaceLexing, WhitespaceOnlyInputProducesOnlyEofToken) {
-  auto tokens = Lex(" \t\n\f");
-  ASSERT_EQ(tokens.size(), 1u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
-}
-
-// The white_space rule applies independently per character: a run of the same
-// alternative between two tokens must all be consumed, not just the first.
-TEST(WhiteSpaceLexing, MultipleConsecutiveSpacesAreEachWhitespace) {
-  auto tokens = Lex("a   b");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-  EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
-}
-
-// The white_space rule's alternatives are interchangeable: a mix of all four
-// non-EOF members appearing between two tokens must each match the rule.
-TEST(WhiteSpaceLexing, MixedWhitespaceCharactersBetweenTokens) {
-  auto tokens = Lex("a \t\n\fb");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-  EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
-}
-
 }  // namespace

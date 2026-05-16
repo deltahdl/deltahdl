@@ -25,8 +25,11 @@ does not inherit the parent's session-mode flag.
 
 import json
 import os
+import shlex
 import subprocess
 import sys
+import tempfile
+from pathlib import Path
 from typing import Any, NoReturn
 
 
@@ -333,17 +336,52 @@ def exit_with_error(message: str, stderr: str) -> NoReturn:
     sys.exit(1)
 
 
+def write_deny_hook_settings(deny_patterns: list[str]) -> str:
+    """Write a temp ``settings.json`` wiring the Bash deny hook.
+
+    The settings install a ``PreToolUse`` hook on ``matcher: "Bash"``
+    that invokes ``deny_bash_hook.py`` with *deny_patterns* as
+    argv. Hooks fire before the permission layer, so the deny
+    survives ``--dangerously-skip-permissions`` (which the CLI is
+    still launched with so every other tool auto-approves).
+
+    Returns the absolute path of the temp file; the caller owns its
+    lifecycle and must ``os.unlink`` it once the session ends.
+    """
+    hook_script = str(Path(__file__).parent / "deny_bash_hook.py")
+    parts = [sys.executable, hook_script, *deny_patterns]
+    hook_cmd = " ".join(shlex.quote(p) for p in parts)
+    settings = {
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "matcher": "Bash",
+                    "hooks": [{"type": "command", "command": hook_cmd}],
+                },
+            ],
+        },
+    }
+    fd, path = tempfile.mkstemp(suffix=".json", prefix="claude_settings_")
+    with os.fdopen(fd, "w") as handle:
+        json.dump(settings, handle)
+    return path
+
+
 def build_streaming_cmd(
     *,
     model: str,
-    disallowed_tools: str,
+    settings_path: str,
     continue_session: bool = False,
     effort: str | None = None,
 ) -> list[str]:
     """Return a Claude CLI argv for stream-json mode.
 
-    Centralises the flag shape so callers wiring different
-    ``--disallowedTools`` lists produce identical argvs otherwise.
+    ``settings_path`` points at a ``settings.json`` (typically the
+    file produced by ``write_deny_hook_settings``) so the headless
+    session inherits a PreToolUse hook that blocks the blacklisted
+    Bash patterns. ``--dangerously-skip-permissions`` stays — every
+    other tool auto-approves; the hook is the only thing gating Bash.
+
     When ``continue_session`` is true, ``--continue`` is appended so
     the call resumes the most recent Claude session rather than
     starting a fresh one — used by multi-step pipelines that keep all
@@ -358,7 +396,7 @@ def build_streaming_cmd(
         "--verbose",
         "--output-format", "stream-json",
         "--dangerously-skip-permissions",
-        "--disallowedTools", disallowed_tools,
+        "--settings", settings_path,
     ]
     if effort is not None:
         cmd.extend(["--effort", effort])

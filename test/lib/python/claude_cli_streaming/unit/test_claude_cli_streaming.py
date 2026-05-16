@@ -1,6 +1,9 @@
 """Unit tests for the subprocess runner in lib.python.claude_cli_streaming."""
 
 import io
+import json
+import os
+from collections.abc import Callable, Iterator
 from types import ModuleType
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -47,64 +50,168 @@ def test_extract_result_missing(streaming: ModuleType) -> None:
 
 def test_build_streaming_cmd_starts_with_claude(streaming: ModuleType) -> None:
     """The argv begins with 'claude' followed by '-p'."""
-    cmd = streaming.build_streaming_cmd(model="opus", disallowed_tools="X")
+    cmd = streaming.build_streaming_cmd(model="opus", settings_path="/tmp/s")
     assert cmd[:2] == ["claude", "-p"]
 
 
 def test_build_streaming_cmd_carries_model(streaming: ModuleType) -> None:
     """The model argument is forwarded to --model."""
-    cmd = streaming.build_streaming_cmd(model="haiku", disallowed_tools="X")
+    cmd = streaming.build_streaming_cmd(model="haiku", settings_path="/tmp/s")
     assert cmd[cmd.index("--model") + 1] == "haiku"
 
 
 def test_build_streaming_cmd_uses_stream_json(streaming: ModuleType) -> None:
     """--output-format stream-json is set so events stream live."""
-    cmd = streaming.build_streaming_cmd(model="opus", disallowed_tools="X")
+    cmd = streaming.build_streaming_cmd(model="opus", settings_path="/tmp/s")
     assert cmd[cmd.index("--output-format") + 1] == "stream-json"
 
 
 def test_build_streaming_cmd_uses_verbose(streaming: ModuleType) -> None:
     """--verbose is required for stream-json output."""
-    cmd = streaming.build_streaming_cmd(model="opus", disallowed_tools="X")
+    cmd = streaming.build_streaming_cmd(model="opus", settings_path="/tmp/s")
     assert "--verbose" in cmd
 
 
 def test_build_streaming_cmd_uses_dangerously_skip_permissions(
     streaming: ModuleType,
 ) -> None:
-    """--dangerously-skip-permissions is set."""
-    cmd = streaming.build_streaming_cmd(model="opus", disallowed_tools="X")
+    """--dangerously-skip-permissions stays so every non-Bash tool auto-approves."""
+    cmd = streaming.build_streaming_cmd(model="opus", settings_path="/tmp/s")
     assert "--dangerously-skip-permissions" in cmd
 
 
-def test_build_streaming_cmd_carries_disallowed_tools(streaming: ModuleType) -> None:
-    """The disallowed-tools string is forwarded to --disallowedTools."""
+def test_build_streaming_cmd_carries_settings_path(streaming: ModuleType) -> None:
+    """The settings path is forwarded to --settings."""
     cmd = streaming.build_streaming_cmd(
-        model="opus", disallowed_tools="Bash(git *)",
+        model="opus", settings_path="/tmp/deny.json",
     )
-    assert cmd[cmd.index("--disallowedTools") + 1] == "Bash(git *)"
+    assert cmd[cmd.index("--settings") + 1] == "/tmp/deny.json"
+
+
+def test_build_streaming_cmd_omits_disallowed_tools_flag(
+    streaming: ModuleType,
+) -> None:
+    """The legacy --disallowedTools flag is no longer emitted."""
+    cmd = streaming.build_streaming_cmd(model="opus", settings_path="/tmp/s")
+    assert "--disallowedTools" not in cmd
 
 
 def test_build_streaming_cmd_carries_effort(streaming: ModuleType) -> None:
     """An effort kwarg is forwarded to --effort."""
     cmd = streaming.build_streaming_cmd(
-        model="opus", disallowed_tools="X", effort="medium",
+        model="opus", settings_path="/tmp/s", effort="medium",
     )
     assert cmd[cmd.index("--effort") + 1] == "medium"
 
 
 def test_build_streaming_cmd_omits_effort_by_default(streaming: ModuleType) -> None:
     """Without an effort kwarg, --effort is not present in the argv."""
-    cmd = streaming.build_streaming_cmd(model="opus", disallowed_tools="X")
+    cmd = streaming.build_streaming_cmd(model="opus", settings_path="/tmp/s")
     assert "--effort" not in cmd
 
 
 def test_build_streaming_cmd_appends_continue(streaming: ModuleType) -> None:
     """continue_session=True appends --continue to the argv."""
     cmd = streaming.build_streaming_cmd(
-        model="opus", disallowed_tools="X", continue_session=True,
+        model="opus", settings_path="/tmp/s", continue_session=True,
     )
     assert "--continue" in cmd
+
+
+# --- write_deny_hook_settings -----------------------------------------------
+
+
+@pytest.fixture()
+def make_settings(
+    streaming: ModuleType,
+) -> Iterator[Callable[[list[str]], dict[str, Any]]]:
+    """Return a factory that writes settings, parses them, and cleans up.
+
+    Each call writes a fresh temp file and registers it for cleanup
+    at fixture teardown, so test bodies stay one-assert and don't
+    repeat try/finally.
+    """
+    paths: list[str] = []
+
+    def _make(patterns: list[str]) -> dict[str, Any]:
+        path = streaming.write_deny_hook_settings(patterns)
+        paths.append(path)
+        with open(path, encoding="utf-8") as handle:
+            data: dict[str, Any] = json.load(handle)
+        return data
+
+    yield _make
+
+    for path in paths:
+        os.unlink(path)
+
+
+def _first_hook_cmd(settings: dict[str, Any]) -> str:
+    """Return the command string from the first PreToolUse hook."""
+    cmd: str = settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+    return cmd
+
+
+def test_write_deny_hook_settings_returns_existing_path(
+    streaming: ModuleType,
+) -> None:
+    """The returned path points at an actual file."""
+    path = streaming.write_deny_hook_settings(["cmake"])
+    try:
+        assert os.path.exists(path)
+    finally:
+        os.unlink(path)
+
+
+def test_write_deny_hook_settings_installs_pretooluse_hook(
+    make_settings: Callable[[list[str]], dict[str, Any]],
+) -> None:
+    """The settings install a PreToolUse hook."""
+    assert "PreToolUse" in make_settings(["cmake"])["hooks"]
+
+
+def test_write_deny_hook_settings_matches_bash(
+    make_settings: Callable[[list[str]], dict[str, Any]],
+) -> None:
+    """The PreToolUse hook matches Bash tool calls."""
+    settings = make_settings(["cmake"])
+    assert settings["hooks"]["PreToolUse"][0]["matcher"] == "Bash"
+
+
+def test_write_deny_hook_settings_command_carries_first_pattern(
+    make_settings: Callable[[list[str]], dict[str, Any]],
+) -> None:
+    """The first deny pattern is embedded in the hook command argv."""
+    assert "cmake" in _first_hook_cmd(make_settings(["cmake", "make"]))
+
+
+def test_write_deny_hook_settings_command_carries_second_pattern(
+    make_settings: Callable[[list[str]], dict[str, Any]],
+) -> None:
+    """The second deny pattern is also embedded in the hook command argv."""
+    assert "make" in _first_hook_cmd(make_settings(["cmake", "make"]))
+
+
+def test_write_deny_hook_settings_command_references_hook_script(
+    make_settings: Callable[[list[str]], dict[str, Any]],
+) -> None:
+    """The hook command references the deny_bash_hook.py script."""
+    assert "deny_bash_hook.py" in _first_hook_cmd(make_settings(["cmake"]))
+
+
+def test_write_deny_hook_settings_quotes_patterns_with_spaces(
+    make_settings: Callable[[list[str]], dict[str, Any]],
+) -> None:
+    """Patterns containing spaces are shell-quoted in the hook command."""
+    assert "'git commit'" in _first_hook_cmd(make_settings(["git commit"]))
+
+
+def test_write_deny_hook_settings_hook_type_is_command(
+    make_settings: Callable[[list[str]], dict[str, Any]],
+) -> None:
+    """The hook entry is typed as a command hook."""
+    settings = make_settings(["cmake"])
+    assert settings["hooks"]["PreToolUse"][0]["hooks"][0]["type"] == "command"
 
 
 # --- run_claude_streaming ---------------------------------------------------
