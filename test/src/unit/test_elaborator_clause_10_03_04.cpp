@@ -51,21 +51,6 @@ TEST(DriveStrengthElaboration, DefaultStrengthIsZero) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 0u);
 }
 
-TEST(DriveStrengthElaboration, StrengthPreservedAfterElaboration) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (pull0, supply1) w = 1'b1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1u);
-  EXPECT_EQ(mod->assigns[0].drive_strength0, 3u);
-  EXPECT_EQ(mod->assigns[0].drive_strength1, 5u);
-}
-
 TEST(DriveStrengthElaboration, NetDeclStrengthOnScalarIsValid) {
   ElabFixture f;
   ElaborateSrc(
@@ -84,54 +69,6 @@ TEST(DriveStrengthElaboration, NetDeclStrengthOnVectorIsError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(DriveStrengthElaboration, DriveStrengthSupply0Supply1Valid) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module t;\n"
-      "  wire w;\n"
-      "  assign (supply0, supply1) w = 1'b1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->assigns.empty());
-  EXPECT_EQ(mod->assigns[0].drive_strength0, 5u);
-  EXPECT_EQ(mod->assigns[0].drive_strength1, 5u);
-}
-
-TEST(DriveStrengthElaboration, DriveStrengthHighz0Strong1Valid) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module t;\n"
-      "  wire w;\n"
-      "  assign (highz0, strong1) w = 1'b1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->assigns.empty());
-  EXPECT_EQ(mod->assigns[0].drive_strength0, 1u);
-  EXPECT_EQ(mod->assigns[0].drive_strength1, 4u);
-}
-
-TEST(DriveStrengthElaboration, DriveStrengthOnContAssign) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module t;\n"
-      "  wire w;\n"
-      "  assign (strong0, weak1) w = 1'b1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->assigns.empty());
-  EXPECT_EQ(mod->assigns[0].drive_strength0, 4u);
-  EXPECT_EQ(mod->assigns[0].drive_strength1, 2u);
 }
 
 TEST(DriveStrengthElaboration, DriveStrengthOnScalarVariableIsError) {
@@ -169,69 +106,6 @@ TEST(DriveStrengthElaboration, NetDeclAssignDriveStrength) {
   ASSERT_GE(mod->assigns.size(), 1u);
   EXPECT_NE(mod->assigns[0].drive_strength0, 0);
   EXPECT_NE(mod->assigns[0].drive_strength1, 0);
-}
-
-TEST(DriveStrengthElaboration, DriveStrengthReversedOrderPreserved) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (pull1, supply0) w = 1'b1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->assigns.empty());
-  EXPECT_EQ(mod->assigns[0].drive_strength0, 5u);
-  EXPECT_EQ(mod->assigns[0].drive_strength1, 3u);
-}
-
-TEST(DriveStrengthElaboration, DriveStrengthHighz0WithStrength1) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (highz0, supply1) w = 1'b1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->assigns.empty());
-  EXPECT_EQ(mod->assigns[0].drive_strength0, 1u);
-  EXPECT_EQ(mod->assigns[0].drive_strength1, 5u);
-}
-
-TEST(DriveStrengthElaboration, DriveStrengthHighz1WithStrength0) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (highz1, weak0) w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->assigns.empty());
-  EXPECT_EQ(mod->assigns[0].drive_strength0, 2u);
-  EXPECT_EQ(mod->assigns[0].drive_strength1, 1u);
-}
-
-TEST(DriveStrengthElaboration, NetDeclDriveStrengthPreserved) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire (supply0, supply1) w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->assigns.empty());
-  EXPECT_EQ(mod->assigns[0].drive_strength0, 5u);
-  EXPECT_EQ(mod->assigns[0].drive_strength1, 5u);
 }
 
 TEST(DriveStrengthElaboration, DriveStrengthOnNetDeclWithAssignOk) {
@@ -301,21 +175,6 @@ TEST(DriveStrengthElaboration, DriveStrengthOnWandScalarIsValid) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(DriveStrengthElaboration, NetDeclReversedStrengthValuesPreserved) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  wire (strong1, weak0) w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->assigns.empty());
-  EXPECT_EQ(mod->assigns[0].drive_strength0, 2u);
-  EXPECT_EQ(mod->assigns[0].drive_strength1, 4u);
 }
 
 TEST(DriveStrengthElaboration, MultipleAssignsPreserveIndependentStrengths) {

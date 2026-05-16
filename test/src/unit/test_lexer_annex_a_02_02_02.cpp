@@ -1,4 +1,5 @@
-// §28.11
+// §A.2.2.2: lexer-stage coverage of the strength keyword set named in the
+// drive_strength, strength0, strength1, and charge_strength productions.
 
 #include <gtest/gtest.h>
 
@@ -8,8 +9,8 @@ using namespace delta;
 
 namespace {
 
-// Each strength0 keyword must lex to its own token kind so the parser can tell
-// them apart without reparsing the identifier text.
+// §A.2.2.2 strength0 keywords: each must lex to its own token kind so the
+// parser can branch on direction without rescanning identifier text.
 TEST(StrengthKeywordLexing, Supply0Keyword) {
   auto tokens = Lex("supply0");
   ASSERT_GE(tokens.size(), 1u);
@@ -34,14 +35,16 @@ TEST(StrengthKeywordLexing, Weak0Keyword) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwWeak0);
 }
 
+// §A.2.2.2 drive_strength alternatives 4-6 reference highz0 directly as a
+// terminal; it must lex to its own keyword kind.
 TEST(StrengthKeywordLexing, Highz0Keyword) {
   auto tokens = Lex("highz0");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwHighz0);
 }
 
-// Strength1 keywords follow the same pattern but must be distinct from their
-// strength0 counterparts.
+// §A.2.2.2 strength1 keywords: distinct from the strength0 set and from one
+// another.
 TEST(StrengthKeywordLexing, Supply1Keyword) {
   auto tokens = Lex("supply1");
   ASSERT_GE(tokens.size(), 1u);
@@ -72,8 +75,8 @@ TEST(StrengthKeywordLexing, Highz1Keyword) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwHighz1);
 }
 
-// A strength0 and strength1 keyword paired in parentheses must lex to two
-// distinct keyword tokens — the pair is not a single compound token.
+// §A.2.2.2 drive_strength is two strength tokens separated by a comma inside
+// parentheses; lexing must produce five distinct tokens, never one compound.
 TEST(StrengthKeywordLexing, StrengthPairProducesTwoKeywords) {
   auto tokens = Lex("(strong0, weak1)");
   ASSERT_GE(tokens.size(), 5u);
@@ -84,8 +87,8 @@ TEST(StrengthKeywordLexing, StrengthPairProducesTwoKeywords) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kRParen);
 }
 
-// The three charge storage strengths are unsuffixed keywords (no 0/1); each
-// must lex to a dedicated token kind, distinct from the drive-strength set.
+// §A.2.2.2 charge_strength keywords are unsuffixed (no 0/1) and must lex to
+// their own token kinds, distinct from the drive-strength set.
 TEST(StrengthKeywordLexing, SmallKeyword) {
   auto tokens = Lex("small");
   ASSERT_GE(tokens.size(), 1u);

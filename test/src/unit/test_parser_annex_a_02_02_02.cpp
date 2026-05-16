@@ -167,4 +167,143 @@ TEST(StrengthParsing, AllDriveStrengthForms) {
   EXPECT_FALSE(r6.has_errors);
 }
 
+// §A.2.2.2: drive_strength has no alternative where both slots carry a
+// value-0 keyword or both carry a value-1 keyword. The parser rejects any
+// such same-direction pair on net declarations and continuous assigns.
+
+TEST(StrengthParsing, SameDirectionStrength0PairRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire (weak0, strong0) w;\n"
+      "endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(StrengthParsing, SameDirectionStrength1PairRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire (pull1, supply1) w;\n"
+      "endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(StrengthParsing, Highz0WithStrength0Rejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire (highz0, weak0) w;\n"
+      "endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(StrengthParsing, Highz1WithStrength1Rejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire (highz1, weak1) w;\n"
+      "endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §A.2.2.2 drive_strength has no `( highz0 , highz1 )` or `( highz1 , highz0 )`
+// alternative, but the BNF restriction is enforced one stage later (in the
+// elaborator) since both slots are well-formed in isolation. These tests pin
+// down that the parser itself does not reject the pair, so the rule's stage
+// attribution is observable.
+
+TEST(StrengthParsing, Highz0Highz1ParsesAtParserStage) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire (highz0, highz1) w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->drive_strength0, 1u);
+  EXPECT_EQ(item->drive_strength1, 1u);
+}
+
+TEST(StrengthParsing, Highz1Highz0ParsesAtParserStage) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire (highz1, highz0) w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->drive_strength0, 1u);
+  EXPECT_EQ(item->drive_strength1, 1u);
+}
+
+TEST(StrengthParsing, ContAssignSameDirectionPairRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (strong0, weak0) w = 1'b0;\n"
+      "endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §A.2.2.2 drive_strength has no single-keyword form: every alternative in the
+// BNF is a parenthesized pair. A UDP instance with one strength keyword is
+// rejected because the second slot is required.
+TEST(StrengthParsing, UdpInstSingleStrengthRejected) {
+  auto r = Parse(
+      "primitive my_udp(output y, input a);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  wire y, a;\n"
+      "  my_udp (weak0) u1(y, a);\n"
+      "endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(StrengthParsing, UdpInstSameDirectionPairRejected) {
+  auto r = Parse(
+      "primitive my_udp(output y, input a);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  wire y, a;\n"
+      "  my_udp (weak0, weak0) u1(y, a);\n"
+      "endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §A.2.2.2: charge_strength is one of ( small ), ( medium ), or ( large ).
+// Each keyword is a separate alternative in the BNF, encoded as 1, 2, and 4
+// respectively in the AST.
+
+TEST(ChargeStrengthParsing, Small) {
+  auto r = Parse(
+      "module m;\n"
+      "  trireg (small) cap;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->data_type.charge_strength, 1u);
+}
+
+TEST(ChargeStrengthParsing, Medium) {
+  auto r = Parse(
+      "module m;\n"
+      "  trireg (medium) cap;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->data_type.charge_strength, 2u);
+}
+
+TEST(ChargeStrengthParsing, Large) {
+  auto r = Parse(
+      "module m;\n"
+      "  trireg (large) cap;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->data_type.charge_strength, 4u);
+}
+
 }  // namespace

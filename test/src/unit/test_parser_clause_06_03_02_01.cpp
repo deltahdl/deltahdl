@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DataTypeParsing, TriregChargeStrengthLarge) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (large) l1;\n"
-      "endmodule\n");
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.charge_strength, 4);
-}
-
 TEST(DataTypeParsing, TriregChargeStrengthWithDelay) {
   auto r = Parse(
       "module t;\n"
@@ -43,28 +33,6 @@ TEST(DataTypeParsing, TriregNoChargeStrengthParserDefault) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
   EXPECT_EQ(item->data_type.charge_strength, 0);
-}
-
-TEST(DataTypeParsing, TriregChargeStrengthMedium) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (medium) m1;\n"
-      "endmodule\n");
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
-  EXPECT_EQ(item->data_type.charge_strength, 2);
-}
-
-TEST(DataTypeParsing, TriregChargeStrengthSmall) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (small) s1;\n"
-      "endmodule\n");
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
-  EXPECT_EQ(item->data_type.charge_strength, 1);
 }
 
 TEST(DataTypeParsing, TriregChargeStrengthLargeWithLogicAndDelay) {

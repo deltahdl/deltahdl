@@ -546,14 +546,25 @@ bool Parser::TryParseStrengthSpec(uint8_t& str0, uint8_t& str1) {
     lexer_.RestorePos(saved);
     return false;
   }
+  auto loc = CurrentLoc();
   if (IsStrength0Token(tk)) {
     str0 = ParseStrength0();
-    if (Match(TokenKind::kComma)) str1 = ParseStrength1();
+    Expect(TokenKind::kComma);
+    str1 = ParseStrength1();
   } else {
     str1 = ParseStrength1();
-    if (Match(TokenKind::kComma)) str0 = ParseStrength0();
+    Expect(TokenKind::kComma);
+    str0 = ParseStrength0();
   }
   Expect(TokenKind::kRParen);
+  // §A.2.2.2: drive_strength is always a parenthesized pair where one slot
+  // carries a value-0 keyword and the other a value-1 keyword. Same-direction
+  // pairs and single-keyword forms are not in the BNF.
+  if (str0 == 0 || str1 == 0) {
+    diag_.Error(loc,
+                "drive_strength requires one strength0 keyword and "
+                "one strength1 keyword");
+  }
   return true;
 }
 

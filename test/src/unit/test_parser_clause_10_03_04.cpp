@@ -18,34 +18,6 @@ TEST(DriveStrengthParsing, DriveStrengthContinuousAssign) {
   EXPECT_EQ(item->drive_strength0, 4u);
   EXPECT_EQ(item->drive_strength1, 3u);
 }
-TEST(DriveStrengthParsing, ContinuousAssignStrengthEncoding) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (strong0, weak1) w = 1'b1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 1u);
-  EXPECT_EQ(cas[0]->drive_strength0, 4u);
-  EXPECT_EQ(cas[0]->drive_strength1, 2u);
-}
-
-TEST(DriveStrengthParsing, ContinuousAssignReversedStrengthOrder) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (pull1, supply0) w = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 1u);
-  EXPECT_EQ(cas[0]->drive_strength0, 5u);
-  EXPECT_EQ(cas[0]->drive_strength1, 3u);
-}
-
 TEST(DriveStrengthParsing, ContinuousAssignStrengthWithDelay) {
   auto r = Parse(
       "module m;\n"
@@ -111,62 +83,6 @@ TEST(DriveStrengthParsing, ContinuousAssignStrengthAndDelay) {
   ASSERT_NE(item, nullptr);
   EXPECT_NE(item->drive_strength0, 0);
   EXPECT_NE(item->assign_delay, nullptr);
-}
-
-TEST(DriveStrengthParsing, Supply0KeywordEncodesCorrectly) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (supply0, strong1) w = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 1u);
-  EXPECT_EQ(cas[0]->drive_strength0, 5u);
-  EXPECT_EQ(cas[0]->drive_strength1, 4u);
-}
-
-TEST(DriveStrengthParsing, Supply1KeywordEncodesCorrectly) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (strong0, supply1) w = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 1u);
-  EXPECT_EQ(cas[0]->drive_strength0, 4u);
-  EXPECT_EQ(cas[0]->drive_strength1, 5u);
-}
-
-TEST(DriveStrengthParsing, Highz0KeywordEncodesCorrectly) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (highz0, strong1) w = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 1u);
-  EXPECT_EQ(cas[0]->drive_strength0, 1u);
-  EXPECT_EQ(cas[0]->drive_strength1, 4u);
-}
-
-TEST(DriveStrengthParsing, Highz1KeywordEncodesCorrectly) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (strong0, highz1) w = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 1u);
-  EXPECT_EQ(cas[0]->drive_strength0, 4u);
-  EXPECT_EQ(cas[0]->drive_strength1, 1u);
 }
 
 TEST(DriveStrengthParsing, Highz0Highz1PairParsesWithoutError) {

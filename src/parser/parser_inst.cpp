@@ -195,6 +195,7 @@ static bool IsStr0Token(TokenKind k) {
 // §10.3.4: Parse drive strength pair. Called after '(' when first token is
 // a strength keyword. Sets s0 (strength for value 0) and s1 (value 1).
 void Parser::ParseDriveStrength(uint8_t& s0, uint8_t& s1) {
+  auto loc = CurrentLoc();
   if (IsStr0Token(CurrentToken().kind)) {
     s0 = ParseStrength0();
     Expect(TokenKind::kComma);
@@ -203,6 +204,14 @@ void Parser::ParseDriveStrength(uint8_t& s0, uint8_t& s1) {
     s1 = ParseStrength1();
     Expect(TokenKind::kComma);
     s0 = ParseStrength0();
+  }
+  // §A.2.2.2: drive_strength's two slots must specify one value-0
+  // strength keyword and one value-1 strength keyword; same-direction
+  // pairs are not in any BNF alternative.
+  if (s0 == 0 || s1 == 0) {
+    diag_.Error(loc,
+                "drive_strength requires one strength0 keyword and "
+                "one strength1 keyword");
   }
 }
 

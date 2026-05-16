@@ -1373,10 +1373,10 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
     diag_.Error(item->loc,
                 "drive strength on net declaration requires an assignment");
   }
-  // §28.11: the (highz0, highz1) pair — in either source ordering, since both
-  // normalize to s0==1 && s1==1 in the parser — is illegal wherever a drive
-  // strength spec may appear: net decls, continuous assigns, and gate/UDP
-  // instances.
+  // §A.2.2.2: the drive_strength BNF lists no `( highz0 , highz1 )` or
+  // `( highz1 , highz0 )` alternative — both normalize to s0==1 && s1==1 in
+  // the parser — so the pair is illegal wherever a drive strength spec may
+  // appear: net decls, continuous assigns, and gate/UDP instances.
   if ((item->kind == ModuleItemKind::kNetDecl ||
        item->kind == ModuleItemKind::kContAssign ||
        item->kind == ModuleItemKind::kGateInst ||
