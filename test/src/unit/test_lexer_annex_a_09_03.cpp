@@ -117,3 +117,22 @@ TEST(IdentifierLexing, SystemIdentSourceLocation) {
   EXPECT_EQ(tokens[0].loc.column, 3u);
 }
 
+// §A.9.3 escaped_identifier ::= \ { any_printable_ASCII_character_except_white_space } white_space
+// — the body alphabet accepts non-alphanumeric printable characters.  The
+// backslash and terminating white_space are not part of the lexeme.
+TEST(IdentifierLexing, EscapedIdentifierWithSpecialChars) {
+  auto tokens = Lex("\\busy-signal+ ");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[0].text, "busy-signal+");
+}
+
+// §A.9.3 escaped_identifier terminator (white_space, per §A.9.4) — newline
+// must end the identifier, not extend the body across lines.
+TEST(IdentifierLexing, EscapedIdentifierTerminatedByNewline) {
+  auto tokens = Lex("\\foo\n");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[0].text, "foo");
+}
+

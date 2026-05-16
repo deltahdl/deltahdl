@@ -25,15 +25,6 @@ TEST(ExpressionParsing, MinTypMaxSingleExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(PrimaryParsing, ConstantPrimaryParenthesized) {
-  auto r = Parse("module m; parameter int P = (1 + 2); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* param = r.cu->modules[0]->items[0];
-  ASSERT_NE(param->init_expr, nullptr);
-  EXPECT_EQ(param->init_expr->kind, ExprKind::kBinary);
-}
-
 TEST(OperatorAndExpressionParsing, MinTypMaxInSpecparam) {
   EXPECT_TRUE(
       ParseOk("module t(input a, output b);\n"

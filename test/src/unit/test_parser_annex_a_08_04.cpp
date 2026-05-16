@@ -113,12 +113,6 @@ TEST(PrimaryParsing, PrimaryLiteralReal) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-TEST(PrimaryParsing, PrimaryLiteralTimeLiteral) {
-  auto r = Parse("module m; initial #10ns; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(PrimaryParsing, PrimaryUnbasedUnsizedLiteral0) {
   auto r = Parse("module m; initial x = '0; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -335,6 +329,24 @@ TEST(PrimaryParsing, ClassQualifierPackageScope) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §A.8.4 constant_primary ::= [ package_scope | class_scope ] enum_identifier
+// — accessing an enum member through the package_scope production from
+// §A.9.3.  The enum itself is declared via the data_type ::= enum form in
+// §A.2.2.1, so this one test braids A.8.4 + A.9.3 + A.2.2.1 together: the
+// type is owned by A.2.2.1, the scope prefix by A.9.3, and the primary-slot
+// usage by A.8.4.
+TEST(PrimaryParsing, ConstantPrimaryPackageScopedEnumIdentifier) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  typedef enum { COLOR_RED, COLOR_GREEN, COLOR_BLUE } color_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  initial x = pkg::COLOR_GREEN;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 // §A.8.4: select — chained member access with bit select
 TEST(PrimaryParsing, SelectChainedMemberAccess) {
   auto r = Parse(
@@ -382,9 +394,71 @@ TEST(PrimaryParsing, ErrorUnclosedParenthesizedExpr) {
   EXPECT_FALSE(ParseOk("module m; initial x = (1 + 2; endmodule\n"));
 }
 
+// §A.8.4 primary ::= this — the bare `this` keyword as a primary expression.
+TEST(PrimaryParsing, PrimaryThis) {
+  auto r = Parse("module m; initial x = this; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §A.8.4 implicit_class_handle ::= this — `this.member` form.  Combined with
+// the surrounding `primary ::= [class_qualifier|package_scope]
+// hierarchical_identifier select` slot, this exercises implicit_class_handle
+// reaching a member through the dot operator.
+TEST(PrimaryParsing, ImplicitClassHandleThisMember) {
+  auto r = Parse("module m; initial x = this.field; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §A.8.4 constant_primary ::= [package_scope|class_scope] enum_identifier —
+// a bare enum_identifier in a constant context (a parameter initializer).
+TEST(PrimaryParsing, ConstantPrimaryEnumIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+      "  parameter color_t C = RED;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §A.8.4 constant_primary ::= ( constant_mintypmax_expression ) — a
+// parenthesised constant expression in a parameter initializer.
+TEST(PrimaryParsing, ConstantPrimaryParenthesized) {
+  auto r = Parse("module m; parameter int P = (1 + 2); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* param = r.cu->modules[0]->items[0];
+  ASSERT_NE(param->init_expr, nullptr);
+  EXPECT_EQ(param->init_expr->kind, ExprKind::kBinary);
+}
+
 // §A.8.4: Error — unclosed bit select bracket
 TEST(PrimaryParsing, ErrorUnclosedBitSelect) {
   EXPECT_FALSE(ParseOk("module m; initial x = a[3; endmodule\n"));
+}
+
+// §A.8.4 primary ::= assignment_pattern_expression — the `'{ ... }` form
+// in a procedural assignment slot.
+TEST(PrimaryParsing, PrimaryAssignmentPattern) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct { int a; int b; } pair_t;\n"
+              "  pair_t p;\n"
+              "  initial p = '{1, 2};\n"
+              "endmodule\n"));
+}
+
+// §A.8.4 primary ::= let_expression — a let-declared name used in an
+// expression slot.
+TEST(PrimaryParsing, PrimaryLetExpression) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let max2(a, b) = (a > b) ? a : b;\n"
+              "  int x;\n"
+              "  initial x = max2(3, 5);\n"
+              "endmodule\n"));
 }
 
 }  // namespace

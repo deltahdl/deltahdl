@@ -5,18 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(PrimaryParsing, PrimaryThis) {
-  auto r = Parse("module m; initial x = this; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(PrimaryParsing, ImplicitClassHandleThisMember) {
-  auto r = Parse("module m; initial x = this.field; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ClassParsing, ThisExpression) {
   auto r = Parse(
       "class MyClass;\n"

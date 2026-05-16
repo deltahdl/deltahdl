@@ -12,22 +12,6 @@ TEST(IdentifierElaboration, SimpleIdentifierElaborates) {
              "endmodule\n"));
 }
 
-TEST(IdentifierElaboration, IdentifierWithDollarElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic [7:0] n$657;\n"
-             "  assign n$657 = 8'd0;\n"
-             "endmodule\n"));
-}
-
-TEST(IdentifierElaboration, IdentifierStartingWithUnderscoreElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic [7:0] _bus3;\n"
-             "  assign _bus3 = 8'd0;\n"
-             "endmodule\n"));
-}
-
 TEST(IdentifierElaboration, CaseSensitiveIdentifiersElaborate) {
   EXPECT_TRUE(
       ElabOk("module t;\n"

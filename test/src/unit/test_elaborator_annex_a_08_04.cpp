@@ -58,6 +58,26 @@ TEST(PrimaryElaboration, ConcatenationWithRangeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §A.8.4 constant_primary ::= [ package_scope | class_scope ] enum_identifier
+// — the elaborator must resolve a package-scoped enum member to its constant
+// value.  Combines A.8.4 (primary slot), A.9.3 (package_scope, enum_identifier)
+// and A.2.2.1 (enum data_type).
+TEST(PrimaryElaboration, PackageScopedEnumIdentifierElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package pkg;\n"
+      "  typedef enum { COLOR_RED, COLOR_GREEN, COLOR_BLUE } color_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import pkg::*;\n"
+      "  int x;\n"
+      "  initial x = COLOR_GREEN;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 // §A.8.4: null primary elaborates
 TEST(PrimaryElaboration, NullPrimaryElaborates) {
   ElabFixture f;

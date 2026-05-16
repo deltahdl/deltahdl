@@ -557,6 +557,23 @@ TEST(IdentifierSyntaxParsing, DpiExportCIdentifierWithDollarIsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §A.9.3 simple_identifier ::= [ a-zA-Z_ ] { [ a-zA-Z0-9_$ ] } — the body
+// alphabet permits `$`, so the parser must accept `my$var` as a regular
+// identifier when it appears in a variable declaration (A.2.2.1
+// list_of_variable_decl_assignments) and in the RHS of an assignment
+// (A.8.4 primary).  Stage = parser.
+TEST(IdentifierSyntaxParsing, SimpleIdentifierWithDollarInBody) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m;\n"
+      "  logic my$var;\n"
+      "  assign my$var = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 // --- identifier ::= simple_identifier | escaped_identifier ---
 
 TEST(IdentifierSyntaxParsing, EscapedIdentifierInExpr) {

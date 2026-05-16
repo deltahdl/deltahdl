@@ -180,4 +180,25 @@ TEST(IdentifierElaboration, NestedHierarchicalIdentResolution) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §A.9.3 simple_identifier ::= [a-zA-Z_]{[a-zA-Z0-9_$]} — the body alphabet
+// permits `$`; the elaborator must accept and resolve an identifier such as
+// `n$657` as a normal user-defined name.
+TEST(IdentifierElaboration, IdentifierWithDollarElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic [7:0] n$657;\n"
+             "  assign n$657 = 8'd0;\n"
+             "endmodule\n"));
+}
+
+// §A.9.3 simple_identifier ::= [a-zA-Z_]{[a-zA-Z0-9_$]} — the leading
+// alphabet permits `_`; the elaborator must accept and resolve `_bus3`.
+TEST(IdentifierElaboration, IdentifierStartingWithUnderscoreElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic [7:0] _bus3;\n"
+             "  assign _bus3 = 8'd0;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

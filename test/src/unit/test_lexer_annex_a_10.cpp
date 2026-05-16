@@ -32,27 +32,6 @@ TEST(BnfClarificationLexing, TimeLiteralNoSpace) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral);
 }
 
-TEST(BnfClarificationLexing, TimeLiteralAllUnits) {
-  auto t_s = Lex("1s");
-  auto t_ms = Lex("1ms");
-  auto t_us = Lex("1us");
-  auto t_ns = Lex("1ns");
-  auto t_ps = Lex("1ps");
-  auto t_fs = Lex("1fs");
-  EXPECT_EQ(t_s[0].kind, TokenKind::kTimeLiteral);
-  EXPECT_EQ(t_ms[0].kind, TokenKind::kTimeLiteral);
-  EXPECT_EQ(t_us[0].kind, TokenKind::kTimeLiteral);
-  EXPECT_EQ(t_ns[0].kind, TokenKind::kTimeLiteral);
-  EXPECT_EQ(t_ps[0].kind, TokenKind::kTimeLiteral);
-  EXPECT_EQ(t_fs[0].kind, TokenKind::kTimeLiteral);
-}
-
-TEST(BnfClarificationLexing, TimeLiteralFixedPoint) {
-  auto tokens = Lex("1.5ns");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral);
-}
-
 TEST(BnfClarificationLexing, SimpleIdentStartsWithAlpha) {
   auto tokens = Lex("abc");
   ASSERT_GE(tokens.size(), 2u);
@@ -91,12 +70,6 @@ TEST(BnfClarificationLexing, DollarAloneIsNotSystemId) {
   auto tokens = Lex("$ display");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
-}
-
-TEST(BnfClarificationLexing, SystemIdWithDigitsOk) {
-  auto tokens = Lex("$clog2");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
 }
 
 TEST(BnfClarificationLexing, EofTerminatesStream) {

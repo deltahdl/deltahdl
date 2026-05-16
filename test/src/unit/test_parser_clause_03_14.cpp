@@ -13,7 +13,7 @@ TEST(DesignBuildingBlockParsing, TimeUnitEnumValues) {
   EXPECT_EQ(static_cast<int8_t>(TimeUnit::kFs), -15);
 }
 
-TEST(DesignBuildingBlockParsing, Table3_1_AllUnitStrings) {
+TEST(DesignBuildingBlockParsing, AllValidTimeUnitStringsAccepted) {
   TimeUnit u = TimeUnit::kNs;
   EXPECT_TRUE(ParseTimeUnitStr("s", u));
   EXPECT_EQ(u, TimeUnit::kS);
@@ -29,7 +29,7 @@ TEST(DesignBuildingBlockParsing, Table3_1_AllUnitStrings) {
   EXPECT_EQ(u, TimeUnit::kFs);
 }
 
-TEST(DesignBuildingBlockParsing, Table3_1_InvalidStrings) {
+TEST(DesignBuildingBlockParsing, InvalidTimeUnitStringsRejected) {
   TimeUnit u = TimeUnit::kNs;
   EXPECT_FALSE(ParseTimeUnitStr("", u));
   EXPECT_FALSE(ParseTimeUnitStr("xs", u));

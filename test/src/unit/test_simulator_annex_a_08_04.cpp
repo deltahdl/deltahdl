@@ -148,6 +148,31 @@ TEST(PrimarySim, NullSimulates) {
   f.scheduler.Run();
 }
 
+// §A.8.4 constant_primary ::= [ package_scope | class_scope ] enum_identifier
+// — the simulator must read the package-scoped enum member's constant value at
+// runtime.  Combines A.8.4 (primary slot), A.9.3 (package_scope,
+// enum_identifier) and A.2.2.1 (enum data_type).
+TEST(PrimarySim, PackageScopedEnumIdentifierSimulates) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package pkg;\n"
+      "  typedef enum { COLOR_RED, COLOR_GREEN, COLOR_BLUE } color_t;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import pkg::*;\n"
+      "  int x;\n"
+      "  initial x = COLOR_GREEN;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 // §A.8.4: concatenation with range simulates
 TEST(PrimarySim, ConcatenationWithRangeSimulates) {
   SimFixture f;

@@ -609,6 +609,39 @@ Expr* Parser::ParseIdentifierExpr() {
     result = ParseParameterizedScope(result);
   }
 
+  // §A.2.2.1 casting_type ::= simple_type where simple_type ::=
+  //     ps_type_identifier | ps_parameter_identifier
+  // — a scope-qualified type (`pkg::byte_t'(v)`) or a bare parameter
+  // (`W'(v)`) followed by `' (` is a cast.  TryParseUserTypeCast above
+  // only handles the bare-known-type case; this branch handles the
+  // remaining simple_type forms after the member-access chain has been
+  // built.  The assignment-pattern form `simple_type'{...}` is handled
+  // analogously via the kApostropheLBrace token.
+  if (Check(TokenKind::kApostropheLBrace)) {
+    auto* pat = ParseAssignmentPattern();
+    auto* typed = arena_.Create<Expr>();
+    typed->kind = ExprKind::kCast;
+    typed->range.start = result->range.start;
+    typed->lhs = pat;
+    typed->rhs = result;
+    return typed;
+  }
+  if (Check(TokenKind::kApostrophe)) {
+    auto saved = lexer_.SavePos();
+    Consume();  // '
+    if (Check(TokenKind::kLParen)) {
+      Consume();  // (
+      auto* cast = arena_.Create<Expr>();
+      cast->kind = ExprKind::kCast;
+      cast->range.start = result->range.start;
+      cast->lhs = ParseExpr();
+      cast->rhs = result;
+      Expect(TokenKind::kRParen);
+      return cast;
+    }
+    lexer_.RestorePos(saved);
+  }
+
   // Postfix chain: calls, selects, member access, and attributes
   // §5.12: attributes may appear before argument list.
   while (Check(TokenKind::kLParen) || Check(TokenKind::kLBracket) ||

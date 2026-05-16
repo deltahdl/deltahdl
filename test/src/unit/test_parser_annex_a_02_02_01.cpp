@@ -172,6 +172,30 @@ TEST(NetAndVariableTypeParsing, StructPackedSigned) {
   EXPECT_TRUE(dt.is_signed);
 }
 
+// §A.2.2.1 struct_union with `packed` qualifier and no signing — the bare
+// `struct packed { ... }` form (without trailing `signed`/`unsigned`).
+TEST(NetAndVariableTypeParsing, StructPackedNoSigning) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct packed {\n"
+              "    logic [7:0] a;\n"
+              "    logic [7:0] b;\n"
+              "  } my_t;\n"
+              "endmodule\n"));
+}
+
+// §A.2.2.1 struct_union ::= union ... — the `union packed { ... }` form
+// (without `soft` or `tagged`).
+TEST(NetAndVariableTypeParsing, UnionPackedNoQualifier) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef union packed {\n"
+              "    logic [7:0] a;\n"
+              "    logic [7:0] b;\n"
+              "  } my_t;\n"
+              "endmodule\n"));
+}
+
 // --- struct_union_member: {attribute_instance} [random_qualifier]
 //     data_type_or_void list_of_variable_decl_assignments ; ---
 
@@ -651,6 +675,38 @@ TEST(NetAndVariableTypeParsing, CastingTypePsTypeIdentifier) {
   EXPECT_TRUE(ParseOk(
       "typedef logic [7:0] byte_t;\n"
       "module m; initial x = byte_t'(y); endmodule\n"));
+}
+
+// §A.2.2.1 simple_type ::= ps_type_identifier, where ps_type_identifier
+// (A.9.3) may be `[package_scope] type_identifier` — verify the parser
+// accepts a package-scoped typedef as a cast type.
+TEST(NetAndVariableTypeParsing, CastingTypePsTypeIdentifierPackageScope) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "endpackage\n"
+      "module m; initial x = pkg::byte_t'(y); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
+}
+
+// §A.2.2.1 simple_type ::= ps_parameter_identifier — a bare parameter name
+// in cast position.  This is the form not handled by `(W)'(value)`, where
+// the parameter is parenthesised as constant_primary; here `W` itself is the
+// simple_type.
+TEST(NetAndVariableTypeParsing, CastingTypePsParameterIdentifier) {
+  auto r = Parse(
+      "module m; parameter W = 16; initial x = W'(y); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
 }
 
 // --- interface_class_type ::= ps_class_identifier

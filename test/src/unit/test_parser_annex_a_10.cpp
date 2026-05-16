@@ -63,16 +63,6 @@ TEST(BnfClarificationParsing, DollarInQueueSelect) {
               "endmodule\n"));
 }
 
-TEST(BnfClarificationParsing, StructPackedOk) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct packed {\n"
-              "    logic [7:0] a;\n"
-              "    logic [7:0] b;\n"
-              "  } my_t;\n"
-              "endmodule\n"));
-}
-
 // Item 10: rand/randc mutual exclusion
 
 TEST(BnfClarificationParsing, ErrorRandAndRandc) {
@@ -101,18 +91,6 @@ TEST(BnfClarificationParsing, ErrorDuplicateStatic) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Item 17: union with packed keyword
-
-TEST(BnfClarificationParsing, UnionPackedOk) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef union packed {\n"
-              "    logic [7:0] a;\n"
-              "    logic [7:0] b;\n"
-              "  } my_t;\n"
-              "endmodule\n"));
-}
-
 // Item 42: nonvoid function call requires parens
 
 TEST(BnfClarificationParsing, NonvoidFunctionCallWithParens) {
@@ -121,35 +99,6 @@ TEST(BnfClarificationParsing, NonvoidFunctionCallWithParens) {
               "  function int my_func(); return 0; endfunction\n"
               "  int y;\n"
               "  initial y = my_func();\n"
-              "endmodule\n"));
-}
-
-// Item 52: streaming concatenation basic forms
-
-TEST(BnfClarificationParsing, StreamingConcatRight) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic [31:0] x;\n"
-              "  logic [31:0] y;\n"
-              "  assign y = {>>{ x }};\n"
-              "endmodule\n"));
-}
-
-TEST(BnfClarificationParsing, StreamingConcatLeft) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic [31:0] x;\n"
-              "  logic [31:0] y;\n"
-              "  assign y = {<<{ x }};\n"
-              "endmodule\n"));
-}
-
-TEST(BnfClarificationParsing, StreamingConcatWithSliceSize) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic [31:0] x;\n"
-              "  logic [31:0] y;\n"
-              "  assign y = {<<8{ x }};\n"
               "endmodule\n"));
 }
 
