@@ -82,14 +82,6 @@ MUTATOR_DENY_PATTERNS = ["git", *_SHARED_DENY_PATTERNS]
 COMMIT_BODY_DENY_PATTERNS = list(_SHARED_DENY_PATTERNS)
 
 
-# The commit body is a pure summarisation of an already-known porcelain
-# diff — no audit reasoning, no normative-rule judgment. Haiku at low
-# effort is enough; pinning the model here means the pipeline's Opus
-# budget is not spent on the commit-message bullets.
-COMMIT_BODY_MODEL = "haiku"
-COMMIT_BODY_EFFORT = "low"
-
-
 @dataclass(frozen=True)
 class CycleMember:
     """The (subclause, issue) pair a mutator drives.
@@ -272,36 +264,32 @@ def build_commit_prompt(
 def generate_commit_body(
     subclauses: list[str],
     added: list[str], modified: list[str], deleted: list[str],
+    *, model: str,
 ) -> str:
-    """Ask Claude to explain each change in a fresh Haiku session.
+    """Ask Claude (resuming the eight-step session) to explain each change.
 
-    The commit body is pure summarisation of a known porcelain diff —
-    the prompt lists every changed path explicitly, so the call needs
-    no audit context from the pipeline session. Runs on Haiku at low
-    effort in its own session; the retry_cmd keeps ``--continue`` so a
-    content-filter recovery resumes the session this call just opened.
-    Returns the raw ``.result`` text; callers fall back to
-    ``build_action_summary`` when the result is blank.
+    Issues a ``--continue`` Claude call so the model that just produced
+    the source-tree edits writes the matching ``- {Verb} `path` because
+    reason.`` bullet for each one. The audit context Claude built in
+    steps 1-2 (BNF enumeration, normative-rule list, src/tests gap
+    analysis) lives in that session, so resuming is the only way the
+    bullets can name the real reason for each change rather than
+    inventing one from the file path alone. Returns the raw ``.result``
+    text; callers fall back to ``build_action_summary`` when the result
+    is blank.
     """
     prompt = build_commit_prompt(subclauses, added, modified, deleted)
     settings_path = write_deny_hook_settings(COMMIT_BODY_DENY_PATTERNS)
     try:
         cmd = build_streaming_cmd(
-            model=COMMIT_BODY_MODEL,
-            settings_path=settings_path,
-            continue_session=False,
-            effort=COMMIT_BODY_EFFORT,
-        )
-        retry_cmd = build_streaming_cmd(
-            model=COMMIT_BODY_MODEL,
+            model=model,
             settings_path=settings_path,
             continue_session=True,
-            effort=COMMIT_BODY_EFFORT,
         )
         print("\nGenerating commit message", flush=True)
         return run_claude_streaming_with_retry(
             cmd, prompt, env=build_env(),
-            retry_cmd=retry_cmd, role="Commit body",
+            retry_cmd=cmd, role="Commit body",
         )
     finally:
         os.unlink(settings_path)
@@ -328,7 +316,7 @@ def _close_satisfied_issue(subclause: str, issue: int) -> None:
 
 
 def commit_mutator_result(
-    subclauses: list[str], issues: list[int],
+    subclauses: list[str], issues: list[int], *, model: str,
 ) -> bool:
     """Commit + push porcelain changes with a Closes trailer.
 
@@ -338,11 +326,13 @@ def commit_mutator_result(
     close`` so the satisfaction state is recorded on GitHub even when
     no commit lands.
 
-    When source-tree changes exist, asks ``generate_commit_body`` to
+    When source-tree changes exist, asks Claude (via ``--continue``) to
     write a ``- {Verb} `path` because reason.`` bullet per change so the
     commit body explains *why* each file moved — matching the historical
-    ``implement_subclause`` commit-message shape. Falls back to a plain
-    porcelain-derived bullet list when Claude's output is blank.
+    ``implement_subclause`` commit-message shape. The model is forwarded
+    to ``generate_commit_body`` so the resumed session uses the same
+    model the pipeline ran on. Falls back to a plain porcelain-derived
+    bullet list when Claude's output is blank.
     """
     added, modified, deleted = filter_changes(get_porcelain_changes())
     changed = added + modified
@@ -351,7 +341,7 @@ def commit_mutator_result(
             _close_satisfied_issue(subclause, issue)
         return False
     summary = generate_commit_body(
-        subclauses, added, modified, deleted,
+        subclauses, added, modified, deleted, model=model,
     ).strip()
     if not summary:
         summary = (
@@ -599,7 +589,7 @@ def _run_pipeline_and_commit(
         subclauses, lrm, satisfied_dependencies=satisfied_dependencies,
     )
     run_steps(steps, model=model)
-    if not commit_mutator_result(subclauses, issues):
+    if not commit_mutator_result(subclauses, issues, model=model):
         print(
             f"{no_change_label} produced no source-tree changes;"
             " nothing committed.",

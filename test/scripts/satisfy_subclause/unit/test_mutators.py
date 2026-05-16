@@ -435,6 +435,21 @@ def test_no_deps_commits_with_subclause_and_issue() -> None:
     assert commit.call_args[0] == (["33.4.1.5"], [42])
 
 
+def test_no_deps_passes_model_to_commit() -> None:
+    """No-deps mutator forwards the pipeline model to commit_mutator_result.
+
+    The commit-body call resumes the eight-step session via --continue,
+    so it must run on the same model the pipeline used.
+    """
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run:
+        with mock_commit as commit:
+            satisfy_unsatisfied_subclause_without_dependencies(
+                _target(), "~/LRM.pdf", model="haiku",
+            )
+    assert commit.call_args[1]["model"] == "haiku"
+
+
 def test_no_deps_warns_when_no_changes(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -511,6 +526,18 @@ def test_with_deps_commits_with_subclause_and_issue() -> None:
                 ["33.6.1"], model="opus",
             )
     assert commit.call_args[0] == (["33.4"], [42])
+
+
+def test_with_deps_passes_model_to_commit() -> None:
+    """With-deps mutator forwards the pipeline model to commit_mutator_result."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run:
+        with mock_commit as commit:
+            satisfy_unsatisfied_subclause_with_satisfied_dependencies(
+                _target(subclause="33.4"), "~/LRM.pdf",
+                ["33.6.1"], model="haiku",
+            )
+    assert commit.call_args[1]["model"] == "haiku"
 
 
 def test_with_deps_warns_when_no_changes(
@@ -687,6 +714,17 @@ def test_cycle_commits_with_all_issues() -> None:
                 _two_member_cycle(), "~/LRM.pdf", [], model="opus",
             )
     assert commit.call_args[0] == (["33.4.1.5", "33.4.1.6"], [10, 11])
+
+
+def test_cycle_passes_model_to_commit() -> None:
+    """Cycle-set mutator forwards the pipeline model to commit_mutator_result."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run:
+        with mock_commit as commit:
+            satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
+                _two_member_cycle(), "~/LRM.pdf", [], model="haiku",
+            )
+    assert commit.call_args[1]["model"] == "haiku"
 
 
 def test_cycle_warns_when_no_changes(

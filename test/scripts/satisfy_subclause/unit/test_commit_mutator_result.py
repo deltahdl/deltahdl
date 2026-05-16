@@ -55,7 +55,7 @@ def test_commit_mutator_result_returns_false_when_no_committable(
     """A clean tree (or one filtered down to empty) returns False."""
     with _patched_porcelain(porcelain), _patched_commit() as mock_c, \
             _patched_close(), _patched_body():
-        result = commit_mutator_result(["6.3"], [42])
+        result = commit_mutator_result(["6.3"], [42], model="opus")
     assert (result, mock_c.called) == (False, False)
 
 
@@ -63,23 +63,28 @@ def test_commit_mutator_result_returns_true_when_dirty() -> None:
     """commit_mutator_result returns True when porcelain has source files."""
     with _patched_porcelain((["foo.cpp"], [], [])), _patched_commit(), \
             _patched_close(), _patched_body():
-        result = commit_mutator_result(["6.3"], [42])
+        result = commit_mutator_result(["6.3"], [42], model="opus")
     assert result is True
 
 
-def test_commit_mutator_result_invokes_body_without_model() -> None:
-    """generate_commit_body is invoked without a model arg — it pins haiku itself."""
+def test_commit_mutator_result_passes_model_to_body() -> None:
+    """The pipeline's model flows through to generate_commit_body.
+
+    The commit-body call resumes the eight-step session via --continue,
+    so it must run on the same model the pipeline used — there is no
+    separate Haiku pin on this path.
+    """
     with _patched_porcelain((["foo.cpp"], [], [])), _patched_commit(), \
             _patched_close(), _patched_body() as mock_body:
-        commit_mutator_result(["6.3"], [42])
-    assert "model" not in mock_body.call_args.kwargs
+        commit_mutator_result(["6.3"], [42], model="haiku")
+    assert mock_body.call_args[1]["model"] == "haiku"
 
 
 def test_commit_mutator_result_calls_commit_and_push() -> None:
     """commit_mutator_result invokes commit_and_push with the file list."""
     with _patched_porcelain((["foo.cpp"], ["bar.h"], [])), \
             _patched_commit() as mock_c, _patched_close(), _patched_body():
-        commit_mutator_result(["6.3"], [42])
+        commit_mutator_result(["6.3"], [42], model="opus")
     assert mock_c.call_args[0][0] == ["foo.cpp", "bar.h"]
 
 
@@ -87,7 +92,7 @@ def test_commit_mutator_result_filters_garbage_added() -> None:
     """commit_mutator_result drops garbage paths from added before commit."""
     with _patched_porcelain((["foo.cpp", "{a,"], [], [])), \
             _patched_commit() as mock_c, _patched_close(), _patched_body():
-        commit_mutator_result(["6.3"], [42])
+        commit_mutator_result(["6.3"], [42], model="opus")
     assert mock_c.call_args[0][0] == ["foo.cpp"]
 
 
@@ -95,7 +100,7 @@ def test_commit_mutator_result_filters_garbage_deleted() -> None:
     """commit_mutator_result drops garbage paths from deleted before commit."""
     with _patched_porcelain(([], [], ["foo.cpp", "{a,"])), \
             _patched_commit() as mock_c, _patched_close(), _patched_body():
-        commit_mutator_result(["6.3"], [42])
+        commit_mutator_result(["6.3"], [42], model="opus")
     assert mock_c.call_args[0][1] == ["foo.cpp"]
 
 
@@ -109,7 +114,7 @@ def test_commit_mutator_result_closes_issue_when_no_committable(
     """A clean (or filter-empty) tree means §X is satisfied → issue is closed."""
     with _patched_porcelain(porcelain), _patched_commit(), \
             _patched_close() as mock_close, _patched_body():
-        commit_mutator_result(["6.3"], [42])
+        commit_mutator_result(["6.3"], [42], model="opus")
     assert mock_close.call_args[0] == ("6.3", 42)
 
 
@@ -117,7 +122,7 @@ def test_commit_mutator_result_closes_every_issue_in_cycle() -> None:
     """A clean tree closes every (subclause, issue) pair in a cycle set."""
     with _patched_porcelain(([], [], [])), _patched_commit(), \
             _patched_close() as mock_close, _patched_body():
-        commit_mutator_result(["6.3", "6.4"], [42, 43])
+        commit_mutator_result(["6.3", "6.4"], [42, 43], model="opus")
     pairs = [call.args for call in mock_close.call_args_list]
     assert pairs == [("6.3", 42), ("6.4", 43)]
 
@@ -126,7 +131,7 @@ def test_commit_mutator_result_skips_close_when_committing() -> None:
     """When a commit is produced, the gh-close fallback is not invoked."""
     with _patched_porcelain((["foo.cpp"], [], [])), _patched_commit(), \
             _patched_close() as mock_close, _patched_body():
-        commit_mutator_result(["6.3"], [42])
+        commit_mutator_result(["6.3"], [42], model="opus")
     assert mock_close.called is False
 
 
@@ -134,7 +139,7 @@ def test_commit_mutator_result_only_deletions_commits() -> None:
     """A commit composed solely of deletions still commits."""
     with _patched_porcelain(([], [], ["foo.cpp"])), \
             _patched_commit() as mock_c, _patched_body():
-        result = commit_mutator_result(["6.3"], [42])
+        result = commit_mutator_result(["6.3"], [42], model="opus")
     assert (result, mock_c.called) == (True, True)
 
 
@@ -142,7 +147,7 @@ def test_commit_mutator_result_summary_lists_added() -> None:
     """The commit summary lists added files when the body generator is blank."""
     with _patched_porcelain((["foo.cpp"], [], [])), \
             _patched_commit() as mock_c, _patched_body():
-        commit_mutator_result(["6.3"], [42])
+        commit_mutator_result(["6.3"], [42], model="opus")
     message = mock_c.call_args[0][2]
     assert "Added foo.cpp" in message
 
@@ -151,7 +156,7 @@ def test_commit_mutator_result_summary_lists_modified() -> None:
     """The commit summary lists modified files when the body generator is blank."""
     with _patched_porcelain(([], ["bar.h"], [])), \
             _patched_commit() as mock_c, _patched_body():
-        commit_mutator_result(["6.3"], [42])
+        commit_mutator_result(["6.3"], [42], model="opus")
     message = mock_c.call_args[0][2]
     assert "Modified bar.h" in message
 
@@ -160,7 +165,7 @@ def test_commit_mutator_result_summary_lists_deleted() -> None:
     """The commit summary lists deleted files when the body generator is blank."""
     with _patched_porcelain(([], [], ["baz.py"])), \
             _patched_commit() as mock_c, _patched_close(), _patched_body():
-        commit_mutator_result(["6.3"], [42])
+        commit_mutator_result(["6.3"], [42], model="opus")
     message = mock_c.call_args[0][2]
     assert "Deleted baz.py" in message
 
@@ -170,7 +175,7 @@ def test_commit_mutator_result_uses_claude_body_when_present() -> None:
     with _patched_porcelain((["foo.cpp"], [], [])), \
             _patched_commit() as mock_c, _patched_close(), \
             _patched_body("- Added `foo.cpp` because reasons."):
-        commit_mutator_result(["6.3"], [42])
+        commit_mutator_result(["6.3"], [42], model="opus")
     message = mock_c.call_args[0][2]
     assert "- Added `foo.cpp` because reasons." in message
 
@@ -179,7 +184,7 @@ def test_commit_mutator_result_invokes_generate_commit_body() -> None:
     """Source-tree changes trigger a generate_commit_body call."""
     with _patched_porcelain((["foo.cpp"], [], [])), _patched_commit(), \
             _patched_close(), _patched_body() as mock_body:
-        commit_mutator_result(["6.3"], [42])
+        commit_mutator_result(["6.3"], [42], model="opus")
     assert mock_body.called is True
 
 
@@ -187,7 +192,7 @@ def test_commit_mutator_result_skips_body_call_when_clean() -> None:
     """A clean tree never calls the body generator."""
     with _patched_porcelain(([], [], [])), _patched_commit(), \
             _patched_close(), _patched_body() as mock_body:
-        commit_mutator_result(["6.3"], [42])
+        commit_mutator_result(["6.3"], [42], model="opus")
     assert mock_body.called is False
 
 
@@ -195,7 +200,7 @@ def test_commit_mutator_result_passes_subclauses_to_body() -> None:
     """generate_commit_body sees the subclause list."""
     with _patched_porcelain((["foo.cpp"], [], [])), _patched_commit(), \
             _patched_close(), _patched_body() as mock_body:
-        commit_mutator_result(["6.3"], [42])
+        commit_mutator_result(["6.3"], [42], model="opus")
     assert mock_body.call_args[0][0] == ["6.3"]
 
 
@@ -203,7 +208,7 @@ def test_commit_mutator_result_passes_filtered_changes_to_body() -> None:
     """generate_commit_body receives the porcelain lists post-filter."""
     with _patched_porcelain((["foo.cpp", "{a,"], ["bar.h"], ["baz.py"])), \
             _patched_commit(), _patched_close(), _patched_body() as mock_body:
-        commit_mutator_result(["6.3"], [42])
+        commit_mutator_result(["6.3"], [42], model="opus")
     args = mock_body.call_args[0]
     assert (args[1], args[2], args[3]) == (
         ["foo.cpp"], ["bar.h"], ["baz.py"],
