@@ -5,6 +5,10 @@
 // primitive instances, module instances, interface instances, or other
 // program instances.
 
+#include <algorithm>
+#include <string_view>
+#include <vector>
+
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -26,6 +30,52 @@ TEST(ProgramBlockParsing, ProgramBodyTerminatesOnlyAtEndprogram) {
   // Without the endprogram keyword the parser cannot close the program block.
   auto r = Parse("program p; initial begin end\n");
   EXPECT_TRUE(r.has_errors);
+}
+
+// --- Scope encapsulation (§3.4 second purpose) ---
+
+// §3.4: "It creates a scope that encapsulates program-wide data, tasks,
+// and functions." Items declared in a program live inside that program's
+// own scope (its items list), so two distinct programs can each declare
+// items with the same name without a parse-time collision, and items
+// inside one program are not visible as siblings of the other.
+TEST(ProgramBlockParsing, ProgramScopeEncapsulatesItems) {
+  auto r = Parse(
+      "program p1;\n"
+      "  int data;\n"
+      "  task t(); endtask\n"
+      "  function int f(); return 0; endfunction\n"
+      "endprogram\n"
+      "program p2;\n"
+      "  int data;\n"
+      "  task t(); endtask\n"
+      "  function int f(); return 0; endfunction\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 2u);
+  // Each program decl owns its own items list — that is the scope.
+  const auto& p1 = *r.cu->programs[0];
+  const auto& p2 = *r.cu->programs[1];
+  EXPECT_EQ(p1.name, "p1");
+  EXPECT_EQ(p2.name, "p2");
+  EXPECT_GE(p1.items.size(), 3u);
+  EXPECT_GE(p2.items.size(), 3u);
+  auto names_in = [](const ModuleDecl& m) {
+    std::vector<std::string_view> ns;
+    for (const auto* it : m.items) ns.push_back(it->name);
+    return ns;
+  };
+  auto p1_names = names_in(p1);
+  auto p2_names = names_in(p2);
+  EXPECT_NE(std::find(p1_names.begin(), p1_names.end(), "data"),
+            p1_names.end());
+  EXPECT_NE(std::find(p1_names.begin(), p1_names.end(), "t"), p1_names.end());
+  EXPECT_NE(std::find(p1_names.begin(), p1_names.end(), "f"), p1_names.end());
+  EXPECT_NE(std::find(p2_names.begin(), p2_names.end(), "data"),
+            p2_names.end());
+  EXPECT_NE(std::find(p2_names.begin(), p2_names.end(), "t"), p2_names.end());
+  EXPECT_NE(std::find(p2_names.begin(), p2_names.end(), "f"), p2_names.end());
 }
 
 // --- Permitted contents ---
@@ -82,6 +132,30 @@ TEST(ProgramBlockParsing, ProgramAcceptsMultipleInitialAndFinalProcedures) {
       "  final begin end\n"
       "endprogram\n");
   EXPECT_FALSE(r.has_errors);
+}
+
+// §3.4 sample program declaration:
+//   program test (input clk, input [16:1] addr, inout [7:0] data);
+// A program declaration accepts a port list with direction-declared ports
+// just like the §3.4 example.
+TEST(ProgramBlockParsing, ProgramAcceptsPortListWithDirections) {
+  auto r = Parse(
+      "program test (input clk, input [16:1] addr, inout [7:0] data);\n"
+      "  initial begin end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  const auto& prog = *r.cu->programs[0];
+  EXPECT_EQ(prog.name, "test");
+  EXPECT_EQ(prog.decl_kind, ModuleDeclKind::kProgram);
+  ASSERT_EQ(prog.ports.size(), 3u);
+  EXPECT_EQ(prog.ports[0].name, "clk");
+  EXPECT_EQ(prog.ports[0].direction, Direction::kInput);
+  EXPECT_EQ(prog.ports[1].name, "addr");
+  EXPECT_EQ(prog.ports[1].direction, Direction::kInput);
+  EXPECT_EQ(prog.ports[2].name, "data");
+  EXPECT_EQ(prog.ports[2].direction, Direction::kInout);
 }
 
 // --- Prohibited contents (§3.4) ---
