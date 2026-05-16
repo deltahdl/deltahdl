@@ -465,7 +465,7 @@ def test_resolve_unlinked_mutates_body_line_in_place() -> None:
     """_resolve_unlinked swaps §X.Y for #NNN on the named line; others untouched."""
     body_lines = ["1. #1307", "2. §6.18", "3. §A.7"]
     with patch(
-        "satisfy_subclauses.pipeline.find_or_create_issue", return_value=5000,
+        "satisfy_subclauses.pipeline.find_or_create_issue", return_value=(5000, "OPEN"),
     ):
         with patch("satisfy_subclauses.pipeline._patch_master_body"):
             _resolve_unlinked(
@@ -479,7 +479,7 @@ def test_resolve_unlinked_patches_master_body_with_updated_lines() -> None:
     """_resolve_unlinked calls _patch_master_body with the joined updated body."""
     body_lines = ["1. §6.18", "2. §A.7"]
     with patch(
-        "satisfy_subclauses.pipeline.find_or_create_issue", return_value=42,
+        "satisfy_subclauses.pipeline.find_or_create_issue", return_value=(42, "OPEN"),
     ):
         with patch(
             "satisfy_subclauses.pipeline._patch_master_body",
@@ -495,7 +495,7 @@ def test_resolve_unlinked_returns_subclause() -> None:
     """_resolve_unlinked returns the input subclause."""
     body_lines = ["1. §6.18"]
     with patch(
-        "satisfy_subclauses.pipeline.find_or_create_issue", return_value=42,
+        "satisfy_subclauses.pipeline.find_or_create_issue", return_value=(42, "OPEN"),
     ):
         with patch("satisfy_subclauses.pipeline._patch_master_body"):
             result = _resolve_unlinked(
@@ -511,7 +511,7 @@ def _run_resolve_unlinked_capturing(
     """Run _resolve_unlinked with all gh dependencies stubbed; return capsys."""
     body_lines = ["1. §6.18"]
     with patch(
-        "satisfy_subclauses.pipeline.find_or_create_issue", return_value=42,
+        "satisfy_subclauses.pipeline.find_or_create_issue", return_value=(42, "OPEN"),
     ):
         with patch("satisfy_subclauses.pipeline._patch_master_body"):
             _resolve_unlinked(
@@ -567,7 +567,7 @@ def _stub_from_issue(
         ),
         patch(
             "satisfy_subclauses.pipeline.find_or_create_issue",
-            return_value=5000,
+            return_value=(5000, "OPEN"),
         ),
         patch(
             "satisfy_subclauses.pipeline.subprocess.run",

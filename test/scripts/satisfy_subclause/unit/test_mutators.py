@@ -9,7 +9,6 @@ from satisfy_subclause.mutators import (
     MUTATOR_DENY_PATTERNS,
     CycleMember,
     build_commit_message,
-    build_steps,
     filter_changes,
     is_valid_path,
     run_step,
@@ -89,7 +88,7 @@ def test_deny_patterns_allows_rm() -> None:
 
 
 def test_deny_patterns_allows_mv() -> None:
-    """Step 4 (Moving misplaced tests) needs mv; it must not be blocked."""
+    """mv is not a destructive shell call; it is not blocked."""
     assert "mv" not in MUTATOR_DENY_PATTERNS
 
 
@@ -345,253 +344,6 @@ def test_build_commit_message_uses_annex_label() -> None:
     assert "Satisfy A.7.1" in msg
 
 
-# --- build_steps ------------------------------------------------------------
-
-
-def _step_descriptions(steps: list[tuple[str, str]]) -> list[str]:
-    """Return just the description strings from a list of step pairs."""
-    return [d for d, _p in steps]
-
-
-_TEN_STEP_DESCRIPTIONS = [
-    "Auditing src",
-    "Auditing tests",
-    "Deleting duplicate tests",
-    "Moving misplaced tests",
-    "Deleting tests for non-normative subclauses",
-    "Deleting empty test files",
-    "Renaming test suites",
-    "Renaming test names",
-    "Writing missing tests",
-    "Writing missing functionality",
-]
-
-
-def test_build_steps_returns_ten() -> None:
-    """build_steps for a single subclause returns ten step pairs."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert len(steps) == 10
-
-
-def test_build_steps_descriptions_match_pipeline() -> None:
-    """The ten descriptions are the audit-then-act pipeline names."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert _step_descriptions(steps) == _TEN_STEP_DESCRIPTIONS
-
-
-def test_build_steps_first_step_reads_lrm() -> None:
-    """Step 1 includes the LRM read instruction for the subclause."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "~/LRM.pdf" in steps[0][1]
-
-
-def test_build_steps_first_step_audits_src() -> None:
-    """Step 1 instructs Claude to audit src/."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "search src/" in steps[0][1]
-
-
-def test_build_steps_second_step_audits_tests() -> None:
-    """Step 2 instructs Claude to audit test/src/unit/."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "test/src/unit/" in steps[1][1]
-
-
-def test_build_steps_no_deps_states_no_dependencies() -> None:
-    """Step 1 with no deps says no external deps were needed."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "No external dependencies" in steps[0][1]
-
-
-def test_build_steps_with_deps_lists_dependencies() -> None:
-    """Step 1 with satisfied deps names them in the deps block."""
-    steps = build_steps(
-        ["33.4.1.5"], "~/LRM.pdf",
-        satisfied_dependencies=["33.6.1", "33.4.1.4"],
-    )
-    assert "§33.6.1" in steps[0][1] and "§33.4.1.4" in steps[0][1]
-
-
-def test_build_steps_with_deps_says_reference_them() -> None:
-    """Step 1 with deps tells Claude they may be referenced."""
-    steps = build_steps(
-        ["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=["33.6.1"],
-    )
-    assert "reference their machinery" in steps[0][1]
-
-
-def test_build_steps_no_json_contract() -> None:
-    """No step asks for a JSON object diagnostic."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    for _description, prompt in steps:
-        assert "JSON object" not in prompt
-
-
-def test_build_steps_no_rule_coverage_token() -> None:
-    """No step references the rule_coverage JSON-key from the dropped oracle."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert all("rule_coverage" not in prompt for _d, prompt in steps)
-
-
-def test_build_steps_no_satisfaction_predicate() -> None:
-    """No step references the (a)-(e) satisfaction-predicate framing."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert all(
-        "satisfaction predicate" not in prompt for _d, prompt in steps
-    )
-
-
-def test_build_steps_canonical_files_listed_in_step_4() -> None:
-    """Step 4 (moving misplaced tests) names the canonical test files."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[3][1]
-
-
-def test_build_steps_canonical_files_listed_in_writing_missing_tests() -> None:
-    """The 'writing missing tests' step names the canonical test files."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[8][1]
-
-
-def test_build_steps_step5_is_non_normative_deletion() -> None:
-    """Step 5's description targets non-normative-subclause test deletion."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert steps[4][0] == "Deleting tests for non-normative subclauses"
-
-
-def test_build_steps_step5_mentions_normative_rules() -> None:
-    """Step 5 frames the criterion as 'no normative rules of its own'."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "no normative rules of its own" in steps[4][1]
-
-
-def test_build_steps_step5_names_descriptive_examples() -> None:
-    """Step 5 names introductions/overviews/roadmaps as worked examples."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    prompt = steps[4][1]
-    assert (
-        "introductions" in prompt
-        and "overviews" in prompt
-        and "roadmaps" in prompt
-    )
-
-
-def test_build_steps_step5_lists_canonical_files() -> None:
-    """Step 5 lists the canonical test files for the subclause."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[4][1]
-
-
-def test_build_steps_step6_is_empty_file_cleanup() -> None:
-    """Step 6's description targets empty-test-file cleanup."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert steps[5][0] == "Deleting empty test files"
-
-
-def test_build_steps_step6_removes_cmakelists_entry() -> None:
-    """Step 6 instructs Claude to also remove the CMakeLists.txt entry."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "CMakeLists.txt" in steps[5][1]
-
-
-def test_build_steps_step6_lists_canonical_files() -> None:
-    """Step 6 names the canonical test files it inspects."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[5][1]
-
-
-def test_build_steps_step4_no_inline_empty_file_rule() -> None:
-    """Step 4 (Moving) no longer carries the inline empty-file rule."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "CMakeLists.txt" not in steps[3][1]
-
-
-def test_build_steps_constraints_present_in_action_steps() -> None:
-    """Every action step (3-8) includes the per-step constraints block."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    for _description, prompt in steps[2:]:
-        assert "Only act on requirements" in prompt
-
-
-def test_build_steps_no_excludes_machinery() -> None:
-    """No step uses the implement_subclause --exclude framing."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    for _description, prompt in steps:
-        assert "OFF-LIMITS" not in prompt
-
-
-def test_build_steps_cycle_lists_each_member() -> None:
-    """Cycle steps name every cycle member in step 1."""
-    steps = build_steps(
-        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
-    )
-    assert "§33.4.1.5" in steps[0][1] and "§33.4.1.6" in steps[0][1]
-
-
-def test_build_steps_cycle_describes_one_pass() -> None:
-    """Step 1 of a multi-subclause run says it satisfies them in one pass."""
-    steps = build_steps(
-        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
-    )
-    assert "in one pass" in steps[0][1]
-
-
-def test_build_steps_cycle_invites_weaving_or_independent_satisfaction() -> None:
-    """Step 1 frames weaving and independent satisfaction as equal options."""
-    steps = build_steps(
-        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
-    )
-    assert "weave" in steps[0][1]
-
-
-def test_build_steps_cycle_does_not_assert_mutual_dependency() -> None:
-    """Step 1 does not claim each member requires machinery from the others."""
-    steps = build_steps(
-        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
-    )
-    assert "requires machinery from the others" not in steps[0][1]
-
-
-def test_build_steps_cycle_lists_first_member_canonical_files() -> None:
-    """Cycle steps list canonical test files for the first cycle member."""
-    steps = build_steps(
-        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
-    )
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[1][1]
-
-
-def test_build_steps_cycle_lists_second_member_canonical_files() -> None:
-    """Cycle steps list canonical test files for the second cycle member."""
-    steps = build_steps(
-        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
-    )
-    assert "test_parser_clause_33_04_01_06.cpp" in steps[1][1]
-
-
-def test_build_steps_cycle_no_per_member_diagnostic() -> None:
-    """Cycle steps no longer carry the per-member DIAGNOSTIC blocks."""
-    steps = build_steps(
-        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
-    )
-    for _description, prompt in steps:
-        assert "DIAGNOSTIC for" not in prompt
-
-
-def test_build_steps_cycle_external_deps_listed() -> None:
-    """Cycle step 1 lists external dependencies if any."""
-    steps = build_steps(
-        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf",
-        satisfied_dependencies=["33.6.1"],
-    )
-    assert "§33.6.1" in steps[0][1]
-
-
-def test_build_steps_single_member_has_no_cycle_intro() -> None:
-    """A single-subclause run skips the multi-subclause weaving preface."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "weave" not in steps[0][1]
-
-
 # --- mutator dispatch shells ------------------------------------------------
 
 
@@ -625,15 +377,15 @@ def test_no_deps_invokes_run_steps() -> None:
     assert run.called
 
 
-def test_no_deps_passes_ten_steps() -> None:
-    """No-deps mutator hands ten step pairs to run_steps."""
+def test_no_deps_passes_nine_steps() -> None:
+    """No-deps mutator hands nine step pairs to run_steps."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
             satisfy_unsatisfied_subclause_without_dependencies(
                 _target(), "~/LRM.pdf", model="opus",
             )
-    assert len(run.call_args[0][0]) == 10
+    assert len(run.call_args[0][0]) == 9
 
 
 def test_no_deps_passes_model() -> None:
@@ -699,8 +451,8 @@ def test_with_deps_invokes_run_steps() -> None:
     assert run.called
 
 
-def test_with_deps_passes_ten_steps() -> None:
-    """With-deps mutator hands ten step pairs to run_steps."""
+def test_with_deps_passes_nine_steps() -> None:
+    """With-deps mutator hands nine step pairs to run_steps."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
@@ -708,7 +460,7 @@ def test_with_deps_passes_ten_steps() -> None:
                 _target(subclause="33.4"), "~/LRM.pdf",
                 ["33.6.1"], model="opus",
             )
-    assert len(run.call_args[0][0]) == 10
+    assert len(run.call_args[0][0]) == 9
 
 
 def test_with_deps_passes_deps_into_first_step_prompt() -> None:
@@ -856,15 +608,15 @@ def test_cycle_invokes_run_steps() -> None:
     assert run.called
 
 
-def test_cycle_passes_ten_steps() -> None:
-    """Cycle mutator hands ten step pairs to run_steps."""
+def test_cycle_passes_nine_steps() -> None:
+    """Cycle mutator hands nine step pairs to run_steps."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
             satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
                 _two_member_cycle(), "~/LRM.pdf", [], model="opus",
             )
-    assert len(run.call_args[0][0]) == 10
+    assert len(run.call_args[0][0]) == 9
 
 
 def test_cycle_first_step_lists_first_member() -> None:
@@ -976,25 +728,3 @@ def test_run_step_retry_cmd_carries_settings_path() -> None:
     with _patched_streaming() as mock_stream:
         run_step("prompt", model="opus", continue_session=False)
     assert "--settings" in mock_stream.call_args[1]["retry_cmd"]
-
-
-# --- build_steps: copyright wording + positive instructions -----------------
-
-
-def test_build_steps_constraints_omit_copyright() -> None:
-    """The eight-step prompts must not carry the LRM copyright reason."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert not any("copyright" in p.lower() for _d, p in steps)
-
-
-def test_build_steps_constraints_omit_paraphrase() -> None:
-    """The eight-step prompts must not tell Claude to paraphrase."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert not any("paraphrase" in p.lower() for _d, p in steps)
-
-
-def test_build_steps_no_negative_do_not_in_oracles() -> None:
-    """No step uses the 'Do NOT' negative phrasing."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    for _description, prompt in steps:
-        assert "Do NOT" not in prompt

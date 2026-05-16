@@ -26,7 +26,7 @@ def test_dispatch_cycle_forwards_labels() -> None:
     """dispatch_cycle forwards --labels into per-member find_or_create_issue."""
     with patch(
         "satisfy_subclause.pipeline.find_or_create_issue",
-        side_effect=[100, 101],
+        side_effect=[(100, "OPEN"), (101, "OPEN")],
     ) as mock_find:
         with patch(
             "satisfy_subclause.pipeline"
@@ -66,7 +66,7 @@ def test_inner_orchestrator_forwards_labels() -> None:
 def test_satisfy_forwards_labels_to_find_or_create() -> None:
     """satisfy_subclause forwards --labels into find_or_create_issue."""
     with patch(
-        "satisfy_subclause.pipeline.find_or_create_issue", return_value=42,
+        "satisfy_subclause.pipeline.find_or_create_issue", return_value=(42, "OPEN"),
     ) as mock_find:
         with patch(
             "satisfy_subclause.pipeline.satisfy_unsatisfied_subclause",
@@ -84,7 +84,7 @@ def test_satisfy_forwards_labels_to_inner_orchestrator() -> None:
     """satisfy_subclause forwards --labels into the inner orchestrator."""
     inner_result = {"status": "satisfied"}
     with patch(
-        "satisfy_subclause.pipeline.find_or_create_issue", return_value=42,
+        "satisfy_subclause.pipeline.find_or_create_issue", return_value=(42, "OPEN"),
     ):
         with patch(
             "satisfy_subclause.pipeline.satisfy_unsatisfied_subclause",
@@ -102,7 +102,7 @@ def test_satisfy_forwards_labels_to_dispatch_cycle() -> None:
     """satisfy_subclause forwards --labels into the cycle dispatch."""
     cycle_result = {"status": "cycle", "members": ["33.4.1.5", "33.6"]}
     with patch(
-        "satisfy_subclause.pipeline.find_or_create_issue", return_value=42,
+        "satisfy_subclause.pipeline.find_or_create_issue", return_value=(42, "OPEN"),
     ):
         with patch(
             "satisfy_subclause.pipeline.satisfy_unsatisfied_subclause",

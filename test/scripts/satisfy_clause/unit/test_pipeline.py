@@ -16,7 +16,7 @@ def _stub_find_or_create_issue(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     monkeypatch.setattr(
         "satisfy_clause.pipeline.find_or_create_issue",
-        lambda _clause, *, labels: 0,
+        lambda _clause, *, labels: (0, "OPEN"),
     )
 
 
@@ -158,11 +158,11 @@ def test_satisfy_clause_empty_descendants_message_names_lrm(
 
 def _record_finder(
     captured: list[tuple[str, list[str]]],
-) -> Callable[..., int]:
+) -> Callable[..., tuple[int, str]]:
     """Return a find_or_create_issue stub that appends to *captured*."""
-    def _stub(clause: str, *, labels: list[str]) -> int:
+    def _stub(clause: str, *, labels: list[str]) -> tuple[int, str]:
         captured.append((clause, labels))
-        return 999
+        return 999, "OPEN"
     return _stub
 
 
@@ -193,7 +193,7 @@ def test_satisfy_clause_skips_parent_issue_when_no_descendants(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An empty-descendants exit must not touch GitHub."""
-    def _explode(*_args: Any, **_kwargs: Any) -> int:
+    def _explode(*_args: Any, **_kwargs: Any) -> tuple[int, str]:
         raise AssertionError("find_or_create_issue must not be called")
     monkeypatch.setattr(
         "satisfy_clause.pipeline.load_toc", lambda _lrm: {"33": (1, 1)},

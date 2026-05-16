@@ -437,8 +437,16 @@ def _apply_labels(number: int, labels: list[str]) -> None:
     )
 
 
-def find_or_create_issue(subclause: str, *, labels: list[str]) -> int:
-    """Return the issue number for *subclause*.
+def find_or_create_issue(
+    subclause: str, *, labels: list[str],
+) -> tuple[int, str]:
+    """Return ``(issue_number, state)`` for *subclause*.
+
+    ``state`` is ``"OPEN"`` or ``"CLOSED"``. Callers decide what to do
+    with a closed match — typically loud-skip; the historical
+    automatic ``gh issue reopen`` is gone because the silent reopen
+    was a source of accidental reruns over already-satisfied
+    subclauses.
 
     Searches for any pre-existing issue whose title matches one of the
     recognised shapes — current canonical (``Satisfy IEEE 1800-2023
@@ -450,16 +458,15 @@ def find_or_create_issue(subclause: str, *, labels: list[str]) -> int:
     retained and the others are hard-deleted via ``gh issue delete
     --yes``. The retained issue is renamed to the new canonical (and
     any descriptive trailing text from the master-list form is
-    dropped), reopened if closed, and tagged with every label in
-    *labels*. Creates a fresh issue (carrying the same labels) when no
-    match exists.
+    dropped) and tagged with every label in *labels*. Creates a fresh
+    issue (carrying the same labels) when no match exists.
     """
     matches = [
         entry for entry in _list_issues_for(subclause)
         if _title_matches(entry.get("title", "") or "", subclause)
     ]
     if not matches:
-        return _create_new_issue(subclause, labels)
+        return _create_new_issue(subclause, labels), "OPEN"
 
     matches.sort(key=lambda entry: int(entry["number"]))
     oldest, *duplicates = matches
@@ -479,10 +486,6 @@ def find_or_create_issue(subclause: str, *, labels: list[str]) -> int:
             ["gh", "issue", "edit", str(number), "--title", canonical],
             check=False,
         )
-    if oldest.get("state", "").lower() == "closed":
-        subprocess.run(
-            ["gh", "issue", "reopen", str(number)],
-            check=False,
-        )
+    state = oldest.get("state", "OPEN").upper()
     _apply_labels(number, labels)
-    return number
+    return number, state

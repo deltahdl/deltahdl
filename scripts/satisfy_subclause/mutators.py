@@ -1,23 +1,32 @@
 """Mutators for the satisfaction pipeline.
 
 Three dispatch shells, each driving Claude (with edit permissions)
-through the eight-step audit-then-act pipeline ported from the
-deleted ``implement_subclause`` script. Each shell runs the steps in
-one ``--continue``d Claude session and then commits whatever changes
+through the audit-then-act pipeline ported from the deleted
+``implement_subclause`` script. Each shell runs the steps in one
+``--continue``d Claude session and then commits whatever changes
 landed on disk with one ``Closes #N`` trailer per subclause:
 
   - ``satisfy_unsatisfied_subclause_without_dependencies``: §X has no
-    deps left; the eight steps act on §X alone.
+    deps left; the steps act on §X alone.
   - ``satisfy_unsatisfied_subclause_with_satisfied_dependencies``: §X
     has dependencies that are now satisfied; step 1 tells Claude they
     are in place and may be referenced rather than re-implemented.
   - ``satisfy_unsatisfied_subclause_set_with_satisfied_dependencies``:
-    A multi-member dependency cycle satisfied in one pass; the
-    eight steps run once over the cycle set, with each step naming
-    every member.
+    A multi-member dependency cycle satisfied in one pass; the steps
+    run once over the cycle set, with each step naming every member.
 
-There is no diagnostic and no verdict. The audit lives in steps 1-2
-of the eight-step pipeline; steps 3-8 act on what those audits found.
+Every step scopes its edits to the named subclause's canonical files.
+Cleanups inside those files (duplicate-deletion, non-normative
+deletion, empty-file deletion) are local. A test misfiled into
+another subclause's canonical file is that subclause's pass's problem
+to remove; a missing observation in §X's canonical file is §X's
+pass's problem to write. No subclause reaches into another's files.
+
+There is no diagnostic and no verdict. The audit in steps 1-2 begins
+by enumerating every normative claim in the subclause's LRM text
+(BNF productions, "shall" sentences, declarative requirements), then
+audits src/ and the canonical test files against the enumeration.
+The action steps work that enumeration to completion.
 Convergence is detected by the orchestrator observing whether the
 working tree changed — empty diff means §X already satisfied (or now
 does); non-empty diff is committed with a ``Closes #N`` trailer.
@@ -386,6 +395,7 @@ def _build_constraints(subclauses: list[str]) -> str:
     drift into satisfying neighbouring subclauses.
     """
     label = _scope_label(subclauses)
+    canonical_files = _all_canonical_test_files(subclauses)
     return (
         f" Only act on requirements directly defined in the text of"
         f" {label} in the LRM — not requirements defined by"
@@ -393,6 +403,14 @@ def _build_constraints(subclauses: list[str]) -> str:
         " A requirement belongs to the subclause whose LRM text defines it."
         " In this step your only action is creating, editing, or removing"
         " files on disk."
+        f" Test edits land only in {label}'s canonical test files:"
+        f" {canonical_files}."
+        " Production-code edits land only in the source files for"
+        f" {label}'s pipeline stages."
+        " Leave every other file untouched — including the canonical"
+        " files of other subclauses. A misfiled test in another"
+        " subclause's file is that subclause's pass's problem to clean"
+        " up; never reach across."
         " This step is complete when the file edits on disk"
         " land the step's deliverable."
         f" A normative statement in {label} is satisfied when"
@@ -402,10 +420,6 @@ def _build_constraints(subclauses: list[str]) -> str:
         " Pipeline stages come from the project's stage-to-file mapping;"
         " the stage where a rule applies is the stage whose source file"
         " carries the rule and whose test file covers it."
-        f" When {label}'s own text requires a shared type or shared"
-        " code path to change, edit those shared files in this run."
-        " Requirement ownership is scoped by subclause; file editing"
-        f" is scoped by what {label}'s text requires."
     )
 
 
@@ -475,28 +489,28 @@ def build_steps(
         ("Auditing src",
          f"{cycle_intro}{read_instructions}\n\n"
          f"{deps_block}\n\n"
-         f"Then search src/ for existing code that handles {label}."
-         " Report what aligns with the LRM and what is missing."
+         f"First, enumerate every normative claim in the LRM text of"
+         f" {label}: every BNF production (the left-hand side of a"
+         " `::=` rule), every 'shall' sentence, and every other"
+         " declarative requirement. For each enumerated claim, name"
+         " (a) the pipeline stage the rule applies to and (b) the"
+         " source file that carries the rule.\n\n"
+         f"Then search src/ for existing code that handles each"
+         " enumerated claim. Report what aligns with the LRM and what"
+         " is missing, citing the enumerated item."
          + constraints),
         ("Auditing tests",
-         f"Search all files in test/src/unit/ for any tests that cover"
-         f" {label} requirements."
-         " Tests may be misplaced in files belonging to other subclauses."
-         " Report what is covered, what is missing, and any tests"
-         f" found in the wrong files."
-         f" The correct files for {label} tests are: {canonical_files}."
+         f"Search {label}'s canonical test files for tests that"
+         " observe each enumerated claim from the prior step."
+         f" The canonical test files for {label} are: {canonical_files}."
+         " Report what is covered and what is missing, citing the"
+         " enumerated item."
          + constraints),
         ("Deleting duplicate tests",
-         f"Delete only the duplicate tests that belong to {label}."
+         f"Among {label}'s canonical test files ({canonical_files}),"
+         " delete duplicate tests within the canonical files."
          " Leave every other subclause's tests untouched, even if"
          " they look similar."
-         + constraints),
-        ("Moving misplaced tests",
-         f"Search ALL files in test/src/unit/ for tests that belong to"
-         f" {label}. Move any that are in the wrong files"
-         f" to the correct files: {canonical_files}."
-         f" Place tests in the canonical files for {label}, not in a"
-         " parent clause file."
          + constraints),
         ("Deleting tests for non-normative subclauses",
          f"Re-read the LRM text of {label}. If a subclause in"
@@ -510,14 +524,14 @@ def build_steps(
         ("Deleting empty test files",
          f"Inspect {label}'s canonical test files: {canonical_files}."
          " For any file that has no TEST(...) blocks remaining after"
-         " the prior deletion and move steps, delete the file and"
+         " the prior deletion steps, delete the file and"
          " remove its add_unit_test(...) entry from test/CMakeLists.txt."
          + constraints),
         ("Renaming test suites",
          f"Rename only test suites that cover {label} requirements"
          " and have unintuitive names"
          " (e.g., containing clause numbers like Cl5_7_1_),"
-         " regardless of which file they are in."
+         f" within {label}'s canonical test files."
          " Use PascalCase names that describe what is being tested"
          " (no clause or annex numbers)."
          " Leave every other subclause's test suites untouched."
@@ -526,13 +540,15 @@ def build_steps(
          f"Rename only test names that cover {label} requirements"
          " and have unintuitive names"
          " (e.g., containing clause numbers like Cl5_7_1_),"
-         " regardless of which file they are in."
+         f" within {label}'s canonical test files."
          " Use PascalCase names that describe what is being tested"
          " (no clause or annex numbers)."
          " Leave every other subclause's tests untouched."
          + constraints),
         ("Writing missing tests",
-         f"Write missing unit tests for {label} requirements."
+         f"Write missing unit tests for {label} requirements,"
+         " using the enumeration from the audit-src step as the"
+         " checklist of what must be observed."
          f" Place them in: {canonical_files}."
          " Cover all affected pipeline stages."
          " Include error conditions and edge cases."
@@ -545,13 +561,12 @@ def build_steps(
          " testable rules of its own (only its descendants do)."
          + constraints),
         ("Writing missing functionality",
-         f"First, list every normative statement in the LRM text of"
-         f" {label} (typically 'shall' sentences, plus unambiguous"
-         " declarative requirements). For each,"
-         " name the pipeline stage the rule applies to and the source"
-         " file that will carry the rule. Then"
-         " make the source-file edits so the production code applies"
-         " each rule."
+         f"Working from the enumeration produced in the audit-src"
+         f" step, make the source-file edits so the production code"
+         " applies every normative claim. For each claim still"
+         " missing implementation, name the pipeline stage the rule"
+         " applies to and the source file that carries the rule, then"
+         " write the code."
          f" Write or edit the source files to add any missing"
          f" functionality defined in {label}."
          f" Act only on {label}, no other subclauses."

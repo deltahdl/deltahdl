@@ -35,10 +35,11 @@ def satisfy_clause(
     """Enumerate §``clause``'s descendants and delegate to satisfy_subclauses.
 
     The clause-level issue itself is also passed through
-    ``find_or_create_issue`` so a pre-existing issue gets reopened (if
-    closed) and renamed to the new canonical title (if matching a
-    legacy or master-list shape) — the descendant loop only handles
-    subclause-level issues.
+    ``find_or_create_issue`` so a pre-existing issue gets renamed to
+    the new canonical title (if matching a legacy or master-list
+    shape) — the descendant loop only handles subclause-level issues.
+    The return state is discarded here; whether the clause-level
+    issue is open or closed is not what gates the descendant loop.
     """
     toc = load_toc(lrm)
     descendants = descendants_of(clause, toc)

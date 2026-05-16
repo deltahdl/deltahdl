@@ -76,7 +76,7 @@ def test_find_or_create_issue_creates_new(stub_completed: Callable[..., MagicMoc
     """find_or_create_issue creates a new issue when none exists."""
     url = "https://github.com/o/r/issues/777"
     with _patched_gh(stub_completed, create_url=url):
-        assert find_or_create_issue("33.4.1.5", labels=_LABELS) == 777
+        assert find_or_create_issue("33.4.1.5", labels=_LABELS)[0] == 777
 
 
 def test_find_or_create_issue_creates_with_new_canonical_title(
@@ -102,7 +102,7 @@ def test_find_or_create_issue_handles_empty_list_stdout(
         "lib.python.github.subprocess.run",
         side_effect=[stub_completed(stdout=""), stub_completed(stdout=url)],
     ):
-        assert find_or_create_issue("33.4.1.5", labels=_LABELS) == 333
+        assert find_or_create_issue("33.4.1.5", labels=_LABELS)[0] == 333
 
 
 def test_find_or_create_issue_exits_on_list_failure(
@@ -141,7 +141,7 @@ def test_find_or_create_issue_creates_when_no_title_matches(
             stub_completed(stdout=body), stub_completed(stdout=create_url),
         ],
     ):
-        assert find_or_create_issue("33.4.1.5", labels=_LABELS) == 333
+        assert find_or_create_issue("33.4.1.5", labels=_LABELS)[0] == 333
 
 
 # --- find_or_create_issue: new-canonical match ------------------------------
@@ -156,7 +156,7 @@ def test_find_or_create_issue_returns_new_canonical_open(
         "lib.python.github.subprocess.run",
         return_value=stub_completed(stdout=body),
     ):
-        assert find_or_create_issue("33.4.1.5", labels=_LABELS) == 99
+        assert find_or_create_issue("33.4.1.5", labels=_LABELS)[0] == 99
 
 
 def test_find_or_create_issue_does_not_rename_new_canonical(
@@ -176,18 +176,64 @@ def test_find_or_create_issue_does_not_rename_new_canonical(
     assert rename_calls == []
 
 
-def test_find_or_create_issue_reopens_new_canonical_closed(
+def _reopen_calls(mock_run: MagicMock) -> list[list[str]]:
+    """Return every ``gh issue reopen`` invocation captured by *mock_run*."""
+    return [
+        call[0][0] for call in mock_run.call_args_list
+        if call[0][0][:3] == ["gh", "issue", "reopen"]
+    ]
+
+
+def test_find_or_create_issue_does_not_reopen_new_canonical_closed(
     stub_completed: Callable[..., MagicMock],
 ) -> None:
-    """A new-canonical-titled closed match is reopened."""
+    """A closed new-canonical match is NOT silently reopened — caller's choice."""
     body = _payload((55, _NEW_CANONICAL, "CLOSED"))
     with patch(
         "lib.python.github.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
     ) as mock_run:
         find_or_create_issue("33.4.1.5", labels=_LABELS)
-    reopen_cmd = mock_run.call_args_list[1][0][0]
-    assert reopen_cmd[:3] == ["gh", "issue", "reopen"]
+    assert _reopen_calls(mock_run) == []
+
+
+def test_find_or_create_issue_returns_closed_state_for_new_canonical_closed(
+    stub_completed: Callable[..., MagicMock],
+) -> None:
+    """A closed new-canonical match reports its CLOSED state back to the caller."""
+    body = _payload((55, _NEW_CANONICAL, "CLOSED"))
+    with patch(
+        "lib.python.github.subprocess.run",
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
+    ):
+        _number, state = find_or_create_issue("33.4.1.5", labels=_LABELS)
+    assert state == "CLOSED"
+
+
+def test_find_or_create_issue_returns_open_state_for_open_match(
+    stub_completed: Callable[..., MagicMock],
+) -> None:
+    """An open match reports its OPEN state back to the caller."""
+    body = _payload((99, _NEW_CANONICAL, "OPEN"))
+    with patch(
+        "lib.python.github.subprocess.run",
+        return_value=stub_completed(stdout=body),
+    ):
+        _number, state = find_or_create_issue("33.4.1.5", labels=_LABELS)
+    assert state == "OPEN"
+
+
+def test_find_or_create_issue_returns_open_state_for_newly_created(
+    stub_completed: Callable[..., MagicMock],
+) -> None:
+    """A freshly-created issue is reported as OPEN."""
+    url = "https://github.com/o/r/issues/777"
+    with patch(
+        "lib.python.github.subprocess.run",
+        side_effect=[stub_completed(stdout="[]"), stub_completed(stdout=url)],
+    ):
+        _number, state = find_or_create_issue("33.4.1.5", labels=_LABELS)
+    assert state == "OPEN"
 
 
 # --- find_or_create_issue: legacy-short ('Satisfy §X') ----------------------
@@ -206,7 +252,7 @@ def _run_rename_open_legacy(
     return mock_run
 
 
-def _run_reopen_closed_legacy(
+def _run_closed_legacy(
     stub_completed: Callable[..., MagicMock], title: str, number: int,
 ) -> MagicMock:
     """Run find_or_create_issue against a single closed legacy-titled match."""
@@ -229,7 +275,7 @@ def test_find_or_create_issue_returns_legacy_short_number(
             stub_completed(stdout=_payload((99, _LEGACY_SHORT, "OPEN"))),
         ] + [stub_completed()] * 2,
     ):
-        assert find_or_create_issue("33.4.1.5", labels=_LABELS) == 99
+        assert find_or_create_issue("33.4.1.5", labels=_LABELS)[0] == 99
 
 
 def test_find_or_create_issue_renames_legacy_short_to_new_canonical(
@@ -241,13 +287,12 @@ def test_find_or_create_issue_renames_legacy_short_to_new_canonical(
     assert edit_cmd == ["gh", "issue", "edit", "99", "--title", _NEW_CANONICAL]
 
 
-def test_find_or_create_issue_reopens_legacy_short_closed(
+def test_find_or_create_issue_does_not_reopen_legacy_short_closed(
     stub_completed: Callable[..., MagicMock],
 ) -> None:
-    """A closed 'Satisfy §X' match is reopened after the rename."""
-    mock_run = _run_reopen_closed_legacy(stub_completed, _LEGACY_SHORT, 55)
-    reopen_cmd = mock_run.call_args_list[2][0][0]
-    assert reopen_cmd[:3] == ["gh", "issue", "reopen"]
+    """A closed 'Satisfy §X' match is NOT silently reopened after the rename."""
+    mock_run = _run_closed_legacy(stub_completed, _LEGACY_SHORT, 55)
+    assert _reopen_calls(mock_run) == []
 
 
 # --- find_or_create_issue: legacy-audit-numeric -----------------------------
@@ -263,7 +308,7 @@ def test_find_or_create_issue_returns_legacy_audit_numeric_open_number(
             stub_completed(stdout=_payload((88, _LEGACY_AUDIT_NUMERIC, "OPEN"))),
         ] + [stub_completed()] * 2,
     ):
-        assert find_or_create_issue("33.4.1.5", labels=_LABELS) == 88
+        assert find_or_create_issue("33.4.1.5", labels=_LABELS)[0] == 88
 
 
 def test_find_or_create_issue_renames_legacy_audit_numeric_open(
@@ -275,15 +320,14 @@ def test_find_or_create_issue_renames_legacy_audit_numeric_open(
     assert edit_cmd == ["gh", "issue", "edit", "88", "--title", _NEW_CANONICAL]
 
 
-def test_find_or_create_issue_reopens_legacy_audit_numeric_closed(
+def test_find_or_create_issue_does_not_reopen_legacy_audit_numeric_closed(
     stub_completed: Callable[..., MagicMock],
 ) -> None:
-    """A legacy-audit-numeric titled closed issue is reopened after the rename."""
-    mock_run = _run_reopen_closed_legacy(
+    """A legacy-audit-numeric closed issue is NOT silently reopened after the rename."""
+    mock_run = _run_closed_legacy(
         stub_completed, _LEGACY_AUDIT_NUMERIC, 88,
     )
-    reopen_cmd = mock_run.call_args_list[2][0][0]
-    assert reopen_cmd[:3] == ["gh", "issue", "reopen"]
+    assert _reopen_calls(mock_run) == []
 
 
 # --- find_or_create_issue: legacy-audit-annex (no §) ------------------------
@@ -298,7 +342,7 @@ def test_find_or_create_issue_returns_legacy_audit_annex_number(
         "lib.python.github.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 3,
     ):
-        assert find_or_create_issue("A.9.3", labels=_LABELS) == 609
+        assert find_or_create_issue("A.9.3", labels=_LABELS)[0] == 609
 
 
 def test_find_or_create_issue_renames_legacy_audit_annex(
@@ -330,7 +374,7 @@ def test_find_or_create_issue_returns_master_list_number(
         "lib.python.github.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
     ):
-        assert find_or_create_issue("33", labels=_LABELS) == 35
+        assert find_or_create_issue("33", labels=_LABELS)[0] == 35
 
 
 def test_find_or_create_issue_renames_master_list_to_new_canonical(
@@ -350,18 +394,17 @@ def test_find_or_create_issue_renames_master_list_to_new_canonical(
     ]
 
 
-def test_find_or_create_issue_reopens_master_list_closed(
+def test_find_or_create_issue_does_not_reopen_master_list_closed(
     stub_completed: Callable[..., MagicMock],
 ) -> None:
-    """A closed master-list issue is reopened after the rename."""
+    """A closed master-list issue is NOT silently reopened after the rename."""
     body = _payload((35, _MASTER_LIST, "CLOSED"))
     with patch(
         "lib.python.github.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 3,
     ) as mock_run:
         find_or_create_issue("33", labels=_LABELS)
-    reopen_cmd = mock_run.call_args_list[2][0][0]
-    assert reopen_cmd[:3] == ["gh", "issue", "reopen"]
+    assert _reopen_calls(mock_run) == []
 
 
 def test_find_or_create_issue_master_list_exact_prefix_match(
@@ -373,7 +416,7 @@ def test_find_or_create_issue_master_list_exact_prefix_match(
         "lib.python.github.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
     ):
-        assert find_or_create_issue("33", labels=_LABELS) == 35
+        assert find_or_create_issue("33", labels=_LABELS)[0] == 35
 
 
 def test_find_or_create_issue_master_list_does_not_match_subclause_subprefix(
@@ -388,7 +431,7 @@ def test_find_or_create_issue_master_list_does_not_match_subclause_subprefix(
             stub_completed(stdout=body), stub_completed(stdout=create_url),
         ],
     ):
-        assert find_or_create_issue("33.4", labels=_LABELS) == 700
+        assert find_or_create_issue("33.4", labels=_LABELS)[0] == 700
 
 
 # --- find_or_create_issue: duplicate-deletion path --------------------------
@@ -427,7 +470,7 @@ def test_find_or_create_issue_keeps_older_when_duplicates(
             stub_completed(stdout=_master_list_with_duplicate_payload()),
         ] + [stub_completed()] * 3,
     ):
-        assert find_or_create_issue("33", labels=_LABELS) == 35
+        assert find_or_create_issue("33", labels=_LABELS)[0] == 35
 
 
 def test_find_or_create_issue_renames_older_master_list_with_duplicates(
@@ -477,18 +520,17 @@ def test_find_or_create_issue_renames_older_legacy_with_duplicates(
     ]
 
 
-def test_find_or_create_issue_reopens_older_legacy_closed_with_duplicates(
+def test_find_or_create_issue_does_not_reopen_older_legacy_closed_with_duplicates(
     stub_completed: Callable[..., MagicMock],
 ) -> None:
-    """A closed older legacy match is reopened after delete + rename."""
+    """A closed older legacy match is NOT silently reopened after delete + rename."""
     body = _older_legacy_with_duplicate_payload()
     with patch(
         "lib.python.github.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 4,
     ) as mock_run:
         find_or_create_issue("A.2.1.3", labels=_LABELS)
-    reopen_cmd = mock_run.call_args_list[3][0][0]
-    assert reopen_cmd[:3] == ["gh", "issue", "reopen"]
+    assert _reopen_calls(mock_run) == []
 
 
 def test_find_or_create_issue_deletes_all_newer_duplicates(

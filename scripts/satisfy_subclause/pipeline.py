@@ -57,7 +57,7 @@ def _build_cycle_members(
     return [
         CycleMember(
             subclause=member,
-            issue=find_or_create_issue(member, labels=labels),
+            issue=find_or_create_issue(member, labels=labels)[0],
         )
         for member in members
     ]
@@ -159,7 +159,13 @@ def satisfy_subclause(
 ) -> dict[str, Any]:
     """Idempotently satisfy ``subclause``.
 
-    Runs one pass of the eight-step mutator pipeline. Returns
+    Loud-skips when the tracking issue is already CLOSED — that
+    state means §X has already been satisfied (or has no normative
+    statements of its own). Reprocessing a closed issue requires the
+    operator to deliberately reopen it on GitHub; the orchestrator
+    no longer reopens silently.
+
+    Otherwise runs one pass of the mutator pipeline. Returns
     ``{"status": "satisfied"}`` after the pass completes, or
     ``{"status": "cycle", "members": [...]}`` when a cycle bubbles up
     through this frame and an outer caller is responsible for
@@ -174,7 +180,16 @@ def satisfy_subclause(
         file=sys.stderr,
     )
 
-    issue = find_or_create_issue(subclause, labels=labels)
+    issue, state = find_or_create_issue(subclause, labels=labels)
+    if state == "CLOSED":
+        print(
+            f"satisfy_subclause: §{subclause} already satisfied"
+            f" (issue #{issue} is CLOSED); nothing to do."
+            " Reopen the issue on GitHub if reprocessing is intended.",
+            file=sys.stderr,
+        )
+        return {"status": "satisfied"}
+
     new_in_progress = in_progress | {subclause}
 
     target = CycleMember(subclause=subclause, issue=issue)

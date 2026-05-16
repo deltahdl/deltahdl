@@ -31,7 +31,7 @@ def _patched_for_cycle(
     return (
         patch(
             "satisfy_subclause.pipeline.find_or_create_issue",
-            side_effect=list(issues),
+            side_effect=[(i, "OPEN") for i in issues],
         ),
         patch(
             "satisfy_subclause.pipeline"
@@ -274,12 +274,13 @@ def test_inner_calls_dep_oracle_with_medium_effort() -> None:
 
 def _patched_pipeline(
     *, inner_results: list[dict[str, Any]] | None = None,
+    issue_state: str = "OPEN",
 ) -> tuple[Any, Any, Any]:
     """Patch the pipeline integration points (no oracle, no retry loop)."""
     return (
         patch(
             "satisfy_subclause.pipeline.find_or_create_issue",
-            return_value=42,
+            return_value=(42, issue_state),
         ),
         patch(
             "satisfy_subclause.pipeline.satisfy_unsatisfied_subclause",
@@ -289,8 +290,8 @@ def _patched_pipeline(
     )
 
 
-def test_satisfy_runs_inner_pipeline_unconditionally() -> None:
-    """satisfy_subclause always runs the inner pipeline (no entry-time skip)."""
+def test_satisfy_runs_inner_pipeline_when_issue_open() -> None:
+    """satisfy_subclause runs the inner pipeline when the issue is open."""
     issue, inner, cycle = _patched_pipeline()
     with issue:
         with inner as mock_inner:
@@ -300,6 +301,47 @@ def test_satisfy_runs_inner_pipeline_unconditionally() -> None:
                     model="opus", labels=_LABELS,
                 )
     assert mock_inner.called
+
+
+def test_satisfy_skips_inner_pipeline_when_issue_closed() -> None:
+    """satisfy_subclause skips the inner pipeline when the issue is already closed."""
+    issue, inner, cycle = _patched_pipeline(issue_state="CLOSED")
+    with issue:
+        with inner as mock_inner:
+            with cycle:
+                satisfy_subclause(
+                    "33.4.1.5", "~/LRM.pdf",
+                    model="opus", labels=_LABELS,
+                )
+    assert not mock_inner.called
+
+
+def test_satisfy_returns_satisfied_when_issue_closed() -> None:
+    """satisfy_subclause returns the satisfied marker when skipping a closed issue."""
+    issue, inner, cycle = _patched_pipeline(issue_state="CLOSED")
+    with issue:
+        with inner:
+            with cycle:
+                result = satisfy_subclause(
+                    "33.4.1.5", "~/LRM.pdf",
+                    model="opus", labels=_LABELS,
+                )
+    assert result == {"status": "satisfied"}
+
+
+def test_satisfy_announces_skip_when_issue_closed(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """satisfy_subclause prints a skip banner to stderr when the issue is closed."""
+    issue, inner, cycle = _patched_pipeline(issue_state="CLOSED")
+    with issue:
+        with inner:
+            with cycle:
+                satisfy_subclause(
+                    "33.4.1.5", "~/LRM.pdf",
+                    model="opus", labels=_LABELS,
+                )
+    assert "already satisfied" in capsys.readouterr().err
 
 
 def test_satisfy_returns_satisfied_after_inner_pipeline() -> None:

@@ -149,7 +149,7 @@ def _resolve_unlinked(
     master_issue: int, body_lines: list[str], labels: list[str],
 ) -> str:
     """Find-or-create a sub-issue for ``§X.Y``; PATCH the master line in place."""
-    number = find_or_create_issue(subclause, labels=labels)
+    number, _state = find_or_create_issue(subclause, labels=labels)
     body_lines[line_index] = _ENTRY_LINE_RE.sub(
         rf"\g<1>#{number}", body_lines[line_index],
     )
