@@ -156,7 +156,8 @@ TEST(NetAndVariableTypeElaboration, StructMemberAttributeInstanceCrossLink) {
 // §A.2.2.1 ↔ §A.8.3 cross-link: packed_dimension bounds are §A.8.3
 // constant_expressions. A parameter-driven bound must constant-fold during
 // elaboration.
-TEST(NetAndVariableTypeElaboration, PackedDimensionConstantExpressionCrossLink) {
+TEST(NetAndVariableTypeElaboration,
+     PackedDimensionConstantExpressionCrossLink) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

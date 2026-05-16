@@ -212,8 +212,9 @@ TEST(NetAndVariableTypeParsing, SigningUnsignedExplicit) {
 // that omits the leading type keyword parses with kImplicit and the dimensions
 // are attached.
 TEST(NetAndVariableTypeParsing, ImplicitDataTypeWithPackedDim) {
-  // §A.2.1.2 input_declaration takes a net_port_type whose data_type_or_implicit
-  // permits the implicit form. The leading [7:0] is parsed by ParsePackedDims.
+  // §A.2.1.2 input_declaration takes a net_port_type whose
+  // data_type_or_implicit permits the implicit form. The leading [7:0] is
+  // parsed by ParsePackedDims.
   auto r = Parse("module m(input [7:0] a); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -300,7 +301,8 @@ TEST(NetAndVariableTypeParsing, DataTypeOrVoidInTaggedUnion) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_GE(item->typedef_type.struct_members.size(), 1u);
-  EXPECT_EQ(item->typedef_type.struct_members[0].type_kind, DataTypeKind::kVoid);
+  EXPECT_EQ(item->typedef_type.struct_members[0].type_kind,
+            DataTypeKind::kVoid);
 }
 
 // §A.2.2.1 data_type ::= ... | string — the string keyword stands as a
@@ -338,7 +340,8 @@ TEST(NetAndVariableTypeParsing, TypeReferenceFromExpression) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  // The second item carries a non-null type_ref_expr captured by TryParseTypeRef.
+  // The second item carries a non-null type_ref_expr captured by
+  // TryParseTypeRef.
   auto* mod = r.cu->modules[0];
   ASSERT_GE(mod->items.size(), 2u);
   EXPECT_NE(mod->items[1]->data_type.type_ref_expr, nullptr);
@@ -353,8 +356,8 @@ TEST(NetAndVariableTypeParsing, VarDataTypeOnPort) {
 }
 
 // §A.2.2.1 simple_type ::= integer_type | non_integer_type | ps_type_identifier
-// | ps_parameter_identifier — a user-defined typedef name is a ps_type_identifier
-// and stands as a simple_type in a variable declaration.
+// | ps_parameter_identifier — a user-defined typedef name is a
+// ps_type_identifier and stands as a simple_type in a variable declaration.
 TEST(NetAndVariableTypeParsing, SimpleTypeUserDefined) {
   auto r = Parse(
       "module m;\n"
