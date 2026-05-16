@@ -630,4 +630,47 @@ TEST(IdentifierSyntaxParsing, EscapedIdentifierInExpr) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §A.9.3 ps_class_identifier ::= [package_scope] class_identifier — the
+// package_scope alternative: a class declared inside a package is referenced
+// from a module via the `pkg::ClassName` form in a variable declaration's
+// data_type slot.
+TEST(IdentifierSyntaxParsing, PsClassIdentifierFromPackage) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "package pkg;\n"
+      "  class my_class;\n"
+      "    int x;\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  pkg::my_class h;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §A.9.3 ps_parameter_identifier ::= ... |
+//     { generate_block_identifier [ [ constant_expression ] ] . }
+//       parameter_identifier
+// The second alternative reaches a parameter declared inside a generate-for
+// block via the generate-block name and an instance index. The parser must
+// accept `gen_blk[0].LOCAL_P` as the value side of a constant_expression in a
+// packed-dimension width slot.
+TEST(IdentifierSyntaxParsing, PsParameterIdentifierFromGenerateBlock) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m;\n"
+      "  generate\n"
+      "    for (genvar i = 0; i < 4; i = i + 1) begin : gen_blk\n"
+      "      localparam int LOCAL_P = 1;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "  logic [gen_blk[0].LOCAL_P-1:0] data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
