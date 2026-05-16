@@ -185,4 +185,22 @@ TEST(ExpressionElaboration, ParamExpressionDataTypeOverrideElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §A.8.3 ↔ §A.6.2 cross-link: expression ::= ( operator_assignment ) —
+// §A.8.3 allows a parenthesized §A.6.2 operator_assignment to stand as an
+// expression. The elaborator must accept the construct without diagnostics.
+TEST(ExpressionElaboration, ExprOperatorAssignmentElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  integer x, y;\n"
+      "  initial begin\n"
+      "    y = 1;\n"
+      "    x = (y += 2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

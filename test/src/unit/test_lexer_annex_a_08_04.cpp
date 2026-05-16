@@ -62,20 +62,4 @@ TEST(PrimaryLexing, TimeUnitFemtoseconds) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral);
 }
 
-// §A.8.4 primary_literal ::= number | time_literal | unbased_unsized_literal |
-// string_literal — the unbased_unsized_literal alternative produces a
-// single token.  (The lexical rule itself is shared with §A.8.7, but A.8.4
-// owns the production slot in `primary_literal`.)
-TEST(PrimaryLexing, UnbasedUnsizedLiteralZero) {
-  auto tokens = Lex("'0");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
-}
-
-TEST(PrimaryLexing, UnbasedUnsizedLiteralOne) {
-  auto tokens = Lex("'1");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
-}
-
 }  // namespace

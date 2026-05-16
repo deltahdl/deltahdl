@@ -595,4 +595,175 @@ TEST(ProceduralBlockSyntaxParsing, Integration_AlwaysCombWithOperatorAssign) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
+// §A.6.2: blocking_assignment ::= variable_lvalue = delay_or_event_control
+// expression — intra-assignment delay form (#N).
+TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_IntraAssignDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a = #5 b; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->delay, nullptr);
+}
+
+// §A.6.2: blocking_assignment ::= variable_lvalue = delay_or_event_control
+// expression — intra-assignment event control form.
+TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_IntraAssignEventControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a = @(posedge clk) b; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(stmt->events.size(), 1u);
+}
+
+// §A.6.2: blocking_assignment ::= nonrange_variable_lvalue =
+// dynamic_array_new — `arr = new[N];`. RHS is an ExprKind::kCall whose
+// text is "new" with the size as the sole argument.
+TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_DynamicArrayNew) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin arr = new[10]; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+  EXPECT_EQ(stmt->rhs->text, "new");
+  EXPECT_EQ(stmt->rhs->args.size(), 1u);
+}
+
+// §A.6.2: nonblocking_assignment ::= variable_lvalue <= [
+// delay_or_event_control ] expression — with intra-assignment delay.
+TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_WithDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin q <= #5 d; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  EXPECT_NE(stmt->delay, nullptr);
+}
+
+// §A.6.2: procedural_continuous_assignment ::= assign variable_assignment.
+// Inside an initial block, `assign lhs = rhs;` is a procedural assign and
+// parses as a StmtKind::kAssign statement.
+TEST(ProceduralBlockSyntaxParsing, ProceduralAssign) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin assign a = b; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
+  EXPECT_NE(stmt->lhs, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
+// §A.6.2: procedural_continuous_assignment ::= deassign variable_lvalue.
+TEST(ProceduralBlockSyntaxParsing, ProceduralDeassign) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin deassign a; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
+  EXPECT_NE(stmt->lhs, nullptr);
+}
+
+// §A.6.2: procedural_continuous_assignment ::= force variable_assignment.
+TEST(ProceduralBlockSyntaxParsing, ProceduralForceVariable) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin force a = b; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForce);
+  EXPECT_NE(stmt->lhs, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
+// §A.6.2: procedural_continuous_assignment ::= release variable_lvalue.
+TEST(ProceduralBlockSyntaxParsing, ProceduralRelease) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin release a; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
+  EXPECT_NE(stmt->lhs, nullptr);
+}
+
+// §A.6.2: variable_assignment ::= variable_lvalue = expression — exercised
+// as the operand of both `assign` and `force`.
+TEST(ProceduralBlockSyntaxParsing, ProceduralAssignAndForceShareVariableAssignment) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    assign a = b + 1;\n"
+      "    force a = b - 1;\n"
+      "    release a;\n"
+      "    deassign a;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto stmts = AllInitialStmts(r);
+  ASSERT_EQ(stmts.size(), 4u);
+  EXPECT_EQ(stmts[0]->kind, StmtKind::kAssign);
+  EXPECT_EQ(stmts[1]->kind, StmtKind::kForce);
+  EXPECT_EQ(stmts[2]->kind, StmtKind::kRelease);
+  EXPECT_EQ(stmts[3]->kind, StmtKind::kDeassign);
+}
+
+// §A.6.2 ↔ §A.8.3 cross-link: blocking_assignment ::= ... |
+// inc_or_dec_expression — §A.6.2 reuses §A.8.3's inc_or_dec_expression as
+// a complete blocking assignment statement. Verify both prefix and
+// postfix variants resolve to StmtKind::kExprStmt with an
+// inc_or_dec-shaped expression.
+TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_IncDecExpressionCrossLink) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ++i;\n"
+      "    i++;\n"
+      "    --j;\n"
+      "    j--;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto stmts = AllInitialStmts(r);
+  ASSERT_EQ(stmts.size(), 4u);
+  for (auto* s : stmts) {
+    EXPECT_EQ(s->kind, StmtKind::kExprStmt);
+    ASSERT_NE(s->expr, nullptr);
+  }
+}
+
 }  // namespace

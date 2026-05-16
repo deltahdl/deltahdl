@@ -97,4 +97,51 @@ TEST(ProceduralBlockLexing, AllCompoundAssignOperators) {
   EXPECT_EQ(count, 12);
 }
 
+// §A.6.2: procedural_continuous_assignment leading keyword 'assign'.
+TEST(ProceduralBlockLexing, AssignKeyword) {
+  auto r = LexOne("assign");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwAssign);
+}
+
+// §A.6.2: procedural_continuous_assignment leading keyword 'deassign'.
+TEST(ProceduralBlockLexing, DeassignKeyword) {
+  auto r = LexOne("deassign");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwDeassign);
+}
+
+// §A.6.2: procedural_continuous_assignment leading keyword 'force'.
+TEST(ProceduralBlockLexing, ForceKeyword) {
+  auto r = LexOne("force");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwForce);
+}
+
+// §A.6.2: procedural_continuous_assignment leading keyword 'release'.
+TEST(ProceduralBlockLexing, ReleaseKeyword) {
+  auto r = LexOne("release");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwRelease);
+}
+
+// §A.6.2: procedural_continuous_assignment ::= force variable_assignment
+// — the token stream of `force lhs = rhs ;` carries kKwForce, identifier,
+// `=`, identifier, `;`.
+TEST(ProceduralBlockLexing, ForceAssignTokenSequence) {
+  auto tokens = Lex("force a = b ;");
+  ASSERT_GE(tokens.size(), 5u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwForce);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kEq);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kSemicolon);
+}
+
+// §A.6.2: procedural_continuous_assignment ::= release variable_lvalue —
+// `release lhs ;` is tokenized as kKwRelease, identifier, `;`.
+TEST(ProceduralBlockLexing, ReleaseLvalueTokenSequence) {
+  auto tokens = Lex("release a ;");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwRelease);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kSemicolon);
+}
+
 }  // namespace

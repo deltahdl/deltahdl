@@ -207,4 +207,24 @@ TEST(ExpressionSim, TaggedUnionExpressionSimulates) {
       "x"), 42u);
 }
 
+// §A.8.3 ↔ §A.6.2 cross-link: expression ::= ( operator_assignment ).
+// At runtime, `(y += 2)` updates y in place and yields the post-update
+// value as the value of the outer expression.
+TEST(ExpressionSim, ExprOperatorAssignmentSimulates) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  integer x, y;\n"
+      "  initial begin\n"
+      "    y = 1;\n"
+      "    x = (y += 2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {
+      {"y", 3u},
+      {"x", 3u},
+  });
+}
+
 }  // namespace

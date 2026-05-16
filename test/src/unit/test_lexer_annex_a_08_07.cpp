@@ -564,4 +564,47 @@ TEST(NumberTokenLexing, UnsizedSignedHexBaseUpperS) {
   EXPECT_EQ(r.token.text, "'Sh1F");
 }
 
+// §A.8.7: decimal_base ::= '[s|S]d | '[s|S]D — the uppercase 'S' signed
+// specifier must be accepted on the decimal base.
+TEST(NumberTokenLexing, UnsizedSignedDecimalBaseUpperS) {
+  auto r = LexOne("'Sd42 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "'Sd42");
+}
+
+// §A.8.7: binary_base ::= '[s|S]b | '[s|S]B — the uppercase 'S' signed
+// specifier must be accepted on the binary base in unsized form.
+TEST(NumberTokenLexing, UnsizedSignedBinaryBaseUpperS) {
+  auto r = LexOne("'Sb1010 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "'Sb1010");
+}
+
+// §A.8.7: binary_value ::= binary_digit { _ | binary_digit } where
+// binary_digit ::= x_digit | z_digit | 0 | 1 — a single x_digit alone
+// (with zero repetitions) is a valid binary_value.
+TEST(NumberTokenLexing, BinaryValueOnlyXDigit) {
+  auto r = LexOne("4'bx ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "4'bx");
+}
+
+// §A.8.7: hex_value ::= hex_digit { _ | hex_digit } where
+// hex_digit ::= x_digit | z_digit | 0..9 | a..f | A..F — a single x_digit
+// alone is a valid hex_value.
+TEST(NumberTokenLexing, HexValueOnlyXDigit) {
+  auto r = LexOne("4'hx ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "4'hx");
+}
+
+// §A.8.7: octal_value ::= octal_digit { _ | octal_digit } where
+// octal_digit ::= x_digit | z_digit | 0..7 — a single x_digit alone is a
+// valid octal_value.
+TEST(NumberTokenLexing, OctalValueOnlyXDigit) {
+  auto r = LexOne("4'ox ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "4'ox");
+}
+
 }  // namespace
