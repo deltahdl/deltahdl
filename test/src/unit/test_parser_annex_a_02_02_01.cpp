@@ -697,6 +697,22 @@ TEST(NetAndVariableTypeParsing, DataTypeVirtualInterfaceWithModport) {
   EXPECT_EQ(dt.modport_name, "mp");
 }
 
+// --- data_type ::= virtual [interface] interface_identifier
+//     [parameter_value_assignment] [. modport_identifier] — the optional
+//     parameter_value_assignment on a virtual interface declaration. ---
+
+TEST(NetAndVariableTypeParsing, DataTypeVirtualInterfaceParameterized) {
+  auto r = Parse(
+      "interface ifc #(parameter int W = 8); logic [W-1:0] d; endinterface\n"
+      "module m; virtual ifc #(.W(16)) v; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& dt = r.cu->modules[0]->items[0]->data_type;
+  EXPECT_EQ(dt.kind, DataTypeKind::kVirtualInterface);
+  EXPECT_EQ(dt.type_name, "ifc");
+  EXPECT_FALSE(dt.type_params.empty());
+}
+
 // --- net_port_type ::= ... | interconnect implicit_data_type ---
 
 TEST(NetAndVariableTypeParsing, NetPortTypeInterconnectBare) {
