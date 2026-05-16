@@ -142,8 +142,15 @@ Token Lexer::Next() {
   }
   char c = Current();
   if (c == '$') {
+    // §A.9.3: system_tf_identifier ::= $[a-zA-Z0-9_$] { [a-zA-Z0-9_$] }.  The
+    // first body-character class admits `$` itself (alongside alphanumerics
+    // and `_`), so `$$x` is a single system_tf_identifier — not a kDollar
+    // followed by `$x`.  A bare `$` (or `$` followed by white_space, EOF, or
+    // any non-body char) falls through to the kDollar token used for queue-
+    // dimension / last-index syntax.
     char next = PeekChar();
-    if (std::isalnum(static_cast<unsigned char>(next)) || next == '_') {
+    if (std::isalnum(static_cast<unsigned char>(next)) || next == '_' ||
+        next == '$') {
       return LexSystemIdentifier();
     }
     auto loc = MakeLoc();

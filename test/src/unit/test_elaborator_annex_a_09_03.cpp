@@ -201,4 +201,19 @@ TEST(IdentifierElaboration, IdentifierStartingWithUnderscoreElaborates) {
              "endmodule\n"));
 }
 
+// §A.9.3 ps_type_identifier ::= [local::] | [package_scope|class_scope]
+// type_identifier — the elaborator must resolve the package-scoped typedef
+// to its underlying packed type so the variable's width and signedness
+// are correctly evaluated for the declaration.
+TEST(IdentifierElaboration, PsTypeIdentifierFromPackageResolves) {
+  EXPECT_TRUE(
+      ElabOk("package pkg;\n"
+             "  typedef logic [7:0] byte_t;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  pkg::byte_t data;\n"
+             "  assign data = 8'hAB;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

@@ -136,3 +136,118 @@ TEST(IdentifierLexing, EscapedIdentifierTerminatedByNewline) {
   EXPECT_EQ(tokens[0].text, "foo");
 }
 
+// §A.9.3 footnote 55, sentence 2: "A system_tf_identifier shall not be
+// escaped."  When `$display` appears after `\`, the lexer must produce an
+// escaped_identifier (kEscapedIdentifier) carrying the literal body
+// "$display", not a system_tf_identifier (kSystemIdentifier).
+TEST(IdentifierLexing, EscapedSystemTfIdentifierIsEscapedNotSystemIdent) {
+  auto tokens = Lex("\\$display ");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_NE(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$display");
+}
+
+// §A.9.3 system_tf_identifier ::= $[a-zA-Z0-9_$] { [a-zA-Z0-9_$] } — a digit
+// is admissible as the first body character (the alphabet after `$` includes
+// 0-9).
+TEST(IdentifierLexing, SystemIdentDigitAsFirstBodyChar) {
+  auto tokens = Lex("$0 ");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$0");
+}
+
+// §A.9.3 system_tf_identifier — `_` is admissible as the first body character.
+TEST(IdentifierLexing, SystemIdentUnderscoreAsFirstBodyChar) {
+  auto tokens = Lex("$_my_task ");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$_my_task");
+}
+
+// §A.9.3 system_tf_identifier — minimum form is `$` + a single body char,
+// per `$[a-zA-Z0-9_$] { [a-zA-Z0-9_$] }` (the trailing brace-iterated body is
+// zero-or-more).
+TEST(IdentifierLexing, SystemIdentSingleCharBody) {
+  auto tokens = Lex("$a ");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$a");
+}
+
+// §A.9.3 system_tf_identifier — uppercase letters are inside the body
+// alphabet `[a-zA-Z0-9_$]`.
+TEST(IdentifierLexing, SystemIdentUppercaseBody) {
+  auto tokens = Lex("$ABC ");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$ABC");
+}
+
+// §A.9.3 system_tf_identifier — `$` is in the body alphabet, so a trailing
+// `$` is part of the identifier (greedy scan stops at first non-body char).
+TEST(IdentifierLexing, SystemIdentTrailingDollar) {
+  auto tokens = Lex("$test$ ;");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$test$");
+}
+
+// §A.9.3 system_tf_identifier — combining the body alphabet (digit, `$`)
+// inside the same lexeme.  Cross-checks that the iteration over body chars
+// does not stop at an embedded `$` followed by a digit.
+TEST(IdentifierLexing, SystemIdentEmbeddedDollarFollowedByDigit) {
+  auto tokens = Lex("$test$0plusargs ");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$test$0plusargs");
+}
+
+// §A.9.3 system_tf_identifier — multiple system_tf_identifier tokens in the
+// same input must be emitted as separate kSystemIdentifier tokens, not glued.
+TEST(IdentifierLexing, SystemIdentMultipleInStream) {
+  auto tokens = Lex("$display $finish $time");
+  ASSERT_GE(tokens.size(), 4u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$display");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[1].text, "$finish");
+  EXPECT_EQ(tokens[2].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[2].text, "$time");
+}
+
+// §A.9.3 simple_identifier ::= [a-zA-Z_] { [a-zA-Z0-9_$] } — the leading-
+// character alphabet `[a-zA-Z_]` includes underscore, so a token beginning
+// with `_` must lex as a kIdentifier with the underscore preserved as the
+// first character of the lexeme.
+TEST(IdentifierLexing, SimpleIdentLeadingUnderscore) {
+  auto tokens = Lex("_foo");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "_foo");
+}
+
+// §A.9.3 escaped_identifier ::= \ { ... } white_space.  §A.9.4 defines
+// white_space ::= space | tab | newline | formfeed | eof — end-of-file is
+// itself a white_space form, so `\foo` followed immediately by EOF must lex
+// as a kEscapedIdentifier with the body stripped of the leading `\`.
+TEST(IdentifierLexing, EscapedIdentifierTerminatedByEof) {
+  auto tokens = Lex("\\foo");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[0].text, "foo");
+}
+
+// §A.9.3 system_tf_identifier ::= $[a-zA-Z0-9_$] { [a-zA-Z0-9_$] } — the
+// first body-character class includes `$` itself, so a leading `$$` followed
+// by further body characters must lex as a single kSystemIdentifier whose
+// text begins with `$$`, not as two separate kDollar tokens or as kDollar
+// followed by a sub-identifier.
+TEST(IdentifierLexing, SystemIdentDollarAsFirstBodyChar) {
+  auto tokens = Lex("$$bar");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$$bar");
+}
+

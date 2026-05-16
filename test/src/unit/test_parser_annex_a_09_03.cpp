@@ -574,6 +574,43 @@ TEST(IdentifierSyntaxParsing, SimpleIdentifierWithDollarInBody) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §A.9.3 ps_type_identifier ::= [local::] | [package_scope|class_scope]
+// type_identifier — the parser must accept a typedef declared inside a
+// package and referenced from a module via the `pkg::` prefix as a valid
+// data_type in a variable declaration.
+TEST(IdentifierSyntaxParsing, PsTypeIdentifierFromPackage) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "package pkg;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  pkg::byte_t data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §A.9.3 ps_or_hierarchical_tf_identifier ::= [package_scope] tf_identifier
+// | hierarchical_tf_identifier — the package_scope alternative: calling a
+// function declared in a package via the `pkg::` prefix must parse as a
+// valid call expression.
+TEST(IdentifierSyntaxParsing, PsOrHierarchicalTfIdentifierPackageScopedCall) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "package pkg;\n"
+      "  function int helper(int x); return x + 1; endfunction\n"
+      "endpackage\n"
+      "module m;\n"
+      "  int y;\n"
+      "  initial y = pkg::helper(5);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 // --- identifier ::= simple_identifier | escaped_identifier ---
 
 TEST(IdentifierSyntaxParsing, EscapedIdentifierInExpr) {
