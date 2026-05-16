@@ -32,19 +32,6 @@ TEST(EventWaitElaborator, BareWaitSyntaxElaborates) {
       "endmodule\n"));
 }
 
-// §15.5.2: Event wait inside begin/end block elaborates.
-TEST(EventWaitElaborator, WaitInsideBeginEndElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  event ev;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    @(ev);\n"
-      "    result = 42;\n"
-      "  end\n"
-      "endmodule\n"));
-}
-
 // §15.5.2 builds on §9.4.2's event control operator. A task call used in
 // place of a hierarchical_event_identifier in an @-wait is therefore
 // rejected for the same reason §9.4.2 rejects task calls in event

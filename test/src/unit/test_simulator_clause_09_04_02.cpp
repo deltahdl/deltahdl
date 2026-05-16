@@ -1,4 +1,7 @@
 #include "fixture_simulator.h"
+#include "helpers_stmt_exec.h"
+#include "simulator/awaiters.h"
+#include "simulator/clocking.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -873,6 +876,68 @@ TEST(EventControlSim, EdgeFiresOnZToZero) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 44u);
+}
+
+// §9.4.2: "If the expression denotes a clocking block input or inout,
+// the event control operator uses the synchronous values sampled by the
+// clocking event (see 14.13)." When @(cb.signal) is encountered, the
+// event control operator shall route the signal lookup through the
+// clocking manager — reaching the underlying input/inout variable that
+// holds the synchronously sampled value — rather than treating the
+// member access as an ordinary hierarchical reference. Constructs a
+// kEventControl Stmt for `@(cb.data) ;` and exercises it through the
+// EventAwaiter path: the production code shall attach a watcher to the
+// clocking-resolved variable, observable as a count increment on that
+// variable's watcher list. Without the clocking routing the lookup would
+// fall through to FindVariable("cb.data"), which has no entry, and the
+// watcher would never be attached.
+TEST(EventControlSim, ClockingBlockInputResolvesThroughClockingManager) {
+  SimFixture f;
+
+  auto* data = f.ctx.CreateVariable("data", 8);
+  data->value = MakeLogic4VecVal(f.arena, 8, 0x00);
+
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kPosedge;
+  ClockingSignal sig;
+  sig.signal_name = "data";
+  sig.direction = ClockingDir::kInput;
+  block.signals.push_back(sig);
+  cmgr.Register(block);
+  f.ctx.SetClockingManager(&cmgr);
+
+  auto* member = f.arena.Create<Expr>();
+  member->kind = ExprKind::kMemberAccess;
+  member->lhs = f.arena.Create<Expr>();
+  member->lhs->kind = ExprKind::kIdentifier;
+  member->lhs->text = "cb";
+  member->rhs = f.arena.Create<Expr>();
+  member->rhs->kind = ExprKind::kIdentifier;
+  member->rhs->text = "data";
+
+  auto* wait_stmt = f.arena.Create<Stmt>();
+  wait_stmt->kind = StmtKind::kEventControl;
+  EventExpr ev;
+  ev.edge = Edge::kNone;
+  ev.signal = member;
+  wait_stmt->events.push_back(ev);
+  auto* null_body = f.arena.Create<Stmt>();
+  null_body->kind = StmtKind::kNull;
+  wait_stmt->body = null_body;
+
+  EXPECT_EQ(data->watchers.size(), 0u);
+
+  DriverResult result;
+  auto coro = DriverCoroutine(wait_stmt, f.ctx, f.arena, &result);
+  coro.Resume();
+
+  // EventAwaiter shall have attached its watcher to the clocking-resolved
+  // underlying variable — the only observable trace of the §9.4.2
+  // clocking-block dispatch rule.
+  EXPECT_EQ(data->watchers.size(), 1u);
 }
 
 }  // namespace

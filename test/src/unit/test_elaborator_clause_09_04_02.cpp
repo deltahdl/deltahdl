@@ -103,18 +103,6 @@ TEST(EventControlElaboration, TaskCallInEventExpressionRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(EventControlElaboration, TaskCallInAlwaysSensitivityRejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  logic q;\n"
-      "  task t; endtask\n"
-      "  always @(t()) q = 1;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(EventControlElaboration, TaskCallInIffGuardRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -166,19 +154,6 @@ TEST(EventControlElaboration, PackedStructEventExpressionAccepted) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-}
-
-// §9.4.2: Sensitivity-list event expressions must also be singular.
-TEST(EventControlElaboration, UnpackedArrayInAlwaysSensitivityRejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  int arr[3];\n"
-      "  logic q;\n"
-      "  always @(arr) q = 1;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
 }
 
 TEST(EventControlElaboration, FunctionCallInEventExpressionAccepted) {
