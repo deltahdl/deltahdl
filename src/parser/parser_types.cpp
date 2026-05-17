@@ -287,6 +287,16 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
     dtype = inner;
     return true;
   }
+  // §6.8 footnote 18: a type_reference in a net declaration is permitted
+  // when preceded by a net type keyword — `wire type(x) y;`. Parse the
+  // type(expr) form and attach the expression to the net's data_type.
+  if (Check(TokenKind::kKwType)) {
+    Consume();
+    Expect(TokenKind::kLParen);
+    dtype.type_ref_expr = ParseExpr();
+    Expect(TokenKind::kRParen);
+    return true;
+  }
   // Enum type: wire enum { ... } [dims] e;
   if (Check(TokenKind::kKwEnum)) {
     auto inner = ParseEnumType();

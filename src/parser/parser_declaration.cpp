@@ -84,10 +84,25 @@ DataType Parser::ParseStructOrUnionType() {
                                            : DataTypeKind::kUnion;
   Consume();  // struct or union
 
-  // Union qualifiers: tagged, soft (§7.3)
+  // §7.2: struct_union ::= struct | union [ soft | tagged ]. The bracketed
+  // alternation is mutually exclusive — at most one of soft or tagged may
+  // appear.
   if (dtype.kind == DataTypeKind::kUnion) {
-    if (Match(TokenKind::kKwTagged)) dtype.is_tagged = true;
-    if (Match(TokenKind::kKwSoft)) dtype.is_soft = true;
+    if (Match(TokenKind::kKwTagged)) {
+      dtype.is_tagged = true;
+      if (Check(TokenKind::kKwSoft)) {
+        diag_.Error(CurrentLoc(),
+                    "union may have at most one of 'soft' or 'tagged'");
+        Consume();
+      }
+    } else if (Match(TokenKind::kKwSoft)) {
+      dtype.is_soft = true;
+      if (Check(TokenKind::kKwTagged)) {
+        diag_.Error(CurrentLoc(),
+                    "union may have at most one of 'soft' or 'tagged'");
+        Consume();
+      }
+    }
   }
 
   if (Match(TokenKind::kKwPacked)) {
@@ -97,6 +112,17 @@ DataType Parser::ParseStructOrUnionType() {
     } else {
       Match(TokenKind::kKwUnsigned);
     }
+  }
+
+  // §7.2: "Structure declarations follow the C syntax, but without the
+  // optional structure tags before the '{'." If an identifier appears here
+  // (where the body's '{' is required), reject it as a stray C-style tag.
+  if (CheckIdentifier() && !Check(TokenKind::kLBrace)) {
+    diag_.Error(CurrentLoc(),
+                dtype.kind == DataTypeKind::kStruct
+                    ? "structure declarations may not have a tag before '{'"
+                    : "union declarations may not have a tag before '{'");
+    Consume();
   }
 
   ParseStructMembers(dtype);

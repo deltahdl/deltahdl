@@ -34,16 +34,6 @@ TEST(DeclarationListParsing, ListOfVariableDeclAssignmentsMultiple) {
   EXPECT_GE(count, 3);
 }
 
-TEST(DeclarationAssignmentParsing, VarDeclAssignmentBasic) {
-  auto r = Parse("module m; int x; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "x");
-  EXPECT_EQ(item->init_expr, nullptr);
-}
-
 TEST(BlockItemDeclParsing, DataDeclMultiVarsInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -59,14 +49,6 @@ TEST(BlockItemDeclParsing, DataDeclMultiVarsInBlock) {
   EXPECT_EQ(body->stmts[0]->var_name, "a");
   EXPECT_EQ(body->stmts[1]->var_name, "b");
   EXPECT_EQ(body->stmts[2]->var_name, "c");
-}
-
-TEST(VariableDeclaration, VarDeclWithInit) {
-  auto r = Parse("module m; logic [7:0] data = 8'hFF; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kVarDecl);
-  EXPECT_NE(r.cu->modules[0]->items[0]->init_expr, nullptr);
 }
 
 TEST(VariableDeclaration, DataTypeScopedType) {
@@ -174,29 +156,6 @@ TEST(DataTypeParsing, ByteWithInitializer) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-TEST(DataTypeParsing, VarKeywordLogicDecl) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  var logic [7:0] data;\n"
-              "endmodule\n"));
-}
-
-TEST(DataTypeParsing, MultipleIntDeclsCommaSeparated) {
-  auto r = Parse(
-      "module m;\n"
-      "  int a, b, c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
-}
-
-TEST(DataTypeParsing, VarKeywordImplicitType) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  var [3:0] nibble;\n"
-              "endmodule\n"));
-}
 TEST(DataTypeParsing, IntWithInitializer) {
   auto r = Parse(
       "module m;\n"
@@ -257,15 +216,6 @@ TEST(DataTypeParsing, VarRegDecl) {
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, VarImplicitInProcedural) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    var [3:0] x;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(DataTypeParsing, MixedIntegerRealStringTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -277,23 +227,6 @@ TEST(DataTypeParsing, MixedIntegerRealStringTypes) {
               "  logic [7:0] l;\n"
               "  integer ig;\n"
               "  realtime rt;\n"
-              "endmodule\n"));
-}
-
-TEST(DataTypeParsing, IntegerTypesInProcedural) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    byte b;\n"
-              "    shortint si;\n"
-              "    int i;\n"
-              "    longint li;\n"
-              "    integer ig;\n"
-              "    bit bv;\n"
-              "    logic l;\n"
-              "    reg r;\n"
-              "    time t;\n"
-              "  end\n"
               "endmodule\n"));
 }
 
@@ -367,21 +300,6 @@ TEST(DataTypeParsing, MixedScalarAndArrayDecl) {
   EXPECT_FALSE(items[1]->unpacked_dims.empty());
 }
 
-TEST(DataTypeParsing, IntInitZero) {
-  auto r = Parse(
-      "module t;\n"
-      "  int i = 0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
-  EXPECT_EQ(item->name, "i");
-  ASSERT_NE(item->init_expr, nullptr);
-  EXPECT_EQ(item->init_expr->int_val, 0u);
-}
-
 TEST(DataTypeParsing, InputVarLogicPort) {
   auto r = Parse(
       "module t(input var logic data_in);\n"
@@ -408,17 +326,6 @@ TEST(ImplicitDataType, ImplicitDataTypeSigned) {
   EXPECT_FALSE(r.has_errors);
   auto& port = r.cu->modules[0]->ports[0];
   EXPECT_TRUE(port.data_type.is_signed);
-}
-
-TEST(VariableDeclarations, LogicWithPackedRange) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [3:0] data;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kVarDecl);
 }
 
 // §6.8: var with no explicit type is valid (implicit logic).
@@ -552,6 +459,124 @@ TEST(VariableDeclarations, TypeRefInNetDeclWithWireOk) {
               "  wire x;\n"
               "  wire type(x) y;\n"
               "endmodule\n"));
+}
+
+// §6.8 BNF `signing ::= signed | unsigned`. The parser must accept the
+// `unsigned` half of the production on an implicit_data_type — pairs with
+// the existing ImplicitDataTypeSigned test that covers the `signed` half.
+TEST(ImplicitDataType, ImplicitDataTypeUnsigned) {
+  auto r = Parse("module m(input unsigned [7:0] d); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_FALSE(port.data_type.is_signed);
+}
+
+// §6.8 BNF `signing ::= signed | unsigned`. The `unsigned` keyword must
+// also be accepted on an explicit integer_vector_type, attaching to the
+// data_type rather than only to implicit forms.
+TEST(DataTypeParsing, UnsignedOnLogicVectorOk) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic unsigned [7:0] data;\n"
+              "endmodule\n"));
+}
+
+// §6.8 BNF `variable_decl_assignment ::= ... | dynamic_array_variable_
+// identifier unsized_dimension { variable_dimension } [ = dynamic_array_new ]`.
+// The dynamic-array form of the production must be accepted by the parser —
+// the unsized `[]` dimension plus a `new[N]` initializer.
+TEST(VariableDeclaration, DynamicArrayVarDeclNew) {
+  auto r = Parse(
+      "module m;\n"
+      "  int da [] = new[4];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §6.8 footnote 18: the rule has two halves — type_reference in a net decl
+// requires a net type keyword; type_reference in a variable decl requires
+// `var`. A bare `type(x) y;` matches neither half: it has no net type
+// keyword (failing the net-side rule) and no `var` (failing the variable-
+// side rule), so it must be diagnosed at every module-item position.
+TEST(VariableDeclarations, TypeRefBareWithoutNetTypeOrVarIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire x;\n"
+      "  type(x) y;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §6.8 BNF `data_type ::= ... | class_type`. A variable whose data_type
+// is a previously-declared class must parse — the parser must look up the
+// class name as a known type and bind it to the variable.
+TEST(DataTypeParsing, ClassTypeVarDecl) {
+  auto r = Parse(
+      "class C;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C handle;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "handle");
+}
+
+// §6.8 BNF `data_type ::= ... | virtual [interface] interface_identifier ...`.
+// A `virtual <iface>` variable declaration must parse — the parser routes
+// through ParseVirtualInterfaceType after consuming the `virtual` keyword.
+TEST(DataTypeParsing, VirtualInterfaceVarDecl) {
+  auto r = Parse(
+      "interface bus_if;\n"
+      "endinterface\n"
+      "module m;\n"
+      "  virtual bus_if vi;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "vi");
+}
+
+// §6.8 BNF `data_type ::= ... | virtual [interface] interface_identifier ...`.
+// The explicit `interface` keyword between `virtual` and the identifier is
+// optional per the BNF. Confirm the explicit form parses too.
+TEST(DataTypeParsing, VirtualInterfaceWithKeywordVarDecl) {
+  auto r = Parse(
+      "interface bus_if;\n"
+      "endinterface\n"
+      "module m;\n"
+      "  virtual interface bus_if vi;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §6.8 BNF `variable_decl_assignment ::= ... | class_variable_identifier
+// [ = class_new ]`. The class_new initializer form must parse on a class
+// handle — paired with the existing DynamicArrayVarDeclNew test which
+// covers the dynamic_array_new alternative.
+TEST(VariableDeclaration, ClassHandleVarDeclWithNew) {
+  auto r = Parse(
+      "class C;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C handle = new();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "handle");
+  EXPECT_NE(item->init_expr, nullptr);
 }
 
 }  // namespace

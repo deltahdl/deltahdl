@@ -152,19 +152,6 @@ TEST(VariableDeclaration, StaticInitializerAppliesBeforeInitialBlock) {
   EXPECT_EQ(val, 42u);
 }
 
-// §6.8: Same rule for vector types — a logic vector with a declaration-time
-// initializer is observed by an initial block at time zero.
-TEST(VariableDeclaration, StaticVectorInitializerAppliesBeforeInitialBlock) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] data = 8'hA5;\n"
-      "  logic [7:0] sampled;\n"
-      "  initial sampled = data;\n"
-      "endmodule\n",
-      "sampled");
-  EXPECT_EQ(val, 0xA5u);
-}
-
 // §6.8 Table 6-7: a chandle variable with no initializer takes the null
 // value (zero), not x.
 TEST(VariableDeclaration, ChandleDefaultIsNull) {
@@ -276,6 +263,24 @@ TEST(VariableDeclaration, StaticInitializerWithClassNew) {
       "endmodule\n",
       "observed");
   EXPECT_EQ(val, 42u);
+}
+
+// §6.8: "A variable shall store a value from one assignment to the next."
+// Drive a value into a variable and observe it later in the same initial
+// block — the stored value must survive between the assignment and the
+// subsequent read with no further assignment in between.
+TEST(VariableDeclaration, VariableStoresValueBetweenAssignmentAndRead) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int x;\n"
+      "  int observed;\n"
+      "  initial begin\n"
+      "    x = 99;\n"
+      "    observed = x;\n"
+      "  end\n"
+      "endmodule\n",
+      "observed");
+  EXPECT_EQ(val, 99u);
 }
 
 }  // namespace

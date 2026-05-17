@@ -211,4 +211,66 @@ TEST(StructDeclarationParsing, NestedInlineStructMember) {
   EXPECT_EQ(members[1].name, "id");
 }
 
+// §7.2: "Structure declarations follow the C syntax, but without the
+// optional structure tags before the '{'." A C-style tag `mytag` between
+// `struct` and the body's '{' must be diagnosed.
+TEST(StructDeclarationParsing, StructTagBeforeBraceRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct mytag { int a; } s_t;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §7.2: same rule for union — a C-style tag between `union` and '{' is
+// not permitted.
+TEST(StructDeclarationParsing, UnionTagBeforeBraceRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef union mytag { int a; logic [31:0] b; } u_t;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §7.2 BNF: `struct_union ::= struct | union [ soft | tagged ]`. The
+// bracketed alternation is mutually exclusive — at most one of `soft` or
+// `tagged` may appear, so writing both must be diagnosed.
+TEST(StructDeclarationParsing, UnionSoftAndTaggedRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  union tagged soft { int a; logic [31:0] b; } u;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §7.2 BNF positive: `union tagged { ... }` is legal — confirms the parser
+// still accepts the single-qualifier forms after the mutual-exclusion fix.
+TEST(StructDeclarationParsing, UnionTaggedAloneOk) {
+  auto r = Parse(
+      "module m;\n"
+      "  union tagged { int a; logic [31:0] b; } u;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kUnion);
+  EXPECT_TRUE(item->data_type.is_tagged);
+  EXPECT_FALSE(item->data_type.is_soft);
+}
+
+// §7.2 BNF positive: `union soft { ... }` is legal — same rationale as the
+// tagged-alone test.
+TEST(StructDeclarationParsing, UnionSoftAloneOk) {
+  auto r = Parse(
+      "module m;\n"
+      "  union soft { int a; logic [31:0] b; } u;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kUnion);
+  EXPECT_TRUE(item->data_type.is_soft);
+  EXPECT_FALSE(item->data_type.is_tagged);
+}
+
 }  // namespace
