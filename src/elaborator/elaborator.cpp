@@ -2304,8 +2304,13 @@ static void ComputeUnpackedDims(
   if (TryParseRangeDim(dim, var)) return;
 
   auto size_val = ConstEvalInt(dim);
-  if (size_val && *size_val > 0) {
-    var.unpacked_size = static_cast<uint32_t>(*size_val);
+  if (size_val) {
+    if (*size_val <= 0) {
+      diag.Error(loc,
+                 "unpacked dimension size shall be a positive integer");
+    } else {
+      var.unpacked_size = static_cast<uint32_t>(*size_val);
+    }
   }
 }
 

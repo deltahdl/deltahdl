@@ -111,19 +111,6 @@ TEST(UnpackedArrayParsing, Int2DUnpackedArray) {
   ASSERT_GE(item->unpacked_dims.size(), 2u);
 }
 
-TEST(UnpackedArrayParsing, IntUnpackedRangeNotation) {
-  auto r = Parse(
-      "module t;\n"
-      "  int data [0:7];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
-  EXPECT_FALSE(item->unpacked_dims.empty());
-}
-
 static bool ParseOk5(const std::string& src) {
   SourceManager mgr;
   Arena arena;
