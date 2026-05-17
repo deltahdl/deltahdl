@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, AssocAssignSameTypeOk) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignSameTypeOk) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -16,7 +16,7 @@ TEST(Elaboration, AssocAssignSameTypeOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elaboration, AssocAssignIndexTypeMismatch_Rejected) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignIndexTypeMismatch_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -28,7 +28,7 @@ TEST(Elaboration, AssocAssignIndexTypeMismatch_Rejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elaboration, AssocAssignIntIndexOk) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignIntIndexOk) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -40,7 +40,7 @@ TEST(Elaboration, AssocAssignIntIndexOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elaboration, AssocAssignClassIndex_SameTypeOk) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndex_SameTypeOk) {
   EXPECT_TRUE(
       ElabOk("module top;\n"
              "  class K;\n"
@@ -52,7 +52,7 @@ TEST(Elaboration, AssocAssignClassIndex_SameTypeOk) {
              "endmodule\n"));
 }
 
-TEST(Elaboration, AssocAssignClassIndex_DifferentTypeRejected) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndex_DifferentTypeRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -70,7 +70,7 @@ TEST(Elaboration, AssocAssignClassIndex_DifferentTypeRejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, AssocAssignClassIndex_MixedTypeRejected) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndex_MixedTypeRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -85,7 +85,7 @@ TEST(Elaboration, AssocAssignClassIndex_MixedTypeRejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, AssocAssignElementTypeMismatch_Rejected) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignElementTypeMismatch_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -97,7 +97,7 @@ TEST(Elaboration, AssocAssignElementTypeMismatch_Rejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elaboration, AssocAssignFromFixedRejected) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignFromFixedRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -109,7 +109,7 @@ TEST(Elaboration, AssocAssignFromFixedRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elaboration, AssocAssignToFixedRejected) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignToFixedRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -121,7 +121,7 @@ TEST(Elaboration, AssocAssignToFixedRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elaboration, AssocAssignFromDynamicRejected) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignFromDynamicRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -133,7 +133,7 @@ TEST(Elaboration, AssocAssignFromDynamicRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elaboration, AssocAssignToDynamicRejected) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignToDynamicRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
