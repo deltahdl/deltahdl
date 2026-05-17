@@ -1,123 +1,89 @@
-#include <gtest/gtest.h>
-
-#include "model_net_declaration.h"
+#include "common/types.h"
+#include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(NetDecl, BasicWireDeclOk) {
-  NetDeclInfo info;
-  info.type = NetType::kWire;
-  EXPECT_TRUE(ValidateNetDecl(info));
+const RtlirNet* FindNet(const RtlirDesign* design, std::string_view name) {
+  for (const auto& net : design->top_modules[0]->nets) {
+    if (net.name == name) return &net;
+  }
+  return nullptr;
 }
 
-TEST(NetDecl, ChargeStrengthOnTriregIsValid) {
-  NetDeclInfo info;
-  info.type = NetType::kTrireg;
-  info.has_charge_strength = true;
-  EXPECT_TRUE(ValidateNetDecl(info));
+TEST(NetDecl, TriregWithoutChargeStrengthOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc("module m; trireg t; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* net = FindNet(design, "t");
+  ASSERT_NE(net, nullptr);
+  EXPECT_EQ(net->net_type, NetType::kTrireg);
 }
 
-TEST(NetDecl, TriregWithChargeStrengthLargeOk) {
-  NetDeclInfo info;
-  info.type = NetType::kTrireg;
-  info.has_charge_strength = true;
-  info.charge = LocalChargeStrength::kLarge;
-  EXPECT_TRUE(ValidateNetDecl(info));
+TEST(NetDecl, TriregChargeSmallProducesSmallStrength) {
+  ElabFixture f;
+  auto* design = ElaborateSrc("module m; trireg (small) t; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* net = FindNet(design, "t");
+  ASSERT_NE(net, nullptr);
+  EXPECT_EQ(net->charge_strength, Strength::kSmall);
 }
 
-TEST(NetDecl, ChargeStrengthOnTriIsError) {
-  NetDeclInfo info;
-  info.type = NetType::kTri;
-  info.has_charge_strength = true;
-  EXPECT_FALSE(ValidateNetDecl(info));
+TEST(NetDecl, TriregChargeMediumProducesMediumStrength) {
+  ElabFixture f;
+  auto* design = ElaborateSrc("module m; trireg (medium) t; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* net = FindNet(design, "t");
+  ASSERT_NE(net, nullptr);
+  EXPECT_EQ(net->charge_strength, Strength::kMedium);
 }
 
-TEST(NetDecl, ChargeStrengthOnWireIsError) {
-  NetDeclInfo info;
-  info.type = NetType::kWire;
-  info.has_charge_strength = true;
-  EXPECT_FALSE(ValidateNetDecl(info));
+TEST(NetDecl, TriregChargeLargeProducesLargeStrength) {
+  ElabFixture f;
+  auto* design = ElaborateSrc("module m; trireg (large) t; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* net = FindNet(design, "t");
+  ASSERT_NE(net, nullptr);
+  EXPECT_EQ(net->charge_strength, Strength::kLarge);
 }
 
-TEST(NetDecl, ChargeStrengthOnWandIsError) {
-  NetDeclInfo info;
-  info.type = NetType::kWand;
-  info.has_charge_strength = true;
-  EXPECT_FALSE(ValidateNetDecl(info));
+TEST(NetDecl, VectoredWithPackedDimOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m; wire vectored [3:0] w; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* net = FindNet(design, "w");
+  ASSERT_NE(net, nullptr);
+  EXPECT_TRUE(net->is_vectored);
 }
 
-TEST(NetDecl, ChargeStrengthOnTri0IsError) {
-  NetDeclInfo info;
-  info.type = NetType::kTri0;
-  info.has_charge_strength = true;
-  EXPECT_FALSE(ValidateNetDecl(info));
+TEST(NetDecl, ScalaredWithPackedDimOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m; wire scalared [3:0] w; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* net = FindNet(design, "w");
+  ASSERT_NE(net, nullptr);
+  EXPECT_TRUE(net->is_scalared);
 }
 
-TEST(NetDecl, ChargeStrengthOnTri1IsError) {
-  NetDeclInfo info;
-  info.type = NetType::kTri1;
-  info.has_charge_strength = true;
-  EXPECT_FALSE(ValidateNetDecl(info));
+TEST(NetDecl, VectoredWithoutPackedDimEmitsError) {
+  ElabFixture f;
+  ElaborateSrc("module m; wire vectored w; endmodule\n", f);
+  EXPECT_TRUE(f.has_errors);
 }
 
-TEST(NetDecl, ChargeStrengthOnSupply0IsError) {
-  NetDeclInfo info;
-  info.type = NetType::kSupply0;
-  info.has_charge_strength = true;
-  EXPECT_FALSE(ValidateNetDecl(info));
-}
-
-TEST(NetDecl, ChargeStrengthOnSupply1IsError) {
-  NetDeclInfo info;
-  info.type = NetType::kSupply1;
-  info.has_charge_strength = true;
-  EXPECT_FALSE(ValidateNetDecl(info));
-}
-
-TEST(NetDecl, ChargeStrengthOnTriandIsError) {
-  NetDeclInfo info;
-  info.type = NetType::kTriand;
-  info.has_charge_strength = true;
-  EXPECT_FALSE(ValidateNetDecl(info));
-}
-
-TEST(NetDecl, ChargeStrengthOnTriorIsError) {
-  NetDeclInfo info;
-  info.type = NetType::kTrior;
-  info.has_charge_strength = true;
-  EXPECT_FALSE(ValidateNetDecl(info));
-}
-
-TEST(NetDecl, ChargeStrengthOnUwireIsError) {
-  NetDeclInfo info;
-  info.type = NetType::kUwire;
-  info.has_charge_strength = true;
-  EXPECT_FALSE(ValidateNetDecl(info));
-}
-
-TEST(NetDecl, ChargeStrengthOnWorIsError) {
-  NetDeclInfo info;
-  info.type = NetType::kWor;
-  info.has_charge_strength = true;
-  EXPECT_FALSE(ValidateNetDecl(info));
-}
-
-TEST(NetDecl, TriregWithChargeStrengthSmallOk) {
-  NetDeclInfo info;
-  info.type = NetType::kTrireg;
-  info.has_charge_strength = true;
-  info.charge = LocalChargeStrength::kSmall;
-  EXPECT_TRUE(ValidateNetDecl(info));
-}
-
-TEST(NetDecl, TriregWithChargeStrengthMediumOk) {
-  NetDeclInfo info;
-  info.type = NetType::kTrireg;
-  info.has_charge_strength = true;
-  info.charge = LocalChargeStrength::kMedium;
-  EXPECT_TRUE(ValidateNetDecl(info));
+TEST(NetDecl, ScalaredWithoutPackedDimEmitsError) {
+  ElabFixture f;
+  ElaborateSrc("module m; wire scalared w; endmodule\n", f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 }
