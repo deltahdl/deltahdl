@@ -882,6 +882,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
     ValidatePackedUnion(item->typedef_type, item->loc);
   }
   ValidatePackedDimOnPredefinedType(item->typedef_type, item->loc);
+  ValidatePackedDimOnDisallowedType(item->typedef_type, item->loc);
   if (item->typedef_type.kind != DataTypeKind::kEnum) return;
   ValidateEnumDecl(item->typedef_type, item->loc);
   int64_t next_val = 0;

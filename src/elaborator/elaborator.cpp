@@ -2517,6 +2517,7 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item) {
     ValidatePackedUnion(item->data_type, item->loc);
   }
   ValidatePackedDimOnPredefinedType(item->data_type, item->loc);
+  ValidatePackedDimOnDisallowedType(item->data_type, item->loc);
   ValidateAssocIndexType(item);
 }
 

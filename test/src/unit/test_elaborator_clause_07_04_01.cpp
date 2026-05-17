@@ -158,4 +158,153 @@ TEST(PackedArrayValidation, PackedDimOnEnumBaseType_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(PackedArrayValidation, PackedDimOnReal_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real [3:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(PackedArrayValidation, PackedDimOnShortreal_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  shortreal [3:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(PackedArrayValidation, PackedDimOnRealtime_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  realtime [3:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(PackedArrayValidation, PackedDimOnString_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  string [3:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(PackedArrayValidation, PackedDimOnChandle_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  chandle [3:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(PackedArrayValidation, PackedDimOnEvent_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  event [3:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(PackedArrayValidation, DescendingPackedRange_Allowed) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [0:7] x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 8u);
+}
+
+TEST(PackedArrayValidation, LargePackedArrayAtLeast65536Bits_Accepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [65535:0] x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 65536u);
+}
+
+TEST(PackedArrayValidation, SignedPackedArrayMarkedSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic signed [7:0] x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_TRUE(mod->variables[0].is_signed);
+  EXPECT_EQ(mod->variables[0].width, 8u);
+}
+
+TEST(PackedArrayValidation, NegativeBoundsInPackedRange_Allowed) {
+  // Bounds in a packed range may be any integer, including negative
+  // values; width is determined by the absolute difference plus one.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [-1:-4] x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 4u);
+}
+
+TEST(PackedArrayValidation, EqualBoundsInPackedRange_Allowed) {
+  // When both range bounds are equal, the packed array degenerates to a
+  // single bit — exercising the "equal to" case of the range rule.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [3:3] x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 1u);
+}
+
+TEST(PackedArrayValidation, PackedDimOnPackedStruct_Allowed) {
+  // The recursive half of the allowed-element-types rule: a packed
+  // structure may itself be the element type of an enclosing packed
+  // array dimension.
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct packed { logic [3:0] a; logic [3:0] b; } s_t;\n"
+      "  s_t [3:0] arr;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }

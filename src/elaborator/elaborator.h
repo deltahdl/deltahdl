@@ -238,6 +238,8 @@ class Elaborator {
 
   void ValidatePackedDimOnPredefinedType(const DataType& dtype, SourceLoc loc);
 
+  void ValidatePackedDimOnDisallowedType(const DataType& dtype, SourceLoc loc);
+
   void ValidateArrayAssignments(const ModuleDecl* decl);
   void ValidateOneArrayAssignment(const ModuleItem* item);
   void CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs, SourceLoc loc);

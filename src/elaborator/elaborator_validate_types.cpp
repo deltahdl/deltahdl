@@ -865,4 +865,29 @@ void Elaborator::ValidatePackedDimOnPredefinedType(const DataType& dtype,
               "array dimensions");
 }
 
+static bool IsAllowedPackedElementKind(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kReal:
+    case DataTypeKind::kShortreal:
+    case DataTypeKind::kRealtime:
+    case DataTypeKind::kString:
+    case DataTypeKind::kChandle:
+    case DataTypeKind::kEvent:
+    case DataTypeKind::kVoid:
+    case DataTypeKind::kVirtualInterface:
+      return false;
+    default:
+      return true;
+  }
+}
+
+void Elaborator::ValidatePackedDimOnDisallowedType(const DataType& dtype,
+                                                   SourceLoc loc) {
+  if (!dtype.packed_dim_left) return;
+  if (IsAllowedPackedElementKind(dtype.kind)) return;
+  diag_.Error(loc,
+              "packed array element type must be a single-bit type, "
+              "enum, or packed aggregate");
+}
+
 }
