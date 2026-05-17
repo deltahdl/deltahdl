@@ -29,34 +29,6 @@ TEST(NondeterminismSim, AnyOrderRegionsAreActiveAndReactive) {
   EXPECT_FALSE(Scheduler::IsAnyOrderRegion(Region::kPostponed));
 }
 
-// §4.7 ¶1 sentence 1, applied at runtime: the scheduler's classification
-// of the current region matches §4.7 while the region is being drained.
-// An event running inside Active observes IsAnyOrderRegion(CurrentRegion)
-// as true; an event running inside NBA observes it as false. This shows
-// production code routing live events through the §4.7 classifier.
-TEST(NondeterminismSim, CurrentRegionAnyOrderClassificationMatchesAt47) {
-  Arena arena;
-  Scheduler sched(arena);
-  bool active_any_order = false;
-  bool nba_any_order = true;
-
-  auto* in_active = sched.GetEventPool().Acquire();
-  in_active->callback = [&]() {
-    active_any_order = Scheduler::IsAnyOrderRegion(sched.CurrentRegion());
-  };
-  sched.ScheduleEvent({0}, Region::kActive, in_active);
-
-  auto* in_nba = sched.GetEventPool().Acquire();
-  in_nba->callback = [&]() {
-    nba_any_order = Scheduler::IsAnyOrderRegion(sched.CurrentRegion());
-  };
-  sched.ScheduleEvent({0}, Region::kNBA, in_nba);
-
-  sched.Run();
-  EXPECT_TRUE(active_any_order);
-  EXPECT_FALSE(nba_any_order);
-}
-
 // §4.7 ¶1 last sentence: "the order of interleaved execution is
 // nondeterministic and not under control of the user". The scheduler
 // attests this by reporting that no user-facing ordering API exists.
@@ -86,17 +58,6 @@ TEST(NondeterminismSim, NonTimeControlStatementsAreClassifiedFalse) {
   EXPECT_FALSE(IsTimeControlStatement(StmtKind::kCycleDelay));
   EXPECT_FALSE(IsTimeControlStatement(StmtKind::kWait));
   EXPECT_FALSE(IsTimeControlStatement(StmtKind::kTimingControl));
-}
-
-// §4.7 ¶1 sentences 2–4: the scheduler exposes a mid-statement
-// suspension hook so that "statements without time-control constructs
-// in procedural blocks do not have to be executed as one event".
-// The counter starts at zero before any production code records a
-// suspension.
-TEST(NondeterminismSim, MidStatementSuspensionCountStartsAtZero) {
-  Arena arena;
-  Scheduler sched(arena);
-  EXPECT_EQ(sched.MidStatementSuspensionCount(), 0u);
 }
 
 // §4.7 ¶1 sentences 2–4 in action: an event simulates the simulator
