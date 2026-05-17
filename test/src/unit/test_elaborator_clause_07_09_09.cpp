@@ -97,4 +97,52 @@ TEST(Elaboration, AssocAssignElementTypeMismatch_Rejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(Elaboration, AssocAssignFromFixedRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa[int];\n"
+      "  int fa[4];\n"
+      "  initial aa = fa;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(Elaboration, AssocAssignToFixedRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa[int];\n"
+      "  int fa[4];\n"
+      "  initial fa = aa;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(Elaboration, AssocAssignFromDynamicRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa[int];\n"
+      "  int da[];\n"
+      "  initial aa = da;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(Elaboration, AssocAssignToDynamicRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa[int];\n"
+      "  int da[];\n"
+      "  initial da = aa;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }
