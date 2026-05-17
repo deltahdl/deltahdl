@@ -12,12 +12,24 @@ namespace delta {
 
 using TypeMap = std::unordered_map<std::string_view, DataTypeKind>;
 
+static std::string_view AggregateOperandName(const Expr* e) {
+  if (!e) return {};
+  if (e->kind == ExprKind::kIdentifier) return e->text;
+  if (e->kind == ExprKind::kSelect &&
+      (e->index_end || e->is_part_select_plus || e->is_part_select_minus) &&
+      e->base && e->base->kind == ExprKind::kIdentifier) {
+    return e->base->text;
+  }
+  return {};
+}
+
 void Elaborator::CheckAggregateCompareOp(const Expr* expr) {
   if (!expr->lhs || !expr->rhs) return;
-  if (expr->lhs->kind != ExprKind::kIdentifier) return;
-  if (expr->rhs->kind != ExprKind::kIdentifier) return;
-  auto lit = var_named_types_.find(expr->lhs->text);
-  auto rit = var_named_types_.find(expr->rhs->text);
+  auto l_name = AggregateOperandName(expr->lhs);
+  auto r_name = AggregateOperandName(expr->rhs);
+  if (l_name.empty() || r_name.empty()) return;
+  auto lit = var_named_types_.find(l_name);
+  auto rit = var_named_types_.find(r_name);
   if (lit == var_named_types_.end() || rit == var_named_types_.end()) return;
   if (lit->second == rit->second) return;
 
@@ -27,8 +39,8 @@ void Elaborator::CheckAggregateCompareOp(const Expr* expr) {
     auto it = typedefs_.find(type_name);
     return it != typedefs_.end() && IsAggregateType(it->second);
   };
-  if (!is_aggregate_var(expr->lhs->text, lit->second)) return;
-  if (!is_aggregate_var(expr->rhs->text, rit->second)) return;
+  if (!is_aggregate_var(l_name, lit->second)) return;
+  if (!is_aggregate_var(r_name, rit->second)) return;
 
   diag_.Error(expr->range.start,
               std::format("comparison of non-equivalent aggregate "

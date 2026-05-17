@@ -229,4 +229,65 @@ TEST(AggregateExpr, NonEquivalentTypeComparisonInContAssign) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(AggregateExpr, NonEquivalentArrayTypeInequalityError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef logic [7:0] arr_a [0:3];\n"
+      "  typedef logic [7:0] arr_b [0:7];\n"
+      "  arr_a x;\n"
+      "  arr_b y;\n"
+      "  logic neq;\n"
+      "  initial neq = (x != y);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AggregateExpr, ArrayPassedThroughPort) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module inner(input arr_t a);\n"
+      "  typedef logic [7:0] arr_t [0:3];\n"
+      "endmodule\n"
+      "module m;\n"
+      "  typedef logic [7:0] arr_t [0:3];\n"
+      "  arr_t s;\n"
+      "  inner u(.a(s));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AggregateExpr, ArrayConstructorAsAggregate) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef int arr_t [0:3];\n"
+      "  arr_t a;\n"
+      "  initial a = '{1, 2, 3, 4};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AggregateExpr, NonEquivalentArraySliceComparisonError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef logic [7:0] arr_a [0:7];\n"
+      "  typedef logic [7:0] arr_b [0:15];\n"
+      "  arr_a x;\n"
+      "  arr_b y;\n"
+      "  logic eq;\n"
+      "  initial eq = (x[0:3] == y[0:3]);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }
