@@ -180,6 +180,28 @@ bool Elaborator::ValidateEnumLiteral(const EnumMember& member,
 }
 
 void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
+  // §6.19 footnote 19: a type_identifier used as enum_base_type shall denote
+  // an integer_atom_type or an integer_vector_type.
+  if (!dtype.enum_base_name.empty()) {
+    auto it = typedefs_.find(dtype.enum_base_name);
+    if (it != typedefs_.end()) {
+      auto k = it->second.kind;
+      bool integer_atom =
+          k == DataTypeKind::kByte || k == DataTypeKind::kShortint ||
+          k == DataTypeKind::kInt || k == DataTypeKind::kLongint ||
+          k == DataTypeKind::kInteger || k == DataTypeKind::kTime;
+      bool integer_vector = k == DataTypeKind::kLogic ||
+                            k == DataTypeKind::kReg ||
+                            k == DataTypeKind::kBit;
+      if (!integer_atom && !integer_vector) {
+        diag_.Error(loc,
+                    std::format("enum base type '{}' is not an "
+                                "integer_atom_type or integer_vector_type",
+                                dtype.enum_base_name));
+      }
+    }
+  }
+
   auto base_width = EvalTypeWidth(dtype, typedefs_);
   bool is_2state = !Is4stateType(dtype, typedefs_);
   bool prev_had_xz = false;

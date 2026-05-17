@@ -92,4 +92,18 @@ TEST(DataTypeParsing, Enum4StateBaseXZ) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §6.19 Syntax 6-5 + Footnote 19: enum_base_type ::= ... | type_identifier
+// [ packed_dimension ]. A type_identifier renaming a built-in integer_vector
+// type shall be legal as an enum_base_type — the parser must accept the
+// type_identifier alternative of the BNF.
+TEST(EnumerationParsing, EnumTypeIdentifierBaseTypeAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [3:0] nibble_t;\n"
+      "  enum nibble_t {A, B, C} state;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

@@ -35,6 +35,11 @@ DataType Parser::ParseEnumType() {
     dtype.is_signed = base.is_signed;
     dtype.packed_dim_left = base.packed_dim_left;
     dtype.packed_dim_right = base.packed_dim_right;
+    // §6.19 footnote 19: record the type_identifier so the elaborator can
+    // verify it denotes an integer_atom_type or integer_vector_type.
+    if (base.kind == DataTypeKind::kNamed) {
+      dtype.enum_base_name = base.type_name;
+    }
   }
 
   dtype = ParseEnumBody(dtype);

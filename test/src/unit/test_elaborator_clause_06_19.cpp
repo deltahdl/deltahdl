@@ -161,4 +161,32 @@ TEST(EnumerationElaboration, EnumParameterInitializer_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.19 footnote 19: "A type_identifier shall be legal as an
+// enum_base_type if it denotes an integer_atom_type ... or an
+// integer_vector_type." A typedef of a struct (a non-integer type) used as
+// the enum base shall be rejected by the elaborator.
+TEST(EnumerationElaboration, EnumStructTypedefBaseTypeIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct packed { int A; } pair_t;\n"
+      "  enum pair_t {A, B, C} state;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.19: "An enum declaration of a 4-state type, such as integer, that
+// includes one or more names with x or z assignments shall be permitted."
+TEST(EnumerationElaboration, EnumIntegerWithXAssignmentPermitted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  enum integer {IDLE = 0, XX = 'x, S1 = 1, S2 = 2} state;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

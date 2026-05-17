@@ -97,4 +97,23 @@ TEST(PortConnectionRulesElaboration, NettypeSignalOnInoutPortErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §23.3.3: "Each port connection shall be a continuous assignment of source
+// to sink, where one connected item shall be a signal source and the other
+// shall be a signal sink." A simple input-port connection from an external
+// net shall elaborate as a source-to-sink wiring with no diagnostics.
+TEST(PortConnectionRulesElaboration, InputPortConnectionIsSourceToSink) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input logic [7:0] a);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] src;\n"
+      "  child u(.a(src));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
+}
+
 }  // namespace

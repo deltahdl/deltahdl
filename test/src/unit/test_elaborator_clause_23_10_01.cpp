@@ -165,4 +165,60 @@ TEST(DefparamElaboration, RhsRejectsHierarchicalReference) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §23.10.1: "Each instantiation of a generate block is considered to be a
+// separate hierarchy scope. Therefore, a defparam statement in a generate
+// block may not target a parameter in another instantiation of the same
+// generate block." The override from a sibling generate scope shall not
+// reach the target instance.
+TEST(DefparamElaboration, DefparamInGenerateCannotTargetSiblingScope) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter int P = 5) ();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  if (1) begin : g1\n"
+      "    child u();\n"
+      "  end\n"
+      "  if (1) begin : g2\n"
+      "    defparam g1.u.P = 99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  bool saw_99 = false;
+  for (auto& c : design->top_modules[0]->children) {
+    if (c.resolved != nullptr) {
+      for (auto& p : c.resolved->params) {
+        if (p.name == "P" && p.resolved_value == 99) saw_99 = true;
+      }
+    }
+  }
+  EXPECT_FALSE(saw_99);
+}
+
+// §23.10.1: "Similarly, a defparam statement in one instance of an array of
+// instances may not target a parameter in another instance of the array."
+// The override of one array index shall not propagate to other indices.
+TEST(DefparamElaboration, DefparamCannotTargetOtherArrayInstance) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter int P = 5) ();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u [1:0] ();\n"
+      "  defparam u[0].P = 77;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  int count_77 = 0;
+  for (auto& c : design->top_modules[0]->children) {
+    if (c.resolved != nullptr) {
+      for (auto& p : c.resolved->params) {
+        if (p.name == "P" && p.resolved_value == 77) ++count_77;
+      }
+    }
+  }
+  EXPECT_LE(count_77, 1);
+}
+
 }  // namespace

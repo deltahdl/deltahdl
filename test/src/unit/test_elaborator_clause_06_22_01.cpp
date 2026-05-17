@@ -74,4 +74,38 @@ TEST(MatchingTypesElaboration, PackageTypedefImportElaborates) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.22.1(a): "Any built-in type matches every other occurrence of itself,
+// in every scope." Two `int` declarations across nested modules shall match.
+TEST(MatchingTypesElaboration, BuiltinIntMatchesAcrossScopes) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child;\n"
+      "  int x;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  int x;\n"
+      "  child c();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.22.1(b): "A simple typedef ... that renames a built-in or user-defined
+// type matches that built-in or user-defined type within the scope of the
+// type identifier."
+TEST(MatchingTypesElaboration, SimpleTypedefMatchesUnderlyingBuiltin) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef bit node;\n"
+      "  bit b1;\n"
+      "  node b2;\n"
+      "  initial b1 = b2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
