@@ -304,4 +304,74 @@ TEST(DisableStatementExecution, DisableAutomaticTask) {
   LowerRunAndCheck(f, design, {{"a", 0u}, {"b", 0u}});
 }
 
+// --- U1: Results UNSPECIFIED when a disabled task has in-flight effects.
+// These tests assert only liveness — that the simulator does not crash. The
+// final values of outputs / pending NBAs / PCAs are unspecified per §9.6.2.
+
+TEST(DisableStatementExecution, DisableTaskWithOutputArgumentDoesNotCrash) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  task my_task(output logic [7:0] result);\n"
+      "    #10;\n"
+      "    result = 8'd42;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      my_task(x);\n"
+      "    join_none\n"
+      "    #5;\n"
+      "    disable my_task;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+}
+
+TEST(DisableStatementExecution, DisableTaskWithPendingNbaDoesNotCrash) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  task my_task;\n"
+      "    #10;\n"
+      "    x <= 8'd42;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      my_task;\n"
+      "    join_none\n"
+      "    #10;\n"
+      "    disable my_task;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+}
+
+TEST(DisableStatementExecution, DisableTaskWithProceduralAssignDoesNotCrash) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  task my_task;\n"
+      "    assign x = 8'd42;\n"
+      "    #10;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      my_task;\n"
+      "    join_none\n"
+      "    #5;\n"
+      "    disable my_task;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+}
+
 }  // namespace

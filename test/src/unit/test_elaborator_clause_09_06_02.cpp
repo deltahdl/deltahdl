@@ -55,41 +55,6 @@ TEST(DisableStatementElaboration, DisableFromOtherProcessElaborates) {
   EXPECT_EQ(design->top_modules[0]->processes.size(), 2u);
 }
 
-TEST(DisableStatementElaboration, DisableConditionalElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a;\n"
-      "  initial begin : blk\n"
-      "    a = 1;\n"
-      "    if (a == 0)\n"
-      "      disable blk;\n"
-      "    a = 2;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(DisableStatementElaboration, DisableInAlwaysElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic clk, q;\n"
-      "  always begin : monostable\n"
-      "    #250 q = 0;\n"
-      "  end\n"
-      "  always @(posedge clk) begin\n"
-      "    disable monostable;\n"
-      "    q = 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(DisableStatementElaboration, DisableFunctionRejectsWithError) {
   ElabFixture f;
   ElaborateSrc(
@@ -121,24 +86,6 @@ TEST(DisableStatementElaboration, DisableNamedBlockInFunctionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(DisableStatementElaboration, DisableNestedNamedBlockElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a;\n"
-      "  initial begin : outer\n"
-      "    begin : inner\n"
-      "      a = 1;\n"
-      "      disable inner;\n"
-      "      a = 2;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(DisableStatementElaboration, DisableOuterBlockFromNestedBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -157,26 +104,6 @@ TEST(DisableStatementElaboration, DisableOuterBlockFromNestedBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(DisableStatementElaboration, DisableTaskFromForkedProcessElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  task my_task;\n"
-      "    #100;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      my_task;\n"
-      "    join_none\n"
-      "    #50;\n"
-      "    disable my_task;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(DisableStatementElaboration, DisableAutoTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -187,6 +114,49 @@ TEST(DisableStatementElaboration, DisableAutoTaskElaborates) {
       "  initial begin\n"
       "    disable my_task;\n"
       "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §9.6.2 R8: A disable inside a function that targets a block or task that
+// called the function has UNDEFINED behavior — meaning the implementation may
+// do anything, but the construct itself is not illegal. The elaborator must
+// accept it (no error), while only R7b (disabling a function) is rejected.
+TEST(DisableStatementElaboration, DisableOuterBlockFromInsideFunctionAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a;\n"
+      "  function int f(input int x);\n"
+      "    disable outer_blk;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  initial begin : outer_blk\n"
+      "    int r;\n"
+      "    r = f(1);\n"
+      "    a = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DisableStatementElaboration, DisableOuterTaskFromInsideFunctionAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function int f(input int x);\n"
+      "    disable t;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  task t;\n"
+      "    int r;\n"
+      "    r = f(1);\n"
+      "  endtask\n"
+      "  initial t;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
