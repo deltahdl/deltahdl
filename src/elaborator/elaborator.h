@@ -283,6 +283,8 @@ class Elaborator {
 
   void ValidateElabSystemTask(const ModuleItem* item);
 
+  void ValidateTypenameAsElabConstant(const Expr* init);
+
   void ValidateAlias(const ModuleItem* item, RtlirModule* mod);
 
   void ValidateSpecparamInParams(const ModuleDecl* decl);

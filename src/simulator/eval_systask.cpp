@@ -136,14 +136,27 @@ static Logic4Vec EvalValuePlusargs(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+static std::string TypenameForVariable(const Variable* var) {
+  uint32_t w = var->width;
+
+  if (!var->is_4state && var->is_signed && w == 32) return "int";
+  std::string base = var->is_4state ? "logic" : "bit";
+  if (w <= 1) return base;
+  return base + "[" + std::to_string(w - 1) + ":0]";
+}
+
 static Logic4Vec EvalTypename(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) {
     return StringToLogic4Vec(arena, "logic");
   }
-  auto val = EvalExpr(expr->args[0], ctx, arena);
-  if (val.width <= 1) return StringToLogic4Vec(arena, "logic");
-  std::string name = "logic[" + std::to_string(val.width - 1) + ":0]";
-  return StringToLogic4Vec(arena, name);
+  const auto* arg = expr->args[0];
+
+  if (arg->kind == ExprKind::kIdentifier) {
+    if (const auto* var = ctx.FindVariable(arg->text)) {
+      return StringToLogic4Vec(arena, TypenameForVariable(var));
+    }
+  }
+  return StringToLogic4Vec(arena, "logic");
 }
 
 static Logic4Vec EvalSformatf(const Expr* expr, SimContext& ctx, Arena& arena) {

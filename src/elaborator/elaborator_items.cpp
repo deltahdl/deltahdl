@@ -587,6 +587,26 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
   mod->assigns.push_back(ca);
 }
 
+void Elaborator::ValidateTypenameAsElabConstant(const Expr* init) {
+  if (init->kind != ExprKind::kSystemCall) return;
+  if (init->callee != "$typename") return;
+  if (init->args.empty()) return;
+  const auto* arg = init->args[0];
+  if (arg->kind == ExprKind::kMemberAccess) {
+    diag_.Error(arg->range.start,
+                "$typename argument in elaboration-time-constant context "
+                "shall not contain hierarchical references");
+    return;
+  }
+  if (arg->kind != ExprKind::kSelect) return;
+  auto it = var_array_info_.find(arg->base->text);
+  if (it == var_array_info_.end()) return;
+  if (!it->second.is_dynamic && !it->second.is_assoc) return;
+  diag_.Error(arg->range.start,
+              "$typename argument in elaboration-time-constant context "
+              "shall not reference elements of dynamic objects");
+}
+
 void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
 
   bool is_type = item->data_type.kind == DataTypeKind::kVoid &&
@@ -608,6 +628,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
       item->init_expr->text == "$") {
     pd.is_unbounded = true;
   } else if (item->init_expr) {
+    ValidateTypenameAsElabConstant(item->init_expr);
     auto scope = BuildParamScope(mod);
     auto val = ConstEvalInt(item->init_expr, scope);
     if (val) {

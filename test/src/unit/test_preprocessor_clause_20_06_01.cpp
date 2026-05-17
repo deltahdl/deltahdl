@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DataTypeParsing, TypeOperatorTypeOf) {
+TEST(DataTypeParsing, TypenamePassesThroughPreprocessor) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  int a;\n"
