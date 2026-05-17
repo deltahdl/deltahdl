@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(AssocArrayAssignment, CopiesEntries_IntKeyed) {
+TEST(AssocArrayAssignment, CopiesEntriesIntKeyed) {
   auto v = RunAndGet(
       "module t;\n"
       "  int src[int];\n"
@@ -21,7 +21,7 @@ TEST(AssocArrayAssignment, CopiesEntries_IntKeyed) {
   EXPECT_EQ(v, 20u);
 }
 
-TEST(AssocArrayAssignment, CopiesEntries_StringKeyed) {
+TEST(AssocArrayAssignment, CopiesEntriesStringKeyed) {
   auto v = RunAndGet(
       "module t;\n"
       "  int src[string];\n"

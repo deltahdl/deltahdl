@@ -16,7 +16,7 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignSameTypeOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AssocArrayAssignmentElaboration, AssocAssignIndexTypeMismatch_Rejected) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignIndexTypeMismatchRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -40,7 +40,7 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignIntIndexOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndex_SameTypeOk) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndexSameTypeOk) {
   EXPECT_TRUE(
       ElabOk("module top;\n"
              "  class K;\n"
@@ -52,7 +52,7 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndex_SameTypeOk) {
              "endmodule\n"));
 }
 
-TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndex_DifferentTypeRejected) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndexDifferentTypeRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -70,7 +70,7 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndex_DifferentTypeRejecte
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndex_MixedTypeRejected) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndexMixedTypeRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -85,7 +85,7 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndex_MixedTypeRejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(AssocArrayAssignmentElaboration, AssocAssignElementTypeMismatch_Rejected) {
+TEST(AssocArrayAssignmentElaboration, AssocAssignElementTypeMismatchRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
