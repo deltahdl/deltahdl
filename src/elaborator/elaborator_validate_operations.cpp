@@ -420,6 +420,66 @@ void Elaborator::ValidateAssocConcatTarget(const ModuleDecl* decl) {
   }
 }
 
+static bool IsEqualityOp(TokenKind op) {
+  return op == TokenKind::kEqEq || op == TokenKind::kBangEq ||
+         op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq ||
+         op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
+}
+
+void Elaborator::CheckAssocOperandInBinaryExpr(const Expr* e) {
+  if (!e) return;
+  if (e->kind == ExprKind::kBinary && !IsEqualityOp(e->op)) {
+    for (const Expr* side : {e->lhs, e->rhs}) {
+      if (!side || side->kind != ExprKind::kIdentifier) continue;
+      auto it = var_array_info_.find(side->text);
+      if (it == var_array_info_.end() || !it->second.is_assoc) continue;
+      diag_.Error(side->range.start,
+                  "associative array operand requires an element "
+                  "selection before use in this expression");
+    }
+  }
+  CheckAssocOperandInBinaryExpr(e->lhs);
+  CheckAssocOperandInBinaryExpr(e->rhs);
+  CheckAssocOperandInBinaryExpr(e->condition);
+  CheckAssocOperandInBinaryExpr(e->true_expr);
+  CheckAssocOperandInBinaryExpr(e->false_expr);
+  CheckAssocOperandInBinaryExpr(e->base);
+  CheckAssocOperandInBinaryExpr(e->index);
+  CheckAssocOperandInBinaryExpr(e->index_end);
+  for (const auto* a : e->args) CheckAssocOperandInBinaryExpr(a);
+  for (const auto* el : e->elements) CheckAssocOperandInBinaryExpr(el);
+}
+
+void Elaborator::WalkStmtsForAssocOperand(const Stmt* s) {
+  if (!s) return;
+  CheckAssocOperandInBinaryExpr(s->rhs);
+  CheckAssocOperandInBinaryExpr(s->expr);
+  CheckAssocOperandInBinaryExpr(s->condition);
+  CheckAssocOperandInBinaryExpr(s->for_cond);
+  for (auto* sub : s->stmts) WalkStmtsForAssocOperand(sub);
+  WalkStmtsForAssocOperand(s->then_branch);
+  WalkStmtsForAssocOperand(s->else_branch);
+  WalkStmtsForAssocOperand(s->body);
+  WalkStmtsForAssocOperand(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForAssocOperand(ci.body);
+}
+
+void Elaborator::ValidateAssocOperandInExpr(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock ||
+        item->kind == ModuleItemKind::kFinalBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      WalkStmtsForAssocOperand(item->body);
+    }
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckAssocOperandInBinaryExpr(item->assign_rhs);
+    }
+  }
+}
+
 void Elaborator::CheckArrayPatternElemTypeInAssign(const Stmt* s) {
   if (!s->lhs || !s->rhs) return;
   if (s->lhs->kind != ExprKind::kIdentifier) return;

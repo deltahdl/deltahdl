@@ -339,6 +339,57 @@ static void WritebackQueueRefs(SimContext& ctx) {
   }
 }
 
+static bool TryBindAssocElementRef(const Expr* expr, int arg_index,
+                                   const FunctionArg& param, SimContext& ctx,
+                                   Arena& arena) {
+  if (arg_index < 0) return false;
+  auto* call_arg = expr->args[static_cast<size_t>(arg_index)];
+  if (!call_arg) return false;
+  if (call_arg->kind != ExprKind::kSelect) return false;
+  if (!call_arg->base || call_arg->base->kind != ExprKind::kIdentifier)
+    return false;
+  auto* aa = ctx.FindAssocArray(call_arg->base->text);
+  if (!aa || !call_arg->index) return false;
+
+  auto* var = ctx.CreateLocalVariable(param.name, aa->elem_width);
+
+  AssocRefBinding binding;
+  binding.assoc = aa;
+  binding.is_string_key = aa->is_string_key;
+  binding.local_var = var;
+  if (aa->is_string_key) {
+    binding.str_key = FormatValueAsString(EvalExpr(call_arg->index, ctx, arena));
+    auto it = aa->str_data.find(binding.str_key);
+    if (it == aa->str_data.end()) {
+      aa->str_data[binding.str_key] = MakeLogic4Vec(arena, aa->elem_width);
+      it = aa->str_data.find(binding.str_key);
+    }
+    var->value = it->second;
+  } else {
+    binding.int_key =
+        static_cast<int64_t>(EvalExpr(call_arg->index, ctx, arena).ToUint64());
+    auto it = aa->int_data.find(binding.int_key);
+    if (it == aa->int_data.end()) {
+      aa->int_data[binding.int_key] = MakeLogic4Vec(arena, aa->elem_width);
+      it = aa->int_data.find(binding.int_key);
+    }
+    var->value = it->second;
+  }
+  ctx.RecordAssocRef(binding);
+  return true;
+}
+
+static void WritebackAssocRefs(SimContext& ctx) {
+  auto bindings = ctx.PopAssocRefFrame();
+  for (const auto& b : bindings) {
+    if (b.is_string_key) {
+      b.assoc->str_data[b.str_key] = b.local_var->value;
+    } else {
+      b.assoc->int_data[b.int_key] = b.local_var->value;
+    }
+  }
+}
+
 static Logic4Vec ResolveArgValue(const FunctionArg& param, const Expr* expr,
                                  int arg_index, SimContext& ctx, Arena& arena) {
   if (arg_index >= 0 && expr->args[static_cast<size_t>(arg_index)] != nullptr) {
@@ -407,6 +458,8 @@ static void BindFunctionArgs(const ModuleItem* func, const Expr* expr,
     if (dir == Direction::kRef) {
       if (TryBindRefArg(expr, ai, func->func_args[i].name, ctx)) continue;
       if (TryBindQueueElementRef(expr, ai, func->func_args[i], ctx, arena))
+        continue;
+      if (TryBindAssocElementRef(expr, ai, func->func_args[i], ctx, arena))
         continue;
     }
     if (ai >= 0 && TryBindArrayArg(expr->args[static_cast<size_t>(ai)],
@@ -964,9 +1017,11 @@ static Logic4Vec ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
   ctx.PushScope();
   ctx.PushThis(obj);
   ctx.PushQueueRefFrame();
+  ctx.PushAssocRefFrame();
   ExecClassMethod(method, expr, ctx, arena, out);
   WritebackOutputArgs(method, expr, ctx, arena);
   WritebackQueueRefs(ctx);
+  WritebackAssocRefs(ctx);
   ctx.PopThis();
   ctx.PopScope();
   return out;
@@ -1372,6 +1427,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
 
   ctx.PushQueueRefFrame();
+  ctx.PushAssocRefFrame();
   BindFunctionArgs(func, expr, ctx, arena);
 
   Variable dummy_ret;
@@ -1388,6 +1444,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   ctx.ExitFunction();
   WritebackOutputArgs(func, expr, ctx, arena);
   WritebackQueueRefs(ctx);
+  WritebackAssocRefs(ctx);
   result = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
 
   if (is_static) {
@@ -1417,6 +1474,7 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
       ctx.PushScope();
     }
     ctx.PushQueueRefFrame();
+    ctx.PushAssocRefFrame();
     ctx.PushFuncName(func->name);
     if (is_void_func) ctx.EnterFunction();
     if (!func->func_args.empty()) BindFunctionArgs(func, expr, ctx, arena);
@@ -1433,6 +1491,7 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
     ctx.PushScope();
   }
   ctx.PushQueueRefFrame();
+  ctx.PushAssocRefFrame();
   ctx.PushFuncName(func->name);
   BindFunctionArgs(func, expr, ctx, arena);
   return func;
@@ -1442,6 +1501,7 @@ void TeardownTaskCall(const ModuleItem* func, const Expr* expr,
                       SimContext& ctx, Arena& arena) {
   WritebackOutputArgs(func, expr, ctx, arena);
   WritebackQueueRefs(ctx);
+  WritebackAssocRefs(ctx);
   bool is_void_func = func->kind == ModuleItemKind::kFunctionDecl &&
                       func->return_type.kind == DataTypeKind::kVoid;
   if (is_void_func) ctx.ExitFunction();

@@ -227,6 +227,19 @@ std::vector<QueueRefBinding> SimContext::PopQueueRefFrame() {
   return frame;
 }
 
+void SimContext::PushAssocRefFrame() { assoc_ref_stack_.emplace_back(); }
+
+void SimContext::RecordAssocRef(const AssocRefBinding& binding) {
+  if (!assoc_ref_stack_.empty()) assoc_ref_stack_.back().push_back(binding);
+}
+
+std::vector<AssocRefBinding> SimContext::PopAssocRefFrame() {
+  if (assoc_ref_stack_.empty()) return {};
+  auto frame = std::move(assoc_ref_stack_.back());
+  assoc_ref_stack_.pop_back();
+  return frame;
+}
+
 void SimContext::RegisterFinalProcess(Process* proc) {
   final_processes_.push_back(proc);
 }

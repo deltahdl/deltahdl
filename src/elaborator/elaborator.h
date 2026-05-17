@@ -382,6 +382,10 @@ class Elaborator {
   void WalkStmtsForAssocConcatTarget(const Stmt* s);
   void CheckAssocConcatTargetInAssign(const Stmt* s);
 
+  void ValidateAssocOperandInExpr(const ModuleDecl* decl);
+  void WalkStmtsForAssocOperand(const Stmt* s);
+  void CheckAssocOperandInBinaryExpr(const Expr* e);
+
   void ValidateArrayPatternElemType(const ModuleDecl* decl);
   void WalkStmtsForArrayPatternElemType(const Stmt* s);
   void CheckArrayPatternElemTypeInAssign(const Stmt* s);

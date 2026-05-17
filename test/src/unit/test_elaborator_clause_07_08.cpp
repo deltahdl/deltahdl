@@ -40,4 +40,26 @@ TEST(AssocArrayElaboration, MultipleArrays) {
              "endmodule\n"));
 }
 
+TEST(AssocArrayElaboration, WholeAssocInArithExprRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int x;\n"
+      "  initial x = aa + 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AssocArrayElaboration, WholeAssocEqualityComparisonAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int aa[int];\n"
+             "  int bb[int];\n"
+             "  logic eq;\n"
+             "  initial eq = (aa == bb);\n"
+             "endmodule\n"));
+}
+
 }

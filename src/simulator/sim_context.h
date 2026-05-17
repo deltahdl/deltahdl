@@ -74,6 +74,16 @@ struct QueueRefBinding {
   Variable* local_var = nullptr;
 };
 
+struct AssocArrayObject;
+
+struct AssocRefBinding {
+  AssocArrayObject* assoc = nullptr;
+  bool is_string_key = false;
+  int64_t int_key = 0;
+  std::string str_key;
+  Variable* local_var = nullptr;
+};
+
 struct AssocArrayObject {
   std::map<int64_t, Logic4Vec> int_data;
   std::map<std::string, Logic4Vec> str_data;
@@ -184,6 +194,10 @@ class SimContext {
   void PushQueueRefFrame();
   void RecordQueueRef(const QueueRefBinding& binding);
   std::vector<QueueRefBinding> PopQueueRefFrame();
+
+  void PushAssocRefFrame();
+  void RecordAssocRef(const AssocRefBinding& binding);
+  std::vector<AssocRefBinding> PopAssocRefFrame();
 
   void SetVcdWriter(VcdWriter* vcd) { vcd_writer_ = vcd; }
   VcdWriter* GetVcdWriter() { return vcd_writer_; }
@@ -434,6 +448,7 @@ class SimContext {
   std::vector<ClassObject*> this_stack_;
 
   std::vector<std::vector<QueueRefBinding>> queue_ref_stack_;
+  std::vector<std::vector<AssocRefBinding>> assoc_ref_stack_;
 
   std::unordered_map<std::string_view, uint32_t> type_widths_;
 

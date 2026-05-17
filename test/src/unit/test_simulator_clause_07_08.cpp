@@ -60,4 +60,21 @@ TEST(AssocArraySimulation, NoStorageAllocatedUntilUsed) {
   EXPECT_EQ(v, 0u);
 }
 
+TEST(AssocArraySimulation, RefArgAllocatesNonexistentEntry) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  task automatic inc_ref(ref int x);\n"
+      "    x = x + 1;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    inc_ref(aa[5]);\n"
+      "    result = aa.size();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 1u);
+}
+
 }
