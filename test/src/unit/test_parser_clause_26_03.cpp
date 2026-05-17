@@ -100,7 +100,7 @@ TEST(PackageImport, MultiItemImport) {
   VerifyImportItem(mod->items[1], "pkg", "b");
 }
 
-TEST(PackageImport, MultiItemImportWithWildcardFirst) {
+TEST(PackageImport, MultiItemImportMixesWildcardAndExplicit) {
   auto r = Parse(
       "module m;\n"
       "  import pkg::*, other::func;\n"
@@ -110,16 +110,6 @@ TEST(PackageImport, MultiItemImportWithWildcardFirst) {
   ASSERT_EQ(mod->items.size(), 2);
   EXPECT_EQ(mod->items[0]->import_item.package_name, "pkg");
   EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
-}
-
-TEST(PackageImport, MultiItemImportWithWildcardSecond) {
-  auto r = Parse(
-      "module m;\n"
-      "  import pkg::*, other::func;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 2);
   EXPECT_EQ(mod->items[1]->import_item.package_name, "other");
   EXPECT_EQ(mod->items[1]->import_item.item_name, "func");
 }

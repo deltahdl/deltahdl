@@ -234,4 +234,49 @@ TEST(PackageScopeReference, PackageScopedFunctionCall) {
              "endmodule\n"));
 }
 
+// §26.3: "If the reference is a function or task call, all of the locally
+// visible identifiers to the end of the current scope shall be searched."
+// A function call appearing before the function's textual definition in
+// the same module scope must still bind to that function — the search
+// extends to the end of the current scope for function/task calls,
+// distinguishing the rule from the point-of-reference rule used for other
+// identifier references.
+TEST(PackageImport, FunctionCallBindsToLaterFunctionInSameScope) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int x;\n"
+             "  initial x = helper(2);\n"
+             "  function int helper(int a); return a + 1; endfunction\n"
+             "endmodule\n"));
+}
+
+// §26.3: "If the reference is not found within the current scope, the next
+// outer lexical scope shall be searched."  A name declared at the
+// compilation-unit (outer) scope must be reachable from a module's inner
+// scope by the outer-scope search step (linking §26.3 search to §3.13(c)
+// compilation-unit scope).
+TEST(PackageImport, OuterScopeSearchFindsCompilationUnitName) {
+  EXPECT_TRUE(
+      ElabOk("localparam int WIDTH = 8;\n"
+             "module m;\n"
+             "  logic [WIDTH-1:0] data;\n"
+             "endmodule\n"));
+}
+
+// §26.3: "The search algorithm shall be repeated for each outer lexical
+// scope until an identifier is found that matches the reference or there
+// are no more outer lexical scopes, the compilation-unit scope being the
+// final scope searched.  For a reference to an identifier other than
+// function or task call, it shall be illegal if no identifier can be
+// found that matches the reference."  A bare reference whose name is
+// neither locally declared nor brought in by any wildcard import nor
+// present in an outer scope must be rejected.
+TEST(PackageImport, UnresolvedReferenceIsError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int y;\n"
+             "  initial y = nonexistent_identifier;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

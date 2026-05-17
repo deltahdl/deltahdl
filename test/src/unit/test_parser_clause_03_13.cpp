@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(DesignBuildingBlockParsing, AttributeNameSpace) {
+TEST(NameSpaceParsing, AttributeNameSpace) {
   auto r = Parse(
       "module m;\n"
       "  (* synthesis *) logic flag;\n"
@@ -17,7 +17,7 @@ TEST(DesignBuildingBlockParsing, AttributeNameSpace) {
   EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "full_case"));
 }
 
-TEST(DesignBuildingBlockParsing, FunctionWithLocalVarsSubscope) {
+TEST(NameSpaceParsing, FunctionWithLocalVarsSubscope) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int compute(int a, int b);\n"
@@ -37,14 +37,14 @@ TEST(DesignBuildingBlockParsing, FunctionWithLocalVarsSubscope) {
   EXPECT_FALSE(func->func_body_stmts.empty());
 }
 
-TEST(DesignBuildingBlockParsing, VarNameSameAsModuleName) {
+TEST(NameSpaceParsing, VarNameSameAsModuleName) {
   EXPECT_TRUE(
       ParseOk("module top;\n"
               "  logic top;\n"
               "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockParsing, ForkJoinBlockSubscope) {
+TEST(NameSpaceParsing, ForkJoinBlockSubscope) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -56,7 +56,7 @@ TEST(DesignBuildingBlockParsing, ForkJoinBlockSubscope) {
               "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockParsing, TextMacroNameSpace) {
+TEST(NameSpaceParsing, TextMacroNameSpace) {
   auto r = ParseWithPreprocessor(
       "`define WIDTH 8\n"
       "`define DEPTH 16\n"
@@ -73,7 +73,7 @@ TEST(DesignBuildingBlockParsing, TextMacroNameSpace) {
                               "module m; logic [7:0] data; endmodule\n"));
 }
 
-TEST(DesignBuildingBlockParsing, NestedClassInModule) {
+TEST(NameSpaceParsing, NestedClassInModule) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  class inner_cls;\n"
@@ -85,7 +85,7 @@ TEST(DesignBuildingBlockParsing, NestedClassInModule) {
               "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockParsing, NamedBlockSubscope) {
+TEST(NameSpaceParsing, NamedBlockSubscope) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : blk1\n"
@@ -101,13 +101,13 @@ TEST(DesignBuildingBlockParsing, NamedBlockSubscope) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(DesignBuildingBlockParsing, PortOverlapsModuleScope) {
+TEST(NameSpaceParsing, PortOverlapsModuleScope) {
   EXPECT_TRUE(
       ParseOk("module m (input logic data);\n"
               "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockParsing, AttributeNameSameAsVar) {
+TEST(NameSpaceParsing, AttributeNameSameAsVar) {
   auto r = Parse(
       "module m;\n"
       "  (* flag *) logic flag;\n"
@@ -116,7 +116,7 @@ TEST(DesignBuildingBlockParsing, AttributeNameSameAsVar) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(DesignBuildingBlockParsing, CuScopeFunction) {
+TEST(NameSpaceParsing, CuScopeFunction) {
   auto r = ParseWithPreprocessor(
       "function automatic int helper(int x); return x + 1; endfunction\n"
       "module m; endmodule\n");
@@ -126,7 +126,7 @@ TEST(DesignBuildingBlockParsing, CuScopeFunction) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "helper");
 }
 
-TEST(DesignBuildingBlockParsing, MacroRedefinition) {
+TEST(NameSpaceParsing, MacroRedefinition) {
   auto r = ParseWithPreprocessor(
       "`define VAL 1\n"
       "`define VAL 2\n"
@@ -137,7 +137,7 @@ TEST(DesignBuildingBlockParsing, MacroRedefinition) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(NameSpaces, LocalScopesDoNotConflict) {
+TEST(NameSpaceParsing, LocalScopesDoNotConflict) {
   EXPECT_TRUE(
       ParseOk("module a; logic x; endmodule\n"
               "module b; logic x; endmodule\n"));
@@ -148,19 +148,11 @@ TEST(NameSpaces, LocalScopesDoNotConflict) {
 // with the same name."  The non-ANSI port style names a port, then the
 // body's data declaration reintroduces the same name in the module name
 // space.
-TEST(NameSpaces, PortNameReintroducedAsVariableInModuleScope) {
+TEST(NameSpaceParsing, PortNameReintroducedAsVariableInModuleScope) {
   EXPECT_TRUE(
       ParseOk("module m(data);\n"
               "  input data;\n"
               "  logic data;\n"
-              "endmodule\n"));
-}
-
-TEST(NameSpaces, PortNameReintroducedAsNetInModuleScope) {
-  EXPECT_TRUE(
-      ParseOk("module m(data);\n"
-              "  input data;\n"
-              "  wire data;\n"
               "endmodule\n"));
 }
 

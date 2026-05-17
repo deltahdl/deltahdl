@@ -161,4 +161,126 @@ TEST(HierarchicalNameElaboration,
              "endmodule\n"));
 }
 
+// §23.6: "Inside any module, each module instance ..., generate block
+// instance, task definition, function definition, and named begin-end or
+// fork-join block shall define a new branch of the hierarchy."  A named
+// begin-end block holding its own local declaration must elaborate
+// cleanly as its own branch of the hierarchy tree.
+TEST(HierarchicalNameElaboration, NamedBeginEndBlockCreatesBranch) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  initial begin : blk\n"
+             "    logic [7:0] x;\n"
+             "    x = 8'h11;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §23.6: "Named blocks within named blocks and within tasks and functions
+// shall create new branches."  Two levels of named-block nesting — an
+// outer named begin-end with an inner named begin-end carrying its own
+// declaration — must elaborate cleanly, since each block produces its own
+// hierarchy branch.
+TEST(HierarchicalNameElaboration, NestedNamedBlocksCreateNestedBranches) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  initial begin : outer\n"
+             "    begin : inner\n"
+             "      logic [7:0] x;\n"
+             "      x = 8'h22;\n"
+             "    end\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §23.6: "Similarly, named action blocks of assertions shall create new
+// branches."  An immediate assertion with a labeled fail-action block must
+// elaborate cleanly — the labeled block contributes a named scope in the
+// module's hierarchy tree alongside other named-block branches.
+TEST(HierarchicalNameElaboration, NamedAssertionActionBlockCreatesBranch) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic a;\n"
+             "  initial begin\n"
+             "    assert (a)\n"
+             "      else begin : fail_blk\n"
+             "        $display(\"a low\");\n"
+             "      end\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §23.6 R3: a generate block instance shall define a new branch of the
+// hierarchy.  A named for-generate block must elaborate and its inner
+// declarations must be reachable through the loop-index instance select
+// (linking the §23.6 R3 rule with the §23.6 instance-select syntax).
+TEST(HierarchicalNameElaboration, NamedGenerateBlockCreatesBranch) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  for (genvar i = 0; i < 2; i = i + 1) begin : g\n"
+             "    logic v;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §23.6: "Unnamed generate blocks are exceptions.  They create branches
+// that are visible only from within the block and within any hierarchy
+// instantiated by the block."  An unnamed if-generate must elaborate
+// cleanly — the elaborator assigns it an automatic external name and
+// items inside the block are usable within the block.
+TEST(HierarchicalNameElaboration, UnnamedGenerateBlockCreatesBranch) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  if (1) begin\n"
+             "    logic v;\n"
+             "    initial v = 1'b1;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §23.6: "The expression shall evaluate to one of the legal index values
+// of the array."  An instance-select index outside the declared range of
+// an arrayed module instance must be rejected by the elaborator.
+TEST(HierarchicalNameElaboration, InstanceSelectOutOfRangeError) {
+  EXPECT_FALSE(
+      ElabOk("module child;\n"
+             "  logic sig;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  child c [3:0] ();\n"
+             "  logic x;\n"
+             "  assign x = c[5].sig;\n"
+             "endmodule\n"));
+}
+
+// §23.6: "If the array name is not the last path element in the
+// hierarchical name, the instance select expression is required."  A
+// hierarchical reference that traverses an arrayed instance without a
+// select must be rejected.
+TEST(HierarchicalNameElaboration, InstanceArrayRefMissingSelectError) {
+  EXPECT_FALSE(
+      ElabOk("module child;\n"
+             "  logic sig;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  child c [3:0] ();\n"
+             "  logic x;\n"
+             "  assign x = c.sig;\n"
+             "endmodule\n"));
+}
+
+// §23.6: An in-range instance select on an arrayed instance must
+// elaborate cleanly.  Complements the out-of-range error case.
+TEST(HierarchicalNameElaboration, InstanceSelectInRangeElaboratesOk) {
+  EXPECT_TRUE(
+      ElabOk("module child;\n"
+             "  logic sig;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  child c [3:0] ();\n"
+             "  logic x;\n"
+             "  assign x = c[2].sig;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

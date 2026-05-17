@@ -87,6 +87,32 @@ TEST(HierarchicalNameSimulation, MultiLevelHierarchicalRead) {
   EXPECT_EQ(v->value.ToUint64(), 77u);
 }
 
+// §23.6: "The instance name $root refers to the top of the instantiated
+// design and is used to unambiguously gain access to the top of the
+// design."  A `$root`-prefixed hierarchical reference must resolve at
+// runtime to the same value as the unqualified reference at the top.
+TEST(HierarchicalNameSimulation, RootPrefixedHierarchicalRead) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [7:0] sig;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    sig = 8'd33;\n"
+      "    #1;\n"
+      "    result = $root.top.sig;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* v = f.ctx.FindVariable("result");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 33u);
+}
+
 // --- R14: Hierarchical name used in event expression (trigger) ---
 
 TEST(HierarchicalNameSimulation, HierarchicalNameInEventExpression) {

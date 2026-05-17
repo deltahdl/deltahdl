@@ -1247,6 +1247,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ValidateProgramSubroutineCall(decl);
   ValidateHierRefToAutomatic(decl);
   ValidateHierRefToImportedName(decl, mod);
+  ValidateHierRefInstanceArray(decl);
   ValidateForwardTypedefsInScope(decl);
   ValidateForwardTypedefScopePrefix(decl);
 }
@@ -1359,6 +1360,74 @@ void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,
     }
   }
   for (const auto* ma : accesses) check_member_access(ma);
+}
+
+// §23.6: When a hierarchical name traverses an arrayed module instance,
+// the array name shall be followed by a constant-expression instance
+// select that evaluates to one of the legal index values of the array.
+// Bare references through an instance array (no select) are illegal.
+void Elaborator::ValidateHierRefInstanceArray(const ModuleDecl* decl) {
+  struct ArrayBounds {
+    int64_t low;
+    int64_t high;
+  };
+  std::unordered_map<std::string_view, ArrayBounds> arrayed;
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kModuleInst) continue;
+    if (!item->inst_range_left || !item->inst_range_right) continue;
+    auto lhi = ConstEvalInt(item->inst_range_left);
+    auto rhi = ConstEvalInt(item->inst_range_right);
+    if (!lhi || !rhi) continue;
+    ArrayBounds b;
+    b.low = std::min(*lhi, *rhi);
+    b.high = std::max(*lhi, *rhi);
+    arrayed[item->inst_name] = b;
+  }
+  if (arrayed.empty()) return;
+
+  std::vector<const Expr*> accesses;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CollectMemberAccess(item->assign_lhs, accesses);
+      CollectMemberAccess(item->assign_rhs, accesses);
+    }
+    if (IsProcBodyItem(item->kind)) {
+      CollectMemberAccessInStmt(item->body, accesses);
+    }
+  }
+
+  for (const auto* ma : accesses) {
+    if (!ma || ma->kind != ExprKind::kMemberAccess || !ma->lhs) continue;
+    const Expr* base = ma->lhs;
+    std::string_view name;
+    const Expr* select_index = nullptr;
+    if (base->kind == ExprKind::kIdentifier) {
+      name = base->text;
+    } else if (base->kind == ExprKind::kSelect && base->base &&
+               base->base->kind == ExprKind::kIdentifier) {
+      name = base->base->text;
+      select_index = base->index;
+    } else {
+      continue;
+    }
+    auto it = arrayed.find(name);
+    if (it == arrayed.end()) continue;
+    if (!select_index) {
+      diag_.Error(ma->range.start,
+                  std::format("hierarchical reference to instance array '{}' "
+                              "requires an instance select",
+                              name));
+      continue;
+    }
+    auto idx = ConstEvalInt(select_index);
+    if (!idx) continue;
+    if (*idx < it->second.low || *idx > it->second.high) {
+      diag_.Error(select_index->range.start,
+                  std::format("instance select [{}] is out of range for "
+                              "instance array '{}' [{}:{}]",
+                              *idx, name, it->second.high, it->second.low));
+    }
+  }
 }
 
 // --- Module instantiation ---

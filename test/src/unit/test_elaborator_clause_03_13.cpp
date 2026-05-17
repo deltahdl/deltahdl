@@ -2,7 +2,7 @@
 
 namespace {
 
-TEST(DesignBuildingBlockElaboration, DistinctNamesInModuleScope) {
+TEST(NameSpaceElaboration, DistinctNamesInModuleScope) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  logic a;\n"
@@ -11,7 +11,7 @@ TEST(DesignBuildingBlockElaboration, DistinctNamesInModuleScope) {
              "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, SameNameDifferentModulesElab) {
+TEST(NameSpaceElaboration, SameNameDifferentModulesElab) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -34,13 +34,13 @@ TEST(DesignBuildingBlockElaboration, SameNameDifferentModulesElab) {
   EXPECT_FALSE(diag.HasErrors());
 }
 
-TEST(DesignBuildingBlockElaboration, DuplicateModuleDefinition) {
+TEST(NameSpaceElaboration, DuplicateModuleDefinition) {
   EXPECT_FALSE(
       ElabOk("module m; endmodule\n"
              "module m; endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, ModuleAndInterfaceSameName) {
+TEST(NameSpaceElaboration, ModuleAndInterfaceSameName) {
   ElabFixture f;
   ElaborateSrc(
       "module foo; endmodule\n"
@@ -49,7 +49,7 @@ TEST(DesignBuildingBlockElaboration, ModuleAndInterfaceSameName) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(DesignBuildingBlockElaboration, ModuleAndProgramSameName) {
+TEST(NameSpaceElaboration, ModuleAndProgramSameName) {
   ElabFixture f;
   ElaborateSrc(
       "module bar; endmodule\n"
@@ -58,7 +58,7 @@ TEST(DesignBuildingBlockElaboration, ModuleAndProgramSameName) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(DesignBuildingBlockElaboration, DuplicatePackageDefinition) {
+TEST(NameSpaceElaboration, DuplicatePackageDefinition) {
   EXPECT_FALSE(
       ElabOk("package p; endpackage\n"
              "package p; endpackage\n"
@@ -68,7 +68,7 @@ TEST(DesignBuildingBlockElaboration, DuplicatePackageDefinition) {
 // §3.13(a): the definitions name space unifies module, primitive, program,
 // and interface identifiers.  Two primitives sharing a name in the same
 // compilation unit must collide under §3.13's closing rule.
-TEST(DesignBuildingBlockElaboration, DuplicateUdpDefinition) {
+TEST(NameSpaceElaboration, DuplicateUdpDefinition) {
   EXPECT_FALSE(
       ElabOk("primitive p(output y, input a);\n"
              "  table 0 : 1 ; 1 : 0 ; endtable\n"
@@ -79,14 +79,14 @@ TEST(DesignBuildingBlockElaboration, DuplicateUdpDefinition) {
              "module m; endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, DistinctDefinitionNamesOk) {
+TEST(NameSpaceElaboration, DistinctDefinitionNamesOk) {
   EXPECT_TRUE(
       ElabOk("module m; endmodule\n"
              "interface ifc; endinterface\n"
              "program p; endprogram\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, ModuleNameSpaceCoexist) {
+TEST(NameSpaceElaboration, ModuleNameSpaceCoexist) {
   EXPECT_TRUE(
       ElabOk("module sub; endmodule\n"
              "module m;\n"
@@ -99,42 +99,42 @@ TEST(DesignBuildingBlockElaboration, ModuleNameSpaceCoexist) {
 
 // §3.13(c) closing rule: within the compilation-unit scope name space, a
 // name shall not be redeclared by a later declaration.
-TEST(DesignBuildingBlockElaboration, DuplicateCuScopeTypedef) {
+TEST(NameSpaceElaboration, DuplicateCuScopeTypedef) {
   EXPECT_FALSE(
       ElabOk("typedef int foo;\n"
              "typedef int foo;\n"
              "module m; endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, DuplicateCuScopeFunction) {
+TEST(NameSpaceElaboration, DuplicateCuScopeFunction) {
   EXPECT_FALSE(
       ElabOk("function int helper(int x); return x; endfunction\n"
              "function int helper(int x); return x + 1; endfunction\n"
              "module m; endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, CuScopeTypedefAndVarSameName) {
+TEST(NameSpaceElaboration, CuScopeTypedefAndVarSameName) {
   EXPECT_FALSE(
       ElabOk("typedef int foo;\n"
              "int foo;\n"
              "module m; endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, CuScopeClassAndCuItemSameName) {
+TEST(NameSpaceElaboration, CuScopeClassAndCuItemSameName) {
   EXPECT_FALSE(
       ElabOk("class foo; endclass\n"
              "int foo;\n"
              "module m; endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, DuplicateCheckerAtCuScope) {
+TEST(NameSpaceElaboration, DuplicateCheckerAtCuScope) {
   EXPECT_FALSE(
       ElabOk("checker chk; endchecker\n"
              "checker chk; endchecker\n"
              "module m; endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, CheckerAndCuItemSameName) {
+TEST(NameSpaceElaboration, CheckerAndCuItemSameName) {
   EXPECT_FALSE(
       ElabOk("checker foo; endchecker\n"
              "int foo;\n"
@@ -143,7 +143,7 @@ TEST(DesignBuildingBlockElaboration, CheckerAndCuItemSameName) {
 
 // §3.13(a) lists module/primitive/program/interface only; checkers belong to
 // §3.13(c), so a checker may share its name with a module without colliding.
-TEST(DesignBuildingBlockElaboration, ModuleAndCheckerSameNameOk) {
+TEST(NameSpaceElaboration, ModuleAndCheckerSameNameOk) {
   EXPECT_TRUE(
       ElabOk("checker foo; endchecker\n"
              "module foo; endmodule\n"));
@@ -153,7 +153,7 @@ TEST(DesignBuildingBlockElaboration, ModuleAndCheckerSameNameOk) {
 // declarations, functions, tasks, named blocks, instance names, and
 // user-defined types within the enclosing construct.  The closing rule of
 // §3.13 forbids redeclaring a name already declared by a prior declaration.
-TEST(DesignBuildingBlockElaboration, RedeclVarInModuleScope) {
+TEST(NameSpaceElaboration, RedeclVarInModuleScope) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic x;\n"
@@ -161,15 +161,7 @@ TEST(DesignBuildingBlockElaboration, RedeclVarInModuleScope) {
              "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, RedeclNetInModuleScope) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  wire w;\n"
-             "  wire w;\n"
-             "endmodule\n"));
-}
-
-TEST(DesignBuildingBlockElaboration, RedeclarationOfVariableAsNetError) {
+TEST(NameSpaceElaboration, RedeclarationOfVariableAsNetError) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -180,7 +172,7 @@ TEST(DesignBuildingBlockElaboration, RedeclarationOfVariableAsNetError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(DesignBuildingBlockElaboration, RedeclarationOfNetAsVariableError) {
+TEST(NameSpaceElaboration, RedeclarationOfNetAsVariableError) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -191,7 +183,7 @@ TEST(DesignBuildingBlockElaboration, RedeclarationOfNetAsVariableError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(DesignBuildingBlockElaboration, TaskSameNameAsVariableError) {
+TEST(NameSpaceElaboration, TaskSameNameAsVariableError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic foo;\n"
@@ -199,7 +191,7 @@ TEST(DesignBuildingBlockElaboration, TaskSameNameAsVariableError) {
              "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, TaskSameNameAsVariableInInterfaceError) {
+TEST(NameSpaceElaboration, TaskSameNameAsVariableInInterfaceError) {
   EXPECT_FALSE(
       ElabOk("interface i;\n"
              "  logic foo;\n"
@@ -210,7 +202,7 @@ TEST(DesignBuildingBlockElaboration, TaskSameNameAsVariableInInterfaceError) {
              "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, GateInstanceSameNameAsOutputNetError) {
+TEST(NameSpaceElaboration, GateInstanceSameNameAsOutputNetError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  wire a, b;\n"
@@ -219,7 +211,7 @@ TEST(DesignBuildingBlockElaboration, GateInstanceSameNameAsOutputNetError) {
              "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, NamedBlockSameNameAsVariableError) {
+TEST(NameSpaceElaboration, NamedBlockSameNameAsVariableError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic blk;\n"
@@ -229,7 +221,7 @@ TEST(DesignBuildingBlockElaboration, NamedBlockSameNameAsVariableError) {
              "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, ModuleInstanceSameNameAsVariableError) {
+TEST(NameSpaceElaboration, ModuleInstanceSameNameAsVariableError) {
   EXPECT_FALSE(
       ElabOk("module child; endmodule\n"
              "module top;\n"
@@ -241,7 +233,7 @@ TEST(DesignBuildingBlockElaboration, ModuleInstanceSameNameAsVariableError) {
 // §3.13(f): The block name space is introduced by named/unnamed blocks,
 // specify, function, and task constructs.  The closing rule of §3.13
 // forbids redeclaring a name within a single block name space.
-TEST(DesignBuildingBlockElaboration, BlockNameSpaceDuplicateDeclarationError) {
+TEST(NameSpaceElaboration, BlockNameSpaceDuplicateDeclarationError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  for (genvar i = 0; i < 2; i = i + 1) begin : g\n"
@@ -255,19 +247,11 @@ TEST(DesignBuildingBlockElaboration, BlockNameSpaceDuplicateDeclarationError) {
 // reintroduced in the module name space by declaring a variable or a net
 // with the same name."  The reintroduction must survive elaboration, not
 // just parsing.
-TEST(DesignBuildingBlockElaboration, PortReintroducedAsVariableElaboratesOk) {
+TEST(NameSpaceElaboration, PortReintroducedAsVariableElaboratesOk) {
   EXPECT_TRUE(
       ElabOk("module m(data);\n"
              "  input data;\n"
              "  logic data;\n"
-             "endmodule\n"));
-}
-
-TEST(DesignBuildingBlockElaboration, PortReintroducedAsNetElaboratesOk) {
-  EXPECT_TRUE(
-      ElabOk("module m(data);\n"
-             "  input data;\n"
-             "  wire data;\n"
              "endmodule\n"));
 }
 

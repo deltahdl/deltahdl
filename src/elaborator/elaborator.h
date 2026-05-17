@@ -635,6 +635,12 @@ class Elaborator {
   /// §23.6 R15: Hierarchical references into checkers prohibited.
   void ValidateHierRefIntoChecker(const ModuleDecl* decl);
 
+  /// §23.6: Instance select on hierarchical references through arrayed
+  /// module instances.  An instance select expression is required when an
+  /// arrayed instance name is not the last path element, and the select
+  /// shall evaluate to one of the legal index values of the array.
+  void ValidateHierRefInstanceArray(const ModuleDecl* decl);
+
   /// §23.6 R12: Objects in automatic tasks/functions inaccessible by hier ref.
   void ValidateHierRefToAutomatic(const ModuleDecl* decl);
 

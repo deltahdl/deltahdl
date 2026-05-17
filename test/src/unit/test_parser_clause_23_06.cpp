@@ -99,4 +99,30 @@ TEST(HierarchicalNameParsing, HierarchicalNameInNonblockingAssignLhs) {
               "endmodule\n"));
 }
 
+// §23.6 Syntax 23-7: hierarchical_identifier ::= [ $root . ] { identifier
+// constant_bit_select . } identifier.  The optional `$root .` prefix marks
+// the absolute root of the design; the parser must accept it on a
+// hierarchical reference.
+TEST(HierarchicalNameParsing, RootPrefixedHierarchicalReference) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    $display(\"%0d\", $root.top.sub.sig);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// §23.6 Syntax 23-7: each non-final identifier in a hierarchical name may
+// be followed by a constant_bit_select (the §23.6 "instance select"
+// expression for array elements).  The parser must accept a hierarchical
+// reference whose interior component carries a bit-select.
+TEST(HierarchicalNameParsing, HierarchicalReferenceWithInstanceSelect) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    $display(\"%0d\", top.arr[3].sig);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

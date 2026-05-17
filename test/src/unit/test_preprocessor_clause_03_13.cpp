@@ -1,10 +1,11 @@
 #include "fixture_parser.h"
+#include "fixture_preprocessor.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleAndPackageInDefinitionNameSpace) {
+TEST(NameSpacePreprocessing, ModuleAndPackageInDefinitionNameSpace) {
   auto r = ParseWithPreprocessor(
       "package my_pkg;\n"
       "  typedef int myint;\n"
@@ -26,7 +27,7 @@ static bool HasItemOfKindAndName(const std::vector<ModuleItem*>& items,
   return false;
 }
 
-TEST(DesignBuildingBlockParsing, SameNameVarsInDifferentModules) {
+TEST(NameSpacePreprocessing, SameNameVarsInDifferentModules) {
   auto r = ParseWithPreprocessor(
       "module a;\n"
       "  logic [7:0] data;\n"
@@ -44,7 +45,7 @@ TEST(DesignBuildingBlockParsing, SameNameVarsInDifferentModules) {
                                    ModuleItemKind::kVarDecl, "data"));
 }
 
-TEST(DesignBuildingBlockParsing, TaskAndFunctionInSameModule) {
+TEST(NameSpacePreprocessing, TaskAndFunctionInSameModule) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  function int add(int a, int b);\n"
@@ -68,7 +69,7 @@ TEST(DesignBuildingBlockParsing, TaskAndFunctionInSameModule) {
   EXPECT_TRUE(found_task);
 }
 
-TEST(DesignBuildingBlockParsing, PortNamesInModuleScope) {
+TEST(NameSpacePreprocessing, PortNamesInModuleScope) {
   auto r = ParseWithPreprocessor(
       "module m (input logic clk, input logic rst_n, output logic [7:0] q);\n"
       "endmodule\n");
@@ -91,7 +92,7 @@ static bool HasAttrNamed(const std::vector<ModuleItem*>& items,
   return false;
 }
 
-TEST(DesignBuildingBlockParsing, AllEightNameSpaces) {
+TEST(NameSpacePreprocessing, AllEightNameSpaces) {
   auto r = ParseWithPreprocessor(
 
       "`define VAL 1\n"
@@ -125,6 +126,23 @@ TEST(DesignBuildingBlockParsing, AllEightNameSpaces) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].name, "clk");
 
   EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "keep"));
+}
+
+// §3.13(d): "Subsequent definitions of the same name override the
+// previous definitions for the balance of the input files."  The
+// preprocessor's text-macro name space must reflect the most-recent
+// definition when expanding subsequent references — defining a macro
+// twice with different bodies must make the second body win.
+TEST(NameSpacePreprocessing, TextMacroLaterDefinitionOverridesEarlier) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define W 4\n"
+      "`define W 8\n"
+      "module m; logic [`W-1:0] data; endmodule\n",
+      f);
+  EXPECT_NE(out.find("[8-1:0]"), std::string::npos);
+  EXPECT_EQ(out.find("[4-1:0]"), std::string::npos);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
