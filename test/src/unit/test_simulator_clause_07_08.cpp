@@ -49,4 +49,15 @@ TEST(AssocArraySimulation, OverwriteElement) {
   EXPECT_EQ(v, 200u);
 }
 
+TEST(AssocArraySimulation, NoStorageAllocatedUntilUsed) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  initial result = aa.size();\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0u);
+}
+
 }

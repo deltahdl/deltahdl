@@ -42,4 +42,20 @@ TEST(AssocArrayParsing, MultipleDeclarations) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
+TEST(AssocArrayParsing, InlineStructTypeAsIndexRejected) {
+  auto r = Parse(
+      "module t;\n"
+      "  int aa [ struct { int x; } ];\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(AssocArrayParsing, InlineEnumTypeAsIndexRejected) {
+  auto r = Parse(
+      "module t;\n"
+      "  int aa [ enum { A, B } ];\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }
