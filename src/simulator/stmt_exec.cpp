@@ -1544,4 +1544,15 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
 }
 
+// §4.7 ¶1 sentence 3: "Time control statements are the # expression and
+// @ expression constructs (see 9.4)." StmtKind::kDelay carries the #
+// expression and StmtKind::kEventControl carries the @ expression, so
+// only those two kinds satisfy §4.7's definition; every other kind —
+// including the broader StmtKind::kTimingControl wrapper and cycle-delay,
+// wait, and wait-fork constructs governed by other subclauses — returns
+// false.
+bool IsTimeControlStatement(StmtKind kind) {
+  return kind == StmtKind::kDelay || kind == StmtKind::kEventControl;
+}
+
 }  // namespace delta

@@ -158,6 +158,33 @@ class Scheduler {
     }
   }
 
+  // §4.7 ¶1 sentence 1: "active events can be taken off the Active or
+  // Reactive event region and processed in any order". Returns true for
+  // the two regions §4.7 names, false for every other region. Codifies
+  // the §4.7 latitude at the region level so callers can decide where
+  // intra-region ordering is constrained to FIFO and where any order
+  // permitted by §4.7 is acceptable.
+  static bool IsAnyOrderRegion(Region r) {
+    return r == Region::kActive || r == Region::kReactive;
+  }
+
+  // §4.7 ¶1 last sentence: "the order of interleaved execution is
+  // nondeterministic and not under control of the user". Returns false
+  // to attest that the scheduler exposes no user-facing API for
+  // selecting the order of intra-region event processing.
+  static constexpr bool AllowsUserOrderControl() { return false; }
+
+  // §4.7 ¶1 sentences 2–4: production code records each time the
+  // simulator suspends evaluation of a procedural statement mid-flight
+  // and re-queues the remainder as a pending event in the event region.
+  // Callers in stmt_exec invoke this when they elect to split a
+  // statement without a time control (# or @) into more than one event,
+  // making the §4.7 permission observable.
+  void NoteMidStatementSuspension() { ++mid_statement_suspension_count_; }
+  size_t MidStatementSuspensionCount() const {
+    return mid_statement_suspension_count_;
+  }
+
  private:
   void ExecuteTimeSlot(TimeSlot& slot);
   void ExecuteActiveRegions(TimeSlot& slot);
@@ -179,6 +206,7 @@ class Scheduler {
   size_t illegal_postponed_write_count_ = 0;
   size_t update_events_scheduled_count_ = 0;
   size_t evaluation_events_scheduled_count_ = 0;
+  size_t mid_statement_suspension_count_ = 0;
   bool stop_requested_ = false;
 };
 
