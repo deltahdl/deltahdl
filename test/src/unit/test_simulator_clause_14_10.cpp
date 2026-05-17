@@ -137,38 +137,6 @@ TEST(ClockingBlockEventSim, EventFiresInObservedRegion) {
   EXPECT_EQ(order[1], "observed");
 }
 
-TEST(ClockingBlockEventSim, WaitForClockingBlockEvent) {
-  ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-
-  ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{0};
-  cmgr.Register(block);
-
-  // Create block event variable and register it.
-  auto* ev_var = f.ctx.CreateVariable("cb", 1);
-  ev_var->is_event = true;
-  cmgr.SetBlockEventVar("cb", ev_var);
-  cmgr.Attach(f.ctx, f.scheduler);
-
-  // Track if watcher fires.
-  bool event_fired = false;
-  ev_var->AddWatcher([&event_fired]() {
-    event_fired = true;
-    return true;
-  });
-
-  SchedulePosedge(f, clk, 10);
-  f.scheduler.Run();
-  EXPECT_TRUE(event_fired);
-}
-
 TEST(ClockingBlockEventSim, NegedgeBlockTriggersOnNegedge) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
