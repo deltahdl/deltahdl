@@ -294,6 +294,8 @@ class Parser {
   Stmt* ParseImmediateAssert();
   Stmt* ParseImmediateAssume();
   Stmt* ParseImmediateAssertLike(StmtKind kind, TokenKind keyword);
+  // §16.14.6 P1: parse a concurrent assertion embedded in procedural code.
+  Stmt* ParseProceduralConcurrentAssertLike(StmtKind kind);
   ModuleItem* ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind);
   Stmt* ParseExpectStmt();
   Stmt* ParseImmediateCover();

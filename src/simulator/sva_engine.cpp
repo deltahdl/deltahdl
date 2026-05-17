@@ -164,6 +164,209 @@ PropertyResult ResolveNonOverlapping(bool consequent_matched) {
 }
 
 // =============================================================================
+// §16.2 — assertion kinds
+// =============================================================================
+
+bool IsImmediateAssertionKindAllowed(AssertionKind kind) {
+  // §16.2: "There is no immediate restrict assertion statement."
+  return kind != AssertionKind::kRestrict;
+}
+
+bool ConcurrentTimingUsesSampledValues(AssertionTiming timing) {
+  // §16.2: "Concurrent assertions are based on clock semantics and use
+  // sampled values of their expressions."  Immediate assertions are
+  // executed under simulation event semantics and do not.
+  return timing == AssertionTiming::kConcurrent;
+}
+
+// =============================================================================
+// §16.5.1 — sampled values
+// =============================================================================
+
+SampledValue SampleStaticVariable(uint64_t preponed_value, SimTime t,
+                                  uint64_t type_default) {
+  // §16.5.1: "The sampled value of a variable in a time slot corresponding
+  // to time greater than 0 is the value of this variable in the Preponed
+  // region of this time slot."  At time 0 the default sampled value is
+  // used.
+  if (t.ticks == 0) {
+    return SampledValue{type_default, SampleMode::kDefault};
+  }
+  return SampledValue{preponed_value, SampleMode::kPreponed};
+}
+
+SampledValue SampleAutomaticVariable(uint64_t current_value) {
+  // §16.5.1: "Sampled values of automatic variables (see 16.14.6), local
+  // variables (see 16.10), and active free checker variables are their
+  // current values."
+  return SampledValue{current_value, SampleMode::kCurrent};
+}
+
+SampledValue DefaultSampledValueOfTriggered() {
+  // §16.5.1: "The default sampled value of the `triggered` event method
+  // ... is false (1'b0)."
+  return SampledValue{0, SampleMode::kDefault};
+}
+
+SampledValue DefaultSampledValueOfMatched() {
+  // §16.5.1: the sequence methods `triggered` and `matched` share the
+  // same false default sampled value.
+  return SampledValue{0, SampleMode::kDefault};
+}
+
+SampledValue SampleSingleVariableExpression(SampledValue var_sample) {
+  // §16.5.1: "The sampled value of an expression consisting of a single
+  // variable is the sampled value of this variable."  The expression
+  // sampled value is the variable's sampled value, unchanged.
+  return var_sample;
+}
+
+SampledValue SampleConstCastExpression(uint64_t argument_current_value) {
+  // §16.5.1: "The sampled value of a `const` cast expression ... is
+  // defined as the current value of its argument."
+  return SampledValue{argument_current_value, SampleMode::kCurrent};
+}
+
+SampledValue SampledValueOfTriggered(bool current_returned) {
+  // §16.5.1: "The sampled value of the `triggered` event method ... is
+  // defined as the current value returned by the event property or
+  // sequence method."
+  return SampledValue{current_returned ? 1u : 0u, SampleMode::kCurrent};
+}
+
+SampledValue SampledValueOfMatched(bool current_returned) {
+  // §16.5.1: same rule for the sequence method `matched`.
+  return SampledValue{current_returned ? 1u : 0u, SampleMode::kCurrent};
+}
+
+SampledValue SampleRecursiveExpression(
+    SampledValue a, SampledValue b,
+    uint64_t (*combinator)(uint64_t, uint64_t)) {
+  // §16.5.1: "The sampled value of any other expression is defined
+  // recursively using the values of its arguments."  The combinator is
+  // applied to the already-sampled subexpressions.  The composite mode
+  // tracks kCurrent if either side is current (since current-value
+  // semantics propagate per the §16.14.6 exception), otherwise stays
+  // Preponed.
+  SampleMode mode =
+      (a.mode == SampleMode::kCurrent || b.mode == SampleMode::kCurrent)
+          ? SampleMode::kCurrent
+          : SampleMode::kPreponed;
+  return SampledValue{combinator(a.value, b.value), mode};
+}
+
+SampledValue DefaultSampledValueOfVariableOrNet(uint64_t type_default) {
+  // §16.5.1: "The default sampled value of any other variable or net is
+  // the default value of the corresponding type."
+  return SampledValue{type_default, SampleMode::kDefault};
+}
+
+bool IsClockingBlockInputSamplingValid(ClockingInputSkew skew) {
+  // §16.5.1: "If a variable is an input variable of a clocking block,
+  // the variable shall be sampled by the clocking block with #1step
+  // sampling.  Any other type of sampling for the clocking block
+  // variable shall result in an error."
+  return skew == ClockingInputSkew::kStep1;
+}
+
+// =============================================================================
+// §16.14.6 — procedural assertion queue
+// =============================================================================
+
+void ProceduralAssertionQueue::Enqueue(PendingProceduralAssertion pending) {
+  // §16.14.6: incoming entries are pending; they are not yet matured.
+  pending.matured = false;
+  queue_.push_back(std::move(pending));
+}
+
+void ProceduralAssertionQueue::MatureAll() {
+  // §16.14.6: "In the Observed region of each simulation time step, each
+  // pending procedural assertion instance that is currently present in a
+  // procedural assertion queue shall mature, which means it is confirmed
+  // for execution."
+  for (auto& p : queue_) p.matured = true;
+}
+
+void ProceduralAssertionQueue::Flush() {
+  // §16.14.6: "If a procedural assertion flush point ... is reached in a
+  // process, its procedural assertion queue is cleared.  Any currently
+  // pending procedural assertion instances will not mature, unless again
+  // placed on the queue."
+  queue_.clear();
+}
+
+uint32_t ProceduralAssertionQueue::Size() const {
+  return static_cast<uint32_t>(queue_.size());
+}
+
+uint32_t ProceduralAssertionQueue::MaturedCount() const {
+  uint32_t n = 0;
+  for (const auto& p : queue_) {
+    if (p.matured) ++n;
+  }
+  return n;
+}
+
+bool IsStaticConcurrentAssertion(bool appears_in_procedural_code) {
+  // §16.14.6: "A concurrent assertion statement that appears outside
+  // procedural code is referred to as a static concurrent assertion
+  // statement."  The negation of the procedural-context flag.
+  return !appears_in_procedural_code;
+}
+
+bool IsAutomaticAllowedInClockingEvent(bool variable_is_automatic) {
+  // §16.14.6: "It shall be illegal to use automatic variables in
+  // clocking events."
+  return !variable_is_automatic;
+}
+
+InferredClock InferClockForProceduralConcurrentAssertion(
+    std::string_view proc_context_clock,
+    std::string_view default_clock) {
+  // §16.14.6: "If no clocking event is specified in a procedural
+  // concurrent assertion, the leading clocking event of the assertion
+  // shall be inferred from the procedural context, if possible.  If no
+  // clock can be inferred from the procedural context, then the clocks
+  // shall be inferred from the default clocking ..."
+  if (!proc_context_clock.empty()) {
+    return InferredClock{InferredClockKind::kFromProceduralContext,
+                         proc_context_clock};
+  }
+  if (!default_clock.empty()) {
+    return InferredClock{InferredClockKind::kFromDefaultClocking,
+                         default_clock};
+  }
+  return InferredClock{InferredClockKind::kNotInferrable, {}};
+}
+
+bool SatisfiesClockInferenceRequirements(bool no_blocking_timing_control,
+                                          bool exactly_one_event_control,
+                                          bool unique_qualifying_event_expr) {
+  // §16.14.6: "A clock shall be inferred for the context of an always
+  // or initial procedure that satisfies the following requirements:"
+  // a) no blocking timing control, b) exactly one event control,
+  // c) exactly one qualifying event expression.  All three must hold.
+  return no_blocking_timing_control && exactly_one_event_control &&
+         unique_qualifying_event_expr;
+}
+
+void MaturedAssertionQueue::Place(PendingProceduralAssertion matured) {
+  // §16.14.6: matured instances whose leading clocking event has not
+  // occurred this time step go to the matured queue to wait for the
+  // next clocking event.
+  matured.matured = true;
+  queue_.push_back(std::move(matured));
+}
+
+std::vector<PendingProceduralAssertion> MaturedAssertionQueue::TakeAll() {
+  return std::exchange(queue_, {});
+}
+
+uint32_t MaturedAssertionQueue::Size() const {
+  return static_cast<uint32_t>(queue_.size());
+}
+
+// =============================================================================
 // DeferredAssertion action execution
 // =============================================================================
 
@@ -277,6 +480,13 @@ void SvaEngine::KillAssertionsForInstance(std::string_view inst) {
 
 uint32_t SvaEngine::DeferredQueueSize() const {
   return static_cast<uint32_t>(deferred_queue_.size());
+}
+
+ProceduralAssertionQueue& SvaEngine::GetProceduralQueue(
+    std::string_view process_id) {
+  // §16.14.6: lazily allocate a procedural assertion queue per executing
+  // process.  Each process owns its own queue.
+  return procedural_queues_[std::string(process_id)];
 }
 
 }  // namespace delta

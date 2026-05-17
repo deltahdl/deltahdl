@@ -16,12 +16,65 @@ static void ExpectDeferredHashZero(DiagEngine& diag, const Token& tok) {
   }
 }
 
+// §16.14.6: skip a balanced parenthesised property_spec embedded in a
+// procedural concurrent assertion.  Mirrors the module-level skip.
+static void SkipBalancedPropertySpec(Lexer& lexer) {
+  int depth = 1;
+  while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
+    if (lexer.Peek().Is(TokenKind::kLParen)) {
+      ++depth;
+    } else if (lexer.Peek().Is(TokenKind::kRParen)) {
+      --depth;
+      if (depth == 0) break;
+    }
+    lexer.Next();
+  }
+}
+
+// §16.14.6 P1: "A concurrent assertion statement can also be embedded in a
+// procedural block."  When the immediate-assertion path sees the `property`
+// keyword right after assert/assume/cover, dispatch to a procedural
+// concurrent assertion parser instead of the §16.3 immediate form.
+Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = kind;
+  stmt->range.start = CurrentLoc();
+  // §16.14.6 P2: this is a "procedural concurrent assertion".  The AST
+  // node records that distinction via the is_procedural_concurrent flag so
+  // downstream stages can tell it apart from an immediate assertion.
+  stmt->is_procedural_concurrent = true;
+  Expect(TokenKind::kKwProperty);
+  Expect(TokenKind::kLParen);
+  stmt->assert_expr = nullptr;
+  SkipBalancedPropertySpec(lexer_);
+  Expect(TokenKind::kRParen);
+
+  if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwElse)) {
+    stmt->assert_pass_stmt = ParseStmt();
+  }
+  if (Match(TokenKind::kKwElse)) {
+    stmt->assert_fail_stmt = ParseStmt();
+  }
+  if (!stmt->assert_pass_stmt && !stmt->assert_fail_stmt) {
+    Expect(TokenKind::kSemicolon);
+  }
+  return stmt;
+}
+
 // Shared logic for immediate assert/assume (§16.3).
 Stmt* Parser::ParseImmediateAssertLike(StmtKind kind, TokenKind keyword) {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = kind;
   stmt->range.start = CurrentLoc();
   Expect(keyword);
+
+  // §16.14.6 P1: `assert property (...)` / `assume property (...)` inside
+  // procedural code is a procedural concurrent assertion, not an
+  // immediate assertion.  Dispatch to the dedicated path so the §16.3
+  // immediate-assertion grammar isn't applied to a concurrent form.
+  if (Check(TokenKind::kKwProperty)) {
+    return ParseProceduralConcurrentAssertLike(kind);
+  }
 
   // §A.6.10: deferred_immediate — assert #0 (...) or assert final (...)
   if (Match(TokenKind::kHash)) {
@@ -68,6 +121,13 @@ Stmt* Parser::ParseImmediateCover() {
   stmt->kind = StmtKind::kCoverImmediate;
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwCover);
+
+  // §16.14.6 P1: `cover property (...)` in procedural code is a procedural
+  // concurrent assertion.  `cover sequence (...)` (§16.5 grammar) is also
+  // allowed in procedural context per §16.14.6.
+  if (Check(TokenKind::kKwProperty)) {
+    return ParseProceduralConcurrentAssertLike(StmtKind::kCoverImmediate);
+  }
 
   // §A.6.10: deferred_immediate — cover #0 (...) or cover final (...)
   if (Match(TokenKind::kHash)) {

@@ -141,6 +141,16 @@ Stmt* Parser::ParseStmtBody() {
       return ParseImmediateAssume();
     case TokenKind::kKwCover:
       return ParseImmediateCover();
+    case TokenKind::kKwRestrict:
+      // §16.2: "There is no immediate restrict assertion statement."  The
+      // `restrict` keyword is only valid at module-item level as
+      // `restrict property (...)`.  Reject it inside procedural code with
+      // a diagnostic so the rule shows up at the parser stage.
+      diag_.Error(CurrentLoc(),
+                  "restrict has no immediate (procedural) form per §16.2; "
+                  "use `restrict property (...)` at module-item level");
+      Consume();
+      return arena_.Create<Stmt>();
     case TokenKind::kKwWaitOrder:
       return ParseWaitOrderStmt();
     case TokenKind::kKwRandcase:

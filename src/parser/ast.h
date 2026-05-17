@@ -387,6 +387,10 @@ struct Stmt {
   // §16.4 P13/P14 (Reactive for observed, Postponed for final), so the kind
   // must survive parsing.
   bool is_final_deferred = false;
+  // §16.14.6 P1/P2: a concurrent assertion statement embedded in procedural
+  // code is a *procedural concurrent assertion*, distinct from a §16.3
+  // immediate assertion that happens to share the same keyword.
+  bool is_procedural_concurrent = false;
 
   // wait_order (§15.5.4)
   std::vector<Expr*> wait_order_events;
