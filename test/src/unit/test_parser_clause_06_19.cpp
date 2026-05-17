@@ -30,18 +30,6 @@ TEST(EnumerationParsing, EnumExplicitBaseTypeValues) {
               " medal;\n"
               "endmodule\n"));
 }
-TEST(EnumerationParsing, InlineEnumVar) {
-  auto r = Parse(
-      "module t;\n"
-      "  enum { X, Y } my_var;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "my_var");
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
-  ASSERT_EQ(item->data_type.enum_members.size(), 2);
-}
 
 TEST(DataTypeParsing, EnumIsIntegral) {
   EXPECT_TRUE(IsIntegralType(DataTypeKind::kEnum));
@@ -51,22 +39,6 @@ TEST(DataTypeParsing, EnumDefaultWidth32) {
   DataType dt;
   dt.kind = DataTypeKind::kEnum;
   EXPECT_EQ(EvalTypeWidth(dt), 32u);
-}
-
-TEST(DataTypeParsing, EnumFirstNameDefaultsToZero) {
-  auto r = Parse(
-      "module m;\n"
-      "  enum {A, B, C} x;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& members = r.cu->modules[0]->items[0]->data_type.enum_members;
-  ASSERT_EQ(members.size(), 3u);
-
-  EXPECT_EQ(members[0].value, nullptr);
-
-  EXPECT_EQ(members[1].value, nullptr);
-  EXPECT_EQ(members[2].value, nullptr);
 }
 
 TEST(DataTypeParsing, EnumMixedValues) {

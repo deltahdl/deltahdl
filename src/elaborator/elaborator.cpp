@@ -2782,8 +2782,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   mod->variables.push_back(var);
   ValidateArrayInitPattern(item);
   ValidateStructInitPattern(item);
-  TrackEnumVariable(item);
+  // §6.19: ValidateVarDeclTypes runs the enum scope-uniqueness check, which
+  // must observe the prior state of enum_member_names_; TrackEnumVariable
+  // updates that set and therefore runs after.
   ValidateVarDeclTypes(item);
+  TrackEnumVariable(item);
 }
 
 // --- §23.11: bind directives ---

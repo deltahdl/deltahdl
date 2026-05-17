@@ -197,6 +197,20 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
 bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
   const auto* resolved = ResolveNamed(dtype, typedefs);
   if (resolved) return Is4stateType(*resolved, typedefs);
+  // §6.19: An enum's 4-state-ness follows its base type. A type_identifier
+  // base resolves through the typedef map; a built-in base is preserved in
+  // enum_base_kind by the parser. Absent any base, the default is `int`,
+  // which is 2-state.
+  if (dtype.kind == DataTypeKind::kEnum) {
+    if (!dtype.enum_base_name.empty()) {
+      auto it = typedefs.find(dtype.enum_base_name);
+      if (it != typedefs.end()) return Is4stateType(it->second, typedefs);
+    }
+    if (dtype.enum_base_kind != DataTypeKind::kImplicit) {
+      return Is4stateType(dtype.enum_base_kind);
+    }
+    return false;
+  }
   if (Is4stateType(dtype.kind)) return true;
   // §7.2.1: If any member of a packed struct/union is 4-state, the whole is.
   // §7.3.1: soft implies packed.

@@ -190,6 +190,9 @@ struct DataType {
   std::string_view enum_base_name;  // §6.19 footnote 19: type_identifier used
                                     // as enum_base_type (empty if base is a
                                     // built-in or implicit).
+  DataTypeKind enum_base_kind = DataTypeKind::kImplicit;  // §6.19: built-in
+                                    // base type (kImplicit when no base was
+                                    // declared — defaults to int per §6.19).
   Expr* type_ref_expr = nullptr;  // §6.23: type(expr) reference
   std::vector<EnumMember> enum_members;
   std::vector<StructMember> struct_members;

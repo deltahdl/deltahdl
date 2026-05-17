@@ -181,7 +181,8 @@ bool Elaborator::ValidateEnumLiteral(const EnumMember& member,
 
 void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
   // §6.19 footnote 19: a type_identifier used as enum_base_type shall denote
-  // an integer_atom_type or an integer_vector_type.
+  // an integer_atom_type or an integer_vector_type, and if it denotes an
+  // integer_atom_type, an additional packed dimension is not permitted.
   if (!dtype.enum_base_name.empty()) {
     auto it = typedefs_.find(dtype.enum_base_name);
     if (it != typedefs_.end()) {
@@ -198,6 +199,11 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
                     std::format("enum base type '{}' is not an "
                                 "integer_atom_type or integer_vector_type",
                                 dtype.enum_base_name));
+      } else if (integer_atom && dtype.packed_dim_left != nullptr) {
+        diag_.Error(loc,
+                    std::format("packed dimension not permitted on enum base "
+                                "type '{}' that denotes an integer_atom_type",
+                                dtype.enum_base_name));
       }
     }
   }
@@ -206,11 +212,15 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
   bool is_2state = !Is4stateType(dtype, typedefs_);
   bool prev_had_xz = false;
 
-  // §6.19: Compute max representable value for overflow detection.
+  // §6.19: Compute representable range of the base type for explicit-value
+  // range checks and auto-increment overflow detection.
   uint64_t max_val = dtype.is_signed
                          ? (base_width > 0 ? (1ULL << (base_width - 1)) - 1 : 0)
                          : (base_width < 64 ? (1ULL << base_width) - 1
                                             : UINT64_MAX);
+  int64_t signed_min = (dtype.is_signed && base_width > 0 && base_width < 64)
+                           ? -(1LL << (base_width - 1))
+                           : INT64_MIN;
 
   std::unordered_set<std::string_view> seen_names;
   std::unordered_set<int64_t> seen_values;
@@ -222,6 +232,14 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
       if (!seen_names.insert(member.name).second) {
         diag_.Error(loc,
                     std::format("duplicate enum member name '{}'", member.name));
+      } else if (enum_member_names_.count(member.name)) {
+        // §6.19: "As in C, there is no overloading of literals" — an enum
+        // member name introduced by a prior enum in the same scope cannot be
+        // reused.
+        diag_.Error(loc,
+                    std::format("enum member name '{}' is already declared "
+                                "in this scope",
+                                member.name));
       }
     }
 
@@ -254,7 +272,28 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
       prev_had_xz = ValidateEnumLiteral(member, base_width, is_2state);
       if (!prev_had_xz) {
         auto v = ConstEvalInt(member.value);
-        if (v) next_val = *v;
+        if (v) {
+          // §6.19: "Any enumeration encoding value that is outside the
+          // representable range of the enum base type shall be an error." For
+          // an unsigned base, any value with a nonzero bit beyond the base
+          // width fails the cast; for a signed base, any value outside
+          // [-(2^(N-1)), 2^(N-1) - 1] fails.
+          bool out_of_range;
+          if (dtype.is_signed) {
+            out_of_range = *v < signed_min ||
+                           *v > static_cast<int64_t>(max_val);
+          } else {
+            out_of_range = *v < 0 || (base_width < 64 &&
+                                      static_cast<uint64_t>(*v) > max_val);
+          }
+          if (out_of_range) {
+            diag_.Error(member.value->range.start,
+                        std::format("enum member '{}' value {} is outside the "
+                                    "representable range of the base type",
+                                    member.name, *v));
+          }
+          next_val = *v;
+        }
       }
     }
 

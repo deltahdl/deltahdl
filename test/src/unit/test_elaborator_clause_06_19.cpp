@@ -189,4 +189,105 @@ TEST(EnumerationElaboration, EnumIntegerWithXAssignmentPermitted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.19: "As in C, there is no overloading of literals; therefore, medal2
+// and medal3 cannot be defined in the same scope because they contain the
+// same names." Two inline enums in the same scope with overlapping member
+// names shall be rejected.
+TEST(EnumerationElaboration, EnumMemberNameReusedInSameScope_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  enum bit [3:0] {bronze=4'h3, silver, gold=4'h5} medal2;\n"
+      "  enum bit [3:0] {bronze=4'h3, silver, gold=4'h5} medal3;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.19 footnote 19: "A type_identifier shall be legal as an enum_base_type
+// if it denotes an integer_atom_type, with which an additional packed
+// dimension is not permitted, or an integer_vector_type." A typedef
+// renaming an integer_atom_type used as enum base with a packed dimension
+// shall be rejected.
+TEST(EnumerationElaboration, EnumAtomTypeBaseWithPackedDim_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef int my_int_t;\n"
+      "  enum my_int_t [3:0] {A, B, C} state;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.19: "Any enumeration encoding value that is outside the representable
+// range of the enum base type shall be an error. For an unsigned base type,
+// this occurs if the cast truncates the value and any of the discarded bits
+// are nonzero." An unsized 'h10 = 16 is outside the 4-bit unsigned range
+// [0,15] even though no sized-literal width mismatch is present.
+TEST(EnumerationElaboration, EnumUnsignedValueOutsideRange_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  enum bit [3:0] {a = 'h10} m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.19: "For a signed base type, this occurs if the cast truncates the
+// value and any of the discarded bits are not equal to the sign bit of the
+// result." A value above the signed-base maximum is out of range.
+TEST(EnumerationElaboration, EnumSignedValueOutsideRange_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  enum bit signed [3:0] {a = 200} m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.19: The same representable-range rule applies symmetrically below the
+// signed minimum. For 4-bit signed, the range is [-8, 7]; -100 lies below
+// the minimum and shall be rejected.
+TEST(EnumerationElaboration, EnumSignedValueBelowMin_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  enum bit signed [3:0] {a = -100} m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.19: For an unsigned base type the representable range starts at 0;
+// any negative encoding value is outside the range.
+TEST(EnumerationElaboration, EnumUnsignedNegativeValue_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  enum bit [3:0] {a = -1} m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.19 footnote 19: "A type_identifier shall be legal as an enum_base_type
+// if it denotes an integer_atom_type, with which an additional packed
+// dimension is not permitted, or an integer_vector_type." The vector-typed
+// alternative explicitly permits an additional packed dimension and shall
+// elaborate without error.
+TEST(EnumerationElaboration, EnumVectorTypedefBaseWithPackedDimAllowed) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef logic my_logic_t;\n"
+      "  enum my_logic_t [3:0] {A, B, C} state;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
