@@ -675,6 +675,8 @@ struct ModuleDecl {
 
   TimeUnit time_unit = TimeUnit::kNs;
   TimeUnit time_prec = TimeUnit::kNs;
+  int time_unit_magnitude = 1;
+  int time_prec_magnitude = 1;
   bool has_timeunit = false;
   bool has_timeprecision = false;
 };
@@ -1004,6 +1006,8 @@ struct CompilationUnit {
 
   TimeUnit cu_time_unit = TimeUnit::kNs;
   TimeUnit cu_time_prec = TimeUnit::kNs;
+  int cu_time_unit_magnitude = 1;
+  int cu_time_prec_magnitude = 1;
   bool has_cu_timeunit = false;
   bool has_cu_timeprecision = false;
 };

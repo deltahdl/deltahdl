@@ -61,7 +61,11 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateThisUsage(decl);
 
   if (decl->has_timeunit && decl->has_timeprecision) {
-    if (static_cast<int>(decl->time_prec) > static_cast<int>(decl->time_unit)) {
+    int unit_order =
+        EffectiveTimeOrder(decl->time_unit, decl->time_unit_magnitude);
+    int prec_order =
+        EffectiveTimeOrder(decl->time_prec, decl->time_prec_magnitude);
+    if (prec_order > unit_order) {
       diag_.Error(decl->range.start,
                   "time precision is less precise than the time unit");
     }

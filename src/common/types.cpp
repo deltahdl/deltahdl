@@ -211,6 +211,13 @@ bool IsPliRegion(Region r) {
   }
 }
 
+int EffectiveTimeOrder(TimeUnit unit, int magnitude) {
+  int order = static_cast<int>(unit);
+  if (magnitude == 10) order += 1;
+  else if (magnitude == 100) order += 2;
+  return order;
+}
+
 bool ParseTimeUnitStr(std::string_view str, TimeUnit& out) {
   if (str == "s") {
     out = TimeUnit::kS;

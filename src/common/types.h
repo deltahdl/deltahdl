@@ -102,6 +102,8 @@ uint64_t RealDelayToTicks(double delay, const TimeScale& scale,
 
 bool ParseTimeUnitStr(std::string_view str, TimeUnit& out);
 
+int EffectiveTimeOrder(TimeUnit unit, int magnitude);
+
 enum class Region : uint8_t {
   kPreponed,
   kPreActive,

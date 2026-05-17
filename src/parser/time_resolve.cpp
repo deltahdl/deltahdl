@@ -12,6 +12,24 @@ bool TryParseTimeUnit(std::string_view text, TimeUnit& out) {
   return ParseTimeUnitStr(text.substr(i), out);
 }
 
+bool TryParseTimeMagnitudeAndUnit(std::string_view text, int& magnitude,
+                                  TimeUnit& out) {
+  size_t i = 0;
+  while (i < text.size() &&
+         std::isdigit(static_cast<unsigned char>(text[i]))) {
+    ++i;
+  }
+  if (i == 0) return false;
+  int mag = 0;
+  for (size_t j = 0; j < i; ++j) {
+    mag = mag * 10 + (text[j] - '0');
+  }
+  if (mag != 1 && mag != 10 && mag != 100) return false;
+  if (!ParseTimeUnitStr(text.substr(i), out)) return false;
+  magnitude = mag;
+  return true;
+}
+
 ResolvedTimescale ResolveModuleTimescale(const ModuleDecl* mod,
                                          const CompilationUnit* cu,
                                          bool has_preproc_timescale,

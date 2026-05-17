@@ -8,6 +8,9 @@ namespace delta {
 
 bool TryParseTimeUnit(std::string_view text, TimeUnit& out);
 
+bool TryParseTimeMagnitudeAndUnit(std::string_view text, int& magnitude,
+                                  TimeUnit& out);
+
 ResolvedTimescale ResolveModuleTimescale(const ModuleDecl* mod,
                                          const CompilationUnit* cu,
                                          bool has_preproc_timescale,

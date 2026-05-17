@@ -40,4 +40,30 @@ TEST(DesignBuildingBlockElaboration, ModuleWithDelayElaborates) {
              "endmodule\n"));
 }
 
+TEST(DesignBuildingBlockElaboration, PrecisionLongerByMagnitudeRejected) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  timeunit 1ns;\n"
+             "  timeprecision 10ns;\n"
+             "endmodule\n"));
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  timeunit 10ps;\n"
+             "  timeprecision 100ps;\n"
+             "endmodule\n"));
+}
+
+TEST(DesignBuildingBlockElaboration, PrecisionFinerByMagnitudeAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  timeunit 100ps;\n"
+             "  timeprecision 1ps;\n"
+             "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  timeunit 10ns;\n"
+             "  timeprecision 1ns;\n"
+             "endmodule\n"));
+}
+
 }

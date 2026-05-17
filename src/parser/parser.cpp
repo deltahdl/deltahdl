@@ -646,35 +646,41 @@ void Parser::ParseGenvarDecl(std::vector<ModuleItem*>& items) {
 }
 
 static void ApplyTimeUnit(ModuleDecl* mod, CompilationUnit* cu, bool is_unit,
-                          TimeUnit tu) {
+                          TimeUnit tu, int mag) {
   if (mod) {
     if (is_unit) {
       mod->time_unit = tu;
+      mod->time_unit_magnitude = mag;
       mod->has_timeunit = true;
     } else {
       mod->time_prec = tu;
+      mod->time_prec_magnitude = mag;
       mod->has_timeprecision = true;
     }
   }
   if (cu) {
     if (is_unit) {
       cu->cu_time_unit = tu;
+      cu->cu_time_unit_magnitude = mag;
       cu->has_cu_timeunit = true;
     } else {
       cu->cu_time_prec = tu;
+      cu->cu_time_prec_magnitude = mag;
       cu->has_cu_timeprecision = true;
     }
   }
 }
 
 static void ApplyTimePrecision(ModuleDecl* mod, CompilationUnit* cu,
-                               TimeUnit prec) {
+                               TimeUnit prec, int mag) {
   if (mod) {
     mod->time_prec = prec;
+    mod->time_prec_magnitude = mag;
     mod->has_timeprecision = true;
   }
   if (cu) {
     cu->cu_time_prec = prec;
+    cu->cu_time_prec_magnitude = mag;
     cu->has_cu_timeprecision = true;
   }
 }
@@ -684,18 +690,28 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu) {
   Consume();
   auto tok = Consume();
   TimeUnit tu = TimeUnit::kNs;
-  TryParseTimeUnit(tok.text, tu);
-  ApplyTimeUnit(mod, cu, is_unit, tu);
+  int mag = 1;
+  if (!TryParseTimeMagnitudeAndUnit(tok.text, mag, tu)) {
+    diag_.Error(tok.loc,
+                "time literal must use magnitude 1, 10, or 100 and unit "
+                "s/ms/us/ns/ps/fs");
+  }
+  ApplyTimeUnit(mod, cu, is_unit, tu, mag);
   if (Match(TokenKind::kSlash)) {
     auto prec_tok = Consume();
     TimeUnit prec = TimeUnit::kNs;
-    TryParseTimeUnit(prec_tok.text, prec);
+    int prec_mag = 1;
+    if (!TryParseTimeMagnitudeAndUnit(prec_tok.text, prec_mag, prec)) {
+      diag_.Error(prec_tok.loc,
+                  "time literal must use magnitude 1, 10, or 100 and unit "
+                  "s/ms/us/ns/ps/fs");
+    }
 
-    if (static_cast<int>(prec) > static_cast<int>(tu)) {
+    if (EffectiveTimeOrder(prec, prec_mag) > EffectiveTimeOrder(tu, mag)) {
       diag_.Error(prec_tok.loc,
                   "time precision is less precise than the time unit");
     }
-    if (is_unit) ApplyTimePrecision(mod, cu, prec);
+    if (is_unit) ApplyTimePrecision(mod, cu, prec, prec_mag);
   }
   Expect(TokenKind::kSemicolon);
 }
