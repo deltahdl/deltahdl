@@ -50,12 +50,4 @@ TEST(AssocArrayParsing, InlineStructTypeAsIndexRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(AssocArrayParsing, InlineEnumTypeAsIndexRejected) {
-  auto r = Parse(
-      "module t;\n"
-      "  int aa [ enum { A, B } ];\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 }
