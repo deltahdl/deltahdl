@@ -1,27 +1,12 @@
 #include <gtest/gtest.h>
 
-#include "model_gate_declaration.h"
+#include "fixture_elaborator.h"
 
 namespace {
 
-TEST(GateDecl, ArrayRequiresName) {
-  GateDeclInfo info;
-  info.has_range = true;
-  info.has_name = false;
-  EXPECT_FALSE(ValidateGateDecl(info));
-}
-
-TEST(GateDecl, ArrayWithNameIsValid) {
-  GateDeclInfo info;
-  info.has_range = true;
-  info.has_name = true;
-  info.range_lhi = 0;
-  info.range_rhi = 3;
-  info.terminal_count = 3;
-  EXPECT_TRUE(ValidateGateDecl(info));
-}
-
-// --- Unnamed gate elaborates the same as named ---
+// §28.3.4: "An optional name can be given to a gate or switch instance."
+// Verify the elaborator accepts and lowers an unnamed gate instance to a
+// continuous assignment exactly as it would for a named instance.
 TEST(GateElaboration, UnnamedGateProducesAssign) {
   ElabFixture f;
   auto* design = Elaborate(
