@@ -117,4 +117,67 @@ TEST(UnionDeclarationValidation, PackedDimOnSoftUnion_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(UnionDeclarationValidation, PackedDimOnPlainUnion_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union { logic [7:0] a; logic [7:0] b; } [3:0] arr;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(UnionDeclarationValidation, ChandleInTaggedUnion_OK) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union tagged { chandle c; int a; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(UnionDeclarationValidation, StringInTaggedUnion_OK) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union tagged { string s; int a; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(UnionDeclarationValidation, PackedDimOnPackedOnlyUnion_Allowed) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union packed { logic [7:0] a; logic [7:0] b; } [3:0] arr;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(UnionDeclarationValidation, VoidMemberInTaggedUnion_OK) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union tagged { void v; int a; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(UnionDeclarationValidation, UnpackedUnionOfStructsSharingInitial_OK) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct { int kind; int a; } pa_t;\n"
+      "  typedef struct { int kind; int b; int c; } pb_t;\n"
+      "  typedef union { pa_t pa; pb_t pb; } u_t;\n"
+      "  u_t u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }
