@@ -240,13 +240,28 @@ static void CheckNbaDynamicArrayTarget(
     CheckNbaDynamicArrayTarget(ci.body, dyn_names, diag);
 }
 
+// §10.4: collect the base names targeted by a procedural-assignment LHS so
+// the "LHS shall be a variable" check sees every form §10.4 enumerates — not
+// just bare identifiers but also bit/part/slice-selects (whose base is the
+// targeted variable), member accesses, and concatenations of any of these.
+static void CollectLhsBaseNames(
+    const Expr* e, SourceLoc loc,
+    std::unordered_map<std::string_view, SourceLoc>& out) {
+  if (!e) return;
+  if (e->kind == ExprKind::kConcatenation) {
+    for (const auto* elem : e->elements) CollectLhsBaseNames(elem, loc, out);
+    return;
+  }
+  auto name = LhsBaseName(e);
+  if (!name.empty()) out.emplace(name, loc);
+}
+
 static void CollectProcTargets(
     const Stmt* s, std::unordered_map<std::string_view, SourceLoc>& out) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
-    auto name = ExprIdent(s->lhs);
-    if (!name.empty()) out.emplace(name, s->range.start);
+    CollectLhsBaseNames(s->lhs, s->range.start, out);
   }
   for (auto* sub : s->stmts) CollectProcTargets(sub, out);
   CollectProcTargets(s->then_branch, out);

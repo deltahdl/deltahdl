@@ -8,26 +8,6 @@ static ModuleItem* FindInitialBlock(ParseResult& r) {
   return FindItemByKind(r, ModuleItemKind::kInitialBlock);
 }
 
-TEST(ProceduralAssignmentParsing, MixBlockingNonblocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b, c, d;\n"
-      "  initial begin\n"
-      "    a = b;\n"
-      "    c <= d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* init_item = FindInitialBlock(r);
-  ASSERT_NE(init_item, nullptr);
-  auto* body = init_item->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
-}
-
 TEST(ProceduralAssignmentParsing, BlockingAssignInAlways) {
   auto r = Parse(
       "module m;\n"
@@ -45,7 +25,7 @@ TEST(ProceduralAssignmentParsing, BlockingAssignInAlways) {
   EXPECT_NE(item->body->rhs, nullptr);
 }
 
-TEST(ProceduralAssignmentParsing, InTaskBody) {
+TEST(ProceduralAssignmentParsing, BlockingAssignInTaskBody) {
   auto r = Parse(
       "module m;\n"
       "  task t();\n"
@@ -63,7 +43,7 @@ TEST(ProceduralAssignmentParsing, InTaskBody) {
   EXPECT_EQ(assign->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ProceduralAssignmentParsing, InFunctionBody) {
+TEST(ProceduralAssignmentParsing, BlockingAssignInFunctionBody) {
   auto r = Parse(
       "module m;\n"
       "  function int compute(int a, int b);\n"
@@ -82,7 +62,7 @@ TEST(ProceduralAssignmentParsing, InFunctionBody) {
   EXPECT_EQ(assign->lhs->text, "tmp");
 }
 
-TEST(ProceduralAssignmentParsing, InInitialBlock) {
+TEST(ProceduralAssignmentParsing, BlockingAssignInInitialBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg a;\n"
@@ -117,6 +97,47 @@ TEST(ProceduralAssignmentParsing, AllThreeAssignmentTypes) {
   EXPECT_EQ(stmts[0]->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(stmts[1]->kind, StmtKind::kNonblockingAssign);
   EXPECT_EQ(stmts[2]->kind, StmtKind::kBlockingAssign);
+}
+
+// §10.4 enumerates four legal LHS forms for procedural assignments. At the
+// parser AST level only three distinct shapes appear: singular and aggregate
+// variables share kIdentifier (already covered by the tests above); bit-,
+// part-, and slice-selects of packed arrays and slices/elements of unpacked
+// arrays all share kSelect (covered here); concatenation lvalues use
+// kConcatenation (covered below).
+TEST(ProceduralAssignmentParsing, LhsSelectIsAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] v;\n"
+      "  initial begin\n"
+      "    v[0] = 1'b1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto stmts = AllInitialStmts(r);
+  ASSERT_EQ(stmts.size(), 1u);
+  EXPECT_EQ(stmts[0]->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmts[0]->lhs, nullptr);
+  EXPECT_EQ(stmts[0]->lhs->kind, ExprKind::kSelect);
+}
+
+TEST(ProceduralAssignmentParsing, LhsConcatenationIsAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic carry;\n"
+      "  logic [7:0] acc;\n"
+      "  initial begin\n"
+      "    {carry, acc} = 9'h1FF;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto stmts = AllInitialStmts(r);
+  ASSERT_EQ(stmts.size(), 1u);
+  EXPECT_EQ(stmts[0]->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmts[0]->lhs, nullptr);
+  EXPECT_EQ(stmts[0]->lhs->kind, ExprKind::kConcatenation);
 }
 
 }  // namespace
