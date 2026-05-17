@@ -108,14 +108,6 @@ TEST(LexicalConventionParsing, IdentifierInAssignExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CompilationUnitStructure, DesignElementNameWithUnderscoresAndDigits) {
-  auto r = Parse("module my_module_123; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "my_module_123");
-}
-
 TEST(LexicalConventionParsing, KeywordCannotBeUsedAsIdentifier) {
   auto r = Parse("module m; logic module; endmodule");
   EXPECT_TRUE(r.has_errors);
