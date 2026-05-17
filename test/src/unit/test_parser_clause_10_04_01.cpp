@@ -138,25 +138,6 @@ TEST(BlockingAssignParsing, MultipleSequential) {
   EXPECT_EQ(s3->lhs->text, "a");
 }
 
-TEST(BlockingAssignParsing, ArrayElementLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [7:0] arr [0:3];\n"
-      "  initial begin\n"
-      "    arr[2] = 8'hAB;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
-
 TEST(BlockingAssignParsing, NestedStructMemberLhs) {
   auto r = Parse(
       "module m;\n"
@@ -197,11 +178,15 @@ TEST(BlockingAssignParsing, ComplexLhsRhsCombinations) {
   EXPECT_EQ(s1->rhs->kind, ExprKind::kBinary);
 }
 
-TEST(BlockingAssignParsing, StructMemberLhs) {
+// §10.4.1 BNF: blocking_assignment ::= variable_lvalue =
+//     delay_or_event_control expression .  The intra-assignment delay
+// form must reduce to a kBlockingAssign with stmt->delay populated and
+// the RHS expression still attached.
+TEST(BlockingAssignParsing, IntraAssignmentDelayForm) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
-      "    s.field = 42;\n"
+      "    a = #5 b;\n"
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -209,8 +194,28 @@ TEST(BlockingAssignParsing, StructMemberLhs) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
+  EXPECT_NE(stmt->delay, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
+// §10.4.1 BNF: the delay_or_event_control alternative also covers the
+// `@event` form (variable_lvalue = @(posedge clk) expression).  Verify
+// the parser populates stmt->events with at least one entry while still
+// classifying the statement as a blocking assignment.
+TEST(BlockingAssignParsing, IntraAssignmentEventControlForm) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_FALSE(stmt->events.empty());
+  EXPECT_NE(stmt->rhs, nullptr);
 }
 
 }  // namespace

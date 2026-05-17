@@ -25,7 +25,7 @@ TEST(LvalueSim, VarLvalueCompoundAdd) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-TEST(EvalOp, PlusEq) {
+TEST(CompoundAssignOpEval, PlusEq) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 10);
@@ -37,7 +37,7 @@ TEST(EvalOp, PlusEq) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-TEST(EvalOp, MinusEq) {
+TEST(CompoundAssignOpEval, MinusEq) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 20);
@@ -49,7 +49,7 @@ TEST(EvalOp, MinusEq) {
   EXPECT_EQ(var->value.ToUint64(), 13u);
 }
 
-TEST(EvalOp, StarEq) {
+TEST(CompoundAssignOpEval, StarEq) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 6);
@@ -61,7 +61,7 @@ TEST(EvalOp, StarEq) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(EvalOp, SlashEq) {
+TEST(CompoundAssignOpEval, SlashEq) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 100);
@@ -73,7 +73,7 @@ TEST(EvalOp, SlashEq) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(EvalOp, PercentEq) {
+TEST(CompoundAssignOpEval, PercentEq) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("m", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 17);
@@ -85,7 +85,7 @@ TEST(EvalOp, PercentEq) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(EvalOp, LtLtLtEq) {
+TEST(CompoundAssignOpEval, LtLtLtEq) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 1);
@@ -97,7 +97,7 @@ TEST(EvalOp, LtLtLtEq) {
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
 
-TEST(EvalOp, GtGtGtEq) {
+TEST(CompoundAssignOpEval, GtGtGtEq) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 256);
@@ -129,7 +129,7 @@ TEST(LvalueSim, CompoundAssignWithIndexedLhs) {
   EXPECT_EQ(var->unpacked_array[2].ToUint64(), 15u);
 }
 
-TEST(EvalOp, LtLtEq) {
+TEST(CompoundAssignOpEval, LtLtEq) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 1);
@@ -141,7 +141,7 @@ TEST(EvalOp, LtLtEq) {
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
 
-TEST(EvalOp, GtGtEq) {
+TEST(CompoundAssignOpEval, GtGtEq) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 256);
@@ -151,6 +151,105 @@ TEST(EvalOp, GtGtEq) {
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 16u);
   EXPECT_EQ(var->value.ToUint64(), 16u);
+}
+
+// §11.4.1: "An assignment operator is semantically equivalent to a
+// blocking assignment, with the exception that any left-hand index
+// expression is only evaluated once."  Drive the lvalue index with a
+// function that increments a counter every time it executes; after
+// `arr[idx_fn()] += 5` the counter must hold 1, not 2.  A naive read-
+// modify-write that re-evaluates the lvalue would call idx_fn twice.
+TEST(LvalueSim, CompoundAssignEvaluatesLvalueIndexOnce) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int arr [0:3];\n"
+      "  int idx_calls;\n"
+      "  function automatic int idx_fn();\n"
+      "    idx_calls = idx_calls + 1;\n"
+      "    return 2;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    arr[0] = 0; arr[1] = 0; arr[2] = 10; arr[3] = 0;\n"
+      "    idx_calls = 0;\n"
+      "    arr[idx_fn()] += 5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* arr = f.ctx.FindVariable("arr");
+  auto* calls = f.ctx.FindVariable("idx_calls");
+  ASSERT_NE(arr, nullptr);
+  ASSERT_NE(calls, nullptr);
+  EXPECT_EQ(arr->unpacked_array[2].ToUint64(), 15u);
+  EXPECT_EQ(calls->value.ToUint64(), 1u);
+}
+
+// §11.4.1 edge case: when the lvalue appears on both sides of a compound
+// assign (`a += a`), the RHS must read the current value of `a` and the
+// final value must equal `a + a`.  This pins down the "semantically
+// equivalent to a blocking assignment" claim — the read-modify-write
+// must not double-apply or skip the addition.
+TEST(LvalueSim, CompoundAssignSelfReferenceDoublesValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a;\n"
+      "  initial begin\n"
+      "    a = 5;\n"
+      "    a += a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
+// §11.4.1: "semantically equivalent to a blocking assignment" must hold
+// for every operator, not just `+=`.  Exercise the arithmetic, bitwise,
+// and shift compounds through the full parse → elaborate → lower →
+// simulate pipeline in a single block.
+TEST(LvalueSim, CompoundAssignArithBitwiseShiftThroughPipeline) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int sub, mul, divr, mod;\n"
+      "  int band, bor, bxor;\n"
+      "  int shl, shr;\n"
+      "  initial begin\n"
+      "    sub = 10;  sub  -= 3;\n"
+      "    mul = 6;   mul  *= 2;\n"
+      "    divr = 8;  divr /= 2;\n"
+      "    mod = 17;  mod  %= 5;\n"
+      "    band = 'hFF; band &= 'h0F;\n"
+      "    bor  = 'h01; bor  |= 'h10;\n"
+      "    bxor = 'hAA; bxor ^= 'hFF;\n"
+      "    shl = 1;   shl  <<= 4;\n"
+      "    shr = 256; shr  >>= 4;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("sub")->value.ToUint64(), 7u);
+  EXPECT_EQ(f.ctx.FindVariable("mul")->value.ToUint64(), 12u);
+  EXPECT_EQ(f.ctx.FindVariable("divr")->value.ToUint64(), 4u);
+  EXPECT_EQ(f.ctx.FindVariable("mod")->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("band")->value.ToUint64(), 0x0Fu);
+  EXPECT_EQ(f.ctx.FindVariable("bor")->value.ToUint64(), 0x11u);
+  EXPECT_EQ(f.ctx.FindVariable("bxor")->value.ToUint64(), 0x55u);
+  EXPECT_EQ(f.ctx.FindVariable("shl")->value.ToUint64(), 16u);
+  EXPECT_EQ(f.ctx.FindVariable("shr")->value.ToUint64(), 16u);
 }
 
 }  // namespace
