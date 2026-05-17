@@ -205,6 +205,55 @@ TEST(ScalarAndVectorDeclaration, MatchingUserDefinedTypeVectorIsVector) {
   EXPECT_TRUE(IsVector(var->data_type, typedefs));
 }
 
+// §6.9: The "matching user-defined type" enumeration in §6.9 applies to
+// typedefs of `bit` as much as to typedefs of logic — a `typedef bit [N:M]`
+// is a §6.9 vector when resolved through the typedef map.
+TEST(ScalarAndVectorDeclaration, BitTypedefVectorIsVector) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef bit [3:0] nibble_t;\n"
+      "  nibble_t v;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  TypedefMap typedefs;
+  const ModuleItem* var = nullptr;
+  for (auto* it : items) {
+    if (it->kind == ModuleItemKind::kTypedef) {
+      typedefs.emplace(it->name, it->data_type);
+    } else if (it->kind == ModuleItemKind::kVarDecl) {
+      var = it;
+    }
+  }
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(IsVector(var->data_type, typedefs));
+}
+
+// §6.9: The "matching user-defined type" enumeration also applies to
+// typedefs of `reg` — a `typedef reg [N:M]` is a §6.9 vector.
+TEST(ScalarAndVectorDeclaration, RegTypedefVectorIsVector) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef reg [3:0] nibble_t;\n"
+      "  nibble_t v;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  TypedefMap typedefs;
+  const ModuleItem* var = nullptr;
+  for (auto* it : items) {
+    if (it->kind == ModuleItemKind::kTypedef) {
+      typedefs.emplace(it->name, it->data_type);
+    } else if (it->kind == ModuleItemKind::kVarDecl) {
+      var = it;
+    }
+  }
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(IsVector(var->data_type, typedefs));
+}
+
 // §6.9: A typedef of a scalar reg/logic/bit is NOT a vector — even when
 // resolved through the typedef map, it has no packed dimension and so
 // fails the §6.9 vector definition.

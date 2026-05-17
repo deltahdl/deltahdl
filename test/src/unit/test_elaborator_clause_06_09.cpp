@@ -143,6 +143,77 @@ TEST(ScalarAndVectorDeclaration, ImplicitLogicVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
+// §6.9: The scalar rule applies to a matching user-defined type of `bit`
+// (a typedef of bit without a range) just as it applies to a typedef of
+// logic. §6.9 explicitly enumerates "reg, logic, or bit (or as a matching
+// user-defined type ...)", so the user-defined-type extension shall cover
+// all three named integer kinds. The elaborator resolves the typedef and
+// elaborates the variable to 1 bit.
+TEST(ScalarAndVectorDeclaration, BitTypedefScalarWidth) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  typedef bit my_bit_t;\n"
+      "  my_bit_t a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 1u);
+}
+
+// §6.9: The scalar rule applies to a matching user-defined type of `reg`.
+TEST(ScalarAndVectorDeclaration, RegTypedefScalarWidth) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  typedef reg my_reg_t;\n"
+      "  my_reg_t a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 1u);
+}
+
+// §6.9: The vector rule applies to a matching user-defined type of `bit`
+// — a typedef of bit with a packed range produces a vector of that range's
+// width. The §6.9 user-defined-type extension covers bit/reg/logic equally.
+TEST(ScalarAndVectorDeclaration, BitTypedefVectorWidth) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  typedef bit [3:0] nibble_t;\n"
+      "  nibble_t b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 4u);
+}
+
+// §6.9: The vector rule applies to a matching user-defined type of `reg`.
+TEST(ScalarAndVectorDeclaration, RegTypedefVectorWidth) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  typedef reg [3:0] nibble_t;\n"
+      "  nibble_t b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 4u);
+}
+
 // §6.9: Each variable in a multi-name declaration without a range is its
 // own 1-bit scalar.
 TEST(ScalarAndVectorDeclaration, MultipleScalarsHaveUnitWidth) {
