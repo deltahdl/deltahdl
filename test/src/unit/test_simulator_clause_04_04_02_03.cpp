@@ -36,6 +36,39 @@ TEST(InactiveRegionSim, AllActiveEventsCompleteBeforeInactive) {
   EXPECT_EQ(order[3], "inactive");
 }
 
+// §4.4.2.3 ¶1: "after **all** the Active events are processed" — including
+// Active events scheduled into the same time slot from inside another Active
+// callback. Distinct from AllActiveEventsCompleteBeforeInactive, which
+// pre-queues every active before Run() and so never exercises the
+// reentrant-push path through DrainQueue's `while (!queue.empty())` loop. If
+// the loop snapshotted queue length at entry (instead of testing emptiness on
+// each pop), the mid-drain active2 would defer past Inactive and the
+// observed order would put "inactive" before "active2".
+TEST(InactiveRegionSim, ActivesScheduledDuringDrainRunBeforeInactive) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+
+  auto* act1 = sched.GetEventPool().Acquire();
+  act1->callback = [&]() {
+    order.push_back("active1");
+    auto* act2 = sched.GetEventPool().Acquire();
+    act2->callback = [&]() { order.push_back("active2"); };
+    sched.ScheduleEvent({0}, Region::kActive, act2);
+  };
+  sched.ScheduleEvent({0}, Region::kActive, act1);
+
+  auto* inactive = sched.GetEventPool().Acquire();
+  inactive->callback = [&]() { order.push_back("inactive"); };
+  sched.ScheduleEvent({0}, Region::kInactive, inactive);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 3u);
+  EXPECT_EQ(order[0], "active1");
+  EXPECT_EQ(order[1], "active2");
+  EXPECT_EQ(order[2], "inactive");
+}
+
 TEST(InactiveRegionSim, InactiveToActiveIteration) {
   Arena arena;
   Scheduler sched(arena);
