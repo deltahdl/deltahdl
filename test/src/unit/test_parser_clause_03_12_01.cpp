@@ -13,7 +13,7 @@ TEST(CompilationUnitParsing, CuScopeTaskParsed) {
   ASSERT_EQ(r.cu->cu_items.size(), 1u);
 }
 
-TEST(DesignBuildingBlockParsing, ForwardRefSyntaxValid) {
+TEST(CompilationUnitParsing, ForwardRefSyntaxValid) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire w;\n"
@@ -41,7 +41,7 @@ TEST(CompilationUnitParsing, TopLevelFunction) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(DesignBuildingBlockParsing, CuScopeTypedef) {
+TEST(CompilationUnitParsing, CuScopeTypedef) {
   auto r = Parse(
       "typedef int myint;\n"
       "module m; endmodule\n");
@@ -52,7 +52,7 @@ TEST(DesignBuildingBlockParsing, CuScopeTypedef) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "myint");
 }
 
-TEST(DesignBuildingBlockParsing, CuScopeLocalparam) {
+TEST(CompilationUnitParsing, CuScopeLocalparam) {
   auto r = Parse(
       "localparam int WIDTH = 8;\n"
       "module m; endmodule\n");
@@ -63,7 +63,7 @@ TEST(DesignBuildingBlockParsing, CuScopeLocalparam) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "WIDTH");
 }
 
-TEST(DesignBuildingBlockParsing, CuScopeParameter) {
+TEST(CompilationUnitParsing, CuScopeParameter) {
   auto r = Parse(
       "parameter int DEPTH = 16;\n"
       "module m; endmodule\n");
@@ -74,7 +74,7 @@ TEST(DesignBuildingBlockParsing, CuScopeParameter) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "DEPTH");
 }
 
-TEST(DesignBuildingBlockParsing, CuScopeImport) {
+TEST(CompilationUnitParsing, CuScopeImport) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef int myint;\n"
@@ -87,7 +87,7 @@ TEST(DesignBuildingBlockParsing, CuScopeImport) {
   EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kImportDecl);
 }
 
-TEST(DesignBuildingBlockParsing, CuScopeDataDecl) {
+TEST(CompilationUnitParsing, CuScopeDataDecl) {
   auto r = Parse(
       "bit b;\n"
       "module m; endmodule\n");
@@ -98,7 +98,7 @@ TEST(DesignBuildingBlockParsing, CuScopeDataDecl) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "b");
 }
 
-TEST(DesignBuildingBlockParsing, CuScopeNamedEventDeclaration) {
+TEST(CompilationUnitParsing, CuScopeNamedEventDeclaration) {
   auto r = Parse(
       "event e;\n"
       "module m; endmodule\n");
@@ -108,7 +108,7 @@ TEST(DesignBuildingBlockParsing, CuScopeNamedEventDeclaration) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "e");
 }
 
-TEST(DesignBuildingBlockParsing, DollarUnitScopeResolutionExpr) {
+TEST(CompilationUnitParsing, DollarUnitScopeResolutionExpr) {
   auto r = Parse(
       "bit b;\n"
       "module m;\n"
@@ -129,7 +129,7 @@ TEST(DesignBuildingBlockParsing, DollarUnitScopeResolutionExpr) {
   EXPECT_EQ(assign_stmt->rhs->scope_prefix, "$unit");
 }
 
-TEST(DesignBuildingBlockParsing, DollarUnitScopeInAssignment) {
+TEST(CompilationUnitParsing, DollarUnitScopeInAssignment) {
   EXPECT_TRUE(
       ParseOk("task t;\n"
               "  int b;\n"
@@ -138,7 +138,7 @@ TEST(DesignBuildingBlockParsing, DollarUnitScopeInAssignment) {
               "module m; endmodule\n"));
 }
 
-TEST(DesignBuildingBlockParsing, MultipleCuScopeItems) {
+TEST(CompilationUnitParsing, MultipleCuScopeItems) {
   auto r = Parse(
       "typedef logic [7:0] byte_t;\n"
       "localparam int N = 4;\n"
@@ -450,17 +450,6 @@ TEST(CompilationUnitStructure, DesignElementsAndCuItemsInterleaved) {
   EXPECT_GE(r.cu->cu_items.size(), 3u);
 }
 
-TEST(CompilationUnitStructure, ManyModulesAccumulate) {
-  std::string src;
-  for (int i = 0; i < 50; ++i) {
-    src += "module m" + std::to_string(i) + "; endmodule\n";
-  }
-  auto r = Parse(src);
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules.size(), 50u);
-}
-
 TEST(CompilationUnitParsing, CompilationUnitScopeCannotBeImportedWildcard) {
   EXPECT_FALSE(
       ParseOk("import $unit::*;\n"
@@ -511,11 +500,11 @@ TEST(CompilationUnitParsing, DollarUnitInSubexpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CompilationUnits, UnrecognizedTopLevelTokenIsError) {
+TEST(CompilationUnitParsing, UnrecognizedTopLevelTokenIsError) {
   EXPECT_FALSE(ParseOk("always_comb begin end"));
 }
 
-TEST(CompilationUnits, BareStatementAtTopLevelIsError) {
+TEST(CompilationUnitParsing, BareStatementAtTopLevelIsError) {
   EXPECT_FALSE(ParseOk("assign x = 1;"));
 }
 
@@ -548,7 +537,7 @@ TEST(CompilationUnitStructure, AllDescriptionTypesCoexist) {
   EXPECT_EQ(r.cu->bind_directives.size(), 1u);
 }
 
-TEST(CompilationUnits, DesignElementsInterleaveWithNonDesignElements) {
+TEST(CompilationUnitParsing, DesignElementsInterleaveWithNonDesignElements) {
   auto r = Parse(
       "typedef int myint;\n"
       "module m; endmodule\n"

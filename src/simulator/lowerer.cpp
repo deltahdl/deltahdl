@@ -1039,14 +1039,28 @@ void Lowerer::LowerAllImported(
 }
 
 void Lowerer::LowerImports(const RtlirModule* mod) {
+  auto alias_data_item = [&](const PackageDecl* pkg, const ModuleItem* item) {
+    bool is_param = item->kind == ModuleItemKind::kParamDecl;
+    bool is_var = item->kind == ModuleItemKind::kVarDecl;
+    if (!(is_param || is_var) || !item->init_expr) return;
+    if (ctx_.FindVariable(item->name)) return;
+    std::string qname =
+        std::string(pkg->name) + "." + std::string(item->name);
+    ctx_.AliasVariable(item->name, qname);
+  };
+
   for (const auto& imp : mod->imports) {
     auto* pkg = FindPackage(imp.package_name);
     if (!pkg) continue;
     std::unordered_set<const PackageDecl*> visited;
     if (imp.is_wildcard) {
       LowerAllImported(pkg, visited);
+      for (const auto* item : pkg->items) alias_data_item(pkg, item);
     } else {
       LowerImportedName(pkg, imp.item_name, visited);
+      for (const auto* item : pkg->items) {
+        if (item->name == imp.item_name) alias_data_item(pkg, item);
+      }
     }
   }
 }
@@ -1152,12 +1166,13 @@ void Lowerer::Lower(const RtlirDesign* design) {
 
   for (auto* pkg : design->packages) {
     for (auto* item : pkg->items) {
-      if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
-        auto* qname = arena_.Create<std::string>(
-            std::string(pkg->name) + "." + std::string(item->name));
-        auto* var = ctx_.CreateVariable(*qname, 32);
-        var->value = EvalExpr(item->init_expr, ctx_, arena_);
-      }
+      bool is_param = item->kind == ModuleItemKind::kParamDecl;
+      bool is_var = item->kind == ModuleItemKind::kVarDecl;
+      if (!(is_param || is_var) || !item->init_expr) continue;
+      auto* qname = arena_.Create<std::string>(
+          std::string(pkg->name) + "." + std::string(item->name));
+      auto* var = ctx_.CreateVariable(*qname, 32);
+      var->value = EvalExpr(item->init_expr, ctx_, arena_);
     }
   }
 

@@ -27,7 +27,7 @@ TEST(CompilationUnitLexing, DollarUnitScopeResolution) {
   EXPECT_EQ(t3.text, "b");
 }
 
-TEST(DesignBuildingBlockLexing, DollarUnitNotScopeResolution) {
+TEST(CompilationUnitLexing, DollarUnitNotScopeResolution) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -40,7 +40,7 @@ TEST(DesignBuildingBlockLexing, DollarUnitNotScopeResolution) {
   EXPECT_EQ(t2.kind, TokenKind::kLParen);
 }
 
-TEST(DesignBuildingBlockLexing, DollarUnitWithWhitespace) {
+TEST(CompilationUnitLexing, DollarUnitWithWhitespace) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);

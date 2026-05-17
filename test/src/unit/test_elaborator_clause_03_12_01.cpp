@@ -2,7 +2,7 @@
 
 using namespace delta;
 
-TEST(DesignBuildingBlockElaboration, ElabModuleWithCuFunction) {
+TEST(CompilationUnitElaboration, ElabModuleWithCuFunction) {
   EXPECT_TRUE(
       ElabOk("function int cu_func(int x); return x; endfunction\n"
              "module m;\n"
@@ -10,7 +10,7 @@ TEST(DesignBuildingBlockElaboration, ElabModuleWithCuFunction) {
              "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, CuScopeFunctionInDesign) {
+TEST(CompilationUnitElaboration, CuScopeFunctionInDesign) {
   ElabFixture f;
   auto* design = Elaborate(
       "function int helper(int x); return x + 1; endfunction\n"
@@ -26,7 +26,7 @@ TEST(DesignBuildingBlockElaboration, CuScopeFunctionInDesign) {
   EXPECT_EQ(design->cu_function_decls[1]->name, "auto_task");
 }
 
-TEST(DesignBuildingBlockElaboration, CuScopeTypedefVisibleInModule) {
+TEST(CompilationUnitElaboration, CuScopeTypedefVisibleInModule) {
   ElabFixture f;
   auto* design = Elaborate(
       "typedef logic [15:0] word_t;\n"
@@ -43,7 +43,7 @@ TEST(DesignBuildingBlockElaboration, CuScopeTypedefVisibleInModule) {
   EXPECT_EQ(mod->variables[0].width, 16u);
 }
 
-TEST(DesignBuildingBlockElaboration, CuScopeTypedefTypeWidth) {
+TEST(CompilationUnitElaboration, CuScopeTypedefTypeWidth) {
   ElabFixture f;
   auto* design = Elaborate(
       "typedef logic [7:0] byte_t;\n"
@@ -56,7 +56,7 @@ TEST(DesignBuildingBlockElaboration, CuScopeTypedefTypeWidth) {
   EXPECT_EQ(it->second, 8u);
 }
 
-TEST(DesignBuildingBlockElaboration, CuScopeLocalparamElaborates) {
+TEST(CompilationUnitElaboration, CuScopeLocalparamElaborates) {
   EXPECT_TRUE(
       ElabOk("localparam int WIDTH = 8;\n"
              "module m;\n"
@@ -64,7 +64,7 @@ TEST(DesignBuildingBlockElaboration, CuScopeLocalparamElaborates) {
              "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, DollarUnitScopeExprElaborates) {
+TEST(CompilationUnitElaboration, DollarUnitScopeExprElaborates) {
   EXPECT_TRUE(
       ElabOk("bit b;\n"
              "module m;\n"
@@ -72,7 +72,7 @@ TEST(DesignBuildingBlockElaboration, DollarUnitScopeExprElaborates) {
              "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, CuScopeClassVisibleInModule) {
+TEST(CompilationUnitElaboration, CuScopeClassVisibleInModule) {
   EXPECT_TRUE(
       ElabOk("class my_class;\n"
              "  int x;\n"
@@ -82,7 +82,7 @@ TEST(DesignBuildingBlockElaboration, CuScopeClassVisibleInModule) {
              "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, CuScopeItemsInSourceOrder) {
+TEST(CompilationUnitElaboration, CuScopeItemsInSourceOrder) {
   ElabFixture f;
   auto* design = Elaborate(
       "typedef int first_t;\n"
@@ -94,7 +94,7 @@ TEST(DesignBuildingBlockElaboration, CuScopeItemsInSourceOrder) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(DesignBuildingBlockElaboration, MultipleCuScopeTypedefs) {
+TEST(CompilationUnitElaboration, MultipleCuScopeTypedefs) {
   ElabFixture f;
   auto* design = Elaborate(
       "typedef logic [7:0] byte_t;\n"
@@ -111,14 +111,14 @@ TEST(DesignBuildingBlockElaboration, MultipleCuScopeTypedefs) {
   EXPECT_EQ(mod->variables[0].width, 8u);
   EXPECT_EQ(mod->variables[1].width, 32u);
 }
-TEST(DesignBuildingBlockElaboration, CuScopeTaskElaboratesSuccessfully) {
+TEST(CompilationUnitElaboration, CuScopeTaskElaboratesSuccessfully) {
   EXPECT_TRUE(
       ElabOk("task my_task;\n"
              "endtask\n"
              "module m; endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, LocalScopeShadowsCuScopeLocalparam) {
+TEST(CompilationUnitElaboration, LocalScopeShadowsCuScopeLocalparam) {
   EXPECT_TRUE(
       ElabOk("localparam int WIDTH = 8;\n"
              "module m;\n"
@@ -127,7 +127,7 @@ TEST(DesignBuildingBlockElaboration, LocalScopeShadowsCuScopeLocalparam) {
              "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, CuScopeLocalparamVisibleInMultipleModules) {
+TEST(CompilationUnitElaboration, CuScopeLocalparamVisibleInMultipleModules) {
   ElabFixture f;
   auto* design = Elaborate(
       "localparam int WIDTH = 8;\n"
@@ -143,11 +143,28 @@ TEST(DesignBuildingBlockElaboration, CuScopeLocalparamVisibleInMultipleModules) 
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(DesignBuildingBlockElaboration, CuScopeVarDeclElaborates) {
+TEST(CompilationUnitElaboration, CuScopeVarDeclElaborates) {
   EXPECT_TRUE(
       ElabOk("int global_counter;\n"
              "module m;\n"
              "  logic sig;\n"
              "endmodule\n"));
+}
+
+TEST(CompilationUnitElaboration, ForwardReferenceToCuScopeFunctionAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int observed;\n"
+             "  initial observed = helper(5);\n"
+             "endmodule\n"
+             "function int helper(int x); return x + 1; endfunction\n"));
+}
+
+TEST(CompilationUnitElaboration, ForwardReferenceToCuScopeTaskAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  initial later_task();\n"
+             "endmodule\n"
+             "task later_task; endtask\n"));
 }
 

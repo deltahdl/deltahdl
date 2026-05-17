@@ -71,6 +71,26 @@ TEST(PackageDeclarationElaboration,
              "endmodule\n"));
 }
 
+TEST(PackageDeclarationElaboration, SingleTimeunitInPackageHeadAccepted) {
+  EXPECT_TRUE(
+      ElabOk("package pkg;\n"
+             "  timeunit 1ns;\n"
+             "endpackage\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+TEST(PackageDeclarationElaboration,
+     TimeunitFollowedByTimeprecisionInPackageHeadAccepted) {
+  EXPECT_TRUE(
+      ElabOk("package pkg;\n"
+             "  timeunit 1ns;\n"
+             "  timeprecision 1ps;\n"
+             "endpackage\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 TEST(PackageDeclarationElaboration, TimeunitsRepeatMatchAccepted) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"

@@ -461,6 +461,116 @@ void Elaborator::ValidatePackageItems() {
   }
 }
 
+void Elaborator::ValidatePackageReferences() {
+
+  std::unordered_set<std::string_view> known_package_names;
+  for (const auto* pkg : unit_->packages) known_package_names.insert(pkg->name);
+
+  std::unordered_set<std::string_view> cu_top_names;
+  for (const auto* item : unit_->cu_items) {
+    if (!item->name.empty()) cu_top_names.insert(item->name);
+    if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
+      cu_top_names.insert(item->class_decl->name);
+    }
+  }
+  for (const auto* cls : unit_->classes) cu_top_names.insert(cls->name);
+
+  for (const auto* pkg : unit_->packages) {
+    std::unordered_set<std::string_view> pkg_names;
+    std::unordered_set<std::string_view> imported_names;
+    std::unordered_set<std::string_view> wildcard_pkgs;
+    for (const auto* it : pkg->items) {
+      if (!it->name.empty()) pkg_names.insert(it->name);
+      if (it->kind == ModuleItemKind::kClassDecl && it->class_decl) {
+        pkg_names.insert(it->class_decl->name);
+      }
+      if (it->kind == ModuleItemKind::kImportDecl) {
+        if (it->import_item.is_wildcard) {
+          wildcard_pkgs.insert(it->import_item.package_name);
+        } else {
+          imported_names.insert(it->import_item.item_name);
+        }
+      }
+    }
+
+    auto is_provided_by_wildcard = [&](std::string_view name) {
+      for (auto pname : wildcard_pkgs) {
+        for (const auto* p : unit_->packages) {
+          if (p->name != pname) continue;
+          for (const auto* pi : p->items) {
+            if (pi->name == name) return true;
+            if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
+                pi->class_decl->name == name)
+              return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    std::function<void(const Expr*)> walk;
+    walk = [&](const Expr* e) {
+      if (!e) return;
+      if (e->kind == ExprKind::kIdentifier) {
+
+        if (!e->scope_prefix.empty()) {
+          diag_.Error(
+              e->range.start,
+              std::format("package item uses scope prefix '{}', which targets "
+                          "a scope outside the package",
+                          e->scope_prefix));
+        } else if (cu_top_names.count(e->text) &&
+                   !pkg_names.count(e->text) &&
+                   !imported_names.count(e->text) &&
+                   !is_provided_by_wildcard(e->text)) {
+          diag_.Error(
+              e->range.start,
+              std::format("package item references '{}' from the "
+                          "compilation-unit scope; packages cannot refer to "
+                          "compilation-unit-scope items",
+                          e->text));
+        }
+      } else if (e->kind == ExprKind::kMemberAccess) {
+        if (e->lhs && e->lhs->kind == ExprKind::kIdentifier && e->rhs) {
+          auto root = e->lhs->text;
+          bool is_pkg = known_package_names.count(root) > 0;
+          bool is_self = pkg_names.count(root) > 0;
+          if (!is_pkg && !is_self) {
+            diag_.Error(
+                e->range.start,
+                std::format("package item contains a hierarchical reference "
+                            "'{}' that does not target the package itself or "
+                            "an imported package",
+                            root));
+          }
+        }
+
+        walk(e->lhs);
+        walk(e->base);
+        walk(e->index);
+        walk(e->index_end);
+        return;
+      }
+      walk(e->lhs);
+      walk(e->rhs);
+      walk(e->base);
+      walk(e->index);
+      walk(e->index_end);
+      walk(e->condition);
+      walk(e->true_expr);
+      walk(e->false_expr);
+      walk(e->repeat_count);
+      walk(e->with_expr);
+      for (const auto* a : e->args) walk(a);
+      for (const auto* el : e->elements) walk(el);
+    };
+
+    for (const auto* item : pkg->items) {
+      if (item->init_expr) walk(item->init_expr);
+    }
+  }
+}
+
 void Elaborator::ValidatePackageExports() {
 
   std::unordered_map<std::string_view, const PackageDecl*> pkg_by_name;
@@ -956,6 +1066,8 @@ void Elaborator::RunPreElaborationValidations() {
   ValidateAnonymousProgramNameSharing();
 
   ValidatePackageItems();
+
+  ValidatePackageReferences();
 
   ValidatePackageExports();
 

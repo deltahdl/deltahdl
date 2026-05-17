@@ -19,7 +19,7 @@ TEST(PackageDeclarationSim, VariableInitOccursBeforeInitialProcedure) {
   ASSERT_NE(design, nullptr);
   ASSERT_FALSE(f.has_errors);
   LowerAndRun(design, f);
-  auto* observed = f.ctx.FindVariable("top.observed");
+  auto* observed = f.ctx.FindVariable("observed");
   ASSERT_NE(observed, nullptr);
   EXPECT_EQ(observed->value.ToUint64(), 42u);
 }
@@ -40,7 +40,7 @@ TEST(PackageDeclarationSim, MultiplePackageVariablesInitBeforeProcedures) {
   ASSERT_NE(design, nullptr);
   ASSERT_FALSE(f.has_errors);
   LowerAndRun(design, f);
-  auto* sum = f.ctx.FindVariable("top.sum");
+  auto* sum = f.ctx.FindVariable("sum");
   ASSERT_NE(sum, nullptr);
   EXPECT_EQ(sum->value.ToUint64(), 12u);
 }

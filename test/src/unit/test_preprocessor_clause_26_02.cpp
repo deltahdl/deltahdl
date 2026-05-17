@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, PackageDeclarationsAndEndLabel) {
+TEST(PackageDeclarationPreprocessing, PackageDeclarationsAndEndLabel) {
   auto r = ParseWithPreprocessor(
       "package ComplexPkg;\n"
       "  typedef struct { shortreal i, r; } Complex;\n"

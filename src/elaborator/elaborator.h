@@ -63,6 +63,8 @@ class Elaborator {
 
   void ValidatePackageItems();
 
+  void ValidatePackageReferences();
+
   void ValidatePackageExports();
 
   void ValidatePackageImportRules(const ModuleDecl* decl);

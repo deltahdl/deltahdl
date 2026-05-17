@@ -13,34 +13,7 @@ namespace {
 
 namespace fs = std::filesystem;
 
-TEST(DesignBuildingBlockParsing, CompilationUnitDefinition) {
-  auto r = ParseWithPreprocessor(
-      "module a; endmodule\n"
-      "module b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-
-  ASSERT_EQ(r.cu->modules.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->name, "a");
-  EXPECT_EQ(r.cu->modules[1]->name, "b");
-}
-
-TEST(DesignBuildingBlockParsing, CuScopeContainsPackageItems) {
-  auto r = ParseWithPreprocessor(
-      "function int helper(int x); return x + 1; endfunction\n"
-      "task auto_task; endtask\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-
-  ASSERT_EQ(r.cu->cu_items.size(), 2u);
-  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(r.cu->cu_items[0]->name, "helper");
-  EXPECT_EQ(r.cu->cu_items[1]->kind, ModuleItemKind::kTaskDecl);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-TEST(DesignBuildingBlockParsing, IncludeBecomesPartOfCU) {
+TEST(CompilationUnitPreprocessing, IncludeBecomesPartOfCU) {
   auto r = ParseWithPreprocessor(
       "`define MY_CONST 42\n"
       "module m;\n"
@@ -52,7 +25,7 @@ TEST(DesignBuildingBlockParsing, IncludeBecomesPartOfCU) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(DesignBuildingBlockParsing, GloballyVisibleDesignElements) {
+TEST(CompilationUnitPreprocessing, GloballyVisibleDesignElements) {
   auto r = ParseWithPreprocessor(
       "package pkg; endpackage\n"
       "interface intf; endinterface\n"
@@ -75,7 +48,7 @@ TEST(DesignBuildingBlockParsing, GloballyVisibleDesignElements) {
   EXPECT_EQ(r.cu->udps.size(), 1u);
 }
 
-TEST(DesignBuildingBlockParsing, CuScopeClassDecl) {
+TEST(CompilationUnitPreprocessing, CuScopeClassDecl) {
   auto r = ParseWithPreprocessor(
       "class my_class;\n"
       "  int x;\n"
@@ -95,7 +68,7 @@ static const ModuleItem* FindItemByKindAndName(
   return nullptr;
 }
 
-TEST(DesignBuildingBlockParsing, NameResolutionOrder) {
+TEST(CompilationUnitPreprocessing, NameResolutionOrder) {
   auto r = ParseWithPreprocessor(
       "function int helper(int x); return x; endfunction\n"
       "module m;\n"
@@ -113,7 +86,7 @@ TEST(DesignBuildingBlockParsing, NameResolutionOrder) {
             nullptr);
 }
 
-TEST(DesignBuildingBlockParsing, CuScopeCannotBeImported) {
+TEST(CompilationUnitPreprocessing, CuScopeCannotBeImported) {
   auto r = ParseWithPreprocessor(
       "package pkg;\n"
       "  typedef int myint;\n"
@@ -128,7 +101,7 @@ TEST(DesignBuildingBlockParsing, CuScopeCannotBeImported) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-TEST(DesignBuildingBlockParsing, HierRefFromCUScope) {
+TEST(CompilationUnitPreprocessing, HierRefFromCUScope) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
       "  module_a u1();\n"
@@ -141,7 +114,7 @@ TEST(DesignBuildingBlockParsing, HierRefFromCUScope) {
   ASSERT_EQ(r.cu->modules.size(), 2u);
 }
 
-TEST(DesignBuildingBlockParsing, TypeSharingViaCUScope) {
+TEST(CompilationUnitPreprocessing, TypeSharingViaCUScope) {
   auto r = ParseWithPreprocessor(
       "class shared_type;\n"
       "  int value;\n"
@@ -158,7 +131,7 @@ TEST(DesignBuildingBlockParsing, TypeSharingViaCUScope) {
   ASSERT_EQ(r.cu->modules.size(), 2u);
 }
 
-TEST(DesignBuildingBlockParsing, CheckerAtCUScope) {
+TEST(CompilationUnitPreprocessing, CheckerAtCUScope) {
   auto r = ParseWithPreprocessor(
       "checker my_chk;\n"
       "endchecker\n"
@@ -168,7 +141,7 @@ TEST(DesignBuildingBlockParsing, CheckerAtCUScope) {
   ASSERT_EQ(r.cu->checkers.size(), 1u);
 }
 
-TEST(DesignBuildingBlockParsing, CuScopeTypedefStored) {
+TEST(CompilationUnitPreprocessing, CuScopeTypedefStored) {
   auto r = ParseWithPreprocessor(
       "typedef logic [7:0] byte_t;\n"
       "module m; endmodule\n");
@@ -179,7 +152,7 @@ TEST(DesignBuildingBlockParsing, CuScopeTypedefStored) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "byte_t");
 }
 
-TEST(DesignBuildingBlockParsing, CuScopeLocalparamStored) {
+TEST(CompilationUnitPreprocessing, CuScopeLocalparamStored) {
   auto r = ParseWithPreprocessor(
       "localparam int WIDTH = 8;\n"
       "module m; endmodule\n");
@@ -190,7 +163,7 @@ TEST(DesignBuildingBlockParsing, CuScopeLocalparamStored) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "WIDTH");
 }
 
-TEST(DesignBuildingBlockParsing, CuScopeImportStored) {
+TEST(CompilationUnitPreprocessing, CuScopeImportStored) {
   auto r = ParseWithPreprocessor(
       "package pkg;\n"
       "  typedef int myint;\n"
@@ -203,7 +176,7 @@ TEST(DesignBuildingBlockParsing, CuScopeImportStored) {
   EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kImportDecl);
 }
 
-TEST(DesignBuildingBlockParsing, CuScopeVarDeclStored) {
+TEST(CompilationUnitPreprocessing, CuScopeVarDeclStored) {
   auto r = ParseWithPreprocessor(
       "int global_counter;\n"
       "module m; endmodule\n");
@@ -214,7 +187,7 @@ TEST(DesignBuildingBlockParsing, CuScopeVarDeclStored) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "global_counter");
 }
 
-TEST(DesignBuildingBlockParsing, DollarUnitScopeResolution) {
+TEST(CompilationUnitPreprocessing, DollarUnitScopeResolution) {
   auto r = ParseWithPreprocessor(
       "bit b;\n"
       "task t;\n"
@@ -226,7 +199,7 @@ TEST(DesignBuildingBlockParsing, DollarUnitScopeResolution) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(DesignBuildingBlockParsing, ForwardRefOnlyDefinedNames) {
+TEST(CompilationUnitPreprocessing, ForwardRefOnlyDefinedNames) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  initial begin end\n"
@@ -245,7 +218,7 @@ TEST(CompilationUnitPreprocessing, EmptySourceText) {
   EXPECT_TRUE(r.cu->modules.empty());
 }
 
-TEST(DesignBuildingBlockParsing, UnitScopeDeclarations) {
+TEST(CompilationUnitPreprocessing, UnitScopeDeclarations) {
   auto r = ParseWithPreprocessor(
       "function automatic int helper(int x);\n"
       "  return x + 1;\n"
@@ -276,7 +249,7 @@ TEST(CompilationUnitPreprocessing, MultipleModules) {
   EXPECT_EQ(r.cu->modules[2]->name, "c");
 }
 
-TEST(DesignBuildingBlockParsing, CuScopeItemWithMacroExpansion) {
+TEST(CompilationUnitPreprocessing, CuScopeItemWithMacroExpansion) {
   auto r = ParseWithPreprocessor(
       "`define DEFAULT_WIDTH 16\n"
       "localparam int WIDTH = `DEFAULT_WIDTH;\n"
@@ -288,7 +261,7 @@ TEST(DesignBuildingBlockParsing, CuScopeItemWithMacroExpansion) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "WIDTH");
 }
 
-TEST(DesignBuildingBlockParsing, DirectiveDefinedBetweenModules) {
+TEST(CompilationUnitPreprocessing, DirectiveDefinedBetweenModules) {
   auto r = ParseWithPreprocessor(
       "module m1; endmodule\n"
       "`define DEPTH 4\n"
@@ -328,6 +301,27 @@ TEST(CompilationUnitPreprocessing, IncludeDirectiveContentBecomesPartOfCu) {
   EXPECT_EQ(cu->cu_items[0]->name, "helper");
 
   fs::remove_all(dir);
+}
+
+TEST(CompilationUnitPreprocessing, MacroDefinitionDoesNotCrossCompilationUnits) {
+  SourceManager mgr_a;
+  DiagEngine diag_a(mgr_a);
+  auto fid_a =
+      mgr_a.AddFile("<unit_a>", "`define WIDTH 8\nmodule a; endmodule\n");
+  Preprocessor preproc_a(mgr_a, diag_a, {});
+  (void)preproc_a.Preprocess(fid_a);
+
+  SourceManager mgr_b;
+  DiagEngine diag_b(mgr_b);
+  auto fid_b =
+      mgr_b.AddFile("<unit_b>",
+                    "module b;\n"
+                    "  localparam int W = `WIDTH;\n"
+                    "endmodule\n");
+  Preprocessor preproc_b(mgr_b, diag_b, {});
+  auto pp_b = preproc_b.Preprocess(fid_b);
+  EXPECT_TRUE(diag_b.HasErrors());
+  EXPECT_EQ(pp_b.find("8"), std::string::npos);
 }
 
 }
