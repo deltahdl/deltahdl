@@ -209,6 +209,7 @@ void LibraryMap::TagCompilationUnit(CompilationUnit& cu,
   for (auto* m : cu.modules) m->library = lib;
   for (auto* i : cu.interfaces) i->library = lib;
   for (auto* p : cu.programs) p->library = lib;
+  for (auto* c : cu.checkers) c->library = lib;
   for (auto* u : cu.udps) u->library = lib;
   for (auto* p : cu.packages) p->library = lib;
   for (auto* c : cu.configs) c->library = lib;
