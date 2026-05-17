@@ -134,6 +134,10 @@ class SimContext {
   void SetDelayMode(DelayMode mode) { delay_mode_ = mode; }
   DelayMode GetDelayMode() const { return delay_mode_; }
 
+  void SetGlobalPrecision(TimeUnit u) { global_precision_ = u; }
+  TimeUnit GlobalPrecision() const { return global_precision_; }
+  TimeUnit StepTimeUnit() const { return global_precision_; }
+
   void RegisterFinalProcess(Process* proc);
   void RunFinalBlocks();
 
@@ -379,6 +383,7 @@ class SimContext {
 
   std::unordered_map<uint32_t, std::vector<Process*>> program_initials_by_block_;
   DelayMode delay_mode_ = DelayMode::kTyp;
+  TimeUnit global_precision_ = TimeUnit::kNs;
   std::vector<std::string> plus_args_;
   std::unordered_map<int, FILE*> file_descriptors_;
   int next_fd_ = 3;

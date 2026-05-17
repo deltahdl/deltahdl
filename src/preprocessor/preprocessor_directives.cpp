@@ -13,29 +13,33 @@ static std::string_view TrimDirective(std::string_view s) {
   return s;
 }
 
-static bool ParseTimescaleComponent(std::string_view text, int& magnitude,
-                                    TimeUnit& unit) {
+enum class TimescaleParseStatus { kOk, kStep, kInvalid };
+
+static TimescaleParseStatus ParseTimescaleComponentStatus(std::string_view text,
+                                                          int& magnitude,
+                                                          TimeUnit& unit) {
   auto trimmed = TrimDirective(text);
-  if (trimmed.empty()) return false;
+  if (trimmed.empty()) return TimescaleParseStatus::kInvalid;
 
   size_t i = 0;
   while (i < trimmed.size() &&
          std::isdigit(static_cast<unsigned char>(trimmed[i]))) {
     ++i;
   }
-  if (i == 0) return false;
+  if (i == 0) return TimescaleParseStatus::kInvalid;
 
   int mag = 0;
   for (size_t j = 0; j < i; ++j) {
     mag = mag * 10 + (trimmed[j] - '0');
   }
-  if (mag != 1 && mag != 10 && mag != 100) return false;
+  if (mag != 1 && mag != 10 && mag != 100) return TimescaleParseStatus::kInvalid;
   magnitude = mag;
 
   auto unit_str = TrimDirective(trimmed.substr(i));
-  return ParseTimeUnitStr(unit_str, unit);
+  if (unit_str == "step") return TimescaleParseStatus::kStep;
+  return ParseTimeUnitStr(unit_str, unit) ? TimescaleParseStatus::kOk
+                                          : TimescaleParseStatus::kInvalid;
 }
-
 
 void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
 
@@ -48,11 +52,27 @@ void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
   auto prec_part = rest.substr(slash + 1);
 
   TimeScale ts;
-  if (!ParseTimescaleComponent(unit_part, ts.magnitude, ts.unit)) {
+  auto unit_status =
+      ParseTimescaleComponentStatus(unit_part, ts.magnitude, ts.unit);
+  if (unit_status == TimescaleParseStatus::kStep) {
+    diag_.Error(
+        loc,
+        "step cannot be used to set or modify the time unit or precision");
+    return;
+  }
+  if (unit_status != TimescaleParseStatus::kOk) {
     diag_.Error(loc, "invalid `timescale unit");
     return;
   }
-  if (!ParseTimescaleComponent(prec_part, ts.prec_magnitude, ts.precision)) {
+  auto prec_status =
+      ParseTimescaleComponentStatus(prec_part, ts.prec_magnitude, ts.precision);
+  if (prec_status == TimescaleParseStatus::kStep) {
+    diag_.Error(
+        loc,
+        "step cannot be used to set or modify the time unit or precision");
+    return;
+  }
+  if (prec_status != TimescaleParseStatus::kOk) {
     diag_.Error(loc, "invalid `timescale precision");
     return;
   }

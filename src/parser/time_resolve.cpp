@@ -116,6 +116,11 @@ TimeUnit ComputeGlobalTimePrecision(const CompilationUnit* cu,
   for (const auto* prog : cu->programs) {
     CollectModulePrecisions(prog, result, found);
   }
+  for (const auto* pkg : cu->packages) {
+    if (pkg->has_timeprecision) {
+      UpdateMin(pkg->time_prec, result, found);
+    }
+  }
 
   return result;
 }

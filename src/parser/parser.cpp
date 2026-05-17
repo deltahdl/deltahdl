@@ -743,27 +743,46 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
   auto tok = Consume();
   TimeUnit tu = TimeUnit::kNs;
   int mag = 1;
-  if (!TryParseTimeMagnitudeAndUnit(tok.text, mag, tu)) {
-    diag_.Error(tok.loc,
-                "time literal must use magnitude 1, 10, or 100 and unit "
-                "s/ms/us/ns/ps/fs");
-  }
-  ApplyTimeUnit(mod, cu, pkg, is_unit, tu, mag);
-  if (Match(TokenKind::kSlash)) {
-    auto prec_tok = Consume();
-    TimeUnit prec = TimeUnit::kNs;
-    int prec_mag = 1;
-    if (!TryParseTimeMagnitudeAndUnit(prec_tok.text, prec_mag, prec)) {
-      diag_.Error(prec_tok.loc,
+  bool unit_is_step =
+      Check(TokenKind::kIdentifier) && CurrentToken().text == "step";
+  if (unit_is_step) {
+    diag_.Error(
+        tok.loc,
+        "step cannot be used to set or modify the time unit or precision");
+    Consume();
+  } else {
+    if (!TryParseTimeMagnitudeAndUnit(tok.text, mag, tu)) {
+      diag_.Error(tok.loc,
                   "time literal must use magnitude 1, 10, or 100 and unit "
                   "s/ms/us/ns/ps/fs");
     }
+    ApplyTimeUnit(mod, cu, pkg, is_unit, tu, mag);
+  }
+  if (Match(TokenKind::kSlash)) {
+    auto prec_tok = Consume();
+    bool prec_is_step =
+        Check(TokenKind::kIdentifier) && CurrentToken().text == "step";
+    if (prec_is_step) {
+      diag_.Error(
+          prec_tok.loc,
+          "step cannot be used to set or modify the time unit or precision");
+      Consume();
+    } else {
+      TimeUnit prec = TimeUnit::kNs;
+      int prec_mag = 1;
+      if (!TryParseTimeMagnitudeAndUnit(prec_tok.text, prec_mag, prec)) {
+        diag_.Error(prec_tok.loc,
+                    "time literal must use magnitude 1, 10, or 100 and unit "
+                    "s/ms/us/ns/ps/fs");
+      }
 
-    if (EffectiveTimeOrder(prec, prec_mag) > EffectiveTimeOrder(tu, mag)) {
-      diag_.Error(prec_tok.loc,
-                  "time precision is less precise than the time unit");
+      if (!unit_is_step &&
+          EffectiveTimeOrder(prec, prec_mag) > EffectiveTimeOrder(tu, mag)) {
+        diag_.Error(prec_tok.loc,
+                    "time precision is less precise than the time unit");
+      }
+      if (is_unit) ApplyTimePrecision(mod, cu, pkg, prec, prec_mag);
     }
-    if (is_unit) ApplyTimePrecision(mod, cu, pkg, prec, prec_mag);
   }
   Expect(TokenKind::kSemicolon);
 }

@@ -60,4 +60,18 @@ TEST(Preprocessor, DelayToTicks_Basic) {
   EXPECT_EQ(DelayToTicks(10, ts, TimeUnit::kPs), 10000);
 }
 
+TEST(Preprocessor, Timescale_StepRejectedAsUnit) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1step / 1ns\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Timescale_StepRejectedAsPrecision) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1ns / 1step\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }

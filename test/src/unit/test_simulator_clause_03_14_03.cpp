@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
+#include "fixture_simulator.h"
 #include "helpers_parse_314.h"
 
 using namespace delta;
@@ -14,6 +15,21 @@ TEST(DesignBuildingBlockParsing, ThreeMagnitudes) {
   EXPECT_EQ(DelayToTicks(1, ts1, TimeUnit::kPs), 1000u);
   EXPECT_EQ(DelayToTicks(1, ts10, TimeUnit::kPs), 10000u);
   EXPECT_EQ(DelayToTicks(1, ts100, TimeUnit::kPs), 100000u);
+}
+
+TEST(DesignBuildingBlockSimulation, StepTimeUnitEqualsGlobalPrecision) {
+  SimFixture f;
+  f.ctx.SetGlobalPrecision(TimeUnit::kFs);
+  EXPECT_EQ(f.ctx.GlobalPrecision(), TimeUnit::kFs);
+  EXPECT_EQ(f.ctx.StepTimeUnit(), TimeUnit::kFs);
+}
+
+TEST(DesignBuildingBlockSimulation, StepTimeUnitTracksLatestGlobalPrecision) {
+  SimFixture f;
+  f.ctx.SetGlobalPrecision(TimeUnit::kNs);
+  ASSERT_EQ(f.ctx.StepTimeUnit(), TimeUnit::kNs);
+  f.ctx.SetGlobalPrecision(TimeUnit::kFs);
+  EXPECT_EQ(f.ctx.StepTimeUnit(), TimeUnit::kFs);
 }
 
 }
