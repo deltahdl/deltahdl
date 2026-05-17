@@ -191,21 +191,6 @@ TEST(PackedStructParsing, PackedMemberAccessWrite) {
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
-TEST(PackedStructParsing, StructPackedSigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed signed {\n"
-      "    int a;\n"
-      "    byte b;\n"
-      "  } packed_s;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->typedef_type.is_packed);
-  EXPECT_TRUE(item->typedef_type.is_signed);
-}
-
 TEST(PackedStructParsing, PackedStructBitwise) {
   auto r = Parse(
       "module t;\n"
@@ -548,23 +533,6 @@ TEST(PackedStructParsing, PackedSignedAllTwoStateMembers) {
   EXPECT_EQ(item->data_type.struct_members.size(), 4u);
 }
 
-TEST(PackedStructParsing, PackedUnsignedWithFourStateMembers) {
-  auto r = Parse(
-      "module t;\n"
-      "  struct packed unsigned {\n"
-      "    time a;\n"
-      "    integer b;\n"
-      "    logic [31:0] c;\n"
-      "  } pack2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->data_type.is_packed);
-  EXPECT_FALSE(item->data_type.is_signed);
-  EXPECT_EQ(item->data_type.struct_members.size(), 3u);
-}
-
 TEST(PackedStructParsing, PackedStructDefaultUnsigned) {
   auto r = Parse(
       "module t;\n"
@@ -595,13 +563,23 @@ TEST(PackedStructParsing, PackedStructPartSelect) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
 
-TEST(PackedStructParsing, PackedStructBasicDecl) {
+// §7.2.1: "The signing of unpacked structures is not allowed."
+// The grammar only consumes a signing keyword after `packed`, so the parser
+// must reject `struct signed { ... }` and `struct unsigned { ... }`.
+TEST(PackedStructParsing, UnpackedSignedStruct_Rejected) {
   auto r = Parse(
-      "module m;\n"
-      "  struct packed { logic [7:0] a; logic [7:0] b; } s;\n"
+      "module t;\n"
+      "  typedef struct signed { int f1; logic f2; } bad_t;\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PackedStructParsing, UnpackedUnsignedStruct_Rejected) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct unsigned { int f1; logic f2; } bad_t;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }  // namespace

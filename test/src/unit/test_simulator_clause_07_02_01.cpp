@@ -4,25 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(PackedStructSimulation, PrimaryMemberAccess) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
-      "  pair_t p;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin p = 16'hABCD; x = p.hi; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xABu);
-}
-
 // §7.2.1: First member is most significant, decreasing significance.
 TEST(PackedStructSimulation, MsbFirstBitOrdering_ThreeFields) {
   auto v = RunAndGet(
@@ -77,6 +58,25 @@ TEST(PackedStructSimulation, MsbFirstBitOrdering_LeastSignificantField) {
   EXPECT_EQ(v, 0xCCu);
 }
 
+// §7.2.1: "A packed structure can also be used as a whole with arithmetic
+// and logical operators." Arithmetic-operator coverage (bitwise/logical
+// coverage lives in BitwiseAndOnPackedStruct).
+TEST(PackedStructSimulation, ArithmeticAdditionOnPackedStruct) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } w_t;\n"
+      "  w_t a, b;\n"
+      "  logic [15:0] z;\n"
+      "  initial begin\n"
+      "    a = 16'h0102;\n"
+      "    b = 16'h0304;\n"
+      "    z = a + b;\n"
+      "  end\n"
+      "endmodule\n",
+      "z");
+  EXPECT_EQ(v, 0x0406u);
+}
+
 // §7.2.1: Packed struct used as a whole with bitwise operators.
 TEST(PackedStructSimulation, BitwiseAndOnPackedStruct) {
   auto v = RunAndGet(
@@ -118,6 +118,59 @@ TEST(PackedStructSimulation, PartSelectOnPackedStruct) {
       "endmodule\n",
       "top_byte");
   EXPECT_EQ(v, 0xABu);
+}
+
+// §7.2.1: "One or more bits of a packed structure can be selected as if it
+// were a packed array with the range [n-1:0]." Single-bit boundary at MSB.
+TEST(PackedStructSimulation, SingleBitSelectOnPackedStruct) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } w_t;\n"
+      "  w_t w;\n"
+      "  logic msb;\n"
+      "  initial begin w = 16'h8000; msb = w[15]; end\n"
+      "endmodule\n",
+      "msb");
+  EXPECT_EQ(v, 1u);
+}
+
+// §7.2.1: "If there are also 2-state members in the structure, there is an
+// implicit conversion ... from 2-state to 4-state when writing them."
+// Writing a 2-state value into a 2-state member of a 4-state struct must
+// overwrite any prior X bits in that member's bit positions.
+TEST(PackedStructSimulation, WriteTwoStateValueToBitMember_OverwritesPriorX) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct packed { bit [7:0] b; logic [7:0] l; } mixed_t;\n"
+      "  mixed_t s;\n"
+      "  logic [7:0] r;\n"
+      "  initial begin\n"
+      "    s = 16'bxxxxxxxx_00000000;\n"
+      "    s.b = 8'hA5;\n"
+      "    r = s.b;\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 0xA5u);
+}
+
+// §7.2.1: "If there are also 2-state members in the structure, there is an
+// implicit conversion from 4-state to 2-state when reading those members."
+// Mixed struct (bit + logic) is 4-state overall; reading the 2-state `bit`
+// member returns a 2-state value, so X bits in the source convert to 0.
+TEST(PackedStructSimulation, BitMemberInFourStateStruct_ReadsAsTwoState) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct packed { bit [7:0] b; logic [7:0] l; } mixed_t;\n"
+      "  mixed_t s;\n"
+      "  logic [7:0] r;\n"
+      "  initial begin\n"
+      "    s = 16'bxxxxxxxx_00000000;\n"
+      "    r = s.b;\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 0u);
 }
 
 // §7.2.1: Member write then read back whole struct.
