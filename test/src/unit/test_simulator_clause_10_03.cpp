@@ -74,4 +74,30 @@ TEST(ContinuousAssignSim, DrivesVectorVariable) {
   EXPECT_EQ(var->value.ToUint64(), 0xBEEFu);
 }
 
+// §10.3: "This assignment shall occur whenever the value of the right-hand
+// side changes." Updating a variable on the RHS re-evaluates the LHS.
+TEST(ContinuousAssignSim, AssignmentReevaluatesOnRhsChange) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  wire  [7:0] y;\n"
+      "  assign y = a + b;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"
+      "    b = 8'd2;\n"
+      "    #1;\n"
+      "    a = 8'd40;\n"
+      "    b = 8'd2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 42u);
+}
+
 }  // namespace

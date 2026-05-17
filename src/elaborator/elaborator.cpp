@@ -2446,7 +2446,8 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
       diag_.Error(item->loc, "net data type must be 4-state");
     }
   }
-  // §6.7 footnote 16: charge strength shall only be used with trireg.
+  // §10.3 Syntax 10-1 footnote 16: charge strength shall only be used with
+  // trireg.
   if (item->data_type.charge_strength != 0 &&
       net.net_type != NetType::kTrireg) {
     diag_.Error(item->loc,
@@ -2454,7 +2455,8 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   }
   net.is_vectored = item->data_type.is_vectored;
   net.is_scalared = item->data_type.is_scalared;
-  // §6.7 footnote 16: vectored/scalared requires at least one packed dim.
+  // §10.3 Syntax 10-1 footnote 16: vectored/scalared requires at least one
+  // packed dim.
   if ((item->data_type.is_vectored || item->data_type.is_scalared) &&
       net.width <= 1 && item->data_type.packed_dim_left == nullptr) {
     diag_.Error(item->loc,
