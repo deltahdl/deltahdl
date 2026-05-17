@@ -6,6 +6,16 @@ namespace delta {
 // §16.3 Immediate assertions
 // =============================================================================
 
+// §16.3 grammar: `deferred_immediate_*_statement ::= keyword #0 (...) ... |
+// keyword final (...) ...`. Only the integer literal 0 is allowed after #.
+static void ExpectDeferredHashZero(DiagEngine& diag, const Token& tok) {
+  if (tok.text != "0") {
+    diag.Error(tok.loc,
+               "deferred immediate assertion requires #0, got #" +
+                   std::string(tok.text));
+  }
+}
+
 // Shared logic for immediate assert/assume (§16.3).
 Stmt* Parser::ParseImmediateAssertLike(StmtKind kind, TokenKind keyword) {
   auto* stmt = arena_.Create<Stmt>();
@@ -15,7 +25,8 @@ Stmt* Parser::ParseImmediateAssertLike(StmtKind kind, TokenKind keyword) {
 
   // §A.6.10: deferred_immediate — assert #0 (...) or assert final (...)
   if (Match(TokenKind::kHash)) {
-    Expect(TokenKind::kIntLiteral);
+    auto tok = Expect(TokenKind::kIntLiteral);
+    ExpectDeferredHashZero(diag_, tok);
     stmt->is_deferred = true;
   } else if (Match(TokenKind::kKwFinal)) {
     stmt->is_deferred = true;
@@ -58,7 +69,8 @@ Stmt* Parser::ParseImmediateCover() {
 
   // §A.6.10: deferred_immediate — cover #0 (...) or cover final (...)
   if (Match(TokenKind::kHash)) {
-    Expect(TokenKind::kIntLiteral);
+    auto tok = Expect(TokenKind::kIntLiteral);
+    ExpectDeferredHashZero(diag_, tok);
     stmt->is_deferred = true;
   } else if (Match(TokenKind::kKwFinal)) {
     stmt->is_deferred = true;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iosfwd>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -94,6 +95,12 @@ Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena);
 // System call and function call dispatch (eval_function.cpp).
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena);
+
+// §20.10: shared severity-task header emitter. The §16.3 default-$error path
+// and the §20.10 severity system tasks both route through this so format and
+// observability stay consistent across the two subclauses.
+void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,
+                        std::string_view msg, std::ostream& os);
 
 // §13: Set up a task call scope (push scope, bind args, push queue ref frame).
 // Returns the task's ModuleItem on success, or nullptr if not a task call.

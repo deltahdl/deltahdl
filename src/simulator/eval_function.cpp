@@ -75,6 +75,17 @@ static void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->callee == "$display") std::cout << "\n";
 }
 
+// §20.10: emit a severity message header with the simulation time. Shared
+// with the §16.3 default-$error path so both subclauses route through the
+// same formatter.
+void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,
+                        std::string_view msg, std::ostream& os) {
+  os << "[" << ctx.CurrentTime().ticks << "] " << prefix;
+  if (!msg.empty()) os << ": " << msg;
+  os << "\n";
+  ctx.SetLastSeverity(prefix, msg, ctx.CurrentTime());
+}
+
 static void ExecSeverityTask(const Expr* expr, SimContext& ctx, Arena& arena,
                              const char* prefix, std::ostream& os) {
   std::string fmt;
@@ -97,7 +108,7 @@ static void ExecSeverityTask(const Expr* expr, SimContext& ctx, Arena& arena,
     }
   }
   std::string msg = fmt.empty() ? "" : FormatDisplay(fmt, arg_vals);
-  os << prefix << ": " << msg << "\n";
+  EmitSeverityHeader(ctx, prefix, msg, os);
 }
 
 static Logic4Vec EvalDeferredPrint(const Expr* expr, SimContext& ctx,

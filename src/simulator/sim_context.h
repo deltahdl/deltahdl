@@ -366,6 +366,23 @@ class SimContext {
   void IncrementAssertionFailCount() { ++assertion_fail_count_; }
   int AssertionFailCount() const { return assertion_fail_count_; }
 
+  // §16.3: immediate cover coverage counters (per "Number of times evaluated"
+  // and "Number of times succeeded").
+  void IncrementCoverEvalCount() { ++cover_eval_count_; }
+  void IncrementCoverSuccessCount() { ++cover_success_count_; }
+  int CoverEvalCount() const { return cover_eval_count_; }
+  int CoverSuccessCount() const { return cover_success_count_; }
+
+  // §20.10: severity-task output captured for testing (latest call).
+  void SetLastSeverity(std::string_view sev, std::string_view msg, SimTime t) {
+    last_severity_ = std::string(sev);
+    last_severity_msg_ = std::string(msg);
+    last_severity_time_ = t;
+  }
+  std::string_view LastSeverity() const { return last_severity_; }
+  std::string_view LastSeverityMsg() const { return last_severity_msg_; }
+  SimTime LastSeverityTime() const { return last_severity_time_; }
+
   // §14: Clocking manager access.
   void SetClockingManager(class ClockingManager* mgr) { clocking_mgr_ = mgr; }
   class ClockingManager* GetClockingManager() { return clocking_mgr_; }
@@ -456,6 +473,13 @@ class SimContext {
   std::unordered_map<std::string, std::string> instance_types_;
   // §16.3: Immediate assertion failure counter.
   int assertion_fail_count_ = 0;
+  // §16.3: immediate cover eval/success counters.
+  int cover_eval_count_ = 0;
+  int cover_success_count_ = 0;
+  // §20.10: latest severity-task observation.
+  std::string last_severity_;
+  std::string last_severity_msg_;
+  SimTime last_severity_time_{};
   // §14: Clocking manager.
   class ClockingManager* clocking_mgr_ = nullptr;
   // §19: Coverage database.

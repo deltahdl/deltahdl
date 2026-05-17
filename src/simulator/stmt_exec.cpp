@@ -1219,19 +1219,26 @@ static ExecTask ExecWaitFork(SimContext& ctx) {
 static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
                                     Arena& arena) {
   auto cond = EvalExpr(stmt->assert_expr, ctx, arena);
-  if (cond.ToUint64() != 0) {
-    // Pass action.
+  // §16.3: expression evaluating to x, z, or 0 is false; otherwise true.
+  bool is_true = cond.IsTruthy();
+  if (stmt->kind == StmtKind::kCoverImmediate) {
+    ctx.IncrementCoverEvalCount();
+  }
+  if (is_true) {
+    if (stmt->kind == StmtKind::kCoverImmediate) {
+      ctx.IncrementCoverSuccessCount();
+    }
     if (stmt->assert_pass_stmt) {
       co_return co_await ExecStmt(stmt->assert_pass_stmt, ctx, arena);
     }
   } else {
-    // Fail action.
     if (stmt->assert_fail_stmt) {
       co_return co_await ExecStmt(stmt->assert_fail_stmt, ctx, arena);
     } else if (stmt->kind != StmtKind::kCoverImmediate) {
-      // §16.3: Default $error when assert/assume fails with no else clause.
+      // §16.3 / §20.10: tool shall, by default, call $error when assert or
+      // assume fails with no else clause.
       ctx.IncrementAssertionFailCount();
-      std::cerr << "ERROR: Assertion failed.\n";
+      EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
     }
   }
   co_return StmtResult::kDone;

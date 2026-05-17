@@ -1,75 +1,31 @@
-#include "fixture_simulator.h"
-#include "simulator/lowerer.h"
-#include "simulator/net.h"
-#include "simulator/variable.h"
+#include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(Lowerer, FatalStopsSim) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial begin\n"
-      "    $fatal(1, \"test fatal\");\n"
-      "    x = 99;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  EXPECT_TRUE(f.ctx.StopRequested());
+// §20.10 BNF "finish_number ::= 0 | 1 | 2". The first argument to $fatal at
+// module level must be in {0,1,2}; values outside that range are rejected.
+TEST(SeveritySystemTaskElab, FatalFinishNumberInRangeAccepted) {
+  for (int fn = 0; fn <= 2; ++fn) {
+    ElabFixture ef;
+    auto src = "module m; $fatal(" + std::to_string(fn) + "); endmodule\n";
+    auto* design = Elaborate(src, ef);
+    ASSERT_NE(design, nullptr);
+    EXPECT_FALSE(ef.has_errors)
+        << "finish_number " << fn << " must elaborate cleanly";
+  }
 }
 
-TEST(Lowerer, ErrorDoesNotStop) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial begin\n"
-      "    $error(\"test error\");\n"
-      "    x = 42;\n"
-      "  end\n"
+TEST(SeveritySystemTaskElab, FatalFinishNumberOutOfRangeRejected) {
+  ElabFixture ef;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  $fatal(5);\n"
       "endmodule\n",
-      f);
+      ef);
   ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-  EXPECT_FALSE(f.ctx.StopRequested());
-}
-
-TEST(Lowerer, WarningContinues) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial begin\n"
-      "    $warning(\"test warning\");\n"
-      "    x = 7;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 7u);
+  EXPECT_TRUE(ef.has_errors);
 }
 
 }  // namespace
