@@ -13,4 +13,4 @@ TEST(OptionalSystemTaskParserParsing, Scope) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

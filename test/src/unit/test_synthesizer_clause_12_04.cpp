@@ -43,4 +43,4 @@ TEST(ConditionalStatementSynth, IfWithoutElseSynthesizes) {
   EXPECT_EQ(aig->outputs.size(), 8);
 }
 
-}  // namespace
+}

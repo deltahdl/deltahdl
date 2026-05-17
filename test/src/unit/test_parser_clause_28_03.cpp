@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Every instance in a comma-separated gate-instance list must inherit the
-// single drive-strength spec written before the list.
 TEST(PrimitiveInstantiationParsing, GateInst_SharedStrengthAcrossInstances) {
   auto r = Parse(
       "module m;\n"
@@ -20,8 +18,6 @@ TEST(PrimitiveInstantiationParsing, GateInst_SharedStrengthAcrossInstances) {
   EXPECT_EQ(gates[0]->drive_strength1, gates[1]->drive_strength1);
 }
 
-// Same requirement, delay side: one shared delay spec applies to every
-// instance in the comma-separated list.
 TEST(PrimitiveInstantiationParsing, GateInst_SharedDelayAcrossInstances) {
   auto r = Parse(
       "module m;\n"
@@ -34,7 +30,6 @@ TEST(PrimitiveInstantiationParsing, GateInst_SharedDelayAcrossInstances) {
   EXPECT_NE(gates[1]->gate_delay, nullptr);
 }
 
-// Two-value (rise, fall) delay must propagate identically to every instance.
 TEST(GateDelayParsing, MultipleInstancesWithRiseFallDelay) {
   auto r = Parse(
       "module m;\n"
@@ -56,4 +51,4 @@ TEST(GateDelayParsing, MultipleInstancesWithRiseFallDelay) {
   EXPECT_EQ(g2->gate_delay_fall->int_val, 6u);
 }
 
-}  // namespace
+}

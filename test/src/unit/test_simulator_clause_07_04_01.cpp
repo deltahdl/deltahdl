@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.4.1: Multi-dimensional packed array is a single contiguous vector.
 TEST(PackedArraySimulation, MultiDimPackedArrayAsSingleVector) {
   auto v = RunAndGet(
       "module t;\n"
@@ -19,7 +18,6 @@ TEST(PackedArraySimulation, MultiDimPackedArrayAsSingleVector) {
   EXPECT_EQ(v, 0xABCDu);
 }
 
-// §7.4.1: Part-select operates on the flattened packed vector.
 TEST(PackedArraySimulation, MultiDimPackedArrayPartSelect) {
   auto v = RunAndGet(
       "module t;\n"
@@ -34,7 +32,6 @@ TEST(PackedArraySimulation, MultiDimPackedArrayPartSelect) {
   EXPECT_EQ(v, 0xABu);
 }
 
-// §7.4.1: Packed array bit-select on flattened vector.
 TEST(PackedArraySimulation, PackedArrayBitSelect) {
   auto v = RunAndGet(
       "module t;\n"
@@ -49,4 +46,4 @@ TEST(PackedArraySimulation, PackedArrayBitSelect) {
   EXPECT_EQ(v, 1u);
 }
 
-}  // namespace
+}

@@ -100,4 +100,4 @@ TEST(GeneralPurposeAlwaysElaboration, AlwaysWithWaitInBodyNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-}  // namespace
+}

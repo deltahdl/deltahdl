@@ -15,10 +15,6 @@
 
 namespace delta {
 
-// =============================================================================
-// ClockingManager
-// =============================================================================
-
 void ClockingManager::Register(ClockingBlock block) {
   name_index_[block.name] = blocks_.size();
   blocks_.push_back(std::move(block));
@@ -48,16 +44,14 @@ SimTime ClockingManager::GetOutputSkew(std::string_view block_name,
   return block->default_output_skew;
 }
 
-// Check if the clock variable transitioned to the expected edge.
 static bool CheckClockEdge(Variable* clk_var, Edge edge) {
   uint64_t cur = clk_var->value.ToUint64() & 1;
   uint64_t prev = clk_var->prev_value.ToUint64() & 1;
   if (edge == Edge::kPosedge) return prev == 0 && cur == 1;
   if (edge == Edge::kNegedge) return prev == 1 && cur == 0;
-  return prev != cur;  // Edge::kNone means any change.
+  return prev != cur;
 }
 
-// Sample input signals for a clocking block, optionally filtering by #0 skew.
 static void SampleBlockInputs(ClockingManager* mgr, const std::string& name,
                               const std::vector<ClockingSignal>& signals,
                               SimContext& ctx, bool only_zero_skew) {
@@ -73,7 +67,6 @@ static void SampleBlockInputs(ClockingManager* mgr, const std::string& name,
   }
 }
 
-// Re-registrable clock watcher that samples inputs on the correct edge.
 static void RegisterClockWatcher(ClockingManager* mgr, Variable* clk_var,
                                  const ClockingBlock& block, SimContext& ctx,
                                  Scheduler& sched) {
@@ -87,16 +80,16 @@ static void RegisterClockWatcher(ClockingManager* mgr, Variable* clk_var,
           if (blk) RegisterClockWatcher(mgr, clk_var, *blk, ctx, sched);
           return true;
         }
-        // §14.13: Non-#0 inputs sampled in Active (Postponed of prior step).
+
         SampleBlockInputs(mgr, block_name, signals, ctx,
-                          /*only_zero_skew=*/false);
-        // §14.10/§14.13: Observed region — sample #0 inputs, then fire event.
+                          false);
+
         auto* ev = sched.GetEventPool().Acquire();
         auto bn_copy = block_name;
         auto sigs_copy = signals;
         ev->callback = [mgr, bn_copy, sigs_copy, &ctx]() {
           SampleBlockInputs(mgr, bn_copy, sigs_copy, ctx,
-                            /*only_zero_skew=*/true);
+                            true);
           mgr->NotifyBlockEvent(bn_copy);
           mgr->InvokeEdgeCallbacks(bn_copy);
         };
@@ -143,12 +136,11 @@ void ClockingManager::ScheduleOutputDrive(std::string_view block_name,
     var->value.words[0].aval = value;
     var->value.words[0].bval = 0;
   };
-  // §14.4: Explicit #0 output skew drives in Re-NBA region.
+
   auto region = (skew.ticks == 0) ? Region::kReNBA : Region::kNBA;
   sched.ScheduleEvent(drive_time, region, ev);
 }
 
-// S14.8: Associate an event variable with a clocking block.
 void ClockingManager::SetBlockEventVar(std::string_view block_name,
                                        Variable* var) {
   block_event_vars_[block_name] = var;
@@ -161,16 +153,13 @@ void ClockingManager::NotifyBlockEvent(std::string_view block_name) {
   }
 }
 
-// Register an edge callback for a clocking block.
 void ClockingManager::RegisterEdgeCallback(std::string_view block_name,
-                                           SimContext& /*ctx*/,
-                                           Scheduler& /*sched*/,
+                                           SimContext& ,
+                                           Scheduler& ,
                                            std::function<void()> cb) {
   auto bn = std::string(block_name);
   edge_callbacks_[bn].push_back(std::move(cb));
 
-  // If the block is already attached, ensure watchers are re-established.
-  // The next edge detection will invoke callbacks.
 }
 
 void ClockingManager::InvokeEdgeCallbacks(std::string_view block_name) {
@@ -199,4 +188,4 @@ Variable* ClockingManager::ResolveClockingMember(
   return ctx.FindVariable(sig->signal_name);
 }
 
-}  // namespace delta
+}

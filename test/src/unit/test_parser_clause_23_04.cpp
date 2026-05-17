@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- Req 1: A module can be declared within another module ---
-
 TEST(ModuleAndHierarchyParsing, NestedModuleParsesOk) {
   EXPECT_TRUE(
       ParseOk("module outer;\n"
@@ -121,8 +119,6 @@ TEST(ModuleAndHierarchyParsing, DeepNesting) {
               "endmodule\n"));
 }
 
-// --- Req 4/5: Nested modules with/without ports ---
-
 TEST(ModuleAndHierarchyParsing, NestedModuleWithPorts) {
   auto r = Parse(
       "module outer;\n"
@@ -168,8 +164,6 @@ TEST(ModuleAndHierarchyParsing, NestedModuleWithPortsNotInstantiated) {
               "endmodule\n"));
 }
 
-// --- Error cases ---
-
 TEST(ModuleAndHierarchyParsing, ErrorNestedModuleMissingEndmodule) {
   auto r = Parse(
       "module outer;\n"
@@ -179,4 +173,4 @@ TEST(ModuleAndHierarchyParsing, ErrorNestedModuleMissingEndmodule) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

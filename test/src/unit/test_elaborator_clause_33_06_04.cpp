@@ -24,12 +24,6 @@ CompilationUnit* ParseSrc(SourceManager& mgr, Arena& arena, DiagEngine& diag,
   return parser.Parse();
 }
 
-// Stage the §33.6 example library structure as a single compilation
-// unit: two adder views (aLib, gateLib), three m views (aLib, gateLib,
-// rtlLib), and a top in rtlLib that instantiates two adders.  Each
-// adder instantiates two m's (f1, f2) so descendant inheritance is
-// observable two levels deep.  Ordering of decls matches the library
-// labels assigned by the caller.
 CompilationUnit* ParseCfg4Fixture(SourceManager& mgr, Arena& arena,
                                   DiagEngine& diag,
                                   const std::string& config_text) {
@@ -55,9 +49,7 @@ CompilationUnit* ParseCfg4Fixture(SourceManager& mgr, Arena& arena,
   src += config_text;
   auto* cu = ParseSrc(mgr, arena, diag, src);
   if (!cu) return nullptr;
-  // adder rtl in aLib, adder gate in gateLib;
-  // m rtl in aLib, m gate in gateLib, m rtl in rtlLib;
-  // top in rtlLib.
+
   cu->modules[0]->library = "aLib";
   cu->modules[1]->library = "gateLib";
   cu->modules[2]->library = "aLib";
@@ -67,7 +59,6 @@ CompilationUnit* ParseCfg4Fixture(SourceManager& mgr, Arena& arena,
   return cu;
 }
 
-// Find the resolved child of `parent` whose inst_name matches.
 RtlirModule* FindChild(RtlirModule* parent, std::string_view inst_name) {
   for (auto& c : parent->children) {
     if (c.inst_name == inst_name) return c.resolved;
@@ -75,11 +66,6 @@ RtlirModule* FindChild(RtlirModule* parent, std::string_view inst_name) {
   return nullptr;
 }
 
-// §33.6.4 cfg4 verbatim: the named instance top.a2 picks up its own
-// liblist (aLib) while the sibling top.a1 falls through to the
-// default liblist (gateLib rtlLib).  This is the headline observation
-// of the clause: the instance clause overrides the default for the
-// matching path only.
 TEST(InstanceClauseLiblistBinding, NamedInstanceUsesItsLiblistOverride) {
   SourceManager mgr;
   Arena arena;
@@ -106,18 +92,12 @@ TEST(InstanceClauseLiblistBinding, NamedInstanceUsesItsLiblistOverride) {
   auto* a2 = FindChild(top, "a2");
   ASSERT_NE(a1, nullptr);
   ASSERT_NE(a2, nullptr);
-  // a1 falls through to the default liblist [gateLib, rtlLib]; gateLib has
-  // adder, so a1 binds gateLib.adder.
+
   EXPECT_EQ(a1->library, "gateLib");
-  // a2 picks up the instance liblist [aLib]; aLib has adder, so a2 binds
-  // aLib.adder — even though aLib is excluded by the default liblist.
+
   EXPECT_EQ(a2->library, "aLib");
 }
 
-// §33.6.4: "Because the liblist is inherited, all of the descendants
-// of top.a2 inherit its liblist from the instance selection clause."
-// The two m's inside top.a2 (f1 and f2) must therefore bind from aLib
-// even though the m inside top.a1 binds through the default liblist.
 TEST(InstanceClauseLiblistBinding, DescendantsInheritLiblistFromInstance) {
   SourceManager mgr;
   Arena arena;
@@ -147,22 +127,16 @@ TEST(InstanceClauseLiblistBinding, DescendantsInheritLiblistFromInstance) {
 
   for (const auto& c : a1->children) {
     ASSERT_NE(c.resolved, nullptr);
-    // m inside a1 inherits the default [gateLib, rtlLib]; gateLib has m,
-    // so it wins.
+
     EXPECT_EQ(c.resolved->library, "gateLib");
   }
   for (const auto& c : a2->children) {
     ASSERT_NE(c.resolved, nullptr);
-    // m inside a2 inherits the instance liblist [aLib], so aLib.m.
+
     EXPECT_EQ(c.resolved->library, "aLib");
   }
 }
 
-// Control: with no instance clause, both subhierarchies follow the
-// default liblist.  Removing the instance rule must put a2 (and its
-// descendants) back on the default-liblist path.  This anchors the
-// instance-clause behavior as the only source of the aLib rebind seen
-// in the cfg4 tests.
 TEST(InstanceClauseLiblistBinding, AbsentInstanceClauseLeavesDefaultBinding) {
   SourceManager mgr;
   Arena arena;
@@ -186,26 +160,16 @@ TEST(InstanceClauseLiblistBinding, AbsentInstanceClauseLeavesDefaultBinding) {
   auto* a2 = FindChild(top, "a2");
   ASSERT_NE(a1, nullptr);
   ASSERT_NE(a2, nullptr);
-  // Both adders bind through the default liblist now.
+
   EXPECT_EQ(a1->library, "gateLib");
   EXPECT_EQ(a2->library, "gateLib");
-  // And the descendants follow the default too.
+
   for (const auto& c : a2->children) {
     ASSERT_NE(c.resolved, nullptr);
     EXPECT_EQ(c.resolved->library, "gateLib");
   }
 }
 
-// §33.6.4: the instance liblist must override §33.6.2's strict
-// default-liblist exclusion for the named path.  In cfg4 the default
-// liblist is [gateLib, rtlLib] which excludes aLib; the instance
-// clause routes top.a2 to aLib regardless.  Without the override
-// taking precedence, no aLib candidate could survive the strict
-// filter and a2 would refuse to bind (or wrongly fall back to
-// gateLib).  This test confirms the override fires by setting up a
-// fixture where aLib is the ONLY library carrying adder (gateLib's
-// adder is removed): a2 must still resolve, proving the instance
-// liblist replaces — not augments — the default for the matched path.
 TEST(InstanceClauseLiblistBinding, OverridesDefaultLiblistExclusion) {
   SourceManager mgr;
   Arena arena;
@@ -226,8 +190,6 @@ TEST(InstanceClauseLiblistBinding, OverridesDefaultLiblistExclusion) {
   ASSERT_FALSE(diag.HasErrors());
   ASSERT_EQ(cu->modules.size(), 2u);
 
-  // adder lives only in aLib — excluded by the default liblist; top in
-  // rtlLib so the design statement still resolves.
   cu->modules[0]->library = "aLib";
   cu->modules[1]->library = "rtlLib";
 
@@ -240,9 +202,8 @@ TEST(InstanceClauseLiblistBinding, OverridesDefaultLiblistExclusion) {
   auto* top = design->top_modules[0];
   auto* a2 = FindChild(top, "a2");
   ASSERT_NE(a2, nullptr);
-  // The instance liblist [aLib] supplants the default [gateLib, rtlLib]
-  // for top.a2 — even though the default would have excluded aLib.
+
   EXPECT_EQ(a2->library, "aLib");
 }
 
-}  // namespace
+}

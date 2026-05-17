@@ -73,4 +73,4 @@ TEST(GlobalClockingSim, GlobalClockingIsGlobalFlag) {
   EXPECT_EQ(found->clock_edge, Edge::kPosedge);
 }
 
-}  // namespace
+}

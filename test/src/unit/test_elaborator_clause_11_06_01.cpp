@@ -149,7 +149,6 @@ TEST(Elaboration, TypeRefInferWidth) {
   EXPECT_EQ(InferExprWidth(ref, typedefs), 32u);
 }
 
-// Table 11-21: Unsized constant number → at least 32 bits.
 TEST(Elaboration, UnsizedConstantWidthAtLeast32) {
   TypedefMap typedefs;
   Expr lit;
@@ -158,7 +157,6 @@ TEST(Elaboration, UnsizedConstantWidthAtLeast32) {
   EXPECT_GE(InferExprWidth(&lit, typedefs), 32u);
 }
 
-// Table 11-21: Sized constant number → as given.
 TEST(Elaboration, SizedConstantWidthAsGiven) {
   TypedefMap typedefs;
   Expr lit8;
@@ -177,7 +175,6 @@ TEST(Elaboration, SizedConstantWidthAsGiven) {
   EXPECT_EQ(InferExprWidth(&lit1, typedefs), 1u);
 }
 
-// Table 11-21: op i, where op is + - ~ → L(i).
 TEST(Elaboration, UnaryPlusMinusTildeWidthEqualsOperand) {
   TypedefMap typedefs;
   Expr operand;
@@ -193,7 +190,6 @@ TEST(Elaboration, UnaryPlusMinusTildeWidthEqualsOperand) {
   }
 }
 
-// Table 11-21: op i, where op is & ~& | ~| ^ ~^ ^~ ! → 1 bit.
 TEST(Elaboration, ReductionAndLogicalNotWidthIsOneBit) {
   TypedefMap typedefs;
   Expr operand;
@@ -212,7 +208,6 @@ TEST(Elaboration, ReductionAndLogicalNotWidthIsOneBit) {
   }
 }
 
-// Table 11-21: i op j, where op is - * / % & | ^ ^~ ~^ → max(L(i),L(j)).
 TEST(Elaboration, ArithmeticAndBitwiseWidthIsMaxOfOperands) {
   TypedefMap typedefs;
   Expr lhs;
@@ -235,7 +230,6 @@ TEST(Elaboration, ArithmeticAndBitwiseWidthIsMaxOfOperands) {
   }
 }
 
-// Table 11-21: i op j, where op is === !== != > >= < <= → 1 bit.
 TEST(Elaboration, AllComparisonOpsWidthIsOneBit) {
   TypedefMap typedefs;
   Expr lhs;
@@ -259,7 +253,6 @@ TEST(Elaboration, AllComparisonOpsWidthIsOneBit) {
   }
 }
 
-// Table 11-21: i op j, where op is && || -> <-> → 1 bit.
 TEST(Elaboration, LogicalOpsWidthIsOneBit) {
   TypedefMap typedefs;
   Expr lhs;
@@ -281,7 +274,6 @@ TEST(Elaboration, LogicalOpsWidthIsOneBit) {
   }
 }
 
-// Table 11-21: i op j, where op is >> << >>> <<< → L(i), j is self-determined.
 TEST(Elaboration, ShiftWidthIsLhsWidth) {
   TypedefMap typedefs;
   Expr lhs;
@@ -303,7 +295,6 @@ TEST(Elaboration, ShiftWidthIsLhsWidth) {
   }
 }
 
-// Table 11-21: i ** j → L(i), j is self-determined.
 TEST(Elaboration, PowerWidthIsLhsWidth) {
   TypedefMap typedefs;
   Expr lhs;
@@ -321,7 +312,6 @@ TEST(Elaboration, PowerWidthIsLhsWidth) {
   EXPECT_EQ(InferExprWidth(&binop, typedefs), 8u);
 }
 
-// Table 11-21: {i{j,...,k}} → i × (L(j)+...+L(k)).
 TEST(Elaboration, ReplicationWidthIsCountTimesInner) {
   TypedefMap typedefs;
   Arena arena;
@@ -339,13 +329,11 @@ TEST(Elaboration, ReplicationWidthIsCountTimesInner) {
   EXPECT_EQ(InferExprWidth(repl, typedefs), 24u);
 }
 
-// Edge case: null expression → 0.
 TEST(Elaboration, NullExpressionWidthIsZero) {
   TypedefMap typedefs;
   EXPECT_EQ(InferExprWidth(nullptr, typedefs), 0u);
 }
 
-// Edge case: context width of 0 returns self-determined width.
 TEST(Elaboration, ContextWidthZeroReturnsSelfDetermined) {
   TypedefMap typedefs;
   Expr lit;
@@ -354,4 +342,4 @@ TEST(Elaboration, ContextWidthZeroReturnsSelfDetermined) {
   EXPECT_EQ(ContextWidth(&lit, 0, typedefs), 32u);
 }
 
-}  // namespace
+}

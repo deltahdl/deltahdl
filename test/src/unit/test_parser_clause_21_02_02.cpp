@@ -40,4 +40,4 @@ TEST(IoSystemTaskParsing, StrobebHexOctal) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

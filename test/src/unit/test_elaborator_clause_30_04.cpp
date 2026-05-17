@@ -4,9 +4,6 @@ using namespace delta;
 
 namespace {
 
-// Every path_declaration alternative — simple parallel, simple full,
-// edge-sensitive, state-dependent with if, state-dependent with ifnone —
-// must elaborate cleanly in a single specify block.
 TEST(SpecifyPathElaboration, AllPathTypesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -24,9 +21,6 @@ TEST(SpecifyPathElaboration, AllPathTypesElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Multiple sources may target the same destination with a distinct delay
-// assigned to each source→destination path. All such declarations must
-// elaborate side-by-side in a single specify block.
 TEST(SpecifyPathElaboration, MultipleSourcesSameDestinationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -43,4 +37,4 @@ TEST(SpecifyPathElaboration, MultipleSourcesSameDestinationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

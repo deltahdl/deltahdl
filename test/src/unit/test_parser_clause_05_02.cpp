@@ -79,4 +79,4 @@ TEST(LexicalConventionParsing, LineCommentBetweenTokens) {
               "endmodule // comment\n"));
 }
 
-}  // namespace
+}

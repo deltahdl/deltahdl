@@ -67,4 +67,4 @@ TEST(ClockingScopeElab, StaticLifetimeInModule) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

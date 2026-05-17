@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- property_expr: parenthesized, sequence_expr ---
-
 TEST(AssertionDeclParsing, PropertyExpr_Parenthesized) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -20,8 +18,6 @@ TEST(AssertionDeclParsing, PropertyExpr_SequenceExpr) {
               "  assert property (@(posedge clk) a ##1 b);\n"
               "endmodule\n"));
 }
-
-// --- property_expr: strong / weak ---
 
 TEST(AssertionDeclParsing, PropertyExpr_Strong) {
   EXPECT_TRUE(
@@ -69,8 +65,6 @@ TEST(AssertionParsing, WeakSequenceProperty) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// --- property_expr: not ---
-
 TEST(AssertionDeclParsing, PropertyExpr_Not) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -102,8 +96,6 @@ TEST(AssertionParsing, PropertyNegationStrong) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
 }
-
-// --- property_expr: or ---
 
 TEST(AssertionDeclParsing, PropertyExpr_Or) {
   EXPECT_TRUE(
@@ -141,8 +133,6 @@ TEST(AssertionParsing, PropertyDisjunctionAndConjunctionCombined) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// --- property_expr: and ---
-
 TEST(AssertionDeclParsing, PropertyExpr_And) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -159,8 +149,6 @@ TEST(AssertionParsing, PropertyConjunction) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
 }
-
-// --- property_expr: if / else ---
 
 TEST(AssertionDeclParsing, PropertyExpr_IfElse) {
   EXPECT_TRUE(
@@ -225,8 +213,6 @@ TEST(AssertionParsing, PropertyIfElseInDecl) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
 }
-
-// --- property_expr: implication |-> |=> ---
 
 TEST(AssertionDeclParsing, PropertyExpr_OverlappedImplication) {
   EXPECT_TRUE(
@@ -309,8 +295,6 @@ TEST(AssertionParsing, SequenceUsedInPropertyDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- property_expr: implies, iff ---
-
 TEST(AssertionDeclParsing, PropertyExpr_Implies) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -325,8 +309,6 @@ TEST(AssertionDeclParsing, PropertyExpr_Iff) {
               "endmodule\n"));
 }
 
-// --- property_expr: #-# #=# ---
-
 TEST(AssertionDeclParsing, PropertyExpr_FollowedByOverlapped) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -340,8 +322,6 @@ TEST(AssertionDeclParsing, PropertyExpr_FollowedByNonOverlapped) {
               "  assert property (@(posedge clk) a #=# b);\n"
               "endmodule\n"));
 }
-
-// --- property_expr: nexttime, s_nexttime ---
 
 TEST(AssertionDeclParsing, PropertyExpr_Nexttime) {
   EXPECT_TRUE(
@@ -371,8 +351,6 @@ TEST(AssertionDeclParsing, PropertyExpr_SNexttimeWithCount) {
               "endmodule\n"));
 }
 
-// --- property_expr: always, s_always ---
-
 TEST(AssertionDeclParsing, PropertyExpr_Always) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -393,8 +371,6 @@ TEST(AssertionDeclParsing, PropertyExpr_SAlways) {
               "  assert property (@(posedge clk) s_always [0:$] a);\n"
               "endmodule\n"));
 }
-
-// --- property_expr: until, s_until, until_with, s_until_with ---
 
 TEST(AssertionDeclParsing, PropertyExpr_Until) {
   EXPECT_TRUE(
@@ -424,8 +400,6 @@ TEST(AssertionDeclParsing, PropertyExpr_SUntilWith) {
               "endmodule\n"));
 }
 
-// --- property_expr: eventually, s_eventually ---
-
 TEST(AssertionDeclParsing, PropertyExpr_SEventually) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -446,8 +420,6 @@ TEST(AssertionDeclParsing, PropertyExpr_Eventually) {
               "  assert property (@(posedge clk) eventually [1:5] a);\n"
               "endmodule\n"));
 }
-
-// --- property_expr: accept_on, reject_on, sync_accept_on, sync_reject_on ---
 
 TEST(AssertionDeclParsing, PropertyExpr_AcceptOn) {
   EXPECT_TRUE(ParseOk(
@@ -478,8 +450,6 @@ TEST(AssertionDeclParsing, PropertyExpr_SyncRejectOn) {
               "    @(posedge clk) sync_reject_on(err) req |-> ack);\n"
               "endmodule\n"));
 }
-
-// --- property_expr: case ---
 
 TEST(AssertionDeclParsing, PropertyExpr_Case) {
   EXPECT_TRUE(
@@ -571,8 +541,6 @@ TEST(AssertionParsing, PropertyCaseInAssert) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// --- property_expr: clocking_event ---
-
 TEST(AssertionDeclParsing, PropertyExpr_ClockingEventPropertyExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -603,4 +571,4 @@ TEST(AssertionParsing, MulticlockPropertyDeclImplication) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -30,4 +30,4 @@ TEST(UtilitySystemTaskParsing, IsUnboundedWithBoundedParam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -75,4 +75,4 @@ TEST(MemoryParsing, BitMemoryDeclaration) {
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
 }
 
-}  // namespace
+}

@@ -120,4 +120,4 @@ TEST(LvalueSim, VarLvalueStreamingConcatBlocking) {
   LowerRunAndCheck(f, design, {{"a", 0x42u}});
 }
 
-}  // namespace
+}

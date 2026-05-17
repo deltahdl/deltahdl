@@ -116,4 +116,4 @@ TEST(Subroutines, TaskAndFunctionCoexistElaborate) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -4,9 +4,6 @@
 
 namespace {
 
-// --- R1: input net-type port can be connected to any expression of a
-//     compatible data type ---
-
 TEST(PortConnectionRulesForNetsSynthesis,
      InputNetPortWithCompatibleConnectionSynthesizes) {
   SynthFixture f;
@@ -22,8 +19,6 @@ TEST(PortConnectionRulesForNetsSynthesis,
   auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
 }
-
-// --- R3: output net-type port can be connected to a net or variable ---
 
 TEST(PortConnectionRulesForNetsSynthesis,
      OutputNetPortDrivingVariableSynthesizes) {
@@ -57,4 +52,4 @@ TEST(PortConnectionRulesForNetsSynthesis,
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

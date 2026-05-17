@@ -981,4 +981,4 @@ TEST(ConfigParsing, MissingDesignStatementIsError) {
       "endconfig\n"));
 }
 
-}  // namespace
+}

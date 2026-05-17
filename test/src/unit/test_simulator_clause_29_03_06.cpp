@@ -100,8 +100,6 @@ TEST(UdpSymbols, StarMatchesAnyChange) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-// r is defined as (01): it fires on a clean 0→1 input transition and drives
-// the sequential output to the row's next state.
 TEST(UdpSymbols, RisingEdgeMatches01) {
   UdpBuilder b;
   b.SetSequential().SetInitial('0').AddSeqRow({'r'}, '?', '1');
@@ -112,8 +110,6 @@ TEST(UdpSymbols, RisingEdgeMatches01) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-// r is strictly (01); a 0→x transition is a potential rising edge (p) but
-// not a rising edge (r), so the r row does not match.
 TEST(UdpSymbols, RisingEdgeDoesNotMatchPotentialRise) {
   UdpBuilder b;
   b.SetSequential().SetInitial('0').AddSeqRow({'r'}, '?', '1');
@@ -124,7 +120,6 @@ TEST(UdpSymbols, RisingEdgeDoesNotMatchPotentialRise) {
   EXPECT_EQ(state.GetOutput(), 'x');
 }
 
-// f is defined as (10): it fires on a clean 1→0 input transition.
 TEST(UdpSymbols, FallingEdgeMatches10) {
   UdpBuilder b;
   b.SetSequential().SetInitial('1').AddSeqRow({'f'}, '?', '0');
@@ -135,8 +130,6 @@ TEST(UdpSymbols, FallingEdgeMatches10) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-// A parenthesized (vw) edge matches exactly when the previous input equals v
-// and the new input equals w.
 TEST(UdpSymbols, ParenthesizedEdgeMatchesExactTransition) {
   UdpDecl decl;
   decl.is_sequential = true;
@@ -155,8 +148,6 @@ TEST(UdpSymbols, ParenthesizedEdgeMatchesExactTransition) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-// A (vw) edge does not match when the observed transition differs from v→w
-// on either endpoint.
 TEST(UdpSymbols, ParenthesizedEdgeRejectsNonMatchingTransition) {
   UdpDecl decl;
   decl.is_sequential = true;
@@ -175,4 +166,4 @@ TEST(UdpSymbols, ParenthesizedEdgeRejectsNonMatchingTransition) {
   EXPECT_EQ(state.GetOutput(), 'x');
 }
 
-}  // namespace
+}

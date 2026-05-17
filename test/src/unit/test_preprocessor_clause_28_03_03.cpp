@@ -64,4 +64,4 @@ TEST(GateDelayParsing, GateWithParenDelay) {
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
-}  // namespace
+}

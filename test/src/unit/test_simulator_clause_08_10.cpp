@@ -123,4 +123,4 @@ TEST(StaticMethodSimulation, StaticMethodSharedAcrossInstances) {
       "endmodule\n", "result"), 3u);
 }
 
-}  // namespace
+}

@@ -1,7 +1,4 @@
-// §A.2.2.2: elaborator-stage coverage of the drive_strength production. The
-// BNF lists six valid alternatives — every same-direction pair, and the two
-// both-highz pairs, are outside the production and must be rejected; the four
-// strength0/strength1 keywords must each round-trip cleanly.
+
 
 #include "fixture_elaborator.h"
 
@@ -9,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §A.2.2.2 drive_strength has no `( highz0 , highz1 )` or `( highz1 , highz0 )`
-// alternative; both forms — and every host construct that accepts a
-// drive_strength — must reject the pair.
 TEST(StrengthPairElaboration, GateInstanceHighz0Highz1IsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -76,8 +70,6 @@ TEST(StrengthPairElaboration, ContAssignHighz1Highz0IsIllegal) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §A.2.2.2 alternatives 3-6 each pair one highz keyword with one strength
-// keyword; those mixed pairs must elaborate without complaint.
 TEST(StrengthPairElaboration, GateInstanceHighz0WithStrong1IsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -89,8 +81,6 @@ TEST(StrengthPairElaboration, GateInstanceHighz0WithStrong1IsLegal) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §A.2.2.2 alternatives 1-2 cover (strength0, strength1) and its reverse; the
-// elaborator must accept any of the four strength0/strength1 keyword pairs.
 TEST(StrengthPairElaboration, GateInstanceStrongPairIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -135,8 +125,6 @@ TEST(StrengthPairElaboration, GateInstanceWeakPairIsLegal) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §A.2.2.2 drive_strength applies wherever a strength spec is permitted; a
-// continuous assignment with a valid strength pair must elaborate cleanly.
 TEST(StrengthPairElaboration, ContAssignStrongPairIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -147,12 +135,6 @@ TEST(StrengthPairElaboration, ContAssignStrongPairIsLegal) {
       f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
-
-// §A.2.2.2 alternative 1 — `( strength0 , strength1 )` — must round-trip from
-// source through elaboration with each keyword distinguishable in the recorded
-// drive_strength fields. The fields encode 1=highz, 2=weak, 3=pull, 4=strong,
-// 5=supply, so a successful elaboration both confirms BNF acceptance and pins
-// down that the parser preserved each keyword separately.
 
 TEST(StrengthPairElaboration, Form1SupplyPairEncodes) {
   ElabFixture f;
@@ -217,11 +199,6 @@ TEST(StrengthPairElaboration, Form1OnNetDeclEncodes) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 5u);
 }
 
-// §A.2.2.2 alternative 2 — `( strength1 , strength0 )` — the reversed-order
-// form must elaborate with strength0/strength1 fields assigned by position
-// (slot 0 = value-0 strength, slot 1 = value-1 strength) regardless of source
-// order.
-
 TEST(StrengthPairElaboration, Form2PullSupplyEncodes) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -252,11 +229,6 @@ TEST(StrengthPairElaboration, Form2StrongWeakOnNetDeclEncodes) {
   EXPECT_EQ(mod->assigns[0].drive_strength0, 2u);
   EXPECT_EQ(mod->assigns[0].drive_strength1, 4u);
 }
-
-// §A.2.2.2 alternatives 3 and 4 — `( strength0 , highz1 )` and
-// `( strength1 , highz0 )` — pair a strength keyword in its native slot with
-// highz in the opposite slot. The elaborator must encode highz as 1 and keep
-// the strength keyword distinguishable.
 
 TEST(StrengthPairElaboration, Form3Strong0Highz1Encodes) {
   ElabFixture f;
@@ -289,10 +261,6 @@ TEST(StrengthPairElaboration, Form4Strong1Highz0Encodes) {
   EXPECT_EQ(mod->assigns[0].drive_strength0, 1u);
   EXPECT_EQ(mod->assigns[0].drive_strength1, 4u);
 }
-
-// §A.2.2.2 alternatives 5 and 6 — `( highz0 , strength1 )` and
-// `( highz1 , strength0 )` — must elaborate with highz encoded as 1 in its
-// own slot and the strength keyword preserved in the other slot.
 
 TEST(StrengthPairElaboration, Form5Highz0Strong1Encodes) {
   ElabFixture f;
@@ -341,10 +309,6 @@ TEST(StrengthPairElaboration, Form6Highz1Weak0Encodes) {
   EXPECT_EQ(mod->assigns[0].drive_strength0, 2u);
   EXPECT_EQ(mod->assigns[0].drive_strength1, 1u);
 }
-
-// §A.2.2.2 charge_strength — `( small ) | ( medium ) | ( large )` — must
-// elaborate to the matching Strength enum value so downstream consumers can
-// distinguish the three storage tiers.
 
 TEST(ChargeStrengthElaboration, SmallEncodesAsSmall) {
   ElabFixture f;
@@ -406,4 +370,4 @@ TEST(ChargeStrengthElaboration, LargeEncodesAsLarge) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// A.7.5.3 timing_check_event_control: a runtime TimingCheckEntry records
-// the edge kind supplied on both sides of the timing check.
 TEST(TimingCheckEventDefSim, RuntimeTimingCheckEntryEdges) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
@@ -23,8 +21,6 @@ TEST(TimingCheckEventDefSim, RuntimeTimingCheckEntryEdges) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].data_edge, SpecifyEdge::kNone);
 }
 
-// A.7.5.3 specify_terminal_descriptor: a bit-select event signal drives the
-// full source→runtime pipeline without disturbing the surrounding design.
 TEST(TimingCheckEventDefSim, TerminalBitSelectSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -45,8 +41,6 @@ TEST(TimingCheckEventDefSim, TerminalBitSelectSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// A.7.5.3 specify_terminal_descriptor: a part-select event signal drives
-// the full source→runtime pipeline.
 TEST(TimingCheckEventDefSim, TerminalPartSelectSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -67,8 +61,6 @@ TEST(TimingCheckEventDefSim, TerminalPartSelectSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-// A.7.5.3 controlled_timing_check_event: a $period invocation with only an
-// edge-qualified event operand runs end-to-end.
 TEST(TimingCheckEventDefSim, ControlledTimingCheckEventPeriodSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -89,8 +81,6 @@ TEST(TimingCheckEventDefSim, ControlledTimingCheckEventPeriodSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// A.7.5.3 timing_check_event_control: `negedge` on the runtime entry is
-// preserved through storage on SpecifyManager.
 TEST(TimingCheckEventDefSim, RuntimeTimingCheckEntryNegedge) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
@@ -103,4 +93,4 @@ TEST(TimingCheckEventDefSim, RuntimeTimingCheckEntryNegedge) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].ref_edge, SpecifyEdge::kNegedge);
 }
 
-}  // namespace
+}

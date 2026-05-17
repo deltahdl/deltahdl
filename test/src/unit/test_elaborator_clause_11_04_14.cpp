@@ -56,4 +56,4 @@ TEST(StreamingOperatorElaboration, StreamingTargetWiderThanStream) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

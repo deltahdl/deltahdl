@@ -150,4 +150,4 @@ TEST(ClassSim, MultipleMethodsSameObject) {
   LowerRunAndCheck(f, design, {{"rx", 3u}, {"ry", 4u}});
 }
 
-}  // namespace
+}

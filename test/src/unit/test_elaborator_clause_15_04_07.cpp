@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.7: peek() call in initial block elaborates.
 TEST(MailboxPeekElaborator, PeekCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,7 +19,6 @@ TEST(MailboxPeekElaborator, PeekCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.7: peek() after put() elaborates.
 TEST(MailboxPeekElaborator, PeekAfterPut) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -37,4 +35,4 @@ TEST(MailboxPeekElaborator, PeekAfterPut) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

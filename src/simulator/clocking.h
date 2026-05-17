@@ -17,30 +17,18 @@ class Scheduler;
 class SimContext;
 struct Variable;
 
-// =============================================================================
-// Clocking signal direction
-// =============================================================================
-
 enum class ClockingDir : uint8_t {
   kInput,
   kOutput,
   kInout,
 };
 
-// =============================================================================
-// ClockingSignal: a signal within a clocking block with optional skew
-// =============================================================================
-
 struct ClockingSignal {
   std::string_view signal_name;
   ClockingDir direction = ClockingDir::kInput;
   SimTime skew{0};
-  bool is_explicit_zero_skew = false;  // §14.13: explicit #0 input skew
+  bool is_explicit_zero_skew = false;
 };
-
-// =============================================================================
-// ClockingBlock: a named clocking block with default skews (S14)
-// =============================================================================
 
 struct ClockingBlock {
   std::string_view name;
@@ -51,10 +39,6 @@ struct ClockingBlock {
   std::vector<ClockingSignal> signals;
   bool is_global = false;
 };
-
-// =============================================================================
-// ClockingManager: registers clocking blocks and applies skew
-// =============================================================================
 
 class ClockingManager {
  public:
@@ -74,27 +58,20 @@ class ClockingManager {
                    uint64_t value);
   uint32_t Count() const { return static_cast<uint32_t>(blocks_.size()); }
 
-  // S14.12: Default clocking block.
   void SetDefaultClocking(std::string_view name) { default_clocking_ = name; }
   std::string_view GetDefaultClocking() const { return default_clocking_; }
 
-  // S14.13: Global clocking block.
   void SetGlobalClocking(std::string_view name) { global_clocking_ = name; }
   std::string_view GetGlobalClocking() const { return global_clocking_; }
 
-  // S14.8: Associate a named-event Variable with a clocking block.
   void SetBlockEventVar(std::string_view block_name, Variable* var);
 
-  // Register a callback invoked on each clock edge of the given block.
   void RegisterEdgeCallback(std::string_view block_name, SimContext& ctx,
                             Scheduler& sched, std::function<void()> cb);
 
-  // Notify event variable and invoke edge callbacks (used by watcher).
   void NotifyBlockEvent(std::string_view block_name);
   void InvokeEdgeCallbacks(std::string_view block_name);
 
-  // §14.15: Resolve a clocking block member (cb.signal) to the underlying
-  // variable.  Returns nullptr if the block or signal is not found.
   Variable* ResolveClockingMember(std::string_view block_name,
                                   std::string_view signal_name,
                                   SimContext& ctx) const;
@@ -122,4 +99,4 @@ class ClockingManager {
       edge_callbacks_;
 };
 
-}  // namespace delta
+}

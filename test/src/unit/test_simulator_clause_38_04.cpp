@@ -45,5 +45,5 @@ TEST_F(VpiSimControlSim, ControlUnknownOpReturnsZero) {
   EXPECT_EQ(result, 0);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

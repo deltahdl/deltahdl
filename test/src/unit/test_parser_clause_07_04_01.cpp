@@ -91,4 +91,4 @@ TEST(PackedArrayParsing, SignedPackedArray) {
   ASSERT_NE(item->data_type.packed_dim_right, nullptr);
 }
 
-}  // namespace
+}

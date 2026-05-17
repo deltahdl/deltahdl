@@ -1,4 +1,4 @@
-// §25.8
+
 
 #include "fixture_parser.h"
 
@@ -47,4 +47,4 @@ TEST(ParameterizedInterfaces, InstanceOverrideFromMacro) {
   EXPECT_EQ(inst->inst_params[0].first, "WIDTH");
 }
 
-}  // namespace
+}

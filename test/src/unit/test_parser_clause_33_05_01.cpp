@@ -4,12 +4,6 @@
 
 namespace {
 
-// §33.5.1: every cell description from the input source ends up in the
-// library, even when the cell is never referenced from another module.
-// Here `top` instantiates `used`, while `unused` has no instantiator.
-// Both must still appear in the parsed compilation unit and both must
-// carry a non-empty library identifier — the §33.3.1 "work" fallback
-// when no library map has explicitly tagged them.
 TEST(SinglePassPrecompile, UnreferencedModuleStillInLibrary) {
   auto pr = Parse(
       "module unused;\n"
@@ -40,10 +34,6 @@ TEST(SinglePassPrecompile, UnreferencedModuleStillInLibrary) {
   EXPECT_EQ(top->library, "work");
 }
 
-// Every cell-kind design element (§33.2.1: modules, interfaces,
-// programs, primitives, packages, configurations) parsed from the
-// command-line input is mapped into the library by default.  The
-// fallback library identifier is "work" per §33.3.1.
 TEST(SinglePassPrecompile, AllCellKindsDefaultToWork) {
   auto pr = Parse(
       "module m;\n"
@@ -79,4 +69,4 @@ TEST(SinglePassPrecompile, AllCellKindsDefaultToWork) {
   EXPECT_EQ(pr.cu->configs[0]->library, "work");
 }
 
-}  // namespace
+}

@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- Basic covergroup declarations elaborate without errors ---
-
 TEST(CovergroupDeclElaboration, BasicCovergroupElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -55,8 +53,6 @@ TEST(CovergroupDeclElaboration, CovergroupWithEndLabelElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- Covergroup with cover specs elaborates ---
 
 TEST(CovergroupDeclElaboration, CovergroupWithCoverpointsElaborates) {
   ElabFixture f;
@@ -119,8 +115,6 @@ TEST(CovergroupDeclElaboration, CovergroupWithOptionsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Covergroup in class elaborates ---
-
 TEST(CovergroupDeclElaboration, CovergroupInClassElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -133,8 +127,6 @@ TEST(CovergroupDeclElaboration, CovergroupInClassElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- Multiple covergroups elaborate ---
 
 TEST(CovergroupDeclElaboration, MultipleCovergroupsElaborate) {
   ElabFixture f;
@@ -152,8 +144,6 @@ TEST(CovergroupDeclElaboration, MultipleCovergroupsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Covergroup with block event elaborates ---
-
 TEST(CovergroupDeclElaboration, CovergroupWithBlockEventElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -167,8 +157,6 @@ TEST(CovergroupDeclElaboration, CovergroupWithBlockEventElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Covergroup with sample function elaborates ---
-
 TEST(CovergroupDeclElaboration, CovergroupWithSampleFunctionElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -181,8 +169,6 @@ TEST(CovergroupDeclElaboration, CovergroupWithSampleFunctionElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- Full covergroup with all spec types elaborates ---
 
 TEST(CovergroupDeclElaboration, FullCovergroupElaborates) {
   ElabFixture f;
@@ -204,8 +190,6 @@ TEST(CovergroupDeclElaboration, FullCovergroupElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Covergroup with extends elaborates ---
-
 TEST(CovergroupDeclElaboration, CovergroupWithExtendsElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -219,4 +203,4 @@ TEST(CovergroupDeclElaboration, CovergroupWithExtendsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

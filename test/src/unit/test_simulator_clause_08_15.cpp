@@ -99,7 +99,7 @@ TEST(SuperSimulation, SuperMethodCallDispatchesToBase) {
       "    LinkedPacket lp = new;\n"
       "    result = lp.delay();\n"
       "  end\n"
-      "endmodule\n", "result"), 24u);  // 3*3 + 5*3 = 9 + 15 = 24
+      "endmodule\n", "result"), 24u);
 }
 
 TEST(SuperSimulation, SuperAccessesInheritedMember) {
@@ -195,4 +195,4 @@ TEST(SuperSimulation, SuperInitializationOrder) {
       "endmodule\n", "result"), 6u);
 }
 
-}  // namespace
+}

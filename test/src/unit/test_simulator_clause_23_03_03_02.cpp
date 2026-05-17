@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1: continuous assignment implied when variable connected to input port;
-//     if left unconnected, default initial value ---
-
 TEST(PortConnectionRulesForVariablesSimulation,
      InputPortReceivesValueFromParent) {
   SimFixture f;
@@ -30,9 +27,6 @@ TEST(PortConnectionRulesForVariablesSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0x42u);
 }
 
-// --- R2: continuous assignment implied when variable connected to output port
-//     of an instance ---
-
 TEST(PortConnectionRulesForVariablesSimulation,
      OutputPortDrivesParentVariable) {
   SimFixture f;
@@ -51,9 +45,6 @@ TEST(PortConnectionRulesForVariablesSimulation,
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x55u);
 }
-
-// --- R5: ref port shall be connected to an equivalent variable data type;
-//     references treated as hierarchical references ---
 
 TEST(PortConnectionRulesForVariablesSimulation, RefPortWriteReflectsInParent) {
   SimFixture f;
@@ -75,4 +66,4 @@ TEST(PortConnectionRulesForVariablesSimulation, RefPortWriteReflectsInParent) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-}  // namespace
+}

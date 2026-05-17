@@ -63,8 +63,6 @@ TEST(IfnoneConditionParsing, ErrorMissingPath) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Per Syntax 30-5, ifnone only takes simple_path_declaration; pairing it
-// with an edge-sensitive path must be rejected.
 TEST(IfnoneConditionParsing, ErrorEdgeSensitiveParallel) {
   auto r = Parse(
       "module m;\n"
@@ -85,8 +83,6 @@ TEST(IfnoneConditionParsing, ErrorEdgeSensitiveFull) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Companion state-dependent paths are free to be either simple or
-// edge-sensitive, even when the ifnone itself is simple.
 TEST(IfnoneConditionParsing, CoexistsWithEdgeSensitiveCompanion) {
   auto r = Parse(
       "module m;\n"
@@ -99,4 +95,4 @@ TEST(IfnoneConditionParsing, CoexistsWithEdgeSensitiveCompanion) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

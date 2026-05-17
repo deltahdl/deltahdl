@@ -181,4 +181,4 @@ TEST(LoopStatementSim, RepeatZCountZeroIterations) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

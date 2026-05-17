@@ -148,4 +148,4 @@ TEST(DynamicArrayNewSimulation, SelfReferenceResizePadZero) {
   EXPECT_EQ(v, 0u);
 }
 
-}  // namespace
+}

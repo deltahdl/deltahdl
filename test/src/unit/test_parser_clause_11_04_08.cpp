@@ -85,4 +85,4 @@ TEST(OperatorAndExpressionParsing, ExprInContinuousAssign) {
   EXPECT_EQ(ca->assign_rhs->op, TokenKind::kCaret);
 }
 
-}  // namespace
+}

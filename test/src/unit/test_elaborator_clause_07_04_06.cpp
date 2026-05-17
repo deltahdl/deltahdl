@@ -70,4 +70,4 @@ TEST(ArrayOperationValidation, AssocArraySliceRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

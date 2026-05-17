@@ -109,7 +109,6 @@ TEST(StreamReordering, StreamingLeftShiftIntegration) {
   EXPECT_EQ(var->value.ToUint64(), 0xD5u);
 }
 
-// Req 3: Default slice_size (no lhs) shall equal explicit slice_size of 1.
 TEST(StreamReordering, DefaultSliceSizeIsOne) {
   SimFixture f;
 
@@ -133,7 +132,6 @@ TEST(StreamReordering, DefaultSliceSizeIsOne) {
   EXPECT_EQ(r1.ToUint64(), r2.ToUint64());
 }
 
-// Req 5: Type used as slice_size → block size is number of bits in that type.
 TEST(StreamReordering, TypeSliceSizeReversesBytes) {
   SimFixture f;
 
@@ -147,7 +145,6 @@ TEST(StreamReordering, TypeSliceSizeReversesBytes) {
   EXPECT_EQ(result.ToUint64(), 0xCDABu);
 }
 
-// Req 10: >> ignores slice_size even when width is not divisible by slice_size.
 TEST(StreamReordering, RightShiftIgnoresSliceSizeNonDivisible) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -165,9 +162,6 @@ TEST(StreamReordering, RightShiftIgnoresSliceSizeNonDivisible) {
   EXPECT_EQ(var->value.ToUint64(), 0b110101u);
 }
 
-// Reqs 12, 13: << slices from rightmost bit; last (leftmost) block keeps
-// remaining bits without padding or truncation.
-// LRM example: { << 4 { 6'b11_0101 }} generates stream 'b0101_11.
 TEST(StreamReordering, LeftShiftShortLastBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -185,7 +179,6 @@ TEST(StreamReordering, LeftShiftShortLastBlock) {
   EXPECT_EQ(var->value.ToUint64(), 0b010111u);
 }
 
-// Req 11: << reverses 16-bit blocks in a 32-bit stream.
 TEST(StreamReordering, LeftShift16BitSliceSwap) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -203,7 +196,6 @@ TEST(StreamReordering, LeftShift16BitSliceSwap) {
   EXPECT_EQ(var->value.ToUint64(), 0x1234ABCDu);
 }
 
-// Edge case: slice_size equals stream width → single block, identity.
 TEST(StreamReordering, LeftShiftSliceSizeEqualsWidth) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -221,7 +213,6 @@ TEST(StreamReordering, LeftShiftSliceSizeEqualsWidth) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-// LRM example: { << 2 { { << { 4'b1101 }} }} generates stream 'b1110.
 TEST(StreamReordering, NestedStreamingReordering) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -239,4 +230,4 @@ TEST(StreamReordering, NestedStreamingReordering) {
   EXPECT_EQ(var->value.ToUint64(), 0b1110u);
 }
 
-}  // namespace
+}

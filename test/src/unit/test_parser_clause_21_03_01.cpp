@@ -15,4 +15,4 @@ TEST(IoSystemTaskParsing, FopenFcloseCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

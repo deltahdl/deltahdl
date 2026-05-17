@@ -68,4 +68,4 @@ TEST(PortKindDataTypeDirection, SignedImplicitTypeElaboratesCorrectly) {
   EXPECT_TRUE(port.is_signed);
 }
 
-}  // namespace
+}

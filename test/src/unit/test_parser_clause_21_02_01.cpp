@@ -120,4 +120,4 @@ TEST(IoSystemTaskParsing, WritebHexOctal) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

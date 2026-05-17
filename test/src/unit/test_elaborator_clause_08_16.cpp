@@ -134,4 +134,4 @@ TEST(ClassCastElaboration, CastDeepHierarchyDowncastOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

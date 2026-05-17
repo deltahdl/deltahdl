@@ -10,10 +10,6 @@
 namespace delta {
 namespace {
 
-// =============================================================================
-// Net naming helpers
-// =============================================================================
-
 std::string InputNetName(const AigGraph& aig, uint32_t lit) {
   uint32_t node_id = AigVar(lit);
   bool compl_flag = AigIsCompl(lit);
@@ -37,10 +33,6 @@ std::string OutputNetName(const AigGraph& aig, uint32_t lit, size_t idx) {
   return "n" + std::to_string(node_id);
 }
 
-// =============================================================================
-// Pattern classification for AIG subgraphs
-// =============================================================================
-
 enum class GateKind : uint8_t {
   kAnd,
   kOr,
@@ -52,18 +44,15 @@ enum class GateKind : uint8_t {
 
 struct GatePattern {
   GateKind kind = GateKind::kUnknown;
-  std::vector<uint32_t> input_lits;  // AIG literals for gate inputs
+  std::vector<uint32_t> input_lits;
 };
 
-/// Classify the logic driving a single output literal.
 GatePattern ClassifyOutput(const AigGraph& aig, uint32_t out_lit) {
   uint32_t node_id = AigVar(out_lit);
   bool compl_flag = AigIsCompl(out_lit);
 
-  // Constant output.
   if (node_id == 0) return {GateKind::kConst, {}};
 
-  // Primary input -- buffer or inverter.
   for (uint32_t inp : aig.inputs) {
     if (inp != node_id) continue;
     if (compl_flag) return {GateKind::kInv, {AigLit(node_id, false)}};
@@ -72,15 +61,12 @@ GatePattern ClassifyOutput(const AigGraph& aig, uint32_t out_lit) {
 
   const auto& node = aig.nodes[node_id];
 
-  // Complemented AND node -> check for OR pattern (De Morgan).
-  // ~(~a & ~b) = a | b
   if (compl_flag && AigIsCompl(node.fanin0) && AigIsCompl(node.fanin1)) {
     uint32_t a = AigLit(AigVar(node.fanin0), false);
     uint32_t b = AigLit(AigVar(node.fanin1), false);
     return {GateKind::kOr, {a, b}};
   }
 
-  // Non-complemented AND node.
   if (!compl_flag) {
     return {GateKind::kAnd, {node.fanin0, node.fanin1}};
   }
@@ -88,11 +74,6 @@ GatePattern ClassifyOutput(const AigGraph& aig, uint32_t out_lit) {
   return {GateKind::kUnknown, {}};
 }
 
-// =============================================================================
-// Function string matching -- find a Liberty cell matching a gate pattern
-// =============================================================================
-
-/// Normalize a function pattern to a canonical gate kind.
 GateKind ClassifyFunction(const std::string& func) {
   if (func == "!A" || func == "A'") return GateKind::kInv;
   if (func == "A") return GateKind::kBuf;
@@ -115,14 +96,10 @@ const LibCell* FindCell(const Liberty& lib, GateKind kind) {
   return nullptr;
 }
 
-// =============================================================================
-// Fallback decomposition for unrecognized patterns
-// =============================================================================
-
 void MapFallback(const AigGraph& aig, const Liberty& lib, uint32_t out_lit,
                  size_t out_idx, CellMapping& result) {
   uint32_t node_id = AigVar(out_lit);
-  // Cannot decompose constants or primary inputs further.
+
   if (node_id == 0) return;
   for (uint32_t inp : aig.inputs) {
     if (inp == node_id) return;
@@ -130,7 +107,6 @@ void MapFallback(const AigGraph& aig, const Liberty& lib, uint32_t out_lit,
   bool compl_flag = AigIsCompl(out_lit);
   const auto& node = aig.nodes[node_id];
 
-  // Map the AND gate.
   const LibCell* and_cell = FindCell(lib, GateKind::kAnd);
   if (and_cell != nullptr) {
     CellInstance inst;
@@ -141,7 +117,6 @@ void MapFallback(const AigGraph& aig, const Liberty& lib, uint32_t out_lit,
     result.instances.push_back(std::move(inst));
   }
 
-  // Add inverter if the output is complemented.
   if (!compl_flag) return;
   const LibCell* inv_cell = FindCell(lib, GateKind::kInv);
   if (inv_cell == nullptr) return;
@@ -151,10 +126,6 @@ void MapFallback(const AigGraph& aig, const Liberty& lib, uint32_t out_lit,
   inst.input_nets.push_back("n" + std::to_string(node_id));
   result.instances.push_back(std::move(inst));
 }
-
-// =============================================================================
-// Single-output mapping
-// =============================================================================
 
 void MapOutput(const AigGraph& aig, const Liberty& lib, uint32_t out_lit,
                size_t out_idx, CellMapping& result) {
@@ -174,11 +145,7 @@ void MapOutput(const AigGraph& aig, const Liberty& lib, uint32_t out_lit,
   result.instances.push_back(std::move(inst));
 }
 
-}  // namespace
-
-// =============================================================================
-// CellMapper public interface
-// =============================================================================
+}
 
 CellMapper::CellMapper(const Liberty& lib) : lib_(lib) {}
 
@@ -190,4 +157,4 @@ CellMapping CellMapper::Map(const AigGraph& aig) const {
   return mapping;
 }
 
-}  // namespace delta
+}

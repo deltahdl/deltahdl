@@ -119,4 +119,4 @@ TEST(IncludeFileElaboration, IncludedDirectiveAffectsElaboration) {
   EXPECT_EQ(design->top_modules[0]->delay_mode, DelayModeDirective::kZero);
 }
 
-}  // namespace
+}

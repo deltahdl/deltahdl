@@ -352,4 +352,4 @@ TEST(EvalSteps, UnsignedOperandZeroExtendsInWiderContext) {
   EXPECT_EQ(var->value.ToUint64(), 0x1Eu);
 }
 
-}  // namespace
+}

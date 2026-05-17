@@ -87,4 +87,4 @@ TEST(ClockingScopeParse, MultipleBlocksInModule) {
   EXPECT_EQ(count, 2);
 }
 
-}  // namespace
+}

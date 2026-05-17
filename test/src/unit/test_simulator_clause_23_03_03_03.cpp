@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1: input net-type port can be connected to any expression of a
-//     compatible data type ---
-
 TEST(PortConnectionRulesForNetsSimulation,
      InputNetPortReceivesValueFromParent) {
   SimFixture f;
@@ -30,8 +27,6 @@ TEST(PortConnectionRulesForNetsSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0x42u);
 }
 
-// --- R2: unconnected input net-type port shall have the value 'z ---
-
 TEST(PortConnectionRulesForNetsSimulation,
      UnconnectedInputNetPortProducesHighZ) {
   SimFixture f;
@@ -51,8 +46,6 @@ TEST(PortConnectionRulesForNetsSimulation,
   EXPECT_EQ(var->value.words[0].aval & 0xFF, 0x00u);
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
-
-// --- R3: output net-type port can be connected to a net or variable ---
 
 TEST(PortConnectionRulesForNetsSimulation,
      OutputNetPortDrivesParentVariable) {
@@ -92,8 +85,6 @@ TEST(PortConnectionRulesForNetsSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0xBEu);
 }
 
-// --- R4: inout net-type port can be connected to a net ---
-
 TEST(PortConnectionRulesForNetsSimulation,
      InoutNetPortPropagatesValueToParent) {
   SimFixture f;
@@ -113,4 +104,4 @@ TEST(PortConnectionRulesForNetsSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
-}  // namespace
+}

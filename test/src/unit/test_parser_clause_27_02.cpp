@@ -56,9 +56,7 @@ TEST(GenerateBlockContent, SpecifyBlockAllowedAtModuleScope) {
 }
 
 TEST(GenerateBlockContent, SpecifyBlockAllowedInBareGenerateRegion) {
-  // Items directly under `generate ... endgenerate` without an enclosing
-  // for/if/case body are module items, not generate-block contents, so the
-  // §27.2 restriction does not apply here.
+
   EXPECT_TRUE(ParseOk(
       "module m(input a, output b);\n"
       "  generate\n"
@@ -89,7 +87,7 @@ TEST(GenerateBlockContent, SpecparamRejectedInGenerateFor) {
 }
 
 TEST(GenerateBlockContent, SpecparamRejectedInSingleItemGenerateBody) {
-  // `generate_block ::= generate_item` — a single-item body without begin/end.
+
   auto r = Parse(
       "module m;\n"
       "  if (1) specparam t = 1.0;\n"
@@ -141,4 +139,4 @@ TEST(GenerateBlockContent, GenerateBlockAcceptsNestedGenerateConstruct) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

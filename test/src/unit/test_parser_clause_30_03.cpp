@@ -70,7 +70,6 @@ TEST(SpecifyBlockDeclParsing, MultipleSpecifyBlocksInModule) {
   EXPECT_EQ(spec_count, 2);
 }
 
-// Exercises each of the five alternatives accepted as a specify_item.
 TEST(SpecifyBlockDeclParsing, SpecifyItemAllFiveKinds) {
   auto r = Parse(
       "module m;\n"
@@ -148,7 +147,6 @@ TEST(SpecifyBlockDeclParsing, SpecifyBlockSingleItem) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
 }
 
-// The block must be terminated by endspecify; omitting it is an error.
 TEST(SpecifyBlockDeclParsing, ErrorMissingEndspecify) {
   auto r = Parse(
       "module m;\n"
@@ -158,8 +156,6 @@ TEST(SpecifyBlockDeclParsing, ErrorMissingEndspecify) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// A specify block at compilation-unit scope (outside any module) is invalid
-// because specify blocks are only permitted as module items.
 TEST(SpecifyBlockDeclParsing, ErrorSpecifyOutsideModule) {
   auto r = Parse(
       "specify\n"
@@ -168,7 +164,6 @@ TEST(SpecifyBlockDeclParsing, ErrorSpecifyOutsideModule) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// A specify block appearing inside a package should not be accepted.
 TEST(SpecifyBlockDeclParsing, ErrorSpecifyInsidePackage) {
   auto r = Parse(
       "package p;\n"
@@ -179,8 +174,6 @@ TEST(SpecifyBlockDeclParsing, ErrorSpecifyInsidePackage) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Content between specify/endspecify that does not match any specify_item
-// alternative must be rejected.
 TEST(SpecifyBlockDeclParsing, ErrorUnknownSpecifyItem) {
   auto r = Parse(
       "module m;\n"
@@ -191,7 +184,6 @@ TEST(SpecifyBlockDeclParsing, ErrorUnknownSpecifyItem) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// endspecify without a matching specify is invalid.
 TEST(SpecifyBlockDeclParsing, ErrorStrayEndspecify) {
   auto r = Parse(
       "module m;\n"
@@ -200,4 +192,4 @@ TEST(SpecifyBlockDeclParsing, ErrorStrayEndspecify) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

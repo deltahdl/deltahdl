@@ -53,4 +53,4 @@ TEST(WhiteSpaceSynthesis, CrlfDelimiterSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

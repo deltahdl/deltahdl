@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.5: Get retrieves and removes the front message.
 TEST(IpcSync, MailboxGetRetrievesFrontMessage) {
   MailboxObject mb;
   mb.TryPut(10);
@@ -19,7 +18,6 @@ TEST(IpcSync, MailboxGetRetrievesFrontMessage) {
   EXPECT_EQ(mb.Num(), 1);
 }
 
-// §15.4.5: Get on empty mailbox returns kBlock.
 TEST(IpcSync, MailboxGetEmptyReturnsBlock) {
   MailboxObject mb;
   uint64_t msg = 0;
@@ -27,7 +25,6 @@ TEST(IpcSync, MailboxGetEmptyReturnsBlock) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-// §15.4.5: Get retrieves in FIFO order.
 TEST(IpcSync, MailboxGetFifoOrder) {
   MailboxObject mb;
   mb.TryPut(100);
@@ -43,7 +40,6 @@ TEST(IpcSync, MailboxGetFifoOrder) {
   EXPECT_EQ(mb.Get(msg), MbxGetStatus::kBlock);
 }
 
-// §15.4.5: Get frees space in a bounded mailbox for subsequent put.
 TEST(IpcSync, MailboxGetFreesSpaceForPut) {
   MailboxObject mb(1);
   EXPECT_EQ(mb.TryPut(10), 1);
@@ -55,7 +51,6 @@ TEST(IpcSync, MailboxGetFreesSpaceForPut) {
   EXPECT_EQ(mb.Num(), 1);
 }
 
-// §15.4.5: Consecutive get calls drain the mailbox.
 TEST(IpcSync, MailboxGetDrainsMailbox) {
   MailboxObject mb;
   for (uint64_t i = 0; i < 50; ++i) {
@@ -72,4 +67,4 @@ TEST(IpcSync, MailboxGetDrainsMailbox) {
   EXPECT_EQ(mb.Get(msg), MbxGetStatus::kBlock);
 }
 
-}  // namespace
+}

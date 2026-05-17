@@ -161,4 +161,4 @@ TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingSemicolon) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

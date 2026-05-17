@@ -120,4 +120,4 @@ TEST(CaseMatchesSyntaxParsing, CaseMatchesEmptyNoItems) {
   EXPECT_EQ(stmt->case_items.size(), 0u);
 }
 
-}  // namespace
+}

@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §31.5: a specify block using the bare `edge` keyword lowers and
-// simulates without disturbing unrelated initial assignments.
 TEST(EdgeControlSpecifierSim, EdgeKeywordSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -29,8 +27,6 @@ TEST(EdgeControlSpecifierSim, EdgeKeywordSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §31.5 Syntax 31-15: a descriptor list `[01, 10]` survives lowering and
-// simulation alongside an unrelated initial block.
 TEST(EdgeControlSpecifierSim, Descriptors01And10Simulate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -51,9 +47,6 @@ TEST(EdgeControlSpecifierSim, Descriptors01And10Simulate) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-// §31.5: "Edge transitions involving z are treated the same way as edge
-// transitions involving x" — a z-form descriptor list lowers and simulates
-// without surfacing a lowering error distinct from the x form.
 TEST(EdgeControlSpecifierSim, ZTransitionsSimulate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -74,10 +67,6 @@ TEST(EdgeControlSpecifierSim, ZTransitionsSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
-// §31.5 Syntax 31-15: the `z_or_x zero_or_one` form (e.g. `x0`, `x1`)
-// lowers and simulates alongside an unrelated initial block. The §31.5
-// x/z equivalence statement makes the x case warrant the same end-to-end
-// coverage the z case already has.
 TEST(EdgeControlSpecifierSim, XTransitionsSimulate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -98,9 +87,6 @@ TEST(EdgeControlSpecifierSim, XTransitionsSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §31.5 Syntax 31-15: the `zero_or_one z_or_x` form is the third
-// edge_descriptor alternative and must survive the full pipeline like
-// the other two.
 TEST(EdgeControlSpecifierSim, ToXTransitionsSimulate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -121,4 +107,4 @@ TEST(EdgeControlSpecifierSim, ToXTransitionsSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-}  // namespace
+}

@@ -31,8 +31,7 @@ TEST(PackageExport, SpecificExportMatchingExplicitImport) {
 }
 
 TEST(PackageExport, SpecificExportMatchingWildcardImport) {
-  // An `export p1::x` is valid when only `import p1::*;` is present;
-  // the export itself counts as the reference that imports x.
+
   EXPECT_TRUE(
       ElabOk("package p1;\n"
              "  typedef int x;\n"
@@ -47,7 +46,7 @@ TEST(PackageExport, SpecificExportMatchingWildcardImport) {
 }
 
 TEST(PackageExport, StarStarExportInPackageWithNoImportsIsLegal) {
-  // With no imports, `export *::*;` exports nothing but is not an error.
+
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
              "  export *::*;\n"
@@ -135,8 +134,7 @@ TEST(PackageExport, ExportFromUnknownPackageIsError) {
 }
 
 TEST(PackageExport, MultipleItemsInOneExportDeclarationElaborate) {
-  // Each package_import_item in a comma-separated export list is validated
-  // independently; all must have a matching import.
+
   EXPECT_TRUE(
       ElabOk("package p1;\n"
              "  typedef int a;\n"
@@ -152,8 +150,7 @@ TEST(PackageExport, MultipleItemsInOneExportDeclarationElaborate) {
 }
 
 TEST(PackageExport, MultiItemExportReportsErrorWhenOneItemIsInvalid) {
-  // If any item in a comma-separated export list fails validation,
-  // the whole declaration is rejected.
+
   EXPECT_FALSE(
       ElabOk("package p1;\n"
              "  typedef int a;\n"
@@ -168,8 +165,7 @@ TEST(PackageExport, MultiItemExportReportsErrorWhenOneItemIsInvalid) {
 }
 
 TEST(PackageExport, ReExportChainAcrossThreePackages) {
-  // A name defined in p1 and re-exported by p2 should itself be re-exportable
-  // from p3, making it visible to importers of p3.
+
   EXPECT_TRUE(
       ElabOk("package p1;\n"
              "  typedef int t;\n"
@@ -187,4 +183,4 @@ TEST(PackageExport, ReExportChainAcrossThreePackages) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

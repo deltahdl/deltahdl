@@ -123,8 +123,6 @@ TEST(SwitchProcessing, Tranif0BlocksWhenControlHigh) {
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
-// Resistive variants differ only in strength (not modeled here); conductivity
-// behavior must match their full-strength counterparts.
 TEST(SwitchProcessing, RtranBidirectionalPropagation) {
   Arena arena;
   auto* va = arena.Create<Variable>();
@@ -181,9 +179,6 @@ TEST(SwitchProcessing, Rtranif0BlocksWhenControlHigh) {
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
-// Pass-enable switches must conduct in both directions just like tran/rtran.
-// MakeNetPair drives side A; these tests drive side B so the propagation has
-// to flow backwards through the same conducting switch.
 TEST(SwitchProcessing, Tranif1PropagatesReverseDirection) {
   Arena arena;
   auto* va = arena.Create<Variable>();
@@ -212,63 +207,48 @@ TEST(SwitchProcessing, Rtranif0PropagatesReverseDirection) {
   EXPECT_EQ(ValOf(*va), kVal0);
 }
 
-// §28.8 R8: With two delays, the first delay is the turn-on delay.
 TEST(PassSwitchDelays, TwoDelaysTurnOnIsFirst) {
   PassSwitchDelaySpec spec{true, true, 10, 20};
   EXPECT_EQ(EffectiveTurnOnDelay(spec), 10u);
 }
 
-// §28.8 R8: With two delays, the second delay is the turn-off delay.
 TEST(PassSwitchDelays, TwoDelaysTurnOffIsSecond) {
   PassSwitchDelaySpec spec{true, true, 10, 20};
   EXPECT_EQ(EffectiveTurnOffDelay(spec), 20u);
 }
 
-// §28.8 R8: A single delay applies to both turn-on and turn-off.
 TEST(PassSwitchDelays, OneDelayAppliesToBoth) {
   PassSwitchDelaySpec spec{true, false, 7, 0};
   EXPECT_EQ(EffectiveTurnOnDelay(spec), 7u);
   EXPECT_EQ(EffectiveTurnOffDelay(spec), 7u);
 }
 
-// §28.8 R8: With no delay specification, both turn-on and turn-off are zero.
 TEST(PassSwitchDelays, NoDelayIsZero) {
   PassSwitchDelaySpec spec{};
   EXPECT_EQ(EffectiveTurnOnDelay(spec), 0u);
   EXPECT_EQ(EffectiveTurnOffDelay(spec), 0u);
 }
 
-// §28.8 R8: For built-in net types, the smaller of the two delays applies to
-// control input transitions to x and z.
 TEST(PassSwitchDelays, BuiltinXZControlUsesSmallerOfTwo) {
   PassSwitchDelaySpec spec{true, true, 10, 20};
   EXPECT_EQ(EffectiveBuiltinControlXZDelay(spec), 10u);
 }
 
-// §28.8 R8: The "smaller of the two" rule is symmetric — when the second delay
-// is smaller, that is the value used for x/z control transitions.
 TEST(PassSwitchDelays, BuiltinXZControlSmallerSecondIsUsed) {
   PassSwitchDelaySpec spec{true, true, 20, 10};
   EXPECT_EQ(EffectiveBuiltinControlXZDelay(spec), 10u);
 }
 
-// §28.8 R8: With a single delay, that delay is the only one available so it
-// applies to x/z control transitions on built-in nets as well.
 TEST(PassSwitchDelays, BuiltinXZControlOneDelayUsesIt) {
   PassSwitchDelaySpec spec{true, false, 5, 0};
   EXPECT_EQ(EffectiveBuiltinControlXZDelay(spec), 5u);
 }
 
-// §28.8 R8: With no delay specification there is no x/z control delay either.
 TEST(PassSwitchDelays, BuiltinXZControlNoDelayIsZero) {
   PassSwitchDelaySpec spec{};
   EXPECT_EQ(EffectiveBuiltinControlXZDelay(spec), 0u);
 }
 
-// §28.8 R6: There shall be no propagation delay through the bidirectional
-// terminals. A delay specification on the instance constrains only the
-// control-input turn-on/turn-off timing; the data signal that passes through
-// the bidirectional terminals must propagate without any added delay.
 TEST(SwitchProcessing, BidirectionalPropagationIgnoresControlDelaySpec) {
   auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
@@ -282,4 +262,4 @@ TEST(SwitchProcessing, BidirectionalPropagationIgnoresControlDelaySpec) {
   EXPECT_EQ(ValOf(*np.vb), kVal1);
 }
 
-}  // namespace
+}

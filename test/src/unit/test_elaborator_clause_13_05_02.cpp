@@ -94,7 +94,6 @@ TEST(PassByRefValidation, MultipleRefArgsInStaticFuncAllRejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §13.5.2: "Nets and selects into nets shall not be passed by reference."
 TEST(PassByRefValidation, NetActualPassedByRefRejected) {
   ElabFixture f;
   Elaborate(
@@ -149,9 +148,6 @@ TEST(PassByRefValidation, VariableActualPassedByRefAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.5.2: bit-select into a packed variable is a select into a variable,
-// not a net — the production net-walker must accept it as the legal
-// "element of an unpacked array" / variable-select shape.
 TEST(PassByRefValidation, VariableBitSelectPassedByRefAccepted) {
   ElabFixture f;
   Elaborate(
@@ -165,9 +161,6 @@ TEST(PassByRefValidation, VariableBitSelectPassedByRefAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.5.2: "A member of an unpacked structure" is a legal pass-by-ref
-// shape — the production net-walker descends member accesses by base and
-// must not flag a struct-field actual as a net.
 TEST(PassByRefValidation, StructMemberPassedByRefAccepted) {
   ElabFixture f;
   Elaborate(
@@ -181,9 +174,6 @@ TEST(PassByRefValidation, StructMemberPassedByRefAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.5.2: "When the formal argument is declared as a const ref, the
-// subroutine cannot alter the variable, and an attempt to do so shall
-// generate a compiler error."
 TEST(PassByRefValidation, ConstRefBlockingWriteRejected) {
   SimFixture f;
 
@@ -269,8 +259,6 @@ TEST(PassByRefValidation, ConstRefWriteInIfBranchRejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §13.5.2: const-ref writes are illegal anywhere in the body; verify the
-// production walker also descends else_branch.
 TEST(PassByRefValidation, ConstRefWriteInElseBranchRejected) {
   SimFixture f;
 
@@ -291,8 +279,6 @@ TEST(PassByRefValidation, ConstRefWriteInElseBranchRejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §13.5.2: const-ref writes nested inside a case-item body are also
-// illegal; verify the production walker descends case_items.
 TEST(PassByRefValidation, ConstRefWriteInCaseItemRejected) {
   SimFixture f;
 
@@ -333,4 +319,4 @@ TEST(PassByRefValidation, NonRefArgsInStaticFuncAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

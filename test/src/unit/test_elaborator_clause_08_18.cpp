@@ -138,4 +138,4 @@ TEST(DataHidingElaboration, ConstructorProtectedAllowed) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

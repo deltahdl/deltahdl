@@ -151,4 +151,4 @@ TEST(ParameterizedInterface, UnknownNamedParameterIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

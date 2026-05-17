@@ -5,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1: The sign attribute shall not cross hierarchy; each side's signedness
-//     comes from its own declaration ---
-
 TEST(SignedValuesViaPortsElaboration,
      SignedSignalToUnsignedInputPortElaborates) {
   EXPECT_TRUE(
@@ -85,9 +82,6 @@ TEST(SignedValuesViaPortsElaboration,
              "endmodule\n"));
 }
 
-// --- R2: Port expressions shall be typed, sized, evaluated, and assigned
-//     using the same rules as an assignment ---
-
 TEST(SignedValuesViaPortsElaboration,
      ExpressionOnPortConnectionElaborates) {
   EXPECT_TRUE(
@@ -102,4 +96,4 @@ TEST(SignedValuesViaPortsElaboration,
              "endmodule\n"));
 }
 
-}  // namespace
+}

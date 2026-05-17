@@ -5,18 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §20.10 Syntax 20-11:
-//   severity_system_task ::= $fatal [ ( finish_number [, list_of_arguments ] ) ] ;
-//                          | $error   [ ( [ list_of_arguments ] ) ] ;
-//                          | $warning [ ( [ list_of_arguments ] ) ] ;
-//                          | $info    [ ( [ list_of_arguments ] ) ] ;
-//   finish_number ::= 0 | 1 | 2
-//
-// The four severity system tasks are surfaced as procedural system-call
-// statements at parse time. §16.3 cross-links the same tasks into immediate
-// assertion action_blocks, so the parser tests below exercise both the
-// standalone procedural form and the §16.3 weave point.
-
 TEST(SeveritySystemTaskParsing, FatalNoArgsParses) {
   EXPECT_TRUE(
       ParseOk("module m; initial $fatal; endmodule\n"));
@@ -62,8 +50,6 @@ TEST(SeveritySystemTaskParsing, InfoWithMessageParses) {
       ParseOk("module m; initial $info(\"fyi\"); endmodule\n"));
 }
 
-// §20.10 "user-defined message shall use the same syntax as the $display
-// system task and thus can include any number of arguments."
 TEST(SeveritySystemTaskParsing, ErrorWithFormatArgsParses) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -73,9 +59,6 @@ TEST(SeveritySystemTaskParsing, ErrorWithFormatArgsParses) {
               "endmodule\n"));
 }
 
-// §20.10 also calls out expect and wait_order — they too contain
-// action_blocks that may default to $error. We only verify the BNF placement
-// of severity tasks inside the action_block here.
 TEST(SeveritySystemTaskParsing, SeverityTaskInsideCoverPassAction) {
   auto r = Parse(
       "module m;\n"
@@ -89,4 +72,4 @@ TEST(SeveritySystemTaskParsing, SeverityTaskInsideCoverPassAction) {
   EXPECT_NE(stmt->assert_pass_stmt, nullptr);
 }
 
-}  // namespace
+}

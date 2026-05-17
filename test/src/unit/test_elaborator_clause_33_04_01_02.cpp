@@ -2,10 +2,6 @@
 
 namespace {
 
-// §33.4.1.2 item 3: there cannot be more than one default clause per
-// config (for the liblist expansion clause, since use is forbidden by
-// item 2).  Two `default liblist ...` rules in the same config must be
-// rejected.
 TEST(ConfigDefaultClause, DuplicateDefaultLiblistRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -19,8 +15,6 @@ TEST(ConfigDefaultClause, DuplicateDefaultLiblistRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// Positive control: a single default-liblist rule does not trigger the
-// duplicate diagnostic.
 TEST(ConfigDefaultClause, SingleDefaultLiblistAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -33,4 +27,4 @@ TEST(ConfigDefaultClause, SingleDefaultLiblistAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

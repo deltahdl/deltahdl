@@ -86,4 +86,4 @@ TEST(ProgramConstructSim, ProgramInitialTerminatesDescendantThreads) {
   EXPECT_EQ(v->value.ToUint64(), 7u);
 }
 
-}  // namespace
+}

@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- Req 2: Outer scope visibility ---
-
 TEST(NestedModuleSimulation, OuterScopeVariableAccessibleFromNestedModule) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -50,8 +48,6 @@ TEST(NestedModuleSimulation, LocalNameShadowsOuterInSimulation) {
   EXPECT_EQ(v->value.ToUint64(), 10u);
 }
 
-// --- Req 4: Portless nested module implicitly instantiated ---
-
 TEST(NestedModuleSimulation, PortlessNestedModuleInitialBlockRuns) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -70,8 +66,6 @@ TEST(NestedModuleSimulation, PortlessNestedModuleInitialBlockRuns) {
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 77u);
 }
-
-// --- Req 5: Ported nested module not instantiated is ignored ---
 
 TEST(NestedModuleSimulation, PortedNestedModuleNotInstantiatedDoesNotRun) {
   SimFixture f;
@@ -93,4 +87,4 @@ TEST(NestedModuleSimulation, PortedNestedModuleNotInstantiatedDoesNotRun) {
   EXPECT_EQ(v->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

@@ -69,4 +69,4 @@ TEST(CompilerDirectiveParsing, NounconnectedDrive_InsideModule_Error) {
                               "endmodule\n"));
 }
 
-}  // namespace
+}

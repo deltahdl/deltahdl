@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- Branch 1: nested streaming_concatenation as stream_expression ---
-
 TEST(StreamExpressionConcatElaboration, NestedStreamingConcatAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -31,8 +29,6 @@ TEST(StreamExpressionConcatElaboration, DeeplyNestedStreamingAccepted) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- Left-to-right concatenation of multiple stream_expressions ---
 
 TEST(StreamExpressionConcatElaboration, MultipleElementsAccepted) {
   ElabFixture f;
@@ -73,4 +69,4 @@ TEST(StreamExpressionConcatElaboration, LiteralElementsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -53,4 +53,4 @@ TEST(AggregateTypeParsing, AssocArrayLiteralNegativeDefault) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -1,4 +1,4 @@
-// §5.6.2
+
 
 #include <string>
 
@@ -123,7 +123,6 @@ TEST(Keywords, EscapedThisIsIdentifier) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
 }
 
-// §5.6.2: "All keywords are defined in lowercase only."
 TEST(Keywords, UppercaseIsNotKeyword) {
   const char* const kSamples[] = {
       "MODULE",  "WIRE",    "REG",     "INPUT",   "OUTPUT",  "ALWAYS",
@@ -154,8 +153,6 @@ TEST(Keywords, MixedCaseIsNotKeyword) {
   }
 }
 
-// §5.6.2: "A SystemVerilog keyword preceded by an escape (backslash)
-// character is not interpreted as a keyword."
 TEST(Keywords, EscapedKeywordsAreIdentifiers) {
   const char* const kSamples[] = {
       "module",   "wire",     "reg",        "input",      "output",  "always",
@@ -183,9 +180,6 @@ TEST(GateKeywordLexing, KeywordPrefixIsIdentifier) {
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
 }
 
-// §5.6.2 Statement 1: keywords whose lexeme contains underscores or trailing
-// digits must still be recognized.  These exercise distinct entries in the
-// keyword map and were not covered by the no-underscore samples above.
 TEST(Keywords, UnderscoreContainingKeywordRecognized) {
   struct Sample {
     const char* text;
@@ -209,8 +203,6 @@ TEST(Keywords, UnderscoreContainingKeywordRecognized) {
   }
 }
 
-// §5.6.2 Statement 3: case-sensitive map lookup must reject uppercase forms of
-// underscore-containing keywords as well.
 TEST(Keywords, UppercaseUnderscoreKeywordIsIdentifier) {
   const char* const kSamples[] = {
       "ALWAYS_COMB", "ALWAYS_FF",   "ALWAYS_LATCH", "JOIN_ANY",
@@ -223,8 +215,6 @@ TEST(Keywords, UppercaseUnderscoreKeywordIsIdentifier) {
   }
 }
 
-// §5.6.2 Statement 3: mixed case of underscore-containing keywords is also
-// not recognized.
 TEST(Keywords, MixedCaseUnderscoreKeywordIsIdentifier) {
   const char* const kSamples[] = {
       "Always_Comb", "Always_FF",   "Always_Latch", "Join_Any",
@@ -237,8 +227,6 @@ TEST(Keywords, MixedCaseUnderscoreKeywordIsIdentifier) {
   }
 }
 
-// §5.6.2 Statement 2: the escape bypass applies to keywords whose lexeme
-// contains underscores or trailing digits.
 TEST(Keywords, EscapedUnderscoreKeywordIsIdentifier) {
   const char* const kSamples[] = {
       "always_comb",  "always_ff", "always_latch", "join_any",
@@ -253,10 +241,6 @@ TEST(Keywords, EscapedUnderscoreKeywordIsIdentifier) {
   }
 }
 
-// §5.6.2 Statement 1 boundary: a keyword followed immediately by punctuation
-// (no intervening whitespace) must still be recognized.  The greedy identifier
-// scan stops at the punctuation, and the keyword-map lookup is then applied to
-// the keyword text alone.
 TEST(Keywords, KeywordFollowedByPunctuation) {
   auto tokens = Lex("module;");
   ASSERT_GE(tokens.size(), 2u);
@@ -274,10 +258,6 @@ TEST(Keywords, KeywordPrecededByPunctuation) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kRParen);
 }
 
-// §5.6.2 Statement 2 boundary: an escaped keyword adjacent to punctuation is
-// terminated by white space per §5.6.1, so without a trailing space the
-// punctuation is consumed into the escaped-identifier body — verifying that
-// the escape mechanism, not the keyword lookup, governs the token here.
 TEST(Keywords, EscapedKeywordWithTrailingWhitespaceTerminates) {
   auto tokens = Lex("\\module ;");
   ASSERT_GE(tokens.size(), 2u);
@@ -286,4 +266,4 @@ TEST(Keywords, EscapedKeywordWithTrailingWhitespaceTerminates) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kSemicolon);
 }
 
-}  // namespace
+}

@@ -9,17 +9,9 @@
 
 namespace delta {
 
-// =============================================================================
-// SvCallable
-// =============================================================================
-
 SvCallable::SvCallable(std::string_view name, bool is_task,
                        std::vector<CallableParam> params, Stmt* body)
     : name_(name), is_task_(is_task), params_(std::move(params)), body_(body) {}
-
-// =============================================================================
-// SvCallableContext
-// =============================================================================
 
 void SvCallableContext::PushFrame(const CallFrame& frame) {
   stack_.push_back(frame);
@@ -41,4 +33,4 @@ const CallFrame* SvCallableContext::CurrentFrame() const {
   return &stack_.back();
 }
 
-}  // namespace delta
+}

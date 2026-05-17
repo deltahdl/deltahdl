@@ -237,4 +237,4 @@ TEST(ProgramPortConnectionSim, ProgramDrivesWireChainIntoDesignAlways) {
   EXPECT_EQ(obs->value.ToUint64(), 64u);
 }
 
-}  // namespace
+}

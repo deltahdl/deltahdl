@@ -26,7 +26,6 @@ class Parser {
   bool TryParseCuScopeItem(CompilationUnit* unit);
   void ParseOutOfBlockConstraint(CompilationUnit* unit);
 
-  // Module/package parsing
   ModuleDecl* ParseModuleDecl();
   ModuleDecl* ParseExternModuleDecl();
   PackageDecl* ParsePackageDecl();
@@ -66,7 +65,6 @@ class Parser {
       std::vector<DataType>* param_types = nullptr);
   void ParseParamsPortsAndSemicolon(ModuleDecl& decl);
 
-  // Generate blocks (parser_generate.cpp)
   void ParseGenerateRegion(std::vector<ModuleItem*>& items);
   void ParseGenerateBody(std::vector<ModuleItem*>& body,
                          std::string_view& out_label);
@@ -75,7 +73,6 @@ class Parser {
   void ParseGenerateCaseLabel(GenerateCaseItem& ci);
   ModuleItem* ParseGenerateCase();
 
-  // Top-level declarations (parser_toplevel.cpp)
   ModuleDecl* ParseInterfaceDecl();
   ModuleDecl* ParseProgramDecl();
   void ParseModportDecl(std::vector<ModportDecl*>& out);
@@ -102,7 +99,6 @@ class Parser {
                                const ClassMember* first, const DataType& dtype);
   ClassMember* ParseConstraintStub(ClassMember* member);
 
-  // Gate primitives (parser_toplevel.cpp)
   bool IsAtGateKeyword();
   void ParseGateInst(std::vector<ModuleItem*>& items);
   void ParseInlineGateTerminals(GateKind kind, SourceLoc loc,
@@ -112,7 +108,6 @@ class Parser {
   uint8_t ParseStrength1();
   void ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3);
 
-  // User-defined primitives (parser_toplevel.cpp)
   UdpDecl* ParseUdpDecl();
   UdpDecl* ParseExternUdpDecl();
   char ParseUdpInitialValue(TokenKind stop1, TokenKind stop2);
@@ -120,19 +115,18 @@ class Parser {
   void ParseUdpPortDecls(UdpDecl* udp);
   void ParseUdpTable(UdpDecl* udp);
   void ParseUdpTableRow(UdpDecl* udp);
-  // Diagnose and skip a packed-range on a UDP port so parsing can continue.
+
   void RejectUdpPortDimension();
-  // Diagnose and swallow an `inout` keyword appearing on a UDP port.
+
   void RejectUdpInoutPort();
-  // Post-parse structural checks on a UDP header.
+
   void ValidateUdpHeader(UdpDecl* udp);
-  // Post-parse cross-row checks on a UDP state table.
+
   void ValidateUdpTable(UdpDecl* udp);
   bool TryParseStrengthSpec(uint8_t& str0, uint8_t& str1);
   ModuleItem* ParseOneUdpInstance(const Token& udp_tok, SourceLoc loc);
   void ParseUdpInstList(const Token& udp_tok, std::vector<ModuleItem*>& items);
 
-  // Verification constructs (parser_verify.cpp — §17/§18/§19)
   ModuleDecl* ParseCheckerDecl();
   Stmt* ParseRandcaseStmt();
   Stmt* ParseRandsequenceStmt();
@@ -150,7 +144,6 @@ class Parser {
   void ParseBlockEventExpression();
   void SkipCovergroupItem();
 
-  // Specify blocks (parser_specify.cpp — §30/§31)
   ModuleItem* ParseSpecifyBlock();
   ModuleItem* ParseSpecparamDecl();
   void ParseSpecifyItem(std::vector<SpecifyItem*>& items);
@@ -177,22 +170,18 @@ class Parser {
   void ParseSetupholdExtendedArgs(TimingCheckDecl& tc);
   void ParseOptionalDelayedRef(std::string_view& name, Expr*& expr);
 
-  // Library source text (A.1.1)
   LibraryDecl* ParseLibraryDecl();
   IncludeStmt* ParseLibraryIncludeStmt();
   std::string_view ParseFilePathSpec();
 
-  // Bind directive (§23.11 / A.1.2)
   BindDirective* ParseBindDirective();
 
-  // Configuration (parser_config.cpp — §33)
   ConfigDecl* ParseConfigDecl();
   void ParseDesignStatement(ConfigDecl* decl);
   ConfigRule* ParseConfigRule();
   void ParseLiblistClause(ConfigRule* rule);
   void ParseUseClause(ConfigRule* rule);
 
-  // Declarations (parser_decl.cpp)
   ModuleItem* ParseDefparam();
   ModuleItem* ParseTypedef();
   ModuleItem* ParseNettypeDecl();
@@ -213,7 +202,6 @@ class Parser {
   std::vector<FunctionArg> ParseFunctionArgs(bool require_identifiers = true);
   void ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw);
 
-  // Declarations
   uint8_t ParseChargeStrength();
   void ParseDriveStrength(uint8_t& s0, uint8_t& s1);
   void ParseNetStrength(DataType& dtype);
@@ -243,7 +231,6 @@ class Parser {
   std::vector<DataType> ParseTypeParamList();
   DataType ParseNamedType();
 
-  // Statements (parser_stmt.cpp)
   Stmt* ParseStmt();
   std::string_view TryParseStmtLabel();
   Stmt* ParseStmtBody();
@@ -282,7 +269,6 @@ class Parser {
   void ParseBlockDataDecl(std::vector<Stmt*>& stmts,
                           const std::vector<Attribute>& attrs);
 
-  // Clocking blocks and interprocess sync (parser_clocking.cpp — §14, §15)
   ModuleItem* ParseClockingDecl();
   void ParseClockingItem(ModuleItem* item);
   void ParseClockingSkew(Edge& edge, Expr*& delay);
@@ -290,11 +276,10 @@ class Parser {
                                    Edge& out_edge, Expr*& out_delay);
   Stmt* ParseWaitOrderStmt();
 
-  // Assertions (parser_assert.cpp — §16)
   Stmt* ParseImmediateAssert();
   Stmt* ParseImmediateAssume();
   Stmt* ParseImmediateAssertLike(StmtKind kind, TokenKind keyword);
-  // §16.14.6 P1: parse a concurrent assertion embedded in procedural code.
+
   Stmt* ParseProceduralConcurrentAssertLike(StmtKind kind);
   ModuleItem* ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind);
   Stmt* ParseExpectStmt();
@@ -307,7 +292,6 @@ class Parser {
   ModuleItem* ParsePropertyDecl();
   ModuleItem* ParseSequenceDecl();
 
-  // Expressions (Pratt parser — in expr_parser.cpp)
   Expr* ParseExpr();
   Expr* ParseExprBp(int min_bp);
   Expr* ParseInfixBp(Expr* lhs, int min_bp);
@@ -346,22 +330,18 @@ class Parser {
   Expr* ParseStreamingConcat(TokenKind dir);
   Expr* ParseMinTypMaxExpr();
 
-  // Attributes (§5.12)
   std::vector<Attribute> ParseAttributes();
   static void AttachAttrs(std::vector<ModuleItem*>& items, size_t before,
                           const std::vector<Attribute>& attrs);
 
-  // Types
   DataType ParseDataType();
   bool TryParseNetDataType(DataType& dtype, bool has_intervening);
   void ParsePackedDims(DataType& dtype);
   DataType ParseVirtualInterfaceType();
 
-  // Event lists
   std::vector<EventExpr> ParseEventList();
   EventExpr ParseSingleEvent();
 
-  // Utilities
   std::string_view ParseDottedPath();
   Token Expect(TokenKind kind);
   Token ExpectIdentifier();
@@ -380,22 +360,17 @@ class Parser {
   DiagEngine& diag_;
   std::unordered_set<std::string_view> known_types_;
   std::unordered_set<std::string_view> known_udps_;
-  ModuleDecl* current_module_ = nullptr;  // Set during module body parsing
+  ModuleDecl* current_module_ = nullptr;
   bool InProgramBlock() const {
     return current_module_ &&
            current_module_->decl_kind == ModuleDeclKind::kProgram;
   }
 
-  // Nonzero while parsing the body of a loop/conditional generate construct.
   int generate_block_depth_ = 0;
   bool InGenerateBlock() const { return generate_block_depth_ > 0; }
 
-  // True while parsing items inside a generate...endgenerate region.
-  // Used to enforce §27.3's rule that generate regions do not nest.
   bool in_generate_region_ = false;
 
-  // §6.20.1: param_assignments inside a class body, package body, or
-  // compilation-unit scope shall become localparam declarations.
   int class_body_depth_ = 0;
   int package_body_depth_ = 0;
   bool in_cu_scope_param_ = false;
@@ -410,8 +385,6 @@ inline bool IsPortDirection(TokenKind tk) {
          tk == TokenKind::kKwInout || tk == TokenKind::kKwRef;
 }
 
-// Skip a brace-delimited block: consume tokens until matching '}'.
-// The opening '{' must already have been consumed before calling this.
 inline void SkipBraceBlock(Lexer& lexer) {
   int depth = 1;
   while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
@@ -422,4 +395,4 @@ inline void SkipBraceBlock(Lexer& lexer) {
   if (lexer.Peek().Is(TokenKind::kRBrace)) lexer.Next();
 }
 
-}  // namespace delta
+}

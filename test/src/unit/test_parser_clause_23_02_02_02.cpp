@@ -14,8 +14,6 @@ TEST(ModuleDeclaration, EmptyPortListParens) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-// --- inout_declaration: inout net_port_type list_of_port_identifiers ---
-
 TEST(PortDeclParsing, InoutWirePackedDims) {
   auto r = Parse("module m(inout wire [7:0] bus); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -34,8 +32,6 @@ TEST(PortDeclParsing, InoutTriNetType) {
   EXPECT_EQ(port.direction, Direction::kInout);
   EXPECT_EQ(port.name, "d");
 }
-
-// --- input_declaration: input net_port_type / variable_port_type ---
 
 TEST(PortDeclParsing, InputWireNetType) {
   auto r = Parse("module m(input wire [7:0] d); endmodule");
@@ -74,8 +70,6 @@ TEST(PortDeclParsing, InputIntegerAtomType) {
   EXPECT_EQ(port.data_type.kind, DataTypeKind::kInt);
 }
 
-// --- output_declaration: output net_port_type / variable_port_type ---
-
 TEST(PortDeclParsing, OutputRegNetType) {
   auto r = Parse("module m(output reg [3:0] q); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -104,8 +98,6 @@ TEST(PortDeclParsing, OutputVariablePortTypeVar) {
   EXPECT_EQ(port.name, "q");
 }
 
-// --- ref_declaration: ref variable_port_type list_of_variable_identifiers ---
-
 TEST(PortDeclParsing, RefLogicPort) {
   auto r = Parse("module m(ref logic [7:0] d); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -133,8 +125,6 @@ TEST(PortDeclParsing, RefWithUnpackedDims) {
   EXPECT_EQ(port.direction, Direction::kRef);
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
-
-// --- Edge cases ---
 
 TEST(PortDeclParsing, AllFourDirections) {
   auto r = Parse(
@@ -185,8 +175,6 @@ TEST(PortDeclParsing, InputWithUnpackedDims) {
   EXPECT_EQ(port.direction, Direction::kInput);
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
-
-// --- Explicitly named ANSI ports ---
 
 TEST(PortDeclParsing, ExplicitlyNamedPortWithExpression) {
   auto r = Parse("module m(output .P1(r[3:0])); endmodule");
@@ -239,8 +227,6 @@ TEST(PortDeclParsing, MultipleExplicitlyNamedPorts) {
   EXPECT_EQ(r.cu->modules[0]->ports[3].direction, Direction::kInput);
 }
 
-// --- LRM examples ---
-
 TEST(PortDeclParsing, LrmExampleAnsiTestModule) {
   auto r = Parse(
       "module test (\n"
@@ -259,8 +245,6 @@ TEST(PortDeclParsing, LrmExampleAnsiTestModule) {
   EXPECT_EQ(r.cu->modules[0]->ports[7].direction, Direction::kOutput);
 }
 
-// --- Additional Syntax 23-4 coverage ---
-
 TEST(PortDeclParsing, InterfacePortWithUnpackedDims) {
   auto r = Parse("module m(interface bus [2]); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -269,8 +253,6 @@ TEST(PortDeclParsing, InterfacePortWithUnpackedDims) {
   EXPECT_TRUE(port.is_interface_port);
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
-
-// --- Error conditions ---
 
 TEST(PortDeclParsing, ErrorMissingPortName) {
   auto r = Parse("module m(input logic); endmodule");
@@ -282,4 +264,4 @@ TEST(PortDeclParsing, ErrorMissingCloseParen) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

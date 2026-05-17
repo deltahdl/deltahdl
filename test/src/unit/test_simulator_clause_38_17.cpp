@@ -37,5 +37,5 @@ TEST_F(VpiVlogInfoSim, GetVlogInfoNullDoesNotCrash) {
   vpi_get_vlog_info(nullptr);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

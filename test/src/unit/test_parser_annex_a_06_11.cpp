@@ -6,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- ClockingBlockParse: clocking_declaration, clocking_direction,
-//     clocking_decl_assign ---
-
 TEST(ClockingBlockParse, OutputDirection) {
   auto r = Parse(
       "module m;\n"
@@ -590,8 +587,6 @@ TEST(ClockingBlockParse, EndLabelSimple) {
               "endmodule\n"));
 }
 
-// --- ClockingSkewParse: clocking_skew, default_skew ---
-
 TEST(ClockingSkewParse, OneStepDelay) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -1147,8 +1142,6 @@ TEST(ClockingSkewParse, DefaultInputOutputBothAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- CycleDelayParse: cycle_delay ---
-
 TEST(CycleDelayParse, IntegralNumber) {
   auto r = Parse(
       "module m;\n"
@@ -1238,8 +1231,6 @@ TEST(CycleDelayParse, WithDefaultClocking) {
               "  end\n"
               "endprogram\n"));
 }
-
-// --- DefaultClockingParse: default clocking declaration ---
 
 TEST(DefaultClockingParse, InlineWithNegedge) {
   auto r = Parse(
@@ -1425,8 +1416,6 @@ TEST(DefaultClockingParse, DuplicateDefaultClockingParses) {
   EXPECT_EQ(default_count, 2u);
 }
 
-// --- GlobalClockingParse: global clocking declaration ---
-
 TEST(GlobalClockingParse, BasicNamedPosedge) {
   auto r = Parse(
       "module t;\n"
@@ -1557,8 +1546,6 @@ TEST(GlobalClockingParse, NotDefaultNotGlobal) {
   EXPECT_FALSE(item->is_default_clocking);
 }
 
-// --- SyncDriveParse: clocking_drive, clockvar, clockvar_expression ---
-
 TEST(SyncDriveParse, SimpleClockingDrive) {
   auto r = Parse(
       "module m;\n"
@@ -1671,8 +1658,6 @@ TEST(SyncDriveParse, CycleDelayIdentifier) {
               "  initial cb.data <= ##n 8'h42;\n"
               "endmodule\n"));
 }
-
-// --- Additional coverage ---
 
 TEST(ClockingBlockParse, SequenceDeclInsideBlock) {
   EXPECT_TRUE(
@@ -1829,4 +1814,4 @@ TEST(ClockingSkewParse, DefaultOutputOnlyFieldStored) {
   ASSERT_NE(item->default_output_skew_delay, nullptr);
 }
 
-}  // namespace
+}

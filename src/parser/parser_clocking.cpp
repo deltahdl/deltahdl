@@ -2,11 +2,6 @@
 
 namespace delta {
 
-// =============================================================================
-// §14 — Clocking block declaration
-// =============================================================================
-
-// §14.3: Parse clocking skew (edge and/or delay control).
 void Parser::ParseClockingSkew(Edge& edge, Expr*& delay) {
   edge = Edge::kNone;
   delay = nullptr;
@@ -19,7 +14,7 @@ void Parser::ParseClockingSkew(Edge& edge, Expr*& delay) {
   }
   if (Check(TokenKind::kHash)) {
     Consume();
-    // Handle 1step: integer 1 followed by identifier "step" (§14.4).
+
     if (Check(TokenKind::kIntLiteral) && CurrentToken().text == "1") {
       auto saved = lexer_.SavePos();
       auto one_tok = CurrentToken();
@@ -46,7 +41,6 @@ ModuleItem* Parser::ParseClockingDecl() {
   item->kind = ModuleItemKind::kClockingBlock;
   item->loc = CurrentLoc();
 
-  // Handle [default | global] prefix — keyword already peeked by caller.
   if (Match(TokenKind::kKwDefault)) {
     item->is_default_clocking = true;
   } else if (Match(TokenKind::kKwGlobal)) {
@@ -55,19 +49,16 @@ ModuleItem* Parser::ParseClockingDecl() {
 
   Expect(TokenKind::kKwClocking);
 
-  // Optional clocking_identifier (before '@').
   if (CheckIdentifier()) {
     item->name = Consume().text;
   }
 
-  // §14.3: default clocking reference form (name only, no body).
   if (item->is_default_clocking && !item->name.empty() &&
       Check(TokenKind::kSemicolon)) {
-    Consume();  // ;
+    Consume();
     return item;
   }
 
-  // clocking_event: @identifier or @(event_expression).
   Expect(TokenKind::kAt);
   if (Check(TokenKind::kLParen)) {
     Consume();
@@ -81,7 +72,6 @@ ModuleItem* Parser::ParseClockingDecl() {
 
   Expect(TokenKind::kSemicolon);
 
-  // Global clocking has no body items.
   if (!item->is_global_clocking) {
     while (!Check(TokenKind::kKwEndclocking) && !AtEnd()) {
       ParseClockingItem(item);
@@ -93,7 +83,6 @@ ModuleItem* Parser::ParseClockingDecl() {
   return item;
 }
 
-// Parse clocking_direction: input/output/inout with optional skews.
 Direction Parser::ParseClockingDirection(Edge& in_edge, Expr*& in_delay,
                                          Edge& out_edge, Expr*& out_delay) {
   if (Match(TokenKind::kKwInput)) {
@@ -114,9 +103,8 @@ Direction Parser::ParseClockingDirection(Edge& in_edge, Expr*& in_delay,
   return Direction::kNone;
 }
 
-// §14.3: Parse a single clocking item (default skew or signal declarations).
 void Parser::ParseClockingItem(ModuleItem* item) {
-  // default_skew: default {input clocking_skew} {output clocking_skew} ;
+
   if (Check(TokenKind::kKwDefault)) {
     Consume();
     if (Match(TokenKind::kKwInput)) {
@@ -131,7 +119,6 @@ void Parser::ParseClockingItem(ModuleItem* item) {
     return;
   }
 
-  // §A.6.11: assertion_item_declaration inside clocking block.
   if (Check(TokenKind::kKwProperty)) {
     ParsePropertyDecl();
     return;
@@ -145,7 +132,6 @@ void Parser::ParseClockingItem(ModuleItem* item) {
     return;
   }
 
-  // Parse clocking_direction and optional skews.
   Edge in_edge = Edge::kNone;
   Expr* in_delay = nullptr;
   Edge out_edge = Edge::kNone;
@@ -154,7 +140,6 @@ void Parser::ParseClockingItem(ModuleItem* item) {
       ParseClockingDirection(in_edge, in_delay, out_edge, out_delay);
   if (dir == Direction::kNone) return;
 
-  // Parse comma-separated signal declarations with optional assignments.
   do {
     ClockingSignalDecl sig;
     sig.direction = dir;
@@ -174,10 +159,6 @@ void Parser::ParseClockingItem(ModuleItem* item) {
   Expect(TokenKind::kSemicolon);
 }
 
-// =============================================================================
-// §15.5.4 — wait_order statement
-// =============================================================================
-
 Stmt* Parser::ParseWaitOrderStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kWaitOrder;
@@ -191,12 +172,11 @@ Stmt* Parser::ParseWaitOrderStmt() {
   }
   Expect(TokenKind::kRParen);
 
-  // §15.5.4: Parse optional action block (pass/else statements).
   if (Check(TokenKind::kKwElse)) {
     Consume();
     stmt->else_branch = ParseStmt();
   } else if (Check(TokenKind::kSemicolon)) {
-    Consume();  // Null action.
+    Consume();
   } else {
     stmt->then_branch = ParseStmt();
     if (Match(TokenKind::kKwElse)) {
@@ -206,4 +186,4 @@ Stmt* Parser::ParseWaitOrderStmt() {
   return stmt;
 }
 
-}  // namespace delta
+}

@@ -33,12 +33,6 @@ struct TempPrecompDir {
   }
 };
 
-// §33.5.4: in the separate-compilation-tool strategy "the config
-// itself shall also be precompiled."  A round-trip through the
-// precompiled-library archive must restore every part of the config
-// the binding tool will later consult — its name, its library tag,
-// and the cells named in its design statement — not just the fact
-// that a config existed.
 TEST(ConfigCommandLine, ConfigPersistsThroughPrecompiledLibrary) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "lib.dpl";
@@ -65,12 +59,6 @@ TEST(ConfigCommandLine, ConfigPersistsThroughPrecompiledLibrary) {
   EXPECT_EQ(cfg->design_cells[0].second, "top");
 }
 
-// §33.5.4: a config with several design cells and additional binding
-// rules must come back from the archive in its entirety, since rule
-// selection by the binding tool depends on every clause being intact.
-// The §33.5.3 round-trip test only checks counts and library tags;
-// here we exercise that the per-config descriptor — design cells and
-// rule list — is preserved as well.
 TEST(ConfigCommandLine, ConfigDesignCellsAndRulesRoundTrip) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "lib.dpl";
@@ -105,4 +93,4 @@ TEST(ConfigCommandLine, ConfigDesignCellsAndRulesRoundTrip) {
   EXPECT_EQ(cfg->rules[1]->cell_name, "a");
 }
 
-}  // namespace
+}

@@ -122,4 +122,4 @@ TEST(OperatorAndExpressionParsing, StreamingSingleElement) {
   EXPECT_EQ(rhs->elements.size(), 1u);
 }
 
-}  // namespace
+}

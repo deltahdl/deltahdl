@@ -34,8 +34,6 @@ TEST(DeclarationAssignmentParsing, ParamAssignmentBasic) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-// --- param_assignment ---
-
 TEST(DeclarationAssignmentParsing, ParamAssignmentNoDefault) {
   auto r = Parse("module m #(parameter int P)(); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -57,8 +55,6 @@ TEST(DeclarationAssignmentParsing, ParamAssignmentWithUnpackedDims) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
   EXPECT_NE(item->init_expr, nullptr);
 }
-
-// --- defparam_assignment ---
 
 TEST(DeclarationAssignmentParsing, DefparamAssignmentBasic) {
   auto r = Parse(
@@ -83,8 +79,6 @@ TEST(DeclarationAssignmentParsing, DefparamAssignmentMintypmax) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-// --- type_assignment ---
 
 TEST(DeclarationAssignmentParsing, TypeAssignmentWithDefault) {
   auto r = Parse("module m #(parameter type T = int)(); endmodule\n");
@@ -112,8 +106,6 @@ TEST(DeclarationAssignmentParsing, TypeAssignmentComplexType) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
 }
-
-// --- variable_decl_assignment ---
 
 TEST(DeclarationAssignmentParsing, VarDeclAssignmentBasic) {
   auto r = Parse("module m; int x = 5; endmodule\n");
@@ -170,8 +162,6 @@ TEST(DeclarationAssignmentParsing, VarDeclAssignmentClassNewWithArgs) {
       "endmodule\n"));
 }
 
-// --- class_new ---
-
 TEST(DeclarationAssignmentParsing, ClassNewNoArgs) {
   EXPECT_TRUE(ParseOk(
       "class C;\n"
@@ -191,8 +181,6 @@ TEST(DeclarationAssignmentParsing, ClassNewWithParenArgs) {
       "endmodule\n"));
 }
 
-// --- dynamic_array_new ---
-
 TEST(DeclarationAssignmentParsing, DynamicArrayNewSizeOnly) {
   EXPECT_TRUE(ParseOk(
       "module m;\n"
@@ -209,4 +197,4 @@ TEST(DeclarationAssignmentParsing, DynamicArrayNewSizeAndSource) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

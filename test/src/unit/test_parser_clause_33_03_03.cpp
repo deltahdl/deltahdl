@@ -15,8 +15,6 @@ LibraryDecl MakeLibDecl(std::string_view name,
   return d;
 }
 
-// §33.3.3: a module's library is the library whose file_path_spec
-// matches the source file's path.
 TEST(LibraryMapCellTagging, TagsModuleWithMatchingLibrary) {
   LibraryMap m;
   m.AddDeclaration(MakeLibDecl("rtlLib", {"*.v"}), "/proj/rtl");
@@ -30,8 +28,6 @@ TEST(LibraryMapCellTagging, TagsModuleWithMatchingLibrary) {
   EXPECT_EQ(mod.library, "rtlLib");
 }
 
-// §33.3.3 + §33.3.1 work-default: a source not matched by any library
-// is tagged with "work".
 TEST(LibraryMapCellTagging, TagsUnmatchedSourceWithWork) {
   LibraryMap m;
   m.AddDeclaration(MakeLibDecl("rtlLib", {"*.v"}), "/proj/rtl");
@@ -45,9 +41,6 @@ TEST(LibraryMapCellTagging, TagsUnmatchedSourceWithWork) {
   EXPECT_EQ(mod.library, "work");
 }
 
-// All §33.2.1 cell kinds (module, primitive, interface, program,
-// package, configuration) are tagged.  Classes are intentionally
-// excluded because §33.2.1 does not list them as cells.
 TEST(LibraryMapCellTagging, TagsAllCellKinds) {
   LibraryMap m;
   m.AddDeclaration(MakeLibDecl("L", {"*.v"}), "/proj");
@@ -85,10 +78,6 @@ TEST(LibraryMapCellTagging, TagsAllCellKinds) {
   EXPECT_EQ(cfg.library, "L");
 }
 
-// §33.3.3 + §33.3.1.1 ambiguity: when LibraryForFile returns the empty
-// ambiguity sentinel, that empty string is what the cells receive.
-// This lets a downstream driver detect that no unique library was
-// determined and report the §33.3.1.1 error.
 TEST(LibraryMapCellTagging, AmbiguousMatchPropagatesEmptyTag) {
   LibraryMap m;
   m.AddDeclaration(MakeLibDecl("a", {"*.v"}), "/proj");
@@ -102,8 +91,6 @@ TEST(LibraryMapCellTagging, AmbiguousMatchPropagatesEmptyTag) {
   EXPECT_TRUE(mod.library.empty());
 }
 
-// Tagging two compilation units from different source paths writes
-// different libraries to each — confirms each tag call is independent.
 TEST(LibraryMapCellTagging, IndependentTaggingPerCompilationUnit) {
   LibraryMap m;
   m.AddDeclaration(MakeLibDecl("rtl", {"*.v"}), "/proj");
@@ -124,4 +111,4 @@ TEST(LibraryMapCellTagging, IndependentTaggingPerCompilationUnit) {
   EXPECT_EQ(mod_gates.library, "gates");
 }
 
-}  // namespace
+}

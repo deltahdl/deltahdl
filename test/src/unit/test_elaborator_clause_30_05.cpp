@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §30.5: delay values shall be constant expressions containing literals or
-// specparams; a regular net reference is not a valid delay operand.
 TEST(SpecifyPathDelayElaboration, RejectsNonSpecparamIdentifier) {
   ElabFixture f;
   ElaborateSrc(
@@ -20,7 +18,6 @@ TEST(SpecifyPathDelayElaboration, RejectsNonSpecparamIdentifier) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §30.5: a specparam is a valid delay operand.
 TEST(SpecifyPathDelayElaboration, AcceptsSpecparamIdentifier) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -35,8 +32,6 @@ TEST(SpecifyPathDelayElaboration, AcceptsSpecparamIdentifier) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.5: a constant expression combining literals and specparams is a valid
-// delay operand.
 TEST(SpecifyPathDelayElaboration, AcceptsLiteralPlusSpecparamExpression) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,4 +46,4 @@ TEST(SpecifyPathDelayElaboration, AcceptsLiteralPlusSpecparamExpression) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

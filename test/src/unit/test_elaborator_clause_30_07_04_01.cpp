@@ -19,9 +19,7 @@ TEST(SpecifyBlockDeclElaboration, SpecifyBlockWithPulsestyleElaborates) {
 }
 
 TEST(SpecifyBlockDeclElaboration, PulsestyleOnModulePathOutputIsError) {
-  // An output driven by a module path cannot also carry a pulsestyle
-  // declaration: both mechanisms would try to own the pulse semantics
-  // for the same destination, so the elaborator must reject the combo.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m(input a, output o);\n"
@@ -35,4 +33,4 @@ TEST(SpecifyBlockDeclElaboration, PulsestyleOnModulePathOutputIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

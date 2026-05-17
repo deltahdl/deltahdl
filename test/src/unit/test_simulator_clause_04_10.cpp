@@ -5,10 +5,6 @@
 
 using namespace delta;
 
-// §4.10 first sentence: PLI callbacks split into two kinds — those that fire
-// immediately when activity occurs (e.g. cbValueChange) and those registered
-// as a one-shot evaluation event (the callbacks listed in Table 4-1).
-
 TEST(PliCallbackTaxonomy, RegisteredEvaluationCallbacksAreOneShot) {
   EXPECT_TRUE(IsOneShotPliCallback(kCbAfterDelay));
   EXPECT_TRUE(IsOneShotPliCallback(kCbNextSimTime));
@@ -20,8 +16,7 @@ TEST(PliCallbackTaxonomy, RegisteredEvaluationCallbacksAreOneShot) {
 }
 
 TEST(PliCallbackTaxonomy, ValueChangeIsImmediate) {
-  // cbValueChange fires when the watched object changes — it is the canonical
-  // "immediately when some specific activity occurs" case from §4.10.
+
   EXPECT_FALSE(IsOneShotPliCallback(kCbValueChange));
 }
 
@@ -30,8 +25,6 @@ TEST(PliCallbackTaxonomy, UnknownReasonIsNotOneShot) {
   EXPECT_FALSE(IsOneShotPliCallback(-1));
   EXPECT_FALSE(IsOneShotPliCallback(9999));
 }
-
-// §4.10 Table 4-1: each row asserts the callback's assigned event region.
 
 TEST(PliCallbackRegion, CbAfterDelayMapsToPreActive) {
   EXPECT_EQ(RegionForPliCallback(kCbAfterDelay), Region::kPreActive);
@@ -46,7 +39,7 @@ TEST(PliCallbackRegion, CbAtStartOfSimTimeMapsToPreActive) {
 }
 
 TEST(PliCallbackRegion, CbReadWriteSynchMapsToPreNbaOrPostNba) {
-  // Table 4-1 lists "Pre-NBA or Post-NBA" — the implementation may pick either.
+
   Region r = RegionForPliCallback(kCbReadWriteSynch);
   EXPECT_TRUE(r == Region::kPreNBA || r == Region::kPostNBA)
       << "cbReadWriteSynch must map to Pre-NBA or Post-NBA per Table 4-1";
@@ -65,9 +58,7 @@ TEST(PliCallbackRegion, CbReadOnlySynchMapsToPostponed) {
 }
 
 TEST(PliCallbackRegion, NonOneShotCallbackHasNoAssignedRegion) {
-  // §4.10 only assigns regions to the seven Table 4-1 callbacks. Other
-  // reasons (immediately-fired or out-of-table) report no assigned region
-  // via the kCOUNT sentinel.
+
   EXPECT_EQ(RegionForPliCallback(kCbValueChange), Region::kCOUNT);
   EXPECT_EQ(RegionForPliCallback(kCbStmt), Region::kCOUNT);
   EXPECT_EQ(RegionForPliCallback(kCbEndOfSimulation), Region::kCOUNT);
@@ -75,8 +66,6 @@ TEST(PliCallbackRegion, NonOneShotCallbackHasNoAssignedRegion) {
   EXPECT_EQ(RegionForPliCallback(9999), Region::kCOUNT);
 }
 
-// Constants for the four callback reasons named in Table 4-1 but not
-// previously defined must exist as distinct values.
 TEST(PliCallbackConstants, OneShotCallbackReasonsAreDistinct) {
   EXPECT_NE(kCbAfterDelay, kCbNextSimTime);
   EXPECT_NE(kCbAfterDelay, kCbNBASynch);
@@ -84,7 +73,7 @@ TEST(PliCallbackConstants, OneShotCallbackReasonsAreDistinct) {
   EXPECT_NE(kCbNextSimTime, kCbNBASynch);
   EXPECT_NE(kCbNextSimTime, kCbAtEndOfSimTime);
   EXPECT_NE(kCbNBASynch, kCbAtEndOfSimTime);
-  // And distinct from the four already-defined reasons.
+
   EXPECT_NE(kCbAfterDelay, kCbReadWriteSynch);
   EXPECT_NE(kCbAfterDelay, kCbAtStartOfSimTime);
   EXPECT_NE(kCbAfterDelay, kCbReadOnlySynch);

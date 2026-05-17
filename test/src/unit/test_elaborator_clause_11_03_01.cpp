@@ -400,8 +400,6 @@ TEST(RealOps, LegalOpOnRealInContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.3.1: "The result of using ... the inside operator on real operands
-// shall be a single-bit value." inside operator is therefore legal on real.
 TEST(RealOps, InsideOnRealIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -414,8 +412,6 @@ TEST(RealOps, InsideOnRealIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.3.1 Table 11-1: increment operator ++ is listed with operand type
-// "Integral, real, shortreal" — legal on real.
 TEST(RealOps, IncrementOnRealIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -427,8 +423,6 @@ TEST(RealOps, IncrementOnRealIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.3.1 Table 11-1: decrement operator -- has operand type
-// "Integral, real, shortreal" — legal on real.
 TEST(RealOps, DecrementOnRealIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -440,9 +434,6 @@ TEST(RealOps, DecrementOnRealIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.3.1 Table 11-1: the binary logical operators include -> with operand
-// type "Integral, real, shortreal"; -> on real shall not be rejected and
-// shall (per §11.3.1) yield a single-bit result.
 TEST(RealOps, ImplicationOnRealIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -455,8 +446,6 @@ TEST(RealOps, ImplicationOnRealIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.3.1 Table 11-1: <-> is a binary logical operator accepting real
-// operands.
 TEST(RealOps, EquivalenceOnRealIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -469,8 +458,6 @@ TEST(RealOps, EquivalenceOnRealIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.3.1: "Real operands can also be used in the following expressions:
-// str.realval // structure or union member"
 TEST(RealOps, StructMemberRealAccessIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -484,8 +471,6 @@ TEST(RealOps, StructMemberRealAccessIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.3.1: "Real operands can also be used in the following expressions:
-// realarray[intval] // array element"
 TEST(RealOps, RealArrayElementAccessIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -499,4 +484,4 @@ TEST(RealOps, RealArrayElementAccessIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

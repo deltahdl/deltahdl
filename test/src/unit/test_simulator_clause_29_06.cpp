@@ -34,8 +34,6 @@ TEST(UdpEdgeSeq, DFlipFlop) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-// An edge transition that matches no row in an edge-sensitive UDP drives
-// the output to x; unspecified transitions default to x.
 TEST(UdpEdgeSeq, UnspecifiedEdgeYieldsX) {
   UdpBuilder b;
   b.SetSequential().SetInitial('1').AddSeqRow({'r'}, '?', '1');
@@ -47,4 +45,4 @@ TEST(UdpEdgeSeq, UnspecifiedEdgeYieldsX) {
   EXPECT_EQ(state.GetOutput(), 'x');
 }
 
-}  // namespace
+}

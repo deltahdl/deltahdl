@@ -1,4 +1,4 @@
-// §28.3.2
+
 
 #include <gtest/gtest.h>
 #include "fixture_lexer.h"
@@ -47,4 +47,4 @@ TEST(GateStrengthLexing, DriveStrengthTokenSequence) {
   EXPECT_EQ(tokens[5].kind, TokenKind::kRParen);
 }
 
-}  // namespace
+}

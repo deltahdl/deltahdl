@@ -128,4 +128,4 @@ TEST(ConstConstantElaboration, ConstCreatesVariable) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

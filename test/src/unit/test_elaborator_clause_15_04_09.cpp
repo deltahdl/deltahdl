@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.9: mailbox #(int) declaration elaborates with class_type_name.
 TEST(MailboxParameterizedElaborator, ParameterizedIntDeclaration) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,7 +18,6 @@ TEST(MailboxParameterizedElaborator, ParameterizedIntDeclaration) {
   EXPECT_EQ(mod->variables[0].class_type_name, "mailbox");
 }
 
-// §15.4.9: mailbox #(string) with new elaborates.
 TEST(MailboxParameterizedElaborator, ParameterizedStringWithNew) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -31,7 +29,6 @@ TEST(MailboxParameterizedElaborator, ParameterizedStringWithNew) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.9: mailbox #(int) with method calls elaborates.
 TEST(MailboxParameterizedElaborator, ParameterizedWithMethodCalls) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -48,4 +45,4 @@ TEST(MailboxParameterizedElaborator, ParameterizedWithMethodCalls) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

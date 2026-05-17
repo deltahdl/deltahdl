@@ -49,4 +49,4 @@ TEST(SystemNameSynthesis, SystemFunctionWithDataTypeArgSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

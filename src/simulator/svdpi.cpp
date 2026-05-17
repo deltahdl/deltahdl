@@ -1,17 +1,10 @@
-// IEEE 1800-2023 Annex I — svdpi.h implementation.
-//
-// All function names are MANDATED by the IEEE standard.
+
 
 #include "simulator/svdpi.h"
 
-// Thread-local DPI scope.
 static thread_local svScope g_current_scope = nullptr;
 
 const char* svDpiVersion(void) { return "IEEE 1800-2023"; }
-
-// =============================================================================
-// Bit-select functions
-// =============================================================================
 
 svBit svGetBitselBit(const svBitVecVal* s, int i) {
   int word = i / 32;
@@ -55,16 +48,12 @@ void svPutBitselLogic(svLogicVecVal* d, int i, svLogic s) {
       d[word].aval &= ~mask;
       d[word].bval |= mask;
       break;
-    default:  // sv_x
+    default:
       d[word].aval |= mask;
       d[word].bval |= mask;
       break;
   }
 }
-
-// =============================================================================
-// Part-select functions (w <= 32)
-// =============================================================================
 
 void svGetPartselBit(svBitVecVal* d, const svBitVecVal* s, int i, int w) {
   if (w <= 0 || w > 32) return;
@@ -113,10 +102,6 @@ void svPutPartselLogic(svLogicVecVal* d, svLogicVecVal s, int i, int w) {
   d[word].bval &= ~(wmask << bit);
   d[word].bval |= (s.bval & wmask) << bit;
 }
-
-// =============================================================================
-// Open array functions (stubs — full impl requires simulator integration)
-// =============================================================================
 
 int svLeft(svOpenArrayHandle h, int d) {
   (void)h;
@@ -180,7 +165,6 @@ void* svGetArrElemPtr3(svOpenArrayHandle h, int indx1, int indx2, int indx3) {
   return nullptr;
 }
 
-// Open array VecVal stubs.
 void svPutBitArrElem1VecVal(svOpenArrayHandle d, const svBitVecVal* s,
                             int indx1) {
   (void)d;
@@ -265,7 +249,6 @@ void svGetLogicArrElem3VecVal(svLogicVecVal* d, svOpenArrayHandle s, int indx1,
   (void)indx3;
 }
 
-// Open array scalar element stubs.
 svBit svGetBitArrElem1(svOpenArrayHandle s, int indx1) {
   (void)s;
   (void)indx1;
@@ -342,10 +325,6 @@ void svPutBitArrElem3(svOpenArrayHandle d, svBit value, int indx1, int indx2,
   (void)indx2;
   (void)indx3;
 }
-
-// =============================================================================
-// DPI context functions
-// =============================================================================
 
 svScope svGetScope(void) { return g_current_scope; }
 

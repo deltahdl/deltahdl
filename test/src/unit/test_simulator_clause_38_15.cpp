@@ -156,5 +156,5 @@ TEST_F(VpiGetValueSim, GetValueTimeFormat) {
   EXPECT_EQ(val.value.integer, 500);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

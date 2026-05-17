@@ -39,18 +39,6 @@ struct TempPrecompDir {
   }
 };
 
-// §33.5.3: "the tool that actually does the binding only needs to be
-// told the top-level module(s) of the design to be bound, and then it
-// shall use the precompiled form of the cell description(s) from the
-// library to determine the subinstances and descend hierarchically
-// down the design, binding each cell as it is located."
-//
-// Two precompile-tool invocations populate the library with `mid`
-// (which itself instantiates `leaf`) and `leaf`.  The binding-tool
-// invocation parses only the top-level source, pulls both cells back
-// from disk, and elaborates from the named top.  The descent has to
-// walk through the precompiled `mid` to reach the precompiled `leaf`,
-// so all three modules show up in the final design.
 TEST(SeparateCompilationToolDescend, TransitiveDescentThroughLibrary) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
@@ -92,12 +80,6 @@ TEST(SeparateCompilationToolDescend, TransitiveDescentThroughLibrary) {
   EXPECT_TRUE(design->all_modules.contains("leaf"));
 }
 
-// §33.5.3: the binding tool relies on the precompiled form to locate
-// every subinstance, so when the library does not contain a needed
-// cell the descent has nowhere to go and binding fails.  Save a
-// stranger cell to disk, point the binding step at a top that
-// instantiates a different name, and expect the elaborator to flag
-// the missing entry rather than synthesize a stub.
 TEST(SeparateCompilationToolDescend, BindingFailsWhenLibraryMissingCell) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
@@ -129,4 +111,4 @@ TEST(SeparateCompilationToolDescend, BindingFailsWhenLibraryMissingCell) {
   EXPECT_TRUE(diag.HasErrors());
 }
 
-}  // namespace
+}

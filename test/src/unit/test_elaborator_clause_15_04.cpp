@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4: mailbox declaration elaborates with class_type_name set.
 TEST(MailboxElaborator, DeclarationSetsClassTypeName) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,7 +18,6 @@ TEST(MailboxElaborator, DeclarationSetsClassTypeName) {
   EXPECT_EQ(mod->variables[0].class_type_name, "mailbox");
 }
 
-// §15.4: multiple mailbox declarations each get correct class_type_name.
 TEST(MailboxElaborator, MultipleMailboxDeclarations) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -36,7 +34,6 @@ TEST(MailboxElaborator, MultipleMailboxDeclarations) {
   EXPECT_EQ(mod->variables[1].class_type_name, "mailbox");
 }
 
-// §15.4: mailbox with initializer elaborates without error.
 TEST(MailboxElaborator, DeclarationWithInitializer) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -52,7 +49,6 @@ TEST(MailboxElaborator, DeclarationWithInitializer) {
   EXPECT_NE(mod->variables[0].init_expr, nullptr);
 }
 
-// §15.4: mailbox does not require an explicit class declaration.
 TEST(MailboxElaborator, BuiltInTypeWithoutClassDecl) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -60,7 +56,6 @@ TEST(MailboxElaborator, BuiltInTypeWithoutClassDecl) {
       "endmodule\n"));
 }
 
-// §15.4: mailbox used in initial block with method calls elaborates.
 TEST(MailboxElaborator, MethodCallsInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -75,4 +70,4 @@ TEST(MailboxElaborator, MethodCallsInInitialBlock) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

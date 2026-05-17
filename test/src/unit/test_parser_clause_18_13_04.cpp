@@ -45,4 +45,4 @@ TEST(ConstrainedRandomParsing, GetRandstateInFunction) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}  // namespace
+}

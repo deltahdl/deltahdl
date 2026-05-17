@@ -121,7 +121,6 @@ TEST(InputSamplingSim, ZeroSkewInputSamplesInObservedRegion) {
   cmgr.Register(block);
   cmgr.Attach(f.ctx, f.scheduler);
 
-  // Schedule Active: clock posedge + data update in same time step.
   auto* ev_clk = f.scheduler.GetEventPool().Acquire();
   ev_clk->callback = [clk, &f]() {
     clk->prev_value = clk->value;
@@ -130,7 +129,6 @@ TEST(InputSamplingSim, ZeroSkewInputSamplesInObservedRegion) {
   };
   f.scheduler.ScheduleEvent(SimTime{10}, Region::kActive, ev_clk);
 
-  // Active-region data change at same time — #0 skew input should see this.
   auto* ev_data = f.scheduler.GetEventPool().Acquire();
   ev_data->callback = [data, &f]() {
     data->value = MakeLogic4VecVal(f.arena, 8, 0x20);
@@ -139,7 +137,6 @@ TEST(InputSamplingSim, ZeroSkewInputSamplesInObservedRegion) {
 
   f.scheduler.Run();
 
-  // #0 skew: samples in Observed, so sees Active-region update.
   EXPECT_EQ(cmgr.GetSampledValue("cb", "data"), 0x20u);
 }
 
@@ -154,7 +151,6 @@ TEST(InputSamplingSim, SameSignalInMultipleBlocks) {
 
   ClockingManager cmgr;
 
-  // Block 1: posedge clk1
   ClockingBlock block1;
   block1.name = "cb1";
   block1.clock_signal = "clk1";
@@ -167,7 +163,6 @@ TEST(InputSamplingSim, SameSignalInMultipleBlocks) {
   block1.signals.push_back(sig1);
   cmgr.Register(block1);
 
-  // Block 2: posedge clk2
   ClockingBlock block2;
   block2.name = "cb2";
   block2.clock_signal = "clk2";
@@ -182,22 +177,18 @@ TEST(InputSamplingSim, SameSignalInMultipleBlocks) {
 
   cmgr.Attach(f.ctx, f.scheduler);
 
-  // Posedge clk1 at t=10, data=0x11
   SchedulePosedge(f, clk1, 10);
 
-  // Change data at t=15
   auto* ev_data = f.scheduler.GetEventPool().Acquire();
   ev_data->callback = [data, &f]() {
     data->value = MakeLogic4VecVal(f.arena, 8, 0x22);
   };
   f.scheduler.ScheduleEvent(SimTime{15}, Region::kActive, ev_data);
 
-  // Posedge clk2 at t=20, data=0x22
   SchedulePosedge(f, clk2, 20);
 
   f.scheduler.Run();
 
-  // Each block samples independently at its own clocking event.
   EXPECT_EQ(cmgr.GetSampledValue("cb1", "data"), 0x11u);
   EXPECT_EQ(cmgr.GetSampledValue("cb2", "data"), 0x22u);
 }
@@ -232,7 +223,6 @@ TEST(InputSamplingSim, SampledBeforeBlockEventFires) {
       f, cmgr,
       {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput});
 
-  // Register an edge callback that reads the sampled value.
   uint64_t value_seen_in_callback = 0;
   cmgr.RegisterEdgeCallback(
       "cb", f.ctx, f.scheduler,
@@ -243,8 +233,7 @@ TEST(InputSamplingSim, SampledBeforeBlockEventFires) {
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
 
-  // Edge callback fires after sampling, so it sees the sampled value.
   EXPECT_EQ(value_seen_in_callback, 0x42u);
 }
 
-}  // namespace
+}

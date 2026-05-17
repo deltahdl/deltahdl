@@ -108,4 +108,4 @@ TEST(QueueSizeSimulation, SizeInForLoopCondition) {
   EXPECT_EQ(f.ctx.FindVariable("total")->value.ToUint64(), 60u);
 }
 
-}  // namespace
+}

@@ -16,4 +16,4 @@ TEST(QueueDeclarationElaboration, UnboundedQueueDimension) {
   EXPECT_EQ(mod->variables[0].queue_max_size, -1);
 }
 
-}  // namespace
+}

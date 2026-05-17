@@ -222,13 +222,12 @@ def test_commit_body_deny_patterns_blocks_pytest() -> None:
     assert "pytest" in COMMIT_BODY_DENY_PATTERNS
 
 
-def test_commit_body_deny_patterns_allows_git() -> None:
-    """Commit-body must read git state (e.g. ``git diff``) to narrate the diff.
-
-    The orchestrator owns commit/push in ``commit_mutator_result``, so
-    the Haiku session is not asked to land a commit — but it needs the
-    ``git`` tool to inspect what the eight-step pass changed, so it
-    can write a meaningful ``- {Verb} `path` because reason.`` bullet
-    per change instead of degenerating into a request for permission.
+def test_commit_body_deny_patterns_blocks_git() -> None:
+    """Commit-body must not run git: a §X session once used git to land
+    a separate "Dedup §X tests" commit during body generation, splitting
+    one logical change across two commits. The orchestrator owns the
+    only commit/push in ``commit_mutator_result``; the body session
+    works from the prompt's porcelain file list plus its --continue
+    session context, never from a git invocation.
     """
-    assert "git" not in COMMIT_BODY_DENY_PATTERNS
+    assert "git" in COMMIT_BODY_DENY_PATTERNS

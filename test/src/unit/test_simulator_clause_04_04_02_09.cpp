@@ -132,14 +132,6 @@ TEST(PostponedRegionSim, PostponedAdvancesToNextTimeSlot) {
   EXPECT_EQ(order[1], "preponed_t1");
 }
 
-// §4.4.2.9 ¶4: "Postponed region PLI events are also scheduled in this
-// region (see 4.4.3.10)." Observe the cross-link from §4.4.2.9's vantage by
-// consulting the production PLI callback router for the canonical Postponed
-// PLI reason (cbReadOnlySynch) and confirming its routing target is the same
-// Region::kPostponed that §4.4.2.9 names. The sim event scheduled into that
-// region during the same time slot executes in the same Postponed drain,
-// demonstrating that this region accepts both sim ($monitor/$strobe per ¶1)
-// and PLI (per ¶4) events without distinction.
 TEST(PostponedRegionSim, PostponedPLIEventsRouteIntoThisRegion) {
   Region pli_target = RegionForPliCallback(kCbReadOnlySynch);
   ASSERT_EQ(pli_target, Region::kPostponed);
@@ -166,10 +158,6 @@ TEST(PostponedRegionSim, PostponedEventsAcrossMultipleTimeSlots) {
   VerifyEventsAcrossTimeSlots(Region::kPostponed);
 }
 
-// §4.4.2.9: "Within this region, it is illegal to ... schedule an event in
-// any previous region within the current time slot." Postponed is the last
-// region of the slot, so any current-time schedule into a non-Postponed
-// region is a violation.
 TEST(PostponedRegionSim, IllegalScheduleIntoPreviousRegionInCurrentTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
@@ -187,10 +175,6 @@ TEST(PostponedRegionSim, IllegalScheduleIntoPreviousRegionInCurrentTimeSlot) {
   EXPECT_EQ(sched.IllegalPostponedScheduleCount(), 1u);
 }
 
-// §4.4.2.9: scheduling into Postponed itself at the current time slot is not
-// "any previous region", so it is not flagged. Likewise scheduling into a
-// previous region at a *future* time slot is allowed because the rule is
-// scoped to the current time slot.
 TEST(PostponedRegionSim, LegalSchedulesFromPostponedAreNotFlagged) {
   Arena arena;
   Scheduler sched(arena);
@@ -210,7 +194,6 @@ TEST(PostponedRegionSim, LegalSchedulesFromPostponedAreNotFlagged) {
   EXPECT_EQ(sched.IllegalPostponedScheduleCount(), 0u);
 }
 
-// §4.4.2.9: each illegal schedule from Postponed is counted independently.
 TEST(PostponedRegionSim, MultipleIllegalSchedulesAreEachCounted) {
   Arena arena;
   Scheduler sched(arena);
@@ -229,9 +212,6 @@ TEST(PostponedRegionSim, MultipleIllegalSchedulesAreEachCounted) {
   EXPECT_EQ(sched.IllegalPostponedScheduleCount(), 3u);
 }
 
-// §4.4.2.9: scheduling from non-Postponed regions (e.g. Active) into earlier
-// regions of the current time slot is permitted by §4.4.2.9 — the rule is
-// specific to the Postponed region.
 TEST(PostponedRegionSim, ScheduleFromActiveIntoEarlierRegionIsNotFlagged) {
   Arena arena;
   Scheduler sched(arena);
@@ -248,10 +228,6 @@ TEST(PostponedRegionSim, ScheduleFromActiveIntoEarlierRegionIsNotFlagged) {
   EXPECT_EQ(sched.IllegalPostponedScheduleCount(), 0u);
 }
 
-// §4.4.2.9: "it is illegal to write values to any net or variable" once the
-// Postponed region is reached. The VPI write path (VpiContext::PutValue)
-// is the canonical write entry point; when invoked from a Postponed callback
-// the scheduler records the violation.
 TEST(PostponedRegionSim, VpiPutValueFromPostponedRecordsWriteViolation) {
   Arena arena;
   Scheduler sched(arena);
@@ -281,9 +257,6 @@ TEST(PostponedRegionSim, VpiPutValueFromPostponedRecordsWriteViolation) {
   EXPECT_EQ(sched.IllegalPostponedWriteCount(), 1u);
 }
 
-// §4.4.2.9 ¶3: each illegal write from Postponed must be counted independently
-// — mirrors the multi-count behavior of the schedule violation counter so the
-// "no new value changes" rule remains observable across repeated VPI writes.
 TEST(PostponedRegionSim, MultipleIllegalWritesAreEachCounted) {
   Arena arena;
   Scheduler sched(arena);
@@ -314,8 +287,6 @@ TEST(PostponedRegionSim, MultipleIllegalWritesAreEachCounted) {
   EXPECT_EQ(sched.IllegalPostponedWriteCount(), 4u);
 }
 
-// §4.4.2.9: VPI writes from regions other than Postponed are not flagged —
-// the rule is scoped to the Postponed region.
 TEST(PostponedRegionSim, VpiPutValueOutsidePostponedDoesNotRecordViolation) {
   Arena arena;
   Scheduler sched(arena);
@@ -345,15 +316,6 @@ TEST(PostponedRegionSim, VpiPutValueOutsidePostponedDoesNotRecordViolation) {
   EXPECT_EQ(var.value.words[0].aval, 42u);
 }
 
-// §4.4.2.9 ¶1: "$monitor, $strobe, and other similar events are scheduled
-// in the Postponed region." EvalDeferredPrint is the production-code routing
-// path: it acquires an event whose callback emits the formatted output and
-// schedules it into Region::kPostponed. To observe the rule, we capture
-// std::cout, run a $strobe inside an initial block, and snapshot the buffer
-// from a Pre-Postponed sentinel. The strobe text must be absent at the
-// Pre-Postponed sample (i.e. not emitted by an earlier region) and present
-// after the run completes — the only remaining region after Pre-Postponed
-// where the deferred print could have fired is Postponed itself.
 TEST(PostponedRegionSim, StrobeIsScheduledIntoPostponedRegion) {
   std::ostringstream captured;
   std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
@@ -383,9 +345,6 @@ TEST(PostponedRegionSim, StrobeIsScheduledIntoPostponedRegion) {
       << "captured=" << captured.str();
 }
 
-// §4.4.2.9 ¶1: $monitor takes the same EvalDeferredPrint path and must also
-// land in the Postponed region. Asserting both system tasks separately keeps
-// the rule observable for each name listed in the LRM text.
 TEST(PostponedRegionSim, MonitorIsScheduledIntoPostponedRegion) {
   std::ostringstream captured;
   std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
@@ -415,9 +374,6 @@ TEST(PostponedRegionSim, MonitorIsScheduledIntoPostponedRegion) {
       << "captured=" << captured.str();
 }
 
-// §4.4.2.9: while executing Postponed, the scheduler reports the current
-// region so net/variable write paths can apply the "no new value changes"
-// restriction.
 TEST(PostponedRegionSim, CurrentRegionIsPostponedDuringPostponedCallback) {
   Arena arena;
   Scheduler sched(arena);

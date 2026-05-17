@@ -5,12 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §16.4 Syntax 16-2 distinguishes two kinds of deferred immediate assertion:
-// observed (assert #0 / assume #0 / cover #0) and final (assert final /
-// assume final / cover final). The §16.4 prose then sends the two kinds to
-// different regions (Reactive vs Postponed). The parser must therefore
-// preserve the kind so later stages can route accordingly.
-
 TEST(DeferredAssertionParsing, Hash0AssertObservedNotFinal) {
   auto r = Parse(
       "module m;\n"
@@ -39,7 +33,6 @@ TEST(DeferredAssertionParsing, FinalAssertMarksFinalDeferred) {
   EXPECT_TRUE(stmt->is_final_deferred);
 }
 
-// §16.4 Syntax 16-2: deferred_immediate_assume_statement covers #0 and final.
 TEST(DeferredAssertionParsing, Hash0AssumeObservedNotFinal) {
   auto r = Parse(
       "module m;\n"
@@ -68,7 +61,6 @@ TEST(DeferredAssertionParsing, FinalAssumeMarksFinalDeferred) {
   EXPECT_TRUE(stmt->is_final_deferred);
 }
 
-// §16.4 Syntax 16-2: deferred_immediate_cover_statement covers #0 and final.
 TEST(DeferredAssertionParsing, Hash0CoverObservedNotFinal) {
   auto r = Parse(
       "module m;\n"
@@ -97,10 +89,6 @@ TEST(DeferredAssertionParsing, FinalCoverMarksFinalDeferred) {
   EXPECT_TRUE(stmt->is_final_deferred);
 }
 
-// §16.4 "A deferred assertion may be used as a module_common_item." The
-// labeled module-level form (deferred_immediate_assertion_item ::=
-// [block_identifier :] deferred_immediate_assertion_statement) must parse
-// for all three keywords and both kinds.
 TEST(DeferredAssertionParsing, ModuleLevelFinalAssertParses) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -117,9 +105,6 @@ TEST(DeferredAssertionParsing, ModuleLevelHash0CoverParses) {
               "endmodule\n"));
 }
 
-// §16.4 BNF "deferred_immediate_assert_statement ::= ... assert final
-// (expression) action_block". The expression is mandatory; verify the
-// parser rejects a missing expression after the `final` keyword.
 TEST(DeferredAssertionParsing, FinalAssertMissingExpressionRejected) {
   auto r = Parse(
       "module m;\n"
@@ -128,10 +113,6 @@ TEST(DeferredAssertionParsing, FinalAssertMissingExpressionRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §16.4 "Syntax: Deferred assertions use #0 (for an observed deferred
-// assertion) or final (for a final deferred assertion) after the
-// verification directive." The two markers are mutually exclusive: a
-// stray final after #0 is not part of any production.
 TEST(DeferredAssertionParsing, Hash0PrecludesFinalKeyword) {
   auto r = Parse(
       "module m;\n"
@@ -140,8 +121,6 @@ TEST(DeferredAssertionParsing, Hash0PrecludesFinalKeyword) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §16.4: deferred assertions still take a pass action_block + else fail.
-// Confirm both branches parse and the final-deferred flag still survives.
 TEST(DeferredAssertionParsing, FinalAssertWithPassAndFailActions) {
   auto r = Parse(
       "module m;\n"
@@ -156,9 +135,6 @@ TEST(DeferredAssertionParsing, FinalAssertWithPassAndFailActions) {
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-// §16.4 Syntax 16-2: `deferred_immediate_assert_statement ::= assert #0
-// (expression) action_block | ...`. The only legal hash value is 0; any
-// other integer literal violates the BNF and must be rejected.
 TEST(DeferredAssertionParsing, ProceduralAssertNonZeroHashRejected) {
   auto r = Parse(
       "module m;\n"
@@ -167,7 +143,6 @@ TEST(DeferredAssertionParsing, ProceduralAssertNonZeroHashRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §16.4 Syntax 16-2: same #0-only rule for `assume`.
 TEST(DeferredAssertionParsing, ProceduralAssumeNonZeroHashRejected) {
   auto r = Parse(
       "module m;\n"
@@ -176,7 +151,6 @@ TEST(DeferredAssertionParsing, ProceduralAssumeNonZeroHashRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §16.4 Syntax 16-2: same #0-only rule for `cover`.
 TEST(DeferredAssertionParsing, ProceduralCoverNonZeroHashRejected) {
   auto r = Parse(
       "module m;\n"
@@ -185,10 +159,6 @@ TEST(DeferredAssertionParsing, ProceduralCoverNonZeroHashRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §16.4 Syntax 16-2 + B2 (deferred_immediate_assertion_item): the
-// module-level form inherits the deferred_immediate_assertion_statement
-// grammar, so `#0` is the only legal hash here too. A `#N` at module
-// level must be rejected on the assert/assume path.
 TEST(DeferredAssertionParsing, ModuleLevelAssertNonZeroHashRejected) {
   auto r = Parse(
       "module m;\n"
@@ -198,8 +168,6 @@ TEST(DeferredAssertionParsing, ModuleLevelAssertNonZeroHashRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §16.4 Syntax 16-2 + B2: same #0-only rule applies to the module-level
-// cover path (separate parser branch from the assert/assume item path).
 TEST(DeferredAssertionParsing, ModuleLevelCoverNonZeroHashRejected) {
   auto r = Parse(
       "module m;\n"
@@ -209,4 +177,4 @@ TEST(DeferredAssertionParsing, ModuleLevelCoverNonZeroHashRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

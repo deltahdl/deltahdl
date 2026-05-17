@@ -190,4 +190,4 @@ TEST(VariableInitSim, StaticClassMemberInitBeforeInitialBlock) {
       "endmodule\n", "result"), 55u);
 }
 
-}  // namespace
+}

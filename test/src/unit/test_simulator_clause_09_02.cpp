@@ -101,10 +101,6 @@ TEST(StructuredProcedureSimulation, InitialAndAlwaysEnabledAtBeginning) {
   EXPECT_EQ(vb->value.ToUint64(), 1u);
 }
 
-// §9.2: "The initial procedure shall execute only once, and its activity
-// shall cease when the statement has finished." If the initial were to
-// repeat, count would grow with simulation time; observing count == 1 at
-// $finish proves the block runs exactly once.
 TEST(StructuredProcedureSimulation, InitialExecutesOnlyOnce) {
   auto val = RunAndGet(
       "module m;\n"
@@ -120,9 +116,6 @@ TEST(StructuredProcedureSimulation, InitialExecutesOnlyOnce) {
   EXPECT_EQ(val, 1u);
 }
 
-// §9.2: "The final procedures are enabled at the end of simulation time and
-// execute only once." The final block writes the marker; if it never ran the
-// variable would remain at the initial-block value (1).
 TEST(StructuredProcedureSimulation, FinalRunsAtEndOfSimulation) {
   auto val = RunAndGet(
       "module m;\n"
@@ -134,8 +127,6 @@ TEST(StructuredProcedureSimulation, FinalRunsAtEndOfSimulation) {
   EXPECT_EQ(val, 99u);
 }
 
-// §9.2: a final procedure executes only once. The block increments marker,
-// so it must equal exactly the initial seed + 1 after simulation ends.
 TEST(StructuredProcedureSimulation, FinalExecutesOnlyOnce) {
   auto val = RunAndGet(
       "module m;\n"
@@ -147,4 +138,4 @@ TEST(StructuredProcedureSimulation, FinalExecutesOnlyOnce) {
   EXPECT_EQ(val, 1u);
 }
 
-}  // namespace
+}

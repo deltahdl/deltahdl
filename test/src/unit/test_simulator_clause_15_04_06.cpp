@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.6: try_get on non-empty mailbox returns positive int and retrieves message.
 TEST(IpcSync, MailboxTryGetSuccessReturnsPositive) {
   MailboxObject mb;
   mb.TryPut(42);
@@ -18,14 +17,12 @@ TEST(IpcSync, MailboxTryGetSuccessReturnsPositive) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-// §15.4.6: try_get on empty mailbox returns 0.
 TEST(IpcSync, MailboxTryGetEmptyReturnsZero) {
   MailboxObject mb;
   uint64_t msg = 0;
   EXPECT_EQ(mb.TryGet(msg), 0);
 }
 
-// §15.4.6: try_get retrieves in FIFO order.
 TEST(IpcSync, MailboxTryGetFifoOrder) {
   MailboxObject mb;
   mb.TryPut(10);
@@ -41,7 +38,6 @@ TEST(IpcSync, MailboxTryGetFifoOrder) {
   EXPECT_EQ(mb.TryGet(msg), 0);
 }
 
-// §15.4.6: try_get does not block — returns immediately.
 TEST(IpcSync, MailboxTryGetDoesNotModifyMsgOnFailure) {
   MailboxObject mb;
   uint64_t msg = 0xDEAD;
@@ -49,7 +45,6 @@ TEST(IpcSync, MailboxTryGetDoesNotModifyMsgOnFailure) {
   EXPECT_EQ(msg, 0xDEADu);
 }
 
-// §15.4.6: try_get frees space in bounded mailbox.
 TEST(IpcSync, MailboxTryGetFreesSpaceBounded) {
   MailboxObject mb(1);
   mb.TryPut(10);
@@ -60,4 +55,4 @@ TEST(IpcSync, MailboxTryGetFreesSpaceBounded) {
   EXPECT_EQ(mb.Num(), 1);
 }
 
-}  // namespace
+}

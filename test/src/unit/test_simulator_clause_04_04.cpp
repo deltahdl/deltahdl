@@ -9,13 +9,6 @@
 
 using namespace delta;
 
-// §4.4 ¶1: "A compliant SystemVerilog simulator shall maintain some form of
-// data structure that allows events to be dynamically scheduled, executed, and
-// removed as the simulator advances through time." The Scheduler hosts the
-// data structure; ScheduleEvent enters an Event into the calendar, Run drains
-// each slot, and EventPool::Release recycles drained Events back into a
-// free-list. Observing FreeCount() rise from 0 to N after Run() shows the full
-// schedule→execute→remove cycle was applied to N scheduled events.
 TEST(StratifiedEventSchedulerSim,
      SchedulerScheduledExecutedAndRemovedEventsThroughDataStructure) {
   Arena arena;
@@ -36,10 +29,6 @@ TEST(StratifiedEventSchedulerSim,
   EXPECT_EQ(sched.GetEventPool().FreeCount(), 5u);
 }
 
-// §4.4 ¶2: "Every event has one and only one simulation execution time, which
-// at any given point during simulation can be the current time or some future
-// time." ScheduleEvent takes a single SimTime, and the event must execute at
-// exactly that time — once, not at any earlier or later slot.
 TEST(StratifiedEventSchedulerSim, EventExecutesAtItsOneSimulationExecutionTime) {
   Arena arena;
   Scheduler sched(arena);
@@ -54,9 +43,6 @@ TEST(StratifiedEventSchedulerSim, EventExecutesAtItsOneSimulationExecutionTime) 
   EXPECT_EQ(fired_at[0], 7u);
 }
 
-// §4.4 ¶2: "...can be the current time or some future time." Both schedules
-// are legal; current-time schedules execute within the in-progress slot's
-// iteration, future-time schedules execute when the calendar advances.
 TEST(StratifiedEventSchedulerSim, EventCanBeScheduledAtCurrentOrFutureTime) {
   Arena arena;
   Scheduler sched(arena);
@@ -81,9 +67,6 @@ TEST(StratifiedEventSchedulerSim, EventCanBeScheduledAtCurrentOrFutureTime) {
   EXPECT_TRUE(seeded_future);
 }
 
-// §4.4 ¶2: "All scheduled events at a specific time define a time slot." Two
-// events scheduled at the same SimTime must share one slot — both execute
-// before CurrentTime advances past that time.
 TEST(StratifiedEventSchedulerSim, EventsAtSameTimeShareASingleTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
@@ -102,10 +85,6 @@ TEST(StratifiedEventSchedulerSim, EventsAtSameTimeShareASingleTimeSlot) {
   EXPECT_EQ(times[2], 4u);
 }
 
-// §4.4 ¶2: "Simulation proceeds by executing and removing all events in the
-// current simulation time slot before moving on to the next nonempty time
-// slot..." When events at time 0 and time 1 are both scheduled, every time-0
-// event must complete (and be removed) before any time-1 event begins.
 TEST(StratifiedEventSchedulerSim,
      CurrentTimeSlotFullyExecutedBeforeAdvancingToNext) {
   Arena arena;
@@ -131,9 +110,6 @@ TEST(StratifiedEventSchedulerSim,
   EXPECT_EQ(sequence[2], 1u);
 }
 
-// §4.4 ¶2: "...moving on to the next nonempty time slot, in time order."
-// Events scheduled at non-consecutive times must execute in ascending time
-// order, skipping empty slots between them.
 TEST(StratifiedEventSchedulerSim, NextNonemptyTimeSlotIsExecutedInTimeOrder) {
   Arena arena;
   Scheduler sched(arena);
@@ -153,13 +129,6 @@ TEST(StratifiedEventSchedulerSim, NextNonemptyTimeSlotIsExecutedInTimeOrder) {
   EXPECT_EQ(times[3], 99u);
 }
 
-// §4.4 ¶3: "A time slot is divided into a set of ordered regions: a) Preponed,
-// b) Pre-Active, c) Active, d) Inactive, e) Pre-NBA, f) NBA, g) Post-NBA,
-// h) Pre-Observed, i) Observed, j) Post-Observed, k) Reactive, l) Re-Inactive,
-// m) Pre-Re-NBA, n) Re-NBA, o) Post-Re-NBA, p) Pre-Postponed, q) Postponed."
-// Seventeen regions, in that exact order. The Region enum and the Scheduler's
-// per-slot drain order together encode the §4.4 ¶3 list — scheduling one event
-// per region at the same time must produce execution in the listed order.
 TEST(StratifiedEventSchedulerSim,
      TimeSlotIsDividedIntoSeventeenOrderedRegionsPerLrmList) {
   EXPECT_EQ(kRegionCount, 17u);
@@ -192,13 +161,6 @@ TEST(StratifiedEventSchedulerSim,
   EXPECT_EQ(fired, expected);
 }
 
-// §4.4 ¶2 error condition: "This procedure guarantees that the simulator never
-// goes backwards in time." Scheduler::ScheduleEvent enforces the guarantee by
-// aborting whenever a caller hands it a SimTime less than CurrentTime.
-// Without that defensive abort, a callback running inside a future slot could
-// inject an event into a past slot and silently violate the no-backwards
-// guarantee, so observing the abort fires is what shows the production code
-// applies the §4.4 ¶2 guarantee. Death-test suite suffix per gtest convention.
 TEST(StratifiedEventSchedulerSimDeathTest,
      SchedulingAtPastTimeAbortsToPreventBackwardsInTime) {
   EXPECT_DEATH(

@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- data_declaration: variable declarations elaborate into RtlirVariable ---
-
 TEST(TypeDeclElaboration, DataDeclVariableElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -59,8 +57,6 @@ TEST(TypeDeclElaboration, DataDeclVarPrefix) {
   }
   EXPECT_TRUE(found);
 }
-
-// --- net_declaration: wire/tri/wand/wor elaborate into RtlirNet ---
 
 TEST(TypeDeclElaboration, NetDeclWireElaborates) {
   ElabFixture f;
@@ -120,8 +116,6 @@ TEST(TypeDeclElaboration, NetDeclMultipleNets) {
   EXPECT_GE(count, 3);
 }
 
-// --- type_declaration (typedef): enum elaborates members into variables ---
-
 TEST(TypeDeclElaboration, TypedefEnumElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -168,8 +162,6 @@ TEST(TypeDeclElaboration, TypedefDataTypeUsable) {
   EXPECT_TRUE(found);
 }
 
-// --- genvar_declaration ---
-
 TEST(TypeDeclElaboration, GenvarDeclElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -180,8 +172,6 @@ TEST(TypeDeclElaboration, GenvarDeclElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- package_import_declaration ---
 
 TEST(TypeDeclElaboration, PackageImportElaborates) {
   ElabFixture f;
@@ -195,8 +185,6 @@ TEST(TypeDeclElaboration, PackageImportElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- nettype_declaration elaborates ---
-
 TEST(TypeDeclElaboration, NettypeDeclElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -207,8 +195,6 @@ TEST(TypeDeclElaboration, NettypeDeclElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- package_export_declaration elaborates ---
 
 TEST(TypeDeclElaboration, PackageExportElaborates) {
   ElabFixture f;
@@ -223,8 +209,6 @@ TEST(TypeDeclElaboration, PackageExportElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- net_declaration interconnect alternative elaborates ---
-
 TEST(TypeDeclElaboration, NetDeclInterconnectElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -235,8 +219,6 @@ TEST(TypeDeclElaboration, NetDeclInterconnectElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- Error conditions ---
 
 TEST(TypeDeclElaboration, ErrorRedeclarationDetected) {
   ElabFixture f;
@@ -250,4 +232,4 @@ TEST(TypeDeclElaboration, ErrorRedeclarationDetected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

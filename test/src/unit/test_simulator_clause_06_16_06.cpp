@@ -84,4 +84,4 @@ TEST(StringMethods, CompareCaseSensitive) {
   EXPECT_NE(signed_val, 0);
 }
 
-}  // namespace
+}

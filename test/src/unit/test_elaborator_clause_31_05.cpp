@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §31.5: the bare `edge` keyword (with no descriptor list) elaborates as a
-// valid event control on a timing check data event.
 TEST(EdgeControlSpecifierElaboration, EdgeKeywordElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,8 +17,6 @@ TEST(EdgeControlSpecifierElaboration, EdgeKeywordElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.5 Syntax 31-15: an `edge [01, 10]` descriptor list elaborates cleanly
-// alongside the timing check it qualifies.
 TEST(EdgeControlSpecifierElaboration, Descriptors01And10Elaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -34,8 +30,6 @@ TEST(EdgeControlSpecifierElaboration, Descriptors01And10Elaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.5 Syntax 31-15: the `z_or_x zero_or_one` form with `x` leads
-// elaborates without diagnostics.
 TEST(EdgeControlSpecifierElaboration, XTransitionsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -49,8 +43,6 @@ TEST(EdgeControlSpecifierElaboration, XTransitionsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.5: "Edge transitions involving z are treated the same way as edge
-// transitions involving x" — z-form descriptors elaborate without errors.
 TEST(EdgeControlSpecifierElaboration, ZTransitionsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -64,9 +56,6 @@ TEST(EdgeControlSpecifierElaboration, ZTransitionsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.5 Syntax 31-15: the `zero_or_one z_or_x` form (e.g. `0x`, `1x`) is
-// the third edge_descriptor alternative and must elaborate as cleanly as
-// the other two.
 TEST(EdgeControlSpecifierElaboration, ToXTransitionsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -80,4 +69,4 @@ TEST(EdgeControlSpecifierElaboration, ToXTransitionsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

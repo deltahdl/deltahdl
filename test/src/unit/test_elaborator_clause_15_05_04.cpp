@@ -43,4 +43,4 @@ TEST(WaitOrderElaborator, WaitOrderWithTriggersElaborates) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

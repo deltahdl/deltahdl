@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.1: mailbox with new() unbounded elaborates.
 TEST(MailboxNewElaborator, NewUnboundedElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,7 +19,6 @@ TEST(MailboxNewElaborator, NewUnboundedElaborates) {
   EXPECT_NE(mod->variables[0].init_expr, nullptr);
 }
 
-// §15.4.1: mailbox with new(bound) elaborates.
 TEST(MailboxNewElaborator, NewBoundedElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -35,7 +33,6 @@ TEST(MailboxNewElaborator, NewBoundedElaborates) {
   EXPECT_EQ(mod->variables[0].class_type_name, "mailbox");
 }
 
-// §15.4.1: mailbox new() assigned in initial block elaborates.
 TEST(MailboxNewElaborator, NewInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -50,4 +47,4 @@ TEST(MailboxNewElaborator, NewInInitialBlock) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

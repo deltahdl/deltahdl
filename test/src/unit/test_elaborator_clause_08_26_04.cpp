@@ -26,8 +26,6 @@ TEST(InterfaceClassTypeUsageRestrictions, ParameterizedInterfaceOk) {
              "endmodule\n"));
 }
 
-// Req 1: A class shall not implement a type parameter.
-
 TEST(InterfaceClassTypeUsageRestrictions, ClassImplementsTypeParamError) {
   EXPECT_FALSE(
       ElabOk("interface class PutImp;\n"
@@ -72,8 +70,6 @@ TEST(InterfaceClassTypeUsageRestrictions,
              "endmodule\n"));
 }
 
-// Req 2: An interface class shall not extend a type parameter.
-
 TEST(InterfaceClassTypeUsageRestrictions, InterfaceExtendsTypeParamError) {
   EXPECT_FALSE(
       ElabOk("interface class PutImp;\n"
@@ -101,8 +97,6 @@ TEST(InterfaceClassTypeUsageRestrictions,
              "module m;\n"
              "endmodule\n"));
 }
-
-// Req 3: A class shall not implement a forward typedef for an interface class.
 
 TEST(InterfaceClassTypeUsageRestrictions,
      ClassImplementsForwardTypedefError) {
@@ -133,9 +127,6 @@ TEST(InterfaceClassTypeUsageRestrictions,
              "endmodule\n"));
 }
 
-// Req 4: An interface class shall not extend from a forward typedef of an
-// interface class.
-
 TEST(InterfaceClassTypeUsageRestrictions,
      InterfaceExtendsForwardTypedefError) {
   EXPECT_FALSE(
@@ -149,9 +140,6 @@ TEST(InterfaceClassTypeUsageRestrictions,
              "module m;\n"
              "endmodule\n"));
 }
-
-// Req 5: An interface class shall be declared before it is implemented or
-// extended.
 
 TEST(InterfaceClassTypeUsageRestrictions,
      ClassImplementsUndeclaredInterfaceError) {
@@ -180,9 +168,6 @@ TEST(InterfaceClassTypeUsageRestrictions,
              "endmodule\n"));
 }
 
-// Positive: using a type parameter as an argument to a concrete interface
-// (not as the implemented/extended type itself) is legal.
-
 TEST(InterfaceClassTypeUsageRestrictions,
      ClassImplementsInterfaceWithTypeParamArgOk) {
   EXPECT_TRUE(
@@ -209,9 +194,6 @@ TEST(InterfaceClassTypeUsageRestrictions,
              "module m;\n"
              "endmodule\n"));
 }
-
-// Positive: forward typedef followed by full declaration, then implements
-// (declaration before use) is legal.
 
 TEST(InterfaceClassTypeUsageRestrictions,
      ForwardTypedefThenDeclThenImplementsOk) {
@@ -242,4 +224,4 @@ TEST(InterfaceClassTypeUsageRestrictions,
              "endmodule\n"));
 }
 
-}  // namespace
+}

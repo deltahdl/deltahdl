@@ -77,4 +77,4 @@ TEST(DollarConstantElaboration, DollarParameterNotResolved) {
   }
 }
 
-}  // namespace
+}

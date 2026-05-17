@@ -199,8 +199,6 @@ TEST(PackageItemsParsing, MixedPackageItems) {
   EXPECT_GE(r.cu->packages[0]->items.size(), 3u);
 }
 
-// --- Moved from test_parser_clause_26_02.cpp ---
-
 TEST(PackageItemsParsing, PackageWithParameter) {
   auto r = Parse(
       "package cfg_pkg;\n"
@@ -429,8 +427,6 @@ TEST(PackageItemsParsing, ComplexPkgExample) {
   EXPECT_EQ(r.cu->packages[0]->name, "ComplexPkg");
 }
 
-// --- Moved from test_parser_clause_24_03.cpp ---
-
 TEST(PackageItemsParsing, AnonymousProgramClasses) {
   auto r = Parse(
       "package pkg;\n"
@@ -460,8 +456,6 @@ TEST(PackageItemsParsing, AnonymousProgramMisc) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-// --- Moved from test_parser_clause_35_05_04.cpp ---
-
 TEST(PackageItemsParsing, PackageItemDpiImportExport) {
   auto r = Parse(
       "package pkg;\n"
@@ -473,8 +467,6 @@ TEST(PackageItemsParsing, PackageItemDpiImportExport) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
   EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
 }
-
-// --- New coverage tests ---
 
 TEST(PackageItemsParsing, ExternConstraintDeclInPackage) {
   auto r = Parse(
@@ -593,8 +585,6 @@ TEST(PackageItemsParsing, AllPackageItemAlternatives) {
   EXPECT_GE(r.cu->packages[0]->items.size(), 10u);
 }
 
-// --- Error tests ---
-
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithPorts) {
   EXPECT_FALSE(ParseOk(
       "package pkg;\n"
@@ -691,4 +681,4 @@ TEST(PackageItemsParsing, PackageOnlyNullItems) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

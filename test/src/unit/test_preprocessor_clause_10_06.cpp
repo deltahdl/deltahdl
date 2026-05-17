@@ -24,4 +24,4 @@ TEST(ProceduralContinuousAssignmentPreprocessing, AssignAndDeassign) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

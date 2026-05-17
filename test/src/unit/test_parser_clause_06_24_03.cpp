@@ -89,4 +89,4 @@ TEST(BitStreamCastParsing, UnpackedArrayToIntCast) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

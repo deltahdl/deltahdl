@@ -436,4 +436,4 @@ TEST(PrimitiveTerminalParsing, GateInst_ComplexTerminalExpressions) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

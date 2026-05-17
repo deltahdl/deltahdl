@@ -250,4 +250,4 @@ TEST(ConstantFunctionRulesElaboration, NonConstantContextOutputArgOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

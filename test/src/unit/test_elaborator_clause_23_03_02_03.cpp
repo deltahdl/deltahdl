@@ -142,4 +142,4 @@ TEST(ImplicitNamedPortConnectionElaboration, ErrorForDissimilarNetTypes) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

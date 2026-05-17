@@ -35,4 +35,4 @@ TEST(TriregResolution, MultipleDrivenDriversResolve) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
-}  // namespace
+}

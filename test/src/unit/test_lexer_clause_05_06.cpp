@@ -44,22 +44,15 @@ TEST(LexicalConventionLexing, DigitStartIsNumber) {
   EXPECT_NE(r.token.kind, TokenKind::kIdentifier);
 }
 
-// §5.6: "The first character of a simple identifier shall not be a digit
-// or $". A leading $ followed by identifier characters is not a simple
-// identifier (it is parsed elsewhere as a system name).
 TEST(LexicalConventionLexing, DollarStartIsNotIdentifier) {
   auto r = LexOne("$abc ");
   EXPECT_NE(r.token.kind, TokenKind::kIdentifier);
 }
 
-// §5.6: "A keyword (see 5.6.2) may not be used as a user-defined
-// identifier." A bare keyword form must not be classified as an identifier
-// token by the lexer.
 TEST(LexicalConventionLexing, KeywordIsNotIdentifier) {
   auto r = LexOne("module ");
   EXPECT_NE(r.token.kind, TokenKind::kIdentifier);
 }
-
 
 TEST(LexicalConventionLexing, CaseSensitive) {
   auto tokens = Lex("ABC abc Abc");
@@ -68,7 +61,6 @@ TEST(LexicalConventionLexing, CaseSensitive) {
   EXPECT_EQ(tokens[1].text, "abc");
   EXPECT_EQ(tokens[2].text, "Abc");
 }
-
 
 TEST(LexicalConventionLexing, MaxLength1024Ok) {
   std::string id(1024, 'a');
@@ -92,11 +84,6 @@ TEST(LexicalConventionLexing, EscapedMaxLength1025Error) {
   EXPECT_TRUE(errors);
 }
 
-// §5.6: "An identifier is either a simple identifier or an escaped
-// identifier" and "the limit shall be at least 1024 characters". An
-// escaped identifier whose body is exactly 1024 characters must lex as
-// kEscapedIdentifier with no length error, observing both the categorical
-// distinction and the boundary of the length floor on the escaped path.
 TEST(LexicalConventionLexing, EscapedMaxLength1024Ok) {
   std::string id = "\\" + std::string(1024, 'a') + " ";
   auto [tokens, errors] = LexWithDiag(id);
@@ -105,7 +92,6 @@ TEST(LexicalConventionLexing, EscapedMaxLength1024Ok) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
   EXPECT_EQ(tokens[0].text.size(), 1024u);
 }
-
 
 TEST(LexicalConventionLexing, IdentifierFollowedByOperator) {
   auto tokens = Lex("abc+def");
@@ -117,4 +103,4 @@ TEST(LexicalConventionLexing, IdentifierFollowedByOperator) {
   EXPECT_EQ(tokens[2].text, "def");
 }
 
-}  // namespace
+}

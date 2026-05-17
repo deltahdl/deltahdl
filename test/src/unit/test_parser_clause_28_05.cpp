@@ -1,4 +1,4 @@
-// §28.5
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -59,8 +59,6 @@ TEST(BufNotParsing, GateBufMultiOutput) {
   EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
-// §28.5: buf/not delay spec is capped at two delays (delay2); three delays
-// are rejected.
 TEST(BufNotParsing, ThreeValueDelayRejected) {
   auto r = Parse(
       "module m;\n"
@@ -69,8 +67,6 @@ TEST(BufNotParsing, ThreeValueDelayRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §28.5: single-delay form is accepted; the one value becomes both the
-// rise and fall delay for the gate.
 TEST(BufNotParsing, SingleValueDelay) {
   auto r = Parse(
       "module m;\n"
@@ -84,8 +80,6 @@ TEST(BufNotParsing, SingleValueDelay) {
   EXPECT_EQ(g->gate_delay_fall, nullptr);
 }
 
-// §28.5: two delays express distinct rise and fall values; both must be
-// captured.
 TEST(BufNotParsing, TwoValueDelayAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -101,4 +95,4 @@ TEST(BufNotParsing, TwoValueDelayAccepted) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-}  // namespace
+}

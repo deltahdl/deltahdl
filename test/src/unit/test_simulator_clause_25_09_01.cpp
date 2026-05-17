@@ -187,4 +187,4 @@ TEST(VirtualInterfaceClockingSim,
   EXPECT_EQ(untouched->value.ToUint64(), 0u);
 }
 
-}  // namespace
+}

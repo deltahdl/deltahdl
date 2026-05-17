@@ -33,4 +33,4 @@ TEST(SyncDriveElab, WriteToInputClockvarErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -68,4 +68,4 @@ TEST(QueuePushBack, MultiplePushesAccumulateAtEnd) {
   EXPECT_EQ(q->elements[2].ToUint64(), 3u);
 }
 
-}  // namespace
+}

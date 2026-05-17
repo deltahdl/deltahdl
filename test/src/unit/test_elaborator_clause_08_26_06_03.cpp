@@ -1,4 +1,4 @@
-// §8.26.6.3
+
 
 #include "fixture_elaborator.h"
 
@@ -140,4 +140,4 @@ TEST(InterfaceClassDiamond, DifferentSpecializationsWithOverrideOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

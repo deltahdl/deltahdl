@@ -32,4 +32,4 @@ TEST(DefaultPortValueSynthesis, MultipleInputsWithDefaultsSynthesize) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

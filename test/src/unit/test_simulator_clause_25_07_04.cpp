@@ -151,4 +151,4 @@ TEST(MultipleTaskExportsSim,
   LowerRunAndCheck(f, design, {{"sb_intf.observed", 8u}});
 }
 
-}  // namespace
+}

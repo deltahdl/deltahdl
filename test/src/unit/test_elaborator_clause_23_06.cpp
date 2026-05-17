@@ -2,8 +2,6 @@
 
 namespace {
 
-// --- R3: Module instance creates a new branch of the hierarchy ---
-
 TEST(HierarchicalNameElaboration, ModuleInstanceCreatesHierarchyBranch) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,8 +20,6 @@ TEST(HierarchicalNameElaboration, ModuleInstanceCreatesHierarchyBranch) {
   EXPECT_NE(mod->children[0].resolved, nullptr);
 }
 
-// --- R3: Arrayed module instance creates hierarchy branches ---
-
 TEST(HierarchicalNameElaboration, ArrayedInstanceCreatesHierarchyBranch) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -39,8 +35,6 @@ TEST(HierarchicalNameElaboration, ArrayedInstanceCreatesHierarchyBranch) {
   auto* mod = design->top_modules[0];
   ASSERT_FALSE(mod->children.empty());
 }
-
-// --- R3: Nested hierarchy creates multiple levels of branches ---
 
 TEST(HierarchicalNameElaboration, MultiLevelHierarchyBranches) {
   ElabFixture f;
@@ -66,8 +60,6 @@ TEST(HierarchicalNameElaboration, MultiLevelHierarchyBranches) {
   EXPECT_EQ(mid->children[0].inst_name, "l1");
 }
 
-// --- R3: Task definition creates a new hierarchy branch ---
-
 TEST(HierarchicalNameElaboration, TaskCreatesHierarchyBranch) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -81,8 +73,6 @@ TEST(HierarchicalNameElaboration, TaskCreatesHierarchyBranch) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- R3: Function definition creates a new hierarchy branch ---
-
 TEST(HierarchicalNameElaboration, FunctionCreatesHierarchyBranch) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -95,8 +85,6 @@ TEST(HierarchicalNameElaboration, FunctionCreatesHierarchyBranch) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- R6: Same identifier name in different hierarchy scopes is allowed ---
 
 TEST(HierarchicalNameElaboration, SameNameInDifferentScopesAllowed) {
   ElabFixture f;
@@ -113,9 +101,6 @@ TEST(HierarchicalNameElaboration, SameNameInDifferentScopesAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- R12: Objects in automatic tasks cannot be accessed by hierarchical
-//     name references ---
-
 TEST(HierarchicalNameElaboration,
      AutomaticTaskVarInaccessibleByHierarchicalRef) {
   EXPECT_FALSE(
@@ -128,9 +113,6 @@ TEST(HierarchicalNameElaboration,
              "  assign x = m.my_task.local_var;\n"
              "endmodule\n"));
 }
-
-// --- R12: Objects in automatic functions cannot be accessed by hierarchical
-//     name references ---
 
 TEST(HierarchicalNameElaboration,
      AutomaticFuncVarInaccessibleByHierarchicalRef) {
@@ -146,8 +128,6 @@ TEST(HierarchicalNameElaboration,
              "endmodule\n"));
 }
 
-// --- R15: Hierarchical references into checkers shall not be permitted ---
-
 TEST(HierarchicalNameElaboration,
      HierarchicalReferenceIntoCheckerProhibited) {
   EXPECT_FALSE(
@@ -161,11 +141,6 @@ TEST(HierarchicalNameElaboration,
              "endmodule\n"));
 }
 
-// §23.6: "Inside any module, each module instance ..., generate block
-// instance, task definition, function definition, and named begin-end or
-// fork-join block shall define a new branch of the hierarchy."  A named
-// begin-end block holding its own local declaration must elaborate
-// cleanly as its own branch of the hierarchy tree.
 TEST(HierarchicalNameElaboration, NamedBeginEndBlockCreatesBranch) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -176,11 +151,6 @@ TEST(HierarchicalNameElaboration, NamedBeginEndBlockCreatesBranch) {
              "endmodule\n"));
 }
 
-// §23.6: "Named blocks within named blocks and within tasks and functions
-// shall create new branches."  Two levels of named-block nesting — an
-// outer named begin-end with an inner named begin-end carrying its own
-// declaration — must elaborate cleanly, since each block produces its own
-// hierarchy branch.
 TEST(HierarchicalNameElaboration, NestedNamedBlocksCreateNestedBranches) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -193,10 +163,6 @@ TEST(HierarchicalNameElaboration, NestedNamedBlocksCreateNestedBranches) {
              "endmodule\n"));
 }
 
-// §23.6: "Similarly, named action blocks of assertions shall create new
-// branches."  An immediate assertion with a labeled fail-action block must
-// elaborate cleanly — the labeled block contributes a named scope in the
-// module's hierarchy tree alongside other named-block branches.
 TEST(HierarchicalNameElaboration, NamedAssertionActionBlockCreatesBranch) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -210,10 +176,6 @@ TEST(HierarchicalNameElaboration, NamedAssertionActionBlockCreatesBranch) {
              "endmodule\n"));
 }
 
-// §23.6 R3: a generate block instance shall define a new branch of the
-// hierarchy.  A named for-generate block must elaborate and its inner
-// declarations must be reachable through the loop-index instance select
-// (linking the §23.6 R3 rule with the §23.6 instance-select syntax).
 TEST(HierarchicalNameElaboration, NamedGenerateBlockCreatesBranch) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -223,11 +185,6 @@ TEST(HierarchicalNameElaboration, NamedGenerateBlockCreatesBranch) {
              "endmodule\n"));
 }
 
-// §23.6: "Unnamed generate blocks are exceptions.  They create branches
-// that are visible only from within the block and within any hierarchy
-// instantiated by the block."  An unnamed if-generate must elaborate
-// cleanly — the elaborator assigns it an automatic external name and
-// items inside the block are usable within the block.
 TEST(HierarchicalNameElaboration, UnnamedGenerateBlockCreatesBranch) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -238,9 +195,6 @@ TEST(HierarchicalNameElaboration, UnnamedGenerateBlockCreatesBranch) {
              "endmodule\n"));
 }
 
-// §23.6: "The expression shall evaluate to one of the legal index values
-// of the array."  An instance-select index outside the declared range of
-// an arrayed module instance must be rejected by the elaborator.
 TEST(HierarchicalNameElaboration, InstanceSelectOutOfRangeError) {
   EXPECT_FALSE(
       ElabOk("module child;\n"
@@ -253,10 +207,6 @@ TEST(HierarchicalNameElaboration, InstanceSelectOutOfRangeError) {
              "endmodule\n"));
 }
 
-// §23.6: "If the array name is not the last path element in the
-// hierarchical name, the instance select expression is required."  A
-// hierarchical reference that traverses an arrayed instance without a
-// select must be rejected.
 TEST(HierarchicalNameElaboration, InstanceArrayRefMissingSelectError) {
   EXPECT_FALSE(
       ElabOk("module child;\n"
@@ -269,8 +219,6 @@ TEST(HierarchicalNameElaboration, InstanceArrayRefMissingSelectError) {
              "endmodule\n"));
 }
 
-// §23.6: An in-range instance select on an arrayed instance must
-// elaborate cleanly.  Complements the out-of-range error case.
 TEST(HierarchicalNameElaboration, InstanceSelectInRangeElaboratesOk) {
   EXPECT_TRUE(
       ElabOk("module child;\n"
@@ -283,4 +231,4 @@ TEST(HierarchicalNameElaboration, InstanceSelectInRangeElaboratesOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

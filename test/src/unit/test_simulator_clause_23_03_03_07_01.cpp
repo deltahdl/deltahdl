@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1+R3: If only one net is an interconnect net, the merged net shall be
-//     the type of the other net; values propagate through the merged net. ---
-
 TEST(InterconnectPortConnectionSimulation,
      ExternalInterconnectInternalWirePropagatesValue) {
   SimFixture f;
@@ -67,8 +64,6 @@ TEST(InterconnectPortConnectionSimulation,
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// R1+R3: Interconnect merged with multiple child ports of different types
-
 TEST(InterconnectPortConnectionSimulation,
      InterconnectMergedWithMultipleChildPortsPropagatesValue) {
   SimFixture f;
@@ -91,4 +86,4 @@ TEST(InterconnectPortConnectionSimulation,
   ASSERT_NE(var, nullptr);
 }
 
-}  // namespace
+}

@@ -41,4 +41,4 @@ TEST(AssertionSemanticsParsing, SequenceDecl) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

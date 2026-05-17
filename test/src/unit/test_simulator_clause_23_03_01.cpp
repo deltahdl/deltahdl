@@ -1,4 +1,4 @@
-// §23.3.1
+
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -87,4 +87,4 @@ TEST(TopLevelModules, DollarRootDisambiguatesFromLocalScope) {
   EXPECT_EQ(v->value.ToUint64(), 20u);
 }
 
-}  // namespace
+}

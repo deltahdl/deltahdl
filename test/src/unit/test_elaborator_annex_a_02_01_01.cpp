@@ -67,8 +67,6 @@ TEST(ParameterDeclElaboration, ParameterExpressionEvaluated) {
   EXPECT_TRUE(found);
 }
 
-// --- local_parameter_declaration elaborates as localparam ---
-
 TEST(ParameterDeclElaboration, LocalparamResolvesAsLocal) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -91,4 +89,4 @@ TEST(ParameterDeclElaboration, LocalparamResolvesAsLocal) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

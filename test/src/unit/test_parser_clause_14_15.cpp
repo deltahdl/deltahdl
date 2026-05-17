@@ -75,4 +75,4 @@ TEST(SyncEventParse, InoutSignalSyncEvent) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

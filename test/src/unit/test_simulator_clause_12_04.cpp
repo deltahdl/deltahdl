@@ -433,4 +433,4 @@ TEST(ConditionalStatementSim, BothBranchesNullNoEffect) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

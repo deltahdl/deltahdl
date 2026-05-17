@@ -16,4 +16,4 @@ TEST_F(ApiParseTest, ReadmembSystemCall) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}  // namespace
+}

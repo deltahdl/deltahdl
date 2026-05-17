@@ -189,4 +189,4 @@ TEST(AssignmentOverviewParsing, RhsComplexExpression) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
-}  // namespace
+}

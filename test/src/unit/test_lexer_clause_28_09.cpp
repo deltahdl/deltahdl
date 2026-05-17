@@ -1,4 +1,4 @@
-// §28.9
+
 
 #include <gtest/gtest.h>
 
@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// Each CMOS switch keyword must map to its own token kind so the parser can
-// distinguish full-strength from resistive variants.
 TEST(CmosSwitchLexing, CmosKeyword) {
   auto tokens = Lex("cmos");
   ASSERT_GE(tokens.size(), 1u);
@@ -46,4 +44,4 @@ TEST(CmosSwitchLexing, RcmosInstantiationTokenSequence) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
 }
 
-}  // namespace
+}

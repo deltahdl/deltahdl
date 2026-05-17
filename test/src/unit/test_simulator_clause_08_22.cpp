@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Unit tests
-// ---------------------------------------------------------------------------
-
 TEST(ClassSim, NonVirtualFallbackToStaticResolution) {
   SimFixture f;
   auto* type = MakeClassType(f, "Foo", {});
@@ -63,10 +59,6 @@ TEST(ClassSim, PolymorphicUnknownMethodReturnsNull) {
   EXPECT_EQ(obj->ResolveVirtualMethod("nonexistent"), nullptr);
   EXPECT_EQ(obj->ResolveMethod("nonexistent"), nullptr);
 }
-
-// ---------------------------------------------------------------------------
-// End-to-end tests
-// ---------------------------------------------------------------------------
 
 TEST(ClassSim, E2eVirtualDispatchThroughBaseVariable) {
   EXPECT_EQ(RunAndGet(
@@ -267,4 +259,4 @@ TEST(ClassSim, E2eAbstractBaseVariableDispatch) {
       "endmodule\n", "result"), 42u);
 }
 
-}  // namespace
+}

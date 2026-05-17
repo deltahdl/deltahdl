@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §28.16.1 R1: synthesis of a cont-assign whose delay slot holds a
-// mintypmax node must lower cleanly — the synth path drops delays but
-// must not choke on the kMinTypMax shape itself.
 TEST(MinTypMaxSynthesis, DelayIgnoredInContAssign) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -22,4 +19,4 @@ TEST(MinTypMaxSynthesis, DelayIgnoredInContAssign) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

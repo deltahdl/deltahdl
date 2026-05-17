@@ -104,4 +104,4 @@ TEST(OperatorAndExpressionParsing, StreamOperatorsParse) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

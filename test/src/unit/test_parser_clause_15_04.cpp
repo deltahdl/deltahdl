@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4: mailbox bare declaration parses.
 TEST(MailboxParser, BareDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -15,7 +14,6 @@ TEST(MailboxParser, BareDeclaration) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4: multiple mailbox declarations in one module.
 TEST(MailboxParser, MultipleMailboxDeclarations) {
   auto r = Parse(
       "module m;\n"
@@ -28,7 +26,6 @@ TEST(MailboxParser, MultipleMailboxDeclarations) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4: mailbox is recognized as a type without a class declaration.
 TEST(MailboxParser, NoClassDeclarationRequired) {
   auto r = Parse(
       "module m;\n"
@@ -41,7 +38,6 @@ TEST(MailboxParser, NoClassDeclarationRequired) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4: mailbox declaration with new() constructor parses.
 TEST(MailboxParser, DeclarationWithNew) {
   auto r = Parse(
       "module m;\n"
@@ -51,7 +47,6 @@ TEST(MailboxParser, DeclarationWithNew) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4: mailbox with method calls in procedural context.
 TEST(MailboxParser, MethodCallsInInitialBlock) {
   auto r = Parse(
       "module m;\n"
@@ -65,4 +60,4 @@ TEST(MailboxParser, MethodCallsInInitialBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

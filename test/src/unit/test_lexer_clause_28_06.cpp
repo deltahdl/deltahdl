@@ -1,4 +1,4 @@
-// §28.6
+
 
 #include <gtest/gtest.h>
 #include "fixture_lexer.h"
@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Each tri-state gate keyword must map to its own token kind so the parser
-// can distinguish bufif0 from bufif1 and notif0 from notif1.
 TEST(TristateGateLexing, Bufif0Keyword) {
   auto tokens = Lex("bufif0");
   ASSERT_GE(tokens.size(), 1u);
@@ -48,4 +46,4 @@ TEST(TristateGateLexing, NamedGateTokenSequence) {
   EXPECT_EQ(tokens[9].kind, TokenKind::kSemicolon);
 }
 
-}  // namespace
+}

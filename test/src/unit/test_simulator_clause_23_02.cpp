@@ -1,4 +1,4 @@
-// §23.2
+
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -28,4 +28,4 @@ TEST(ModuleDefinitions, MacromoduleSimulates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

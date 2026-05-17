@@ -27,4 +27,4 @@ TEST(FormatArg, StringFromAscii) {
   EXPECT_EQ(FormatValueAsString(val), "A");
 }
 
-}  // namespace
+}

@@ -39,4 +39,4 @@ TEST(TypedefEnumSynthesis, NamedEnumTypeReusedForMultipleVars) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

@@ -13,8 +13,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
   return nullptr;
 }
 
-// === class_declaration ===
-
 TEST(ClassSyntaxParsing, EmptyClassDecl) {
   auto r = Parse("class Packet; endclass");
   ASSERT_NE(r.cu, nullptr);
@@ -78,8 +76,6 @@ TEST(ClassSyntaxParsing, ExtendsWithArgs) {
   EXPECT_EQ(cls->base_class, "Base");
   ASSERT_EQ(cls->extends_args.size(), 1u);
 }
-
-// === class_item ===
 
 TEST(ClassSyntaxParsing, ClassEmptyItem) {
   auto r = Parse(
@@ -145,8 +141,6 @@ TEST(ClassSyntaxParsing, CovergroupInClass) {
               "  int x;\n"
               "endclass\n"));
 }
-
-// === class_property ===
 
 TEST(ClassSyntaxParsing, ClassWithProperty) {
   auto r = Parse("class pkt; int data; endclass");
@@ -243,8 +237,6 @@ TEST(ClassSyntaxParsing, ClassPropertyWithAttr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// === property_qualifier: random_qualifier ===
-
 TEST(ClassSyntaxParsing, RandProperty) {
   auto r = Parse(
       "class C;\n"
@@ -265,8 +257,6 @@ TEST(ClassSyntaxParsing, RandcProperty) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_randc);
 }
 
-// === property_qualifier: class_item_qualifier ===
-
 TEST(ClassSyntaxParsing, StaticProperty) {
   auto r = Parse(
       "class C;\n"
@@ -276,8 +266,6 @@ TEST(ClassSyntaxParsing, StaticProperty) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_static);
 }
-
-// === property_qualifier combinations ===
 
 TEST(ClassSyntaxParsing, RandStaticProperty) {
   auto r = Parse(
@@ -290,8 +278,6 @@ TEST(ClassSyntaxParsing, RandStaticProperty) {
   EXPECT_TRUE(m->is_rand);
   EXPECT_TRUE(m->is_static);
 }
-
-// === class_method ===
 
 TEST(ClassSyntaxParsing, ClassWithMethod) {
   auto r = Parse(
@@ -377,8 +363,6 @@ TEST(ClassSyntaxParsing, MethodWithAttribute) {
   EXPECT_EQ(r.cu->classes[0]->members[0]->kind, ClassMemberKind::kMethod);
 }
 
-// === method_qualifier: virtual ===
-
 TEST(ClassSyntaxParsing, VirtualMethod) {
   auto r = Parse(
       "class C;\n"
@@ -431,8 +415,6 @@ TEST(ClassSyntaxParsing, PureVirtualTaskPrototype) {
   EXPECT_TRUE(m->is_virtual);
 }
 
-// === method_qualifier: class_item_qualifier ===
-
 TEST(ClassSyntaxParsing, MixedStaticFuncAndTask) {
   auto r = Parse(
       "virtual class Utils#(parameter N = 4);\n"
@@ -470,8 +452,6 @@ TEST(ClassSyntaxParsing, StaticMethodMultipleArgs) {
               "  endfunction\n"
               "endclass\n"));
 }
-
-// === class_method: extern ===
 
 TEST(ClassSyntaxParsing, ExternMethod) {
   auto r = Parse(
@@ -522,8 +502,6 @@ TEST(ClassSyntaxParsing, ExternConstructorPrototype) {
   EXPECT_EQ(members[0]->kind, ClassMemberKind::kMethod);
   EXPECT_EQ(members[0]->method->name, "new");
 }
-
-// === class_constructor_declaration ===
 
 TEST(ClassSyntaxParsing, ClassConstructor) {
   auto r = Parse(
@@ -631,8 +609,6 @@ TEST(ClassSyntaxParsing, ExternConstructorPrototypeNoArgs) {
   EXPECT_EQ(members[0]->method->name, "new");
 }
 
-// === class_constraint ===
-
 TEST(ClassSyntaxParsing, ConstraintPrototype) {
   auto r = Parse(
       "class C;\n"
@@ -651,8 +627,6 @@ TEST(ClassSyntaxParsing, ConstraintDeclaration) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-// === class_item: nested class_declaration / interface_class_declaration ===
 
 TEST(ClassSyntaxParsing, ClassNestedClass) {
   auto r = Parse(
@@ -703,8 +677,6 @@ TEST(ClassSyntaxParsing, ClassCovergroup) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// === Footnote 10: mutual exclusivity ===
-
 TEST(ClassSyntaxParsing, ErrorDuplicateStatic) {
   auto r = Parse(
       "class C;\n"
@@ -737,8 +709,6 @@ TEST(ClassSyntaxParsing, ErrorDuplicateRandc) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// === class_declaration: virtual + final combined ===
-
 TEST(ClassSyntaxParsing, VirtualFinalClass) {
   auto r = Parse("virtual class :final C; endclass\n");
   ASSERT_NE(r.cu, nullptr);
@@ -747,8 +717,6 @@ TEST(ClassSyntaxParsing, VirtualFinalClass) {
   EXPECT_TRUE(r.cu->classes[0]->is_virtual);
   EXPECT_TRUE(r.cu->classes[0]->is_final);
 }
-
-// === class_method: extern with method_qualifier combinations ===
 
 TEST(ClassSyntaxParsing, ExternStaticMethodPrototype) {
   auto r = Parse(
@@ -761,8 +729,6 @@ TEST(ClassSyntaxParsing, ExternStaticMethodPrototype) {
   EXPECT_TRUE(m->is_static);
   EXPECT_TRUE(m->method->is_extern);
 }
-
-// === class_constructor_prototype: multiple args, default ===
 
 TEST(ClassSyntaxParsing, ExternConstructorPrototypeMultipleArgs) {
   auto r = Parse(
@@ -785,8 +751,6 @@ TEST(ClassSyntaxParsing, ExternConstructorPrototypeWithDefault) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-// === class_constraint: with dynamic_override_specifiers ===
 
 TEST(ClassSyntaxParsing, ConstraintWithInitialSpecifier) {
   auto r = Parse(
@@ -818,8 +782,6 @@ TEST(ClassSyntaxParsing, ConstraintWithExtendsFinalSpecifiers) {
   EXPECT_EQ(r.cu->classes[0]->members[0]->kind, ClassMemberKind::kConstraint);
 }
 
-// === class_constraint: pure and extern prototypes ===
-
 TEST(ClassSyntaxParsing, PureConstraintPrototype) {
   auto r = Parse(
       "class C;\n"
@@ -850,4 +812,4 @@ TEST(ClassSyntaxParsing, StaticConstraintDeclaration) {
   EXPECT_EQ(r.cu->classes[0]->members[0]->kind, ClassMemberKind::kConstraint);
 }
 
-}  // namespace
+}

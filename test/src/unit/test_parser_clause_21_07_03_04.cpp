@@ -11,4 +11,4 @@ TEST(IoSystemTaskParsing, DumpportslimitCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

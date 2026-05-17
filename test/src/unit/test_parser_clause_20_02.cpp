@@ -8,4 +8,4 @@ TEST(SystemNameParserParsing, SystemTask_FinishNoArgs) {
   EXPECT_TRUE(ParseOk("module m; initial $finish; endmodule"));
 }
 
-}  // namespace
+}

@@ -1,4 +1,4 @@
-// §28.7
+
 
 #include <gtest/gtest.h>
 #include "fixture_lexer.h"
@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Each MOS switch keyword must map to its own token kind so the parser can
-// distinguish nmos from pmos and rnmos from rpmos.
 TEST(MosSwitchLexing, NmosKeyword) {
   auto tokens = Lex("nmos");
   ASSERT_GE(tokens.size(), 1u);
@@ -48,4 +46,4 @@ TEST(MosSwitchLexing, NamedSwitchTokenSequence) {
   EXPECT_EQ(tokens[9].kind, TokenKind::kSemicolon);
 }
 
-}  // namespace
+}

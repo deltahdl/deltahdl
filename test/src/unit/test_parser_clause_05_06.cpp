@@ -108,7 +108,6 @@ TEST(LexicalConventionParsing, IdentifierInAssignExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §3.1 — Module with design element name containing underscores and digits.
 TEST(CompilationUnitStructure, DesignElementNameWithUnderscoresAndDigits) {
   auto r = Parse("module my_module_123; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -117,22 +116,15 @@ TEST(CompilationUnitStructure, DesignElementNameWithUnderscoresAndDigits) {
   EXPECT_EQ(r.cu->modules[0]->name, "my_module_123");
 }
 
-// §5.6: "A keyword (see 5.6.2) may not be used as a user-defined identifier."
-// In a position where the parser expects an identifier, a keyword token must
-// cause a parse error rather than being accepted as a name.
 TEST(LexicalConventionParsing, KeywordCannotBeUsedAsIdentifier) {
   auto r = Parse("module m; logic module; endmodule");
   EXPECT_TRUE(r.has_errors);
 }
 
-// §5.6: "If an identifier exceeds the implementation-specific length limit,
-// an error shall be reported." The lexer-stage error must reach the parser's
-// diagnostic engine when source containing a 1025-character identifier is
-// parsed.
 TEST(LexicalConventionParsing, IdentifierExceedingMaxLengthReportsError) {
   std::string long_id(1025, 'a');
   auto r = Parse("module m; logic " + long_id + "; endmodule");
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

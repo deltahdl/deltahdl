@@ -14,7 +14,7 @@ struct KeywordEntry {
 };
 
 const std::unordered_map<std::string_view, KeywordEntry> kKeywordMap = {
-    // IEEE 1364-1995 (Table 22-1)
+
     {"always", {TokenKind::kKwAlways, V::kVer13641995}},
     {"and", {TokenKind::kKwAnd, V::kVer13641995}},
     {"assign", {TokenKind::kKwAssign, V::kVer13641995}},
@@ -117,7 +117,7 @@ const std::unordered_map<std::string_view, KeywordEntry> kKeywordMap = {
     {"wor", {TokenKind::kKwWor, V::kVer13641995}},
     {"xnor", {TokenKind::kKwXnor, V::kVer13641995}},
     {"xor", {TokenKind::kKwXor, V::kVer13641995}},
-    // IEEE 1364-2001 (Table 22-2)
+
     {"automatic", {TokenKind::kKwAutomatic, V::kVer13642001}},
     {"cell", {TokenKind::kKwCell, V::kVer13642001}},
     {"config", {TokenKind::kKwConfig, V::kVer13642001}},
@@ -140,9 +140,9 @@ const std::unordered_map<std::string_view, KeywordEntry> kKeywordMap = {
     {"signed", {TokenKind::kKwSigned, V::kVer13642001}},
     {"unsigned", {TokenKind::kKwUnsigned, V::kVer13642001}},
     {"use", {TokenKind::kKwUse, V::kVer13642001}},
-    // IEEE 1364-2005 (Table 22-3)
+
     {"uwire", {TokenKind::kKwUwire, V::kVer13642005}},
-    // IEEE 1800-2005 (Table 22-4)
+
     {"alias", {TokenKind::kKwAlias, V::kVer18002005}},
     {"always_comb", {TokenKind::kKwAlwaysComb, V::kVer18002005}},
     {"always_ff", {TokenKind::kKwAlwaysFF, V::kVer18002005}},
@@ -240,7 +240,7 @@ const std::unordered_map<std::string_view, KeywordEntry> kKeywordMap = {
     {"wildcard", {TokenKind::kKwWildcard, V::kVer18002005}},
     {"with", {TokenKind::kKwWith, V::kVer18002005}},
     {"within", {TokenKind::kKwWithin, V::kVer18002005}},
-    // IEEE 1800-2009 (Table 22-5)
+
     {"accept_on", {TokenKind::kKwAcceptOn, V::kVer18002009}},
     {"checker", {TokenKind::kKwChecker, V::kVer18002009}},
     {"endchecker", {TokenKind::kKwEndchecker, V::kVer18002009}},
@@ -264,15 +264,14 @@ const std::unordered_map<std::string_view, KeywordEntry> kKeywordMap = {
     {"until_with", {TokenKind::kKwUntilWith, V::kVer18002009}},
     {"untyped", {TokenKind::kKwUntyped, V::kVer18002009}},
     {"weak", {TokenKind::kKwWeak, V::kVer18002009}},
-    // IEEE 1800-2012 (Table 22-6)
+
     {"implements", {TokenKind::kKwImplements, V::kVer18002012}},
     {"interconnect", {TokenKind::kKwInterconnect, V::kVer18002012}},
     {"nettype", {TokenKind::kKwNettype, V::kVer18002012}},
     {"soft", {TokenKind::kKwSoft, V::kVer18002012}},
-    // IEEE 1800-2017 and 1800-2023 add no new keywords.
+
 };
 
-// Keywords excluded from the "1364-2001-noconfig" version (§22.14.4).
 const std::unordered_set<std::string_view> kNoconfigExcluded = {
     "cell",    "config",   "design",  "endconfig", "incdir",
     "include", "instance", "liblist", "library",   "use",
@@ -290,7 +289,7 @@ const std::unordered_map<std::string_view, KeywordVersion> kVersionMap = {
     {"1800-2023", V::kVer18002023},
 };
 
-}  // namespace
+}
 
 std::optional<KeywordVersion> ParseKeywordVersion(std::string_view spec) {
   auto it = kVersionMap.find(spec);
@@ -310,7 +309,7 @@ std::optional<TokenKind> LookupKeyword(std::string_view text,
   if (min_ver > version) {
     return std::nullopt;
   }
-  // "1364-2001-noconfig" excludes 10 config-related keywords (§22.14.4).
+
   if (version == V::kVer13642001Noconfig && min_ver == V::kVer13642001 &&
       kNoconfigExcluded.contains(text)) {
     return std::nullopt;
@@ -389,4 +388,4 @@ std::string_view TokenKindName(TokenKind kind) {
   }
 }
 
-}  // namespace delta
+}

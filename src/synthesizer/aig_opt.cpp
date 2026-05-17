@@ -5,10 +5,6 @@
 
 namespace delta {
 
-// =============================================================================
-// Constant propagation
-// =============================================================================
-
 static bool IsConst(uint32_t lit) {
   return lit == AigGraph::kConstFalse || lit == AigGraph::kConstTrue;
 }
@@ -40,7 +36,7 @@ void ConstProp(AigGraph& g) {
   for (size_t i = 1; i < g.nodes.size(); ++i) {
     auto id = static_cast<uint32_t>(i);
     uint32_t lit = AigLit(id, false);
-    if (IsInputNode(g, id)) continue;  // Skip primary inputs.
+    if (IsInputNode(g, id)) continue;
     auto& node = g.nodes[i];
     uint32_t f0 = remap[node.fanin0];
     uint32_t f1 = remap[node.fanin1];
@@ -57,10 +53,6 @@ void ConstProp(AigGraph& g) {
     next = remap[next];
   }
 }
-
-// =============================================================================
-// AIG balancing
-// =============================================================================
 
 static void CollectAndLeaves(const AigGraph& g, uint32_t lit,
                              std::vector<uint32_t>& leaves) {
@@ -107,25 +99,13 @@ void Balance(AigGraph& g) {
   }
 }
 
-// =============================================================================
-// AIG rewriting (basic — delegates to ConstProp)
-// =============================================================================
-
 void Rewrite(AigGraph& g) { ConstProp(g); }
-
-// =============================================================================
-// AIG refactoring (basic — balance + constprop)
-// =============================================================================
 
 void Refactor(AigGraph& g) {
   Balance(g);
   ConstProp(g);
 }
 
-// =============================================================================
-// Redundancy removal (basic — delegates to ConstProp)
-// =============================================================================
-
 void RemoveRedundancy(AigGraph& g) { ConstProp(g); }
 
-}  // namespace delta
+}

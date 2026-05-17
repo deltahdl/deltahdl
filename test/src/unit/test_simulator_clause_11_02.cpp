@@ -6,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2: Each operand kind from the operand list produces a value when
-// evaluated as a standalone expression.
-
 TEST(OperandEvaluation, IntegerLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -58,7 +55,7 @@ TEST(OperandEvaluation, VariableBitSelect) {
   LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // 8'hA5 = 8'b1010_0101, bit[5] = 1
+
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
@@ -78,7 +75,7 @@ TEST(OperandEvaluation, VariablePartSelect) {
   LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // 8'hA5 bits[3:0] = 4'b0101 = 5
+
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
@@ -150,4 +147,4 @@ TEST(OperandEvaluation, ArrayElementAsExpression) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-}  // namespace
+}

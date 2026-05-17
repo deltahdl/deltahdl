@@ -38,4 +38,4 @@ TEST(ArrayLiteralSynthesis, ReplicationInitSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

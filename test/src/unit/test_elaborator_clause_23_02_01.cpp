@@ -83,4 +83,4 @@ TEST(ModuleHeaderDefinition, ModuleWithAttributesElaborates) {
   EXPECT_FALSE(design->top_modules[0]->attrs.empty());
 }
 
-}  // namespace
+}

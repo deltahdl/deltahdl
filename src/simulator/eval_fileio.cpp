@@ -13,10 +13,6 @@
 
 namespace delta {
 
-// ============================================================================
-// Helpers
-// ============================================================================
-
 static int FdFromArg(const Expr* arg, SimContext& ctx, Arena& arena) {
   return static_cast<int>(EvalExpr(arg, ctx, arena).ToUint64());
 }
@@ -35,10 +31,6 @@ static Logic4Vec StringToVec(Arena& arena, const std::string& str,
   return vec;
 }
 
-// ============================================================================
-// section 21.3 -- $fgets(str, fd)
-// ============================================================================
-
 static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
   int fd = FdFromArg(expr->args[1], ctx, arena);
@@ -52,17 +44,12 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string line(buf);
   auto nchars = static_cast<uint64_t>(line.size());
 
-  // Write the string into the destination variable.
   if (expr->args[0]->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(expr->args[0]->text);
     if (var) var->value = StringToVec(arena, line, var->value.width);
   }
   return MakeLogic4VecVal(arena, 32, nchars);
 }
-
-// ============================================================================
-// section 21.3 -- $fgetc(fd)
-// ============================================================================
 
 static Logic4Vec EvalFgetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
@@ -75,13 +62,9 @@ static Logic4Vec EvalFgetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(ch));
 }
 
-// ============================================================================
-// section 21.3 -- $fflush(fd)
-// ============================================================================
-
 static Logic4Vec EvalFflush(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) {
-    std::fflush(nullptr);  // Flush all open streams.
+    std::fflush(nullptr);
     return MakeLogic4VecVal(arena, 1, 0);
   }
   int fd = FdFromArg(expr->args[0], ctx, arena);
@@ -89,10 +72,6 @@ static Logic4Vec EvalFflush(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (fp) std::fflush(fp);
   return MakeLogic4VecVal(arena, 1, 0);
 }
-
-// ============================================================================
-// section 21.3 -- $feof(fd)
-// ============================================================================
 
 static Logic4Vec EvalFeof(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 1);
@@ -103,10 +82,6 @@ static Logic4Vec EvalFeof(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, result != 0 ? 1 : 0);
 }
 
-// ============================================================================
-// section 21.3 -- $ferror(fd, str)
-// ============================================================================
-
 static Logic4Vec EvalFerror(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
   int fd = FdFromArg(expr->args[0], ctx, arena);
@@ -114,7 +89,7 @@ static Logic4Vec EvalFerror(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
 
   int err = std::ferror(fp);
-  // Optionally write error string to second arg variable.
+
   if (err != 0 && expr->args.size() >= 2) {
     if (expr->args[1]->kind == ExprKind::kIdentifier) {
       auto* var = ctx.FindVariable(expr->args[1]->text);
@@ -126,10 +101,6 @@ static Logic4Vec EvalFerror(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(err));
 }
-
-// ============================================================================
-// section 21.3 -- $fseek(fd, offset, whence)
-// ============================================================================
 
 static Logic4Vec EvalFseek(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 32, 0);
@@ -145,10 +116,6 @@ static Logic4Vec EvalFseek(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(result));
 }
 
-// ============================================================================
-// section 21.3 -- $ftell(fd)
-// ============================================================================
-
 static Logic4Vec EvalFtell(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
   int fd = FdFromArg(expr->args[0], ctx, arena);
@@ -158,10 +125,6 @@ static Logic4Vec EvalFtell(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(pos));
 }
 
-// ============================================================================
-// section 21.3 -- $rewind(fd)
-// ============================================================================
-
 static Logic4Vec EvalRewind(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
   int fd = FdFromArg(expr->args[0], ctx, arena);
@@ -169,10 +132,6 @@ static Logic4Vec EvalRewind(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (fp) std::fseek(fp, 0, SEEK_SET);
   return MakeLogic4VecVal(arena, 32, 0);
 }
-
-// ============================================================================
-// section 21.3 -- $ungetc(char, fd)
-// ============================================================================
 
 static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
@@ -183,10 +142,6 @@ static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   int result = std::ungetc(ch, fp);
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(result));
 }
-
-// ============================================================================
-// section 21.3 -- $fscanf(fd, format, args...)
-// ============================================================================
 
 static int SpecToBase(char spec) {
   if (spec == 'd') return 10;
@@ -260,10 +215,6 @@ static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, state.matched);
 }
 
-// ============================================================================
-// section 21.3 -- $fread(variable, fd [, start [, count]])
-// ============================================================================
-
 static Logic4Vec EvalFread(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
   int fd = FdFromArg(expr->args[1], ctx, arena);
@@ -276,12 +227,10 @@ static Logic4Vec EvalFread(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   if (!var) return MakeLogic4VecVal(arena, 32, 0);
 
-  // Read width/8 bytes (rounded up) to fill the variable.
   uint32_t nbytes = (var->value.width + 7) / 8;
   auto* buf = new uint8_t[nbytes];
   size_t nread = std::fread(buf, 1, nbytes, fp);
 
-  // Pack bytes into the variable (big-endian as per LRM).
   uint64_t val = 0;
   for (size_t i = 0; i < nread && i < 8; ++i) {
     val = (val << 8) | buf[i];
@@ -290,10 +239,6 @@ static Logic4Vec EvalFread(const Expr* expr, SimContext& ctx, Arena& arena) {
   delete[] buf;
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(nread));
 }
-
-// ============================================================================
-// Public dispatch: EvalFileIOSysCall
-// ============================================================================
 
 Logic4Vec EvalFileIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             std::string_view name) {
@@ -311,4 +256,4 @@ Logic4Vec EvalFileIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-}  // namespace delta
+}

@@ -200,4 +200,4 @@ TEST(ClassSim, FinalMethodInVTable) {
   EXPECT_EQ(obj->ResolveVirtualMethod("locked"), method);
 }
 
-}  // namespace
+}

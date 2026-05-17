@@ -27,8 +27,6 @@ TEST(ContinuousAssignElab, SingleDelayOnVariableIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.3 Syntax 10-1 footnote 16: when vectored or scalared is used, there shall
-// be at least one packed dimension.
 TEST(VectoredOrScalaredPackedDim, VectoredRequiresPackedDim) {
   ElabFixture f;
   Elaborate(
@@ -60,4 +58,4 @@ TEST(VectoredOrScalaredPackedDim, VectoredWithPackedDimOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

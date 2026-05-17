@@ -15,4 +15,4 @@ TEST(DesignBuildingBlockParsing, DelayToTicksFullRange) {
   EXPECT_EQ(DelayToTicks(1, ts_fs, TimeUnit::kFs), 1u);
 }
 
-}  // namespace
+}

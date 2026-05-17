@@ -109,4 +109,4 @@ TEST(VirtualInterfaceClockingParsing,
       "endmodule\n"));
 }
 
-}  // namespace
+}

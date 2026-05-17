@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.4.2: Write to unpacked array element and read it back.
 TEST(UnpackedArraySimulation, ElementWriteAndRead) {
   auto v = RunAndGet(
       "module t;\n"
@@ -20,7 +19,6 @@ TEST(UnpackedArraySimulation, ElementWriteAndRead) {
   EXPECT_EQ(v, 0xAAu);
 }
 
-// §7.4.2: Unpacked array with range form [lo:hi] element access.
 TEST(UnpackedArraySimulation, RangeFormElementAccess) {
   auto v = RunAndGet(
       "module t;\n"
@@ -35,4 +33,4 @@ TEST(UnpackedArraySimulation, RangeFormElementAccess) {
   EXPECT_EQ(v, 0x42u);
 }
 
-}  // namespace
+}

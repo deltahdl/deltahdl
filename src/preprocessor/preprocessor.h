@@ -21,9 +21,9 @@ struct PreprocConfig {
 };
 
 struct CondState {
-  bool active;         // Is this branch currently active?
-  bool any_taken;      // Has any branch in this chain been taken?
-  bool parent_active;  // Was enclosing scope active at ifdef entry?
+  bool active;
+  bool any_taken;
+  bool parent_active;
 };
 
 class Preprocessor {
@@ -155,7 +155,7 @@ class Preprocessor {
   uint32_t LineOffset() const { return line_offset_; }
   bool HasLineOverride() const { return has_line_override_; }
   const std::string& LineFile() const { return line_file_override_; }
-  // Annex E accessors.
+
   uint64_t DefaultDecayTime() const { return default_decay_time_; }
   double DefaultDecayTimeReal() const { return default_decay_time_real_; }
   bool DefaultDecayTimeInfinite() const { return default_decay_time_infinite_; }
@@ -171,28 +171,27 @@ class Preprocessor {
   bool has_timescale_ = false;
   NetType default_net_type_ = NetType::kWire;
   bool in_celldefine_ = false;
-  NetType unconnected_drive_ = NetType::kWire;  // kWire = no drive override
-  uint32_t line_offset_ = 0;             // Line number from `line directive.
-  uint32_t line_override_src_line_ = 0;  // Source line where `line appeared.
+  NetType unconnected_drive_ = NetType::kWire;
+  uint32_t line_offset_ = 0;
+  uint32_t line_override_src_line_ = 0;
   bool has_line_override_ = false;
   std::string line_file_override_;
   std::vector<KeywordVersion> keyword_version_stack_;
-  std::vector<std::string> expansion_stack_;  // §22.5.1: recursive macro guard.
-  uint32_t design_element_depth_ = 0;         // §22.3: for resetall validation.
-  std::vector<std::string> cell_module_names_;  // §22.10: modules inside celldefine.
-  bool in_block_comment_ = false;  // §22.2: track /* */ across lines.
-  // Annex E state.
+  std::vector<std::string> expansion_stack_;
+  uint32_t design_element_depth_ = 0;
+  std::vector<std::string> cell_module_names_;
+  bool in_block_comment_ = false;
+
   uint64_t default_decay_time_ = 0;
   double default_decay_time_real_ = 0.0;
-  bool default_decay_time_infinite_ = true;  // §E.2: default is no decay.
-  uint32_t default_trireg_strength_ = 0;     // §E.3: 0-250.
+  bool default_decay_time_infinite_ = true;
+  uint32_t default_trireg_strength_ = 0;
   bool has_default_trireg_strength_ = false;
   enum DelayModeDirective delay_mode_directive_ = DelayModeDirective::kNone;
 };
 
-// §22.5.1: Free-function helpers used across preprocessor translation units.
 bool IsCompilerDirective(std::string_view name);
 bool HasUnterminatedString(std::string_view body);
 bool IsIdentChar(char c);
 
-}  // namespace delta
+}

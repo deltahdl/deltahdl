@@ -182,10 +182,6 @@ TEST(SpecifyPathDelaySim, ThreeDelayPathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
-// ===========================================================================
-// §30.5.1 R1 — min:typ:max selection follows SimContext DelayMode.
-// ===========================================================================
-
 TEST(SpecifyPathDelaySim, MinTypMaxSelectsTypicalByDefault) {
   SimFixture f;
   auto* e = ParseExprFrom("1:2:3", f);
@@ -214,8 +210,7 @@ TEST(SpecifyPathDelaySim, MinTypMaxSelectsMaximumInMaxMode) {
 }
 
 TEST(SpecifyPathDelaySim, SingleValueIgnoresDelayMode) {
-  // §30.5.1: a single value represents the typical delay. The same value is
-  // used regardless of the configured DelayMode because no alternatives exist.
+
   for (auto mode : {DelayMode::kMin, DelayMode::kTyp, DelayMode::kMax}) {
     SimFixture f;
     f.ctx.SetDelayMode(mode);
@@ -225,10 +220,6 @@ TEST(SpecifyPathDelaySim, SingleValueIgnoresDelayMode) {
     EXPECT_EQ(val.ToUint64(), 7u);
   }
 }
-
-// ===========================================================================
-// §30.5.1 R2 — negative path delay values are treated as zero.
-// ===========================================================================
 
 TEST(SpecifyPathDelaySim, ClampPathDelayNegativeIsZero) {
   EXPECT_EQ(ClampPathDelay(-1), 0u);
@@ -267,15 +258,8 @@ TEST(SpecifyPathDelaySim, NegativePathDelaySimulatesAsZero) {
   EXPECT_EQ(var->value.ToUint64(), 17u);
 }
 
-// ===========================================================================
-// §30.5.1 R3 — Table 30-2 associates N delay expressions with transitions.
-// Scope: non-x transitions only; x-transition handling belongs to §30.5.2.
-// Slot order in PathDelay::delays matches the 12-delay column of Table 30-2:
-//   [0]=t01 [1]=t10 [2]=t0z [3]=tz1 [4]=t1z [5]=tz0.
-// ===========================================================================
-
 TEST(SpecifyPathDelaySim, ExpandOneDelayFillsAllBasicSlots) {
-  // Count 1: every basic transition takes the same t value.
+
   PathDelay pd;
   pd.delay_count = 1;
   pd.delays[0] = 7;
@@ -286,40 +270,38 @@ TEST(SpecifyPathDelaySim, ExpandOneDelayFillsAllBasicSlots) {
 }
 
 TEST(SpecifyPathDelaySim, ExpandTwoDelaysDistributesRiseAndFall) {
-  // Count 2: trise is used for rising/settling transitions, tfall for the
-  // falling/returning ones. Table 30-2 column "2".
+
   PathDelay pd;
   pd.delay_count = 2;
-  pd.delays[0] = 3;  // trise
-  pd.delays[1] = 5;  // tfall
+  pd.delays[0] = 3;
+  pd.delays[1] = 5;
   ExpandTransitionDelays(pd);
-  EXPECT_EQ(pd.delays[0], 3u);  // 0->1 = trise
-  EXPECT_EQ(pd.delays[1], 5u);  // 1->0 = tfall
-  EXPECT_EQ(pd.delays[2], 3u);  // 0->z = trise
-  EXPECT_EQ(pd.delays[3], 3u);  // z->1 = trise
-  EXPECT_EQ(pd.delays[4], 5u);  // 1->z = tfall
-  EXPECT_EQ(pd.delays[5], 5u);  // z->0 = tfall
+  EXPECT_EQ(pd.delays[0], 3u);
+  EXPECT_EQ(pd.delays[1], 5u);
+  EXPECT_EQ(pd.delays[2], 3u);
+  EXPECT_EQ(pd.delays[3], 3u);
+  EXPECT_EQ(pd.delays[4], 5u);
+  EXPECT_EQ(pd.delays[5], 5u);
 }
 
 TEST(SpecifyPathDelaySim, ExpandThreeDelaysAddsZColumn) {
-  // Count 3: z-bound transitions share a dedicated tz value; the remaining
-  // rising/falling transitions use trise/tfall.
+
   PathDelay pd;
   pd.delay_count = 3;
-  pd.delays[0] = 2;  // trise
-  pd.delays[1] = 4;  // tfall
-  pd.delays[2] = 6;  // tz
+  pd.delays[0] = 2;
+  pd.delays[1] = 4;
+  pd.delays[2] = 6;
   ExpandTransitionDelays(pd);
-  EXPECT_EQ(pd.delays[0], 2u);  // 0->1 = trise
-  EXPECT_EQ(pd.delays[1], 4u);  // 1->0 = tfall
-  EXPECT_EQ(pd.delays[2], 6u);  // 0->z = tz
-  EXPECT_EQ(pd.delays[3], 2u);  // z->1 = trise
-  EXPECT_EQ(pd.delays[4], 6u);  // 1->z = tz
-  EXPECT_EQ(pd.delays[5], 4u);  // z->0 = tfall
+  EXPECT_EQ(pd.delays[0], 2u);
+  EXPECT_EQ(pd.delays[1], 4u);
+  EXPECT_EQ(pd.delays[2], 6u);
+  EXPECT_EQ(pd.delays[3], 2u);
+  EXPECT_EQ(pd.delays[4], 6u);
+  EXPECT_EQ(pd.delays[5], 4u);
 }
 
 TEST(SpecifyPathDelaySim, ExpandSixDelaysKeepsIdentityForBasicSlots) {
-  // Count 6: each transition has its own distinct value and none are shared.
+
   PathDelay pd;
   pd.delay_count = 6;
   pd.delays[0] = 10;
@@ -338,9 +320,7 @@ TEST(SpecifyPathDelaySim, ExpandSixDelaysKeepsIdentityForBasicSlots) {
 }
 
 TEST(SpecifyPathDelaySim, ExpandTwelveDelaysLeavesAllSlotsUntouched) {
-  // Count 12: the 12-expression form is already fully explicit per Table 30-2;
-  // expansion is a no-op across all twelve slots (including the x-transition
-  // slots 6..11 which §30.5.1 does not re-specify).
+
   PathDelay pd;
   pd.delay_count = 12;
   for (int i = 0; i < 12; ++i) {
@@ -352,4 +332,4 @@ TEST(SpecifyPathDelaySim, ExpandTwelveDelaysLeavesAllSlotsUntouched) {
   }
 }
 
-}  // namespace
+}

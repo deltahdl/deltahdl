@@ -1,4 +1,4 @@
-// §28.6
+
 
 #include "fixture_elaborator.h"
 
@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §28.6: the first terminal is the driven output and must appear as the
-// lhs of the emitted continuous assign.
 TEST(TristateGateElaboration, OutputIsFirstTerminal) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -24,8 +22,6 @@ TEST(TristateGateElaboration, OutputIsFirstTerminal) {
   EXPECT_EQ(mod->assigns[0].lhs->text, "y");
 }
 
-// §28.6: bufif1 conducts when control is 1 — true arm passes data, false
-// arm is high-Z.
 TEST(TristateGateElaboration, Bufif1LowersToTernaryWithZOnBlocked) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -50,8 +46,6 @@ TEST(TristateGateElaboration, Bufif1LowersToTernaryWithZOnBlocked) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-// §28.6: bufif0 conducts when control is 0 — arms are swapped relative to
-// bufif1.
 TEST(TristateGateElaboration, Bufif0LowersToTernaryWithZOnActiveControl) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -74,7 +68,6 @@ TEST(TristateGateElaboration, Bufif0LowersToTernaryWithZOnActiveControl) {
   EXPECT_EQ(rhs->false_expr->text, "a");
 }
 
-// §28.6: notif gates invert the data leg; the Z leg is unchanged.
 TEST(TristateGateElaboration, Notif1InvertsDataArm) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -123,4 +116,4 @@ TEST(TristateGateElaboration, Notif0InvertsDataArmAndSwapsArms) {
   EXPECT_EQ(rhs->false_expr->lhs->text, "a");
 }
 
-}  // namespace
+}

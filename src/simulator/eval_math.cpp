@@ -11,10 +11,6 @@
 
 namespace delta {
 
-// ============================================================================
-// Helpers
-// ============================================================================
-
 static double ArgToDouble(const Expr* arg, SimContext& ctx, Arena& arena) {
   if (arg->kind == ExprKind::kRealLiteral) return arg->real_val;
   auto val = EvalExpr(arg, ctx, arena);
@@ -34,10 +30,6 @@ static Logic4Vec DoubleToResult(Arena& arena, double d) {
   vec.is_real = true;
   return vec;
 }
-
-// ============================================================================
-// section 20.8 -- Basic math functions
-// ============================================================================
 
 static Logic4Vec EvalLn(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
@@ -82,10 +74,6 @@ static Logic4Vec EvalCeil(const Expr* expr, SimContext& ctx, Arena& arena) {
   return DoubleToResult(arena, std::ceil(x));
 }
 
-// ============================================================================
-// section 20.8 -- Trigonometric functions
-// ============================================================================
-
 static Logic4Vec EvalSin(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
   double x = ArgToDouble(expr->args[0], ctx, arena);
@@ -128,10 +116,6 @@ static Logic4Vec EvalAtan2(const Expr* expr, SimContext& ctx, Arena& arena) {
   double x = ArgToDouble(expr->args[1], ctx, arena);
   return DoubleToResult(arena, std::atan2(y, x));
 }
-
-// ============================================================================
-// section 20.8 -- Hyperbolic functions
-// ============================================================================
 
 static Logic4Vec EvalHypot(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 64, 0);
@@ -176,13 +160,9 @@ static Logic4Vec EvalAtanh(const Expr* expr, SimContext& ctx, Arena& arena) {
   return DoubleToResult(arena, std::atanh(x));
 }
 
-// ============================================================================
-// section 20.14 -- Distribution functions
-// ============================================================================
-
 static Logic4Vec EvalDistUniform(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
-  // $dist_uniform(seed, lo, hi)
+
   if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 32, 0);
   auto lo =
       static_cast<int32_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
@@ -197,13 +177,13 @@ static Logic4Vec EvalDistUniform(const Expr* expr, SimContext& ctx,
 
 static Logic4Vec EvalDistNormal(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
-  // $dist_normal(seed, mean, std_dev)
+
   if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 32, 0);
   auto mean =
       static_cast<int32_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
   auto sdev =
       static_cast<int32_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64());
-  // Box-Muller approximation using urandom.
+
   double u1 = (ctx.Urandom32() + 1.0) / 4294967297.0;
   double u2 = (ctx.Urandom32() + 1.0) / 4294967297.0;
   double z = std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * M_PI * u2);
@@ -213,7 +193,7 @@ static Logic4Vec EvalDistNormal(const Expr* expr, SimContext& ctx,
 
 static Logic4Vec EvalDistExponential(const Expr* expr, SimContext& ctx,
                                      Arena& arena) {
-  // $dist_exponential(seed, mean)
+
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
   auto mean =
       static_cast<int32_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
@@ -225,7 +205,7 @@ static Logic4Vec EvalDistExponential(const Expr* expr, SimContext& ctx,
 
 static Logic4Vec EvalDistPoisson(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
-  // $dist_poisson(seed, mean)
+
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
   auto mean =
       static_cast<int32_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
@@ -240,15 +220,11 @@ static Logic4Vec EvalDistPoisson(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(k - 1));
 }
 
-static Logic4Vec EvalDistGeneric(const Expr* /*expr*/, SimContext& ctx,
+static Logic4Vec EvalDistGeneric(const Expr* , SimContext& ctx,
                                  Arena& arena) {
-  // $dist_chi_square, $dist_t, $dist_erlang -- simplified to urandom.
+
   return MakeLogic4VecVal(arena, 32, ctx.Urandom32());
 }
-
-// ============================================================================
-// Category dispatchers
-// ============================================================================
 
 static Logic4Vec EvalBasicMath(const Expr* expr, SimContext& ctx, Arena& arena,
                                std::string_view name) {
@@ -295,10 +271,6 @@ static Logic4Vec EvalDistSysCall(const Expr* expr, SimContext& ctx,
   return EvalDistGeneric(expr, ctx, arena);
 }
 
-// ============================================================================
-// Public dispatch: EvalMathSysCall
-// ============================================================================
-
 static bool IsBasicMathCall(std::string_view n) {
   return n == "$ln" || n == "$log10" || n == "$exp" || n == "$sqrt" ||
          n == "$pow" || n == "$floor" || n == "$ceil";
@@ -325,4 +297,4 @@ Logic4Vec EvalMathSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-}  // namespace delta
+}

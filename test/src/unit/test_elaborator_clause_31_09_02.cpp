@@ -4,9 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §31.9.2: the elaborator must accept a $setuphold invocation whose
-// sixth positional slot carries the timestamp_condition introduced by
-// this subclause, even when the seventh slot is left unset.
 TEST(NegativeTimingConditions, SetupholdTimestampConditionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,9 +17,6 @@ TEST(NegativeTimingConditions, SetupholdTimestampConditionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.9.2: populating both condition slots must elaborate as well, so
-// the pair can reach the simulator for the runtime rules this subclause
-// describes.
 TEST(NegativeTimingConditions, SetupholdBothConditionsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -36,10 +30,6 @@ TEST(NegativeTimingConditions, SetupholdBothConditionsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.9.2 via §31.9's identical-behaviour rule: $recrem must accept
-// the same paired condition arguments that $setuphold does, or the
-// negative-hold recovery/removal case would have no way to pair the
-// condition with the correct delayed signal.
 TEST(NegativeTimingConditions, RecremBothConditionsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -53,10 +43,6 @@ TEST(NegativeTimingConditions, RecremBothConditionsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.9.2: the comma-first form that leaves the timestamp slot empty
-// while populating the timecheck slot — mirroring the LRM's
-// negative-setup example — must pass through elaboration so the
-// simulator receives the exact association the subclause describes.
 TEST(NegativeTimingConditions, SetupholdOmittedTimestampPopulatedTimecheckElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -70,4 +56,4 @@ TEST(NegativeTimingConditions, SetupholdOmittedTimestampPopulatedTimecheckElabor
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -63,8 +63,6 @@ TEST(BnfClarificationParsing, DollarInQueueSelect) {
               "endmodule\n"));
 }
 
-// Item 10: rand/randc mutual exclusion
-
 TEST(BnfClarificationParsing, ErrorRandAndRandc) {
   auto r = Parse(
       "class c;\n"
@@ -81,8 +79,6 @@ TEST(BnfClarificationParsing, ErrorDuplicateRand) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Item 10: static/virtual duplicate
-
 TEST(BnfClarificationParsing, ErrorDuplicateStatic) {
   auto r = Parse(
       "class c;\n"
@@ -90,8 +86,6 @@ TEST(BnfClarificationParsing, ErrorDuplicateStatic) {
       "endclass\n");
   EXPECT_TRUE(r.has_errors);
 }
-
-// Item 42: nonvoid function call requires parens
 
 TEST(BnfClarificationParsing, NonvoidFunctionCallWithParens) {
   EXPECT_TRUE(
@@ -101,8 +95,6 @@ TEST(BnfClarificationParsing, NonvoidFunctionCallWithParens) {
               "  initial y = my_func();\n"
               "endmodule\n"));
 }
-
-// Item 29: covergroup extends only within class
 
 TEST(BnfClarificationParsing, CovergroupExtendsInClassOk) {
   EXPECT_TRUE(
@@ -114,8 +106,6 @@ TEST(BnfClarificationParsing, CovergroupExtendsInClassOk) {
               "endclass\n"));
 }
 
-// Item 8: pure virtual method parses ok (constraint enforced at elaboration)
-
 TEST(BnfClarificationParsing, PureVirtualMethodOk) {
   EXPECT_TRUE(
       ParseOk("virtual class c;\n"
@@ -123,4 +113,4 @@ TEST(BnfClarificationParsing, PureVirtualMethodOk) {
               "endclass\n"));
 }
 
-}  // namespace
+}

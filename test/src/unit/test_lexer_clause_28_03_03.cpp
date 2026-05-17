@@ -1,4 +1,4 @@
-// §28.3.3
+
 
 #include <gtest/gtest.h>
 #include "fixture_lexer.h"
@@ -43,4 +43,4 @@ TEST(GateDelayLexing, NandWithDelayTokenSequence) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kHash);
 }
 
-}  // namespace
+}

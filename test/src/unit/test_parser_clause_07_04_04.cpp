@@ -36,7 +36,6 @@ TEST(MultidimensionalArrayParsing, MultidimensionalPackedArray) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-// §7.4.4: Comma-separated declarations share data type and packed dims.
 TEST(MultidimensionalArrayParsing, CommaSeparatedDeclaration) {
   auto r = Parse(
       "module t;\n"
@@ -53,7 +52,6 @@ TEST(MultidimensionalArrayParsing, CommaSeparatedDeclaration) {
             i1->data_type.packed_dim_left->int_val);
 }
 
-// §7.4.4: Three-dimensional unpacked array.
 TEST(MultidimensionalArrayParsing, ThreeDimUnpackedArray) {
   auto r = Parse(
       "module t;\n"
@@ -66,4 +64,4 @@ TEST(MultidimensionalArrayParsing, ThreeDimUnpackedArray) {
   ASSERT_EQ(item->unpacked_dims.size(), 3u);
 }
 
-}  // namespace
+}

@@ -18,4 +18,4 @@ TEST(DynamicArrayAndQueueParsing, QueueMethodCalls) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

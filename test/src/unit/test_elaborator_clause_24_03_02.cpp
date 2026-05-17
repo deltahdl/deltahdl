@@ -156,4 +156,4 @@ TEST(ProgramPortElab, PositionalProgramPortBindingsResolve) {
   }
 }
 
-}  // namespace
+}

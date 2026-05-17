@@ -65,4 +65,4 @@ TEST(SvaEngine, ConsecutiveRepetitionRange) {
   EXPECT_FALSE(MatchRepetition(seq, {1}));
 }
 
-}  // namespace
+}

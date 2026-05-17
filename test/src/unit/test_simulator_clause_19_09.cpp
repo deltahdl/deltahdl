@@ -14,4 +14,4 @@ TEST(Coverage, GlobalCoverageEmpty) {
   EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 0.0);
 }
 
-}  // namespace
+}

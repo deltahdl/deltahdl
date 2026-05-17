@@ -35,4 +35,4 @@ TEST(UtilitySystemTaskTest, BitsOfVariable) {
   EXPECT_EQ(result.ToUint64(), 64u);
 }
 
-}  // namespace
+}

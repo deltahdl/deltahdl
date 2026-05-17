@@ -411,11 +411,6 @@ TEST(ForceReleaseSim, ReleaseReestablishesAssign) {
   EXPECT_EQ(x->value.ToUint64(), 10u);
 }
 
-// §10.6.2: "Releasing a variable that is driven by a continuous assignment
-// ... shall reestablish that assignment and schedule a reevaluation in the
-// continuous assignment's scheduling region." Observed via a module-level
-// continuous assignment driving the variable: after release, a subsequent
-// change to the cont-assign source must propagate into the released variable.
 TEST(ForceReleaseSim, ReleaseReestablishesContinuousAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -444,9 +439,6 @@ TEST(ForceReleaseSim, ReleaseReestablishesContinuousAssignment) {
   EXPECT_EQ(x->value.ToUint64(), 42u);
 }
 
-// §10.6.2: "A force procedural statement on a net shall override all drivers
-// of the net—gate outputs, module outputs, and continuous assignments—until
-// a release procedural statement is executed on the net."
 TEST(ForceReleaseSim, ForceOnNetOverridesContinuousDriver) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -469,9 +461,6 @@ TEST(ForceReleaseSim, ForceOnNetOverridesContinuousDriver) {
   EXPECT_EQ(w->value.ToUint64(), 99u);
 }
 
-// §10.6.2: "When released, the net shall immediately be assigned the value
-// determined by the drivers of the net." Observed by changing the cont-assign
-// source after release — the released net must take that new driver value.
 TEST(ForceReleaseSim, ReleaseOnNetUsesDriverValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -500,4 +489,4 @@ TEST(ForceReleaseSim, ReleaseOnNetUsesDriverValue) {
   EXPECT_EQ(w->value.ToUint64(), 55u);
 }
 
-}  // namespace
+}

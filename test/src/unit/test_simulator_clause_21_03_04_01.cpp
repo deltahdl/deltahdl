@@ -40,4 +40,4 @@ TEST(IoSystemTaskTest, Ungetc) {
   std::remove(tmp_path.c_str());
 }
 
-}  // namespace
+}

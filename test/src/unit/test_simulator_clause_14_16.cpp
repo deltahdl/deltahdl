@@ -120,7 +120,6 @@ TEST(SyncDriveSim, LastDriveWinsInSameTimestep) {
   cmgr.Register(block);
   cmgr.Attach(f.ctx, f.scheduler);
 
-  // Schedule two drives to the same output in the same timestep.
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [&cmgr, &f]() {
     cmgr.ScheduleOutputDrive("cb", "nibble", 0x05, f.ctx, f.scheduler);
@@ -129,8 +128,7 @@ TEST(SyncDriveSim, LastDriveWinsInSameTimestep) {
   f.scheduler.ScheduleEvent(SimTime{5}, Region::kActive, ev);
   f.scheduler.Run();
 
-  // §14.16.2: Last value scheduled wins.
   EXPECT_EQ(out->value.ToUint64(), 0x03u);
 }
 
-}  // namespace
+}

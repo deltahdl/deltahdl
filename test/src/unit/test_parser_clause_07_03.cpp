@@ -19,7 +19,6 @@ TEST(UnionParsing, UnionBasic) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
 }
 
-// §7.3: Union is unpacked by default (no packed keyword).
 TEST(UnionParsing, UnionDefaultNotPacked) {
   auto r = Parse(
       "module t;\n"
@@ -37,7 +36,6 @@ TEST(UnionParsing, UnionDefaultNotPacked) {
   EXPECT_FALSE(item->typedef_type.is_soft);
 }
 
-// §7.3: Union member type kinds are preserved in AST.
 TEST(UnionParsing, UnionMemberTypeKinds) {
   auto r = Parse(
       "module t;\n"
@@ -57,7 +55,6 @@ TEST(UnionParsing, UnionMemberTypeKinds) {
   EXPECT_EQ(item->typedef_type.struct_members[2].type_kind, DataTypeKind::kByte);
 }
 
-// §7.3 LRM example: anonymous union nested inside a struct.
 TEST(UnionParsing, AnonymousUnionInStruct) {
   auto r = Parse(
       "module t;\n"
@@ -74,4 +71,4 @@ TEST(UnionParsing, AnonymousUnionInStruct) {
             DataTypeKind::kUnion);
 }
 
-}  // namespace
+}

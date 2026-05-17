@@ -28,7 +28,6 @@ TEST(OperatorElaboration, BinaryWildcardNeqElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// ==? is equivalent to == on class handles.
 TEST(OperatorElaboration, WildcardEqOnClassHandles) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -44,7 +43,6 @@ TEST(OperatorElaboration, WildcardEqOnClassHandles) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// !=? is equivalent to != on class handles.
 TEST(OperatorElaboration, WildcardNeqOnClassHandles) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -60,7 +58,6 @@ TEST(OperatorElaboration, WildcardNeqOnClassHandles) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// ==? with null on class handle.
 TEST(OperatorElaboration, WildcardEqClassHandleWithNull) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -76,7 +73,6 @@ TEST(OperatorElaboration, WildcardEqClassHandleWithNull) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// !=? with null on class handle.
 TEST(OperatorElaboration, WildcardNeqClassHandleWithNull) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -92,7 +88,6 @@ TEST(OperatorElaboration, WildcardNeqClassHandleWithNull) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// ==? on chandle operands.
 TEST(OperatorElaboration, WildcardEqOnChandle) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -106,7 +101,6 @@ TEST(OperatorElaboration, WildcardEqOnChandle) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// !=? on chandle operands.
 TEST(OperatorElaboration, WildcardNeqOnChandle) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -120,4 +114,4 @@ TEST(OperatorElaboration, WildcardNeqOnChandle) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

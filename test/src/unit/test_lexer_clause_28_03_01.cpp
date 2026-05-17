@@ -1,4 +1,4 @@
-// §28.3.1
+
 
 #include <gtest/gtest.h>
 #include "fixture_lexer.h"
@@ -43,4 +43,4 @@ TEST(GateKeywordLexing, AllTwentySixKeywords) {
   }
 }
 
-}  // namespace
+}

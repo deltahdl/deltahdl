@@ -30,17 +30,10 @@ TEST(PliPostponedSim, PostponedCanReadValues) {
   EXPECT_EQ(sampled, 42);
 }
 
-// §4.4.3.10: "PLI cbReadOnlySynch and other similar events are scheduled in
-// the Postponed region." The PLI callback router applies this mapping, so
-// reasons that name read-only-synch landings resolve to Region::kPostponed.
 TEST(PliPostponedSim, ReadOnlySynchCallbackMapsToPostponedRegion) {
   EXPECT_EQ(RegionForPliCallback(kCbReadOnlySynch), Region::kPostponed);
 }
 
-// §4.4.3.10: the Postponed region "allows PLI application routines to create
-// read-only events". A PLI write through VpiContext::PutValue is not a
-// read-only operation, so it is recorded as a violation when it executes
-// from a Postponed PLI callback (the same Postponed region §4.4.2.9 names).
 TEST(PliPostponedSim, PliWriteFromPostponedRecordsWriteViolation) {
   Arena arena;
   Scheduler sched(arena);
@@ -70,9 +63,6 @@ TEST(PliPostponedSim, PliWriteFromPostponedRecordsWriteViolation) {
   EXPECT_EQ(sched.IllegalPostponedWriteCount(), 1u);
 }
 
-// §4.4.3.10: "create read-only events after processing all other regions."
-// A PLI callback in Postponed that schedules into an earlier region of the
-// current time slot is creating a non-read-only event, which is forbidden.
 TEST(PliPostponedSim, PliScheduleIntoEarlierRegionIsFlagged) {
   Arena arena;
   Scheduler sched(arena);
@@ -90,10 +80,6 @@ TEST(PliPostponedSim, PliScheduleIntoEarlierRegionIsFlagged) {
   EXPECT_EQ(sched.IllegalPostponedScheduleCount(), 1u);
 }
 
-// §4.4.3.10: a PLI callback in Postponed creating a future-time event is a
-// read-only operation with respect to the current time slot — the rule is
-// scoped to "after processing all other regions" of this slot. Such a
-// schedule must not be flagged.
 TEST(PliPostponedSim, PliScheduleIntoFutureTimeSlotIsNotFlagged) {
   Arena arena;
   Scheduler sched(arena);
@@ -110,14 +96,6 @@ TEST(PliPostponedSim, PliScheduleIntoFutureTimeSlotIsNotFlagged) {
   EXPECT_EQ(sched.IllegalPostponedScheduleCount(), 0u);
 }
 
-// §4.4.3.10: "create read-only events after processing all other regions."
-// A PLI callback in Postponed creating another Postponed event at the current
-// time slot is not scheduling into "any previous region" — Postponed is the
-// current region, not a prior one. The production schedule check in
-// scheduler.cpp (region != Region::kPostponed) lets this through; observing
-// the count stays at zero proves the legal same-region branch fires from a
-// §4.4.3.10 PLI vantage. Companion positive case for
-// PliScheduleIntoEarlierRegionIsFlagged.
 TEST(PliPostponedSim, PliScheduleIntoSameRegionAtCurrentTimeIsNotFlagged) {
   Arena arena;
   Scheduler sched(arena);

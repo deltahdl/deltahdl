@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Default value inserted when input port omitted at instantiation ---
-
 TEST(DefaultPortValueSimulation, OmittedInputGetsDefaultValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -69,8 +67,6 @@ TEST(DefaultPortValueSimulation, ExplicitConnectionOverridesDefault) {
   EXPECT_EQ(var->value.ToUint64(), 0x42u);
 }
 
-// --- Default evaluated in the defining module's scope ---
-
 TEST(DefaultPortValueSimulation, DefaultEvaluatedInDefiningModuleScope) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -96,8 +92,6 @@ TEST(DefaultPortValueSimulation, DefaultEvaluatedInDefiningModuleScope) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-// --- Default from parameter in the defining module ---
-
 TEST(DefaultPortValueSimulation, DefaultFromModuleParameter) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -119,4 +113,4 @@ TEST(DefaultPortValueSimulation, DefaultFromModuleParameter) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
-}  // namespace
+}

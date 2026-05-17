@@ -70,4 +70,4 @@ TEST(GenericInterfaceModportInstantiation, AcceptsAnyInterfaceTypeWithModport) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

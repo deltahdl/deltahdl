@@ -160,4 +160,4 @@ TEST(SubroutineCallSim, NamedArgTaskOutputWriteback) {
   EXPECT_EQ(vb->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

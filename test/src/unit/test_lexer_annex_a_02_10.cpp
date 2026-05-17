@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- Assertion declaration keywords ---
-
 TEST(AssertionKeywordLexing, PropertyKeyword) {
   auto r = LexOne("property");
   EXPECT_EQ(r.token.kind, TokenKind::kKwProperty);
@@ -122,8 +120,6 @@ TEST(AssertionKeywordLexing, LocalKeyword) {
   EXPECT_EQ(r.token.text, "local");
 }
 
-// --- Property expression keywords ---
-
 TEST(AssertionKeywordLexing, NexttimeKeyword) {
   auto r = LexOne("nexttime");
   EXPECT_EQ(r.token.kind, TokenKind::kKwNexttime);
@@ -201,8 +197,6 @@ TEST(AssertionKeywordLexing, SyncRejectOnKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwSyncRejectOn);
   EXPECT_EQ(r.token.text, "sync_reject_on");
 }
-
-// --- Assertion operators ---
 
 TEST(AssertionOperatorLexing, OverlapImplicationOp) {
   auto tokens = Lex("a |-> b");
@@ -299,8 +293,6 @@ TEST(AssertionOperatorLexing, CycleDelayInSequence) {
   EXPECT_EQ(count, 2);
 }
 
-// --- Keyword used as identifier guard ---
-
 TEST(AssertionKeywordLexing, PropertyNotIdentifier) {
   auto tokens = Lex("property foo");
   ASSERT_GE(tokens.size(), 2u);
@@ -315,4 +307,4 @@ TEST(AssertionKeywordLexing, SequenceNotIdentifier) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
 }
 
-}  // namespace
+}

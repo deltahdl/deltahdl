@@ -65,4 +65,4 @@ TEST(CompilerDirectiveParsing, MultipleResetallBetweenModulesValid) {
                               "`resetall\n"));
 }
 
-}  // namespace
+}

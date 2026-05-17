@@ -82,4 +82,4 @@ TEST(TypeParameterElab, TypeParamLogicVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-}  // namespace
+}

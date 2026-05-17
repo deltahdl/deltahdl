@@ -3,7 +3,6 @@
 
 namespace {
 
-// §15.5.5.1: After merge (a = b), triggering a unblocks waiter on b.
 TEST(IpcSync, MergedTriggerUnblocksAliasWaiter) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -31,7 +30,6 @@ TEST(IpcSync, MergedTriggerUnblocksAliasWaiter) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §15.5.5.1: After merge (a = b), triggering b unblocks waiter on a.
 TEST(IpcSync, MergedTriggerUnblocksOriginalWaiter) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -59,7 +57,6 @@ TEST(IpcSync, MergedTriggerUnblocksOriginalWaiter) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §15.5.5.1: Chained merge (a=c; b=a) propagates trigger to all aliases.
 TEST(IpcSync, ChainedMergePropagatesTrigger) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -88,7 +85,6 @@ TEST(IpcSync, ChainedMergePropagatesTrigger) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-// §15.5.5.1: Process blocked on @E2 before E2=E1 never unblocks.
 TEST(IpcSync, ProcessBlockedBeforeMergeDoesNotUnblock) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -116,7 +112,6 @@ TEST(IpcSync, ProcessBlockedBeforeMergeDoesNotUnblock) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §15.5.5.1: Triggered state propagates across merged events.
 TEST(IpcSync, MergedEventTriggeredStateShared) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -143,4 +138,4 @@ TEST(IpcSync, MergedEventTriggeredStateShared) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-}  // namespace
+}

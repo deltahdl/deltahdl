@@ -22,4 +22,4 @@ TEST(FormalSyntaxParsing, ChainedMemberAccess) {
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
 }
 
-}  // namespace
+}

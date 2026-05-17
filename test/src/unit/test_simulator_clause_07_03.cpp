@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.3: Union is single storage — write one member, read same member back.
 TEST(UnionSimulation, UnpackedUnionMemberWriteReadBack) {
   auto v = RunAndGet(
       "module t;\n"
@@ -20,7 +19,6 @@ TEST(UnionSimulation, UnpackedUnionMemberWriteReadBack) {
   EXPECT_EQ(v, 42u);
 }
 
-// §7.3: Union is single storage — write via one member, read via another.
 TEST(UnionSimulation, UnpackedUnionSingleStorage_CrossMemberRead) {
   auto v = RunAndGet(
       "module t;\n"
@@ -36,8 +34,6 @@ TEST(UnionSimulation, UnpackedUnionSingleStorage_CrossMemberRead) {
   EXPECT_EQ(v, 99u);
 }
 
-// §7.3: Uninitialized unpacked union defaults to first member's type default.
-// First member is int (2-state) → default is 0.
 TEST(UnionSimulation, UnpackedUnionDefaultInit_IntFirstMember) {
   auto v = RunAndGet(
       "module t;\n"
@@ -52,7 +48,6 @@ TEST(UnionSimulation, UnpackedUnionDefaultInit_IntFirstMember) {
   EXPECT_EQ(v, 0u);
 }
 
-// §7.3: Overwrite union member and read back whole-variable value.
 TEST(UnionSimulation, UnpackedUnionOverwrite) {
   auto v = RunAndGet(
       "module t;\n"
@@ -69,4 +64,4 @@ TEST(UnionSimulation, UnpackedUnionOverwrite) {
   EXPECT_EQ(v, 20u);
 }
 
-}  // namespace
+}

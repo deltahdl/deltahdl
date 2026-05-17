@@ -1,4 +1,4 @@
-// §8.26.6
+
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -6,9 +6,6 @@
 using namespace delta;
 
 namespace {
-
-// Req: When a class implements multiple interface classes, identifiers are
-// merged from different name spaces into a single name space.
 
 TEST(InterfaceClassNameMerging, MethodsFromMultipleInterfacesCallable) {
   EXPECT_EQ(RunAndGet(
@@ -34,9 +31,6 @@ TEST(InterfaceClassNameMerging, MethodsFromMultipleInterfacesCallable) {
       "  end\n"
       "endmodule\n", "result"), 3u);
 }
-
-// Req: When an interface class extends multiple interface classes, identifiers
-// are merged from different name spaces into a single name space.
 
 TEST(InterfaceClassNameMerging, ParamsFromMultipleExtendedInterfacesAccessible) {
   EXPECT_EQ(RunAndGet(
@@ -85,4 +79,4 @@ TEST(InterfaceClassNameMerging, TransitiveMergeMethodsCallable) {
       "endmodule\n", "result"), 7u);
 }
 
-}  // namespace
+}

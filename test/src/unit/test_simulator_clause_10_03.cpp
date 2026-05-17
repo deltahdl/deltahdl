@@ -74,8 +74,6 @@ TEST(ContinuousAssignSim, DrivesVectorVariable) {
   EXPECT_EQ(var->value.ToUint64(), 0xBEEFu);
 }
 
-// §10.3: "This assignment shall occur whenever the value of the right-hand
-// side changes." Updating a variable on the RHS re-evaluates the LHS.
 TEST(ContinuousAssignSim, AssignmentReevaluatesOnRhsChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -100,4 +98,4 @@ TEST(ContinuousAssignSim, AssignmentReevaluatesOnRhsChange) {
   EXPECT_EQ(y->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

@@ -211,9 +211,6 @@ TEST(StructDeclarationParsing, NestedInlineStructMember) {
   EXPECT_EQ(members[1].name, "id");
 }
 
-// §7.2: "Structure declarations follow the C syntax, but without the
-// optional structure tags before the '{'." A C-style tag `mytag` between
-// `struct` and the body's '{' must be diagnosed.
 TEST(StructDeclarationParsing, StructTagBeforeBraceRejected) {
   auto r = Parse(
       "module m;\n"
@@ -222,8 +219,6 @@ TEST(StructDeclarationParsing, StructTagBeforeBraceRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §7.2: same rule for union — a C-style tag between `union` and '{' is
-// not permitted.
 TEST(StructDeclarationParsing, UnionTagBeforeBraceRejected) {
   auto r = Parse(
       "module m;\n"
@@ -232,9 +227,6 @@ TEST(StructDeclarationParsing, UnionTagBeforeBraceRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §7.2 BNF: `struct_union ::= struct | union [ soft | tagged ]`. The
-// bracketed alternation is mutually exclusive — at most one of `soft` or
-// `tagged` may appear, so writing both must be diagnosed.
 TEST(StructDeclarationParsing, UnionSoftAndTaggedRejected) {
   auto r = Parse(
       "module m;\n"
@@ -243,8 +235,6 @@ TEST(StructDeclarationParsing, UnionSoftAndTaggedRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §7.2 BNF positive: `union tagged { ... }` is legal — confirms the parser
-// still accepts the single-qualifier forms after the mutual-exclusion fix.
 TEST(StructDeclarationParsing, UnionTaggedAloneOk) {
   auto r = Parse(
       "module m;\n"
@@ -258,8 +248,6 @@ TEST(StructDeclarationParsing, UnionTaggedAloneOk) {
   EXPECT_FALSE(item->data_type.is_soft);
 }
 
-// §7.2 BNF positive: `union soft { ... }` is legal — same rationale as the
-// tagged-alone test.
 TEST(StructDeclarationParsing, UnionSoftAloneOk) {
   auto r = Parse(
       "module m;\n"
@@ -273,4 +261,4 @@ TEST(StructDeclarationParsing, UnionSoftAloneOk) {
   EXPECT_FALSE(item->data_type.is_tagged);
 }
 
-}  // namespace
+}

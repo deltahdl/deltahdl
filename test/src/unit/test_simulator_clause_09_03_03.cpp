@@ -178,4 +178,4 @@ TEST(BlockStartFinishSimulation, DeeplyNestedSeqBlocksFinishBeforeContinue) {
   LowerRunAndCheck(f, design, {{"r", 5u}});
 }
 
-}  // namespace
+}

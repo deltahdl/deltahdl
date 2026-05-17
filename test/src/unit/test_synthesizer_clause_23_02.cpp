@@ -1,12 +1,10 @@
-// §23.2
+
 
 #include "fixture_synthesizer.h"
 #include "synthesizer/synth_lower.h"
 
 namespace {
 
-// §23.2 Module definitions — a minimal empty module reaches the synthesizer
-// and lowers to an AIG without diagnostics.
 TEST(ModuleDefinitions, MinimalEmpty) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f, "module m; endmodule");
@@ -25,4 +23,4 @@ TEST(ModuleDefinitions, MacromoduleSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

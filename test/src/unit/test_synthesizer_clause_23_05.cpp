@@ -4,8 +4,6 @@
 
 namespace {
 
-// --- Req 1: Extern declaration shall not interfere with synthesis ---
-
 TEST(ExternModuleSynthesis, ExternDoesNotInterfereWithSynthesis) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -21,8 +19,6 @@ TEST(ExternModuleSynthesis, ExternDoesNotInterfereWithSynthesis) {
   auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
 }
-
-// --- Req 2: .* port resolution from extern synthesizes correctly ---
 
 TEST(ExternModuleSynthesis, WildcardPortsFromExternSynthesize) {
   SynthFixture f;
@@ -40,4 +36,4 @@ TEST(ExternModuleSynthesis, WildcardPortsFromExternSynthesize) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

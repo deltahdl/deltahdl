@@ -92,9 +92,6 @@ TEST(RealDataType, RealAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.12: "Edge event controls (posedge, negedge, edge) applied to real
-// variables" are prohibited. Tests cover all three edge keywords here so
-// the prohibition is exercised for every form named in §6.12.
 TEST(RealDataType, RealEdgeKeyword_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -107,8 +104,6 @@ TEST(RealDataType, RealEdgeKeyword_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.12: "Bit-select or part-select references of real variables" are
-// prohibited.
 TEST(RealDataType, RealBitSelectError) {
   ElabFixture f;
   ElaborateSrc(
@@ -121,8 +116,6 @@ TEST(RealDataType, RealBitSelectError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.12: "Bit-select or part-select references of real variables" are
-// prohibited; part-select form.
 TEST(RealDataType, RealPartSelectError) {
   ElabFixture f;
   ElaborateSrc(
@@ -135,8 +128,6 @@ TEST(RealDataType, RealPartSelectError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.12: the bit-select prohibition applies to every real variable type —
-// shortreal here, alongside the real and realtime cases.
 TEST(RealDataType, ShortrealBitSelectError) {
   ElabFixture f;
   ElaborateSrc(
@@ -149,9 +140,6 @@ TEST(RealDataType, ShortrealBitSelectError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.12: "The realtime declarations shall be treated synonymously with real
-// declarations and can be used interchangeably." Cross-assignment between a
-// real variable and a realtime variable shall be permitted in both directions.
 TEST(RealDataType, RealAndRealtimeInterchangeable) {
   ElabFixture f;
   ElaborateSrc(
@@ -168,4 +156,4 @@ TEST(RealDataType, RealAndRealtimeInterchangeable) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

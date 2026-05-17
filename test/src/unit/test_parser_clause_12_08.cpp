@@ -120,7 +120,6 @@ TEST(JumpStatementSyntaxParsing, ReturnFromVoidFunctionEarly) {
   EXPECT_EQ(if_stmt->then_branch->expr, nullptr);
 }
 
-
 TEST(JumpStatementSyntaxParsing, ReturnVoid) {
   auto r = Parse(
       "module t;\n"
@@ -207,4 +206,4 @@ TEST(JumpStatementSyntaxParsing, ContinueStatementInBody) {
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);
 }
 
-}  // namespace
+}

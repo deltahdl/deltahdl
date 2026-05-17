@@ -19,62 +19,48 @@ class Arena;
 Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
                    uint32_t context_width = 0);
 
-// §11 helpers shared across eval*.cpp files.
 bool HasUnknownBits(const Logic4Vec& v);
 Logic4Vec MakeAllX(Arena& arena, uint32_t width);
 int64_t SignExtend(uint64_t val, uint32_t width);
 
-// §7: Select (bit/part) and indexed access (eval.cpp → eval_expr.cpp).
 Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena);
 
-// §20 Utility system calls ($clog2, $bits, $countones, etc.)
 Logic4Vec EvalUtilitySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::string_view name);
 
-// §21 I/O system calls ($fopen, $fclose, $readmemh, etc.)
 Logic4Vec EvalIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                         std::string_view name);
 
-// §20.8 Math system calls ($ln, $log10, $sin, $pow, etc.)
 Logic4Vec EvalMathSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                           std::string_view name);
 
-// §21.3 Extended file I/O ($fgets, $fgetc, $feof, $fseek, etc.)
 Logic4Vec EvalFileIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             std::string_view name);
 
-// §20.7 Array query functions ($dimensions, $left, $right, etc.)
 Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 std::string_view name);
 
-// §20.11-20.16 Assertion control, sampled values, coverage, stochastic, PLA.
 Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            std::string_view name);
 
-// §6.16 String method dispatch (eval_string.cpp).
 bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              Logic4Vec& out);
 
-// §6.19 Enum method dispatch (eval_enum.cpp).
 bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out);
 bool TryEvalEnumProperty(std::string_view var_name, std::string_view method,
                           SimContext& ctx, Arena& arena, Logic4Vec& out);
 
-// §7.12 Array method dispatch (eval_array.cpp).
 bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             Logic4Vec& out);
 bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena);
 
-// Assemble a vector of Logic4Vec parts into a single value (MSB-first).
 Logic4Vec AssembleConcatParts(const std::vector<Logic4Vec>& parts,
                               uint32_t total_width, Arena& arena);
 
-// Binary operator dispatch (used by compound assignment).
 Logic4Vec EvalBinaryOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs, Arena& arena,
                        uint32_t context_width = 0);
 
-// §11.4.1: Compound assignment operators (eval_expr.cpp).
 TokenKind CompoundAssignBaseOp(TokenKind op);
 bool IsCompoundAssignOp(TokenKind op);
 Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena);
@@ -87,58 +73,42 @@ Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
                                 Arena& arena);
-// §10.9.2: Evaluate a named assignment pattern against struct type info.
+
 Logic4Vec EvalStructPattern(const Expr* expr, const StructTypeInfo* info,
                             SimContext& ctx, Arena& arena);
 Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena);
 
-// System call and function call dispatch (eval_function.cpp).
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena);
 
-// §20.10: shared severity-task header emitter. The §16.3 default-$error path
-// and the §20.10 severity system tasks both route through this so format and
-// observability stay consistent across the two subclauses.
 void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,
                         std::string_view msg, std::ostream& os);
 
-// §13: Set up a task call scope (push scope, bind args, push queue ref frame).
-// Returns the task's ModuleItem on success, or nullptr if not a task call.
-// Caller must execute task body, then call TeardownTaskCall().
 const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
                                 Arena& arena);
 void TeardownTaskCall(const ModuleItem* func, const Expr* expr,
                       SimContext& ctx, Arena& arena);
 
-// §8.7: Allocate a class object and execute constructor. Returns handle.
 Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
                        SimContext& ctx, Arena& arena);
 
-// §8.5: Override parameter properties on a class object with specialization
-// values stored for the given variable.
 void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
                               SimContext& ctx, Arena& arena);
 
-// §6.21: Validate that ref arguments are not used in static subroutines.
 class DiagEngine;
 struct ModuleItem;
 void ValidateRefLifetime(const ModuleItem* func, DiagEngine& diag);
 
-// §13.5.2: Reject writes to const ref arguments.
 void ValidateConstRefWriteProtection(const ModuleItem* func, DiagEngine& diag);
 
-// String <-> Logic4Vec conversion (eval_string.cpp).
 Logic4Vec StringToLogic4Vec(Arena& arena, std::string_view str);
 
-// Extract var_name and method_name from a kCall with kMemberAccess lhs.
-// Returns false if the expression is not a method call pattern.
 struct MethodCallParts {
   std::string_view var_name;
   std::string_view method_name;
 };
 bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out);
 
-// Shared formatting helpers (eval_format.cpp).
 std::string FormatDisplay(const std::string& fmt,
                           const std::vector<Logic4Vec>& vals,
                           const std::vector<std::string>& p_fmts = {});
@@ -146,9 +116,8 @@ std::string FormatArg(const Logic4Vec& val, char spec);
 std::string FormatValueAsString(const Logic4Vec& val);
 std::string ExtractFormatString(const Expr* first_arg);
 
-// §5.7/§5.9: Literal evaluation (evaluation_literal.cpp).
 Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena);
 Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena);
 Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena);
 
-}  // namespace delta
+}

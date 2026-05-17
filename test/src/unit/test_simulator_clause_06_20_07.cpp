@@ -35,4 +35,4 @@ TEST(DollarConstantSimulation, BoundedParameterNotRegisteredAsUnbounded) {
   EXPECT_FALSE(f.ctx.IsUnboundedParam("P"));
 }
 
-}  // namespace
+}

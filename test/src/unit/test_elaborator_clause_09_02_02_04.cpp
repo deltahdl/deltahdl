@@ -241,4 +241,4 @@ TEST(AlwaysFFElaboration, WaitForkInAlwaysFFErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

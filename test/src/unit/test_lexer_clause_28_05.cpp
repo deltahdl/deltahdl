@@ -1,4 +1,4 @@
-// §28.5
+
 
 #include <gtest/gtest.h>
 #include "fixture_lexer.h"
@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// The two multiple-output logic gate keywords must each lex to their own
-// distinct token kind so downstream stages can tell buf from not.
 TEST(BufNotLexing, BufKeyword) {
   auto tokens = Lex("buf");
   ASSERT_GE(tokens.size(), 1u);
@@ -34,4 +32,4 @@ TEST(BufNotLexing, NamedBufGateTokenSequence) {
   EXPECT_EQ(tokens[7].kind, TokenKind::kSemicolon);
 }
 
-}  // namespace
+}

@@ -16,9 +16,6 @@ static const RtlirNet* FindNetByName(std::string_view name,
   return nullptr;
 }
 
-// §28.8: Resolve the underlying net referenced by a bidirectional terminal
-// expression. Returns nullptr when the terminal does not reduce to a single
-// net (e.g. concatenation, variable, or unrecognised form).
 static const RtlirNet* TerminalNet(const Expr* term, const RtlirModule* mod) {
   if (!term) return nullptr;
   if (term->kind == ExprKind::kIdentifier)
@@ -29,9 +26,6 @@ static const RtlirNet* TerminalNet(const Expr* term, const RtlirModule* mod) {
   return nullptr;
 }
 
-// §28.8: True when `term` is either a scalar net identifier (width 1) or a
-// single-bit select on a net identifier — the only forms permitted on the
-// bidirectional terminals of resistive (rtran/rtranif*) switches.
 static bool IsScalarNetOrBitSelect(const Expr* term, const RtlirModule* mod) {
   if (!term) return false;
   if (term->kind == ExprKind::kIdentifier) {
@@ -56,12 +50,6 @@ static const RtlirVariable* FindVariableByName(std::string_view name,
   return nullptr;
 }
 
-// §28.8: Reports the disqualifying type kind when the control terminal
-// directly references a variable whose type cannot serve as a control input
-// (real, string, chandle, event). Returns nullptr for nets, 4-state and
-// 2-state variables, and for terminals that are not a bare identifier — those
-// cases are either explicitly permitted or fall outside this single-signal
-// rule (an arbitrary expression's type is checked elsewhere).
 static const char* DisallowedControlVariableKind(const Expr* term,
                                                  const RtlirModule* mod) {
   if (!term || term->kind != ExprKind::kIdentifier) return nullptr;
@@ -91,10 +79,7 @@ void ValidateBidirectionalSwitchConnections(const ModuleItem* item,
                        kind == GateKind::kRtranif1);
   if (is_resistive) {
     for (size_t i = 0; i < 2; ++i) {
-      // §28.8: tran/tranif* get the "may also ... user-defined net types"
-      // carve-out; the resistive variants do not, so reject UDNT terminals
-      // before the scalar-net check to give a clearer diagnostic than
-      // "must be a scalar net" for a net that is in fact scalar.
+
       auto* net = TerminalNet(terms[i], mod);
       if (net && net->is_user_nettype) {
         diag.Error(item->loc,
@@ -142,15 +127,12 @@ void ValidateBidirectionalSwitchConnections(const ModuleItem* item,
   }
 }
 
-// §4.9.6: Per-gate-kind index list of terminals that act as outputs or
-// inout (bidirectional) connections. These are the terminals the spec
-// constrains to 1-bit nets.
 static std::vector<size_t> OutputOrInoutTerminalIndices(GateKind kind,
                                                         size_t nterms) {
   switch (kind) {
     case GateKind::kBuf:
     case GateKind::kNot: {
-      // Last terminal is the input; every preceding terminal is an output.
+
       std::vector<size_t> outs;
       for (size_t i = 0; i + 1 < nterms; ++i) outs.push_back(i);
       return outs;
@@ -161,13 +143,10 @@ static std::vector<size_t> OutputOrInoutTerminalIndices(GateKind kind,
     case GateKind::kTranif1:
     case GateKind::kRtranif0:
     case GateKind::kRtranif1:
-      // Bidirectional pass switches: terminals 0 and 1 are the two inout
-      // terminals; the optional terminal 2 (control) is an input.
+
       return (nterms >= 2) ? std::vector<size_t>{0, 1} : std::vector<size_t>{};
     default:
-      // Single-output gates (and/nand/or/nor/xor/xnor, bufif*, notif*,
-      // nmos/pmos/rnmos/rpmos, cmos/rcmos, pullup/pulldown): terminal 0 is
-      // the output, every later terminal is an input.
+
       return (nterms >= 1) ? std::vector<size_t>{0} : std::vector<size_t>{};
   }
 }
@@ -176,8 +155,7 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                                            const RtlirModule* mod,
                                            DiagEngine& diag) {
   if (!item || item->kind != ModuleItemKind::kGateInst) return;
-  // Array-of-instances forms have a separate width rule (1 or array length)
-  // already enforced where the array is unrolled; do not double-diagnose.
+
   if (item->inst_range_left || item->inst_range_right) return;
 
   const auto& terms = item->gate_terminals;
@@ -193,8 +171,6 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
   }
 }
 
-/// Build a binary expression tree from left-folding the given operand over
-/// all inputs with the given operator.
 static Expr* BuildBinaryChain(Arena& arena, TokenKind op,
                               const std::vector<Expr*>& inputs) {
   Expr* result = inputs[0];
@@ -209,7 +185,6 @@ static Expr* BuildBinaryChain(Arena& arena, TokenKind op,
   return result;
 }
 
-/// Wrap an expression in a unary NOT (~).
 static Expr* WrapInvert(Arena& arena, Expr* inner) {
   auto* inv = arena.Create<Expr>();
   inv->kind = ExprKind::kUnary;
@@ -218,7 +193,6 @@ static Expr* WrapInvert(Arena& arena, Expr* inner) {
   return inv;
 }
 
-/// Create an integer literal expression with the given value.
 static Expr* MakeIntLiteral(Arena& arena, uint64_t val) {
   auto* lit = arena.Create<Expr>();
   lit->kind = ExprKind::kIntegerLiteral;
@@ -226,7 +200,6 @@ static Expr* MakeIntLiteral(Arena& arena, uint64_t val) {
   return lit;
 }
 
-/// Create an unbased-unsized high-Z literal ('z).
 static Expr* MakeHighZ(Arena& arena) {
   auto* lit = arena.Create<Expr>();
   lit->kind = ExprKind::kUnbasedUnsizedLiteral;
@@ -234,7 +207,6 @@ static Expr* MakeHighZ(Arena& arena) {
   return lit;
 }
 
-/// Build a ternary (cond ? t : f) expression.
 static Expr* MakeTernary(Arena& arena, Expr* cond, Expr* t, Expr* f) {
   auto* tern = arena.Create<Expr>();
   tern->kind = ExprKind::kTernary;
@@ -244,10 +216,9 @@ static Expr* MakeTernary(Arena& arena, Expr* cond, Expr* t, Expr* f) {
   return tern;
 }
 
-/// Build the RHS expression for an N-input gate (and/nand/or/nor/xor/xnor).
 static Expr* BuildNInputGateExpr(Arena& arena, GateKind kind,
                                  const std::vector<Expr*>& terminals) {
-  // terminals[0] = output, terminals[1..n-1] = inputs.
+
   std::vector<Expr*> inputs(terminals.begin() + 1, terminals.end());
   TokenKind op = TokenKind::kAmp;
   bool invert = false;
@@ -280,16 +251,12 @@ static Expr* BuildNInputGateExpr(Arena& arena, GateKind kind,
   return invert ? WrapInvert(arena, chain) : chain;
 }
 
-// §28.16: Gate primitives lower to continuous assignments; the parsed
-// `#(d1, d2, d3)` on the instance must ride along to the simulator so
-// Table 28-9 selection and the 1/2/3-delay rules apply to the driven net.
 static void ApplyGateDelays(RtlirContAssign& ca, const ModuleItem* item) {
   ca.delay = item->gate_delay;
   ca.delay_fall = item->gate_delay_fall;
   ca.delay_decay = item->gate_delay_decay;
 }
 
-/// Build RHS for bufif/notif/pull gates (all single-output).
 static Expr* BuildOutputGateExpr(Arena& arena, GateKind kind,
                                  const std::vector<Expr*>& terminals) {
   switch (kind) {
@@ -307,9 +274,6 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   auto& terms = item->gate_terminals;
   if (terms.empty()) return;
 
-  // §28.5: buf and not have one input (last terminal) and one or more
-  // outputs (all preceding terminals); emit one continuous assign per
-  // output.
   if (kind == GateKind::kBuf || kind == GateKind::kNot) {
     if (terms.size() < 2) return;
     auto* input = terms.back();
@@ -326,10 +290,6 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     return;
   }
 
-  // §28.6: tri-state gates take (output, data, control). When control
-  // asserts the gate conducts (optionally inverting for notif); otherwise
-  // the output is high-Z. Suffix 1 conducts on control==1, suffix 0 on
-  // control==0.
   if (kind == GateKind::kBufif0 || kind == GateKind::kBufif1 ||
       kind == GateKind::kNotif0 || kind == GateKind::kNotif1) {
     if (terms.size() != 3) return;
@@ -352,19 +312,12 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     return;
   }
 
-  // §28.8: bidirectional pass switches have no unique driven terminal, so
-  // they cannot be lowered to a continuous assignment. Skip emitting any
-  // driver here; switch-network resolution happens at simulation time.
   if (kind == GateKind::kTran || kind == GateKind::kRtran ||
       kind == GateKind::kTranif0 || kind == GateKind::kTranif1 ||
       kind == GateKind::kRtranif0 || kind == GateKind::kRtranif1) {
     return;
   }
 
-  // §28.7: MOS switches take (output, data, control) and pass data through
-  // only when conducting; otherwise the output is high-Z. nmos/rnmos
-  // conduct on control==1; pmos/rpmos conduct on control==0. MOS switches
-  // do not invert data (strength attenuation is modeled elsewhere).
   if (kind == GateKind::kNmos || kind == GateKind::kPmos ||
       kind == GateKind::kRnmos || kind == GateKind::kRpmos) {
     if (terms.size() != 3) return;
@@ -379,7 +332,7 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     ca.lhs = terms[0];
     ca.rhs = rhs;
     ca.width = LookupLhsWidth(ca.lhs, mod);
-    // §28.13 covers nmos and pmos only; rnmos/rpmos are resistive (§28.14).
+
     ca.from_nonresistive_switch =
         (kind == GateKind::kNmos || kind == GateKind::kPmos);
     ca.from_resistive_switch =
@@ -392,17 +345,11 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     return;
   }
 
-  // §28.10: pullup places logic 1 on its net; pulldown places logic 0.
-  // When no strength is specified these sources drive at pull strength.
-  // For pullup, only the strength1 side is meaningful — any strength0 is
-  // ignored (and vice versa for pulldown) because these sources only ever
-  // drive a single logic level. Delay specifications are not permitted and
-  // are already rejected during parsing.
   if (kind == GateKind::kPullup || kind == GateKind::kPulldown) {
     if (terms.size() != 1) return;
     bool is_up = (kind == GateKind::kPullup);
     uint8_t driving = is_up ? item->drive_strength1 : item->drive_strength0;
-    if (driving == 0) driving = 3;  // pull
+    if (driving == 0) driving = 3;
     RtlirContAssign ca;
     ca.lhs = terms[0];
     ca.rhs = MakeIntLiteral(arena, is_up ? 1 : 0);
@@ -413,13 +360,6 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     return;
   }
 
-  // §28.9: cmos/rcmos are an nmos+pmos pair sharing the data input/output
-  // with separate n- and p-channel controls. Terminals are (out, data,
-  // ncontrol, pcontrol). The nmos half conducts on ncontrol==1; the pmos
-  // half conducts on pcontrol==0. The combined output is data whenever
-  // either half conducts, otherwise high-Z. Equivalently:
-  //   ncontrol ? data : (pcontrol ? 'z : data)
-  // Strength reduction for rcmos is handled elsewhere.
   if (kind == GateKind::kCmos || kind == GateKind::kRcmos) {
     if (terms.size() != 4) return;
     auto* data = terms[1];
@@ -432,7 +372,7 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     ca.lhs = terms[0];
     ca.rhs = rhs;
     ca.width = LookupLhsWidth(ca.lhs, mod);
-    // §28.13: cmos is nonresistive; rcmos is resistive (§28.14).
+
     ca.from_nonresistive_switch = (kind == GateKind::kCmos);
     ca.from_resistive_switch = (kind == GateKind::kRcmos);
     if (ca.from_nonresistive_switch || ca.from_resistive_switch) {
@@ -468,4 +408,4 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   mod->assigns.push_back(ca);
 }
 
-}  // namespace delta
+}

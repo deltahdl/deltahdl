@@ -14,8 +14,6 @@ using namespace delta;
 
 namespace {
 
-// §4.9.5: Switch processing shall consider all the devices in a bidirectional
-// switch-connected net before determining the appropriate value for any node.
 TEST(BidirectionalSwitchNetwork,
      NetworkResolutionPropagatesAcrossCascadedSwitches) {
   Arena arena;
@@ -39,10 +37,6 @@ TEST(BidirectionalSwitchNetwork,
   EXPECT_EQ(ValOf(*vc), kVal1);
 }
 
-// §4.9.5: The "consider all the devices in a bidirectional switch-connected
-// net" rule has to take non-conducting devices into account too — they
-// partition the net so a value cannot reach nodes on the far side of an open
-// switch even if every other device in the chain conducts.
 TEST(BidirectionalSwitchNetwork,
      NonConductingSwitchBlocksDownstreamPropagation) {
   Arena arena;
@@ -84,9 +78,6 @@ TEST(BidirectionalSwitchNetwork, AllSixSourceElementsAreBidirectional) {
   }
 }
 
-// §4.9.5: For built-in net types, when the control input is x, any node with
-// the same logic level under all conducting/nonconducting combinations gets
-// that level; nodes whose value depends on the choice get x.
 TEST(BidirectionalSwitchNetwork, BuiltinNetXControlAmbiguousGivesX) {
   auto np = MakeNetPair(1);
   std::vector<BidirSwitchInst> sw;
@@ -95,9 +86,6 @@ TEST(BidirectionalSwitchNetwork, BuiltinNetXControlAmbiguousGivesX) {
   EXPECT_EQ(ValOf(*np.vb), kValX);
 }
 
-// §4.9.5: A z control input on a built-in-net switch is unknown for the same
-// reason as x and produces x at every node whose value is not unique across
-// the conducting/nonconducting combinations.
 TEST(BidirectionalSwitchNetwork, BuiltinNetZControlAmbiguousGivesX) {
   auto np = MakeNetPair(0);
   std::vector<BidirSwitchInst> sw;
@@ -106,10 +94,6 @@ TEST(BidirectionalSwitchNetwork, BuiltinNetZControlAmbiguousGivesX) {
   EXPECT_EQ(ValOf(*np.vb), kValX);
 }
 
-// §4.9.5: The other half of the built-in-net x-control rule: when both the
-// fully-conducting and fully-nonconducting solutions agree on a node, that
-// shared level is the steady-state value rather than x. Both terminals are
-// driven to the same value here, so neither solution can disagree.
 TEST(BidirectionalSwitchNetwork,
      BuiltinNetUnknownControlUniqueLogicLevelIsPreserved) {
   Arena arena;
@@ -129,8 +113,6 @@ TEST(BidirectionalSwitchNetwork,
   EXPECT_EQ(ValOf(*vb), kVal1);
 }
 
-// §4.9.5: For user-defined net types, when the control input is on, the two
-// terminal nets are resolved as if a single net.
 TEST(BidirectionalSwitchNetwork,
      UserDefinedNetKnownControlOnResolvesAsSingleNet) {
   auto np = MakeNetPair(1);
@@ -140,8 +122,6 @@ TEST(BidirectionalSwitchNetwork,
   EXPECT_EQ(ValOf(*np.vb), kVal1);
 }
 
-// §4.9.5: For user-defined net types, when the control input is off, each
-// terminal net is resolved separately, so an undriven net stays at z.
 TEST(BidirectionalSwitchNetwork,
      UserDefinedNetKnownControlOffResolvesSeparately) {
   auto np = MakeNetPair(1);
@@ -151,9 +131,6 @@ TEST(BidirectionalSwitchNetwork,
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
-// §4.9.5: The bidirectional switch shall be treated as off for an x control
-// input value when the connected nets are user-defined. The undriven side
-// therefore retains its prior z value rather than picking up x.
 TEST(BidirectionalSwitchNetwork, UserDefinedNetXControlIsOff) {
   auto np = MakeNetPair(1);
   std::vector<BidirSwitchInst> sw;
@@ -162,8 +139,6 @@ TEST(BidirectionalSwitchNetwork, UserDefinedNetXControlIsOff) {
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
-// §4.9.5: A z control input on a user-defined-net switch likewise turns the
-// switch off; this is the contrast with the built-in-net rule.
 TEST(BidirectionalSwitchNetwork, UserDefinedNetZControlIsOff) {
   auto np = MakeNetPair(1);
   std::vector<BidirSwitchInst> sw;
@@ -194,4 +169,4 @@ TEST(BidirectionalSwitchNetwork,
   EXPECT_TRUE(BidirSwitchControlIsUnknown(BidirSwitchKind::kRtranif1, {1, 1}));
 }
 
-}  // namespace
+}

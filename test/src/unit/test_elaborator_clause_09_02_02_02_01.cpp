@@ -529,4 +529,4 @@ TEST(AlwaysCombSensitivityCollection, WaitConditionExcludedFromSensitivity) {
   EXPECT_FALSE(reads.count("x"));
 }
 
-}  // namespace
+}

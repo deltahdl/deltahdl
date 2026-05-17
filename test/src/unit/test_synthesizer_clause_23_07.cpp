@@ -4,8 +4,6 @@
 
 namespace {
 
-// --- Rule (a): Struct member select synthesizes ---
-
 TEST(DottedNameSynthesis, StructMemberSelectSynthesizes) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -37,4 +35,4 @@ TEST(DottedNameSynthesis, NestedStructMemberSelectSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

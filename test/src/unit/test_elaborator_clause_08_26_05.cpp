@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// Req 1: Assign object handle to interface class variable.
-
 TEST(InterfaceClassCastingAndRefAssignment, InterfaceRefAssignOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
@@ -64,8 +62,6 @@ TEST(InterfaceClassCastingAndRefAssignment, AssignImplHandleToMultipleIfaceVarsO
              "endmodule\n"));
 }
 
-// Req 4: Interface class objects shall not be constructed.
-
 TEST(InterfaceClassCastingAndRefAssignment, InterfaceClassDeclElaboratesOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
@@ -88,4 +84,4 @@ TEST(InterfaceClassCastingAndRefAssignment, InterfaceClassNewError) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

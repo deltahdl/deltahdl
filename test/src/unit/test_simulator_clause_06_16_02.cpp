@@ -36,7 +36,7 @@ TEST(StringMethods, PutcZeroByte) {
 TEST(StringMethods, PutcNegativeIndex) {
   StringFixture f;
   auto* var = f.CreateStringVar("s", "abc");
-  // -1 as uint64_t wraps to a large value, exceeding any string length.
+
   auto* call = f.MakeMethodCall(
       "s", "putc",
       {f.MakeIntLiteral(static_cast<uint64_t>(-1)), f.MakeIntLiteral('X')});
@@ -44,4 +44,4 @@ TEST(StringMethods, PutcNegativeIndex) {
   EXPECT_EQ(VecToString(var->value), "abc");
 }
 
-}  // namespace
+}

@@ -120,4 +120,4 @@ TEST(NetDecl, TriregWithChargeStrengthMediumOk) {
   EXPECT_TRUE(ValidateNetDecl(info));
 }
 
-}  // namespace
+}

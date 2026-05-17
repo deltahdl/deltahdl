@@ -14,15 +14,11 @@ TEST(ClassSim, HandleCopiedNotObjectContents) {
   auto [handle, obj] = MakeObj(f, type);
   obj->SetProperty("value", MakeLogic4VecVal(f.arena, 32, 10));
 
-  // Simulate passing the handle as an argument (copy the handle value).
   uint64_t arg_handle = handle;
 
-  // Modify property through the copied handle.
   auto* arg_obj = f.ctx.GetClassObject(arg_handle);
   arg_obj->SetProperty("value", MakeLogic4VecVal(f.arena, 32, 99));
 
-  // The original sees the change because the handle was copied, not the
-  // object contents.
   EXPECT_EQ(obj->GetProperty("value", f.arena).ToUint64(), 99u);
 }
 
@@ -42,13 +38,11 @@ TEST(ClassSim, ClassContainsBothPropertiesAndMethods) {
 
   auto [handle, obj] = MakeObj(f, type);
 
-  // Properties are accessible.
   obj->SetProperty("command", MakeLogic4VecVal(f.arena, 32, 7));
   EXPECT_EQ(obj->GetProperty("command", f.arena).ToUint64(), 7u);
 
-  // Both function and task methods are resolvable.
   EXPECT_NE(obj->ResolveMethod("clean"), nullptr);
   EXPECT_NE(obj->ResolveMethod("current_status"), nullptr);
 }
 
-}  // namespace
+}

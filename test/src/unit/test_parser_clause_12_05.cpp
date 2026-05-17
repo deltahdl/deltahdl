@@ -452,4 +452,4 @@ TEST(CaseSyntaxParsing, CaseDefaultInMiddle) {
   EXPECT_FALSE(stmt->case_items[2].is_default);
 }
 
-}  // namespace
+}

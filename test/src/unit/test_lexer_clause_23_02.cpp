@@ -1,4 +1,4 @@
-// §23.2
+
 
 #include "fixture_lexer.h"
 
@@ -32,4 +32,4 @@ TEST(ModuleDefinitions, IdentifierAfterModuleKeyword) {
   EXPECT_EQ(tokens[1].text, "my_design");
 }
 
-}  // namespace
+}

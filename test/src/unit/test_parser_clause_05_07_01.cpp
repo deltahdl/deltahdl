@@ -385,4 +385,4 @@ TEST(IntegerLiteralParsing, UnbasedUnsizedLiteralInExpression) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

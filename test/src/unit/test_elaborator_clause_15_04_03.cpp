@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.3: put() call in initial block elaborates.
 TEST(MailboxPutElaborator, PutCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,7 +18,6 @@ TEST(MailboxPutElaborator, PutCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.3: put() with variable argument elaborates.
 TEST(MailboxPutElaborator, PutWithVariableArg) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -35,7 +33,6 @@ TEST(MailboxPutElaborator, PutWithVariableArg) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.3: Multiple put() calls elaborate.
 TEST(MailboxPutElaborator, MultiplePutCalls) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,4 +48,4 @@ TEST(MailboxPutElaborator, MultiplePutCalls) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

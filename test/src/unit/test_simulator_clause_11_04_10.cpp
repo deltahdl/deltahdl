@@ -135,45 +135,38 @@ TEST(OperatorSim, BinaryArithRightShift) {
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
 
-// §11.4.10: Arithmetic right shift fills with sign bit when result type is
-// signed (LRM Example 2: signed 4'b1000 >>> 2 yields 4'b1110).
 TEST(OperatorSim, ArithRightShiftSignedSignExtends) {
   SimFixture f;
-  // Signed variable with MSB set: 4'b1000 = -8 signed.
+
   MakeSignedVarAdv(f, "s", 4, 0b1000);
   auto* expr = MakeBinary(f.arena, TokenKind::kGtGtGt, MakeId(f.arena, "s"),
                           MakeInt(f.arena, 2));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  // Vacated bits filled with sign bit (1), so 4'b1110 = 14 unsigned / -2.
+
   EXPECT_EQ(result.ToUint64() & 0xFu, 0b1110u);
 }
 
-// §11.4.10: Arithmetic right shift fills with zeros when result type is
-// unsigned, even if the MSB is 1.
 TEST(OperatorSim, ArithRightShiftUnsignedZeroFills) {
   SimFixture f;
-  // Unsigned variable with MSB set: 4'b1000 = 8 unsigned.
+
   MakeVar(f, "u", 4, 0b1000);
   auto* expr = MakeBinary(f.arena, TokenKind::kGtGtGt, MakeId(f.arena, "u"),
                           MakeInt(f.arena, 2));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  // Unsigned: vacated bits filled with 0, so 4'b0010 = 2.
+
   EXPECT_EQ(result.ToUint64() & 0xFu, 0b0010u);
 }
 
-// §11.4.10: If the right operand has an x or z value, the result is unknown.
 TEST(EvalOpXZ, ArithRightShiftXAmount) {
   SimFixture f;
   MakeVar(f, "v", 4, 0b1100);
-  MakeVar4(f, "sa", 4, 0b0000, 0b0010);  // x in shift amount
+  MakeVar4(f, "sa", 4, 0b0000, 0b0010);
   auto* expr = MakeBinary(f.arena, TokenKind::kGtGtGt, MakeId(f.arena, "v"),
                           MakeId(f.arena, "sa"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-// §11.4.10: If the right operand has an x or z value, the result is unknown
-// (logical right shift variant).
 TEST(EvalOpXZ, LogicalRightShiftXAmount) {
   SimFixture f;
   MakeVar(f, "v", 4, 0b1100);
@@ -184,24 +177,21 @@ TEST(EvalOpXZ, LogicalRightShiftXAmount) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-// §11.4.10: X/Z bits in the LHS propagate through logical right shift.
 TEST(EvalOpXZ, LogicalRightShiftXOperand) {
   SimFixture f;
-  // aval=0b1000, bval=0b0100 → bit2 is x, bit3 is 1.
+
   MakeVar4(f, "so", 4, 0b1000, 0b0100);
   auto* expr = MakeBinary(f.arena, TokenKind::kGtGt, MakeId(f.arena, "so"),
                           MakeInt(f.arena, 1));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  // After >> 1: bit1 is x (was bit2), bit2 is 1 (was bit3).
+
   EXPECT_EQ(result.words[0].aval & 0xFu, 0b0100u);
   EXPECT_EQ(result.words[0].bval & 0xFu, 0b0010u);
 }
 
-// §11.4.10: The right operand is always treated as unsigned and has no effect
-// on the signedness of the result.
 TEST(OperatorSim, ShiftResultSignednessFromLhs) {
   SimFixture f;
-  // Signed LHS, unsigned RHS.
+
   MakeSignedVarAdv(f, "s", 8, 0x0F);
   MakeVar(f, "amt", 4, 2);
   auto* expr = MakeBinary(f.arena, TokenKind::kLtLt, MakeId(f.arena, "s"),
@@ -209,7 +199,6 @@ TEST(OperatorSim, ShiftResultSignednessFromLhs) {
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_TRUE(result.is_signed);
 
-  // Unsigned LHS, signed RHS — result still unsigned.
   MakeVar(f, "u", 8, 0x0F);
   MakeSignedVarAdv(f, "samt", 4, 2);
   auto* expr2 = MakeBinary(f.arena, TokenKind::kLtLt, MakeId(f.arena, "u"),
@@ -218,8 +207,6 @@ TEST(OperatorSim, ShiftResultSignednessFromLhs) {
   EXPECT_FALSE(result2.is_signed);
 }
 
-// §11.4.10: Result signedness is preserved from LHS for all four shift
-// operators.
 TEST(OperatorSim, AllShiftOpsPreserveLhsSignedness) {
   SimFixture f;
   MakeSignedVarAdv(f, "s", 8, 0x0F);
@@ -235,7 +222,6 @@ TEST(OperatorSim, AllShiftOpsPreserveLhsSignedness) {
   }
 }
 
-// §11.4.10: Shift by zero returns the operand unchanged.
 TEST(OperatorSim, ShiftByZero) {
   SimFixture f;
   MakeVar(f, "v", 8, 0xAB);
@@ -249,8 +235,6 @@ TEST(OperatorSim, ShiftByZero) {
   }
 }
 
-// §11.4.10: Shift amount larger than width produces zero (for left/logical
-// right shifts) or all-ones (for arithmetic right shift of negative signed).
 TEST(OperatorSim, ShiftByMoreThanWidth) {
   SimFixture f;
   MakeVar(f, "v", 4, 0b1111);
@@ -407,4 +391,4 @@ TEST(BlockingAssignSim, BlockingAssignShiftOps) {
   EXPECT_EQ(shr->value.ToUint64(), 0x03u);
 }
 
-}  // namespace
+}

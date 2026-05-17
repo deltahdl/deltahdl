@@ -36,7 +36,6 @@ static bool IsCompoundAssignOp(TokenKind op) {
   }
 }
 
-// §7.6, §7.9.9: Check array assignment compatibility for a pair of exprs.
 void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
                                        SourceLoc loc) {
   if (!lhs || !rhs) return;
@@ -45,8 +44,7 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
   auto lhs_it = var_array_info_.find(lhs->text);
   auto rhs_it = var_array_info_.find(rhs->text);
   if (lhs_it == var_array_info_.end() || rhs_it == var_array_info_.end()) {
-    // §7.6: A packed array cannot be directly assigned to an unpacked array
-    // without an explicit cast.
+
     if (lhs_it != var_array_info_.end() &&
         packed_array_vars_.count(rhs->text)) {
       diag_.Error(loc,
@@ -58,7 +56,7 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
   }
   const auto& l = lhs_it->second;
   const auto& r = rhs_it->second;
-  // §7.9.9
+
   if (l.is_assoc != r.is_assoc) {
     diag_.Error(loc,
                 "associative array cannot be assigned to or from a "
@@ -70,8 +68,7 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
     diag_.Error(loc, "associative array index type mismatch in assignment");
     return;
   }
-  // §7.6: for two arrays to be assignment compatible it is necessary that
-  // they have the same number of unpacked dimensions.
+
   if (l.num_unpacked_dims != r.num_unpacked_dims) {
     diag_.Error(loc,
                 std::format("array assignment requires the same number of "
@@ -80,10 +77,7 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
                             rhs->text, r.num_unpacked_dims));
     return;
   }
-  // §7.6: "The element types of source and target shall be equivalent."
-  // §7.6 routes faster-varying dimensions through §6.22.2 type equivalence,
-  // so the kind comparison delegates to ElementTypesEquivalent rather than a
-  // strict kind+identity check.
+
   if (!ElementTypesEquivalent(l.elem_type, l.elem_width, l.elem_is_signed,
                               l.elem_is_4state, r.elem_type, r.elem_width,
                               r.elem_is_signed, r.elem_is_4state)) {
@@ -102,11 +96,7 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
                             rhs->text, r.unpacked_size));
     return;
   }
-  // §7.6: "Any faster-varying dimensions shall meet the requirements for
-  // equivalence (see 6.22.2)." For two fixed-size leftmost arrays the
-  // dim_sizes vector is leftmost-first; the slowest-varying entry was
-  // checked above, so any divergence in the remaining (faster-varying)
-  // entries means the arrays are not assignment compatible.
+
   if (!l.is_dynamic && !r.is_dynamic && !l.is_assoc && !r.is_assoc &&
       l.dim_sizes.size() == r.dim_sizes.size() && l.dim_sizes.size() > 1) {
     for (size_t i = 1; i < l.dim_sizes.size(); ++i) {
@@ -142,7 +132,6 @@ void Elaborator::WalkStmtsForArrayAssign(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForArrayAssign(ci.body);
 }
 
-// §7.6, §7.9.9: Validate array assignment compatibility.
 void Elaborator::ValidateArrayAssignments(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
@@ -156,7 +145,6 @@ void Elaborator::ValidateArrayAssignments(const ModuleDecl* decl) {
   }
 }
 
-// §7.9.10: Build VarArrayInfo for a formal parameter from its dimensions.
 static Elaborator::VarArrayInfo FormalArrayInfo(
     const FunctionArg& arg,
     const std::unordered_set<std::string_view>& class_names) {
@@ -170,7 +158,7 @@ static Elaborator::VarArrayInfo FormalArrayInfo(
   }
   if (dim->kind == ExprKind::kIdentifier) {
     auto t = dim->text;
-    if (t == "$") return info;  // queue — not assoc or fixed
+    if (t == "$") return info;
     if (t == "string" || t == "int" || t == "integer" || t == "byte" ||
         t == "shortint" || t == "longint" || t == "*") {
       info.is_assoc = true;
@@ -183,12 +171,11 @@ static Elaborator::VarArrayInfo FormalArrayInfo(
       return info;
     }
   }
-  // Fixed-size array — set a nonzero size to distinguish from scalar.
+
   info.unpacked_size = 1;
   return info;
 }
 
-// §7.9.10: Check a single call's array argument compatibility.
 static void CheckArrayArgTypes(
     const Expr* expr,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -204,9 +191,9 @@ static void CheckArrayArgTypes(
   for (size_t i = 0; i < func->func_args.size(); ++i) {
     const auto& formal = func->func_args[i];
     auto formal_info = FormalArrayInfo(formal, class_names);
-    // Only check when formal is an array parameter.
+
     if (formal.unpacked_dims.empty()) continue;
-    // Resolve actual argument.
+
     int ai = -1;
     if (expr->arg_names.empty()) {
       ai = (i < expr->args.size()) ? static_cast<int>(i) : -1;
@@ -240,7 +227,6 @@ static void CheckArrayArgTypes(
   }
 }
 
-// §7.9.10: Walk expressions for array argument checks.
 static void WalkExprForArrayArgTypes(
     const Expr* expr,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -266,7 +252,6 @@ static void WalkExprForArrayArgTypes(
     WalkExprForArrayArgTypes(e, func_decls, var_array_info, class_names, diag);
 }
 
-// §7.9.10: Walk statements for array argument checks.
 static void WalkStmtForArrayArgTypes(
     const Stmt* s,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -328,7 +313,6 @@ void Elaborator::ValidateArrayArgTypes(const ModuleDecl* decl) {
   }
 }
 
-// §7.4.6: Detect slice expressions on associative arrays.
 static bool IsSliceSelect(const Expr* e) {
   if (!e || e->kind != ExprKind::kSelect) return false;
   return e->is_part_select_plus || e->is_part_select_minus || e->index_end;
@@ -394,9 +378,6 @@ void Elaborator::ValidateAssocArraySlices(const ModuleDecl* decl) {
     }
   }
 }
-
-// §7.9.4–§7.9.7: Traversal methods (first/last/next/prev) shall not be
-// called on wildcard-indexed associative arrays.
 
 static bool IsTraversalMethod(std::string_view name) {
   return name == "first" || name == "last" || name == "next" || name == "prev";
@@ -468,7 +449,6 @@ void Elaborator::ValidateAssocWildcardTraversal(const ModuleDecl* decl) {
   }
 }
 
-// §7.8.5: real/shortreal shall be an illegal associative array index type.
 static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds) {
   if (dtype.kind == DataTypeKind::kNamed) {
     auto it = tds.find(dtype.type_name);
@@ -493,7 +473,7 @@ void Elaborator::ValidateAssocIndexType(const ModuleItem* item) {
                 "associative array index type");
     return;
   }
-  // §7.8.5: A type containing real or shortreal is also illegal.
+
   auto it = typedefs_.find(t);
   if (it != typedefs_.end() && ContainsRealType(it->second, typedefs_)) {
     diag_.Error(item->loc,
@@ -502,8 +482,6 @@ void Elaborator::ValidateAssocIndexType(const ModuleItem* item) {
   }
 }
 
-// --- §8.4: Class handle operator restriction validation ---
-
 static bool IsClassVar(const Expr* e,
                        const std::unordered_set<std::string_view>& class_vars) {
   auto name = ExprIdent(e);
@@ -511,15 +489,12 @@ static bool IsClassVar(const Expr* e,
   return class_vars.count(name) != 0;
 }
 
-// §8.4 Table 8-1: Only ==, !=, ===, !== are legal binary ops on class handles.
 static bool IsAllowedClassBinaryOp(TokenKind op) {
   return op == TokenKind::kEqEq || op == TokenKind::kBangEq ||
          op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq ||
          op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
-// §8.4/§8.26.5: Check whether class type `a` is the same as or derived from
-// `b`, including implements and extends relationships for interface classes.
 static bool IsClassDerivedFrom(std::string_view a, std::string_view b,
                                const CompilationUnit* unit) {
   if (a == b) return true;
@@ -537,8 +512,6 @@ static bool IsClassDerivedFrom(std::string_view a, std::string_view b,
   return false;
 }
 
-// §8.4: One of the objects being compared shall be assignment compatible with
-// the other; for assignment, the source must be compatible with the target.
 static bool AreClassTypesComparable(
     std::string_view type_a, std::string_view type_b,
     const CompilationUnit* unit) {
@@ -552,7 +525,7 @@ static void CheckClassHandleExpr(
         class_var_types,
     const CompilationUnit* unit, DiagEngine& diag) {
   if (!e) return;
-  // Binary: only equality operators are allowed.
+
   if (e->kind == ExprKind::kBinary) {
     bool lhs_class = e->lhs && IsClassVar(e->lhs, class_vars);
     bool rhs_class = e->rhs && IsClassVar(e->rhs, class_vars);
@@ -560,8 +533,7 @@ static void CheckClassHandleExpr(
       diag.Error(e->range.start,
                  "operator is not allowed on class object handles");
     }
-    // §8.4: When both operands are class handles, check assignment
-    // compatibility.
+
     if (lhs_class && rhs_class && IsAllowedClassBinaryOp(e->op)) {
       auto lhs_name = ExprIdent(e->lhs);
       auto rhs_name = ExprIdent(e->rhs);
@@ -575,28 +547,28 @@ static void CheckClassHandleExpr(
       }
     }
   }
-  // Unary: no unary operators are allowed on class handles.
+
   if (e->kind == ExprKind::kUnary && IsClassVar(e->lhs, class_vars)) {
     diag.Error(e->range.start,
                "operator is not allowed on class object handles");
   }
-  // Postfix (++, --): not allowed.
+
   if (e->kind == ExprKind::kPostfixUnary && IsClassVar(e->lhs, class_vars)) {
     diag.Error(e->range.start,
                "operator is not allowed on class object handles");
   }
-  // Bit-select on class handle is illegal.
+
   if (e->kind == ExprKind::kSelect && e->base &&
       IsClassVar(e->base, class_vars)) {
     diag.Error(e->range.start, "bit-select on class object handle is illegal");
   }
-  // §8.28(b): Casting a class handle to a non-class data type is disallowed.
+
   if (e->kind == ExprKind::kCast && e->lhs && IsClassVar(e->lhs, class_vars) &&
       !e->text.empty() && !FindClassDecl(e->text, unit)) {
     diag.Error(e->range.start,
                "cannot cast class object handle to a non-class type");
   }
-  // §8.28(b): Casting a non-class value to a class type is disallowed.
+
   if (e->kind == ExprKind::kCast && !e->text.empty() &&
       FindClassDecl(e->text, unit) != nullptr && e->lhs &&
       !IsClassVar(e->lhs, class_vars) &&
@@ -604,7 +576,7 @@ static void CheckClassHandleExpr(
     diag.Error(e->range.start,
                "cannot cast non-class value to a class type");
   }
-  // Recurse into sub-expressions.
+
   CheckClassHandleExpr(e->lhs, class_vars, class_var_types, unit, diag);
   CheckClassHandleExpr(e->rhs, class_vars, class_var_types, unit, diag);
   CheckClassHandleExpr(e->base, class_vars, class_var_types, unit, diag);
@@ -617,15 +589,12 @@ static void CheckClassHandleExpr(
   }
 }
 
-// §8.26.9: Extract a method call on a class handle from an expression.
-// Matches patterns: var.method(...), void'(var.method(...)).
-// Returns the var name and method name if the var is an interface class handle.
 static void CheckInterfaceHandleRandConstraintMode(
     const Stmt* s,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
     const CompilationUnit* unit, DiagEngine& diag) {
   if (!s) return;
-  // Match expression statement or assignment RHS containing a method call.
+
   const Expr* call = nullptr;
   if (s->kind == StmtKind::kExprStmt && s->expr) {
     call = s->expr;
@@ -634,7 +603,7 @@ static void CheckInterfaceHandleRandConstraintMode(
              s->rhs) {
     call = s->rhs;
   }
-  // Unwrap void'(...) cast.
+
   if (call && call->kind == ExprKind::kCast && call->lhs) call = call->lhs;
   if (!call || call->kind != ExprKind::kCall) return;
   const Expr* callee = call->lhs;
@@ -655,14 +624,14 @@ static void CheckInterfaceHandleRandConstraintMode(
 
 void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
   if (!s) return;
-  // §8.28: Track local class variable declarations inside procedural blocks.
+
   if (s->kind == StmtKind::kVarDecl &&
       s->var_decl_type.kind == DataTypeKind::kNamed &&
       class_names_.count(s->var_decl_type.type_name)) {
     class_var_names_.insert(s->var_name);
     class_var_types_[s->var_name] = s->var_decl_type.type_name;
   }
-  // Check compound assignment to class handle.
+
   if ((s->kind == StmtKind::kBlockingAssign ||
        s->kind == StmtKind::kNonblockingAssign) &&
       s->lhs && IsClassVar(s->lhs, class_var_names_)) {
@@ -671,8 +640,7 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
       diag_.Error(s->range.start,
                   "operator is not allowed on class object handles");
     }
-    // §8.26.5: Interface class objects shall not be constructed.
-    // §9.7: process objects shall not be constructed with new.
+
     if (s->rhs && s->rhs->kind == ExprKind::kCall && s->rhs->text == "new") {
       auto lhs_name = ExprIdent(s->lhs);
       auto lt = class_var_types_.find(lhs_name);
@@ -691,8 +659,7 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
         }
       }
     }
-    // §8.4: Assignment of a class object whose class data type is assignment
-    // compatible with the target class object.
+
     if (s->rhs && IsClassVar(s->rhs, class_var_names_)) {
       auto lhs_name = ExprIdent(s->lhs);
       auto rhs_name = ExprIdent(s->rhs);
@@ -705,13 +672,13 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
                     "types");
       }
     }
-    // §8.28(b): Assigning a non-class literal to a class handle is disallowed.
+
     if (s->rhs && s->rhs->kind == ExprKind::kLiteral) {
       diag_.Error(s->range.start,
                   "cannot assign non-class value to class object handle");
     }
   }
-  // §8.28(b): Assigning a class handle to a non-class variable is disallowed.
+
   if ((s->kind == StmtKind::kBlockingAssign ||
        s->kind == StmtKind::kNonblockingAssign) &&
       s->lhs && s->lhs->kind == ExprKind::kIdentifier &&
@@ -720,11 +687,9 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
     diag_.Error(s->range.start,
                 "cannot assign class object handle to a non-class variable");
   }
-  // §8.26.9: rand_mode and constraint_mode shall not be legal on interface
-  // class handles.
+
   CheckInterfaceHandleRandConstraintMode(s, class_var_types_, unit_, diag_);
 
-  // Check expressions in assignments, conditions, and expression statements.
   CheckClassHandleExpr(s->rhs, class_var_names_, class_var_types_, unit_,
                        diag_);
   CheckClassHandleExpr(s->expr, class_var_names_, class_var_types_, unit_,
@@ -762,7 +727,6 @@ void Elaborator::ValidateClassHandleContAssign(const ModuleItem* item) {
   }
 }
 
-// §8.10: Check if an expression references 'this' or 'super'.
 static bool ExprRefsThisOrSuper(const Expr* e) {
   if (!e) return false;
   if (e->kind == ExprKind::kIdentifier &&
@@ -785,7 +749,6 @@ static bool ExprRefsThisOrSuper(const Expr* e) {
   return false;
 }
 
-// §8.10: Walk statements looking for 'this'/'super' references.
 static bool StmtRefsThisOrSuper(const Stmt* s) {
   if (!s) return false;
   if (ExprRefsThisOrSuper(s->lhs)) return true;
@@ -805,7 +768,6 @@ static bool StmtRefsThisOrSuper(const Stmt* s) {
   return false;
 }
 
-// §8.10: Collect all local variable names declared in a method body.
 static void CollectLocalNames(const Stmt* s,
                               std::unordered_set<std::string_view>& out) {
   if (!s) return;
@@ -824,7 +786,6 @@ static void CollectLocalNames(const Stmt* s,
   for (auto& ci : s->case_items) CollectLocalNames(ci.body, out);
 }
 
-// §8.10: Check if an expression contains an unqualified non-static member ref.
 static bool ExprRefsNonStaticMember(
     const Expr* e,
     const std::unordered_set<std::string_view>& non_static,
@@ -853,7 +814,6 @@ static bool ExprRefsNonStaticMember(
   return false;
 }
 
-// §8.10: Walk statements looking for unqualified non-static member references.
 static bool StmtRefsNonStaticMember(
     const Stmt* s,
     const std::unordered_set<std::string_view>& non_static,
@@ -876,10 +836,8 @@ static bool StmtRefsNonStaticMember(
   return false;
 }
 
-// §8.10: Check a single class for static methods referencing this/super
-// or unqualified non-static members.
 void Elaborator::ValidateOneClassStaticMethods(const ClassDecl* cls) {
-  // First pass: check for this/super.
+
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kMethod || !m->is_static) continue;
     if (!m->method) continue;
@@ -893,7 +851,6 @@ void Elaborator::ValidateOneClassStaticMethods(const ClassDecl* cls) {
     }
   }
 
-  // Collect non-static member names for unqualified access check.
   std::unordered_set<std::string_view> non_static;
   for (const auto* member : cls->members) {
     if (member->is_static) continue;
@@ -906,7 +863,6 @@ void Elaborator::ValidateOneClassStaticMethods(const ClassDecl* cls) {
   }
   if (non_static.empty()) return;
 
-  // Second pass: check for unqualified non-static member access.
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kMethod || !m->is_static) continue;
     if (!m->method) continue;
@@ -943,7 +899,6 @@ void Elaborator::ValidateStaticMethodBodies(const ModuleDecl* decl) {
   }
 }
 
-// §8.11: Check a single module item for illegal 'this' usage.
 void Elaborator::ValidateThisInItem(const ModuleItem* item) {
   bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                  item->kind == ModuleItemKind::kInitialBlock;
@@ -965,18 +920,16 @@ void Elaborator::ValidateThisInItem(const ModuleItem* item) {
   }
 }
 
-// §8.11: 'this' shall only be used within non-static class methods.
 void Elaborator::ValidateThisUsage(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     ValidateThisInItem(item);
   }
 }
 
-// §8.13: A class declared :final shall not be extended.
 void Elaborator::ValidateFinalClassExtension() {
   auto check = [&](const ClassDecl* cls) {
     if (cls->base_class.empty()) return;
-    // §9.7: process is a built-in :final class and shall not be extended.
+
     if (cls->base_class == "process") {
       diag_.Error(cls->range.start, "cannot extend a class declared ':final'");
       return;
@@ -991,7 +944,6 @@ void Elaborator::ValidateFinalClassExtension() {
   }
 }
 
-// §8.17: Detect if a statement is a super.new() call.
 static bool IsSuperNewCall(const Stmt* s) {
   if (!s || s->kind != StmtKind::kExprStmt || !s->expr) return false;
   const auto* call = s->expr;
@@ -1006,7 +958,6 @@ static bool IsSuperNewCall(const Stmt* s) {
   return lhs_is_super && rhs_is_new;
 }
 
-// §8.17: Validate chaining constructor rules for a single class.
 void Elaborator::ValidateOneClassChainingCtor(const ClassDecl* cls) {
   if (cls->base_class.empty()) return;
   const ClassMember* ctor = nullptr;
@@ -1037,8 +988,6 @@ void Elaborator::ValidateOneClassChainingCtor(const ClassDecl* cls) {
   }
 }
 
-// §8.7: Validate class method function bodies (constructors are functions and
-// shall be nonblocking; general function body rules from §13.2 apply).
 void Elaborator::ValidateClassMethodBodies(const ModuleDecl* decl) {
   for (const auto* cls : unit_->classes) {
     for (const auto* m : cls->members) {
@@ -1055,10 +1004,6 @@ void Elaborator::ValidateClassMethodBodies(const ModuleDecl* decl) {
   }
 }
 
-// §6.21: Force the automatic lifetime onto every class method that does
-// not carry an explicit qualifier. The class-scope override outranks the
-// enclosing module/package/program default-static rule so that local
-// variables inside methods reinitialise on every call.
 static void ApplyAutoToClassMethods(const ClassDecl* cls) {
   if (!cls) return;
   for (auto* m : cls->members) {
@@ -1066,7 +1011,7 @@ static void ApplyAutoToClassMethods(const ClassDecl* cls) {
         !m->method->is_automatic && !m->method->is_static) {
       m->method->is_automatic = true;
     }
-    // Apply the same rule to any nested class declared inside this one.
+
     if (m->kind == ClassMemberKind::kClassDecl && m->nested_class) {
       ApplyAutoToClassMethods(m->nested_class);
     }
@@ -1091,7 +1036,6 @@ void Elaborator::ApplyClassMethodAutomaticDefault() {
   }
 }
 
-// §8.15: Check if an expression references 'super'.
 static bool ExprRefsSuper(const Expr* e) {
   if (!e) return false;
   if (e->kind == ExprKind::kIdentifier && e->text == "super") return true;
@@ -1110,7 +1054,6 @@ static bool ExprRefsSuper(const Expr* e) {
   return false;
 }
 
-// §8.15: Walk statements looking for 'super' references.
 static bool StmtRefsSuper(const Stmt* s) {
   if (!s) return false;
   if (ExprRefsSuper(s->lhs)) return true;
@@ -1128,7 +1071,6 @@ static bool StmtRefsSuper(const Stmt* s) {
   return false;
 }
 
-// §8.15: 'super' shall only be used in a class that extends a base class.
 void Elaborator::ValidateSuperInNonDerivedClass() {
   for (const auto* cls : unit_->classes) {
     if (!cls->base_class.empty()) continue;
@@ -1145,18 +1087,16 @@ void Elaborator::ValidateSuperInNonDerivedClass() {
   }
 }
 
-// §8.17: Validate chaining constructor rules.
 void Elaborator::ValidateChainingConstructors() {
   for (const auto* cls : unit_->classes) {
     ValidateOneClassChainingCtor(cls);
   }
 }
 
-// §8.18: Find a class member by name, walking up the hierarchy.
 static const ClassMember* FindMemberInClass(const ClassDecl* cls,
                                             std::string_view name,
                                             const CompilationUnit* unit) {
-  for (const auto* c = cls; c; /* advance below */) {
+  for (const auto* c = cls; c; ) {
     for (const auto* m : c->members) {
       if (m->name == name) return m;
     }
@@ -1166,7 +1106,6 @@ static const ClassMember* FindMemberInClass(const ClassDecl* cls,
   return nullptr;
 }
 
-// §8.18: Check a single obj.member access for visibility violations.
 static void CheckMemberAccessVisibility(
     const Expr* e,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
@@ -1177,7 +1116,7 @@ static void CheckMemberAccessVisibility(
   if (e->rhs->kind != ExprKind::kIdentifier) return;
   const auto* cls = FindClassDecl(it->second, unit);
   if (!cls) return;
-  // §8.5: Accessing a type parameter via a class handle is illegal.
+
   if (cls->type_param_names.count(e->rhs->text) > 0) {
     diag.Error(e->rhs->range.start,
                "cannot access type parameter via class handle");
@@ -1194,8 +1133,6 @@ static void CheckMemberAccessVisibility(
   }
 }
 
-// §8.18: Check expressions for local/protected member access from outside
-// class.
 static void CheckVisibilityExpr(
     const Expr* e,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
@@ -1215,7 +1152,6 @@ static void CheckVisibilityExpr(
     CheckVisibilityExpr(arg, var_types, unit, diag);
 }
 
-// §8.18: Walk statements checking for local/protected access violations.
 static void WalkStmtsForVisibility(
     const Stmt* s,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
@@ -1234,7 +1170,6 @@ static void WalkStmtsForVisibility(
     WalkStmtsForVisibility(ci.body, var_types, unit, diag);
 }
 
-// §8.18: Validate local/protected access from module-level code.
 void Elaborator::ValidateLocalProtectedAccess(const ModuleDecl* decl) {
   if (class_var_types_.empty()) return;
   for (const auto* item : decl->items) {
@@ -1246,7 +1181,6 @@ void Elaborator::ValidateLocalProtectedAccess(const ModuleDecl* decl) {
   }
 }
 
-// §8.19: Walk statements checking for assignments to const class properties.
 static void WalkStmtsForConstClassProp(
     const Stmt* s,
     const std::unordered_set<std::string_view>& global_consts,
@@ -1285,7 +1219,6 @@ static void WalkStmtsForConstClassProp(
                                in_constructor, diag);
 }
 
-// §8.19: Validate constant class property rules.
 void Elaborator::ValidateConstClassProperties() {
   for (const auto* cls : unit_->classes) {
     std::unordered_set<std::string_view> global_consts;
@@ -1312,7 +1245,6 @@ void Elaborator::ValidateConstClassProperties() {
   }
 }
 
-// §8.20: Find a virtual method in a base class by name.
 static const ClassMember* FindBaseVirtualMethod(const ClassDecl* cls,
                                                 std::string_view method_name,
                                                 const CompilationUnit* unit) {
@@ -1331,7 +1263,6 @@ static const ClassMember* FindBaseVirtualMethod(const ClassDecl* cls,
   return nullptr;
 }
 
-// §8.20: Find any method with ':final' in a base class by name.
 static const ClassMember* FindBaseFinalMethod(const ClassDecl* cls,
                                               std::string_view method_name,
                                               const CompilationUnit* unit) {
@@ -1349,7 +1280,6 @@ static const ClassMember* FindBaseFinalMethod(const ClassDecl* cls,
   return nullptr;
 }
 
-// §8.20: Validate that a virtual method override has a compatible signature.
 static void ValidateOverrideSignature(const ModuleItem* base_method,
                                       const ModuleItem* override_method,
                                       const CompilationUnit* unit,
@@ -1401,7 +1331,6 @@ static void ValidateOverrideSignature(const ModuleItem* base_method,
   }
 }
 
-// §8.20: Validate a single method's override rules within a class.
 void Elaborator::ValidateOneMethodOverride(const ClassDecl* cls,
                                            const ClassMember* m) {
   auto* method = m->method;
@@ -1421,19 +1350,17 @@ void Elaborator::ValidateOneMethodOverride(const ClassDecl* cls,
                 "method with ':extends' does not override a virtual "
                 "base class method");
   }
-  // §8.20: ':final' prevents override regardless of whether the method is
-  // declared virtual in either the subclass or the base.
+
   const auto* base_final = FindBaseFinalMethod(cls, method->name, unit_);
   if (base_final) {
     diag_.Error(method->loc, "cannot override a method declared ':final'");
   }
-  // §8.20: Validate override signature compatibility.
+
   if (base_virtual && base_virtual->method) {
     ValidateOverrideSignature(base_virtual->method, method, unit_, diag_);
   }
 }
 
-// §8.20: Validate virtual method override rules.
 void Elaborator::ValidateVirtualMethodOverrides() {
   for (const auto* cls : unit_->classes) {
     for (const auto* m : cls->members) {
@@ -1443,7 +1370,6 @@ void Elaborator::ValidateVirtualMethodOverrides() {
   }
 }
 
-// §8.21: Collect all pure virtual method names from a class and its ancestors.
 static void CollectPureVirtualMethods(
     const ClassDecl* cls, const CompilationUnit* unit,
     std::vector<std::string_view>& pure_names) {
@@ -1462,7 +1388,6 @@ static void CollectPureVirtualMethods(
   }
 }
 
-// §8.21: Check that a non-abstract class implements all pure virtual methods.
 void Elaborator::ValidateAbstractClassUnimplemented(const ClassDecl* cls) {
   if (cls->is_virtual || cls->base_class.empty()) return;
   std::vector<std::string_view> unimpl;
@@ -1475,7 +1400,6 @@ void Elaborator::ValidateAbstractClassUnimplemented(const ClassDecl* cls) {
   }
 }
 
-// §8.21: Validate abstract class and pure virtual method rules.
 void Elaborator::ValidateAbstractClassRules() {
   for (const auto* cls : unit_->classes) {
     for (const auto* m : cls->members) {
@@ -1584,8 +1508,6 @@ static const ModuleItem* FindInterfaceExternPrototype(const ModuleDecl* ifc,
   return nullptr;
 }
 
-// §8.24: Validate out-of-block method declarations.
-// §25.7: Also validate hierarchical interface subroutine bodies.
 void Elaborator::ValidateOutOfBlockDeclarations() {
   std::unordered_set<std::string> linked;
   for (auto* item : unit_->cu_items) {
@@ -1645,7 +1567,6 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
   }
 }
 
-// §8.26.1: Validate members of an interface class.
 void Elaborator::ValidateInterfaceClassMembers(const ClassDecl* cls) {
   for (const auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kMethod && m->method &&
@@ -1681,8 +1602,7 @@ void Elaborator::ValidateInterfaceClassMembers(const ClassDecl* cls) {
                               "nested classes",
                               cls->name));
     }
-    // §8.26.8: Default argument values in interface class methods shall be
-    // constant expressions.
+
     if (m->kind == ClassMemberKind::kMethod && m->method) {
       for (const auto& arg : m->method->func_args) {
         if (arg.default_value &&
@@ -1697,8 +1617,6 @@ void Elaborator::ValidateInterfaceClassMembers(const ClassDecl* cls) {
   }
 }
 
-// §8.26.4: Check whether a name refers to a forward typedef that has not yet
-// been fully declared before the given class in the compilation unit.
 static bool IsForwardTypedefOnly(std::string_view name,
                                  const ClassDecl* before_cls,
                                  const CompilationUnit* unit) {
@@ -1717,8 +1635,6 @@ static bool IsForwardTypedefOnly(std::string_view name,
   return true;
 }
 
-// §8.26.4: Check whether a class declaration appears before another in the
-// compilation unit's class list.
 static bool IsDeclaredBefore(std::string_view name,
                              const ClassDecl* before_cls,
                              const CompilationUnit* unit) {
@@ -1729,7 +1645,6 @@ static bool IsDeclaredBefore(std::string_view name,
   return false;
 }
 
-// §8.26.2: Validate inheritance rules for an interface class.
 void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
   if (!cls->implements_types.empty()) {
     diag_.Error(cls->range.start,
@@ -1739,21 +1654,20 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
   }
   if (cls->base_class.empty()) return;
 
-  // §8.26.4: An interface class shall not extend a type parameter.
   if (cls->type_param_names.count(cls->base_class) > 0) {
     diag_.Error(cls->range.start,
                 std::format("interface class '{}' shall not extend type "
                             "parameter '{}'",
                             cls->name, cls->base_class));
   } else if (IsForwardTypedefOnly(cls->base_class, cls, unit_)) {
-    // §8.26.4: An interface class shall not extend from a forward typedef.
+
     diag_.Error(cls->range.start,
                 std::format("interface class '{}' shall not extend forward "
                             "typedef '{}'; the interface class must be "
                             "declared before it is extended",
                             cls->name, cls->base_class));
   } else if (!IsDeclaredBefore(cls->base_class, cls, unit_)) {
-    // §8.26.4: An interface class shall be declared before it is extended.
+
     const auto* base = FindClassDecl(cls->base_class, unit_);
     if (base && base->is_interface) {
       diag_.Error(cls->range.start,
@@ -1772,7 +1686,7 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
   }
   for (const auto& ref : cls->extends_interfaces) {
     auto iface_name = ref.name;
-    // §8.26.4: An interface class shall not extend a type parameter.
+
     if (cls->type_param_names.count(iface_name) > 0) {
       diag_.Error(cls->range.start,
                   std::format("interface class '{}' shall not extend type "
@@ -1780,7 +1694,7 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
                               cls->name, iface_name));
       continue;
     }
-    // §8.26.4: An interface class shall not extend from a forward typedef.
+
     if (IsForwardTypedefOnly(iface_name, cls, unit_)) {
       diag_.Error(cls->range.start,
                   std::format("interface class '{}' shall not extend forward "
@@ -1789,7 +1703,7 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
                               cls->name, iface_name));
       continue;
     }
-    // §8.26.4: An interface class shall be declared before it is extended.
+
     if (!IsDeclaredBefore(iface_name, cls, unit_)) {
       const auto* ibase = FindClassDecl(iface_name, unit_);
       if (ibase && ibase->is_interface) {
@@ -1810,8 +1724,6 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
   }
 }
 
-// §8.26.2: Validate that a regular class does not extend an interface class
-// and does not implement a non-interface class.
 void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls) {
   if (!cls->base_class.empty()) {
     const auto* base = FindClassDecl(cls->base_class, unit_);
@@ -1824,7 +1736,7 @@ void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls) {
   }
   for (const auto& ref : cls->implements_types) {
     auto impl_name = ref.name;
-    // §8.26.4: A class shall not implement a type parameter.
+
     if (cls->type_param_names.count(impl_name) > 0) {
       diag_.Error(cls->range.start,
                   std::format("class '{}' shall not implement type "
@@ -1832,7 +1744,7 @@ void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls) {
                               cls->name, impl_name));
       continue;
     }
-    // §8.26.4: A class shall not implement a forward typedef.
+
     if (IsForwardTypedefOnly(impl_name, cls, unit_)) {
       diag_.Error(cls->range.start,
                   std::format("class '{}' shall not implement forward "
@@ -1841,7 +1753,7 @@ void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls) {
                               cls->name, impl_name));
       continue;
     }
-    // §8.26.4: An interface class shall be declared before it is implemented.
+
     if (!IsDeclaredBefore(impl_name, cls, unit_)) {
       const auto* impl = FindClassDecl(impl_name, unit_);
       if (impl && impl->is_interface) {
@@ -1862,8 +1774,6 @@ void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls) {
   }
 }
 
-// §8.26.6.1: Check whether two method signatures are compatible (same return
-// type, same argument count, same argument types).
 static bool MethodSignaturesCompatible(const ModuleItem* a,
                                        const ModuleItem* b) {
   if (!TypesMatch(a->return_type, b->return_type)) return false;
@@ -1876,9 +1786,6 @@ static bool MethodSignaturesCompatible(const ModuleItem* a,
   return true;
 }
 
-// §8.26.6.3: Build a key that uniquely identifies an interface class
-// specialization.  Different parameterizations produce different keys so they
-// are not treated as a diamond relationship.
 static std::string MakeSpecKey(std::string_view name,
                                const std::vector<DataType>& type_params) {
   if (type_params.empty()) return std::string(name);
@@ -1896,8 +1803,6 @@ static std::string MakeSpecKey(std::string_view name,
   return key;
 }
 
-// §8.26.6.1: Collect all pure virtual methods from an interface class and all
-// its extended parents into a map keyed by method name.
 using IfaceMethodMap =
     std::unordered_map<std::string_view,
                        std::vector<std::pair<std::string,
@@ -1930,7 +1835,6 @@ static void CollectInterfacePureVirtualMethods(
   }
 }
 
-// §8.26: Collect all implemented interfaces from the class hierarchy.
 static void CollectImplementedInterfaces(
     const ClassDecl* cls, const CompilationUnit* unit,
     std::vector<InterfaceRef>& out) {
@@ -1945,15 +1849,13 @@ static void CollectImplementedInterfaces(
   }
 }
 
-// §8.26.6.1: Validate method name conflicts for a class implementing
-// interfaces, or an interface extending multiple interfaces.
 static void ValidateMethodNameConflicts(
     const ClassDecl* cls, const CompilationUnit* unit, DiagEngine& diag) {
   IfaceMethodMap iface_methods;
   std::unordered_set<std::string> visited;
 
   if (cls->is_interface) {
-    // Interface class extending multiple interfaces.
+
     if (!cls->base_class.empty()) {
       const auto* base = FindClassDecl(cls->base_class, unit);
       if (base && base->is_interface) {
@@ -1972,7 +1874,7 @@ static void ValidateMethodNameConflicts(
       }
     }
   } else {
-    // Regular/virtual class implementing interfaces.
+
     std::vector<InterfaceRef> all_ifaces;
     CollectImplementedInterfaces(cls, unit, all_ifaces);
     std::unordered_set<std::string> seen_iface;
@@ -1986,9 +1888,6 @@ static void ValidateMethodNameConflicts(
     }
   }
 
-  // Check that all same-named methods from different interfaces have compatible
-  // signatures.  pre_randomize and post_randomize are built-in virtual methods
-  // on interface classes and shall not cause method name conflicts.
   for (const auto& [method_name, entries] : iface_methods) {
     if (entries.size() < 2) continue;
     if (method_name == "pre_randomize" || method_name == "post_randomize")
@@ -2007,11 +1906,9 @@ static void ValidateMethodNameConflicts(
     }
   }
 
-  // For non-interface classes: validate that the implementing method's signature
-  // matches each interface method's signature.
   if (!cls->is_interface) {
     for (const auto& [method_name, entries] : iface_methods) {
-      // Find the concrete virtual method in the class hierarchy.
+
       const ModuleItem* impl = nullptr;
       for (const auto* cm : cls->members) {
         if (cm->kind == ClassMemberKind::kMethod && cm->method &&
@@ -2053,7 +1950,6 @@ static void ValidateMethodNameConflicts(
   }
 }
 
-// §8.26: Check whether a class hierarchy has a concrete virtual method.
 static bool HasConcreteVirtualMethodInHierarchy(const ClassDecl* cls,
                                                 std::string_view method_name,
                                                 const CompilationUnit* unit) {
@@ -2079,8 +1975,6 @@ static bool HasConcreteVirtualMethodInHierarchy(const ClassDecl* cls,
   return false;
 }
 
-// §8.26.8: Find the concrete virtual method implementation in a class
-// hierarchy, returning its ModuleItem (or nullptr if not found).
 static const ModuleItem* FindConcreteMethodInHierarchy(
     const ClassDecl* cls, std::string_view method_name,
     const CompilationUnit* unit) {
@@ -2123,8 +2017,7 @@ static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
                              cls->name, im->method->name, iface_name));
       continue;
     }
-    // §8.26.8: The value of the default argument constant expression shall be
-    // the same for all the classes that implement the method.
+
     const auto& iface_args = im->method->func_args;
     const auto& impl_args = impl->func_args;
     size_t n = std::min(iface_args.size(), impl_args.size());
@@ -2144,7 +2037,6 @@ static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
   }
 }
 
-// §8.26: Validate that a non-abstract class implements all interface methods.
 void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
   if (cls->is_virtual) return;
   std::vector<InterfaceRef> all_ifaces;
@@ -2160,8 +2052,6 @@ void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
   }
 }
 
-// §8.26.6.2: Collect the effective set of param/typedef names visible from an
-// interface class, mapping each name to its originating interface class(es).
 using NameOriginMap =
     std::unordered_map<std::string_view,
                        std::unordered_set<std::string>>;
@@ -2211,8 +2101,6 @@ static void CollectEffectiveParamTypeNames(
   }
 }
 
-// §8.26.6.2: Validate that parameter/type declaration name collisions from
-// multiple parent interface classes are overridden by the subclass.
 static void ValidateParamTypeConflicts(
     const ClassDecl* cls, const CompilationUnit* unit, DiagEngine& diag) {
   if (!cls->is_interface) return;
@@ -2254,7 +2142,6 @@ static void ValidateParamTypeConflicts(
   }
 }
 
-// §8.26: Validate interface class rules.
 void Elaborator::ValidateInterfaceClassRules() {
   for (const auto* cls : unit_->classes) {
     if (cls->is_interface) {
@@ -2264,14 +2151,13 @@ void Elaborator::ValidateInterfaceClassRules() {
       ValidateRegularClassInheritance(cls);
       ValidateImplementsInterfaceMethods(cls);
     }
-    // §8.26.6.1: Check for method name conflicts across interfaces.
+
     ValidateMethodNameConflicts(cls, unit_, diag_);
-    // §8.26.6.2: Check for parameter/type declaration name collisions.
+
     ValidateParamTypeConflicts(cls, unit_, diag_);
   }
 }
 
-// §8.25.1: Check expressions for unadorned parameterized class scope resolution.
 static void CheckParamScopeExpr(
     const Expr* e,
     const std::unordered_set<std::string_view>& param_classes,
@@ -2365,4 +2251,4 @@ void Elaborator::ValidateForwardClassTypedefs() {
   }
 }
 
-}  // namespace delta
+}

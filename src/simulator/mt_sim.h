@@ -10,28 +10,16 @@ class CompiledProcess;
 class SimContext;
 struct Process;
 
-// =============================================================================
-// SimPartition: a subset of processes that share no signals
-// =============================================================================
-
 struct SimPartition {
   uint32_t id = 0;
   std::vector<uint32_t> process_ids;
 };
-
-// =============================================================================
-// SignalDep: describes a process's signal dependencies
-// =============================================================================
 
 struct SignalDep {
   uint32_t process_id = 0;
   std::vector<std::string_view> reads;
   std::vector<std::string_view> writes;
 };
-
-// =============================================================================
-// Partitioner: builds partitions from the signal dependency graph
-// =============================================================================
 
 class Partitioner {
  public:
@@ -48,10 +36,6 @@ class Partitioner {
 
   std::vector<SignalDep> deps_;
 };
-
-// =============================================================================
-// MtScheduler: runs partitions in parallel using a thread pool
-// =============================================================================
 
 class MtScheduler {
  public:
@@ -71,4 +55,4 @@ class MtScheduler {
   std::vector<SimPartition> partitions_;
 };
 
-}  // namespace delta
+}

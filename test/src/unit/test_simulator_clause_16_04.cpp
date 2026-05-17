@@ -127,14 +127,6 @@ TEST(SvaEngine, FlushClearsQueue) {
   EXPECT_EQ(f.engine.DeferredQueueSize(), 0u);
 }
 
-// §16.4 P7: "the reporting or action blocks are scheduled at a later point
-// in the current time step." This test puts a non-deferred assignment AFTER
-// a deferred-assertion pass action that writes the same variable. If the
-// deferred action ran inline (the §16.3 simple-immediate behavior) the
-// inline assignment would overwrite the post-statement assignment, leaving
-// the variable at 99. The §16.4 deferral routes the action into a later
-// region (Reactive for #0), so the deferred write lands AFTER the inline
-// write and the variable settles at 44.
 TEST(AssertionStatementSim, ObservedDeferredActionFiresAfterFollowingStmt) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -156,11 +148,6 @@ TEST(AssertionStatementSim, ObservedDeferredActionFiresAfterFollowingStmt) {
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
-// §16.4 P14: "For a final deferred assertion, the subroutine shall be
-// scheduled in the Postponed region." The Postponed region runs after the
-// active/reactive regions, so a final-deferred pass action sequenced
-// before a same-variable non-deferred assignment must still observably
-// land last.
 TEST(AssertionStatementSim, FinalDeferredActionFiresAfterFollowingStmt) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -182,10 +169,6 @@ TEST(AssertionStatementSim, FinalDeferredActionFiresAfterFollowingStmt) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-// §16.4 prose: when the assertion expression evaluates false, the fail
-// branch runs (not the pass branch). The deferral routing applies the
-// same way as the pass branch — verify the fail action lands in the
-// later region by chaining it with a follow-on inline assignment.
 TEST(AssertionStatementSim, ObservedDeferredFailActionDeferred) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -207,12 +190,6 @@ TEST(AssertionStatementSim, ObservedDeferredFailActionDeferred) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §16.4 P16: "In addition to deferred assert statements, deferred assume
-// and cover statements are also defined. Other than the deferred
-// evaluation as described in this subclause, these assume and cover
-// statements behave the same way as the simple immediate assume and cover
-// statements." The cover form must also route its pass action through
-// the §16.4 P13 deferral path.
 TEST(AssertionStatementSim, DeferredCoverActionDeferred) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -234,15 +211,6 @@ TEST(AssertionStatementSim, DeferredCoverActionDeferred) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-// §16.4 P7 (first half): "the deferred assertion's expression is
-// evaluated at the time the deferred assertion statement is processed."
-// The expression must be sampled at the processing instant — NOT at the
-// time the action eventually runs. We assert `q == 0` at processing
-// time (so the pass branch is taken), then mutate q before the action
-// fires. If the expression had been evaluated at action time it would
-// see q == 1 and the fail branch would run instead. Observing q == 44
-// proves the expression's processing-instant value (q == 0 → true)
-// drove the routing.
 TEST(AssertionStatementSim, ObservedExpressionEvaluatedAtProcessingTime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -264,13 +232,6 @@ TEST(AssertionStatementSim, ObservedExpressionEvaluatedAtProcessingTime) {
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
-// §16.4 P11: "Actual argument expressions that are passed by value,
-// including function calls, shall be fully evaluated at the instant the
-// deferred assertion expression is evaluated." The actual `s` is sampled
-// at the schedule point (= 5), then `s` is mutated to 99 before the
-// deferred action fires. The user task writes its formal back into
-// `result`; observing `result == 5` proves the action saw the schedule-
-// time value of the actual, not the action-time value.
 TEST(AssertionStatementSim, DeferredCallArgEvaluatedAtScheduleTime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -295,10 +256,6 @@ TEST(AssertionStatementSim, DeferredCallArgEvaluatedAtScheduleTime) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §16.4 P13 × P16: the Reactive-region routing applies to deferred
-// `assume` too. The deferred assume's pass action must land in the
-// Reactive region (after the inline post-assert assignment), so the
-// observed final value reflects the deferred write.
 TEST(AssertionStatementSim, ObservedDeferredAssumeActionDeferred) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -320,4 +277,4 @@ TEST(AssertionStatementSim, ObservedDeferredAssumeActionDeferred) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-}  // namespace
+}

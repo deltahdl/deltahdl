@@ -139,8 +139,6 @@ TEST(SourceText, DescriptionConfig) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-// --- checker_declaration edge case ---
-
 TEST(SourceText, CheckerDeclWithParens) {
   auto r = Parse("checker chk(); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
@@ -148,16 +146,12 @@ TEST(SourceText, CheckerDeclWithParens) {
   ASSERT_EQ(r.cu->checkers.size(), 1u);
 }
 
-// --- package_declaration missing form ---
-
 TEST(SourceText, PackageWithLifetime) {
   auto r = Parse("package automatic pkg; endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
-
-// --- Error conditions ---
 
 TEST(SourceText, ErrorUnknownTopLevelToken) {
   auto r = Parse("foobar;\n");
@@ -174,4 +168,4 @@ TEST(SourceText, ErrorMissingEndclass) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

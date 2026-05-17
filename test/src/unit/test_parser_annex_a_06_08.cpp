@@ -237,7 +237,6 @@ TEST(LoopSyntaxParsing, ForWithDecrement) {
   EXPECT_NE(stmt->for_step, nullptr);
 }
 
-
 TEST(LoopSyntaxParsing, ForIntDeclHasInitAndCond) {
   auto r = Parse(
       "module t;\n"
@@ -632,9 +631,6 @@ TEST(LoopSyntaxParsing, AutomaticFuncWithForLoop) {
   EXPECT_NE(for_stmt->for_body, nullptr);
 }
 
-
-// --- Missing syntax coverage ---
-
 TEST(LoopSyntaxParsing, ForStepPreDecrement) {
   auto r = Parse(
       "module m;\n"
@@ -680,8 +676,6 @@ TEST(LoopSyntaxParsing, ForVarLogicTypeDecl) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kLogic);
 }
 
-// --- Error conditions ---
-
 TEST(LoopSyntaxParsing, ErrorForMissingSemicolonAfterInit) {
   auto r = Parse(
       "module m;\n"
@@ -702,4 +696,4 @@ TEST(LoopSyntaxParsing, ErrorForMissingCloseParen) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -77,7 +77,6 @@ TEST(StructAssignmentValidation, UnpackedStructAssignment) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §7.2.2: Even when ALL members of a packed struct have defaults, still rejected.
 TEST(StructAssignmentValidation, PackedStructAllMembersDefaulted_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -88,7 +87,6 @@ TEST(StructAssignmentValidation, PackedStructAllMembersDefaulted_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.2.2: Packed struct member default rejected even via typedef.
 TEST(StructAssignmentValidation, PackedStructTypedefMemberDefault_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -103,10 +101,6 @@ TEST(StructAssignmentValidation, PackedStructTypedefMemberDefault_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.2.2: "The assigned expression shall be a constant expression."
-// A struct member default that references a runtime variable (not a constant)
-// must be diagnosed by the elaborator. The production rule lives in
-// ValidateStructMemberDefaultsConstant.
 TEST(StructAssignmentValidation, NonConstantMemberDefault_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -122,7 +116,6 @@ TEST(StructAssignmentValidation, NonConstantMemberDefault_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.2.2: Unpacked struct with nested union, default on the union member itself.
 TEST(StructAssignmentValidation,
      UnpackedStructWithUnionMemberDefault_OnUnionMember_Rejected) {
   ElabFixture f;
@@ -137,4 +130,4 @@ TEST(StructAssignmentValidation,
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

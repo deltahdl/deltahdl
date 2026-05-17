@@ -25,4 +25,4 @@ TEST(DesignBuildingBlockParsing, ConfigWithDefaultRule) {
               "endconfig\n"));
 }
 
-}  // namespace
+}

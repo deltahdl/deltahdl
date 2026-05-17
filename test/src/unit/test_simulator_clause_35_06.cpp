@@ -30,4 +30,4 @@ TEST(Dpi, CallMissingReturnsZero) {
   EXPECT_EQ(result, 0u);
 }
 
-}  // namespace
+}

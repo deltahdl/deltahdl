@@ -98,7 +98,6 @@ TEST(IpcSync, MultipleMailboxesInContext) {
   EXPECT_EQ(msg, 200u);
 }
 
-// §15.4: Default constructor creates unbounded mailbox (bound = 0).
 TEST(IpcSync, MailboxDefaultConstructorUnbounded) {
   MailboxObject mb;
   EXPECT_EQ(mb.bound, 0);
@@ -106,7 +105,6 @@ TEST(IpcSync, MailboxDefaultConstructorUnbounded) {
   EXPECT_FALSE(mb.IsFull());
 }
 
-// §15.4: Bounded mailbox rejects put when full.
 TEST(IpcSync, MailboxBoundedPutRejectedWhenFull) {
   MailboxObject mb(1);
   EXPECT_EQ(mb.TryPut(42), 1);
@@ -114,4 +112,4 @@ TEST(IpcSync, MailboxBoundedPutRejectedWhenFull) {
   EXPECT_EQ(mb.Num(), 1);
 }
 
-}  // namespace
+}

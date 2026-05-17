@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Unit tests: ClassObject API
-// ---------------------------------------------------------------------------
-
 TEST(ClassAssignRenameSim, HandleAssignmentSharesObject) {
   SimFixture f;
   auto* type = MakeClassType(f, "Data", {"val"});
@@ -97,10 +93,6 @@ TEST(ClassAssignRenameSim, ShallowCopyPreservesDerivedType) {
   EXPECT_EQ(copy->GetProperty("j", f.arena).ToUint64(), 5u);
   EXPECT_EQ(copy->GetProperty("x", f.arena).ToUint64(), 9u);
 }
-
-// ---------------------------------------------------------------------------
-// End-to-end tests: full pipeline (parse -> elaborate -> lower -> run)
-// ---------------------------------------------------------------------------
 
 TEST(ClassAssignRenameSim, E2eHandleAssignmentAliasesObject) {
   SimFixture f;
@@ -292,4 +284,4 @@ TEST(ClassAssignRenameSim, E2eShallowCopyMultipleProperties) {
   LowerRunAndCheck(f, design, {{"ra", 1u}, {"rb", 2u}, {"rc", 3u}});
 }
 
-}  // namespace
+}

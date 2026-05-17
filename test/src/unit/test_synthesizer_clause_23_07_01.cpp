@@ -4,8 +4,6 @@
 
 namespace {
 
-// --- Requirement 1: :: prefix resolves downward in synthesizable code ---
-
 TEST(ScopeResolutionPrefixSynthesis, PackagePrefixParamSynthesizes) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -22,4 +20,4 @@ TEST(ScopeResolutionPrefixSynthesis, PackagePrefixParamSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

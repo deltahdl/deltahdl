@@ -274,7 +274,7 @@ TEST(LvalueSim, VarLvalueIndexedPartSelectMinus) {
   EXPECT_EQ(var->value.ToUint64(), 0xCD00u);
 }
 
-}  // namespace
+}
 TEST(BlockingAssignBitSelect, BlockingAssignBitSelect) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("bs", 8);

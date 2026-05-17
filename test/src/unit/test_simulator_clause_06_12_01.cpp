@@ -183,4 +183,4 @@ TEST(RealConversion, XzBecomesZeroInRealConversion) {
   EXPECT_NEAR(VecToDouble(var->value), 0.0, 1e-10);
 }
 
-}  // namespace
+}

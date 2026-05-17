@@ -19,9 +19,7 @@ TEST(SpecifyBlockDeclElaboration, SpecifyBlockWithShowcancelledElaborates) {
 }
 
 TEST(SpecifyBlockDeclElaboration, ShowcancelledAfterModulePathIsError) {
-  // A module path drives `o` with its default (noshowcancelled) policy; a
-  // later showcancelled declaration for `o` would be contradictory for that
-  // same destination, so the elaborator must flag it.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m(input a, output o);\n"
@@ -35,4 +33,4 @@ TEST(SpecifyBlockDeclElaboration, ShowcancelledAfterModulePathIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

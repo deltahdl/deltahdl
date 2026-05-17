@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- assert_property_statement ---
-
 TEST(AssertionDeclParsing, ConcurrentAssertionItem_AssertProperty) {
   auto r = Parse(
       "module m;\n"
@@ -225,8 +223,6 @@ TEST(AssertionStatementSyntaxParsing, AssertPropertyActionBlock) {
   ASSERT_NE(item->assert_fail_stmt, nullptr);
 }
 
-// --- assume_property_statement ---
-
 TEST(AssertionDeclParsing, AssumeProperty_WithElseAction) {
   auto r = Parse(
       "module m;\n"
@@ -342,8 +338,6 @@ TEST(AssertionStatementSyntaxParsing, AssumePropertyModule) {
   auto* item = FindItemByKind(r, ModuleItemKind::kAssumeProperty);
   ASSERT_NE(item, nullptr);
 }
-
-// --- cover_property_statement / cover_sequence_statement ---
 
 TEST(AssertionDeclParsing, ConcurrentAssertionItem_CoverProperty) {
   auto r = Parse(
@@ -548,8 +542,6 @@ TEST(AssertionStatementSyntaxParsing, CoverPropertyPassAction) {
   ASSERT_NE(item->assert_pass_stmt, nullptr);
 }
 
-// --- restrict_property_statement ---
-
 TEST(AssertionDeclParsing, RestrictProperty_Basic) {
   auto r = Parse(
       "module m;\n"
@@ -604,8 +596,6 @@ TEST(AssertionStatementSyntaxParsing, RestrictPropertyModule) {
   auto* item = FindItemByKind(r, ModuleItemKind::kRestrictProperty);
   ASSERT_NE(item, nullptr);
 }
-
-// --- concurrent_assertion_statement (mixed) ---
 
 TEST(AssertionDeclParsing, ConcurrentAssertionItem_AssumeProperty) {
   auto r = Parse(
@@ -702,8 +692,6 @@ TEST(AssertionParsing, AssertPropertyInAlwaysBlock) {
               "endmodule\n"));
 }
 
-// --- expect_property_statement ---
-
 TEST(AssertionDeclParsing, ExpectPropertyStatement) {
   EXPECT_TRUE(ParseOk(
       "module m;\n"
@@ -735,4 +723,4 @@ TEST(AssertionParsing, ExpectStatement) {
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

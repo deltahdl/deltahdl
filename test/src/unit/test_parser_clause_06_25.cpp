@@ -72,4 +72,4 @@ TEST(DataTypeParsing, ParameterizedDataType_ValueParamOnly) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

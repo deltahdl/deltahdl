@@ -53,4 +53,4 @@ TEST(AssertionSemanticsParsing, UnboundedDelayRange) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-}  // namespace
+}

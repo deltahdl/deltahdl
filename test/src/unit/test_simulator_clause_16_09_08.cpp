@@ -33,4 +33,4 @@ TEST(SvaEngine, SequenceOperatorIntersect) {
   EXPECT_FALSE(EvalSequenceIntersect(true, false, 3, 3));
 }
 
-}  // namespace
+}

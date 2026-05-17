@@ -74,11 +74,6 @@ TEST(ConcatenationParsing, StreamingConcatWithSliceSize) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.1 slice_size ::= simple_type | constant_expression — the simple_type
-// alternative ties A.8.1 to A.2.2.1.  Here simple_type is a ps_type_identifier
-// (A.9.3) naming a user-defined typedef, so this single test exercises the
-// shared A.8.1 ↔ A.2.2.1 ↔ A.9.3 chain on the streaming-concatenation
-// slice_size slot.
 TEST(ConcatenationParsing, StreamingConcatWithTypedefSliceSize) {
   auto r = Parse(
       "typedef logic [3:0] nibble_t;\n"
@@ -186,9 +181,6 @@ TEST(ConcatenationParsing, ErrorConcatenationMissingCloseBrace) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §A.8.1 stream_expression ::= expression [with [ array_range_expression ]];
-// §A.8.1 array_range_expression ::= expression — single-index form inside
-// stream_expression's optional `with [...]` clause.
 TEST(ConcatenationParsing, StreamExpressionWithSingleIndex) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -197,7 +189,6 @@ TEST(ConcatenationParsing, StreamExpressionWithSingleIndex) {
               "endmodule\n"));
 }
 
-// §A.8.1 array_range_expression ::= expression : expression
 TEST(ConcatenationParsing, StreamExpressionWithMsbLsbRange) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -206,7 +197,6 @@ TEST(ConcatenationParsing, StreamExpressionWithMsbLsbRange) {
               "endmodule\n"));
 }
 
-// §A.8.1 array_range_expression ::= expression +: expression
 TEST(ConcatenationParsing, StreamExpressionWithIndexedPlusRange) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -215,7 +205,6 @@ TEST(ConcatenationParsing, StreamExpressionWithIndexedPlusRange) {
               "endmodule\n"));
 }
 
-// §A.8.1 array_range_expression ::= expression -: expression
 TEST(ConcatenationParsing, StreamExpressionWithIndexedMinusRange) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -224,9 +213,6 @@ TEST(ConcatenationParsing, StreamExpressionWithIndexedMinusRange) {
               "endmodule\n"));
 }
 
-// §A.8.1 module_path_multiple_concatenation ::=
-//     { constant_expression module_path_concatenation }
-// — replicated module_path_concatenation inside a specify-block path source.
 TEST(ConcatenationParsing, ModulePathMultipleConcatenation) {
   EXPECT_TRUE(
       ParseOk("module m(input a, input b, output c);\n"
@@ -236,4 +222,4 @@ TEST(ConcatenationParsing, ModulePathMultipleConcatenation) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

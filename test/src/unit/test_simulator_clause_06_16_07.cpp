@@ -68,4 +68,4 @@ TEST(StringMethods, IcompareSameCase) {
   EXPECT_EQ(static_cast<int64_t>(result.ToUint64()), 0);
 }
 
-}  // namespace
+}

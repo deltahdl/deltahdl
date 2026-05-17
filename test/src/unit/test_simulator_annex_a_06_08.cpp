@@ -63,4 +63,4 @@ TEST(LoopSyntaxSimulation, ForPreIncrementStep) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-}  // namespace
+}

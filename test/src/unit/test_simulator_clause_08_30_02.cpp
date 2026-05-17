@@ -44,4 +44,4 @@ TEST(ClassSim, WeakRefInstancesAreUnique) {
   EXPECT_NE(&wr1, &wr2);
 }
 
-}  // namespace
+}

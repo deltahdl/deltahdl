@@ -48,34 +48,34 @@ TEST(Lexer, KeywordVersion_1800_2005_AllAdditionalKeywordsRecognized) {
 }
 
 TEST(Lexer, KeywordVersion_1800_2005_IncludesEarlierKeywords) {
-  // 1364-1995
+
   EXPECT_TRUE(
       LookupKeyword("module", KeywordVersion::kVer18002005).has_value());
   EXPECT_TRUE(
       LookupKeyword("wire", KeywordVersion::kVer18002005).has_value());
-  // 1364-2001
+
   EXPECT_TRUE(
       LookupKeyword("automatic", KeywordVersion::kVer18002005).has_value());
   EXPECT_TRUE(
       LookupKeyword("generate", KeywordVersion::kVer18002005).has_value());
-  // 1364-2005
+
   EXPECT_TRUE(
       LookupKeyword("uwire", KeywordVersion::kVer18002005).has_value());
 }
 
 TEST(Lexer, KeywordVersion_1800_2005_LaterKeywordsNotRecognized) {
-  // 1800-2009 additions
+
   EXPECT_FALSE(
       LookupKeyword("checker", KeywordVersion::kVer18002005).has_value());
   EXPECT_FALSE(
       LookupKeyword("accept_on", KeywordVersion::kVer18002005).has_value());
   EXPECT_FALSE(
       LookupKeyword("eventually", KeywordVersion::kVer18002005).has_value());
-  // 1800-2012 additions
+
   EXPECT_FALSE(
       LookupKeyword("interconnect", KeywordVersion::kVer18002005).has_value());
   EXPECT_FALSE(
       LookupKeyword("soft", KeywordVersion::kVer18002005).has_value());
 }
 
-}  // namespace
+}

@@ -16,4 +16,4 @@ TEST(IoSystemTaskParsing, FgetsCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

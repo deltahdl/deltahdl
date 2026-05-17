@@ -73,7 +73,6 @@ TEST(SignalMultiBlockSim, SameSignalInTwoBlocksSampled) {
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
 
-  // Both blocks sample the same signal at the same clock edge.
   EXPECT_EQ(cmgr.GetSampledValue("cb1", "data"), 0xAAu);
   EXPECT_EQ(cmgr.GetSampledValue("cb2", "data"), 0xAAu);
 }
@@ -118,9 +117,8 @@ TEST(SignalMultiBlockSim, SharedClockBothBlocksTriggered) {
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
 
-  // Both blocks triggered by the same clock event.
   EXPECT_EQ(cmgr.GetSampledValue("cb1", "sig_a"), 0x11u);
   EXPECT_EQ(cmgr.GetSampledValue("cb2", "sig_b"), 0x22u);
 }
 
-}  // namespace
+}

@@ -13,15 +13,9 @@
 
 namespace delta {
 
-// §13.5.2 semantic validators; the implementation currently lives alongside
-// other ModuleItem-shaped validators in eval_function.cpp. Forward-declared
-// here so the elaborator's per-subroutine validation can invoke them without
-// pulling a downstream-stage header into this translation unit.
 void ValidateRefLifetime(const ModuleItem* func, DiagEngine& diag);
 void ValidateConstRefWriteProtection(const ModuleItem* func, DiagEngine& diag);
 
-
-// §10.9.2: Type key strings that are valid in assignment patterns.
 static bool IsTypeKeyword(std::string_view key) {
   return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
          key == "byte" || key == "shortint" || key == "longint" ||
@@ -29,7 +23,6 @@ static bool IsTypeKeyword(std::string_view key) {
          key == "time" || key == "realtime" || key == "string";
 }
 
-// §5.11: Check if an assignment pattern is a replication or named form.
 static bool IsArrayPatternSpecial(const Expr* init) {
   if (init->repeat_count) return true;
   if (init->elements.size() == 1 &&
@@ -48,7 +41,6 @@ static std::optional<int64_t> ComputeDimSize(const Expr* dim) {
   return ConstEvalInt(dim);
 }
 
-// §10.9.1: Check for duplicate index keys in a keyed array pattern.
 static void CheckArrayPatternDuplicateIndices(const Expr* init, SourceLoc loc,
                                               DiagEngine& diag) {
   if (init->pattern_keys.empty()) return;
@@ -62,7 +54,6 @@ static void CheckArrayPatternDuplicateIndices(const Expr* init, SourceLoc loc,
   }
 }
 
-// §10.9.1: Verify every element is covered by an index key, type key, or default.
 static void CheckArrayPatternCoverage(const ModuleItem* item, SourceLoc loc,
                                       DiagEngine& diag) {
   if (item->init_expr->pattern_keys.empty()) return;
@@ -152,7 +143,7 @@ static void CheckPatternKeys(const ModuleItem* item,
                  std::format("duplicate member key '{}' in pattern", key));
     }
   }
-  // §10.9.2: Every member shall be covered by member, type, or default key.
+
   if (!has_default && !has_type_key) {
     CheckPatternCoverage(item, members, seen, diag);
   }
@@ -162,7 +153,6 @@ void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {
   if (!item->init_expr) return;
   if (item->init_expr->kind != ExprKind::kAssignmentPattern) return;
 
-  // Resolve struct members from the type or typedef.
   const std::vector<StructMember>* members = nullptr;
   if (!item->data_type.struct_members.empty()) {
     members = &item->data_type.struct_members;
@@ -174,7 +164,7 @@ void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {
   if (!members) return;
 
   if (item->init_expr->pattern_keys.empty()) {
-    // Positional pattern — skip replication patterns.
+
     bool is_replication =
         item->init_expr->repeat_count ||
         (item->init_expr->elements.size() == 1 &&
@@ -193,15 +183,12 @@ void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {
   CheckPatternKeys(item, *members, diag_);
 }
 
-// --- §6 validation helpers ---
-
 std::string_view ExprIdent(const Expr* e) {
   if (!e) return {};
   if (e->kind == ExprKind::kIdentifier) return e->text;
   return {};
 }
 
-// §10.4.2: Walk through select/member-access chains to find the base variable.
 static std::string_view LhsBaseName(const Expr* e) {
   while (e) {
     if (e->kind == ExprKind::kIdentifier) return e->text;
@@ -214,10 +201,6 @@ static std::string_view LhsBaseName(const Expr* e) {
   return {};
 }
 
-// §6.21 / §10.4.2: Elements of dynamically sized array variables shall not
-// be written with nonblocking, continuous, or procedural-continuous
-// assignments. The procedural-continuous forms are `force` and the
-// procedural `assign` statement (§10.6).
 static void CheckNbaDynamicArrayTarget(
     const Stmt* s,
     const std::unordered_set<std::string_view>& dyn_names,
@@ -248,10 +231,6 @@ static void CheckNbaDynamicArrayTarget(
     CheckNbaDynamicArrayTarget(ci.body, dyn_names, diag);
 }
 
-// §10.4: collect the base names targeted by a procedural-assignment LHS so
-// the "LHS shall be a variable" check sees every form §10.4 enumerates — not
-// just bare identifiers but also bit/part/slice-selects (whose base is the
-// targeted variable), member accesses, and concatenations of any of these.
 static void CollectLhsBaseNames(
     const Expr* e, SourceLoc loc,
     std::unordered_map<std::string_view, SourceLoc>& out) {
@@ -279,8 +258,6 @@ static void CollectProcTargets(
   for (auto& ci : s->case_items) CollectProcTargets(ci.body, out);
 }
 
-// §6.6.8: interconnect nets cannot be targets of procedural continuous
-// assignments (force/release/assign/deassign).
 static void CheckInterconnectProcContAssign(
     const Stmt* s,
     const std::unordered_set<std::string_view>& interconnect_names,
@@ -321,11 +298,6 @@ static void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag) {
   for (auto& ci : s->case_items) CheckProceduralAssignLhs(ci.body, diag);
 }
 
-// §10.6.2: validate one LHS operand of a force/release statement. The LHS
-// can be a singular variable reference, a net, a constant bit/part-select of
-// a vector net, or (recursively) a concatenation of these. It shall not be
-// a bit-select or part-select of a variable, nor a bit-select or part-select
-// of a net with a user-defined nettype.
 static void CheckForceLhsOperand(
     const Expr* e,
     const std::unordered_set<std::string_view>& net_names,
@@ -373,7 +345,6 @@ static void CheckForceLhs(
     CheckForceLhs(ci.body, net_names, nettype_net_names, diag);
 }
 
-// §6.6.8: check if an expression tree contains an interconnect identifier.
 static bool ExprUsesInterconnect(
     const Expr* e,
     const std::unordered_set<std::string_view>& names) {
@@ -810,10 +781,6 @@ void Elaborator::ValidateVirtualInterfaceOps(const ModuleDecl* decl) {
   }
 }
 
-// =============================================================================
-// §25.9.1 — Virtual interfaces and clocking blocks
-// =============================================================================
-
 namespace {
 
 using VifTypeMap = std::unordered_map<std::string_view, std::string_view>;
@@ -990,7 +957,7 @@ void WalkStmtsForVifClocking(const Stmt* s, const VifTypeMap& vifs,
   }
 }
 
-}  // namespace
+}
 
 void Elaborator::ValidateArrayOfVifInitStmt(const Stmt* s) {
   if (!s || s->kind != StmtKind::kVarDecl) return;
@@ -1090,10 +1057,6 @@ void Elaborator::ValidateVirtualInterfaceClocking(const ModuleDecl* decl) {
     }
   }
 }
-
-// =============================================================================
-// §25.10 — Access to interface objects
-// =============================================================================
 
 namespace {
 
@@ -1268,7 +1231,7 @@ void WalkStmtsForInterfaceObjectAccess(const Stmt* s,
   }
 }
 
-}  // namespace
+}
 
 void Elaborator::ValidateInterfaceObjectAccess(const ModuleDecl* decl) {
   if (!decl) return;
@@ -1325,23 +1288,21 @@ void Elaborator::ValidateInterfaceObjectAccess(const ModuleDecl* decl) {
   }
 }
 
-// §6.6.8: interconnect nets cannot appear in continuous assignments.
 void Elaborator::ValidateInterconnectContAssign(const ModuleItem* item) {
   if (item->kind != ModuleItemKind::kContAssign) return;
-  // §6.6.8: interconnect net cannot be LHS of continuous assignment.
+
   if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier &&
       interconnect_names_.count(item->assign_lhs->text)) {
     diag_.Error(item->loc,
                 "interconnect net cannot be used in continuous assignment");
   }
-  // §6.6.8: interconnect net cannot appear in RHS expression.
+
   if (ExprUsesInterconnect(item->assign_rhs, interconnect_names_)) {
     diag_.Error(item->loc,
                 "interconnect net cannot be used in expression");
   }
 }
 
-// §10.9: LHS assignment patterns shall use positional notation only.
 static void CheckLhsPatternNamedKeys(const Expr* lhs, DiagEngine& diag) {
   if (!lhs) return;
   const Expr* pat = lhs;
@@ -1373,13 +1334,12 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
                  item->kind == ModuleItemKind::kInitialBlock;
   if (is_proc && item->body) {
     CollectProcTargets(item->body, proc_assign_targets_);
-    // §6.6.8: interconnect cannot be target of force/release/assign/deassign.
+
     CheckInterconnectProcContAssign(item->body, interconnect_names_, diag_);
     CheckProceduralAssignLhs(item->body, diag_);
-    // §10.6.2: force LHS shall not be bit/part-select of a variable, nor of
-    // a net with a user-defined nettype.
+
     CheckForceLhs(item->body, net_names_, nettype_net_names_, diag_);
-    // §10.9: LHS assignment patterns must use positional notation.
+
     WalkStmtsForLhsPatternKeys(item->body, diag_);
   }
   ValidateEdgeOnReal(item);
@@ -1389,17 +1349,14 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
   ValidateVirtualInterfaceSensitivity(item);
   ValidateInterconnectContAssign(item);
   ValidateClassHandleContAssign(item);
-  // §6.3.2.2: Drive strength on a net declaration requires an initializer.
+
   if (item->kind == ModuleItemKind::kNetDecl &&
       (item->drive_strength0 != 0 || item->drive_strength1 != 0) &&
       !item->init_expr) {
     diag_.Error(item->loc,
                 "drive strength on net declaration requires an assignment");
   }
-  // §A.2.2.2: the drive_strength BNF lists no `( highz0 , highz1 )` or
-  // `( highz1 , highz0 )` alternative — both normalize to s0==1 && s1==1 in
-  // the parser — so the pair is illegal wherever a drive strength spec may
-  // appear: net decls, continuous assigns, and gate/UDP instances.
+
   if ((item->kind == ModuleItemKind::kNetDecl ||
        item->kind == ModuleItemKind::kContAssign ||
        item->kind == ModuleItemKind::kGateInst ||
@@ -1450,7 +1407,6 @@ void Elaborator::ValidateMixedAssignments() {
   }
 }
 
-// §9.6.2 R8: Recursively check for disable statements targeting functions.
 static void CheckDisableTargets(
     const Stmt* s,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -1566,7 +1522,6 @@ void Elaborator::ValidateSpecparamInParams(const ModuleDecl* decl) {
   }
 }
 
-// §6.20.2: Check whether an expression contains a hierarchical reference.
 static bool ExprContainsHierRef(const Expr* e) {
   if (!e) return false;
   if (e->kind == ExprKind::kMemberAccess) return true;
@@ -1586,11 +1541,10 @@ static bool ExprContainsHierRef(const Expr* e) {
 
 void Elaborator::ValidateValueParams(const ModuleDecl* decl,
                                      const RtlirModule* mod) {
-  // §6.20.1 footnote 22: outside a parameter_port_list, a param_assignment
-  // may not omit its default constant_param_expression.
+
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kParamDecl) continue;
-    // Skip type parameters (§6.20.3).
+
     if (item->data_type.kind == DataTypeKind::kVoid &&
         item->typedef_type.kind != DataTypeKind::kImplicit)
       continue;
@@ -1600,14 +1554,14 @@ void Elaborator::ValidateValueParams(const ModuleDecl* decl,
                               item->name));
       continue;
     }
-    // §6.20.2: Parameter value shall not contain hierarchical references.
+
     if (ExprContainsHierRef(item->init_expr)) {
       diag_.Error(item->loc,
                   std::format("parameter '{}' value contains a hierarchical "
                               "reference",
                               item->name));
     }
-    // §10.9: constant_assignment_pattern_expression elements must be constant.
+
     if (item->is_localparam &&
         item->init_expr->kind == ExprKind::kAssignmentPattern &&
         !IsConstantExpr(item->init_expr, BuildParamScope(mod))) {
@@ -1617,7 +1571,7 @@ void Elaborator::ValidateValueParams(const ModuleDecl* decl,
                               item->name));
     }
   }
-  // §6.20.2: Port list parameter values must also be constant.
+
   for (const auto& [pname, pval] : decl->params) {
     if (!pval) continue;
     if (ExprContainsHierRef(pval)) {
@@ -1629,7 +1583,6 @@ void Elaborator::ValidateValueParams(const ModuleDecl* decl,
   }
 }
 
-// §9.3.2: Return statement inside a fork-join block is illegal.
 static void CheckNoReturnInFork(const Stmt* s, DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kReturn) {
@@ -1651,7 +1604,6 @@ static void CheckNoReturnInFork(const Stmt* s, DiagEngine& diag) {
   CheckNoReturnInFork(s->assert_fail_stmt, diag);
 }
 
-// §9.3.2: Check if an expression references any name from a set.
 static void CheckExprForRefArgs(
     const Expr* e,
     const std::unordered_set<std::string_view>& ref_names,
@@ -1678,9 +1630,6 @@ static void CheckExprForRefArgs(
   for (auto* elem : e->elements) CheckExprForRefArgs(elem, ref_names, diag);
 }
 
-// §9.3.2: Check a statement tree for references to ref arguments.
-// is_fork_block_item: true for top-level fork block_item_declarations whose
-// initializers are exempt from the restriction.
 static void CheckStmtForRefArgs(
     const Stmt* s,
     const std::unordered_set<std::string_view>& ref_names,
@@ -1729,8 +1678,6 @@ static void CheckStmtForRefArgs(
   CheckStmtForRefArgs(s->assert_fail_stmt, ref_names, false, diag);
 }
 
-// §9.3.2: In fork-join_any/join_none, ref args (not ref static) are illegal
-// except in block_item_declaration initializers.
 static void CheckRefArgsInForkBlocks(
     const Stmt* s,
     const std::unordered_set<std::string_view>& ref_names,
@@ -1758,7 +1705,6 @@ static void CheckRefArgsInForkBlocks(
     CheckRefArgsInForkBlocks(ri.second, ref_names, diag);
 }
 
-// §13.2/§13.4.1/§13.4.4: Check function body for illegal constructs.
 static void CheckFuncBodyStmt(
     const Stmt* s, bool is_void,
     const std::unordered_set<std::string_view>& task_names,
@@ -1771,9 +1717,7 @@ static void CheckFuncBodyStmt(
     diag.Error(s->range.start,
                "only fork/join_none is permitted inside a function");
   }
-  // §13.4(a): A function shall not contain any time-controlling statements,
-  // i.e., any statements containing #, ##, @, fork-join, fork-join_any,
-  // wait, wait fork, wait_order, or expect.
+
   if (s->kind == StmtKind::kDelay || s->kind == StmtKind::kCycleDelay ||
       s->kind == StmtKind::kEventControl ||
       s->kind == StmtKind::kTimingControl || s->kind == StmtKind::kWait ||
@@ -1782,21 +1726,20 @@ static void CheckFuncBodyStmt(
     diag.Error(s->range.start,
                "time-controlling statement is not allowed inside a function");
   }
-  // §13.2: A function cannot enable a task.
+
   if (s->kind == StmtKind::kExprStmt && s->expr &&
       s->expr->kind == ExprKind::kCall &&
       task_names.count(s->expr->callee) != 0) {
     diag.Error(s->range.start, "function cannot enable a task");
   }
-  // §13.4.1: Illegal to declare variable with same name as function inside
-  // body.
+
   if (s->kind == StmtKind::kVarDecl && !func_name.empty() &&
       s->var_name == func_name) {
     diag.Error(s->range.start,
                std::format("declaration of '{}' conflicts with function name",
                            func_name));
   }
-  // §13.4.2: Static variable initializer must be a constant expression.
+
   if (s->kind == StmtKind::kVarDecl && s->var_is_static && s->var_init) {
     if (!IsConstantExpr(s->var_init)) {
       diag.Error(s->range.start,
@@ -1810,11 +1753,11 @@ static void CheckFuncBodyStmt(
     diag.Error(s->range.start,
                "bit-select or part-select in procedural assign LHS");
   }
-  // §9.3.2: Return is illegal inside any fork-join body.
+
   if (s->kind == StmtKind::kFork) {
     for (auto* sub : s->fork_stmts) CheckNoReturnInFork(sub, diag);
   }
-  // §13.4.4: fork/join_none body follows task rules, not function rules.
+
   if (s->kind == StmtKind::kFork && s->join_kind == TokenKind::kKwJoinNone)
     return;
   for (auto* sub : s->stmts)
@@ -1831,9 +1774,6 @@ static void CheckFuncBodyStmt(
     CheckFuncBodyStmt(ri.second, is_void, task_names, func_name, diag);
 }
 
-// §13.2: A task shall not return a value.
-// §13.3.2: Automatic task variables shall not appear in nonblocking
-// assignments.
 static void CheckTaskBodyStmt(
     const Stmt* s,
     const std::unordered_set<std::string_view>& auto_vars, DiagEngine& diag) {
@@ -1841,15 +1781,14 @@ static void CheckTaskBodyStmt(
   if (s->kind == StmtKind::kReturn && s->expr) {
     diag.Error(s->range.start, "task returns a value");
   }
-  // §13.3.2: Automatic task variables shall not use nonblocking assignments.
+
   if (s->kind == StmtKind::kNonblockingAssign && s->lhs &&
       s->lhs->kind == ExprKind::kIdentifier &&
       auto_vars.count(s->lhs->text) != 0) {
     diag.Error(s->range.start,
                "automatic task variable in nonblocking assignment");
   }
-  // §6.21: Automatic variables shall not be written by procedural continuous
-  // assignments (force/release/assign/deassign).
+
   if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
     auto name = ExprIdent(s->lhs);
     if (!name.empty() && auto_vars.count(name) != 0) {
@@ -1862,7 +1801,7 @@ static void CheckTaskBodyStmt(
     diag.Error(s->range.start,
                "bit-select or part-select in procedural assign LHS");
   }
-  // §9.3.2: Return is illegal inside any fork-join body.
+
   if (s->kind == StmtKind::kFork) {
     for (auto* sub : s->fork_stmts) CheckNoReturnInFork(sub, diag);
   }
@@ -1876,13 +1815,11 @@ static void CheckTaskBodyStmt(
     CheckTaskBodyStmt(ci.body, auto_vars, diag);
 }
 
-// §13.3.2: Collect names of variables that are automatic within a task body.
 static void CollectAutoVarNames(const Stmt* s, bool task_is_auto,
                                 std::unordered_set<std::string_view>& out) {
   if (!s) return;
   if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
-    // In an automatic task, all locals are automatic unless explicitly static.
-    // In a static task, only explicitly automatic locals are automatic.
+
     if (task_is_auto && !s->var_is_static) {
       out.insert(s->var_name);
     } else if (!task_is_auto && s->var_is_automatic) {
@@ -1899,15 +1836,11 @@ static void CollectAutoVarNames(const Stmt* s, bool task_is_auto,
 }
 
 void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
-  // §13.5.2: "It shall be illegal to use argument passing by reference for
-  // subroutines with a lifetime of static."
+
   ValidateRefLifetime(item, diag_);
-  // §13.5.2: "When the formal argument is declared as a const ref, the
-  // subroutine cannot alter the variable, and an attempt to do so shall
-  // generate a compiler error."
+
   ValidateConstRefWriteProtection(item, diag_);
 
-  // §8.30.1: Validate weak_reference type parameter on function/task arguments.
   for (const auto& arg : item->func_args) {
     if (arg.data_type.kind == DataTypeKind::kNamed &&
         arg.data_type.type_name == "weak_reference" &&
@@ -1926,7 +1859,6 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
     }
   }
 
-  // §9.3.2: Ref args (not ref static) restricted in fork-join_any/join_none.
   {
     std::unordered_set<std::string_view> ref_names;
     for (const auto& arg : item->func_args) {
@@ -1942,7 +1874,7 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
 
   if (item->kind == ModuleItemKind::kTaskDecl) {
     bool is_auto = item->is_automatic;
-    // §13.3.2: Collect automatic variable names in the task.
+
     std::unordered_set<std::string_view> auto_vars;
     if (is_auto) {
       for (const auto& arg : item->func_args) {
@@ -1964,11 +1896,6 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
   }
 }
 
-// §6.21: Walk a statement subtree and flag writes to any name in `auto_vars`
-// using nonblocking, force, or procedural-continuous assignments. The same
-// restriction applies regardless of whether the surrounding scope is a task,
-// initial block, always block, or final block — automatic storage cannot be
-// driven by these assignment forms.
 static void CheckAutoVarWritesInProc(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
     DiagEngine& diag) {
@@ -1997,9 +1924,6 @@ static void CheckAutoVarWritesInProc(
     CheckAutoVarWritesInProc(ci.body, auto_vars, diag);
 }
 
-// §6.21: Apply the automatic-variable write restriction to every
-// procedural block in the module — initial, always (and its variants), and
-// final. Tasks are handled by ValidateFunctionBody via CheckTaskBodyStmt.
 void Elaborator::ValidateAutomaticVarProcWrites(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     bool is_proc = item->kind == ModuleItemKind::kInitialBlock ||
@@ -2010,13 +1934,12 @@ void Elaborator::ValidateAutomaticVarProcWrites(const ModuleDecl* decl) {
                    item->kind == ModuleItemKind::kAlwaysLatchBlock;
     if (!is_proc || !item->body) continue;
     std::unordered_set<std::string_view> auto_vars;
-    CollectAutoVarNames(item->body, /*task_is_auto=*/false, auto_vars);
+    CollectAutoVarNames(item->body, false, auto_vars);
     if (auto_vars.empty()) continue;
     CheckAutoVarWritesInProc(item->body, auto_vars, diag_);
   }
 }
 
-// §13.4.3: Check if a function body contains fork constructs.
 static bool BodyContainsFork(const Stmt* s) {
   if (!s) return false;
   if (s->kind == StmtKind::kFork) return true;
@@ -2031,7 +1954,6 @@ static bool BodyContainsFork(const Stmt* s) {
   return false;
 }
 
-// §13.4.3: Check if a function body contains nonblocking assignments.
 static bool BodyContainsNonblocking(const Stmt* s) {
   if (!s) return false;
   if (s->kind == StmtKind::kNonblockingAssign) return true;
@@ -2046,7 +1968,6 @@ static bool BodyContainsNonblocking(const Stmt* s) {
   return false;
 }
 
-// §13.4.3: Validate that a function meets constant function constraints.
 static bool ValidateConstantFunction(const ModuleItem* func, SourceLoc loc,
                                      DiagEngine& diag) {
   for (const auto& arg : func->func_args) {
@@ -2082,7 +2003,6 @@ static bool ValidateConstantFunction(const ModuleItem* func, SourceLoc loc,
   return true;
 }
 
-// §13.4.3: Find function calls in an expression and validate for constant use.
 static void ValidateConstantFuncCallsInExpr(
     const Expr* expr, SourceLoc loc,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -2105,8 +2025,6 @@ static void ValidateConstantFuncCallsInExpr(
     ValidateConstantFuncCallsInExpr(elem, loc, func_decls, diag);
 }
 
-// §13.4.3: Recursively scan module items for constant function calls in
-// parameter initializers and generate conditions.
 static void ValidateConstFuncCallsInItems(
     const std::vector<ModuleItem*>& items,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -2137,7 +2055,7 @@ static void ValidateConstFuncCallsInItems(
 }
 
 void Elaborator::ValidateConstantFunctionCalls(const ModuleDecl* decl) {
-  // Check function calls in module header parameter defaults.
+
   for (const auto& [name, default_expr] : decl->params) {
     if (default_expr) {
       ValidateConstantFuncCallsInExpr(default_expr, decl->range.start,
@@ -2147,14 +2065,12 @@ void Elaborator::ValidateConstantFunctionCalls(const ModuleDecl* decl) {
   ValidateConstFuncCallsInItems(decl->items, func_decls_, diag_);
 }
 
-// §13.5: Check if an expression is a valid LHS for output/inout args.
 static bool IsValidOutputArg(const Expr* e) {
   if (!e) return false;
   return e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kSelect ||
          e->kind == ExprKind::kMemberAccess;
 }
 
-// §13.5: Check whether parameter i is provided by the call expression.
 static bool IsArgProvided(const Expr* expr, size_t i, std::string_view name,
                           size_t positional_count) {
   if (expr->arg_names.empty())
@@ -2166,7 +2082,6 @@ static bool IsArgProvided(const Expr* expr, size_t i, std::string_view name,
   return false;
 }
 
-// §13.5.3: Check that required args (no default) are provided.
 static void CheckRequiredArgs(const Expr* expr, const ModuleItem* func,
                               size_t positional_count, DiagEngine& diag) {
   for (size_t i = 0; i < func->func_args.size(); ++i) {
@@ -2180,7 +2095,6 @@ static void CheckRequiredArgs(const Expr* expr, const ModuleItem* func,
   }
 }
 
-// §13.5.4: Check that named args reference valid parameter names.
 static void CheckNamedArgs(const Expr* expr, const ModuleItem* func,
                            DiagEngine& diag) {
   for (size_t j = 0; j < expr->arg_names.size(); ++j) {
@@ -2199,7 +2113,6 @@ static void CheckNamedArgs(const Expr* expr, const ModuleItem* func,
   }
 }
 
-// §13.5: Find the call-site arg index for a named/positional parameter.
 static int ResolveCallArgIndex(const Expr* expr, size_t i,
                                std::string_view name, size_t positional_count) {
   if (expr->arg_names.empty()) {
@@ -2214,7 +2127,6 @@ static int ResolveCallArgIndex(const Expr* expr, size_t i,
   return -1;
 }
 
-// §13.5: Check output/inout args are valid LHS.
 static void CheckOutputArgs(const Expr* expr, const ModuleItem* func,
                             size_t positional_count, DiagEngine& diag) {
   for (size_t i = 0; i < func->func_args.size(); ++i) {
@@ -2233,11 +2145,6 @@ static void CheckOutputArgs(const Expr* expr, const ModuleItem* func,
   }
 }
 
-// §13.5.2: Walk an actual argument expression bound to a ref formal and
-// return the net identifier text if the actual is a net or a select into a
-// net. Returns an empty view otherwise. A bare identifier names a net when
-// it appears in `nets`; a select expression names a select-into-net when
-// its base identifier is in `nets`.
 static std::string_view RefActualNetName(
     const Expr* e, const std::unordered_set<std::string_view>& nets) {
   if (!e || nets.empty()) return {};
@@ -2250,9 +2157,6 @@ static std::string_view RefActualNetName(
   return {};
 }
 
-// §13.5.2: "Nets and selects into nets shall not be passed by reference."
-// Applied at every subroutine call site that supplies an actual for a ref
-// or const ref formal.
 static void CheckRefArgsNotNets(
     const Expr* expr, const ModuleItem* func, size_t positional_count,
     const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
@@ -2272,7 +2176,6 @@ static void CheckRefArgsNotNets(
   }
 }
 
-// §13.5: Validate a single call expression against its declaration.
 static void CheckCallArgs(
     const Expr* expr,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -2295,7 +2198,6 @@ static void CheckCallArgs(
   CheckRefArgsNotNets(expr, func, positional_count, net_names, diag);
 }
 
-// §13.4.1: A void function cannot be used as an expression operand.
 static void CheckVoidCallInExpr(
     const Expr* expr,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -2320,11 +2222,6 @@ static void CheckVoidCallInExpr(
   for (auto* e : expr->elements) CheckVoidCallInExpr(e, func_decls, diag);
 }
 
-// §13.4: A function shall not be called with output, inout, or ref (non-const)
-// arguments inside an event expression, an expression within a procedural
-// continuous assignment, or any expression that is not within a procedural
-// statement. Returns the offending argument's direction name when illegal,
-// or empty when the call is acceptable in such a context.
 static std::string_view ForbiddenFuncArgInNonProc(
     const Expr* expr,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
@@ -2337,16 +2234,12 @@ static std::string_view ForbiddenFuncArgInNonProc(
   for (const auto& arg : func->func_args) {
     if (arg.direction == Direction::kOutput) return "output";
     if (arg.direction == Direction::kInout) return "inout";
-    // §13.5.2 + §13.4: const ref function argument is legal in this context.
+
     if (arg.direction == Direction::kRef && !arg.is_const) return "ref";
   }
   return {};
 }
 
-// §9.4.2: Walk an expression and flag any task call. Event expressions
-// allow non-virtual methods, built-in methods, and system functions whose
-// return type is singular and "defined as a function, not a task". Any
-// task call as part of an event expression is therefore illegal.
 static void CheckNoTaskCallInExpr(
     const Expr* expr,
     const std::unordered_map<std::string_view, const ModuleItem*>& decls,
@@ -2374,13 +2267,6 @@ static void CheckNoTaskCallInExpr(
   for (auto* e : expr->elements) CheckNoTaskCallInExpr(e, decls, diag);
 }
 
-// §9.4.2: Walk an event expression and flag any bare identifier that
-// names an unpacked-array variable, or any function call whose declared
-// return type is non-singular. "Event expressions shall return singular
-// values"; aggregate types are illegal unless the expression reduces to a
-// singular value. R16 narrows this further for callees: a function is
-// allowed in an event expression only when "the type of the return value
-// is singular".
 static void CheckEventExprSingular(
     const Expr* expr,
     const std::unordered_set<std::string_view>& non_singular_vars,
@@ -2421,8 +2307,6 @@ static void CheckEventExprSingular(
     CheckEventExprSingular(e, non_singular_vars, non_singular_funcs, diag);
 }
 
-// §9.4.2: Recursively walk statements; apply CheckEventExprSingular to
-// every event-control signal and iff condition encountered.
 static void WalkStmtForEventSingular(
     const Stmt* s,
     const std::unordered_set<std::string_view>& non_singular_vars,
@@ -2456,9 +2340,6 @@ static void WalkStmtForEventSingular(
                              diag);
 }
 
-// §13.4: Walk an expression and flag any function call that uses
-// output / inout / non-const ref arguments. Used in non-procedural and
-// event-expression contexts.
 static void CheckCallNoOutInoutRefInExpr(
     const Expr* expr,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -2485,7 +2366,6 @@ static void CheckCallNoOutInoutRefInExpr(
     CheckCallNoOutInoutRefInExpr(e, func_decls, diag, context);
 }
 
-// §13.5: Walk expression tree for call validation.
 static void WalkExprForCallArgs(
     const Expr* expr,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -2502,13 +2382,12 @@ static void WalkExprForCallArgs(
     WalkExprForCallArgs(e, func_decls, net_names, diag);
 }
 
-// §13.5: Walk statement tree for call validation.
 static void WalkStmtForCallArgs(
     const Stmt* s,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
     const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
   if (!s) return;
-  // §13.5 footnote 42: bare identifier call must be a task or void function.
+
   if (s->kind == StmtKind::kExprStmt && s->expr &&
       s->expr->kind == ExprKind::kIdentifier) {
     auto it = func_decls.find(s->expr->text);
@@ -2525,7 +2404,7 @@ static void WalkStmtForCallArgs(
       }
     }
   }
-  // §13.4.1: Void function calls are legal only as standalone statements.
+
   if (s->kind == StmtKind::kExprStmt && s->expr &&
       s->expr->kind == ExprKind::kCall) {
     for (auto* a : s->expr->args) CheckVoidCallInExpr(a, func_decls, diag);
@@ -2535,9 +2414,7 @@ static void WalkStmtForCallArgs(
   CheckVoidCallInExpr(s->rhs, func_decls, diag);
   CheckVoidCallInExpr(s->condition, func_decls, diag);
   CheckVoidCallInExpr(s->for_cond, func_decls, diag);
-  // §13.4: Function calls with output / inout / non-const ref args are
-  // illegal in procedural continuous assignments (assign / force) and inside
-  // event expressions (event control or wait_order arguments).
+
   if (s->kind == StmtKind::kAssign || s->kind == StmtKind::kForce) {
     CheckCallNoOutInoutRefInExpr(s->rhs, func_decls, diag,
                                  "a procedural continuous assignment");
@@ -2548,7 +2425,7 @@ static void WalkStmtForCallArgs(
                                    "an event expression");
       CheckCallNoOutInoutRefInExpr(ev.iff_condition, func_decls, diag,
                                    "an event expression");
-      // §9.4.2: tasks cannot be called in an event expression.
+
       CheckNoTaskCallInExpr(ev.signal, func_decls, diag);
       CheckNoTaskCallInExpr(ev.iff_condition, func_decls, diag);
     }
@@ -2573,15 +2450,13 @@ static void WalkStmtForCallArgs(
 }
 
 void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
-  // Build combined map of tasks and functions.
+
   std::unordered_map<std::string_view, const ModuleItem*> all_decls =
       func_decls_;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl) all_decls[item->name] = item;
   }
-  // §9.4.2: Collect variables whose declared type is non-singular (unpacked
-  // array, unpacked struct/union). Event expressions shall return singular
-  // values, so a bare reference to one of these is illegal.
+
   std::unordered_set<std::string_view> non_singular_vars;
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kVarDecl) continue;
@@ -2593,10 +2468,7 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
     if (unpacked_array || unpacked_aggregate)
       non_singular_vars.insert(item->name);
   }
-  // §9.4.2 R16: A function may be called in an event expression only when
-  // "the type of the return value is singular". Collect functions whose
-  // declared return type is an unpacked aggregate so calls to them in
-  // event expressions can be flagged.
+
   std::unordered_set<std::string_view> non_singular_funcs;
   auto add_if_non_singular_return = [&](const ModuleItem* item) {
     if (item->kind != ModuleItemKind::kFunctionDecl) return;
@@ -2618,29 +2490,26 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
                          item->kind == ModuleItemKind::kFinalBlock;
     if (is_proc_block) {
       WalkStmtForCallArgs(item->body, all_decls, net_names_, diag_);
-      // §9.4.2: event expressions shall return singular values; walk the
-      // body for any @(unpacked-aggregate-var) references.
+
       WalkStmtForEventSingular(item->body, non_singular_vars,
                                non_singular_funcs, diag_);
-      // §13.4: Sensitivity-list event expressions are not within a procedural
-      // statement; function calls with output / inout / non-const ref args
-      // are illegal here.
+
       for (const auto& ev : item->sensitivity) {
         CheckCallNoOutInoutRefInExpr(ev.signal, all_decls, diag_,
                                      "an event expression");
         CheckCallNoOutInoutRefInExpr(ev.iff_condition, all_decls, diag_,
                                      "an event expression");
-        // §9.4.2: tasks cannot be called in an event expression.
+
         CheckNoTaskCallInExpr(ev.signal, all_decls, diag_);
         CheckNoTaskCallInExpr(ev.iff_condition, all_decls, diag_);
-        // §9.4.2: sensitivity event expressions must also be singular.
+
         CheckEventExprSingular(ev.signal, non_singular_vars,
                                non_singular_funcs, diag_);
         CheckEventExprSingular(ev.iff_condition, non_singular_vars,
                                non_singular_funcs, diag_);
       }
     }
-    // Also check function/task bodies.
+
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
       for (auto* s : item->func_body_stmts) {
@@ -2649,8 +2518,7 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
     }
     if (item->kind == ModuleItemKind::kContAssign) {
       CheckVoidCallInExpr(item->assign_rhs, all_decls, diag_);
-      // §13.4: A continuous assignment is not within a procedural statement;
-      // function calls with output / inout / non-const ref args are illegal.
+
       CheckCallNoOutInoutRefInExpr(
           item->assign_rhs, all_decls, diag_,
           "a continuous assignment");
@@ -2658,16 +2526,12 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
   }
 }
 
-// =============================================================================
-// §14.3 — Clocking block declaration validation
-// =============================================================================
-
 void Elaborator::ValidateClockingBlock(ModuleItem* item) {
-  // §14.3: Only default clocking blocks may be unnamed.
+
   if (item->name.empty() && !item->is_default_clocking) {
     diag_.Error(item->loc, "non-default clocking block must have a name");
   }
-  // Register clocking signals for direction tracking.
+
   if (!item->name.empty()) {
     auto& sigs = clocking_signals_[item->name];
     for (const auto& sig : item->clocking_signals) {
@@ -2676,14 +2540,13 @@ void Elaborator::ValidateClockingBlock(ModuleItem* item) {
   }
 }
 
-// §14.3: Check a single expression for clockvar access direction violations.
 void Elaborator::CheckClockvarAccessExpr(const Expr* e, bool is_lvalue) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess && e->lhs &&
       e->lhs->kind == ExprKind::kIdentifier) {
     auto block_it = clocking_signals_.find(e->lhs->text);
     if (block_it != clocking_signals_.end()) {
-      // Determine the member name from rhs or text.
+
       std::string_view member;
       if (e->rhs && e->rhs->kind == ExprKind::kIdentifier) {
         member = e->rhs->text;
@@ -2707,7 +2570,7 @@ void Elaborator::CheckClockvarAccessExpr(const Expr* e, bool is_lvalue) {
       }
     }
   }
-  // Recurse into sub-expressions (rvalue context).
+
   if (!is_lvalue) {
     CheckClockvarAccessExpr(e->lhs, false);
     CheckClockvarAccessExpr(e->rhs, false);
@@ -2723,8 +2586,8 @@ void Elaborator::WalkStmtsForClockvarAccess(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
-    CheckClockvarAccessExpr(s->lhs, /*is_lvalue=*/true);
-    CheckClockvarAccessExpr(s->rhs, /*is_lvalue=*/false);
+    CheckClockvarAccessExpr(s->lhs, true);
+    CheckClockvarAccessExpr(s->rhs, false);
   } else {
     CheckClockvarAccessExpr(s->expr, false);
     CheckClockvarAccessExpr(s->rhs, false);
@@ -2752,7 +2615,6 @@ void Elaborator::ValidateClockvarAccess(const ModuleDecl* decl) {
   }
 }
 
-// §14.11: Check if any procedural statement uses ## cycle delay.
 static bool HasCycleDelay(const Stmt* s) {
   if (!s) return false;
   if (s->kind == StmtKind::kCycleDelay) return true;
@@ -2793,7 +2655,6 @@ void Elaborator::ValidateCycleDelayDefaultClocking(const ModuleDecl* decl) {
   }
 }
 
-// §14.12: At most one default clocking per module/interface/program/checker.
 void Elaborator::ValidateDuplicateDefaultClocking(const ModuleDecl* decl) {
   const ModuleItem* first_default = nullptr;
   for (const auto* item : decl->items) {
@@ -2809,7 +2670,6 @@ void Elaborator::ValidateDuplicateDefaultClocking(const ModuleDecl* decl) {
   }
 }
 
-// §14.14: At most one global clocking per module/interface/program/checker.
 void Elaborator::ValidateDuplicateGlobalClocking(const ModuleDecl* decl) {
   const ModuleItem* first_global = nullptr;
   for (const auto* item : decl->items) {
@@ -2825,7 +2685,6 @@ void Elaborator::ValidateDuplicateGlobalClocking(const ModuleDecl* decl) {
   }
 }
 
-// §14.16: Continuous assignment to a clocking output variable is illegal.
 void Elaborator::ValidateContAssignToClockvar(const ModuleDecl* decl) {
   if (clocking_signals_.empty()) return;
   for (const auto* item : decl->items) {
@@ -2848,7 +2707,6 @@ void Elaborator::ValidateContAssignToClockvar(const ModuleDecl* decl) {
   }
 }
 
-// §9.4.2.4: Walk a statement tree marking sequence events and checking R5.
 static void WalkStmtsForSequenceEvents(
     Stmt* s, const std::unordered_set<std::string_view>& seq_names,
     bool in_automatic, DiagEngine& diag) {
@@ -2866,8 +2724,7 @@ static void WalkStmtsForSequenceEvents(
       }
       if (!name.empty() && seq_names.count(name) != 0) {
         ev.is_sequence_event = true;
-        // R5: Arguments to a sequence instance in an event expression
-        // shall be static — automatic variables are illegal.
+
         if (has_args && in_automatic) {
           diag.Error(s->range.start,
                      "sequence event arguments shall not reference "
@@ -2900,7 +2757,7 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl) {
                                    sequence_names_, false, diag_);
       }
     }
-    // R5: Check tasks — automatic tasks cannot pass automatic vars.
+
     if (item->kind == ModuleItemKind::kTaskDecl && item->body) {
       WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body),
                                  sequence_names_, item->is_automatic, diag_);
@@ -2908,19 +2765,8 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl) {
   }
 }
 
-// =============================================================================
-// §16.4 — Deferred assertion action block restrictions
-// =============================================================================
-
-// §16.4 P5/P8/P9: "Action blocks may only contain a single subroutine call."
-// "The pass and fail statements in a deferred assertion's action_block, if
-// present, shall each consist of a single subroutine call." "The requirement
-// of a single subroutine call implies that no begin-end block shall surround
-// the pass or fail statements, as begin is itself a statement that is not
-// a subroutine call." A subroutine call shows up in the AST as an expression
-// statement whose expression is a call or system call.
 static bool IsSingleSubroutineCall(const Stmt* action) {
-  if (!action) return true;  // No action is always allowed.
+  if (!action) return true;
   if (action->kind == StmtKind::kNull) return true;
   if (action->kind != StmtKind::kExprStmt) return false;
   if (!action->expr) return false;
@@ -2928,13 +2774,6 @@ static bool IsSingleSubroutineCall(const Stmt* action) {
          action->expr->kind == ExprKind::kSystemCall;
 }
 
-// §16.4 P10: "In the case of a final deferred assertion, the subroutine
-// shall be one that may be legally called in the Postponed region (see
-// 4.4.2.9)." Per §4.4.2.9 the Postponed region forbids new value changes
-// and scheduling into earlier regions; statements that create those
-// effects therefore disqualify a subroutine from the final-deferred
-// path. Returns true when the supplied stmt subtree contains any such
-// disqualifying statement.
 static bool ContainsPostponedIllegalStmt(const Stmt* s) {
   if (!s) return false;
   switch (s->kind) {
@@ -2967,9 +2806,6 @@ static bool ContainsPostponedIllegalStmt(const Stmt* s) {
   return false;
 }
 
-// §16.4 P10: walk a callee's body (function or task) for Postponed-illegal
-// statements. Functions store their body in func_body_stmts; tasks reuse
-// `body`. Returns true on first hit so the caller can flag the call.
 static bool CalleeBodyHasPostponedIllegal(const ModuleItem* callee) {
   if (!callee) return false;
   if (callee->body && ContainsPostponedIllegalStmt(callee->body)) return true;
@@ -2982,11 +2818,6 @@ static bool CalleeBodyHasPostponedIllegal(const ModuleItem* callee) {
 using DeferredSubroutineMap =
     std::unordered_map<std::string_view, const ModuleItem*>;
 
-// §16.4 P10: for a final-deferred assertion whose action is a kCall to a
-// user-defined task/function, look the callee up by name and warn if its
-// body contains Postponed-illegal statements. System calls (kSystemCall)
-// are accepted: $info/$warning/$error/$fatal/$display and similar
-// read-only severity tasks are the canonical legal Postponed callees.
 static void CheckFinalDeferredCallee(const Stmt* action,
                                      const DeferredSubroutineMap& subs,
                                      DiagEngine& diag) {
@@ -3005,13 +2836,6 @@ static void CheckFinalDeferredCallee(const Stmt* action,
   }
 }
 
-// §16.4 P12: "It shall be an error to pass automatic or dynamic variables
-// as actuals to a ref or const ref formal." For a deferred-assertion
-// action call to a user-defined subroutine, walk each formal; for any
-// ref / const ref formal, check whether the actual at the same position
-// is a class-member access (kMemberAccess) — class properties live on a
-// dynamically-allocated object so passing them by reference violates the
-// rule.
 static void CheckDeferredCallRefArgs(const Stmt* action,
                                      const DeferredSubroutineMap& subs,
                                      DiagEngine& diag) {
@@ -3057,12 +2881,12 @@ static void CheckDeferredActionStmt(const Stmt* s,
                  "§16.4: deferred assertion fail action shall be a single "
                  "subroutine call");
   }
-  // §16.4 P10: final-deferred subroutine must be Postponed-callable.
+
   if (s->is_final_deferred) {
     CheckFinalDeferredCallee(s->assert_pass_stmt, subs, diag);
     CheckFinalDeferredCallee(s->assert_fail_stmt, subs, diag);
   }
-  // §16.4 P12: ref formals shall not receive automatic/dynamic actuals.
+
   CheckDeferredCallRefArgs(s->assert_pass_stmt, subs, diag);
   CheckDeferredCallRefArgs(s->assert_fail_stmt, subs, diag);
 }
@@ -3081,8 +2905,7 @@ void Elaborator::WalkStmtsForDeferredActions(const Stmt* s) {
 }
 
 void Elaborator::ValidateDeferredAssertionActions(const ModuleDecl* decl) {
-  // Build the module-local map of callable subroutines once so P10 / P12
-  // lookups have access to formal-direction and body information.
+
   deferred_subroutine_map_.clear();
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl ||
@@ -3091,13 +2914,11 @@ void Elaborator::ValidateDeferredAssertionActions(const ModuleDecl* decl) {
     }
   }
   for (const auto* item : decl->items) {
-    // §16.4: deferred assertion may also be used as a module_common_item;
-    // when parsed at module level, it's wrapped as an assert/cover-property
-    // item whose body is the assertion statement.
+
     if (item->body) {
       WalkStmtsForDeferredActions(item->body);
     }
   }
 }
 
-}  // namespace delta
+}

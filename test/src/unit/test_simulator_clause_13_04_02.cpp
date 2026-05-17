@@ -32,12 +32,6 @@ TEST(FunctionLifetimeSim, StaticFunctionWithArgs) {
   EXPECT_EQ(EvalExpr(c3, f.ctx, f.arena).ToUint64(), 10u);
 }
 
-// Static-function var persistence, automatic-function var freshness,
-// the default-lifetime rule, the static-var-in-auto-func and
-// auto-var-in-static-func cases, and the auto-module-inherits-auto rule
-// are §6.21 lifetime semantics. The corresponding simulator tests live
-// in test_simulator_clause_06_21.cpp.
-
 TEST(FunctionLifetimeSim, RecursiveAutomaticFunction) {
   auto val = RunAndGet(
       "module t;\n"
@@ -56,4 +50,4 @@ TEST(FunctionLifetimeSim, RecursiveAutomaticFunction) {
   EXPECT_EQ(val, 120u);
 }
 
-}  // namespace
+}

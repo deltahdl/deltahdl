@@ -13,18 +13,11 @@
 
 namespace delta {
 
-// =============================================================================
-// svdpi.h type mapping (IEEE 1800-2023 S35.5)
-// =============================================================================
-
-// Two-state scalar types.
 using SvBit = uint8_t;
 using SvScalar = uint8_t;
 
-// Four-state scalar types.
 using SvLogic = uint8_t;
 
-// Packed array element types.
 using SvBitVecVal = uint32_t;
 
 struct SvLogicVecVal {
@@ -32,29 +25,19 @@ struct SvLogicVecVal {
   uint32_t bval = 0;
 };
 
-// Chandle: opaque pointer to C data.
 using SvChandle = void*;
 
-// Open array handle (S35.5.6).
 struct SvOpenArrayHandle {
   void* data = nullptr;
   uint32_t size = 0;
   uint32_t elem_width = 0;
 };
 
-// =============================================================================
-// DPI scope management (IEEE 1800-2023 S35.5.4)
-// =============================================================================
-
 struct DpiScope {
   std::string name;
   std::string_view module_name;
   void* user_data = nullptr;
 };
-
-// =============================================================================
-// DpiArgValue: typed argument for DPI calls
-// =============================================================================
 
 struct DpiArgValue {
   DataTypeKind type = DataTypeKind::kInt;
@@ -85,10 +68,6 @@ struct DpiArgValue {
   SvLogic AsLogic() const;
 };
 
-// =============================================================================
-// DpiRtFunction: runtime DPI-C function with typed arguments
-// =============================================================================
-
 using DpiRtCallback =
     std::function<DpiArgValue(const std::vector<DpiArgValue>&)>;
 
@@ -102,50 +81,37 @@ struct DpiRtFunction {
   bool is_context = false;
 };
 
-// =============================================================================
-// DpiRtExport: runtime DPI-C export registration
-// =============================================================================
-
 struct DpiRtExport {
   std::string_view c_name;
   std::string_view sv_name;
-  DpiRtCallback impl;  // The SV-side implementation.
+  DpiRtCallback impl;
 };
-
-// =============================================================================
-// DpiRuntime: full DPI-C runtime manager (S35)
-// =============================================================================
 
 class DpiRuntime {
  public:
-  // Import management.
+
   void RegisterImport(DpiRtFunction func);
   const DpiRtFunction* FindImport(std::string_view sv_name) const;
   bool HasImport(std::string_view sv_name) const;
   uint32_t ImportCount() const;
 
-  // Export management.
   void RegisterExport(DpiRtExport exp);
   const DpiRtExport* FindExport(std::string_view sv_name) const;
   bool HasExport(std::string_view sv_name) const;
   uint32_t ExportCount() const;
 
-  // Call an import function with typed arguments.
   DpiArgValue CallImport(std::string_view sv_name,
                          const std::vector<DpiArgValue>& args) const;
 
-  // Invoke an export function from C side.
   DpiArgValue CallExport(std::string_view sv_name,
                          const std::vector<DpiArgValue>& args) const;
 
-  // Scope management (S35.5.4).
   void PushScope(DpiScope scope);
   void PopScope();
   const DpiScope* CurrentScope() const;
   void SetScope(const DpiScope* scope);
   const DpiScope* GetScope() const;
 
-  // Open array support (S35.5.6).
   static uint32_t SvLow(const SvOpenArrayHandle& h);
   static uint32_t SvHigh(const SvOpenArrayHandle& h);
   static uint32_t SvSize(const SvOpenArrayHandle& h);
@@ -159,11 +125,6 @@ class DpiRuntime {
   const DpiScope* current_scope_ = nullptr;
 };
 
-// =============================================================================
-// Assertion API (IEEE 1800-2023 S39)
-// =============================================================================
-
-// Assertion severity levels (S39.5.1).
 enum class AssertionSeverity : uint8_t {
   kInfo = 0,
   kWarning = 1,
@@ -171,7 +132,6 @@ enum class AssertionSeverity : uint8_t {
   kFatal = 3,
 };
 
-// Assertion action types (S39.5.2).
 enum class AssertionAction : uint8_t {
   kNone = 0,
   kPass = 1,
@@ -182,7 +142,6 @@ enum class AssertionAction : uint8_t {
   kKill = 6,
 };
 
-// Assertion callback data (S39.5.3).
 struct AssertionCbData {
   int reason = 0;
   AssertionSeverity severity = AssertionSeverity::kError;
@@ -191,10 +150,8 @@ struct AssertionCbData {
   void* user_data = nullptr;
 };
 
-// Assertion callback type.
 using AssertionCbFunc = std::function<void(const AssertionCbData&)>;
 
-// Assertion callback reason constants (S39.5).
 constexpr int kCbAssertionStart = 601;
 constexpr int kCbAssertionSuccess = 602;
 constexpr int kCbAssertionFailure = 603;
@@ -202,7 +159,6 @@ constexpr int kCbAssertionDisabled = 604;
 constexpr int kCbAssertionReset = 605;
 constexpr int kCbAssertionKilled = 606;
 
-// Assertion API context.
 class AssertionApi {
  public:
   void RegisterCallback(int reason, AssertionCbFunc cb, void* user_data);
@@ -226,11 +182,6 @@ class AssertionApi {
   std::unordered_map<std::string, AssertionAction> action_map_;
 };
 
-// =============================================================================
-// Coverage API (IEEE 1800-2023 S40)
-// =============================================================================
-
-// Coverage control constants (S40.3).
 enum class CoverageControl : uint8_t {
   kStop = 0,
   kStart = 1,
@@ -238,7 +189,6 @@ enum class CoverageControl : uint8_t {
   kCheck = 3,
 };
 
-// Coverage API context.
 class CoverageApi {
  public:
   void SetControl(CoverageControl ctrl);
@@ -250,7 +200,6 @@ class CoverageApi {
   void SetActive(bool active);
   bool IsActive() const;
 
-  // Coverage data access.
   void StoreValue(std::string_view key, double value);
   double GetValue(std::string_view key) const;
 
@@ -261,11 +210,6 @@ class CoverageApi {
   std::unordered_map<std::string, double> values_;
 };
 
-// =============================================================================
-// Data Read API (IEEE 1800-2023 S41)
-// =============================================================================
-
-// Value format identifiers for the data read API (S41.3).
 enum class DataReadFormat : uint8_t {
   kBinStr = 1,
   kOctStr = 2,
@@ -278,7 +222,6 @@ enum class DataReadFormat : uint8_t {
   kStrength = 9,
 };
 
-// Data read value container.
 struct DataReadValue {
   DataReadFormat format = DataReadFormat::kInt;
   int32_t int_val = 0;
@@ -288,25 +231,20 @@ struct DataReadValue {
   std::vector<SvLogicVecVal> vector_val;
 };
 
-// Value change callback.
 using ValueChangeCb =
     std::function<void(std::string_view, const DataReadValue&)>;
 
-// Data read API context.
 class DataReadApi {
  public:
-  // Read a variable's value (S41.4).
+
   DataReadValue GetValue(std::string_view name, DataReadFormat fmt) const;
 
-  // Write a variable's value (S41.5).
   void PutValue(std::string_view name, const DataReadValue& val);
 
-  // Register a value-change callback (S41.6).
   void RegisterValueChangeCb(std::string_view name, ValueChangeCb cb);
   void NotifyValueChange(std::string_view name, const DataReadValue& val);
   uint32_t ValueChangeCbCount() const;
 
-  // Internal variable storage for standalone testing.
   void StoreVariable(std::string_view name, const DataReadValue& val);
 
  private:
@@ -314,4 +252,4 @@ class DataReadApi {
   std::unordered_map<std::string, std::vector<ValueChangeCb>> change_cbs_;
 };
 
-}  // namespace delta
+}

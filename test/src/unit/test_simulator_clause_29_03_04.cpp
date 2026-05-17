@@ -21,8 +21,6 @@ UdpDecl MakeCombinational(std::vector<std::vector<char>> rows,
   return decl;
 }
 
-// An explicitly specified all-x input row drives the output to x, consistent
-// with the all-x-inputs rule that also forces an x output.
 TEST(UdpStateTable, CombinationalExplicitAllXRowProducesX) {
   auto decl = MakeCombinational(
       {{'0', '0'}, {'1', '1'}, {'x', 'x'}},
@@ -31,4 +29,4 @@ TEST(UdpStateTable, CombinationalExplicitAllXRowProducesX) {
   EXPECT_EQ(state.Evaluate({'x', 'x'}), 'x');
 }
 
-}  // namespace
+}

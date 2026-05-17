@@ -216,4 +216,4 @@ TEST(ClassSim, E2eCastFailsIncompatibleTypesEvenIfNull) {
       "endmodule\n", "result"), 0u);
 }
 
-}  // namespace
+}

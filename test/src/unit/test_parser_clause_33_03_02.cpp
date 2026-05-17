@@ -15,9 +15,6 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// Per-test temp directory under the OS temp area.  Each instance picks
-// a fresh directory using pid + a process-local counter so concurrent
-// tests do not collide.
 struct TempLibMapDir {
   fs::path dir;
 
@@ -44,7 +41,6 @@ struct TempLibMapDir {
   }
 };
 
-// §33.3.2: simplest case — a lib.map's library declaration is loaded.
 TEST(LibraryMapInclude, LoadsLibraryDeclarationFromMapFile) {
   TempLibMapDir tmp;
   auto top = tmp.Write("lib.map", "library rtlLib *.v;\n");
@@ -53,7 +49,6 @@ TEST(LibraryMapInclude, LoadsLibraryDeclarationFromMapFile) {
   EXPECT_EQ(m.LibraryForFile((tmp.dir / "top.v").string()), "rtlLib");
 }
 
-// §33.3.2 item 1: include inserts the contents of the referenced map.
 TEST(LibraryMapInclude, IncludeMergesReferencedFile) {
   TempLibMapDir tmp;
   tmp.Write("sub.map", "library subLib *.sv;\n");
@@ -66,8 +61,6 @@ TEST(LibraryMapInclude, IncludeMergesReferencedFile) {
   EXPECT_EQ(m.LibraryForFile((tmp.dir / "y.sv").string()), "subLib");
 }
 
-// §33.3.2 item 2 (include side): a relative include path is resolved
-// against the directory of the file that contains it.
 TEST(LibraryMapInclude, RelativeIncludePathAnchorsToContainingFile) {
   TempLibMapDir tmp;
   auto sub_dir = tmp.dir / "subdir";
@@ -79,8 +72,6 @@ TEST(LibraryMapInclude, RelativeIncludePathAnchorsToContainingFile) {
   EXPECT_EQ(m.LibraryForFile((sub_dir / "x.sv").string()), "subLib");
 }
 
-// §33.3.2 item 2 (library side): a relative library spec inside an
-// included file is resolved against that included file's directory.
 TEST(LibraryMapInclude, RelativeLibrarySpecAnchorsToContainingFile) {
   TempLibMapDir tmp;
   auto a_dir = tmp.dir / "a";
@@ -89,15 +80,12 @@ TEST(LibraryMapInclude, RelativeLibrarySpecAnchorsToContainingFile) {
   auto top = tmp.Write("top.map", "include \"a/sub.map\";\n");
   LibraryMap m;
   ASSERT_TRUE(m.LoadMapFile(top));
-  // sub.map's "*.v" anchors to a/, so a/x.v should match.
+
   EXPECT_EQ(m.LibraryForFile((a_dir / "x.v").string()), "inner");
-  // The same name in the parent dir should not match — proving the
-  // library spec used a/, not the host map's directory.
+
   EXPECT_EQ(m.LibraryForFile((tmp.dir / "x.v").string()), "work");
 }
 
-// §33.3.2 item 1, transitive: a chain of includes accumulates all
-// declarations as if textually inlined.
 TEST(LibraryMapInclude, NestedIncludesAccumulateAllDeclarations) {
   TempLibMapDir tmp;
   tmp.Write("c.map", "library cLib *.cv;\n");
@@ -114,8 +102,6 @@ TEST(LibraryMapInclude, NestedIncludesAccumulateAllDeclarations) {
   EXPECT_EQ(m.LibraryForFile((tmp.dir / "x.cv").string()), "cLib");
 }
 
-// §33.3.2 textual-inclusion semantics imply termination — a cycle has
-// to be diagnosed instead of silently looping.
 TEST(LibraryMapInclude, CycleIsDetectedAndReported) {
   TempLibMapDir tmp;
   tmp.Write("a.map", "include \"b.map\";\n");
@@ -126,8 +112,6 @@ TEST(LibraryMapInclude, CycleIsDetectedAndReported) {
   EXPECT_FALSE(errors.empty());
 }
 
-// A missing include target is reported through the error channel
-// rather than silently swallowed.
 TEST(LibraryMapInclude, MissingIncludeIsReported) {
   TempLibMapDir tmp;
   auto top = tmp.Write("top.map", "include \"nonexistent.map\";\n");
@@ -137,4 +121,4 @@ TEST(LibraryMapInclude, MissingIncludeIsReported) {
   EXPECT_FALSE(errors.empty());
 }
 
-}  // namespace
+}

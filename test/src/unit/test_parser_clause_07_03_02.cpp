@@ -67,7 +67,6 @@ TEST(TaggedUnionParsing, TaggedUnionVoidMember) {
   EXPECT_EQ(item->typedef_type.struct_members[0].name, "Invalid");
 }
 
-// §7.3.2: tagged + packed qualifiers together.
 TEST(TaggedUnionParsing, PackedTaggedUnion) {
   auto r = Parse(
       "module t;\n"
@@ -85,7 +84,6 @@ TEST(TaggedUnionParsing, PackedTaggedUnion) {
   EXPECT_TRUE(item->typedef_type.is_packed);
 }
 
-// §7.3.2: tagged union with three members.
 TEST(TaggedUnionParsing, TaggedUnionThreeMembers) {
   auto r = Parse(
       "module t;\n"
@@ -103,4 +101,4 @@ TEST(TaggedUnionParsing, TaggedUnionThreeMembers) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 3u);
 }
 
-}  // namespace
+}

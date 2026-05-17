@@ -60,4 +60,4 @@ TEST(ClassOverviewParsing, MethodsIncludeBothFunctionsAndTasks) {
   EXPECT_TRUE(has_task);
 }
 
-}  // namespace
+}

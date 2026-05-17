@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §31.4.3 Syntax 31-11: the two positional limits plus edge-qualified
-// reference and data events must round-trip through the parser.
 TEST(TimingCheckCommandParsing, FullskewTwoLimits) {
   auto r = Parse(
       "module m;\n"
@@ -25,8 +23,6 @@ TEST(TimingCheckCommandParsing, FullskewTwoLimits) {
   ASSERT_EQ(tc->limits.size(), 2u);
 }
 
-// §31.4.3 Table 31-9: the optional notifier slot resolves to a variable
-// identifier alongside the edge-qualified events and two limits.
 TEST(TimingCheckCommandParsing, FullskewWithNotifier) {
   auto r = Parse(
       "module m;\n"
@@ -43,9 +39,6 @@ TEST(TimingCheckCommandParsing, FullskewWithNotifier) {
   EXPECT_EQ(tc->remain_active_flag, nullptr);
 }
 
-// §31.4.3 Syntax 31-11 / Table 31-9: the two trailing optional slots —
-// event_based_flag and remain_active_flag — capture as expressions on the
-// AST node past the notifier.
 TEST(TimingCheckCommandParsing, FullskewWithEventAndRemainFlags) {
   auto r = Parse(
       "module m;\n"
@@ -62,8 +55,6 @@ TEST(TimingCheckCommandParsing, FullskewWithEventAndRemainFlags) {
   ASSERT_NE(tc->remain_active_flag, nullptr);
 }
 
-// §31.4.3 Table 31-9: each limit is a non-negative constant expression, so
-// specparam references in the limit slots must parse.
 TEST(TimingCheckCommandParsing, FullskewLimitsAreExpressions) {
   auto r = Parse(
       "module m;\n"
@@ -80,8 +71,6 @@ TEST(TimingCheckCommandParsing, FullskewLimitsAreExpressions) {
   ASSERT_EQ(tc->limits.size(), 2u);
 }
 
-// §31.4.3: zero is a valid non-negative constant and names the boundary
-// case for simultaneous transitions; both limits must accept zero.
 TEST(TimingCheckCommandParsing, FullskewZeroLimits) {
   auto r = Parse(
       "module m;\n"
@@ -96,8 +85,6 @@ TEST(TimingCheckCommandParsing, FullskewZeroLimits) {
   ASSERT_EQ(tc->limits.size(), 2u);
 }
 
-// §31.4.3 Syntax 31-11 requires two positional limits; providing only one
-// is ill-formed.
 TEST(TimingCheckCommandParsing, ErrorFullskewMissingSecondLimit) {
   auto r = Parse(
       "module m;\n"
@@ -108,8 +95,6 @@ TEST(TimingCheckCommandParsing, ErrorFullskewMissingSecondLimit) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §31.4.3 Syntax 31-11 requires the two positional limits; omitting both
-// is ill-formed.
 TEST(TimingCheckCommandParsing, ErrorFullskewMissingBothLimits) {
   auto r = Parse(
       "module m;\n"
@@ -120,4 +105,4 @@ TEST(TimingCheckCommandParsing, ErrorFullskewMissingBothLimits) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

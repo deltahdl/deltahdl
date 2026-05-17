@@ -21,9 +21,6 @@ TEST(FunctionDeclParsing, FunctionDeclBasic) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
 }
 
-// Lifetime-keyword acceptance on function declarations is a §6.21 rule;
-// the corresponding parser tests live in test_parser_clause_06_21.cpp.
-
 TEST(FunctionDeclParsing, FunctionDeclVoidReturn) {
   auto r = Parse(
       "module m;\n"
@@ -239,8 +236,6 @@ TEST(FunctionDeclParsing, FunctionBodyWithBlockItem) {
   EXPECT_GE(item->func_body_stmts.size(), 2u);
 }
 
-// --- function_declaration: no lifetime (default) ---
-
 TEST(FunctionDeclParsing, FunctionDeclNoLifetime) {
   auto r = Parse(
       "module m;\n"
@@ -254,16 +249,12 @@ TEST(FunctionDeclParsing, FunctionDeclNoLifetime) {
   EXPECT_FALSE(item->is_static);
 }
 
-// --- function_body_declaration: interface_identifier form ---
-
 TEST(FunctionDeclParsing, FunctionBodyWithInterfaceScope) {
   EXPECT_TRUE(ParseOk(
       "interface ifc;\n"
       "  function int f(); return 0; endfunction\n"
       "endinterface\n"));
 }
-
-// --- function_data_type_or_implicit: signed implicit ---
 
 TEST(FunctionDeclParsing, FunctionImplicitReturnTypeSigned) {
   auto r = Parse(
@@ -278,8 +269,6 @@ TEST(FunctionDeclParsing, FunctionImplicitReturnTypeSigned) {
   EXPECT_NE(item->return_type.packed_dim_left, nullptr);
 }
 
-// --- function_data_type_or_implicit: named type ---
-
 TEST(FunctionDeclParsing, FunctionNamedReturnType) {
   EXPECT_TRUE(ParseOk(
       "module m;\n"
@@ -288,8 +277,6 @@ TEST(FunctionDeclParsing, FunctionNamedReturnType) {
       "endmodule\n"));
 }
 
-// --- function_prototype with dynamic_override_specifiers ---
-
 TEST(FunctionDeclParsing, FunctionPrototypeWithOverride) {
   EXPECT_TRUE(ParseOk(
       "class C;\n"
@@ -297,16 +284,12 @@ TEST(FunctionDeclParsing, FunctionPrototypeWithOverride) {
       "endclass\n"));
 }
 
-// --- function_prototype with args ---
-
 TEST(FunctionDeclParsing, FunctionPrototypeWithArgs) {
   EXPECT_TRUE(ParseOk(
       "module m;\n"
       "  import \"DPI-C\" function int add(int a, int b);\n"
       "endmodule\n"));
 }
-
-// --- dpi_task_import_property: context on task ---
 
 TEST(FunctionDeclParsing, DpiImportTaskContext) {
   auto r = Parse(
@@ -322,8 +305,6 @@ TEST(FunctionDeclParsing, DpiImportTaskContext) {
   EXPECT_TRUE(item->dpi_is_context);
 }
 
-// --- dpi_import_export: DPI import with C identifier on task ---
-
 TEST(FunctionDeclParsing, DpiImportTaskWithCIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -337,8 +318,6 @@ TEST(FunctionDeclParsing, DpiImportTaskWithCIdentifier) {
   EXPECT_TRUE(item->dpi_is_task);
   EXPECT_EQ(item->dpi_c_name, "c_task_name");
 }
-
-// --- dpi_import_export: DPI export task with C identifier ---
 
 TEST(FunctionDeclParsing, DpiExportTaskWithCIdentifier) {
   auto r = Parse(
@@ -355,8 +334,6 @@ TEST(FunctionDeclParsing, DpiExportTaskWithCIdentifier) {
   EXPECT_EQ(item->dpi_c_name, "c_alias");
 }
 
-// --- dynamic_override_specifiers: combined extends:final ---
-
 TEST(FunctionDeclParsing, FunctionDynOverrideExtendsFinal) {
   EXPECT_TRUE(ParseOk(
       "class c;\n"
@@ -364,4 +341,4 @@ TEST(FunctionDeclParsing, FunctionDynOverrideExtendsFinal) {
       "endclass\n"));
 }
 
-}  // namespace
+}

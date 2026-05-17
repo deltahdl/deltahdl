@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// === constraint_declaration in a class ===
-
 TEST(ConstraintElaboration, ClassWithConstraintDeclaration) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -37,8 +35,6 @@ TEST(ConstraintElaboration, ClassWithMultipleConstraints) {
              "endmodule\n"));
 }
 
-// === constraint_prototype in a class ===
-
 TEST(ConstraintElaboration, ClassWithConstraintPrototype) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -69,8 +65,6 @@ TEST(ConstraintElaboration, ClassWithPureConstraintPrototype) {
              "endmodule\n"));
 }
 
-// === constraint_declaration with dynamic_override_specifiers ===
-
 TEST(ConstraintElaboration, ConstraintWithDynamicOverride) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -80,8 +74,6 @@ TEST(ConstraintElaboration, ConstraintWithDynamicOverride) {
              "module m;\n"
              "endmodule\n"));
 }
-
-// === extern_constraint_declaration ===
 
 TEST(ConstraintElaboration, ExternConstraintDeclaration) {
   EXPECT_TRUE(
@@ -93,8 +85,6 @@ TEST(ConstraintElaboration, ExternConstraintDeclaration) {
              "module m;\n"
              "endmodule\n"));
 }
-
-// === constraint_block: complex block contents ===
 
 TEST(ConstraintElaboration, ConstraintWithComplexBlock) {
   EXPECT_TRUE(
@@ -114,4 +104,4 @@ TEST(ConstraintElaboration, ConstraintWithComplexBlock) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

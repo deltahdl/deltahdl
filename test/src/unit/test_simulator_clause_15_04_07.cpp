@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.7: Peek copies front message without removing it.
 TEST(IpcSync, MailboxPeekCopiesWithoutRemoving) {
   MailboxObject mb;
   mb.TryPut(42);
@@ -18,14 +17,12 @@ TEST(IpcSync, MailboxPeekCopiesWithoutRemoving) {
   EXPECT_EQ(mb.Num(), 1);
 }
 
-// §15.4.7: Peek on empty mailbox returns kBlock.
 TEST(IpcSync, MailboxPeekEmptyReturnsBlock) {
   MailboxObject mb;
   uint64_t msg = 0;
   EXPECT_EQ(mb.Peek(msg), MbxPeekStatus::kBlock);
 }
 
-// §15.4.7: Multiple peeks return the same front message.
 TEST(IpcSync, MailboxPeekRepeatedReturnsSameMessage) {
   MailboxObject mb;
   mb.TryPut(100);
@@ -38,7 +35,6 @@ TEST(IpcSync, MailboxPeekRepeatedReturnsSameMessage) {
   EXPECT_EQ(mb.Num(), 2);
 }
 
-// §15.4.7: Peek followed by Get retrieves the same message.
 TEST(IpcSync, MailboxPeekThenGetReturnsSameMessage) {
   MailboxObject mb;
   mb.TryPut(55);
@@ -50,7 +46,6 @@ TEST(IpcSync, MailboxPeekThenGetReturnsSameMessage) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-// §15.4.7: Peek after get returns the next message.
 TEST(IpcSync, MailboxPeekAfterGetReturnsNext) {
   MailboxObject mb;
   mb.TryPut(10);
@@ -62,4 +57,4 @@ TEST(IpcSync, MailboxPeekAfterGetReturnsNext) {
   EXPECT_EQ(mb.Num(), 1);
 }
 
-}  // namespace
+}

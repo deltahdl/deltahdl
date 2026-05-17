@@ -84,4 +84,4 @@ TEST(Lexer, KeywordVersion_Noconfig_ExcludedKeywordsStillInRegular2001) {
   }
 }
 
-}  // namespace
+}

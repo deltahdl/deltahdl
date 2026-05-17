@@ -266,4 +266,4 @@ TEST(RealIncDecSim, PostfixDecrementBy1Point0) {
   EXPECT_DOUBLE_EQ(AdvToDouble(var->value), 3.0);
 }
 
-}  // namespace
+}

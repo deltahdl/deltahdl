@@ -237,4 +237,4 @@ TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsZeroDelay) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

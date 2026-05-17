@@ -244,4 +244,4 @@ TEST(SpecparamParsing, SpecparamInBothSpecifyAndModuleBody) {
   EXPECT_EQ(items[1]->kind, ModuleItemKind::kSpecifyBlock);
 }
 
-}  // namespace
+}

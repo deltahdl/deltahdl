@@ -60,4 +60,4 @@ TEST(StrengthParsing, NoStrengthNoFields) {
   EXPECT_EQ(item->drive_strength1, 0u);
 }
 
-}  // namespace
+}

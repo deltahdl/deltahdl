@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §A.8.7: unsigned_number — decimal_digit { _ | decimal_digit }
-
 TEST(NumberTokenLexing, UnsignedNumber) {
   auto r = LexOne("42 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
@@ -27,8 +25,6 @@ TEST(NumberTokenLexing, UnsignedNumberZero) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "0");
 }
-
-// §A.8.7: decimal_number — [size] decimal_base unsigned_number
 
 TEST(NumberTokenLexing, DecimalBaseUnsized) {
   auto r = LexOne("'d99 ");
@@ -48,8 +44,6 @@ TEST(NumberTokenLexing, DecimalBaseUpperD) {
   EXPECT_EQ(r.token.text, "'D7");
 }
 
-// §A.8.7: decimal_number — [size] decimal_base x_digit { _ }
-
 TEST(NumberTokenLexing, DecimalBaseXDigit) {
   auto r = LexOne("8'dx ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
@@ -61,8 +55,6 @@ TEST(NumberTokenLexing, DecimalBaseXDigitUpper) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "8'dX");
 }
-
-// §A.8.7: decimal_number — [size] decimal_base z_digit { _ }
 
 TEST(NumberTokenLexing, DecimalBaseZDigit) {
   auto r = LexOne("8'dz ");
@@ -81,8 +73,6 @@ TEST(NumberTokenLexing, DecimalBaseQuestionMark) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "8'd?");
 }
-
-// §A.8.7: binary_number — [size] binary_base binary_value
 
 TEST(NumberTokenLexing, BinaryBaseUnsized) {
   auto r = LexOne("'b1010 ");
@@ -114,8 +104,6 @@ TEST(NumberTokenLexing, BinaryValueWithXZ) {
   EXPECT_EQ(r.token.text, "4'b1xz0");
 }
 
-// §A.8.7: octal_number — [size] octal_base octal_value
-
 TEST(NumberTokenLexing, OctalBaseUnsized) {
   auto r = LexOne("'o77 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
@@ -140,8 +128,6 @@ TEST(NumberTokenLexing, OctalValueWithUnderscore) {
   EXPECT_EQ(r.token.text, "12'o77_77");
 }
 
-// §A.8.7: octal_digit — x_digit | z_digit | 0..7
-
 TEST(NumberTokenLexing, OctalValueWithXDigit) {
   auto r = LexOne("8'o7x ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
@@ -159,8 +145,6 @@ TEST(NumberTokenLexing, OctalValueWithQuestion) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "8'o?");
 }
-
-// §A.8.7: hex_number — [size] hex_base hex_value
 
 TEST(NumberTokenLexing, HexBaseUnsized) {
   auto r = LexOne("'hFF ");
@@ -191,8 +175,6 @@ TEST(NumberTokenLexing, HexValueAllDigits) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-// §A.8.7: hex_digit — x_digit | z_digit | 0..9 | a..f | A..F
-
 TEST(NumberTokenLexing, HexValueWithXDigit) {
   auto r = LexOne("8'h1x ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
@@ -210,8 +192,6 @@ TEST(NumberTokenLexing, HexValueWithQuestion) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "8'h?");
 }
-
-// §A.8.7: signed bases — 'sd, 'sb, 'so, 'sh
 
 TEST(NumberTokenLexing, SignedDecimalBase) {
   auto r = LexOne("8'sd42 ");
@@ -243,10 +223,6 @@ TEST(NumberTokenLexing, SignedUpperS) {
   EXPECT_EQ(r.token.text, "4'Sb1010");
 }
 
-// §A.8.7: decimal_number/binary_number/octal_number/hex_number — the
-// [size] prefix is optional, so the signed-base form `'[s|S]<base>` is
-// itself a valid number with no leading size.
-
 TEST(NumberTokenLexing, UnsizedSignedDecimalBase) {
   auto r = LexOne("'sd42 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
@@ -271,17 +247,12 @@ TEST(NumberTokenLexing, UnsizedSignedHexBase) {
   EXPECT_EQ(r.token.text, "'shFF");
 }
 
-// §A.8.7: size ::= unsigned_number, and unsigned_number permits underscores
-// between digits — the size prefix may therefore contain `_`.
 TEST(NumberTokenLexing, SizeWithUnderscoreDigits) {
   auto r = LexOne("1_2'b0 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "1_2'b0");
 }
 
-// §A.8.7: decimal_number's x_digit and z_digit forms are
-// `[ size ] decimal_base x_digit { _ }` and the z_digit equivalent —
-// trailing underscores after the lone x_digit or z_digit are permitted.
 TEST(NumberTokenLexing, DecimalBaseXDigitWithTrailingUnderscore) {
   auto r = LexOne("8'dx_ ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
@@ -294,15 +265,11 @@ TEST(NumberTokenLexing, DecimalBaseZDigitWithTrailingUnderscore) {
   EXPECT_EQ(r.token.text, "8'dz_");
 }
 
-// §A.8.7: real_number — fixed_point_number
-
 TEST(NumberTokenLexing, FixedPointNumber) {
   auto r = LexOne("3.14 ");
   EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
   EXPECT_EQ(r.token.text, "3.14");
 }
-
-// §A.8.7: real_number — unsigned_number [. unsigned_number] exp [sign] unsigned_number
 
 TEST(NumberTokenLexing, RealExponentLowerE) {
   auto r = LexOne("1e10 ");
@@ -334,8 +301,6 @@ TEST(NumberTokenLexing, RealFixedPointWithUnderscore) {
   EXPECT_EQ(r.token.text, "1_000.000_1");
 }
 
-// §A.8.7: unbased_unsized_literal — '0 | '1 | 'z_or_x
-
 TEST(NumberTokenLexing, UnbasedUnsizedZero) {
   auto r = LexOne("'0 ");
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
@@ -366,10 +331,6 @@ TEST(NumberTokenLexing, UnbasedUnsizedUpperZ) {
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
-// §A.8.7: real_number — exp [ sign ] unsigned_number; the unsigned_number
-// after the exponent marker must start with decimal_digit, so a bare
-// 'e'/'E' (no digit) must not extend the integer into a real literal.
-
 TEST(NumberTokenLexing, RealExponentBareENotConsumed) {
   auto tokens = Lex("1e ");
   ASSERT_GE(tokens.size(), 2u);
@@ -398,8 +359,6 @@ TEST(NumberTokenLexing, RealExponentSignWithoutDigit) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kPlus);
 }
 
-// §A.8.7: error — invalid digits for base
-
 TEST(NumberTokenLexing, ErrorBinaryDigitOutOfRange) {
   auto [tokens, errors] = LexWithDiag("4'b2 ");
   EXPECT_TRUE(errors);
@@ -420,28 +379,17 @@ TEST(NumberTokenLexing, ErrorUnderscoreLeadingDigitValue) {
   EXPECT_TRUE(errors);
 }
 
-// §A.8.7: unbased_unsized_literal is a single contiguous token —
-// `'0`/`'1`/`'z_or_x` with no whitespace allowed between the apostrophe
-// and the value character.
 TEST(NumberTokenLexing, WhitespaceAfterApostropheNotUnbasedUnsized) {
   auto tokens = Lex("' 1 ");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_NE(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
-// §A.8.7: hex_value ::= hex_digit { _ | hex_digit } — an underscore at the
-// first position of the value is rejected (the value must start with a
-// hex_digit). Covers the hex base; the binary base is covered by
-// ErrorUnderscoreLeadingDigitValue above.
 TEST(NumberTokenLexing, ErrorUnderscoreLeadingDigitValueHex) {
   auto [tokens, errors] = LexWithDiag("8'h_FF ");
   EXPECT_TRUE(errors);
 }
 
-// §A.8.7: decimal_number with x_digit/z_digit — the BNF only allows
-// `[ size ] decimal_base x_digit { _ }` or `[ size ] decimal_base z_digit { _ }`,
-// so an x/z digit must be the sole value digit and may not be mixed with
-// regular decimal digits or another x/z digit.
 TEST(NumberTokenLexing, ErrorDecimalNoValueDigits) {
   auto [tokens, errors] = LexWithDiag("8'd-6");
   EXPECT_TRUE(errors);
@@ -457,18 +405,11 @@ TEST(NumberTokenLexing, ErrorDecimalMultipleXZDigits) {
   EXPECT_TRUE(errors);
 }
 
-// §A.8.7: binary_digit ::= x_digit | z_digit | 0 | 1, with z_digit ::= z | Z | ?.
-// Covers the binary base path for `?`.
 TEST(NumberTokenLexing, BinaryValueWithQuestion) {
   auto r = LexOne("4'b? ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-// §A.8.7: fixed_point_number ::= unsigned_number . unsigned_number — the
-// production requires an unsigned_number on both sides of the dot. A bare
-// leading or trailing dot must not extend the integer into a real literal,
-// and a dot without fractional digits before the exponent marker likewise
-// must not.
 TEST(NumberTokenLexing, RealLeadingDotNotRealLiteral) {
   auto tokens = Lex(".12 ");
   ASSERT_GE(tokens.size(), 3u);
@@ -493,17 +434,11 @@ TEST(NumberTokenLexing, RealLeadingDotWithExponentNotRealLiteral) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kDot);
 }
 
-// §A.8.7: unsigned_number ::= decimal_digit { _ | decimal_digit } — a
-// trailing underscore is allowed inside an unsigned_number, including
-// immediately before the exponent marker.
 TEST(NumberTokenLexing, RealTrailingUnderscoreBeforeExponent) {
   auto r = LexOne("236.123_763_e-12 ");
   EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
 }
 
-// §A.8.7: real_number ::= unsigned_number [ . unsigned_number ] exp [ sign ]
-// unsigned_number — the [ . unsigned_number ] is optional, so a real with
-// no fractional part but an explicit + or - sign on the exponent is valid.
 TEST(NumberTokenLexing, RealExpNoFracPosSign) {
   auto r = LexOne("1e+5 ");
   EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
@@ -516,95 +451,68 @@ TEST(NumberTokenLexing, RealExpNoFracNegSign) {
   EXPECT_EQ(r.token.text, "1e-5");
 }
 
-// §A.8.7: real_number with fractional part and exponent but no explicit
-// sign — the [ sign ] is optional even when [ . unsigned_number ] is present.
 TEST(NumberTokenLexing, RealFracExpNoSign) {
   auto r = LexOne("1.5e10 ");
   EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
   EXPECT_EQ(r.token.text, "1.5e10");
 }
 
-// §A.8.7: unbased_unsized_literal ::= '0 | '1 | 'z_or_x, where
-// z_or_x ::= x | X | z | Z (no '?'). The apostrophe-question form must not
-// tokenize as an unbased_unsized_literal.
 TEST(NumberTokenLexing, ApostropheQuestionNotUnbasedUnsized) {
   auto tokens = Lex("'? ");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_NE(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
-// §A.8.7: octal_value ::= octal_digit { _ | octal_digit } — the first
-// character must be an octal_digit, not an underscore.
 TEST(NumberTokenLexing, ErrorOctalValueLeadingUnderscore) {
   auto [tokens, errors] = LexWithDiag("8'o_77 ");
   EXPECT_TRUE(errors);
 }
 
-// §A.8.7: decimal_number ::= [ size ] decimal_base unsigned_number, and
-// unsigned_number ::= decimal_digit { _ | decimal_digit } — the first
-// character of the value must be a decimal_digit, not an underscore.
 TEST(NumberTokenLexing, ErrorDecimalValueLeadingUnderscore) {
   auto [tokens, errors] = LexWithDiag("8'd_42 ");
   EXPECT_TRUE(errors);
 }
 
-// §A.8.7: octal_base ::= '[s|S]o | '[s|S]O — the uppercase 'S' signed
-// specifier must be accepted on the octal base.
 TEST(NumberTokenLexing, UnsizedSignedOctalBaseUpperS) {
   auto r = LexOne("'So77 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "'So77");
 }
 
-// §A.8.7: hex_base ::= '[s|S]h | '[s|S]H — the uppercase 'S' signed
-// specifier must be accepted on the hex base.
 TEST(NumberTokenLexing, UnsizedSignedHexBaseUpperS) {
   auto r = LexOne("'Sh1F ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "'Sh1F");
 }
 
-// §A.8.7: decimal_base ::= '[s|S]d | '[s|S]D — the uppercase 'S' signed
-// specifier must be accepted on the decimal base.
 TEST(NumberTokenLexing, UnsizedSignedDecimalBaseUpperS) {
   auto r = LexOne("'Sd42 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "'Sd42");
 }
 
-// §A.8.7: binary_base ::= '[s|S]b | '[s|S]B — the uppercase 'S' signed
-// specifier must be accepted on the binary base in unsized form.
 TEST(NumberTokenLexing, UnsizedSignedBinaryBaseUpperS) {
   auto r = LexOne("'Sb1010 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "'Sb1010");
 }
 
-// §A.8.7: binary_value ::= binary_digit { _ | binary_digit } where
-// binary_digit ::= x_digit | z_digit | 0 | 1 — a single x_digit alone
-// (with zero repetitions) is a valid binary_value.
 TEST(NumberTokenLexing, BinaryValueOnlyXDigit) {
   auto r = LexOne("4'bx ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "4'bx");
 }
 
-// §A.8.7: hex_value ::= hex_digit { _ | hex_digit } where
-// hex_digit ::= x_digit | z_digit | 0..9 | a..f | A..F — a single x_digit
-// alone is a valid hex_value.
 TEST(NumberTokenLexing, HexValueOnlyXDigit) {
   auto r = LexOne("4'hx ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "4'hx");
 }
 
-// §A.8.7: octal_value ::= octal_digit { _ | octal_digit } where
-// octal_digit ::= x_digit | z_digit | 0..7 — a single x_digit alone is a
-// valid octal_value.
 TEST(NumberTokenLexing, OctalValueOnlyXDigit) {
   auto r = LexOne("4'ox ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "4'ox");
 }
 
-}  // namespace
+}

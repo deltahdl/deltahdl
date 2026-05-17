@@ -69,7 +69,6 @@ TEST(ArrayArgPassing, CopySemantics) {
   EXPECT_EQ(orig->value.ToUint64(), 10u);
 }
 
-// §7.7: End-to-end pass-by-value — function reads array element.
 TEST(ArrayArgPassing, PassByValueEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
@@ -87,7 +86,6 @@ TEST(ArrayArgPassing, PassByValueEndToEnd) {
   EXPECT_EQ(v, 20u);
 }
 
-// §7.7: End-to-end copy semantics — modifying formal does not affect actual.
 TEST(ArrayArgPassing, CopySemanticsEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
@@ -106,7 +104,6 @@ TEST(ArrayArgPassing, CopySemanticsEndToEnd) {
   EXPECT_EQ(v, 999u);
 }
 
-// §7.7: Caller's array is unchanged after function modifies its copy.
 TEST(ArrayArgPassing, CallerUnchangedEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
@@ -127,7 +124,6 @@ TEST(ArrayArgPassing, CallerUnchangedEndToEnd) {
   EXPECT_EQ(v, 42u);
 }
 
-// §7.7: Multiple array arguments passed to a single function.
 TEST(ArrayArgPassing, MultipleArrayArgs) {
   FuncFixture f;
 
@@ -165,7 +161,6 @@ TEST(ArrayArgPassing, MultipleArrayArgs) {
   EXPECT_EQ(result.ToUint64(), 20u);
 }
 
-// §7.7: All elements are copied, not just the first.
 TEST(ArrayArgPassing, AllElementsCopied) {
   FuncFixture f;
 
@@ -191,4 +186,4 @@ TEST(ArrayArgPassing, AllElementsCopied) {
   EXPECT_EQ(result.ToUint64(), 40u);
 }
 
-}  // namespace
+}

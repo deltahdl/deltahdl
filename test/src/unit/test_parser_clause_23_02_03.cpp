@@ -109,4 +109,4 @@ TEST(ParameterizedModules, LocalparamDerivedFromParameterViaExpression) {
   EXPECT_EQ(mod->ports[1].name, "Y");
 }
 
-}  // namespace
+}

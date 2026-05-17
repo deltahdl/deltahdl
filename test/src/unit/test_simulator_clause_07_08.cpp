@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.8: Write to associative array creates element dynamically, read returns it.
 TEST(AssocArraySimulation, DynamicElementCreation) {
   auto v = RunAndGet(
       "module t;\n"
@@ -19,7 +18,6 @@ TEST(AssocArraySimulation, DynamicElementCreation) {
   EXPECT_EQ(v, 42u);
 }
 
-// §7.8: Multiple elements can be stored and retrieved independently.
 TEST(AssocArraySimulation, MultipleElements) {
   auto v = RunAndGet(
       "module t;\n"
@@ -36,7 +34,6 @@ TEST(AssocArraySimulation, MultipleElements) {
   EXPECT_EQ(v, 20u);
 }
 
-// §7.8: Overwriting an existing key updates the element.
 TEST(AssocArraySimulation, OverwriteElement) {
   auto v = RunAndGet(
       "module t;\n"
@@ -52,4 +49,4 @@ TEST(AssocArraySimulation, OverwriteElement) {
   EXPECT_EQ(v, 200u);
 }
 
-}  // namespace
+}

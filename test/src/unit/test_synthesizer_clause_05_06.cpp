@@ -84,9 +84,6 @@ TEST(IdentifierSynthesis, MaxLengthIdentifierSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-// §5.6: "If an identifier exceeds the implementation-specific length limit,
-// an error shall be reported." A 1025-character identifier reaching the
-// synthesizer-stage pipeline must cause an error on the diagnostic engine.
 TEST(IdentifierSynthesis, IdentifierExceedingMaxLengthReportsError) {
   SynthFixture f;
   std::string long_id(1025, 'a');
@@ -98,4 +95,4 @@ TEST(IdentifierSynthesis, IdentifierExceedingMaxLengthReportsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

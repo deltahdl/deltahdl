@@ -12,9 +12,6 @@ namespace delta {
 
 using TypeMap = std::unordered_map<std::string_view, DataTypeKind>;
 
-// --- §11.2.2: Aggregate expression comparison validation ---
-
-// §11.2.2: Check a single binary expression for aggregate type mismatch.
 void Elaborator::CheckAggregateCompareOp(const Expr* expr) {
   if (!expr->lhs || !expr->rhs) return;
   if (expr->lhs->kind != ExprKind::kIdentifier) return;
@@ -82,8 +79,6 @@ void Elaborator::ValidateAggregateComparisons(const ModuleDecl* decl) {
   }
 }
 
-// --- §11.3.1: Operators not permitted on real operands ---
-
 static bool IsRealVar(const Expr* e, const TypeMap& types) {
   auto name = ExprIdent(e);
   if (name.empty()) return false;
@@ -91,27 +86,26 @@ static bool IsRealVar(const Expr* e, const TypeMap& types) {
   return it != types.end() && IsRealType(it->second);
 }
 
-// Operators illegal on real/shortreal operands per Table 11-1.
 static bool IsIllegalOnReal(TokenKind op) {
   switch (op) {
-    // Case equality
+
     case TokenKind::kEqEqEq:
     case TokenKind::kBangEqEq:
-    // Wildcard equality
+
     case TokenKind::kEqEqQuestion:
     case TokenKind::kBangEqQuestion:
-    // Bitwise binary
+
     case TokenKind::kAmp:
     case TokenKind::kPipe:
     case TokenKind::kCaret:
     case TokenKind::kTildeCaret:
     case TokenKind::kCaretTilde:
-    // Shift
+
     case TokenKind::kLtLt:
     case TokenKind::kGtGt:
     case TokenKind::kLtLtLt:
     case TokenKind::kGtGtGt:
-    // Modulus
+
     case TokenKind::kPercent:
       return true;
     default:
@@ -119,7 +113,6 @@ static bool IsIllegalOnReal(TokenKind op) {
   }
 }
 
-// Unary operators illegal on real operands.
 static bool IsUnaryIllegalOnReal(TokenKind op) {
   switch (op) {
     case TokenKind::kTilde:
@@ -190,8 +183,6 @@ void Elaborator::ValidateRealOperatorRestrictions(const ModuleDecl* decl) {
   }
 }
 
-// --- §11.3.6: Assignment-in-expression restrictions ---
-
 static bool IsAssignOp(TokenKind op) {
   switch (op) {
     case TokenKind::kEq:
@@ -235,8 +226,7 @@ void Elaborator::WalkExprForAssignInExpr(const Expr* expr,
 
 void Elaborator::WalkStmtsForAssignInExpr(const Stmt* s) {
   if (!s) return;
-  // §11.3.6: assignment operator is illegal in a procedural continuous
-  // assignment expression.
+
   if (s->kind == StmtKind::kAssign && s->rhs) {
     WalkExprForAssignInExpr(s->rhs, true);
   }
@@ -265,7 +255,6 @@ void Elaborator::ValidateAssignInExprRestrictions(const ModuleDecl* decl) {
   }
 }
 
-// §10.11: Validate alias statement operands.
 static std::string_view AliasNetIdent(const Expr* e) {
   if (!e) return {};
   if (e->kind == ExprKind::kIdentifier) return e->text;
@@ -302,7 +291,7 @@ static NetType DataTypeKindToNetType(DataTypeKind kind) {
 }
 
 void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
-  // Self-aliasing: same identifier appears more than once.
+
   std::unordered_set<std::string_view> seen;
   for (auto* net : item->alias_nets) {
     auto name = AliasNetIdent(net);
@@ -312,7 +301,6 @@ void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
     }
   }
 
-  // Variables and hierarchical references cannot be used.
   for (auto* net : item->alias_nets) {
     if (ExprContainsHierarchicalRef(net)) {
       diag_.Error(item->loc,
@@ -328,7 +316,6 @@ void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
     }
   }
 
-  // Net type compatibility: all nets must be the same net type.
   std::vector<std::string_view> ident_names;
   for (auto* net : item->alias_nets) {
     auto name = AliasNetIdent(net);
@@ -356,7 +343,6 @@ void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
     }
   }
 
-  // Size equality: all members must be the same size.
   if (ident_names.size() >= 2) {
     auto scoped_first = ScopedName(ident_names[0]);
     uint32_t first_width = 0;
@@ -381,7 +367,6 @@ void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
     }
   }
 
-  // Duplicate alias detection: same pair must not be specified more than once.
   for (size_t i = 0; i < ident_names.size(); ++i) {
     for (size_t j = i + 1; j < ident_names.size(); ++j) {
       auto a = ident_names[i];
@@ -397,7 +382,6 @@ void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
   }
 }
 
-// §10.10: Check a single assignment for concatenation to associative array.
 void Elaborator::CheckAssocConcatTargetInAssign(const Stmt* s) {
   if (!s->lhs || !s->rhs) return;
   if (s->lhs->kind != ExprKind::kIdentifier) return;
@@ -409,7 +393,6 @@ void Elaborator::CheckAssocConcatTargetInAssign(const Stmt* s) {
               "unpacked array concatenation cannot target an associative array");
 }
 
-// §10.10: Walk statements for associative array concatenation targets.
 void Elaborator::WalkStmtsForAssocConcatTarget(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
@@ -437,10 +420,6 @@ void Elaborator::ValidateAssocConcatTarget(const ModuleDecl* decl) {
   }
 }
 
-// §10.10.1: Check that assignment patterns targeting unpacked arrays do not
-// contain array-typed identifiers as elements (positional or replicated).
-// Only applies when the target is a 1D unpacked array — for multi-dimensional
-// targets, elements matching the element type (itself an array) are valid.
 void Elaborator::CheckArrayPatternElemTypeInAssign(const Stmt* s) {
   if (!s->lhs || !s->rhs) return;
   if (s->lhs->kind != ExprKind::kIdentifier) return;
@@ -448,10 +427,10 @@ void Elaborator::CheckArrayPatternElemTypeInAssign(const Stmt* s) {
   auto it = var_array_info_.find(s->lhs->text);
   if (it == var_array_info_.end()) return;
   if (it->second.num_unpacked_dims != 1) return;
-  // Check positional elements.
+
   for (auto* elem : s->rhs->elements) {
     if (elem->kind == ExprKind::kReplicate) {
-      // Replicated assignment pattern: '{N{expr}} — check inner elements.
+
       for (auto* inner : elem->elements) {
         if (inner->kind == ExprKind::kIdentifier &&
             var_array_info_.count(inner->text)) {
@@ -496,7 +475,6 @@ void Elaborator::ValidateArrayPatternElemType(const ModuleDecl* decl) {
   }
 }
 
-// §10.10.1: Reject replication expressions targeting unpacked arrays.
 void Elaborator::CheckReplicateTargetingArrayInAssign(const Stmt* s) {
   if (!s->lhs || !s->rhs) return;
   if (s->lhs->kind != ExprKind::kIdentifier) return;
@@ -534,8 +512,6 @@ void Elaborator::ValidateReplicateTargetingArray(const ModuleDecl* decl) {
   }
 }
 
-// §10.10.3: Check a single assignment for nested concatenation in unpacked
-// array context.
 void Elaborator::CheckArrayConcatNestingInAssign(const Stmt* s) {
   if (!s->lhs || !s->rhs) return;
   if (s->lhs->kind != ExprKind::kIdentifier) return;
@@ -557,7 +533,6 @@ void Elaborator::CheckArrayConcatNestingInAssign(const Stmt* s) {
   }
 }
 
-// §10.10.3: Validate nesting of unpacked array concatenations.
 void Elaborator::WalkStmtsForArrayConcatNesting(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
@@ -585,8 +560,6 @@ void Elaborator::ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl) {
   }
 }
 
-// --- §11.4.12: Unsized constants not allowed in concatenations ---
-
 void Elaborator::WalkExprForUnsizedInConcat(const Expr* expr) {
   if (!expr) return;
   if (expr->kind == ExprKind::kConcatenation) {
@@ -611,9 +584,7 @@ void Elaborator::WalkExprForUnsizedInConcat(const Expr* expr) {
 
 void Elaborator::WalkStmtsForUnsizedInConcat(const Stmt* s) {
   if (!s) return;
-  // §10.10.2: When the RHS concatenation targets an unpacked array, it acts as
-  // an unpacked array concatenation under §10.10 rules — the §11.4.12
-  // unsized-constant restriction does not apply to its direct items.
+
   bool is_array_concat_rhs =
       s->rhs && s->rhs->kind == ExprKind::kConcatenation &&
       s->lhs && s->lhs->kind == ExprKind::kIdentifier &&
@@ -661,8 +632,6 @@ void Elaborator::ValidateUnsizedInConcat(const ModuleDecl* decl) {
     WalkExprForUnsizedInConcat(p.init_value);
   }
 }
-
-// --- §11.4.12: Select of concatenation shall not be an lvalue ---
 
 static bool IsSelectOnConcat(const Expr* expr) {
   if (!expr || expr->kind != ExprKind::kSelect) return false;
@@ -714,8 +683,6 @@ void Elaborator::ValidateSelectOnConcatLvalue(const ModuleDecl* decl) {
     }
   }
 }
-
-// --- §11.4.12.1: Replication shall not appear on the LHS of an assignment ---
 
 static bool ExprContainsReplicate(const Expr* expr) {
   if (!expr) return false;
@@ -770,8 +737,6 @@ void Elaborator::ValidateReplicateLvalue(const ModuleDecl* decl) {
   }
 }
 
-// --- §11.4.12.1: Replication multiplier constraints ---
-
 static bool RepeatCountHasXZ(const Expr* e) {
   if (!e) return false;
   if (e->kind == ExprKind::kIntegerLiteral) {
@@ -798,12 +763,7 @@ void Elaborator::WalkExprForReplicateMultiplier(const Expr* expr) {
           diag_.Error(rc->range.start,
                       "replication multiplier shall not be negative");
         } else if (*val == 0) {
-          // Zero is only valid inside a concatenation with other operands.
-          // A standalone zero replication is checked here: the parent must
-          // be a concatenation (which is ensured by the caller context).
-          // We flag standalone uses — the enclosing expression check below
-          // handles the case where {0{x}} appears as a top-level expression
-          // rather than inside a concatenation.
+
         }
       }
     }
@@ -832,10 +792,7 @@ static void CheckZeroReplicateStandalone(const Expr* expr,
                "in which at least one operand has a positive size");
   }
   if (expr->kind == ExprKind::kConcatenation) {
-    // Inside a concatenation, zero replication is OK as long as at least one
-    // other operand has positive size. Since a concatenation requires at
-    // least one element, and the only way ALL operands could have zero size
-    // is if every element is a zero replication, we check that.
+
     bool all_zero = true;
     for (const auto* elem : expr->elements) {
       if (!IsZeroReplicate(elem)) {
@@ -848,8 +805,7 @@ static void CheckZeroReplicateStandalone(const Expr* expr,
                  "zero replication shall appear only within a concatenation "
                  "in which at least one operand has a positive size");
     }
-    // Recurse into non-zero elements (but not into the zero replication
-    // elements, which are valid here).
+
     for (const auto* elem : expr->elements) {
       if (!IsZeroReplicate(elem)) {
         CheckZeroReplicateStandalone(elem, diag);
@@ -930,8 +886,6 @@ void Elaborator::ValidateReplicateMultiplier(const ModuleDecl* decl) {
   }
 }
 
-// --- §11.4.12.2: String concatenation shall not appear on the LHS ---
-
 bool Elaborator::ConcatContainsStringElement(const Expr* expr) {
   if (!expr) return false;
   if (expr->kind == ExprKind::kIdentifier) {
@@ -990,8 +944,6 @@ void Elaborator::ValidateStringConcatLvalue(const ModuleDecl* decl) {
   }
 }
 
-// --- §11.4.14: Streaming concatenation context restrictions ---
-
 void Elaborator::WalkExprForStreamingContext(const Expr* expr,
                                              bool is_valid_context) {
   if (!expr) return;
@@ -1002,20 +954,20 @@ void Elaborator::WalkExprForStreamingContext(const Expr* expr,
                   "of an expression other than an assignment or bit-stream "
                   "cast");
     }
-    // Elements inside streaming concat are valid contexts for nested streaming.
+
     for (auto* elem : expr->elements) {
       WalkExprForStreamingContext(elem, true);
     }
-    // Slice size expression cannot contain streaming concat.
+
     WalkExprForStreamingContext(expr->lhs, false);
     return;
   }
   if (expr->kind == ExprKind::kCast) {
-    // The operand of a cast is a valid context for streaming concat.
+
     WalkExprForStreamingContext(expr->lhs, true);
     return;
   }
-  // For all other expression kinds, children are not valid contexts.
+
   WalkExprForStreamingContext(expr->lhs, false);
   WalkExprForStreamingContext(expr->rhs, false);
   WalkExprForStreamingContext(expr->condition, false);
@@ -1031,11 +983,11 @@ void Elaborator::WalkStmtsForStreamingContext(const Stmt* s) {
       s->kind == StmtKind::kNonblockingAssign ||
       s->kind == StmtKind::kAssign ||
       s->kind == StmtKind::kForce) {
-    // LHS and RHS of assignments are valid top-level contexts.
+
     WalkExprForStreamingContext(s->lhs, true);
     WalkExprForStreamingContext(s->rhs, true);
   } else {
-    // All other expression positions are invalid contexts.
+
     WalkExprForStreamingContext(s->lhs, false);
     WalkExprForStreamingContext(s->rhs, false);
   }
@@ -1067,8 +1019,6 @@ void Elaborator::ValidateStreamingConcatContext(const ModuleDecl* decl) {
     }
   }
 }
-
-// --- §23.6 R15: Hierarchical references into checkers prohibited ---
 
 static std::string_view HierRefLeftmost(const Expr* e) {
   if (e->kind == ExprKind::kIdentifier) return e->text;
@@ -1129,8 +1079,6 @@ void Elaborator::ValidateHierRefIntoChecker(const ModuleDecl* decl) {
   }
 }
 
-// --- §24.3: Hierarchical references to program signals prohibited ---
-
 static bool ExprRefersToProgram(
     const Expr* e,
     const std::unordered_set<std::string_view>& program_names) {
@@ -1188,9 +1136,6 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
       WalkStmtsForProgramRef(item->body, program_inst_names_, diag_);
   }
 }
-
-// --- §23.6 R12: Objects in automatic tasks/functions inaccessible by
-//     hierarchical reference ---
 
 static void CollectHierPathComponents(const Expr* e,
                                       std::vector<std::string_view>& out) {
@@ -1263,8 +1208,6 @@ void Elaborator::ValidateHierRefToAutomatic(const ModuleDecl* decl) {
       WalkStmtsForAutoRef(item->body, auto_task_func_names_, diag_);
   }
 }
-
-// --- §24.5: Calling program subroutines from design modules prohibited ---
 
 static bool IsProgramSubroutineCallExpr(
     const Expr* e,
@@ -1349,4 +1292,4 @@ void Elaborator::ValidateProgramSubroutineCall(const ModuleDecl* decl) {
   }
 }
 
-}  // namespace delta
+}

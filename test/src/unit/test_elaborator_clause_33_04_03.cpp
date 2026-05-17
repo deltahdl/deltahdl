@@ -2,9 +2,6 @@
 
 namespace {
 
-// §33.4.3 item 1: a localparam in a configuration shall only be set to
-// a literal value.  A non-literal initialiser (a binary expression, a
-// reference to another identifier, etc.) is rejected.
 TEST(ConfigLocalparamLiteral, NonLiteralLocalparamRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -29,7 +26,6 @@ TEST(ConfigLocalparamLiteral, IdentifierLocalparamRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// Positive control: an integer literal is allowed.
 TEST(ConfigLocalparamLiteral, IntegerLiteralLocalparamAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -42,7 +38,6 @@ TEST(ConfigLocalparamLiteral, IntegerLiteralLocalparamAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Positive control: a string literal is allowed.
 TEST(ConfigLocalparamLiteral, StringLiteralLocalparamAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -55,9 +50,6 @@ TEST(ConfigLocalparamLiteral, StringLiteralLocalparamAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §33.4.3 item 3: when a hierarchical identifier is used in a
-// parameter override, it shall be the only term in the expression.
-// `top.WIDTH + 7` is the LRM's textbook example of an invalid form.
 TEST(ConfigParamOverride, HierIdentInExpressionRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -70,9 +62,6 @@ TEST(ConfigParamOverride, HierIdentInExpressionRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// Positive control: a bare hierarchical identifier as the entire
-// override expression is the form §33.4.3 explicitly endorses
-// (Example 3: `instance top.a1 use #(.W(top.WIDTH));`).
 TEST(ConfigParamOverride, HierIdentAloneAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -85,9 +74,6 @@ TEST(ConfigParamOverride, HierIdentAloneAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Positive control: a non-hierarchical identifier embedded in an
-// expression resolves in the instance's parent scope and is fine —
-// item 3's restriction targets hierarchical references specifically.
 TEST(ConfigParamOverride, NonHierIdentInExpressionAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -100,8 +86,6 @@ TEST(ConfigParamOverride, NonHierIdentInExpressionAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §33.4.3 item 2: an identifier appearing inside a select index of a
-// hierarchical reference must name a localparam of the configuration.
 TEST(ConfigParamOverride, IndexUsingUnknownIdentifierRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -114,7 +98,6 @@ TEST(ConfigParamOverride, IndexUsingUnknownIdentifierRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// Positive control: an integer-literal index is always permitted.
 TEST(ConfigParamOverride, IndexUsingLiteralAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -127,8 +110,6 @@ TEST(ConfigParamOverride, IndexUsingLiteralAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Positive control: an index identifier that resolves to a localparam
-// of the same configuration is accepted.
 TEST(ConfigParamOverride, IndexUsingConfigLocalparamAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -142,8 +123,6 @@ TEST(ConfigParamOverride, IndexUsingConfigLocalparamAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §33.4.3 item 5: a hierarchical reference inside a parameter
-// override may not traverse an array-of-instances scope.
 TEST(ConfigParamOverride, HierRefThroughArrayOfInstancesRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -156,8 +135,6 @@ TEST(ConfigParamOverride, HierRefThroughArrayOfInstancesRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §33.4.3 item 6: a parameter override may not call a user-defined
-// constant function.
 TEST(ConfigParamOverride, UserFunctionCallRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -170,8 +147,6 @@ TEST(ConfigParamOverride, UserFunctionCallRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// Positive control for item 6: built-in (system) constant functions
-// are explicitly permitted.
 TEST(ConfigParamOverride, SystemFunctionCallAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -184,4 +159,4 @@ TEST(ConfigParamOverride, SystemFunctionCallAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

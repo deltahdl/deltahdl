@@ -364,4 +364,4 @@ TEST(NettypeParsing,NettypeWithResolveAndNetDecl) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

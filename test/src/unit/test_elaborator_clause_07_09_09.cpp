@@ -97,4 +97,4 @@ TEST(Elaboration, AssocAssignElementTypeMismatch_Rejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

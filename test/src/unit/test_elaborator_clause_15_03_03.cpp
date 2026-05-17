@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.3.3: get() call in initial block elaborates without error.
 TEST(SemaphoreGetElaborator, GetCallInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,7 +18,6 @@ TEST(SemaphoreGetElaborator, GetCallInInitialBlock) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.3.3: get() with default keyCount elaborates.
 TEST(SemaphoreGetElaborator, GetDefaultKeyCount) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -34,7 +32,6 @@ TEST(SemaphoreGetElaborator, GetDefaultKeyCount) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.3.3: multiple get() calls elaborate.
 TEST(SemaphoreGetElaborator, MultipleGetCalls) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,4 +48,4 @@ TEST(SemaphoreGetElaborator, MultipleGetCalls) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

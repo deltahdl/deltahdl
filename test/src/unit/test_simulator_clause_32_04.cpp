@@ -250,14 +250,6 @@ TEST(SdfParser, ParseMinTypMaxDelay_FallValues) {
   EXPECT_EQ(io.fall.max_val, 6u);
 }
 
-// =============================================================================
-// §32.4 (parent text only) — Mapping of SDF constructs to SystemVerilog
-// =============================================================================
-
-// §32.4 sentence 1: "SDF timing values appear within a CELL declaration,
-// which can contain one or more of DELAY, TIMINGCHECK, and LABEL sections."
-// All three sections must coexist in a single CELL without the parser
-// rejecting the file or losing the surrounding metadata.
 TEST(SdfConstructMapping, CellWithAllThreeSectionsParses) {
   SdfFile file;
   std::string sdf = R"(
@@ -279,9 +271,6 @@ TEST(SdfConstructMapping, CellWithAllThreeSectionsParses) {
   ASSERT_EQ(file.cells[0].timing_checks.size(), 1u);
 }
 
-// §32.4 sentence 1 ("one or more of"): a CELL with only LABEL — no DELAY
-// or TIMINGCHECK — must parse. The LRM does not require any particular
-// section to be present, only that one of the three is.
 TEST(SdfConstructMapping, CellWithOnlyLabelSectionParses) {
   SdfFile file;
   std::string sdf = R"(
@@ -299,12 +288,6 @@ TEST(SdfConstructMapping, CellWithOnlyLabelSectionParses) {
   EXPECT_EQ(file.cells[0].instance, "u2");
 }
 
-// §32.4 sentence 5: "Backannotation into SystemVerilog is done by matching
-// SDF constructs to the corresponding SystemVerilog declarations and then
-// replacing the existing SystemVerilog timing values with those from the
-// SDF file." Annotating the same SDF file twice must converge — the second
-// pass replaces the first pass's specparam value rather than producing a
-// second entry for the same name.
 TEST(SdfConstructMapping, ReannotationReplacesSpecparamRatherThanDuplicating) {
   SdfFile file;
   SdfCell cell;
@@ -323,4 +306,4 @@ TEST(SdfConstructMapping, ReannotationReplacesSpecparamRatherThanDuplicating) {
   EXPECT_EQ(mgr.GetSpecparamValues()[0].value, 11u);
 }
 
-}  // namespace
+}

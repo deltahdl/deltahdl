@@ -23,4 +23,4 @@ TEST(IoSystemTaskParsing, SscanfCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

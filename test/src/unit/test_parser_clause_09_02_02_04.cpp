@@ -191,4 +191,4 @@ TEST(AlwaysFFParsing, PosedgeTriggered) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

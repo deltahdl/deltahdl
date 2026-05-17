@@ -202,4 +202,4 @@ TEST(LevelSensitiveSequenceSimulation, WaitSequenceTriggeredDoesNotFireBeforeMat
   EXPECT_EQ(val, 0u);
 }
 
-}  // namespace
+}

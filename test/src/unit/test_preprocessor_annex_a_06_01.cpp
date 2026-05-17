@@ -48,4 +48,4 @@ TEST(ContinuousAssignPreprocessor, ConditionalCompilationAroundAssign) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -137,4 +137,4 @@ TEST(NetsAndVariables, NetCannotBeProcedurallyAssigned) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

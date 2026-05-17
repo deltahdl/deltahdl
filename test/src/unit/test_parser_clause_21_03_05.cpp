@@ -17,4 +17,4 @@ TEST(IoSystemTaskParsing, FtellFseek) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

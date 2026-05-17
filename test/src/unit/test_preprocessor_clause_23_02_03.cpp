@@ -40,4 +40,4 @@ TEST(ParameterizedModules, LocalparamDerivedFromParamThroughPreprocessor) {
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
 }
 
-}  // namespace
+}

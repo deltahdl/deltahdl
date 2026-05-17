@@ -1,14 +1,10 @@
-// §8.26.6.2
+
 
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
-
-// Req: A name collision will occur if the same name is inherited from different
-// interface classes. The subclass shall provide declarations that override all
-// such name collisions.
 
 TEST(InterfaceClassParamTypeConflict, ParamCollisionFromTwoParentsError) {
   EXPECT_FALSE(ElabOk(
@@ -38,8 +34,6 @@ TEST(InterfaceClassParamTypeConflict, TypedefCollisionFromTwoParentsError) {
       "endmodule\n"));
 }
 
-// Req: A conflict occurs despite the fact that the inherited values match.
-
 TEST(InterfaceClassParamTypeConflict, ParamCollisionEvenWhenValuesMatchError) {
   EXPECT_FALSE(ElabOk(
       "interface class IA;\n"
@@ -67,9 +61,6 @@ TEST(InterfaceClassParamTypeConflict, TypedefCollisionEvenWhenTypesMatchError) {
       "module m;\n"
       "endmodule\n"));
 }
-
-// Req: The subclass shall provide parameter and/or type declarations that
-// override all such name collisions.
 
 TEST(InterfaceClassParamTypeConflict, TypedefOverrideResolvesParamCollision) {
   EXPECT_TRUE(ElabOk(
@@ -116,8 +107,6 @@ TEST(InterfaceClassParamTypeConflict, TypedefOverrideResolvesTypedefCollision) {
       "endmodule\n"));
 }
 
-// Req: LRM example -- PutGetIntf resolves T inherited from PutImp and GetImp.
-
 TEST(InterfaceClassParamTypeConflict, LrmExamplePutGetIntfResolvesCollision) {
   EXPECT_TRUE(ElabOk(
       "interface class PutImp#(type T = logic);\n"
@@ -133,8 +122,6 @@ TEST(InterfaceClassParamTypeConflict, LrmExamplePutGetIntfResolvesCollision) {
       "module m;\n"
       "endmodule\n"));
 }
-
-// Req: All collisions must be resolved -- error if only some are overridden.
 
 TEST(InterfaceClassParamTypeConflict, PartialOverrideStillError) {
   EXPECT_FALSE(ElabOk(
@@ -153,8 +140,6 @@ TEST(InterfaceClassParamTypeConflict, PartialOverrideStillError) {
       "endmodule\n"));
 }
 
-// No collision when names are distinct across parents.
-
 TEST(InterfaceClassParamTypeConflict, DistinctNamesNoCollision) {
   EXPECT_TRUE(ElabOk(
       "interface class IA;\n"
@@ -169,4 +154,4 @@ TEST(InterfaceClassParamTypeConflict, DistinctNamesNoCollision) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

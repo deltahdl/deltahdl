@@ -128,16 +128,12 @@ TEST(ConditionalExpressionSim, NestedTernary) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// --- Moved from test_parser_clause_11_04_11_b.cpp ---
-
 TEST(ConditionalOperatorEval, TrueConditionSelectsTrueExpression) {
   ExprFixture f;
   auto* expr = ParseExprFrom("1 ? 42 : 99", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 42u);
 }
-
-// --- Moved from test_simulator_clause_11_03_05.cpp ---
 
 TEST(ShortCircuit, TernaryEvaluatesTrueBranchOnly) {
   SimFixture f;
@@ -188,8 +184,6 @@ TEST(ShortCircuit, TernaryFalseCondSkipsTrueBranchSideEffect) {
   EXPECT_EQ(result.ToUint64(), 20u);
   EXPECT_EQ(f.ctx.FindVariable("se")->value.ToUint64(), 99u);
 }
-
-// --- Moved from test_simulator_clause_11.cpp ---
 
 TEST(TernaryOperatorSim, TernaryVariableCondition) {
   SimFixture f;
@@ -819,10 +813,9 @@ TEST(TernaryOperatorSim, TernaryLogicalAndCondition) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-// Ambiguous condition: both branches' side effects must execute.
 TEST(ConditionalAmbiguousCondition, BothBranchSideEffectsExecute) {
   SimFixture f;
-  MakeVar4(f, "cond", 1, 0, 1);  // x condition
+  MakeVar4(f, "cond", 1, 0, 1);
   MakeVar(f, "se_t", 8, 99);
   MakeVar(f, "se_f", 8, 99);
   EvalExpr(
@@ -834,7 +827,6 @@ TEST(ConditionalAmbiguousCondition, BothBranchSideEffectsExecute) {
   EXPECT_EQ(f.ctx.FindVariable("se_f")->value.ToUint64(), 22u);
 }
 
-// Table 11-20: both branches all-zero → result is all-zero.
 TEST(ConditionalAmbiguousCondition, AllZeroBranchesCombineToZero) {
   SimFixture f;
   MakeVar4(f, "xc", 1, 0, 1);
@@ -848,7 +840,6 @@ TEST(ConditionalAmbiguousCondition, AllZeroBranchesCombineToZero) {
   EXPECT_EQ(result.words[0].bval, 0u);
 }
 
-// Table 11-20: both branches all-one → result is all-one.
 TEST(ConditionalAmbiguousCondition, AllOneBranchesCombineToOne) {
   SimFixture f;
   MakeVar4(f, "xc", 1, 0, 1);
@@ -862,7 +853,6 @@ TEST(ConditionalAmbiguousCondition, AllOneBranchesCombineToOne) {
   EXPECT_EQ(result.words[0].bval, 0u);
 }
 
-// Table 11-20: all bits differ → all result bits are x.
 TEST(ConditionalAmbiguousCondition, AllDifferingBitsBecomeX) {
   SimFixture f;
   MakeVar4(f, "xc", 1, 0, 1);
@@ -876,27 +866,25 @@ TEST(ConditionalAmbiguousCondition, AllDifferingBitsBecomeX) {
   EXPECT_EQ(result.words[0].bval, 0b1111u);
 }
 
-// Table 11-20: x bits in branch values propagate to result.
 TEST(ConditionalAmbiguousCondition, XInBranchesPropagates) {
   SimFixture f;
   MakeVar4(f, "xc", 1, 0, 1);
   auto* tv = f.ctx.CreateVariable("t", 4);
   tv->value = MakeLogic4Vec(f.arena, 4);
   tv->value.words[0].aval = 0b1111;
-  tv->value.words[0].bval = 0b0010;  // bit 1 is x
+  tv->value.words[0].bval = 0b0010;
   MakeVar(f, "e", 4, 0b1111);
   auto result =
       EvalExpr(MakeTernary(f.arena, MakeId(f.arena, "xc"), MakeId(f.arena, "t"),
                            MakeId(f.arena, "e")),
                f.ctx, f.arena);
-  // bit 1 was x in true branch → must be x in result
+
   EXPECT_NE(result.words[0].bval & 0b0010u, 0u);
 }
 
-// z condition with equal branches returns the value with no x bits.
 TEST(ConditionalAmbiguousCondition, ZConditionEqualBranchesReturnsValue) {
   SimFixture f;
-  MakeVar4(f, "zc", 1, 0, 1);  // z condition
+  MakeVar4(f, "zc", 1, 0, 1);
   MakeVar(f, "t", 8, 42);
   MakeVar(f, "e", 8, 42);
   auto result =
@@ -907,7 +895,6 @@ TEST(ConditionalAmbiguousCondition, ZConditionEqualBranchesReturnsValue) {
   EXPECT_EQ(result.words[0].bval, 0u);
 }
 
-// Ambiguous condition with different-width operands: result width is max.
 TEST(ConditionalAmbiguousCondition, DifferentWidthBranchesCombinedToMaxWidth) {
   SimFixture f;
   MakeVar4(f, "xc", 1, 0, 1);
@@ -920,25 +907,23 @@ TEST(ConditionalAmbiguousCondition, DifferentWidthBranchesCombinedToMaxWidth) {
   EXPECT_EQ(result.width, 8u);
 }
 
-// Multi-bit condition with partial x bits triggers ambiguous path.
 TEST(ConditionalAmbiguousCondition, MultiBitPartialXTriggersAmbiguous) {
   SimFixture f;
   auto* cv = f.ctx.CreateVariable("cond", 4);
   cv->value = MakeLogic4Vec(f.arena, 4);
   cv->value.words[0].aval = 0b0001;
-  cv->value.words[0].bval = 0b0010;  // bit 1 is x, bit 0 is 1
+  cv->value.words[0].bval = 0b0010;
   MakeVar(f, "t", 4, 0b1100);
   MakeVar(f, "e", 4, 0b1010);
   auto result = EvalExpr(
       MakeTernary(f.arena, MakeId(f.arena, "cond"), MakeId(f.arena, "t"),
                   MakeId(f.arena, "e")),
       f.ctx, f.arena);
-  // Condition has x bit → ambiguous path → branches combined
+
   EXPECT_EQ(result.words[0].aval, 0b1000u);
   EXPECT_EQ(result.words[0].bval, 0b0110u);
 }
 
-// &&& in ternary condition: both conjuncts true → true branch.
 TEST(TernaryOperatorSim, CondPredicateTripleAndBothTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -962,7 +947,6 @@ TEST(TernaryOperatorSim, CondPredicateTripleAndBothTrue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// &&& in ternary condition: first conjunct false → false branch.
 TEST(TernaryOperatorSim, CondPredicateTripleAndFirstFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -986,7 +970,6 @@ TEST(TernaryOperatorSim, CondPredicateTripleAndFirstFalse) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// &&& in ternary condition: second conjunct false → false branch.
 TEST(TernaryOperatorSim, CondPredicateTripleAndSecondFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -1010,4 +993,4 @@ TEST(TernaryOperatorSim, CondPredicateTripleAndSecondFalse) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

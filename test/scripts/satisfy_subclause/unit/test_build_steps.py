@@ -2,6 +2,8 @@
 
 from satisfy_subclause.mutators import build_steps
 
+from lib.python.claude_cli_streaming import COPYRIGHT_REASON
+
 
 def _step_descriptions(steps: list[tuple[str, str]]) -> list[str]:
     """Return just the description strings from a list of step pairs."""
@@ -312,20 +314,22 @@ def test_build_steps_single_member_has_no_cycle_intro() -> None:
 # --- copyright wording + positive instructions ------------------------------
 
 
-def test_build_steps_constraints_omit_copyright() -> None:
-    """The pipeline prompts must not carry the LRM copyright reason."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert not any("copyright" in p.lower() for _d, p in steps)
-
-
-def test_build_steps_constraints_omit_paraphrase() -> None:
-    """The pipeline prompts must not tell Claude to paraphrase."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert not any("paraphrase" in p.lower() for _d, p in steps)
-
-
 def test_build_steps_no_negative_do_not_in_oracles() -> None:
     """No step uses the 'Do NOT' negative phrasing."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
     for _description, prompt in steps:
         assert "Do NOT" not in prompt
+
+
+def test_build_steps_constraints_carry_copyright_reason() -> None:
+    """Every action step's constraints carry the LRM copyright reason.
+
+    Without the explanation in the prompt, recent §13.5.2 and §4.7
+    commits added comments that quoted the LRM verbatim. Reusing the
+    same COPYRIGHT_REASON the commit-body prompt uses gives Claude the
+    WHY for paraphrasing in source/test comments, not just commit
+    messages.
+    """
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    for _description, prompt in steps[2:]:
+        assert COPYRIGHT_REASON in prompt

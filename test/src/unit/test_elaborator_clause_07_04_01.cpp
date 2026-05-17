@@ -158,4 +158,4 @@ TEST(PackedArrayValidation, PackedDimOnEnumBaseType_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

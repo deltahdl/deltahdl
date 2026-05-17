@@ -16,8 +16,6 @@ TEST(SpecifyBlockDeclLexing, EndspecifyKeywordToken) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndspecify);
 }
 
-// Whitespace and comments between the delimiters must not affect keyword
-// recognition.
 TEST(SpecifyBlockDeclLexing, SpecifyEndspecifyBracketStream) {
   auto tokens = Lex("specify endspecify");
   ASSERT_GE(tokens.size(), 2u);
@@ -25,8 +23,6 @@ TEST(SpecifyBlockDeclLexing, SpecifyEndspecifyBracketStream) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kKwEndspecify);
 }
 
-// Identifiers that contain but do not equal the keywords must not lex as
-// keywords.
 TEST(SpecifyBlockDeclLexing, SpecifyPrefixIsIdentifier) {
   auto tokens = Lex("specifyxx");
   ASSERT_GE(tokens.size(), 1u);
@@ -39,4 +35,4 @@ TEST(SpecifyBlockDeclLexing, EndspecifyPrefixIsIdentifier) {
   EXPECT_NE(tokens[0].kind, TokenKind::kKwEndspecify);
 }
 
-}  // namespace
+}

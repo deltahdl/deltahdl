@@ -60,4 +60,4 @@ TEST(Constraint, DistributionUniform) {
   EXPECT_TRUE(val >= 1 && val <= 3);
 }
 
-}  // namespace
+}

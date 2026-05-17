@@ -41,4 +41,4 @@ TEST(SvaEngine, DisableIffFalsePass) {
   EXPECT_EQ(result, PropertyResult::kPass);
 }
 
-}  // namespace
+}

@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// A UDP definition placed inside a module body is not a legal module item;
-// the parser should not consume it silently.
 TEST(UdpTopLevelParsing, PrimitiveInsideModuleRejected) {
   auto r = Parse(
       "module m;\n"
@@ -49,8 +47,6 @@ TEST(UdpTopLevelParsing, PrimitiveInsidePackageRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// A UDP definition placed between modules is at top level and must parse
-// cleanly regardless of surrounding design-element order.
 TEST(UdpTopLevelParsing, PrimitiveBetweenModulesAccepted) {
   auto r = Parse(
       "module a; endmodule\n"
@@ -64,8 +60,6 @@ TEST(UdpTopLevelParsing, PrimitiveBetweenModulesAccepted) {
   EXPECT_EQ(r.cu->udps.size(), 1u);
 }
 
-// A UDP defined after a module that instantiates it is still a valid
-// top-level design element; the parser must accept the source text.
 TEST(UdpTopLevelParsing, PrimitiveDefinedAfterInstantiationSiteParses) {
   auto r = Parse(
       "module m;\n"
@@ -81,9 +75,6 @@ TEST(UdpTopLevelParsing, PrimitiveDefinedAfterInstantiationSiteParses) {
   EXPECT_EQ(r.cu->udps.size(), 1u);
 }
 
-// Implementations must accept at least 256 UDPs in a single model. Emit
-// enough distinct UDPs to prove the parser and compilation-unit storage do
-// not impose a small fixed cap.
 TEST(UdpTopLevelParsing, AtLeast256UdpsAccepted) {
   std::string src;
   src.reserve(256 * 96);
@@ -98,4 +89,4 @@ TEST(UdpTopLevelParsing, AtLeast256UdpsAccepted) {
   EXPECT_EQ(r.cu->udps.size(), 300u);
 }
 
-}  // namespace
+}

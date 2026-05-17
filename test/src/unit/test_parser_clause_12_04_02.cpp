@@ -228,4 +228,4 @@ TEST(QualifiedIfParsing, NestedQualifiedIfs) {
   EXPECT_EQ(inner->qualifier, CaseQualifier::kUnique);
 }
 
-}  // namespace
+}

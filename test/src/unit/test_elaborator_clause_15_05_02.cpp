@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.5.2: Event wait @(ev) in initial block elaborates.
 TEST(EventWaitElaborator, WaitInInitialBlockElaborates) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -13,7 +12,6 @@ TEST(EventWaitElaborator, WaitInInitialBlockElaborates) {
       "endmodule\n"));
 }
 
-// §15.5.2: Event wait with body statement elaborates.
 TEST(EventWaitElaborator, WaitWithBodyElaborates) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -23,7 +21,6 @@ TEST(EventWaitElaborator, WaitWithBodyElaborates) {
       "endmodule\n"));
 }
 
-// §15.5.2: Bare @ev syntax (no parentheses) elaborates.
 TEST(EventWaitElaborator, BareWaitSyntaxElaborates) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -32,10 +29,6 @@ TEST(EventWaitElaborator, BareWaitSyntaxElaborates) {
       "endmodule\n"));
 }
 
-// §15.5.2 builds on §9.4.2's event control operator. A task call used in
-// place of a hierarchical_event_identifier in an @-wait is therefore
-// rejected for the same reason §9.4.2 rejects task calls in event
-// expressions.
 TEST(EventWaitElaborator, WaitOnTaskCallRejected) {
   EXPECT_FALSE(ElabOk(
       "module m;\n"
@@ -44,9 +37,6 @@ TEST(EventWaitElaborator, WaitOnTaskCallRejected) {
       "endmodule\n"));
 }
 
-// §15.5.2: The wait syntax is "@ hierarchical_event_identifier;" — a
-// hierarchical reference to a named event in another instance is a legal
-// waited-on identifier and must elaborate.
 TEST(EventWaitElaborator, HierarchicalEventWaitElaborates) {
   EXPECT_TRUE(ElabOk(
       "module child;\n"
@@ -58,4 +48,4 @@ TEST(EventWaitElaborator, HierarchicalEventWaitElaborates) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

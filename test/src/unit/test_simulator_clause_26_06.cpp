@@ -74,8 +74,7 @@ TEST(PackageExportSim, FunctionVisibleThroughStarStarExport) {
 }
 
 TEST(PackageExportSim, FunctionVisibleThroughReExportChain) {
-  // Three-package chain: p1 defines, p2 re-exports from p1, p3 re-exports
-  // from p2. The call site importing from p3 must still resolve to p1's body.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "package p1;\n"
@@ -103,7 +102,7 @@ TEST(PackageExportSim, FunctionVisibleThroughReExportChain) {
 }
 
 TEST(PackageExportSim, MultipleFunctionsExportedViaStarStarResolve) {
-  // `export *::*;` must make every imported function reachable, not just one.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "package p1;\n"
@@ -133,4 +132,4 @@ TEST(PackageExportSim, MultipleFunctionsExportedViaStarStarResolve) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 22u);
 }
 
-}  // namespace
+}

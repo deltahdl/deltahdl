@@ -104,4 +104,4 @@ TEST(EvalOp, ConcatBitOrdering) {
   EXPECT_EQ(result.ToUint64(), 0xFF00u);
 }
 
-}  // namespace
+}

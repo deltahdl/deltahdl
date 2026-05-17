@@ -300,11 +300,6 @@ TEST(DesignBuildingBlockParsing, DirectiveDefinedBetweenModules) {
   ASSERT_EQ(r.cu->modules.size(), 2u);
 }
 
-// §3.12.1: "The contents of files included using one or more `include
-// directives become part of the compilation unit of the file within which
-// they are included."  This is a preprocessor-stage rule: the contents of
-// the included file must end up in the same compilation unit as the file
-// that included it.
 TEST(CompilationUnitPreprocessing, IncludeDirectiveContentBecomesPartOfCu) {
   fs::path dir = fs::temp_directory_path() /
                  ("delta_test_cu_include_" + std::to_string(getpid()));
@@ -335,4 +330,4 @@ TEST(CompilationUnitPreprocessing, IncludeDirectiveContentBecomesPartOfCu) {
   fs::remove_all(dir);
 }
 
-}  // namespace
+}

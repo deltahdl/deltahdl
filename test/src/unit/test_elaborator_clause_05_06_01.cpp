@@ -43,9 +43,6 @@ TEST(EscapedIdentifierElaboration, EscapedIdentMatchesSimpleIdent) {
              "endmodule\n"));
 }
 
-// §5.6.1: rule (4) symmetry — when the declaration uses the escaped form and
-// the reference uses the simple form, the reference must still resolve to the
-// declaration (both forms denote the stored name "cpu3").
 TEST(EscapedIdentifierElaboration, EscapedDeclResolvesSimpleRef) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -54,4 +51,4 @@ TEST(EscapedIdentifierElaboration, EscapedDeclResolvesSimpleRef) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -1,4 +1,4 @@
-// §non-lrm:keyword_lexing
+
 
 #include <gtest/gtest.h>
 #include "fixture_lexer.h"
@@ -47,4 +47,4 @@ TEST(GateKeywordLexing, MultipleNInputKeywordsInSequence) {
   EXPECT_EQ(tokens[5].kind, TokenKind::kKwXnor);
 }
 
-}  // namespace
+}

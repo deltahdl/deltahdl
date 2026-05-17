@@ -71,7 +71,7 @@ TEST(NetDecl, NetValueUsesFourStateEncoding) {
   net.type = NetType::kWire;
   net.resolved = var;
   InitializeNet(net, NetType::kWire, arena);
-  // z is encoded as aval=1, bval=1 in 4-state representation.
+
   EXPECT_EQ(var->value.words[0].aval, 1u);
   EXPECT_EQ(var->value.words[0].bval, 1u);
 }
@@ -121,4 +121,4 @@ TEST(NetDecl, TriregDefaultsToXLarge) {
   EXPECT_EQ(ValOf(*var), kValX);
 }
 
-}  // namespace
+}

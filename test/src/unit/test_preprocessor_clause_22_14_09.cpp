@@ -50,4 +50,4 @@ TEST(CompilerDirectiveParsing, BeginKeywordsModuleNamePreserved) {
   EXPECT_EQ(r.cu->modules[0]->name, "bar");
 }
 
-}  // namespace
+}

@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.7: Function with fixed-size array parameter elaborates.
 TEST(ArraySubroutineArgValidation, FuncWithFixedArrayArgElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -14,7 +13,6 @@ TEST(ArraySubroutineArgValidation, FuncWithFixedArrayArgElaborates) {
              "endmodule\n"));
 }
 
-// §7.7: Task with multiple array parameters elaborates.
 TEST(ArraySubroutineArgValidation, TaskWithMultipleArrayArgsElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -24,7 +22,6 @@ TEST(ArraySubroutineArgValidation, TaskWithMultipleArrayArgsElaborates) {
              "endmodule\n"));
 }
 
-// §7.7: Function with dynamic array parameter elaborates.
 TEST(ArraySubroutineArgValidation, FuncWithDynamicArrayArgElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -34,7 +31,6 @@ TEST(ArraySubroutineArgValidation, FuncWithDynamicArrayArgElaborates) {
              "endmodule\n"));
 }
 
-// §7.7: Calling function with array actual argument elaborates.
 TEST(ArraySubroutineArgValidation, ArrayArgCallElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -47,7 +43,6 @@ TEST(ArraySubroutineArgValidation, ArrayArgCallElaborates) {
              "endmodule\n"));
 }
 
-// §7.7: Calling function with dynamic array actual elaborates.
 TEST(ArraySubroutineArgValidation, DynamicArrayArgCallElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -60,4 +55,4 @@ TEST(ArraySubroutineArgValidation, DynamicArrayArgCallElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -400,4 +400,4 @@ TEST(ModuleHeaderDefinition, ErrorMissingSemicolonAfterHeader) {
   EXPECT_FALSE(ParseOk("module m endmodule\n"));
 }
 
-}  // namespace
+}

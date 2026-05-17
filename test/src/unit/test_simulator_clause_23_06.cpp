@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- R14: Hierarchical name can be read in an expression ---
-
 TEST(HierarchicalNameSimulation, ReadChildInstanceVariable) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -33,8 +31,6 @@ TEST(HierarchicalNameSimulation, ReadChildInstanceVariable) {
   EXPECT_EQ(v->value.ToUint64(), 42u);
 }
 
-// --- R14: Hierarchical name can be written in an assignment ---
-
 TEST(HierarchicalNameSimulation, WriteChildInstanceVariable) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -56,8 +52,6 @@ TEST(HierarchicalNameSimulation, WriteChildInstanceVariable) {
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 99u);
 }
-
-// --- R10/R14: Complete path from top-level, multi-level read ---
 
 TEST(HierarchicalNameSimulation, MultiLevelHierarchicalRead) {
   SimFixture f;
@@ -87,10 +81,6 @@ TEST(HierarchicalNameSimulation, MultiLevelHierarchicalRead) {
   EXPECT_EQ(v->value.ToUint64(), 77u);
 }
 
-// §23.6: "The instance name $root refers to the top of the instantiated
-// design and is used to unambiguously gain access to the top of the
-// design."  A `$root`-prefixed hierarchical reference must resolve at
-// runtime to the same value as the unqualified reference at the top.
 TEST(HierarchicalNameSimulation, RootPrefixedHierarchicalRead) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -112,8 +102,6 @@ TEST(HierarchicalNameSimulation, RootPrefixedHierarchicalRead) {
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 33u);
 }
-
-// --- R14: Hierarchical name used in event expression (trigger) ---
 
 TEST(HierarchicalNameSimulation, HierarchicalNameInEventExpression) {
   SimFixture f;
@@ -144,4 +132,4 @@ TEST(HierarchicalNameSimulation, HierarchicalNameInEventExpression) {
   EXPECT_EQ(v->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

@@ -6,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §A.9.4: white_space ::= space | tab | newline | formfeed | eof — observed at
-// the preprocessor stage: each non-EOF alternative must traverse preprocessing
-// without producing errors.
-
 TEST(WhiteSpacePreprocessor, SpaceDelimiterPreserved) {
   PreprocFixture f;
   auto result = Preprocess("module t; logic a; endmodule\n", f);
@@ -34,12 +30,10 @@ TEST(WhiteSpacePreprocessor, FormfeedDelimiterPreserved) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §A.9.4 eof alternative (degenerate form): empty source must preprocess
-// without errors — EOF is the only white_space and there are no tokens.
 TEST(WhiteSpacePreprocessor, EmptyInputPreprocessesCleanly) {
   PreprocFixture f;
   auto result = Preprocess("", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

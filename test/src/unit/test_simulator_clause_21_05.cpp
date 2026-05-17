@@ -52,4 +52,4 @@ TEST(IoSystemTaskTest, WritemembBasic) {
   std::remove(tmp_path.c_str());
 }
 
-}  // namespace
+}

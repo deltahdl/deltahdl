@@ -20,9 +20,6 @@
 
 namespace delta {
 
-// Awaiter for #N delay control. Suspends the coroutine and schedules a
-// wakeup event at current_time + delay_ticks. For #0, targets the
-// Inactive region per IEEE 1800-2023 §4.5.
 struct DelayAwaiter {
   SimContext& ctx;
   uint64_t delay_ticks;
@@ -36,8 +33,7 @@ struct DelayAwaiter {
     auto* proc = ctx.CurrentProcess();
     event->callback = [h, proc, &ctx]() mutable {
       if (proc && !proc->active) return;
-      // §9.7: A process suspended while in the WAITING state is
-      // desensitized to the delay expiration on which it is blocked.
+
       if (proc && proc->is_suspended) return;
       if (proc) ctx.SetCurrentProcess(proc);
       h.resume();
@@ -55,9 +51,6 @@ struct DelayAwaiter {
   void await_resume() const noexcept {}
 };
 
-// Awaiter for @(posedge/negedge/any-change) event control. Suspends the
-// coroutine until the specified edge condition is detected on any of the
-// watched signals.
 struct EventAwaiter {
   SimContext& ctx;
   const std::vector<EventExpr>& events;
@@ -73,7 +66,7 @@ struct EventAwaiter {
       if (ev.signal->kind == ExprKind::kIdentifier) {
         var = ctx.FindVariable(ev.signal->text);
       } else if (ev.signal->kind == ExprKind::kMemberAccess) {
-        // §14.15: @(cb.signal) — try clocking manager first.
+
         if (ev.signal->lhs &&
             ev.signal->lhs->kind == ExprKind::kIdentifier) {
           auto* mgr = ctx.GetClockingManager();
@@ -85,17 +78,14 @@ struct EventAwaiter {
           if (mgr && !member.empty())
             var = mgr->ResolveClockingMember(ev.signal->lhs->text, member, ctx);
         }
-        // §23.6: Hierarchical name in event expression.
+
         if (!var) {
           std::string hier_name;
           BuildLhsName(ev.signal, hier_name);
           var = ctx.FindVariable(hier_name);
         }
       } else {
-        // §9.4.2: Compound event expression (e.g. @(a|b)). An event fires
-        // only when the *result* of the expression changes; a change in
-        // any operand that leaves the result unchanged shall not be
-        // detected as an event.
+
         AttachCompoundWatchers(ev, h, proc);
         continue;
       }
@@ -104,7 +94,7 @@ struct EventAwaiter {
         auto* ctx_ptr = &ctx;
         var->AddWatcher([h, proc, ctx_ptr]() mutable {
           if (proc && !proc->active) return true;
-          // §9.7: WAITING-state suspension desensitizes the event watcher.
+
           if (proc && proc->is_suspended) return false;
           ResumeMaybeReactive(h, proc, *ctx_ptr);
           return true;
@@ -116,7 +106,7 @@ struct EventAwaiter {
       var->AddWatcher([h, var, edge = ev.edge, iff_cond = ev.iff_condition,
                        ctx_ptr, proc]() mutable {
         if (proc && !proc->active) return true;
-        // §9.7: WAITING-state suspension desensitizes the edge watcher.
+
         if (proc && proc->is_suspended) return false;
         return HandleEdgeEvent(h, var, edge, iff_cond, *ctx_ptr, proc);
       });
@@ -137,7 +127,7 @@ struct EventAwaiter {
       }
       return false;
     }
-    // Edge events: Table 9-2, detected only on the LSB.
+
     uint64_t pa = 0, pb = 0, ca = 0, cb = 0;
     if (var->prev_value.nwords > 0) {
       pa = var->prev_value.words[0].aval & 1;
@@ -156,7 +146,7 @@ struct EventAwaiter {
     bool neg = (prev_is_1 && !cur_is_1) || (prev_is_xz && cur_is_0);
     if (edge == Edge::kPosedge) return pos;
     if (edge == Edge::kNegedge) return neg;
-    return pos || neg;  // Edge::kEdge
+    return pos || neg;
   }
 
   static bool HandleEdgeEvent(std::coroutine_handle<>& h, Variable* var,
@@ -177,8 +167,6 @@ struct EventAwaiter {
     return true;
   }
 
-  // §9.4.2: Walk a compound event expression and append the identifier
-  // names of every variable operand it reads.
   static void CollectExprIdentifiers(const Expr* e,
                                      std::vector<std::string_view>& out) {
     if (!e) return;
@@ -198,8 +186,6 @@ struct EventAwaiter {
     for (auto* el : e->elements) CollectExprIdentifiers(el, out);
   }
 
-  // Bit-exact equality on aval/bval words; used to detect whether an
-  // expression's result has changed since the last evaluation.
   static bool Logic4VecBitsEqual(const Logic4Vec& a, const Logic4Vec& b) {
     if (a.nwords != b.nwords) return false;
     for (uint32_t i = 0; i < a.nwords; ++i) {
@@ -210,7 +196,6 @@ struct EventAwaiter {
     return true;
   }
 
-  // §9.4.2 Table 9-2: edge detection on the LSB of an expression result.
   static bool CheckEdgeOnValues(const Logic4Vec& prev, const Logic4Vec& cur,
                                 Edge edge) {
     uint64_t pa = 0, pb = 0, ca = 0, cb = 0;
@@ -231,13 +216,9 @@ struct EventAwaiter {
     bool neg = (prev_is_1 && !cur_is_1) || (prev_is_xz && cur_is_0);
     if (edge == Edge::kPosedge) return pos;
     if (edge == Edge::kNegedge) return neg;
-    return pos || neg;  // Edge::kEdge
+    return pos || neg;
   }
 
-  // §9.4.2: Attach a watcher to each operand variable in a compound event
-  // expression. On any operand write the expression is re-evaluated; the
-  // process resumes only when the result actually changes (and any edge
-  // qualifier or iff guard agrees).
   void AttachCompoundWatchers(const EventExpr& ev, std::coroutine_handle<> h,
                               Process* proc) {
     std::vector<std::string_view> names;
@@ -259,7 +240,7 @@ struct EventAwaiter {
             if (proc && !proc->active) return true;
             auto cur = EvalExpr(signal, *ctx_ptr, ctx_ptr->GetArena());
             if (Logic4VecBitsEqual(cur, *prev)) {
-              // Operand changed but result did not — not an event.
+
               return false;
             }
             if (edge != Edge::kNone &&
@@ -292,8 +273,7 @@ struct EventAwaiter {
                                        event);
       return;
     }
-    // §24.3.2: design process woken by a reactive-context write defers to
-    // the Active region of the next scheduling-loop iteration.
+
     if (proc && ctx.IsReactiveContext()) {
       auto* event = ctx.GetScheduler().GetEventPool().Acquire();
       event->callback = [h, proc, &ctx]() mutable {
@@ -309,9 +289,6 @@ struct EventAwaiter {
   }
 };
 
-// Awaiter for named event wait (@ev). Suspends the coroutine until the
-// event variable is triggered via ->ev (NotifyWatchers). No edge check;
-// resumes unconditionally on trigger.
 struct NamedEventAwaiter {
   SimContext& ctx;
   std::string_view event_name;
@@ -330,11 +307,6 @@ struct NamedEventAwaiter {
   void await_resume() const noexcept {}
 };
 
-// §9.4.2.4: Awaiter for sequence events (@(seq_name)). Blocks the process
-// until the sequence reaches its end point (R2), then resumes following the
-// Observed region (R3) — i.e. in the Reactive region.  The sequence is
-// instantiated as if by assert property (R4); its endpoint fires an internal
-// named event that this awaiter watches.
 struct SequenceEventAwaiter {
   SimContext& ctx;
   const std::vector<EventExpr>& events;
@@ -351,14 +323,13 @@ struct SequenceEventAwaiter {
         seq_name = ev.signal->callee;
       if (seq_name.empty()) continue;
 
-      // Create or find the endpoint event variable for this sequence.
       std::string ep_name = std::string("__seq_") + std::string(seq_name);
       auto* ep_var = ctx.FindVariable(ep_name);
       if (!ep_var) {
         ep_var = ctx.CreateVariable(ep_name, 1);
         ep_var->is_event = true;
       }
-      // R3: Resume in the Reactive region (following Observed).
+
       auto* sched = &ctx.GetScheduler();
       auto* ctx_ptr = &ctx;
       ep_var->AddWatcher([h, sched, ctx_ptr]() mutable {
@@ -373,8 +344,6 @@ struct SequenceEventAwaiter {
   void await_resume() const noexcept {}
 };
 
-// Awaiter that watches a set of variables and resumes on any value change.
-// Used for always_comb sensitivity inference.
 struct AnyChangeAwaiter {
   SimContext& ctx;
   const std::vector<std::string_view>& var_names;
@@ -399,9 +368,6 @@ struct AnyChangeAwaiter {
   void await_resume() const noexcept {}
 };
 
-// §10.3.3: Awaiter for inertial delay on continuous assignments. Schedules a
-// delay event AND watches RHS variables simultaneously. Resumes when either the
-// delay expires or an RHS variable changes, whichever comes first.
 struct InertialDelayAwaiter {
   SimContext& ctx;
   uint64_t delay_ticks;
@@ -414,7 +380,6 @@ struct InertialDelayAwaiter {
   void await_suspend(std::coroutine_handle<> h) {
     auto* proc = ctx.CurrentProcess();
 
-    // Schedule the delay event.
     auto time = ctx.CurrentTime() + SimTime{delay_ticks};
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
     auto f = fired_;
@@ -429,7 +394,6 @@ struct InertialDelayAwaiter {
     };
     ctx.GetScheduler().ScheduleEvent(time, Region::kActive, event);
 
-    // Register watchers on RHS variables.
     for (auto name : var_names) {
       auto* var = ctx.FindVariable(name);
       if (!var) continue;
@@ -445,11 +409,9 @@ struct InertialDelayAwaiter {
     }
   }
 
-  // Returns true if the delay expired, false if an RHS variable changed.
   bool await_resume() const noexcept { return *expired_; }
 };
 
-// Shared state for fork/join synchronization.
 struct ForkJoinState {
   uint32_t remaining = 0;
   std::coroutine_handle<> parent;
@@ -457,8 +419,6 @@ struct ForkJoinState {
   bool resumed = false;
 };
 
-// Awaiter for fork/join and fork/join_any. Suspends the parent coroutine
-// until all (join) or any (join_any) children complete.
 struct ForkJoinAwaiter {
   ForkJoinState* state;
 
@@ -469,8 +429,6 @@ struct ForkJoinAwaiter {
   void await_resume() const noexcept {}
 };
 
-// Awaiter for wait fork (§9.6.1). Suspends the parent coroutine until all
-// immediate child subprocesses spawned by fork/join_none have terminated.
 struct WaitForkAwaiter {
   WaitForkState* state;
 
@@ -481,8 +439,6 @@ struct WaitForkAwaiter {
   void await_resume() const noexcept {}
 };
 
-// Awaiter for ##N cycle delay. Suspends the coroutine until N clocking
-// block events have occurred on the default clocking block.
 struct CycleDelayAwaiter {
   SimContext& ctx;
   uint32_t cycles;
@@ -515,8 +471,6 @@ struct CycleDelayAwaiter {
   void await_resume() const noexcept {}
 };
 
-// §9.7: Awaiter for process.await(). Suspends the caller until the
-// target process reaches FINISHED or KILLED state.
 struct ProcessAwaitAwaiter {
   Process* target;
 
@@ -532,8 +486,6 @@ struct ProcessAwaitAwaiter {
   void await_resume() const noexcept {}
 };
 
-// §15.3.3: Awaiter for semaphore get(). Suspends the coroutine when
-// insufficient keys are available; resumes when Put() adds enough keys.
 struct SemaphoreGetAwaiter {
   SemaphoreObject& sem;
   int32_t count;
@@ -550,4 +502,4 @@ struct SemaphoreGetAwaiter {
   void await_resume() const noexcept {}
 };
 
-}  // namespace delta
+}

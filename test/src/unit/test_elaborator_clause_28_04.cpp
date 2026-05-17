@@ -56,7 +56,6 @@ TEST(NInputGateElaboration, ElaborateXorGate) {
   EXPECT_EQ(mod->assigns[0].rhs->op, TokenKind::kCaret);
 }
 
-// --- N-input gate chain depth ---
 TEST(NInputGateElaboration, FourInputAndProducesThreeNodeChain) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -72,7 +71,7 @@ TEST(NInputGateElaboration, FourInputAndProducesThreeNodeChain) {
   auto& ca = mod->assigns.back();
   ASSERT_NE(ca.rhs, nullptr);
   EXPECT_EQ(ca.rhs->kind, ExprKind::kBinary);
-  // (a & b) & c) & d => root is binary, lhs is binary, lhs->lhs is binary
+
   ASSERT_NE(ca.rhs->lhs, nullptr);
   EXPECT_EQ(ca.rhs->lhs->kind, ExprKind::kBinary);
   ASSERT_NE(ca.rhs->lhs->lhs, nullptr);
@@ -99,7 +98,6 @@ TEST(NInputGateElaboration, TwoInputOrProducesSingleBinary) {
   EXPECT_EQ(ca.rhs->rhs->kind, ExprKind::kIdentifier);
 }
 
-// --- Full pipeline: elaborate through preprocessor ---
 TEST(NInputGateElaboration, NandGateElaboratesThroughFullPipeline) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -108,8 +106,6 @@ TEST(NInputGateElaboration, NandGateElaboratesThroughFullPipeline) {
       "endmodule\n"));
 }
 
-// nor and xnor complete the six n-input gates; each inverts its base gate's
-// binary-chain expression.
 TEST(NInputGateElaboration, ElaborateNorGate) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -148,8 +144,6 @@ TEST(NInputGateElaboration, ElaborateXnorGate) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kCaret);
 }
 
-// The first terminal drives the output, so the elaborated continuous
-// assignment must use it as the lhs.
 TEST(NInputGateElaboration, FirstTerminalIsOutputLhs) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -168,4 +162,4 @@ TEST(NInputGateElaboration, FirstTerminalIsOutputLhs) {
   EXPECT_EQ(lhs->text, "y");
 }
 
-}  // namespace
+}

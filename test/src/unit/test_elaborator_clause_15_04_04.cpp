@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.4: try_put() call in initial block elaborates.
 TEST(MailboxTryPutElaborator, TryPutCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,7 +18,6 @@ TEST(MailboxTryPutElaborator, TryPutCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.4: try_put() result assigned to variable elaborates.
 TEST(MailboxTryPutElaborator, TryPutResultAssigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -35,7 +33,6 @@ TEST(MailboxTryPutElaborator, TryPutResultAssigned) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.4: try_put() with variable argument elaborates.
 TEST(MailboxTryPutElaborator, TryPutWithVariableArg) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,4 +48,4 @@ TEST(MailboxTryPutElaborator, TryPutWithVariableArg) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §15.5.5.3: Two distinct events compare not-equal.
 TEST(IpcSync, DistinctEventsCompareNotEqual) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -30,7 +29,6 @@ TEST(IpcSync, DistinctEventsCompareNotEqual) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §15.5.5.3: Merged events compare equal (same sync queue).
 TEST(IpcSync, MergedEventsCompareEqual) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -55,7 +53,6 @@ TEST(IpcSync, MergedEventsCompareEqual) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §15.5.5.3: Event != null returns true for non-null event.
 TEST(IpcSync, EventNotEqualToNullReturnsTrue) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -79,7 +76,6 @@ TEST(IpcSync, EventNotEqualToNullReturnsTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §15.5.5.3: Event == null returns true for null event.
 TEST(IpcSync, NullEventEqualsNull) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -103,7 +99,6 @@ TEST(IpcSync, NullEventEqualsNull) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §15.5.5.3: Case equality (===) has same semantics as == for events.
 TEST(IpcSync, CaseEqualitySameSemanticsAsEqForEvents) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -128,7 +123,6 @@ TEST(IpcSync, CaseEqualitySameSemanticsAsEqForEvents) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §15.5.5.3: Case inequality (!==) has same semantics as != for events.
 TEST(IpcSync, CaseInequalitySameSemanticsAsNeqForEvents) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -152,7 +146,6 @@ TEST(IpcSync, CaseInequalitySameSemanticsAsNeqForEvents) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §15.5.5.3: Boolean conversion — non-null event is truthy.
 TEST(IpcSync, NonNullEventIsTruthy) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -176,7 +169,6 @@ TEST(IpcSync, NonNullEventIsTruthy) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §15.5.5.3: Boolean conversion — null event is falsy.
 TEST(IpcSync, NullEventIsFalsy) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -200,4 +192,4 @@ TEST(IpcSync, NullEventIsFalsy) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-}  // namespace
+}

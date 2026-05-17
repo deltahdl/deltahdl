@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- Rule (a): First component is a data object → member select ---
-
 TEST(DottedNameSimulation, StructMemberSelectReadsField) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -123,8 +121,6 @@ TEST(DottedNameSimulation, NestedStructMemberSelectReadsDeepField) {
   EXPECT_EQ(v->value.ToUint64(), 0x77u);
 }
 
-// --- Rule (b): First component is a scope name → hierarchical name ---
-
 TEST(DottedNameSimulation, InstanceScopeReadsHierarchicalName) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -170,8 +166,6 @@ TEST(DottedNameSimulation, InstanceScopeWritesHierarchicalName) {
   EXPECT_EQ(v->value.ToUint64(), 55u);
 }
 
-// --- Rules (a) and (b) coexist in one module ---
-
 TEST(DottedNameSimulation, MemberSelectAndHierarchicalNameInSameModule) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -204,4 +198,4 @@ TEST(DottedNameSimulation, MemberSelectAndHierarchicalNameInSameModule) {
   EXPECT_EQ(v2->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

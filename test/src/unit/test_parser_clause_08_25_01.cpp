@@ -132,4 +132,4 @@ TEST(ParameterizedScopeResolutionParsing, EmptyParamListWithMemberAccess) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

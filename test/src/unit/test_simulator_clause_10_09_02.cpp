@@ -193,7 +193,7 @@ TEST(StructPattern, TypeKeyOverridesDefault) {
   pat->elements = {MakeInt(f.arena, 0xAA), MakeInt(f.arena, 0xFF)};
 
   auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
-  // byte key matches a and b (0xAA each), default fills c (0xFF).
+
   uint64_t expected = (uint64_t{0xAA} << 16) | (uint64_t{0xAA} << 8) | 0xFF;
   EXPECT_EQ(result.ToUint64(), expected);
 }
@@ -296,7 +296,7 @@ TEST(StructPatternSimulation, ThreeTierPrecedence) {
   LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("s");
   ASSERT_NE(var, nullptr);
-  // a=1 (member key), b=2 (byte type key), c=3 (default).
+
   uint64_t expected = (uint64_t{1} << 16) | (uint64_t{2} << 8) | 3;
   EXPECT_EQ(var->value.ToUint64(), expected);
 }
@@ -319,7 +319,7 @@ TEST(StructPatternSimulation, TypeKeyMultipleFieldsPipeline) {
   LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("p");
   ASSERT_NE(var, nullptr);
-  // Both int fields get 42.
+
   EXPECT_EQ(var->value.ToUint64(), (uint64_t{42} << 32) | 42);
 }
 
@@ -341,4 +341,4 @@ TEST(StructPatternSimulation, ReplicationInStructContext) {
   EXPECT_EQ(var->value.ToUint64(), 0xABABu);
 }
 
-}  // namespace
+}

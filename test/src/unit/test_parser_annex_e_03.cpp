@@ -33,4 +33,4 @@ TEST(OptionalDirectiveExtendedParsing, DefaultTriregStrength_NoDirective) {
   EXPECT_FALSE(r.cu->has_default_trireg_strength);
 }
 
-}  // namespace
+}

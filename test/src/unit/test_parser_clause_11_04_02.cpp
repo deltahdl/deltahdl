@@ -103,4 +103,4 @@ TEST(LvalueParsing, VarLvaluePostDecrement) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

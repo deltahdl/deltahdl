@@ -4,18 +4,17 @@ namespace delta {
 
 Expr* Parser::ParseStreamingConcat(TokenKind dir) {
   auto loc = CurrentLoc();
-  Consume();  // << or >>
+  Consume();
   auto* sc = arena_.Create<Expr>();
   sc->kind = ExprKind::kStreamingConcat;
   sc->range.start = loc;
-  sc->op = dir;  // store direction
+  sc->op = dir;
 
-  // Optional slice_size: type keyword (byte, int, etc.) or expression.
   if (!Check(TokenKind::kLBrace)) {
     auto saved = lexer_.SavePos();
     auto tok = Consume();
     if (Check(TokenKind::kLBrace)) {
-      // Single token followed by '{' — treat as type-sized slice.
+
       auto* type_id = arena_.Create<Expr>();
       type_id->kind = ExprKind::kIdentifier;
       type_id->text = tok.text;
@@ -62,9 +61,9 @@ Expr* Parser::ParseCompoundAssignExpr(Expr* lhs) {
 }
 
 Expr* Parser::ParseParenExpr() {
-  Consume();  // (
+  Consume();
   auto* lhs = ParseExpr();
-  // Assignment expression inside parens: (a = b), (a += 1)
+
   auto k = CurrentToken().kind;
   bool is_assign = k == TokenKind::kEq || k == TokenKind::kPlusEq ||
                    k == TokenKind::kMinusEq || k == TokenKind::kStarEq ||
@@ -85,12 +84,9 @@ Expr* Parser::ParseParenExpr() {
     lhs = bin;
   }
   Expect(TokenKind::kRParen);
-  // §A.2.2.1: casting_type ::= ... | constant_primary | ...
-  // After a parenthesized expression, accept '(value) as a cast where the
-  // parenthesized inner expression supplies the casting_type's
-  // constant_primary (e.g. (WIDTH)'(value)).
+
   if (Check(TokenKind::kApostrophe)) {
-    Consume();  // '
+    Consume();
     Expect(TokenKind::kLParen);
     auto* cast = arena_.Create<Expr>();
     cast->kind = ExprKind::kCast;
@@ -103,4 +99,4 @@ Expr* Parser::ParseParenExpr() {
   return lhs;
 }
 
-}  // namespace delta
+}

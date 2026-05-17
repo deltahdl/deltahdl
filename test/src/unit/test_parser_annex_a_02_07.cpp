@@ -5,11 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- task_declaration ---
-
-// Lifetime-keyword acceptance on task declarations is a §6.21 rule;
-// the corresponding parser tests live in test_parser_clause_06_21.cpp.
-
 TEST(TaskDeclParsing, TaskDeclNoLifetime) {
   auto r = Parse(
       "module m;\n"
@@ -24,8 +19,6 @@ TEST(TaskDeclParsing, TaskDeclNoLifetime) {
   EXPECT_FALSE(item->is_static);
   EXPECT_EQ(item->name, "my_task");
 }
-
-// --- task_body_declaration ---
 
 TEST(TaskDeclParsing, TaskBodyNewStyleBlockItemDecl) {
   auto r = Parse(
@@ -110,8 +103,6 @@ TEST(TaskDeclParsing, TaskBodyEmptyNoPortsNoStatements) {
   EXPECT_TRUE(item->func_body_stmts.empty());
 }
 
-// --- tf_item_declaration ---
-
 TEST(TaskDeclParsing, TfItemDeclMixedPortsAndVars) {
   auto r = Parse(
       "module m;\n"
@@ -130,8 +121,6 @@ TEST(TaskDeclParsing, TfItemDeclMixedPortsAndVars) {
   EXPECT_GE(item->func_body_stmts.size(), 2u);
 }
 
-// --- tf_port_list ---
-
 TEST(TaskDeclParsing, TfPortListMultiplePorts) {
   auto r = Parse(
       "module m;\n"
@@ -146,13 +135,6 @@ TEST(TaskDeclParsing, TfPortListMultiplePorts) {
   EXPECT_EQ(item->func_args[1].name, "b");
   EXPECT_EQ(item->func_args[2].name, "c");
 }
-
-// The sticky-direction rule ("Once a direction is given, subsequent formals
-// default to the same direction") is §13.3 base-text; the corresponding
-// parser test (FormalArgDirectionStickyAcrossSwitch) lives in
-// test_parser_clause_13_03.cpp.
-
-// --- tf_port_item ---
 
 TEST(TaskDeclParsing, TfPortItemVar) {
   auto r = Parse(
@@ -204,8 +186,6 @@ TEST(TaskDeclParsing, TfPortItemNoIdentifier) {
   ASSERT_EQ(item->func_args.size(), 1u);
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
 }
-
-// --- tf_port_direction ---
 
 TEST(TaskDeclParsing, TfPortDirectionInput) {
   auto r = Parse(
@@ -276,8 +256,6 @@ TEST(TaskDeclParsing, TfPortDirectionRefStatic) {
       "  endtask\n"
       "endmodule\n"));
 }
-
-// --- tf_port_declaration (old-style) ---
 
 TEST(TaskDeclParsing, TfPortDeclOldStyleVar) {
   auto r = Parse(
@@ -355,8 +333,6 @@ TEST(TaskDeclParsing, TfPortDeclWithDefaultValue) {
   EXPECT_NE(item->func_args[0].default_value, nullptr);
 }
 
-// --- task_prototype ---
-
 TEST(TaskDeclParsing, TaskPrototypeWithArgs) {
   auto r = Parse(
       "module m;\n"
@@ -394,8 +370,6 @@ TEST(TaskDeclParsing, TaskPrototypeNoParens) {
   EXPECT_TRUE(item->is_extern);
   EXPECT_TRUE(item->func_args.empty());
 }
-
-// --- dynamic_override_specifiers ---
 
 TEST(TaskDeclParsing, TaskDeclDynOverrideInitial) {
   auto r = Parse(
@@ -463,8 +437,6 @@ TEST(TaskDeclParsing, TaskDeclDynOverrideInitialFinal) {
   EXPECT_TRUE(method->is_method_final);
 }
 
-// --- tf_port_direction: all directions in one task ---
-
 TEST(TaskDeclParsing, TfPortAllDirections) {
   auto r = Parse(
       "module m;\n"
@@ -478,4 +450,4 @@ TEST(TaskDeclParsing, TfPortAllDirections) {
                            Direction::kInout, Direction::kRef});
 }
 
-}  // namespace
+}

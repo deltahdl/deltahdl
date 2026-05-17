@@ -31,4 +31,4 @@ TEST(InitialProcedureSynthesis, RejectInitialWithAssignment) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

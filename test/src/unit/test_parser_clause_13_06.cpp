@@ -93,4 +93,4 @@ TEST(ImportExportParsing, ImportedFunctionUsedInExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

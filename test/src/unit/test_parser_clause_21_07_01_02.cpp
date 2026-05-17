@@ -71,4 +71,4 @@ TEST(IoSystemTaskParsing, DumpvarsInsideBeginEnd) {
   EXPECT_GE(item->body->stmts.size(), 2u);
 }
 
-}  // namespace
+}

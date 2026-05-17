@@ -154,7 +154,6 @@ TEST(TaggedUnionEval, MismatchedMemberReadThreeMemberUnion) {
   f.ctx.SetVariableStructType("u", "u3");
   f.ctx.SetVariableTag("u", "a");
 
-  // Access "b" while tag is "a" — should return X.
   auto* access_b = f.arena.Create<Expr>();
   access_b->kind = ExprKind::kMemberAccess;
   access_b->lhs = MakeId(f.arena, "u");
@@ -162,7 +161,6 @@ TEST(TaggedUnionEval, MismatchedMemberReadThreeMemberUnion) {
   auto rb = EvalExpr(access_b, f.ctx, f.arena);
   EXPECT_NE(rb.words[0].bval, 0u);
 
-  // Access "c" while tag is "a" — should also return X.
   auto* access_c = f.arena.Create<Expr>();
   access_c->kind = ExprKind::kMemberAccess;
   access_c->lhs = MakeId(f.arena, "u");
@@ -231,4 +229,4 @@ TEST(TaggedUnionEval, VoidMemberThenValueMember) {
   EXPECT_EQ(v, 77u);
 }
 
-}  // namespace
+}

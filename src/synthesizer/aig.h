@@ -6,35 +6,19 @@
 
 namespace delta {
 
-// --- And-Inverter Graph (AIG) ---
-//
-// Core data structure for logic synthesis. Each node represents a two-input
-// AND gate. Edges carry an optional complement (inversion) flag stored in
-// the LSB of the literal encoding:
-//   literal = (node_id << 1) | complement_bit
-//
-// Constant-false is represented by literal 0, constant-true by literal 1.
-
 struct AigNode {
   uint32_t id = 0;
-  uint32_t fanin0 = 0;  // literal: LSB is complement flag
-  uint32_t fanin1 = 0;  // literal: LSB is complement flag
+  uint32_t fanin0 = 0;
+  uint32_t fanin1 = 0;
 };
 
-// --- Literal helpers ---
-
-/// Construct a literal from a node id and complement flag.
 inline uint32_t AigLit(uint32_t id, bool compl_flag) {
   return (id << 1) | static_cast<uint32_t>(compl_flag);
 }
 
-/// Extract the node id from a literal.
 inline uint32_t AigVar(uint32_t lit) { return lit >> 1; }
 
-/// Return true if the literal carries a complement.
 inline bool AigIsCompl(uint32_t lit) { return (lit & 1u) != 0; }
-
-// --- AIG graph container ---
 
 class AigGraph {
  public:
@@ -43,51 +27,37 @@ class AigGraph {
 
   AigGraph();
 
-  /// Create a new primary input. Returns its literal.
   uint32_t AddInput();
 
-  /// Create a structurally-hashed AND node. Returns its literal.
   uint32_t AddAnd(uint32_t lit0, uint32_t lit1);
 
-  /// Negate a literal (flip complement bit).
   uint32_t AddNot(uint32_t lit) const;
 
-  /// OR via De Morgan: a | b = ~(~a & ~b).
   uint32_t AddOr(uint32_t a, uint32_t b);
 
-  /// XOR: a ^ b = (a & ~b) | (~a & b).
   uint32_t AddXor(uint32_t a, uint32_t b);
 
-  /// MUX: sel ? a : b = (sel & a) | (~sel & b).
   uint32_t AddMux(uint32_t sel, uint32_t a, uint32_t b);
 
-  /// Register a primary output literal.
   void AddOutput(uint32_t lit);
 
-  /// Register a latch: next-state literal feeds back as a new input.
-  /// Returns the current-state literal (a primary input).
   uint32_t AddLatch(uint32_t next_state);
 
-  /// Total number of AIG nodes (including constant node).
   size_t NodeCount() const;
 
-  // Public data — kept accessible for pass algorithms.
   std::vector<AigNode> nodes;
   std::vector<uint32_t> inputs;
   std::vector<uint32_t> outputs;
 
-  /// Latches: each entry is {current_state_input_id, next_state_literal}.
   std::vector<std::pair<uint32_t, uint32_t>> latches;
 
  private:
-  /// Pack two literals into a single 64-bit key for structural hashing.
+
   static uint64_t HashKey(uint32_t lit0, uint32_t lit1);
 
-  /// Allocate a fresh node and return its id.
   uint32_t AllocNode();
 
-  // Structural hash: maps (fanin0, fanin1) -> node id for dedup.
   std::unordered_map<uint64_t, uint32_t> strash_;
 };
 
-}  // namespace delta
+}

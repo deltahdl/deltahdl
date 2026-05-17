@@ -173,4 +173,4 @@ TEST(CaseViolationMultiProcessSim, MixedQualifiersBothViolate) {
   EXPECT_GE(f.diag.WarningCount(), 2u);
 }
 
-}  // namespace
+}

@@ -229,4 +229,4 @@ TEST(AggregateExpr, NonEquivalentTypeComparisonInContAssign) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

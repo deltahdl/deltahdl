@@ -43,4 +43,4 @@ TEST(NamedPortLexer, MultipleNamedPortsTokenSequence) {
   EXPECT_EQ(tokens[10].text, "b");
 }
 
-}  // namespace
+}

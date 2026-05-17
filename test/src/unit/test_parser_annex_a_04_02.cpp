@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// -- generate_region --
-
 TEST(GenerateInstantiationGrammar, GenerateRegionBasic) {
   auto r = Parse(
       "module m;\n"
@@ -186,8 +184,6 @@ TEST(GenerateInstantiationGrammar, IntegerTypesInGenerateBlock) {
               "  endgenerate\n"
               "endmodule\n"));
 }
-
-// -- loop_generate_construct --
 
 TEST(GenerateInstantiationGrammar, LoopGenerateBasic) {
   auto r = Parse(
@@ -405,8 +401,6 @@ TEST(GenerateConstructParsing, MultipleGenerateConstructs) {
   EXPECT_EQ(mod->items[2]->kind, ModuleItemKind::kGenerateCase);
 }
 
-// -- genvar_initialization --
-
 TEST(GenerateInstantiationGrammar, GenvarInitWithGenvarKeyword) {
   auto r = Parse(
       "module m;\n"
@@ -465,8 +459,6 @@ TEST(GenerateConstructParsing, InlineGenvarInForInitBody) {
   ASSERT_EQ(gen->gen_body.size(), 1);
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
 }
-
-// -- genvar_iteration --
 
 TEST(GenerateInstantiationGrammar, GenvarIterationCompoundAssign) {
   auto r = Parse(
@@ -591,8 +583,6 @@ TEST(GenerateConstructParsing, GenerateForPreDecrement) {
   EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
   ASSERT_NE(gen->gen_step, nullptr);
 }
-
-// -- conditional_generate_construct (if_generate_construct) --
 
 TEST(GenerateInstantiationGrammar, IfGenerateBasic) {
   auto r = Parse(
@@ -897,8 +887,6 @@ TEST(GenerateInstantiationGrammar, IfGenerateNamedBlockWithWire) {
               "endmodule\n"));
 }
 
-// -- conditional_generate_construct (case_generate_construct) --
-
 TEST(GenerateInstantiationGrammar, CaseGenerateBasic) {
   auto r = Parse(
       "module m;\n"
@@ -1117,8 +1105,6 @@ TEST(GenerateConstructParsing, GenerateCaseItemDefaults) {
   }
 }
 
-// -- generate_block --
-
 TEST(GenerateInstantiationGrammar, GenerateBlockLabeled) {
   auto r = Parse(
       "module m;\n"
@@ -1267,8 +1253,6 @@ TEST(GenerateInstantiationGrammar, ForGenerateNamedBlockWithWire) {
               "endmodule\n"));
 }
 
-// -- generate_item --
-
 TEST(GenerateInstantiationGrammar, GenerateItemAlwaysBlock) {
   auto r = Parse(
       "module m;\n"
@@ -1388,8 +1372,6 @@ TEST(GenerateInstantiationGrammar, GenerateForInstantiation) {
   EXPECT_EQ(mod->items[0]->gen_body[0]->kind, ModuleItemKind::kModuleInst);
 }
 
-// -- genvar_iteration: pre-increment / pre-decrement --
-
 TEST(GenerateInstantiationGrammar, GenvarIterationPreIncrement) {
   auto r = Parse(
       "module m;\n"
@@ -1417,8 +1399,6 @@ TEST(GenerateInstantiationGrammar, GenvarIterationPreDecrement) {
   EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
   ASSERT_NE(gen->gen_step, nullptr);
 }
-
-// -- genvar_iteration: compound assignment operators --
 
 TEST(GenerateInstantiationGrammar, GenvarIterationSubtractAssign) {
   auto r = Parse(
@@ -1552,8 +1532,6 @@ TEST(GenerateInstantiationGrammar, GenvarIterationArithRightShiftAssign) {
   ASSERT_NE(r.cu->modules[0]->items[0]->gen_step, nullptr);
 }
 
-// -- genvar_initialization: constant_expression --
-
 TEST(GenerateInstantiationGrammar, GenvarInitNonZeroStart) {
   auto r = Parse(
       "module m;\n"
@@ -1578,8 +1556,6 @@ TEST(GenerateInstantiationGrammar, GenvarInitConstantExpression) {
   ASSERT_NE(r.cu->modules[0]->items[0]->gen_init, nullptr);
 }
 
-// -- case_generate_item: default without colon --
-
 TEST(GenerateInstantiationGrammar, CaseGenerateDefaultNoColon) {
   auto r = Parse(
       "module m;\n"
@@ -1594,8 +1570,6 @@ TEST(GenerateInstantiationGrammar, CaseGenerateDefaultNoColon) {
   ASSERT_EQ(gen->gen_case_items.size(), 2u);
   EXPECT_TRUE(gen->gen_case_items[1].is_default);
 }
-
-// -- generate_block: empty begin/end --
 
 TEST(GenerateInstantiationGrammar, GenerateBlockEmptyBeginEnd) {
   auto r = Parse(
@@ -1640,8 +1614,6 @@ TEST(GenerateInstantiationGrammar, CaseGenerateEmptyItem) {
   EXPECT_TRUE(gen->gen_case_items[1].body.empty());
 }
 
-// -- generate_block: label before begin only (no end label) --
-
 TEST(GenerateInstantiationGrammar, GenerateBlockLabelBeginOnly) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -1651,8 +1623,6 @@ TEST(GenerateInstantiationGrammar, GenerateBlockLabelBeginOnly) {
               "endmodule\n"));
 }
 
-// -- generate_block: label after begin (not before) --
-
 TEST(GenerateInstantiationGrammar, GenerateBlockLabelAfterBegin) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -1661,8 +1631,6 @@ TEST(GenerateInstantiationGrammar, GenerateBlockLabelAfterBegin) {
               "  end : blk\n"
               "endmodule\n"));
 }
-
-// -- generate_item: nested generate_region inside generate --
 
 TEST(GenerateInstantiationGrammar, NestedGenerateRegion) {
   auto r = Parse(
@@ -1676,8 +1644,6 @@ TEST(GenerateInstantiationGrammar, NestedGenerateRegion) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_GE(r.cu->modules[0]->items.size(), 1u);
 }
-
-// -- generate_item: in checker context --
 
 TEST(GenerateInstantiationGrammar, GenerateIfInChecker) {
   auto r = Parse(
@@ -1701,8 +1667,6 @@ TEST(GenerateInstantiationGrammar, GenerateForInChecker) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// -- generate_item: parameter declaration in generate block --
-
 TEST(GenerateInstantiationGrammar, GenerateItemWithParamDecl) {
   auto r = Parse(
       "module m;\n"
@@ -1718,8 +1682,6 @@ TEST(GenerateInstantiationGrammar, GenerateItemWithParamDecl) {
   EXPECT_GE(gen->gen_body.size(), 2u);
 }
 
-// -- generate_item: initial block in generate block --
-
 TEST(GenerateInstantiationGrammar, GenerateItemWithInitialBlock) {
   auto r = Parse(
       "module m;\n"
@@ -1734,8 +1696,6 @@ TEST(GenerateInstantiationGrammar, GenerateItemWithInitialBlock) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
-// -- generate_item: function declaration in generate block --
-
 TEST(GenerateInstantiationGrammar, GenerateItemWithFunction) {
   auto r = Parse(
       "module m;\n"
@@ -1748,8 +1708,6 @@ TEST(GenerateInstantiationGrammar, GenerateItemWithFunction) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-// -- case_generate_construct: single case item (minimum) --
 
 TEST(GenerateInstantiationGrammar, CaseGenerateSingleItem) {
   auto r = Parse(
@@ -1765,8 +1723,6 @@ TEST(GenerateInstantiationGrammar, CaseGenerateSingleItem) {
   ASSERT_EQ(gen->gen_case_items.size(), 1u);
 }
 
-// -- case_generate_construct: only default item --
-
 TEST(GenerateInstantiationGrammar, CaseGenerateOnlyDefault) {
   auto r = Parse(
       "module m;\n"
@@ -1780,8 +1736,6 @@ TEST(GenerateInstantiationGrammar, CaseGenerateOnlyDefault) {
   ASSERT_EQ(gen->gen_case_items.size(), 1u);
   EXPECT_TRUE(gen->gen_case_items[0].is_default);
 }
-
-// -- case_generate_construct: nested case inside case --
 
 TEST(GenerateInstantiationGrammar, CaseGenerateNested) {
   auto r = Parse(
@@ -1801,8 +1755,6 @@ TEST(GenerateInstantiationGrammar, CaseGenerateNested) {
   ASSERT_GE(gen->gen_case_items.size(), 2u);
 }
 
-// -- if_generate inside case_generate --
-
 TEST(GenerateInstantiationGrammar, IfGenerateInsideCaseGenerate) {
   auto r = Parse(
       "module m;\n"
@@ -1818,8 +1770,6 @@ TEST(GenerateInstantiationGrammar, IfGenerateInsideCaseGenerate) {
   ASSERT_GE(gen->gen_case_items[0].body.size(), 1u);
   EXPECT_EQ(gen->gen_case_items[0].body[0]->kind, ModuleItemKind::kGenerateIf);
 }
-
-// -- deeply nested generate constructs --
 
 TEST(GenerateInstantiationGrammar, DeeplyNestedGenerateFor) {
   auto r = Parse(
@@ -1845,4 +1795,4 @@ TEST(GenerateInstantiationGrammar, DeeplyNestedGenerateFor) {
   ASSERT_EQ(l3->gen_body.size(), 1u);
 }
 
-}  // namespace
+}

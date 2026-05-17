@@ -172,4 +172,4 @@ TEST(ObjectPropertySim, NoRestrictionOnPropertyDataType) {
       "endmodule\n", "result"), 5u);
 }
 
-}  // namespace
+}

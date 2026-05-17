@@ -58,4 +58,4 @@ TEST(OperatorAndExpressionParsing, StringLiteralWithRelationalOperator) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

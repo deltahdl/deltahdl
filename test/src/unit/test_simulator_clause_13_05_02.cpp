@@ -538,4 +538,4 @@ TEST(QueueRef, QueueRefOutOfBoundsFallsBackToValue) {
   EXPECT_EQ(q->elements[2].ToUint64(), 30u);
 }
 
-}  // namespace
+}

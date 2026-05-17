@@ -62,4 +62,4 @@ TEST(InterfaceModportInstantiation, InstancePortNamedModportSelector) {
   EXPECT_EQ(conn->rhs->text, "initiator");
 }
 
-}  // namespace
+}

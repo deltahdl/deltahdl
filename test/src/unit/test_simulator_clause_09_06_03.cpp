@@ -27,8 +27,6 @@ TEST(StmtExec, DisableForkReturnsKDone) {
   EXPECT_EQ(result, StmtResult::kDone);
 }
 
-// --- R1: disable fork terminates all descendant subprocesses ---
-
 TEST(DisableForkExecution, DisableForkTerminatesJoinNoneChild) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -65,8 +63,6 @@ TEST(DisableForkExecution, DisableForkTerminatesMultipleChildren) {
   LowerRunAndCheck(f, design, {{"a", 0u}, {"b", 0u}});
 }
 
-// --- R1: terminates descendants, not just immediate children ---
-
 TEST(DisableForkExecution, DisableForkTerminatesDescendantSubprocesses) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -92,8 +88,6 @@ TEST(DisableForkExecution, DisableForkTerminatesDescendantSubprocesses) {
   LowerRunAndCheck(f, design, {{"x", 0u}});
 }
 
-// --- R2: disable fork after join_any kills remaining children ---
-
 TEST(DisableForkExecution, DisableForkAfterJoinAnyKillsRemaining) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -110,9 +104,6 @@ TEST(DisableForkExecution, DisableForkAfterJoinAnyKillsRemaining) {
       f);
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 0u}});
 }
-
-// --- R3: disable fork considers dynamic parent-child relationships ---
-// --- R4: disable fork ends only processes spawned by the calling thread ---
 
 TEST(DisableForkExecution, DisableForkOnlyAffectsCallingThread) {
   SimFixture f;
@@ -136,8 +127,6 @@ TEST(DisableForkExecution, DisableForkOnlyAffectsCallingThread) {
   LowerRunAndCheck(f, design, {{"a", 0u}, {"b", 2u}});
 }
 
-// --- Edge case: disable fork with no children is a no-op ---
-
 TEST(DisableForkExecution, DisableForkWithNoChildrenIsNoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -151,8 +140,6 @@ TEST(DisableForkExecution, DisableForkWithNoChildrenIsNoop) {
       f);
   LowerRunAndCheck(f, design, {{"x", 1u}});
 }
-
-// --- Edge case: execution continues after disable fork ---
 
 TEST(DisableForkExecution, ExecutionContinuesAfterDisableFork) {
   SimFixture f;
@@ -171,4 +158,4 @@ TEST(DisableForkExecution, ExecutionContinuesAfterDisableFork) {
   LowerRunAndCheck(f, design, {{"x", 0u}, {"y", 1u}});
 }
 
-}  // namespace
+}

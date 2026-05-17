@@ -30,4 +30,4 @@ TEST(StringMethods, ItoaOverwritesExisting) {
   EXPECT_EQ(VecToString(var->value), "456");
 }
 
-}  // namespace
+}

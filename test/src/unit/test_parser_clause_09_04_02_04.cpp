@@ -78,4 +78,4 @@ TEST(SequenceEventParsing, SequenceEventOrRegularEvent) {
   EXPECT_EQ(stmt->events[1].edge, Edge::kPosedge);
 }
 
-}  // namespace
+}

@@ -5,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1: An interface port instance shall always be connected to an interface
-//     instance or a higher level interface port ---
-
 TEST(InterfacePortConnectionRulesElaboration,
      GenericInterfacePortConnectedToInterfaceInstance) {
   EXPECT_TRUE(
@@ -86,8 +83,6 @@ TEST(InterfacePortConnectionRulesElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-// --- R2: An interface port cannot be left unconnected ---
-
 TEST(InterfacePortConnectionRulesElaboration,
      UnconnectedInterfacePortEmptyListErrors) {
   ElabFixture f;
@@ -155,9 +150,6 @@ TEST(InterfacePortConnectionRulesElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-// --- R3: If a port declaration has a generic interface type, then it can be
-//     connected to an interface instance of any type ---
-
 TEST(InterfacePortConnectionRulesElaboration,
      GenericInterfacePortAcceptsAnyInterfaceTypeA) {
   EXPECT_TRUE(
@@ -200,9 +192,6 @@ TEST(InterfacePortConnectionRulesElaboration,
              "  child u(.port_a(inst));\n"
              "endmodule\n"));
 }
-
-// --- R4: If a port declaration has a named interface type, then it shall be
-//     connected to an interface instance of the identical type ---
 
 TEST(InterfacePortConnectionRulesElaboration,
      NamedInterfacePortConnectedToSameType) {
@@ -275,8 +264,6 @@ TEST(InterfacePortConnectionRulesElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-// --- Edge cases ---
-
 TEST(InterfacePortConnectionRulesElaboration,
      MultipleInterfacePortsAllConnected) {
   EXPECT_TRUE(
@@ -344,4 +331,4 @@ TEST(InterfacePortConnectionRulesElaboration,
              "endmodule\n"));
 }
 
-}  // namespace
+}

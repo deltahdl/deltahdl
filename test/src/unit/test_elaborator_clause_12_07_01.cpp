@@ -136,4 +136,4 @@ TEST(LoopStatementElaboration, ForTypedInitNotVisibleAfterLoop) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

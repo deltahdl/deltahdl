@@ -16,7 +16,6 @@ TEST(StringIndexAssocArrayElaboration, AssocDimElaboratesStringIndex) {
   EXPECT_TRUE(mod->variables[0].is_string_index);
 }
 
-// §7.8.2: String-indexed array is not wildcard.
 TEST(StringIndexAssocArrayElaboration, NotWildcardIndex) {
   ElabFixture f;
   auto* design = Elaborate("module m; int aa [string]; endmodule\n", f);
@@ -25,7 +24,6 @@ TEST(StringIndexAssocArrayElaboration, NotWildcardIndex) {
   EXPECT_FALSE(v.is_wildcard_index);
 }
 
-// §7.8.2: Vector element type with string index.
 TEST(StringIndexAssocArrayElaboration, VectorElementType) {
   ElabFixture f;
   auto* design =
@@ -37,4 +35,4 @@ TEST(StringIndexAssocArrayElaboration, VectorElementType) {
   EXPECT_EQ(v.width, 8u);
 }
 
-}  // namespace
+}

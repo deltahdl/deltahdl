@@ -3,8 +3,6 @@
 
 namespace {
 
-// Synthesis accepts upward reference to a parameter in the enclosing module.
-
 TEST(UpwardNameReferenceSynthesis, UpwardParameterReferenceSynthesizes) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -20,8 +18,6 @@ TEST(UpwardNameReferenceSynthesis, UpwardParameterReferenceSynthesizes) {
   auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
 }
-
-// Synthesis accepts upward reference to a net in the enclosing module.
 
 TEST(UpwardNameReferenceSynthesis, UpwardNetReferenceSynthesizes) {
   SynthFixture f;
@@ -40,4 +36,4 @@ TEST(UpwardNameReferenceSynthesis, UpwardNetReferenceSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

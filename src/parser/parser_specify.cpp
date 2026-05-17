@@ -2,7 +2,6 @@
 
 namespace delta {
 
-// Determine if a system identifier is a timing check keyword (§31.2).
 bool Parser::IsTimingCheckName(std::string_view name) {
   return name == "$setup" || name == "$hold" || name == "$setuphold" ||
          name == "$recovery" || name == "$removal" || name == "$recrem" ||
@@ -10,7 +9,6 @@ bool Parser::IsTimingCheckName(std::string_view name) {
          name == "$nochange" || name == "$timeskew" || name == "$fullskew";
 }
 
-// Parse: specify ... endspecify
 ModuleItem* Parser::ParseSpecifyBlock() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kSpecifyBlock;
@@ -24,14 +22,12 @@ ModuleItem* Parser::ParseSpecifyBlock() {
   return item;
 }
 
-// Parse: specparam [range] name = expr {, name = expr} ;
 ModuleItem* Parser::ParseSpecparamDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kSpecparam;
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwSpecparam);
 
-  // Optional packed dimension [msb:lsb]
   if (Check(TokenKind::kLBracket)) {
     Consume();
     item->data_type.packed_dim_left = ParseExpr();
@@ -42,7 +38,7 @@ ModuleItem* Parser::ParseSpecparamDecl() {
 
   item->name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kEq);
-  // pulse_control_specparam: PATHPULSE$ = ( reject [, error] ) (A.2.4)
+
   if (item->name.starts_with("PATHPULSE$")) {
     Expect(TokenKind::kLParen);
     item->init_expr = ParseMinTypMaxExpr();
@@ -51,7 +47,7 @@ ModuleItem* Parser::ParseSpecparamDecl() {
   } else {
     item->init_expr = ParseMinTypMaxExpr();
   }
-  // list_of_specparam_assignments: skip additional assignments (A.2.1.1)
+
   while (Match(TokenKind::kComma)) {
     auto name = Expect(TokenKind::kIdentifier).text;
     Expect(TokenKind::kEq);
@@ -68,27 +64,25 @@ ModuleItem* Parser::ParseSpecparamDecl() {
   return item;
 }
 
-// Dispatch a single specify block item.
 void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
-  // pulsestyle_onevent / pulsestyle_ondetect
+
   if (Check(TokenKind::kKwPulsestyleOnevent) ||
       Check(TokenKind::kKwPulsestyleOndetect)) {
     items.push_back(ParsePulsestyleDecl());
     return;
   }
-  // showcancelled / noshowcancelled
+
   if (Check(TokenKind::kKwShowcancelled) ||
       Check(TokenKind::kKwNoshowcancelled)) {
     items.push_back(ParseShowcancelledDecl());
     return;
   }
-  // specparam inside specify block
+
   if (Check(TokenKind::kKwSpecparam)) {
     items.push_back(ParseSpecparamInSpecify());
     return;
   }
-  // Timing checks: $setup, $hold, etc. §31.2 bars any other system task from a
-  // specify block — emit a targeted diagnostic before resyncing below.
+
   if (Check(TokenKind::kSystemIdentifier)) {
     auto name = CurrentToken().text;
     if (IsTimingCheckName(name)) {
@@ -104,12 +98,12 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
     if (Check(TokenKind::kSemicolon)) Consume();
     return;
   }
-  // ifnone path
+
   if (Check(TokenKind::kKwIfnone)) {
     items.push_back(ParseIfnonePathDecl());
     return;
   }
-  // Conditional path: if (...) (path)
+
   if (Check(TokenKind::kKwIf)) {
     Consume();
     Expect(TokenKind::kLParen);
@@ -118,13 +112,12 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
     items.push_back(ParseConditionalPathDecl(cond));
     return;
   }
-  // Simple path declaration: ( ... => ... ) = delay ;
+
   if (Check(TokenKind::kLParen)) {
     items.push_back(ParseSpecifyPathDecl());
     return;
   }
-  // No specify_item alternative matched — flag once and resync to the next
-  // statement boundary (or an end-keyword) to keep error output compact.
+
   diag_.Error(CurrentLoc(), "unexpected token in specify block");
   while (!AtEnd() && !Check(TokenKind::kSemicolon) &&
          !Check(TokenKind::kKwEndspecify) &&
@@ -134,33 +127,21 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
   if (Check(TokenKind::kSemicolon)) Consume();
 }
 
-// A.7.5.3: Parse a single edge_descriptor inside edge [ ... ].
-// edge_descriptor ::= 01 | 10 | z_or_x zero_or_one | zero_or_one z_or_x
 static bool IsZorX(char c) {
   return c == 'x' || c == 'X' || c == 'z' || c == 'Z';
 }
 
 static bool IsZeroOrOne(char c) { return c == '0' || c == '1'; }
 
-// A.7.5.3: Parse the bracket list in edge [ edge_descriptor {, ...} ].
-// §31.5: the list is bounded by "from one to six pairs of edge transitions"
-// — the grammar rules out an empty bracket list by requiring at least one
-// edge_descriptor, and six is the number of distinct non-identity pairs over
-// {0, 1, x} (with z folded into x), so a longer list must contain a duplicate
-// and is rejected.
 void Parser::ParseEdgeDescriptorList(
     std::vector<std::pair<char, char>>& descriptors) {
   auto list_loc = CurrentLoc();
   do {
-    // Reaching `]` here means the list is empty or has a trailing comma; let
-    // the empty-list diagnostic and the closing Expect handle it.
+
     if (Check(TokenKind::kRBracket)) break;
     auto text = CurrentToken().text;
     auto tok_loc = CurrentLoc();
-    // Single 2-char token: "01"/"10" (IntLiteral) or "x0"/"z1" (Identifier).
-    // The `zero_or_one zero_or_one` alternative is restricted to the
-    // literals `01` and `10` — the two digits must differ — so `00` and
-    // `11` fall through to the diagnostic below.
+
     if ((Check(TokenKind::kIntLiteral) || Check(TokenKind::kIdentifier)) &&
         text.size() == 2 &&
         ((IsZorX(text[0]) && IsZeroOrOne(text[1])) ||
@@ -170,8 +151,7 @@ void Parser::ParseEdgeDescriptorList(
       Consume();
     } else if (Check(TokenKind::kIntLiteral) && text.size() == 1 &&
                IsZeroOrOne(text[0])) {
-      // Two-token form: "0"+"x", "1"+"z", etc. — the lexer splits these
-      // when a digit is followed by an identifier letter.
+
       char first = text[0];
       Consume();
       auto next_text = CurrentToken().text;
@@ -198,7 +178,6 @@ void Parser::ParseEdgeDescriptorList(
   Expect(TokenKind::kRBracket);
 }
 
-// Parse edge qualifier: posedge | negedge | edge [ [...] ] | (nothing)
 SpecifyEdge Parser::ParseSpecifyEdge(
     std::vector<std::pair<char, char>>* edge_descriptors) {
   if (Check(TokenKind::kKwPosedge)) {
@@ -219,18 +198,15 @@ SpecifyEdge Parser::ParseSpecifyEdge(
   return SpecifyEdge::kNone;
 }
 
-// Parse a single specify terminal: identifier [ . identifier ] [ [ range ] ]
 SpecifyTerminal Parser::ParseSpecifyTerminal() {
   SpecifyTerminal term;
   term.name = Expect(TokenKind::kIdentifier).text;
 
-  // Check for dotted interface.port form
   if (Match(TokenKind::kDot)) {
     term.interface_name = term.name;
     term.name = Expect(TokenKind::kIdentifier).text;
   }
 
-  // Optional [ constant_range_expression ]
   if (Match(TokenKind::kLBracket)) {
     term.range_left = ParseExpr();
     if (Match(TokenKind::kColon)) {
@@ -251,27 +227,22 @@ SpecifyTerminal Parser::ParseSpecifyTerminal() {
   return term;
 }
 
-// Parse port list inside path: terminal {, terminal} or {terminal {, terminal}}
-// A.8.1: module_path_concatenation ::= { port {, port} }
-// A.8.1: module_path_multiple_concatenation ::= { const_expr { port {, port} } }
 void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
   if (Match(TokenKind::kLBrace)) {
-    // Disambiguate: if next token is not an identifier, it must be a
-    // replication count (e.g. {3{a, b}}).  If it IS an identifier, peek
-    // ahead: identifier followed by '{' is also replication ({N{a, b}}).
+
     bool is_replication = false;
     if (!Check(TokenKind::kIdentifier)) {
       is_replication = true;
     } else {
       auto saved = lexer_.SavePos();
-      Consume();  // identifier
+      Consume();
       is_replication = Check(TokenKind::kLBrace);
       lexer_.RestorePos(saved);
     }
 
     if (is_replication) {
-      // module_path_multiple_concatenation: skip count, parse inner concat.
-      ParseExpr();  // constant_expression (count)
+
+      ParseExpr();
       Expect(TokenKind::kLBrace);
       ports.push_back(ParseSpecifyTerminal());
       while (Match(TokenKind::kComma)) {
@@ -282,7 +253,6 @@ void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
       return;
     }
 
-    // module_path_concatenation
     ports.push_back(ParseSpecifyTerminal());
     while (Match(TokenKind::kComma)) {
       ports.push_back(ParseSpecifyTerminal());
@@ -296,8 +266,6 @@ void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
   }
 }
 
-// Parse delay values: mintypmax_expr or (mintypmax_expr, ...) after '='
-// A.7.4: path_delay_value uses constant_mintypmax_expression
 void Parser::ParsePathDelays(std::vector<Expr*>& delays) {
   auto loc = CurrentLoc();
   if (Match(TokenKind::kLParen)) {
@@ -309,14 +277,13 @@ void Parser::ParsePathDelays(std::vector<Expr*>& delays) {
   } else {
     delays.push_back(ParseMinTypMaxExpr());
   }
-  // A.7.4: list_of_path_delay_expressions allows exactly 1, 2, 3, 6, or 12
+
   auto n = delays.size();
   if (n != 1 && n != 2 && n != 3 && n != 6 && n != 12) {
     diag_.Error(loc, "path delay must have 1, 2, 3, 6, or 12 values");
   }
 }
 
-// Parse optional polarity operator: + | -
 SpecifyPolarity Parser::ParseSpecifyPolarity() {
   if (Check(TokenKind::kPlus)) {
     Consume();
@@ -329,9 +296,6 @@ SpecifyPolarity Parser::ParseSpecifyPolarity() {
   return SpecifyPolarity::kNone;
 }
 
-// Parse: ( [edge] src_ports [polarity] =>|*> dst_ports ) = delay ;
-// Also handles edge-sensitive form: ( [edge] src [polarity] => ( dst [polarity]
-// : data_source ) )
 SpecifyItem* Parser::ParseSpecifyPathDecl() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kPathDecl;
@@ -341,12 +305,8 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
   item->path.edge = ParseSpecifyEdge();
   ParsePathPorts(item->path.src_ports);
 
-  // Optional polarity operator before => or *>
   item->path.polarity = ParseSpecifyPolarity();
 
-  // §30.4.7.2 / §30.4.7.3: the LRM writes `+=>` and `-=>` with no whitespace,
-  // which the lexer's max-munch rule tokenizes as kPlusEq+kGt and kMinusEq+kGt.
-  // Recognize those sequences as a polarity operator followed by `=>`.
   bool polarity_eq_gt_handled = false;
   if (item->path.polarity == SpecifyPolarity::kNone &&
       (Check(TokenKind::kPlusEq) || Check(TokenKind::kMinusEq))) {
@@ -363,7 +323,6 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
     }
   }
 
-  // => (parallel) or *> (full)
   if (!polarity_eq_gt_handled) {
     if (Match(TokenKind::kEqGt)) {
       item->path.path_kind = SpecifyPathKind::kParallel;
@@ -374,7 +333,6 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
     }
   }
 
-  // Check for edge-sensitive data_source form: ( dst [polarity] : data_source )
   if (Match(TokenKind::kLParen)) {
     ParsePathPorts(item->path.dst_ports);
     item->path.dst_polarity = ParseSpecifyPolarity();
@@ -390,9 +348,6 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
   ParsePathDelays(item->path.delays);
   Expect(TokenKind::kSemicolon);
 
-  // §30.4.2: parallel_path_description binds a single input terminal to a
-  // single output terminal. Only enforced for non-edge simple paths; the
-  // edge-sensitive variant is governed by §30.4.3.
   if (item->path.path_kind == SpecifyPathKind::kParallel &&
       item->path.edge == SpecifyEdge::kNone &&
       item->path.data_source == nullptr) {
@@ -406,22 +361,18 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
   return item;
 }
 
-// Parse: if (cond) ( path ) = delay ;
 SpecifyItem* Parser::ParseConditionalPathDecl(Expr* cond) {
   auto* item = ParseSpecifyPathDecl();
   item->path.condition = cond;
   return item;
 }
 
-// Parse: ifnone ( path ) = delay ;
 SpecifyItem* Parser::ParseIfnonePathDecl() {
   auto loc = CurrentLoc();
   Expect(TokenKind::kKwIfnone);
   auto* item = ParseSpecifyPathDecl();
   item->path.is_ifnone = true;
-  // §30.4.4.4: ifnone only admits a simple_path_declaration; edge-sensitive
-  // and data-source forms are disallowed even when the companion state-
-  // dependent path uses them.
+
   if (item->path.edge != SpecifyEdge::kNone ||
       item->path.data_source != nullptr) {
     diag_.Error(loc, "ifnone requires a simple path declaration");
@@ -429,7 +380,6 @@ SpecifyItem* Parser::ParseIfnonePathDecl() {
   return item;
 }
 
-// Map system identifier name to TimingCheckKind.
 TimingCheckKind Parser::ParseTimingCheckKind(std::string_view name) {
   if (name == "$setup") return TimingCheckKind::kSetup;
   if (name == "$hold") return TimingCheckKind::kHold;
@@ -446,7 +396,6 @@ TimingCheckKind Parser::ParseTimingCheckKind(std::string_view name) {
   return TimingCheckKind::kSetup;
 }
 
-// Checks that require a data signal (two reference signals).
 static bool NeedsDataSignal(TimingCheckKind kind) {
   switch (kind) {
     case TimingCheckKind::kSetup:
@@ -467,23 +416,18 @@ static bool NeedsDataSignal(TimingCheckKind kind) {
   return false;
 }
 
-// Peek at the token after the current one and check if it's ',' or ')'.
 bool Parser::CheckNextIsCommaOrRParen() {
   auto saved = lexer_.SavePos();
-  Consume();  // Skip current token.
+  Consume();
   bool result = Check(TokenKind::kComma) || Check(TokenKind::kRParen);
   lexer_.RestorePos(saved);
   return result;
 }
 
-// Parse additional limits and optional notifier after the first timing limit.
 void Parser::ParseTimingCheckTrailingArgs(TimingCheckDecl& tc) {
   while (Match(TokenKind::kComma)) {
     if (Check(TokenKind::kRParen)) break;
-    // §31.4.4 Syntax 31-12: `$width(ref, limit, threshold [, [notifier]])` —
-    // the positional threshold slot is a constant_expression, which may be an
-    // identifier referencing a specparam. Don't let the generic
-    // identifier-before-`)` notifier heuristic swallow that slot.
+
     bool width_needs_threshold =
         tc.check_kind == TimingCheckKind::kWidth && tc.limits.size() < 2;
     if (!width_needs_threshold && Check(TokenKind::kIdentifier) &&
@@ -496,8 +440,6 @@ void Parser::ParseTimingCheckTrailingArgs(TimingCheckDecl& tc) {
   }
 }
 
-// §31.8: $timeskew/$fullskew extended args: event_based_flag,
-// remain_active_flag.
 void Parser::ParseTimeskewExtendedArgs(TimingCheckDecl& tc) {
   if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
   if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
@@ -509,8 +451,6 @@ void Parser::ParseTimeskewExtendedArgs(TimingCheckDecl& tc) {
   }
 }
 
-// A.7.5.2: Parse optional delayed_reference/delayed_data identifier with
-// optional [constant_mintypmax_expression].
 void Parser::ParseOptionalDelayedRef(std::string_view& name, Expr*& expr) {
   if (!Check(TokenKind::kIdentifier)) return;
   name = Consume().text;
@@ -520,8 +460,6 @@ void Parser::ParseOptionalDelayedRef(std::string_view& name, Expr*& expr) {
   }
 }
 
-// §31.9: $setuphold/$recrem extended args: timestamp_cond, timecheck_cond,
-// delayed_reference, delayed_data.
 void Parser::ParseSetupholdExtendedArgs(TimingCheckDecl& tc) {
   if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
   if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen)) {
@@ -537,25 +475,19 @@ void Parser::ParseSetupholdExtendedArgs(TimingCheckDecl& tc) {
   ParseOptionalDelayedRef(tc.delayed_data, tc.delayed_data_expr);
 }
 
-// Parse extended args after notifier, dispatching by check kind.
 void Parser::ParseExtendedTimingCheckArgs(TimingCheckDecl& tc) {
   if (tc.check_kind == TimingCheckKind::kTimeskew ||
       tc.check_kind == TimingCheckKind::kFullskew) {
     ParseTimeskewExtendedArgs(tc);
     return;
   }
-  // §31.4.1 Syntax 31-9: $skew takes nothing past the notifier — it has
-  // neither the $timeskew/$fullskew event/remain flags nor the
-  // $setuphold/$recrem condition and delayed-terminal arguments.
+
   if (tc.check_kind == TimingCheckKind::kSkew) {
     return;
   }
   ParseSetupholdExtendedArgs(tc);
 }
 
-// Parse: $setup(data [&&& cond], posedge clk [&&& cond], limit ...) ;
-// A.7.5.3: timing_check_event uses specify_terminal_descriptor, not bare
-// identifier.
 SpecifyItem* Parser::ParseTimingCheck() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kTimingCheck;
@@ -563,14 +495,10 @@ SpecifyItem* Parser::ParseTimingCheck() {
 
   auto name = CurrentToken().text;
   item->timing_check.check_kind = ParseTimingCheckKind(name);
-  Consume();  // system identifier
+  Consume();
 
   Expect(TokenKind::kLParen);
 
-  // First signal argument (with optional edge and §31.7 condition).
-  // A.7.5.3: timing_check_event ::=
-  //   [ timing_check_event_control ] specify_terminal_descriptor
-  //   [ &&& timing_check_condition ]
   item->timing_check.ref_edge =
       ParseSpecifyEdge(&item->timing_check.ref_edge_descriptors);
   item->timing_check.ref_terminal = ParseSpecifyTerminal();
@@ -579,7 +507,6 @@ SpecifyItem* Parser::ParseTimingCheck() {
   }
   Expect(TokenKind::kComma);
 
-  // Second signal argument (with optional edge/condition) or limit.
   bool has_data_signal = NeedsDataSignal(item->timing_check.check_kind);
   if (has_data_signal) {
     item->timing_check.data_edge =
@@ -591,60 +518,39 @@ SpecifyItem* Parser::ParseTimingCheck() {
     Expect(TokenKind::kComma);
   }
 
-  // Timing limit(s) and optional notifier / §31.9 extended args.
-  // A.7.5.2: timing_check_limit ::= expression; but start_edge_offset and
-  // end_edge_offset ($nochange) are mintypmax_expression. Using
-  // ParseMinTypMaxExpr() handles both forms uniformly.
   item->timing_check.limits.push_back(ParseMinTypMaxExpr());
   ParseTimingCheckTrailingArgs(item->timing_check);
 
-  // §31.3.3 Syntax 31-5: `$setuphold` requires two timing_check_limit args
-  // (setup_limit and hold_limit). Other check kinds police their own limit
-  // counts in their owning subclauses.
   if (item->timing_check.check_kind == TimingCheckKind::kSetuphold &&
       item->timing_check.limits.size() < 2) {
     diag_.Error(item->loc,
                 "$setuphold requires two timing_check_limit arguments");
   }
-  // §31.3.6 Syntax 31-8: `$recrem` requires two timing_check_limit args
-  // (recovery_limit and removal_limit).
+
   if (item->timing_check.check_kind == TimingCheckKind::kRecrem &&
       item->timing_check.limits.size() < 2) {
     diag_.Error(item->loc,
                 "$recrem requires two timing_check_limit arguments");
   }
-  // §31.4.3 Syntax 31-11: `$fullskew` takes two timing_check_limit args —
-  // limit 1 bounds the data-after-reference window and limit 2 bounds the
-  // reference-after-data window. Both slots are positional and mandatory.
+
   if (item->timing_check.check_kind == TimingCheckKind::kFullskew &&
       item->timing_check.limits.size() < 2) {
     diag_.Error(item->loc,
                 "$fullskew requires two timing_check_limit arguments");
   }
-  // §31.4.4 Syntax 31-12 / Table 31-10: `$width` derives its data event
-  // as the opposite edge on the reference signal, so the reference event
-  // must carry an edge specification — a missing edge is a compilation
-  // error.
+
   if (item->timing_check.check_kind == TimingCheckKind::kWidth &&
       item->timing_check.ref_edge == SpecifyEdge::kNone) {
     diag_.Error(item->loc,
                 "$width reference_event must be an edge specification");
   }
-  // §31.4.5 Syntax 31-13 / Table 31-11: `$period` derives its data event
-  // as the same edge on the reference signal, so the reference event
-  // must carry an edge specification — a missing edge is a compilation
-  // error.
+
   if (item->timing_check.check_kind == TimingCheckKind::kPeriod &&
       item->timing_check.ref_edge == SpecifyEdge::kNone) {
     diag_.Error(item->loc,
                 "$period reference_event must be an edge specification");
   }
-  // §31.4.6 Syntax 31-14 / Table 31-12: `$nochange` requires both
-  // start_edge_offset and end_edge_offset as mandatory positional
-  // arguments, and the reference_event is described as "Edge triggered"
-  // and limited to the posedge or negedge keyword — the edge-control
-  // specifiers of §31.5 (`edge` with or without a descriptor list) are
-  // explicitly disallowed.
+
   if (item->timing_check.check_kind == TimingCheckKind::kNochange) {
     if (item->timing_check.limits.size() < 2) {
       diag_.Error(item->loc,
@@ -663,8 +569,6 @@ SpecifyItem* Parser::ParseTimingCheck() {
   return item;
 }
 
-// Parse: pulsestyle_onevent signal_list ;
-// Parse: pulsestyle_ondetect signal_list ;
 SpecifyItem* Parser::ParsePulsestyleDecl() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kPulsestyle;
@@ -673,9 +577,8 @@ SpecifyItem* Parser::ParsePulsestyleDecl() {
   if (Check(TokenKind::kKwPulsestyleOndetect)) {
     item->is_ondetect = true;
   }
-  Consume();  // pulsestyle keyword
+  Consume();
 
-  // Signal list
   item->signal_list.push_back(Expect(TokenKind::kIdentifier).text);
   while (Match(TokenKind::kComma)) {
     item->signal_list.push_back(Expect(TokenKind::kIdentifier).text);
@@ -684,8 +587,6 @@ SpecifyItem* Parser::ParsePulsestyleDecl() {
   return item;
 }
 
-// Parse: showcancelled signal_list ;
-// Parse: noshowcancelled signal_list ;
 SpecifyItem* Parser::ParseShowcancelledDecl() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kShowcancelled;
@@ -694,7 +595,7 @@ SpecifyItem* Parser::ParseShowcancelledDecl() {
   if (Check(TokenKind::kKwNoshowcancelled)) {
     item->is_noshowcancelled = true;
   }
-  Consume();  // showcancelled/noshowcancelled keyword
+  Consume();
 
   item->signal_list.push_back(Expect(TokenKind::kIdentifier).text);
   while (Match(TokenKind::kComma)) {
@@ -704,14 +605,12 @@ SpecifyItem* Parser::ParseShowcancelledDecl() {
   return item;
 }
 
-// Parse: specparam name = expr ;  (inside specify block)
 SpecifyItem* Parser::ParseSpecparamInSpecify() {
   auto* first = arena_.Create<SpecifyItem>();
   first->kind = SpecifyItemKind::kSpecparam;
   first->loc = CurrentLoc();
   Expect(TokenKind::kKwSpecparam);
 
-  // Optional packed dimension [msb:lsb] (A.2.1.1)
   if (Check(TokenKind::kLBracket)) {
     Consume();
     ParseExpr();
@@ -720,14 +619,12 @@ SpecifyItem* Parser::ParseSpecparamInSpecify() {
     Expect(TokenKind::kRBracket);
   }
 
-  // list_of_specparam_assignments (A.2.4)
   first->param_name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kEq);
-  // pulse_control_specparam: PATHPULSE$ = ( reject [, error] ) (A.2.4)
+
   if (first->param_name.starts_with("PATHPULSE$")) {
     first->is_pathpulse = true;
-    // Split `PATHPULSE$input$output` into its terminals; an unadorned
-    // `PATHPULSE$` leaves both terminals empty for module-wide scope.
+
     constexpr std::string_view kPrefix = "PATHPULSE$";
     std::string_view rest = first->param_name.substr(kPrefix.size());
     if (!rest.empty()) {
@@ -765,4 +662,4 @@ SpecifyItem* Parser::ParseSpecparamInSpecify() {
   return first;
 }
 
-}  // namespace delta
+}

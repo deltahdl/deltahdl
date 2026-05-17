@@ -30,4 +30,4 @@ TEST(RandsequenceSim, IfElseProduction) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-}  // namespace
+}

@@ -84,4 +84,4 @@ TEST(NetTypes, AllBuiltinNetTypesElaborate) {
   EXPECT_EQ(n->net_type, NetType::kUwire);
 }
 
-}  // namespace
+}

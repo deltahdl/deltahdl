@@ -49,4 +49,4 @@ TEST(KeywordSynthesis, UppercaseKeywordAsSignalSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

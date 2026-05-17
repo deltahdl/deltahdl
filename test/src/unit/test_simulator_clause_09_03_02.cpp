@@ -138,4 +138,4 @@ TEST(ParallelBlockSimulation, ForkJoinNoneAllChildrenComplete) {
   EXPECT_EQ(c->value.ToUint64(), 3u);
 }
 
-}  // namespace
+}

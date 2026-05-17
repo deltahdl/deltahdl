@@ -9,7 +9,6 @@ namespace delta {
 
 namespace {
 
-// Per-memory accumulation during analysis.
 struct MemAccum {
   std::string name;
   uint32_t data_width = 0;
@@ -17,13 +16,11 @@ struct MemAccum {
   std::vector<MemoryPort> write_ports;
 };
 
-// Get the clock edge from an always_ff process sensitivity list.
 Edge GetClockEdge(const RtlirProcess& proc) {
   if (proc.sensitivity.empty()) return Edge::kNone;
   return proc.sensitivity[0].edge;
 }
 
-// Look up the width of a signal in the RTLIR module.
 uint32_t LookupWidth(const RtlirModule* mod, std::string_view name) {
   for (const auto& v : mod->variables) {
     if (v.name == name) return v.width;
@@ -37,7 +34,6 @@ uint32_t LookupWidth(const RtlirModule* mod, std::string_view name) {
   return 1;
 }
 
-// Check if a select expression represents a memory access (ident[index]).
 bool IsMemSelect(const Expr* expr) {
   if (!expr) return false;
   if (expr->kind != ExprKind::kSelect) return false;
@@ -45,7 +41,6 @@ bool IsMemSelect(const Expr* expr) {
   return expr->base->kind == ExprKind::kIdentifier && !expr->index_end;
 }
 
-// Add a port to the accumulator for a given memory name.
 void AddPort(std::unordered_map<std::string_view, MemAccum>& mems,
              const RtlirModule* mod, const Expr* select, bool is_write,
              Edge edge) {
@@ -62,7 +57,6 @@ void AddPort(std::unordered_map<std::string_view, MemAccum>& mems,
   port.is_write = is_write;
   port.clock_edge = edge;
 
-  // Infer address width from the index expression.
   if (select->index && select->index->kind == ExprKind::kIdentifier) {
     port.addr_width = LookupWidth(mod, select->index->text);
   } else {
@@ -76,7 +70,6 @@ void AddPort(std::unordered_map<std::string_view, MemAccum>& mems,
   }
 }
 
-// Scan an expression RHS for memory read accesses (mem[addr]).
 void ScanReadsInExpr(const Expr* expr,
                      std::unordered_map<std::string_view, MemAccum>& mems,
                      const RtlirModule* mod, Edge edge) {
@@ -85,7 +78,7 @@ void ScanReadsInExpr(const Expr* expr,
     AddPort(mems, mod, expr, false, edge);
     return;
   }
-  // Recurse into sub-expressions.
+
   ScanReadsInExpr(expr->lhs, mems, mod, edge);
   ScanReadsInExpr(expr->rhs, mems, mod, edge);
   ScanReadsInExpr(expr->condition, mems, mod, edge);
@@ -94,7 +87,6 @@ void ScanReadsInExpr(const Expr* expr,
   ScanReadsInExpr(expr->base, mems, mod, edge);
 }
 
-// Scan a statement for memory read and write accesses.
 void ScanStmt(const Stmt* stmt,
               std::unordered_map<std::string_view, MemAccum>& mems,
               const RtlirModule* mod, Edge edge) {
@@ -107,11 +99,11 @@ void ScanStmt(const Stmt* stmt,
       break;
     case StmtKind::kNonblockingAssign:
     case StmtKind::kBlockingAssign:
-      // Check for write: mem[addr] <= data
+
       if (IsMemSelect(stmt->lhs)) {
         AddPort(mems, mod, stmt->lhs, true, edge);
       }
-      // Check for read: data <= mem[addr]
+
       ScanReadsInExpr(stmt->rhs, mems, mod, edge);
       break;
     case StmtKind::kIf:
@@ -128,7 +120,7 @@ void ScanStmt(const Stmt* stmt,
   }
 }
 
-}  // namespace
+}
 
 std::vector<InferredMemory> InferMemories(const RtlirModule* mod) {
   if (!mod) return {};
@@ -150,7 +142,6 @@ std::vector<InferredMemory> InferMemories(const RtlirModule* mod) {
     mem.read_ports = std::move(acc.read_ports);
     mem.write_ports = std::move(acc.write_ports);
 
-    // Infer depth from address width of any port.
     uint32_t addr_w = 0;
     if (!mem.read_ports.empty()) {
       addr_w = mem.read_ports[0].addr_width;
@@ -164,4 +155,4 @@ std::vector<InferredMemory> InferMemories(const RtlirModule* mod) {
   return result;
 }
 
-}  // namespace delta
+}

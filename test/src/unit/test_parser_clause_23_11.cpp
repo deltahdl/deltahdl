@@ -37,4 +37,4 @@ TEST(BindDirective, BindDirectiveInInterface) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

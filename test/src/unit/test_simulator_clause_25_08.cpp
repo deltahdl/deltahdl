@@ -51,4 +51,4 @@ TEST(ParameterizedInterfaceSim, IndependentInstancesHoldIndependentValues) {
   LowerRunAndCheck(f, design, {{"a.data", 0xCu}, {"b.data", 0x0123u}});
 }
 
-}  // namespace
+}

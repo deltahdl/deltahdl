@@ -82,4 +82,4 @@ TEST(QueueAssignElaboration, ConcatInsertAtPosElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-}  // namespace
+}

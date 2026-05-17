@@ -170,8 +170,6 @@ TEST(SubroutineCallExprParsing, XorCallExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- product() call syntax ---
-
 TEST(SubroutineCallExprParsing, ProductCallExpression) {
   auto r = Parse(
       "module m;\n"
@@ -184,8 +182,6 @@ TEST(SubroutineCallExprParsing, ProductCallExpression) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
-
-// --- with clause for each reduction method ---
 
 TEST(AggregateTypeParsing, ProductWithClause) {
   auto r = Parse(
@@ -227,8 +223,6 @@ TEST(AggregateTypeParsing, XorWithClause) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- with clause populates with_expr on AST ---
-
 TEST(AggregateTypeParsing, SumWithClausePopulatesWithExpr) {
   auto r = Parse(
       "module t;\n"
@@ -243,8 +237,6 @@ TEST(AggregateTypeParsing, SumWithClausePopulatesWithExpr) {
   EXPECT_NE(rhs->with_expr, nullptr);
 }
 
-// --- custom iterator argument ---
-
 TEST(AggregateTypeParsing, ReductionWithCustomIterator) {
   auto r = Parse(
       "module t;\n"
@@ -255,4 +247,4 @@ TEST(AggregateTypeParsing, ReductionWithCustomIterator) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -5,11 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1: Table 23-1 determines the resulting net type when different net types
-//     connect through a module port; entries marked "warn" require a warning ---
-
-// Same-type connections: no warning
-
 TEST(DissimilarNetTypePortConnectionElaboration,
      WireToWireNoWarning) {
   ElabFixture f;
@@ -106,8 +101,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// External type used, no warning
-
 TEST(DissimilarNetTypePortConnectionElaboration,
      InternalWireExternalWandNoWarning) {
   ElabFixture f;
@@ -203,8 +196,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
-
-// Internal type used, no warning
 
 TEST(DissimilarNetTypePortConnectionElaboration,
      InternalWandExternalWireNoWarning) {
@@ -317,8 +308,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
-
-// External type used, warning required
 
 TEST(DissimilarNetTypePortConnectionElaboration,
      InternalWandExternalWorWarns) {
@@ -464,8 +453,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-// Internal type used, warning required
-
 TEST(DissimilarNetTypePortConnectionElaboration,
      InternalUwireExternalWandWarns) {
   ElabFixture f;
@@ -546,8 +533,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-// Synonymous types resolve identically (triand=wand, trior=wor, tri=wire)
-
 TEST(DissimilarNetTypePortConnectionElaboration,
      TriandBehavesAsWandInternalDominatesWireNoWarning) {
   ElabFixture f;
@@ -596,9 +581,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// --- R2: When no dominating net type exists, the external net type shall be
-//     used ---
-
 TEST(DissimilarNetTypePortConnectionElaboration,
      NeitherDominatesExternalTypeUsedWithWarning) {
   ElabFixture f;
@@ -614,8 +596,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_FALSE(f.has_errors);
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
-
-// Table 23-1 applies regardless of port direction
 
 TEST(DissimilarNetTypePortConnectionElaboration,
      InputPortDissimilarNetTypesWarns) {
@@ -666,4 +646,4 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-}  // namespace
+}

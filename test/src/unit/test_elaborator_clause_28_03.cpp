@@ -1,4 +1,4 @@
-// §28.3
+
 
 #include "fixture_elaborator.h"
 
@@ -37,4 +37,4 @@ TEST(GateElaboration, AllElaborableGatesThroughFullPipeline) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

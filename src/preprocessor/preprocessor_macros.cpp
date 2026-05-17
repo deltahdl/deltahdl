@@ -8,14 +8,6 @@ bool IsIdentChar(char c) {
   return std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '$';
 }
 
-// --- Ifdef expression evaluator (IEEE 1800-2023 §22.6) ---
-// Grammar: expr       ::= equiv_expr
-//          equiv_expr ::= impl_expr ('<->' impl_expr)*
-//          impl_expr  ::= or_expr ('->' or_expr)*
-//          or_expr    ::= and_expr ('||' and_expr)*
-//          and_expr   ::= unary ('&&' unary)*
-//          unary      ::= '!' unary | '(' expr ')' | identifier
-
 static void SkipSpaces(std::string_view& s) {
   while (!s.empty() && std::isspace(static_cast<unsigned char>(s[0]))) {
     s.remove_prefix(1);
@@ -87,7 +79,7 @@ bool Preprocessor::EvalIfdefUnary(std::string_view& expr) {
     if (!expr.empty() && expr[0] == ')') expr.remove_prefix(1);
     return result;
   }
-  // Identifier.
+
   SkipSpaces(expr);
   size_t len = 0;
   while (len < expr.size() && IsIdentChar(expr[len])) ++len;
@@ -96,13 +88,11 @@ bool Preprocessor::EvalIfdefUnary(std::string_view& expr) {
   return macros_.IsDefined(id);
 }
 
-// --- Macro expansion helpers ---
-
 std::string Preprocessor::ExpandMacro(const MacroDef& macro,
                                       std::string_view args_text) {
   if (!macro.is_function_like) return macro.body;
   auto args = SplitMacroArgs(args_text);
-  // Apply defaults for empty arguments (IEEE §22.5.1).
+
   std::vector<std::string> resolved;
   resolved.reserve(macro.params.size());
   for (size_t i = 0; i < macro.params.size(); ++i) {
@@ -134,7 +124,7 @@ std::vector<std::string> Preprocessor::ParseMacroParams(
       defaults.emplace_back(Trim(token.substr(eq + 1)));
     } else {
       params.emplace_back(token);
-      // Sentinel: \x01 means "no default specified" vs "" = explicit empty.
+
       defaults.emplace_back("\x01");
     }
     pos = comma + 1;
@@ -162,14 +152,12 @@ std::string_view Preprocessor::ExtractBalancedArgs(std::string_view text) {
   return {};
 }
 
-// Track balanced delimiters: parentheses, brackets, braces, and strings.
 struct DelimiterTracker {
   int paren_depth = 0;
   int bracket_depth = 0;
   int brace_depth = 0;
   bool in_string = false;
 
-  // Update state for a character. Returns true if inside a nested context.
   bool Update(char c, char prev) {
     if (c == '"' && prev != '\\') {
       in_string = !in_string;
@@ -196,7 +184,6 @@ struct DelimiterTracker {
   }
 };
 
-// §22.5.1: Split macro arguments respecting balanced (), [], {}, and "".
 std::vector<std::string_view> Preprocessor::SplitMacroArgs(
     std::string_view args_text) {
   std::vector<std::string_view> args;
@@ -214,7 +201,6 @@ std::vector<std::string_view> Preprocessor::SplitMacroArgs(
   return args;
 }
 
-// Replace an identifier token with its parameter argument if it matches.
 static void SubstituteToken(std::string_view token,
                             const std::vector<std::string>& params,
                             const std::vector<std::string_view>& args,
@@ -235,22 +221,22 @@ std::string Preprocessor::SubstituteParams(
   result.reserve(body.size());
   size_t i = 0;
   while (i < body.size()) {
-    // Handle `\`" — escaped quote in macro string (IEEE §22.5.1).
+
     if (i + 3 < body.size() && body[i] == '`' && body[i + 1] == '\\' &&
         body[i + 2] == '`' && body[i + 3] == '"') {
       result += "\\\"";
       i += 4;
       continue;
     }
-    // Handle `" — macro string delimiter (IEEE §22.5.1).
+
     if (i + 1 < body.size() && body[i] == '`' && body[i + 1] == '"') {
       result += '"';
       i += 2;
       continue;
     }
-    // Handle `` (double backtick) concatenation (IEEE §22.5.1).
+
     if (i + 1 < body.size() && body[i] == '`' && body[i + 1] == '`') {
-      i += 2;  // Skip both backticks — concatenate adjacent tokens.
+      i += 2;
       continue;
     }
     if (!IsIdentChar(body[i])) {
@@ -264,4 +250,4 @@ std::string Preprocessor::SubstituteParams(
   return result;
 }
 
-}  // namespace delta
+}

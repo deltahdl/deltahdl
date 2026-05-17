@@ -27,7 +27,6 @@ TEST(SyncEventSim, ClockingSignalChangeDetected) {
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
 
-  // After posedge, data was sampled.
   EXPECT_EQ(cmgr.GetSampledValue("cb", "data"), 0x00u);
 }
 
@@ -43,7 +42,6 @@ TEST(SyncEventSim, SampledValueUsedInSyncContext) {
       f, cmgr,
       {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput});
 
-  // Register edge callback to capture sampled value after block event.
   uint64_t sampled_at_event = 0;
   cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler,
                             [&cmgr, &sampled_at_event]() {
@@ -59,7 +57,7 @@ TEST(SyncEventSim, SampledValueUsedInSyncContext) {
 
 TEST(SyncEventSim, ResolveClockingMemberVariable) {
   ClockingSimFixture f;
-  // Simulate resolving "cb.data" -> underlying variable "data".
+
   auto* data = f.ctx.CreateVariable("data", 8);
   data->value = MakeLogic4VecVal(f.arena, 8, 0x55);
 
@@ -74,7 +72,6 @@ TEST(SyncEventSim, ResolveClockingMemberVariable) {
   block.signals.push_back(sig);
   cmgr.Register(block);
 
-  // ResolveClockingMember should find the underlying variable.
   auto* resolved = cmgr.ResolveClockingMember("cb", "data", f.ctx);
   ASSERT_NE(resolved, nullptr);
   EXPECT_EQ(resolved->value.ToUint64(), 0x55u);
@@ -100,4 +97,4 @@ TEST(SyncEventSim, ResolveClockingMemberUnknownSignal) {
   EXPECT_EQ(resolved, nullptr);
 }
 
-}  // namespace
+}

@@ -126,7 +126,6 @@ TEST(DelayControlParsing, InitialBlockWithDelays) {
   EXPECT_EQ(init_item->body->stmts[1]->kind, StmtKind::kDelay);
 }
 
-
 TEST(DelayControlParsing, DelayControl) {
   auto r = Parse(
       "module m;\n"
@@ -173,4 +172,4 @@ TEST(DelayControlParsing, IdentifierAsDelayValue) {
   EXPECT_EQ(stmt->delay->kind, ExprKind::kIdentifier);
 }
 
-}  // namespace
+}

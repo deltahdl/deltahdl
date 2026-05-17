@@ -24,13 +24,6 @@ CompilationUnit* ParseSrc(SourceManager& mgr, Arena& arena, DiagEngine& diag,
   return parser.Parse();
 }
 
-// §33.6.3 — the cfg3 example from the LRM, with the "selects all"
-// claim observed directly: top instantiates m three times, and every
-// sibling must rebind to gateLib.m even though the default liblist
-// (aLib rtlLib) would have routed m through aLib.  Picking up all
-// three siblings is what makes "selects all cells named m" testable;
-// a single-instance form would not distinguish "binds the first" from
-// "binds every".
 TEST(CellClauseBinding, AppliesToAllInstancesOfThatCellName) {
   SourceManager mgr;
   Arena arena;
@@ -75,10 +68,6 @@ TEST(CellClauseBinding, AppliesToAllInstancesOfThatCellName) {
   }
 }
 
-// §33.6.3: the cell clause names a specific cell and only that cell
-// reroutes — adder in cfg3's example continues to bind through the
-// default liblist (aLib).  The cell-clause override must not leak to
-// unrelated cell names.
 TEST(CellClauseBinding, DoesNotAffectOtherCellNames) {
   SourceManager mgr;
   Arena arena;
@@ -109,12 +98,12 @@ TEST(CellClauseBinding, DoesNotAffectOtherCellNames) {
   ASSERT_FALSE(diag.HasErrors());
   ASSERT_EQ(cu->modules.size(), 6u);
 
-  cu->modules[0]->library = "aLib";     // adder rtl
-  cu->modules[1]->library = "gateLib";  // adder gate
-  cu->modules[2]->library = "aLib";     // m rtl variant in aLib
-  cu->modules[3]->library = "gateLib";  // m gate
-  cu->modules[4]->library = "rtlLib";   // m rtl variant in rtlLib
-  cu->modules[5]->library = "rtlLib";   // top
+  cu->modules[0]->library = "aLib";
+  cu->modules[1]->library = "gateLib";
+  cu->modules[2]->library = "aLib";
+  cu->modules[3]->library = "gateLib";
+  cu->modules[4]->library = "rtlLib";
+  cu->modules[5]->library = "rtlLib";
 
   Elaborator elab(arena, diag, cu);
   elab.SetLibraryDeclarationOrder({"rtlLib", "aLib", "gateLib"});
@@ -134,17 +123,12 @@ TEST(CellClauseBinding, DoesNotAffectOtherCellNames) {
   }
   ASSERT_NE(picked_adder, nullptr);
   ASSERT_NE(picked_m, nullptr);
-  // adder follows the default liblist [aLib, rtlLib]: aLib has adder, so aLib.
+
   EXPECT_EQ(picked_adder->library, "aLib");
-  // m is rerouted by the cell clause regardless of the default liblist.
+
   EXPECT_EQ(picked_m->library, "gateLib");
 }
 
-// §33.6.3: "explicitly binds" — the binding is unconditional.  Even
-// when the default liblist excludes gateLib (cfg3's liblist is just
-// aLib + rtlLib), the cell clause must still bind m to gateLib.m.
-// Without this rule the strict liblist filter from §33.6.2 would
-// reject gateLib outright.
 TEST(CellClauseBinding, OverridesDefaultLiblistExclusion) {
   SourceManager mgr;
   Arena arena;
@@ -164,9 +148,6 @@ TEST(CellClauseBinding, OverridesDefaultLiblistExclusion) {
   ASSERT_FALSE(diag.HasErrors());
   ASSERT_EQ(cu->modules.size(), 2u);
 
-  // m exists only in gateLib, which is NOT on the default liblist.
-  // §33.6.2 alone would refuse to bind it; §33.6.3's cell clause has
-  // to override that.
   cu->modules[0]->library = "gateLib";
   cu->modules[1]->library = "rtlLib";
 
@@ -183,9 +164,6 @@ TEST(CellClauseBinding, OverridesDefaultLiblistExclusion) {
   EXPECT_EQ(bound->library, "gateLib");
 }
 
-// §33.6.3: "selects all cells named m" — the rule is name-scoped over
-// the entire elaborated hierarchy, so an m nested several levels deep
-// must rebind to gateLib.m the same way a top-level m would.
 TEST(CellClauseBinding, AppliesTransitivelyAtNestedInstances) {
   SourceManager mgr;
   Arena arena;
@@ -215,12 +193,12 @@ TEST(CellClauseBinding, AppliesTransitivelyAtNestedInstances) {
   ASSERT_FALSE(diag.HasErrors());
   ASSERT_EQ(cu->modules.size(), 6u);
 
-  cu->modules[0]->library = "aLib";     // m rtl
-  cu->modules[1]->library = "gateLib";  // m gate
-  cu->modules[2]->library = "rtlLib";   // m rtl
-  cu->modules[3]->library = "aLib";     // adder rtl
-  cu->modules[4]->library = "gateLib";  // adder gate
-  cu->modules[5]->library = "rtlLib";   // top
+  cu->modules[0]->library = "aLib";
+  cu->modules[1]->library = "gateLib";
+  cu->modules[2]->library = "rtlLib";
+  cu->modules[3]->library = "aLib";
+  cu->modules[4]->library = "gateLib";
+  cu->modules[5]->library = "rtlLib";
 
   Elaborator elab(arena, diag, cu);
   elab.SetLibraryDeclarationOrder({"rtlLib", "aLib", "gateLib"});
@@ -232,19 +210,15 @@ TEST(CellClauseBinding, AppliesTransitivelyAtNestedInstances) {
   ASSERT_EQ(top->children.size(), 1u);
   auto* picked_adder = top->children[0].resolved;
   ASSERT_NE(picked_adder, nullptr);
-  // adder picks aLib via the default liblist (aLib has adder, rtlLib does not).
+
   EXPECT_EQ(picked_adder->library, "aLib");
   ASSERT_EQ(picked_adder->children.size(), 1u);
   auto* nested_m = picked_adder->children[0].resolved;
   ASSERT_NE(nested_m, nullptr);
-  // The nested m still rebinds to gateLib.m thanks to the cell clause.
+
   EXPECT_EQ(nested_m->library, "gateLib");
 }
 
-// Control: with no cell clause in the config, default-liblist binding
-// from §33.6.2 stays in effect — m falls through to the first liblist
-// entry that contains it (aLib here).  This anchors the cell-clause
-// behavior as the only source of the gateLib rebind seen above.
 TEST(CellClauseBinding, AbsentCellClauseLeavesDefaultBindingInEffect) {
   SourceManager mgr;
   Arena arena;
@@ -282,16 +256,10 @@ TEST(CellClauseBinding, AbsentCellClauseLeavesDefaultBindingInEffect) {
   ASSERT_EQ(top->children.size(), 1u);
   auto* bound = top->children[0].resolved;
   ASSERT_NE(bound, nullptr);
-  // Default liblist [aLib, rtlLib] picks aLib first.
+
   EXPECT_EQ(bound->library, "aLib");
 }
 
-// §33.6.3: the binding is "explicit", so the cell clause must apply
-// even when the config carries no default liblist at all.  Without
-// the clause the lib.map declaration order [rtlLib, aLib, gateLib]
-// would route m through rtlLib (§33.6.1).  With only the cell clause
-// — and no default-liblist override beneath it to confound the
-// observation — m must still resolve to gateLib.m.
 TEST(CellClauseBinding, BindsExplicitlyWithoutDefaultLiblist) {
   SourceManager mgr;
   Arena arena;
@@ -321,9 +289,7 @@ TEST(CellClauseBinding, BindsExplicitlyWithoutDefaultLiblist) {
   cu->modules[3]->library = "rtlLib";
 
   Elaborator elab(arena, diag, cu);
-  // rtlLib leads the lib.map order, so without the cell clause m
-  // would have bound to rtlLib.m.  The cell clause is the only
-  // binding signal in the config and must redirect m to gateLib.m.
+
   elab.SetLibraryDeclarationOrder({"rtlLib", "aLib", "gateLib"});
   auto* design = elab.Elaborate(cu->configs[0]);
   ASSERT_FALSE(diag.HasErrors());
@@ -337,4 +303,4 @@ TEST(CellClauseBinding, BindsExplicitlyWithoutDefaultLiblist) {
   EXPECT_EQ(bound->library, "gateLib");
 }
 
-}  // namespace
+}

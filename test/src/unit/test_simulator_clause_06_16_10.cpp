@@ -72,4 +72,4 @@ TEST(StringMethods, AtorealIntegerString) {
   EXPECT_NEAR(d, 42.0, 0.001);
 }
 
-}  // namespace
+}

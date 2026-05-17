@@ -19,10 +19,6 @@ TEST(ChargeDecayParsing, TriregNoDelayIdeal) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-// §28.16.2 R2/R3: when a trireg net declaration carries three delays, the
-// first two shall specify rise/fall transition delays and the third shall
-// specify the charge decay time (not a turn-off delay). Distinct values pin
-// the positional slot meaning so a wrong-slot bug cannot pass.
 TEST(ChargeDecayParsing, ThreeDelaysSlotIntoRiseFallDecay) {
   auto r = Parse(
       "module t;\n"
@@ -41,4 +37,4 @@ TEST(ChargeDecayParsing, ThreeDelaysSlotIntoRiseFallDecay) {
   EXPECT_EQ(item->net_delay_decay->int_val, 9u);
 }
 
-}  // namespace
+}

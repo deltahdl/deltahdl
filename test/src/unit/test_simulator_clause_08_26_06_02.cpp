@@ -1,4 +1,4 @@
-// §8.26.6.2
+
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -6,9 +6,6 @@
 using namespace delta;
 
 namespace {
-
-// Req: The subclass shall provide parameter and/or type declarations that
-// override all such name collisions. Verify the override value is accessible.
 
 TEST(InterfaceClassParamTypeConflict, ResolvedParamAccessibleAtRuntime) {
   EXPECT_EQ(RunAndGet(
@@ -58,4 +55,4 @@ TEST(InterfaceClassParamTypeConflict, LrmExampleResolvedTypeUsableAtRuntime) {
       "endmodule\n", "result"), 77u);
 }
 
-}  // namespace
+}

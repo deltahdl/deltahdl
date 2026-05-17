@@ -66,4 +66,4 @@ TEST(ClassSim, WeakRefGetIdReturnsLongint) {
   EXPECT_GT(id, 0);
 }
 
-}  // namespace
+}

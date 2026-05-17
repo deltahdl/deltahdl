@@ -56,4 +56,4 @@ TEST(WhiteSpacePreprocessor, TabsInStringPreserved) {
   EXPECT_NE(result.find("\thello\tworld\t"), std::string::npos);
 }
 
-}  // namespace
+}

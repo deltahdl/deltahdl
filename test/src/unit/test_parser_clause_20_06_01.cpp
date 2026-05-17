@@ -14,4 +14,4 @@ TEST(DataTypeParsing, BareTypeKeywordInExpr) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

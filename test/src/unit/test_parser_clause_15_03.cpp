@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §15.3: semaphore is a built-in class; verify bare declaration parses.
 TEST(SemaphoreParser, BareDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -16,7 +15,6 @@ TEST(SemaphoreParser, BareDeclaration) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3: semaphore declaration with new() constructor and method calls.
 TEST(SemaphoreParser, DeclarationWithNewAndMethodCalls) {
   auto r = Parse(
       "module m;\n"
@@ -31,7 +29,6 @@ TEST(SemaphoreParser, DeclarationWithNewAndMethodCalls) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3: all four semaphore methods parse in procedural context.
 TEST_F(AnnexHParseTest, MethodCallsInInitialBlock) {
   auto* unit = Parse(
       "module m;\n"
@@ -47,7 +44,6 @@ TEST_F(AnnexHParseTest, MethodCallsInInitialBlock) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §15.3: multiple semaphore declarations in one module.
 TEST(SemaphoreParser, MultipleSemaphoreDeclarations) {
   auto r = Parse(
       "module m;\n"
@@ -60,7 +56,6 @@ TEST(SemaphoreParser, MultipleSemaphoreDeclarations) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3: semaphore is recognized as a type without a class declaration.
 TEST(SemaphoreParser, NoClassDeclarationRequired) {
   auto r = Parse(
       "module m;\n"
@@ -76,4 +71,4 @@ TEST(SemaphoreParser, NoClassDeclarationRequired) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

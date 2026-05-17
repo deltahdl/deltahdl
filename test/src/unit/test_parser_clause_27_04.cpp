@@ -49,8 +49,6 @@ TEST(LoopGenerateParsing, ParameterizedModuleWithGenerate) {
   ASSERT_EQ(mod->ports.size(), 2);
 }
 
-// §27.4 permits genvar declarations to appear either at module scope or
-// inside a generate region, so the parser should accept both placements.
 TEST(LoopGenerateParsing, GenvarDeclaredInsideGenerateRegion) {
   EXPECT_TRUE(ParseOk(
       "module m;\n"
@@ -63,4 +61,4 @@ TEST(LoopGenerateParsing, GenvarDeclaredInsideGenerateRegion) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

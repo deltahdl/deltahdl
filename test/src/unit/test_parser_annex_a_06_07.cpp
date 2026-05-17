@@ -525,4 +525,4 @@ TEST(CaseQualifierParsing, Unique0Casex) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
 }
 
-}  // namespace
+}

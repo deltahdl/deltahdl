@@ -6,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §10.6: "The right-hand side of an assign or force procedural continuous
-// assignment can be an expression. This shall be treated just as a
-// continuous assignment; that is, if any variable on the right-hand side of
-// the assignment changes, the assignment shall be reevaluated while the
-// assign or force is in effect."
 TEST(ProceduralContinuousAssignSim, AssignRhsReevaluatesOnVariableChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -34,8 +29,6 @@ TEST(ProceduralContinuousAssignSim, AssignRhsReevaluatesOnVariableChange) {
   EXPECT_EQ(q->value.ToUint64(), 120u);
 }
 
-// §10.6: matches the "force a = b + f(c);" example — an RHS variable change
-// causes the forced LHS to be reevaluated while the force is in effect.
 TEST(ProceduralContinuousAssignSim, ForceRhsReevaluatesOnVariableChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -59,10 +52,6 @@ TEST(ProceduralContinuousAssignSim, ForceRhsReevaluatesOnVariableChange) {
   EXPECT_EQ(a->value.ToUint64(), 52u);
 }
 
-// §10.6: "if any variable on the right-hand side of the assignment changes,
-// the assignment shall be reevaluated" — the universal "any variable" must
-// cover every RHS operand, not just the first one. Mirrors the LRM's
-// "if b or c changes" wording for the force a = b + f(c) example.
 TEST(ProceduralContinuousAssignSim, ForceReevaluatesForEachRhsVariableChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -86,4 +75,4 @@ TEST(ProceduralContinuousAssignSim, ForceReevaluatesForEachRhsVariableChange) {
   EXPECT_EQ(a->value.ToUint64(), 30u);
 }
 
-}  // namespace
+}

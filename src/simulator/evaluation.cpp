@@ -18,7 +18,7 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   auto* var = ctx.FindVariable(expr->text);
   if (var) {
-    // §15.5.5.3: Boolean value of event — 0 if null, 1 otherwise.
+
     if (var->is_event)
       return MakeLogic4VecVal(arena, 1, var->is_null_event ? 0u : 1u);
     auto val = var->value;
@@ -27,7 +27,7 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
     if (var->is_signed) val.is_signed = true;
     return val;
   }
-  return MakeLogic4Vec(arena, 1);  // X for unknown
+  return MakeLogic4Vec(arena, 1);
 }
 bool HasUnknownBits(const Logic4Vec& v) {
   for (uint32_t i = 0; i < v.nwords; ++i) {
@@ -42,7 +42,7 @@ Logic4Vec MakeAllX(Arena& arena, uint32_t width) {
   }
   return vec;
 }
-// Extract a single bit from a Logic4Vec as a 1-bit Logic4Word.
+
 static Logic4Word ExtractBit(const Logic4Vec& v, uint32_t idx) {
   uint32_t word = idx / 64;
   uint64_t mask = uint64_t{1} << (idx % 64);
@@ -50,7 +50,7 @@ static Logic4Word ExtractBit(const Logic4Vec& v, uint32_t idx) {
   uint64_t b = (v.words[word].bval & mask) ? 1 : 0;
   return {a, b};
 }
-// Select the base 4-state fold function for the reduction operator.
+
 using FoldFn = Logic4Word (*)(Logic4Word, Logic4Word);
 static FoldFn ReductionFoldFn(TokenKind op) {
   switch (op) {
@@ -106,8 +106,7 @@ static Logic4Vec EvalUnaryOp(TokenKind op, Logic4Vec operand, Arena& arena) {
       for (uint32_t i = 0; i < result.nwords; ++i) {
         result.words[i] = Logic4Not(operand.words[i]);
       }
-      // Mask the top word: Logic4Not inverts all 64 bits, including those
-      // above the declared width.
+
       uint32_t bit_pos = operand.width % 64;
       if (bit_pos != 0) {
         uint64_t mask = (uint64_t{1} << bit_pos) - 1;
@@ -118,7 +117,7 @@ static Logic4Vec EvalUnaryOp(TokenKind op, Logic4Vec operand, Arena& arena) {
       return result;
     }
     case TokenKind::kBang:
-      // §11.4.7: X/Z operand → 1'bx.
+
       if (HasUnknownBits(operand)) return MakeAllX(arena, 1);
       return MakeLogic4VecVal(arena, 1, operand.ToUint64() == 0 ? 1 : 0);
     case TokenKind::kMinus: {
@@ -155,7 +154,7 @@ static uint64_t IntPow(uint64_t base, uint64_t exp) {
   }
   return result;
 }
-// §11.4.3, Table 11-4: signed integer power with negative exponent handling.
+
 static Logic4Vec EvalSignedPow(int64_t base, int64_t exp, uint32_t width,
                                Arena& arena) {
   if (exp < 0) {
@@ -206,8 +205,7 @@ static Logic4Vec EvalSignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   result.is_signed = true;
   return result;
 }
-// §6.12: real holds C double bits (width 64); shortreal holds C float bits
-// (width 32). Convert either representation to double for computation.
+
 static double ToDouble(const Logic4Vec& v) {
   if (v.is_real) {
     if (v.width == 32) {
@@ -223,8 +221,7 @@ static double ToDouble(const Logic4Vec& v) {
   }
   return static_cast<double>(v.ToUint64());
 }
-// §11.3.1: Wrap a double result into a real Logic4Vec at the requested
-// precision. result_width==32 stores the value in C-float precision per §6.12.
+
 static Logic4Vec MakeRealResult(Arena& arena, double val,
                                 uint32_t result_width = 64) {
   if (result_width == 32) {
@@ -241,17 +238,14 @@ static Logic4Vec MakeRealResult(Arena& arena, double val,
   r.is_real = true;
   return r;
 }
-// §11.3.1: "if any operand … is real, the result is real. Otherwise, if any
-// operand … is shortreal, the result is shortreal." real operands are tagged
-// is_real with width 64; shortreal operands are tagged is_real with width 32.
+
 static uint32_t RealResultWidth(const Logic4Vec& lhs, const Logic4Vec& rhs) {
   bool lhs_real64 = lhs.is_real && lhs.width == 64;
   bool rhs_real64 = rhs.is_real && rhs.width == 64;
   if (lhs_real64 || rhs_real64) return 64;
   return 32;
 }
-// §11.3.1: Real binary arithmetic — both operands converted to double,
-// result precision selected by RealResultWidth.
+
 static Logic4Vec EvalRealArith(TokenKind op, const Logic4Vec& lhs,
                                const Logic4Vec& rhs, Arena& arena) {
   double lv = ToDouble(lhs);
@@ -275,7 +269,7 @@ static Logic4Vec EvalRealArith(TokenKind op, const Logic4Vec& lhs,
 }
 static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                  Arena& arena, uint32_t context_width = 0) {
-  // §11.3.1: If either operand is real, do real arithmetic.
+
   if (lhs.is_real || rhs.is_real) return EvalRealArith(op, lhs, rhs, arena);
   uint32_t self_w = (op == TokenKind::kPower)
                         ? lhs.width
@@ -284,7 +278,7 @@ static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) {
     return MakeAllX(arena, width);
   }
-  // §11.4.3.1: Both signed → signed arithmetic.
+
   if (lhs.is_signed && rhs.is_signed) {
     return EvalSignedArith(op, lhs, rhs, width, arena);
   }
@@ -323,7 +317,7 @@ static Logic4Vec EvalBinaryBitwise(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                    Arena& arena, uint32_t context_width = 0) {
   uint32_t self_w = (lhs.width > rhs.width) ? lhs.width : rhs.width;
   uint32_t width = (context_width > self_w) ? context_width : self_w;
-  // Sign-extend the smaller operand when both are signed; zero-extend otherwise.
+
   if (lhs.width != rhs.width) {
     bool sign_ext = lhs.is_signed && rhs.is_signed;
     if (lhs.width < width) lhs = ExtendVec(lhs, width, sign_ext, arena);
@@ -353,7 +347,7 @@ static Logic4Vec EvalBinaryBitwise(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
     }
   }
   result.is_signed = lhs.is_signed && rhs.is_signed;
-  // XNOR: Logic4Not inverts all 64 bits per word; mask the top word to width.
+
   bool is_xnor = op == TokenKind::kTildeCaret || op == TokenKind::kCaretTilde;
   uint32_t bit_pos = width % 64;
   if (is_xnor && bit_pos != 0) {
@@ -445,12 +439,12 @@ static Logic4Vec EvalShift(TokenKind op, Logic4Vec lhs, uint64_t rv,
   }
   return EvalArithShiftRight(lhs, rv, arena);
 }
-// Return 2 to indicate X result (neither 0 nor 1).
+
 static constexpr uint64_t kResultX = 2;
 static uint64_t EvalWildcardEq(Logic4Vec lhs, Logic4Vec rhs) {
   uint64_t rhs_dc = rhs.nwords > 0 ? rhs.words[0].bval : 0;
   uint64_t lhs_x = lhs.nwords > 0 ? lhs.words[0].bval : 0;
-  // §11.4.6: Left X/Z in non-wildcard positions → result is X.
+
   if (lhs_x & ~rhs_dc) return kResultX;
   return (((lhs.ToUint64() ^ rhs.ToUint64()) & ~rhs_dc) == 0) ? 1 : 0;
 }
@@ -458,7 +452,7 @@ static uint64_t EvalEqualityOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs) {
   switch (op) {
     case TokenKind::kEqEq:
     case TokenKind::kBangEq:
-      // §11.4.5: X/Z in either operand → 1'bx.
+
       if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) return kResultX;
       return (op == TokenKind::kEqEq) == (lhs.ToUint64() == rhs.ToUint64()) ? 1
                                                                             : 0;
@@ -514,7 +508,7 @@ static bool IsEqualityOp(TokenKind op) {
          op == TokenKind::kBangEq || op == TokenKind::kBangEqEq ||
          op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
-// §11.3.1: Real relational comparison.
+
 static Logic4Vec EvalRealRelational(TokenKind op, const Logic4Vec& lhs,
                                     const Logic4Vec& rhs, Arena& arena) {
   double ld = ToDouble(lhs);
@@ -538,7 +532,7 @@ static Logic4Vec EvalRealRelational(TokenKind op, const Logic4Vec& lhs,
   }
   return MakeLogic4VecVal(arena, 1, r ? 1 : 0);
 }
-// §11.4.4–§11.4.5: Relational operator dispatch.
+
 static Logic4Vec EvalRelational(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                 Arena& arena) {
   if (lhs.is_real || rhs.is_real) {
@@ -555,8 +549,7 @@ static Logic4Vec EvalRelational(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   return MakeLogic4VecVal(arena, 1,
                           EvalRelationalOp(op, lhs.ToUint64(), rhs.ToUint64()));
 }
-// §6.16 Table 6-9: Convert packed string Logic4Vec to std::string for
-// lexicographic comparison.
+
 static std::string PackedToStr(const Logic4Vec& vec) {
   std::string result;
   uint32_t nbytes = vec.width / 8;
@@ -573,7 +566,6 @@ static std::string PackedToStr(const Logic4Vec& vec) {
   return result;
 }
 
-// §6.16 Table 6-9: String equality and relational comparison.
 static Logic4Vec EvalStringCompare(TokenKind op, const Logic4Vec& lhs,
                                     const Logic4Vec& rhs, Arena& arena) {
   auto ls = PackedToStr(lhs);
@@ -617,7 +609,7 @@ static Logic4Vec EvalBinaryCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
     if (HasUnknownBits(rhs)) return MakeAllX(arena, lhs.width);
     return EvalShift(op, lhs, rhs.ToUint64(), arena);
   }
-  // §6.16 Table 6-9: String comparison uses lexicographic ordering.
+
   if (lhs.is_string || rhs.is_string) {
     return EvalStringCompare(op, lhs, rhs, arena);
   }
@@ -685,9 +677,7 @@ Logic4Vec AssembleConcatParts(const std::vector<Logic4Vec>& parts,
   }
   return result;
 }
-// §11.4.12.2: String concatenation uses the same bit-level assembly path
-// because the 8-bit-per-char MSB-first encoding is compatible with both
-// bit and string semantics.  No-truncation resizing is an assignment concern.
+
 static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t total_width = 0;
   bool any_string = false;
@@ -702,8 +692,7 @@ static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   result.is_string = any_string;
   return result;
 }
-// §11.4.11 Table 11-20: combine two branches when condition is X/Z.
-// Matching known bits → keep; differing → X.
+
 static Logic4Vec CombineBranches(Logic4Vec tv, Logic4Vec fv, Arena& arena) {
   uint32_t width = (tv.width > fv.width) ? tv.width : fv.width;
   auto result = MakeLogic4Vec(arena, width);
@@ -719,7 +708,7 @@ static Logic4Vec CombineBranches(Logic4Vec tv, Logic4Vec fv, Arena& arena) {
 static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena,
                              uint32_t context_width = 0) {
   auto cond = EvalExpr(expr->condition, ctx, arena);
-  // §11.4.11: X/Z condition → eval both, combine bit-by-bit.
+
   if (HasUnknownBits(cond)) {
     auto tv = EvalExpr(expr->true_expr, ctx, arena, context_width);
     auto fv = EvalExpr(expr->false_expr, ctx, arena, context_width);
@@ -752,8 +741,7 @@ static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena,
   chosen.is_signed = result_signed;
   return chosen;
 }
-// §11.3.6: Compute the bit-width that the LHS of an assignment expression
-// contributes to the return type.
+
 static uint32_t AssignExprLhsWidth(const Expr* lhs, SimContext& ctx) {
   if (lhs->kind == ExprKind::kConcatenation) {
     uint32_t total = 0;
@@ -764,8 +752,6 @@ static uint32_t AssignExprLhsWidth(const Expr* lhs, SimContext& ctx) {
   return var ? var->value.width : 0;
 }
 
-// §11.3.6: Assignment within expression — evaluate RHS, store in LHS, return
-// the value cast to LHS type (width).
 static Logic4Vec EvalAssignInExpr(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
   auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
@@ -777,7 +763,7 @@ static Logic4Vec EvalAssignInExpr(const Expr* expr, SimContext& ctx,
   if (lhs_w < 64) v &= (uint64_t{1} << lhs_w) - 1;
   return MakeLogic4VecVal(arena, lhs_w, v);
 }
-// §7.4.6: Compare two unpacked arrays element-by-element.
+
 static bool ArrayElementsEqual(std::string_view a, const ArrayInfo* ai,
                                std::string_view b, SimContext& ctx) {
   for (uint32_t i = 0; i < ai->size; ++i) {
@@ -790,7 +776,7 @@ static bool ArrayElementsEqual(std::string_view a, const ArrayInfo* ai,
   }
   return true;
 }
-// §7.4.6: Try element-by-element unpacked array equality/inequality.
+
 static bool TryArrayEqualityOp(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out) {
   if (expr->op != TokenKind::kEqEq && expr->op != TokenKind::kBangEq)
@@ -807,7 +793,7 @@ static bool TryArrayEqualityOp(const Expr* expr, SimContext& ctx, Arena& arena,
   out = MakeLogic4VecVal(arena, 1, val);
   return true;
 }
-// §11.4.7: Logical AND with 3-value truth table.
+
 static Logic4Vec EvalLogicalAnd(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   auto l = EvalExpr(expr->lhs, ctx, arena);
@@ -823,7 +809,7 @@ static Logic4Vec EvalLogicalAnd(const Expr* expr, SimContext& ctx,
   if (l_unknown || r_unknown) return MakeAllX(arena, 1);
   return MakeLogic4VecVal(arena, 1, 1);
 }
-// §11.4.7: Logical OR with 3-value truth table.
+
 static Logic4Vec EvalLogicalOr(const Expr* expr, SimContext& ctx,
                                Arena& arena) {
   auto l = EvalExpr(expr->lhs, ctx, arena);
@@ -839,24 +825,23 @@ static Logic4Vec EvalLogicalOr(const Expr* expr, SimContext& ctx,
   if (l_unknown || r_unknown) return MakeAllX(arena, 1);
   return MakeLogic4VecVal(arena, 1, 0);
 }
-// §11.4.7: Logical implication (a -> b) = (!a || b) with 3-value logic.
-// Short-circuits: if a is false, result is 1 without evaluating b.
+
 static Logic4Vec EvalLogicalImpl(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
   auto l = EvalExpr(expr->lhs, ctx, arena);
   bool l_unknown = HasUnknownBits(l);
   if (!l_unknown && l.ToUint64() == 0) {
-    return MakeLogic4VecVal(arena, 1, 1);  // false -> anything = true
+    return MakeLogic4VecVal(arena, 1, 1);
   }
   auto r = EvalExpr(expr->rhs, ctx, arena);
   bool r_unknown = HasUnknownBits(r);
   if (!r_unknown && r.ToUint64() != 0) {
-    return MakeLogic4VecVal(arena, 1, 1);  // anything -> true = true
+    return MakeLogic4VecVal(arena, 1, 1);
   }
   if (l_unknown || r_unknown) return MakeAllX(arena, 1);
-  return MakeLogic4VecVal(arena, 1, 0);  // true -> false = false
+  return MakeLogic4VecVal(arena, 1, 0);
 }
-// §11.4.7: Logical equivalence (a <-> b) = (a -> b) && (b -> a).
+
 static Logic4Vec EvalLogicalEquiv(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
   auto l = EvalExpr(expr->lhs, ctx, arena);
@@ -876,7 +861,7 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
     if (TryArrayEqualityOp(expr, ctx, arena, arr_result)) return arr_result;
   }
   if (expr->op == TokenKind::kAmpAmp) return EvalLogicalAnd(expr, ctx, arena);
-  // §12.6: &&& is sequential conjunction — short-circuit on false.
+
   if (expr->op == TokenKind::kAmpAmpAmp) {
     auto lv = EvalExpr(expr->lhs, ctx, arena);
     if (!lv.IsTruthy()) return MakeLogic4VecVal(arena, 1, 0);
@@ -887,7 +872,7 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
   if (expr->op == TokenKind::kArrow) return EvalLogicalImpl(expr, ctx, arena);
   if (expr->op == TokenKind::kLtDashGt)
     return EvalLogicalEquiv(expr, ctx, arena);
-  // §15.5.5.3: Event comparison — compare by Variable* identity.
+
   if (expr->op == TokenKind::kEqEq || expr->op == TokenKind::kBangEq ||
       expr->op == TokenKind::kEqEqEq || expr->op == TokenKind::kBangEqEq) {
     auto* lhs_id = (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier)
@@ -922,15 +907,15 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
   return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena),
                       EvalExpr(expr->rhs, ctx, arena), arena, context_width);
 }
-// §7.3.2/§11.9: Evaluate tagged union expression — return member value.
+
 static Logic4Vec EvalTaggedExpr(const Expr* expr, SimContext& ctx,
                                 Arena& arena, uint32_t context_width = 0) {
-  // expr->rhs = member name identifier, expr->lhs = optional value.
+
   if (expr->lhs) return EvalExpr(expr->lhs, ctx, arena, context_width);
-  // Void member (no value) — return 0.
+
   return MakeLogic4VecVal(arena, 1, 0);
 }
-// §5.8: Scale a time literal's value to the default time unit (ns).
+
 static double ScaleTimeLiteral(const Expr* e) {
   double v = e->real_val;
   TimeUnit u = TimeUnit::kNs;
@@ -943,9 +928,7 @@ static double ScaleTimeLiteral(const Expr* e) {
 Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
                    uint32_t context_width) {
   if (!expr) return MakeLogic4Vec(arena, 1);
-  // §16.4 P11: if a deferred-assertion snapshot exists for this AST node
-  // (populated at expression-eval instant by ScheduleDeferredAction),
-  // return the snapshot value instead of re-evaluating at action time.
+
   if (const auto* snap = ctx.FindDeferredArgSnapshot(expr)) {
     return *snap;
   }
@@ -1021,4 +1004,4 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
   }
 }
 
-}  // namespace delta
+}

@@ -50,8 +50,6 @@ TEST(SpecifyBlockDeclSim, SpecifyWithAllItemKindsSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// A specify block carries timing metadata only; surrounding behavioral code
-// must still execute normally.
 TEST(SpecifyBlockDeclSim, SpecifyBlockDoesNotInterfereBehavioral) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -71,4 +69,4 @@ TEST(SpecifyBlockDeclSim, SpecifyBlockDoesNotInterfereBehavioral) {
   LowerRunAndCheck(f, design, {{"a", 11u}, {"b", 22u}});
 }
 
-}  // namespace
+}

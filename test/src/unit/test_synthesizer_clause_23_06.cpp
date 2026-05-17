@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §23.6 R3: a module instance creates a new branch of the hierarchy.  After
-// the elaborator binds that branch, synthesis must lower the parent without
-// error.
 TEST(HierarchicalNameSynthesis, ModuleInstanceHierarchyLowers) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
@@ -28,9 +25,6 @@ TEST(HierarchicalNameSynthesis, ModuleInstanceHierarchyLowers) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §23.6 R14: a hierarchical name read in an expression must survive
-// synthesis lowering — the parent's RHS that reaches into a child's signal
-// is a hierarchical reference recognized by §23.6.
 TEST(HierarchicalNameSynthesis, HierarchicalNameReadInAssignmentLowers) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
@@ -51,8 +45,6 @@ TEST(HierarchicalNameSynthesis, HierarchicalNameReadInAssignmentLowers) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §23.6 R15: hierarchical references into a checker are not permitted; the
-// elaborator must reject this design so it never reaches the synthesizer.
 TEST(HierarchicalNameSynthesis, HierarchicalRefIntoCheckerRejectedBeforeSynth) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
@@ -72,4 +64,4 @@ TEST(HierarchicalNameSynthesis, HierarchicalRefIntoCheckerRejectedBeforeSynth) {
   }
 }
 
-}  // namespace
+}

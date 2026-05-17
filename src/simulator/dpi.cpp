@@ -7,10 +7,6 @@
 
 namespace delta {
 
-// =============================================================================
-// DpiContext
-// =============================================================================
-
 void DpiContext::RegisterImport(DpiFunction func) {
   import_index_[func.sv_name] = imports_.size();
   imports_.push_back(std::move(func));
@@ -42,4 +38,4 @@ bool DpiContext::HasExport(std::string_view sv_name) const {
   return export_index_.count(sv_name) != 0;
 }
 
-}  // namespace delta
+}

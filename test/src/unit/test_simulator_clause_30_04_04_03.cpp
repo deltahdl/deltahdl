@@ -9,8 +9,6 @@ using namespace delta;
 
 namespace {
 
-// Presence of an edge-sensitive state-dependent path must not disturb
-// surrounding behavioral execution in the same module.
 TEST(EdgeSensitiveStateDependentPathSim, ParallelPathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -31,8 +29,6 @@ TEST(EdgeSensitiveStateDependentPathSim, ParallelPathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-// Multiple coexisting edge-sensitive state-dependent declarations at the
-// same endpoints (unique by edge) must not disrupt unrelated simulation.
 TEST(EdgeSensitiveStateDependentPathSim, CoexistingPathsSimulate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -54,4 +50,4 @@ TEST(EdgeSensitiveStateDependentPathSim, CoexistingPathsSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-}  // namespace
+}

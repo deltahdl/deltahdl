@@ -1,4 +1,4 @@
-// §28.7
+
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Return true when the 1-bit wire ``name`` settled to a known logic value
-// equal to ``expected`` (aval matches, bval is 0 meaning no x/z bits).
 bool SettledToKnown(SimFixture& f, std::string_view name, uint64_t expected) {
   auto* v = f.ctx.FindVariable(name);
   if (!v) return false;
@@ -16,7 +14,6 @@ bool SettledToKnown(SimFixture& f, std::string_view name, uint64_t expected) {
          (v->value.words[0].bval & 1u) == 0u;
 }
 
-// Return true when the 1-bit wire ``name`` settled to high-Z (aval=0, bval=1).
 bool SettledToHighZ(SimFixture& f, std::string_view name) {
   auto* v = f.ctx.FindVariable(name);
   if (!v) return false;
@@ -24,7 +21,6 @@ bool SettledToHighZ(SimFixture& f, std::string_view name) {
          (v->value.words[0].bval & 1u) == 1u;
 }
 
-// nmos conducts when control is 1; a driven data=0 reaches the output.
 TEST(MosSwitchSimulation, NmosConductsDataLowWhenControlHigh) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -40,7 +36,6 @@ TEST(MosSwitchSimulation, NmosConductsDataLowWhenControlHigh) {
   EXPECT_TRUE(SettledToKnown(f, "y", 0u));
 }
 
-// nmos conducts when control is 1; a driven data=1 reaches the output.
 TEST(MosSwitchSimulation, NmosConductsDataHighWhenControlHigh) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -56,8 +51,6 @@ TEST(MosSwitchSimulation, NmosConductsDataHighWhenControlHigh) {
   EXPECT_TRUE(SettledToKnown(f, "y", 1u));
 }
 
-// nmos is non-conducting when control is 0; output goes to high-Z
-// regardless of data value.
 TEST(MosSwitchSimulation, NmosBlocksOutputWhenControlLow) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -73,7 +66,6 @@ TEST(MosSwitchSimulation, NmosBlocksOutputWhenControlLow) {
   EXPECT_TRUE(SettledToHighZ(f, "y"));
 }
 
-// pmos polarity is the mirror of nmos: it conducts on control=0.
 TEST(MosSwitchSimulation, PmosConductsDataLowWhenControlLow) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -119,9 +111,6 @@ TEST(MosSwitchSimulation, PmosBlocksOutputWhenControlHigh) {
   EXPECT_TRUE(SettledToHighZ(f, "y"));
 }
 
-// Table 28-6 groups rnmos with nmos: a conducting rnmos must produce the
-// same logic output as a conducting nmos for deterministic controls.
-// Strength attenuation is a separate concern (§28.14).
 TEST(MosSwitchSimulation, RnmosConductsDataWhenControlHigh) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -152,7 +141,6 @@ TEST(MosSwitchSimulation, RnmosBlocksOutputWhenControlLow) {
   EXPECT_TRUE(SettledToHighZ(f, "y"));
 }
 
-// Table 28-6 groups rpmos with pmos.
 TEST(MosSwitchSimulation, RpmosConductsDataWhenControlLow) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -183,11 +171,6 @@ TEST(MosSwitchSimulation, RpmosBlocksOutputWhenControlHigh) {
   EXPECT_TRUE(SettledToHighZ(f, "y"));
 }
 
-// §28.7 says the four switches are unidirectional channels for data.
-// Running two sibling switches with swapped input sources must produce
-// distinct outputs on their respective output terminals — confirming the
-// simulator wires data only into the output (terms[0]) and never back
-// from the output into the data/control inputs.
 TEST(MosSwitchSimulation, OutputFollowsDataOnlyWhenConducting) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -210,9 +193,6 @@ TEST(MosSwitchSimulation, OutputFollowsDataOnlyWhenConducting) {
   EXPECT_TRUE(SettledToKnown(f, "c_off", 0u));
 }
 
-// Table 28-6 blocking row: when control is 0 the nmos output is high-Z
-// regardless of data. This case pairs with NmosBlocksOutputWhenControlLow
-// (which uses data=1) to close the ctrl=0 row of the nmos table.
 TEST(MosSwitchSimulation, NmosBlocksOutputWithLowDataAndControl) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -228,8 +208,6 @@ TEST(MosSwitchSimulation, NmosBlocksOutputWithLowDataAndControl) {
   EXPECT_TRUE(SettledToHighZ(f, "y"));
 }
 
-// Table 28-6 cell (D=x, C=1): a conducting nmos passes the unknown data
-// value through to the output.
 TEST(MosSwitchSimulation, NmosPassesUnknownDataWhenConducting) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -244,14 +222,11 @@ TEST(MosSwitchSimulation, NmosPassesUnknownDataWhenConducting) {
   LowerAndRun(design, f);
   auto* v = f.ctx.FindVariable("y");
   ASSERT_NE(v, nullptr);
-  // x is encoded aval=1, bval=1 in the 4-value rails.
+
   EXPECT_EQ(v->value.words[0].aval & 1u, 1u);
   EXPECT_EQ(v->value.words[0].bval & 1u, 1u);
 }
 
-// Table 28-6 cell (D=z, C=1) for nmos: a conducting switch with a high-Z
-// data value yields a high-Z output — production selects the data arm and
-// the arm's z bit propagates unchanged.
 TEST(MosSwitchSimulation, NmosPassesHighZDataWhenConducting) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -267,9 +242,6 @@ TEST(MosSwitchSimulation, NmosPassesHighZDataWhenConducting) {
   EXPECT_TRUE(SettledToHighZ(f, "y"));
 }
 
-// Table 28-6 cell (D=0, C=1) for pmos blocks: pmos conducts on control=0,
-// so control=1 with any data gives high-Z. Pairs with
-// PmosBlocksOutputWhenControlHigh (data=1) to close the pmos ctrl=1 row.
 TEST(MosSwitchSimulation, PmosBlocksOutputWithLowDataAndHighControl) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -285,4 +257,4 @@ TEST(MosSwitchSimulation, PmosBlocksOutputWithLowDataAndHighControl) {
   EXPECT_TRUE(SettledToHighZ(f, "y"));
 }
 
-}  // namespace
+}

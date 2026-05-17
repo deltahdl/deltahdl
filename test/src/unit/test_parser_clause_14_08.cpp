@@ -73,4 +73,4 @@ TEST(MultiBlockExampleParse, ProgramAssignStatement) {
               "endprogram\n"));
 }
 
-}  // namespace
+}

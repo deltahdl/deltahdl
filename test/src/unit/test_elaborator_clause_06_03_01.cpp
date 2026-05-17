@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §6.3.1 ¶4: a `logic` declaration produces an object of the basic 4-state
-// data type. The elaborated variable must carry is_4state=true.
 TEST(LogicValuesElab, LogicScalarVariableIs4State) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -24,8 +22,6 @@ TEST(LogicValuesElab, LogicScalarVariableIs4State) {
   EXPECT_TRUE(mod->variables[0].is_4state);
 }
 
-// §6.3.1 ¶4 + ¶5: a vector declared from `logic` is a 4-state vector — every
-// bit of the resulting variable is part of the 4-state storage.
 TEST(LogicValuesElab, LogicVectorVariableIs4State) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -41,8 +37,6 @@ TEST(LogicValuesElab, LogicVectorVariableIs4State) {
   EXPECT_TRUE(mod->variables[0].is_4state);
 }
 
-// §6.3.1 ¶4: a user-defined data type constructed from `logic` (via typedef)
-// must inherit the 4-state property from its base.
 TEST(LogicValuesElab, UserTypeBuiltFromLogicInheritsFourState) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -65,9 +59,6 @@ TEST(LogicValuesElab, UserTypeBuiltFromLogicInheritsFourState) {
   EXPECT_TRUE(found);
 }
 
-// §6.3.1 ¶5: "Other exceptions are the event type (see 6.17), which has no
-// storage." The elaborator must mark an event-typed variable as is_event,
-// distinguishing it from the 4-state/2-state value-storing categories.
 TEST(LogicValuesElab, EventTypeIsNotFourState) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -84,8 +75,6 @@ TEST(LogicValuesElab, EventTypeIsNotFourState) {
   EXPECT_FALSE(mod->variables[0].is_4state);
 }
 
-// §6.3.1 ¶5: "Other exceptions are ... the real types (see 6.12)." The
-// elaborator must mark a real variable as is_real and not as a 4-state value.
 TEST(LogicValuesElab, RealTypeIsNotFourState) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -102,4 +91,4 @@ TEST(LogicValuesElab, RealTypeIsNotFourState) {
   EXPECT_FALSE(mod->variables[0].is_4state);
 }
 
-}  // namespace
+}

@@ -130,8 +130,6 @@ TEST(GenerateElaboration, NestedGenerateForIf) {
   EXPECT_GE(mod->variables.size(), 2u);
 }
 
-// §27.4 requires that a loop generate terminate. A condition that can never
-// become false forces the elaborator's iteration guard to trip.
 TEST(GenerateElaboration, GenerateForNonTerminatingLoopErrors) {
   EXPECT_FALSE(
       ElabOk("module top();\n"
@@ -143,8 +141,6 @@ TEST(GenerateElaboration, GenerateForNonTerminatingLoopErrors) {
              "endmodule\n"));
 }
 
-// §27.4 requires each iteration to produce a distinct genvar value. A step
-// that leaves the genvar unchanged revisits the same value and must fail.
 TEST(GenerateElaboration, GenerateForRepeatedGenvarValueErrors) {
   EXPECT_FALSE(
       ElabOk("module top();\n"
@@ -156,8 +152,6 @@ TEST(GenerateElaboration, GenerateForRepeatedGenvarValueErrors) {
              "endmodule\n"));
 }
 
-// §27.4 requires the initial assignment and step assignment to operate on
-// the same genvar; using different genvars is malformed.
 TEST(GenerateElaboration, GenerateForInitStepDifferentVariablesErrors) {
   EXPECT_FALSE(
       ElabOk("module top();\n"
@@ -170,8 +164,6 @@ TEST(GenerateElaboration, GenerateForInitStepDifferentVariablesErrors) {
              "endmodule\n"));
 }
 
-// §27.4 treats the initial assignment as a constant expression; it cannot
-// read the genvar it is about to define.
 TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarErrors) {
   EXPECT_FALSE(
       ElabOk("module top();\n"
@@ -183,8 +175,6 @@ TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarErrors) {
              "endmodule\n"));
 }
 
-// §27.4 does not constrain the direction of iteration. A decrementing step
-// that eventually fails the condition should elaborate normally.
 TEST(GenerateElaboration, GenerateForDecrementingStride) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -201,4 +191,4 @@ TEST(GenerateElaboration, GenerateForDecrementingStride) {
   EXPECT_EQ(mod->variables.size(), 3u);
 }
 
-}  // namespace
+}

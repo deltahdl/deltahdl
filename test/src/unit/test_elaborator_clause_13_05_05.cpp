@@ -76,8 +76,6 @@ TEST(SubroutineCallElaborationSyntax,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.5.5: A void class function method with no arguments may be called
-// without empty parentheses.
 TEST(SubroutineCallElaborationSyntax, VoidClassMethodNoArgsWithoutParensOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -93,8 +91,6 @@ TEST(SubroutineCallElaborationSyntax, VoidClassMethodNoArgsWithoutParensOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.5.5: A class method that requires arguments is callable without
-// parentheses when all arguments have default values.
 TEST(SubroutineCallElaborationSyntax,
      ClassMethodAllDefaultsWithoutParensOk) {
   ElabFixture f;
@@ -111,10 +107,6 @@ TEST(SubroutineCallElaborationSyntax,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.5.5 third sentence + §13.4.1 implicit variable: inside a nonvoid class
-// function method, the bare method name is the implicit return-value
-// variable, not a recursive call without parentheses. The body shall
-// elaborate without flagging the bare reference.
 TEST(SubroutineCallElaborationSyntax,
      NonvoidClassMethodSelfReferenceIsImplicitVariable) {
   ElabFixture f;
@@ -133,4 +125,4 @@ TEST(SubroutineCallElaborationSyntax,
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -43,7 +43,7 @@ TEST(GenerateRegion, RegionNestedInGenerateForBodyRejected) {
 }
 
 TEST(GenerateRegion, GenerateRegionAtModuleScopeAllowedOncePerSibling) {
-  // Sibling (non-nested) regions are fine.
+
   EXPECT_TRUE(ParseOk(
       "module m;\n"
       "  generate\n"
@@ -65,9 +65,7 @@ TEST(GenerateRegion, MissingEndgenerateRejected) {
 }
 
 TEST(GenerateRegion, OptionalRegionKeywordsProduceSameItems) {
-  // §27.3: generate/endgenerate keywords have no semantic significance.
-  // Items accepted directly at module scope are equivalent to items wrapped
-  // in a generate region.
+
   auto with_region = Parse(
       "module m;\n"
       "  generate\n"
@@ -103,4 +101,4 @@ TEST(GenerateRegion, EmptyRegionProducesNoItems) {
   EXPECT_TRUE(r.cu->modules[0]->items.empty());
 }
 
-}  // namespace
+}

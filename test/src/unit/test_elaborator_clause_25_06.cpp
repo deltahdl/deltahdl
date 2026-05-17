@@ -43,4 +43,4 @@ TEST(TimingCheckEventDefElaboration, TerminalInterfaceDotPortElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

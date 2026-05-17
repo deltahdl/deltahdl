@@ -34,4 +34,4 @@ TEST(CheckerDeclaration, EmptyCheckerElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

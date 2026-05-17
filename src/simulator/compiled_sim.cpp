@@ -70,20 +70,12 @@ static CompiledFn CompileStmt(const Stmt* stmt) {
   }
 }
 
-// =============================================================================
-// CompiledProcess
-// =============================================================================
-
 CompiledProcess::CompiledProcess(uint32_t id, CompiledFn fn)
     : id_(id), fn_(std::move(fn)) {}
 
 void CompiledProcess::Execute(SimContext& ctx) const {
   if (fn_) fn_(ctx);
 }
-
-// =============================================================================
-// ProcessCompiler
-// =============================================================================
 
 bool ProcessCompiler::IsCompilable(const Stmt* body) {
   if (body == nullptr) return false;
@@ -136,4 +128,4 @@ bool ProcessCompiler::HasTimingControlInBlock(const std::vector<Stmt*>& stmts) {
   return false;
 }
 
-}  // namespace delta
+}

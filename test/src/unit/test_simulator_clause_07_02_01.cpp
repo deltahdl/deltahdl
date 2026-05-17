@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.2.1: First member is most significant, decreasing significance.
 TEST(PackedStructSimulation, MsbFirstBitOrdering_ThreeFields) {
   auto v = RunAndGet(
       "module t;\n"
@@ -58,9 +57,6 @@ TEST(PackedStructSimulation, MsbFirstBitOrdering_LeastSignificantField) {
   EXPECT_EQ(v, 0xCCu);
 }
 
-// §7.2.1: "A packed structure can also be used as a whole with arithmetic
-// and logical operators." Arithmetic-operator coverage (bitwise/logical
-// coverage lives in BitwiseAndOnPackedStruct).
 TEST(PackedStructSimulation, ArithmeticAdditionOnPackedStruct) {
   auto v = RunAndGet(
       "module t;\n"
@@ -77,7 +73,6 @@ TEST(PackedStructSimulation, ArithmeticAdditionOnPackedStruct) {
   EXPECT_EQ(v, 0x0406u);
 }
 
-// §7.2.1: Packed struct used as a whole with bitwise operators.
 TEST(PackedStructSimulation, BitwiseAndOnPackedStruct) {
   auto v = RunAndGet(
       "module t;\n"
@@ -94,7 +89,6 @@ TEST(PackedStructSimulation, BitwiseAndOnPackedStruct) {
   EXPECT_EQ(v, 0x0F0Fu);
 }
 
-// §7.2.1: Packed struct assigned from concatenation.
 TEST(PackedStructSimulation, AssignFromConcatenation) {
   auto v = RunAndGet(
       "module t;\n"
@@ -107,7 +101,6 @@ TEST(PackedStructSimulation, AssignFromConcatenation) {
   EXPECT_EQ(v, 0xABu);
 }
 
-// §7.2.1: Packed struct can be bit-selected as packed array [n-1:0].
 TEST(PackedStructSimulation, PartSelectOnPackedStruct) {
   auto v = RunAndGet(
       "module t;\n"
@@ -120,8 +113,6 @@ TEST(PackedStructSimulation, PartSelectOnPackedStruct) {
   EXPECT_EQ(v, 0xABu);
 }
 
-// §7.2.1: "One or more bits of a packed structure can be selected as if it
-// were a packed array with the range [n-1:0]." Single-bit boundary at MSB.
 TEST(PackedStructSimulation, SingleBitSelectOnPackedStruct) {
   auto v = RunAndGet(
       "module t;\n"
@@ -134,10 +125,6 @@ TEST(PackedStructSimulation, SingleBitSelectOnPackedStruct) {
   EXPECT_EQ(v, 1u);
 }
 
-// §7.2.1: "If there are also 2-state members in the structure, there is an
-// implicit conversion ... from 2-state to 4-state when writing them."
-// Writing a 2-state value into a 2-state member of a 4-state struct must
-// overwrite any prior X bits in that member's bit positions.
 TEST(PackedStructSimulation, WriteTwoStateValueToBitMember_OverwritesPriorX) {
   auto v = RunAndGet(
       "module t;\n"
@@ -154,10 +141,6 @@ TEST(PackedStructSimulation, WriteTwoStateValueToBitMember_OverwritesPriorX) {
   EXPECT_EQ(v, 0xA5u);
 }
 
-// §7.2.1: "If there are also 2-state members in the structure, there is an
-// implicit conversion from 4-state to 2-state when reading those members."
-// Mixed struct (bit + logic) is 4-state overall; reading the 2-state `bit`
-// member returns a 2-state value, so X bits in the source convert to 0.
 TEST(PackedStructSimulation, BitMemberInFourStateStruct_ReadsAsTwoState) {
   auto v = RunAndGet(
       "module t;\n"
@@ -173,7 +156,6 @@ TEST(PackedStructSimulation, BitMemberInFourStateStruct_ReadsAsTwoState) {
   EXPECT_EQ(v, 0u);
 }
 
-// §7.2.1: Member write then read back whole struct.
 TEST(PackedStructSimulation, MemberWriteUpdatesWholeVector) {
   auto v = RunAndGet(
       "module t;\n"
@@ -190,4 +172,4 @@ TEST(PackedStructSimulation, MemberWriteUpdatesWholeVector) {
   EXPECT_EQ(v, 0xAB00u);
 }
 
-}  // namespace
+}

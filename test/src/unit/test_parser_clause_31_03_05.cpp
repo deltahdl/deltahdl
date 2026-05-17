@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §31.3.5 Table 31-5: the optional notifier argument is captured as a
-// variable identifier on the timing check entry.
 TEST(TimingCheckCommandParsing, RecoveryWithNotifier) {
   auto r = Parse(
       "module m;\n"
@@ -21,9 +19,6 @@ TEST(TimingCheckCommandParsing, RecoveryWithNotifier) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-// §31.3.5 Syntax 31-7 as a specify-block item: edge-qualified reference
-// first (timestamp event) and edge-qualified data second (timecheck event),
-// both captured with their respective edges.
 TEST(TimingCheckCommandParsing, RecoveryAsSpecifyItem) {
   auto sp = ParseSpecifySingle(
       "module m(input rst, clk);\n"
@@ -43,8 +38,6 @@ TEST(TimingCheckCommandParsing, RecoveryAsSpecifyItem) {
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
-// §31.3.5 Table 31-5: the limit is a constant expression, not just a
-// literal. A specparam reference in the limit slot must parse.
 TEST(TimingCheckCommandParsing, RecoveryLimitIsExpression) {
   auto r = Parse(
       "module m;\n"
@@ -60,8 +53,6 @@ TEST(TimingCheckCommandParsing, RecoveryLimitIsExpression) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
-// §31.3.5 Syntax 31-7: the timing_check_limit argument is required, not
-// optional. Omitting it must produce a parse error.
 TEST(TimingCheckCommandParsing, ErrorRecoveryMissingLimit) {
   auto r = Parse(
       "module m;\n"
@@ -72,4 +63,4 @@ TEST(TimingCheckCommandParsing, ErrorRecoveryMissingLimit) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

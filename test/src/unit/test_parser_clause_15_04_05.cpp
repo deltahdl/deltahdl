@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.5: get() call with ref argument parses.
 TEST(MailboxGetParser, GetCallParses) {
   auto r = Parse(
       "module m;\n"
@@ -18,7 +17,6 @@ TEST(MailboxGetParser, GetCallParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.5: get() on a declared mailbox with new parses.
 TEST(MailboxGetParser, GetAfterNew) {
   auto r = Parse(
       "module m;\n"
@@ -32,7 +30,6 @@ TEST(MailboxGetParser, GetAfterNew) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.5: Multiple get() calls in sequence parse.
 TEST(MailboxGetParser, MultipleGetCalls) {
   auto r = Parse(
       "module m;\n"
@@ -47,4 +44,4 @@ TEST(MailboxGetParser, MultipleGetCalls) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

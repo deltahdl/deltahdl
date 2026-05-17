@@ -60,4 +60,4 @@ TEST(DataTypeParsing, EventAssignNull) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
 }
 
-}  // namespace
+}

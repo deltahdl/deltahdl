@@ -17,12 +17,10 @@ class Lexer {
   Token Next();
   Token Peek();
 
-  // Read a file_path_spec token (A.1.1): raw text until whitespace/comma/semi.
   Token NextFilePathSpec();
 
   std::vector<Token> LexAll();
 
-  // Save/restore lexer position for backtracking (used by parser).
   struct SavedPos {
     uint32_t pos;
     uint32_t line;
@@ -42,17 +40,14 @@ class Lexer {
   bool AtEnd() const;
   SourceLoc MakeLoc() const;
 
-  // Whitespace / comments
   void SkipWhitespaceAndComments();
   void ConsumeKeywordMarker();
   void SkipLineComment();
   void SkipBlockComment(SourceLoc start_loc);
 
-  // Token construction helpers
   Token MakeToken(TokenKind kind, SourceLoc loc) const;
   Token MakeOp(TokenKind kind, SourceLoc loc, uint32_t start);
 
-  // Primary lexing entry points
   Token LexIdentifier();
   Token LexNumber();
   Token LexStringLiteral();
@@ -63,7 +58,6 @@ class Lexer {
   Token LexApostrophe();
   Token LexOperator();
 
-  // Number sub-helpers
   Token LexUnbasedUnsized(SourceLoc loc, uint32_t start);
   Token LexBasedNumber(SourceLoc loc, uint32_t start);
   void ValidateDecimalXZ(SourceLoc loc, char base_letter, uint32_t digit_start);
@@ -75,7 +69,6 @@ class Lexer {
   bool IsWordBoundary(uint32_t p) const;
   bool TryLexTimeSuffix();
 
-  // Operator sub-helpers
   Token LexOpTilde(SourceLoc loc, uint32_t start);
   Token LexOpPlus(SourceLoc loc, uint32_t start);
   Token LexOpMinus(SourceLoc loc, uint32_t start);
@@ -106,4 +99,4 @@ class Lexer {
   KeywordVersion keyword_version_ = KeywordVersion::kVer18002023;
 };
 
-}  // namespace delta
+}

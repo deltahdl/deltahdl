@@ -21,8 +21,7 @@ TEST(StdBuiltinPackageParsing, ModuleWildcardImportOfStd) {
 }
 
 TEST(StdBuiltinPackageParsing, StdScopeResolutionCallWithArgument) {
-  // Moved from test_parser_annex_a_08_02.cpp: `std::name(args)` is the
-  // built_in_function_call form defined by Syntax 26-5.
+
   auto r = Parse(
       "module m;\n"
       "  int x;\n"
@@ -35,9 +34,7 @@ TEST(StdBuiltinPackageParsing, StdScopeResolutionCallWithArgument) {
 }
 
 TEST(StdBuiltinPackageParsing, StdScopedDataTypeInVariableDeclaration) {
-  // Syntax 26-5 allows `std ::` as an optional prefix on a data type
-  // identifier; verify the parser accepts the qualified form in a variable
-  // declaration.
+
   auto r = Parse(
       "module m;\n"
       "  std::mailbox mb;\n"
@@ -47,7 +44,7 @@ TEST(StdBuiltinPackageParsing, StdScopedDataTypeInVariableDeclaration) {
 }
 
 TEST(StdBuiltinPackageParsing, UserPackageNamedStdParses) {
-  // The parser does not reject 'package std;' — only the elaborator does.
+
   auto r = Parse(
       "package std;\n"
       "  typedef int t;\n"
@@ -58,4 +55,4 @@ TEST(StdBuiltinPackageParsing, UserPackageNamedStdParses) {
   EXPECT_EQ(r.cu->packages[0]->name, "std");
 }
 
-}  // namespace
+}

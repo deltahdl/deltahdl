@@ -19,8 +19,6 @@
 
 namespace delta {
 
-// --- PRNG system calls ---
-
 static Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
                               std::string_view name) {
   if (name == "$random") {
@@ -45,9 +43,6 @@ static Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// --- System call evaluation ---
-
-// §21.2.1.6: Build %p format string for a tagged union variable.
 static std::string BuildFormatP(const Expr* arg, SimContext& ctx) {
   if (arg->kind != ExprKind::kIdentifier) return "";
   auto tag = ctx.GetVariableTag(arg->text);
@@ -75,9 +70,6 @@ static void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->callee == "$display") std::cout << "\n";
 }
 
-// §20.10: emit a severity message header with the simulation time. Shared
-// with the §16.3 default-$error path so both subclauses route through the
-// same formatter.
 void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,
                         std::string_view msg, std::ostream& os) {
   os << "[" << ctx.CurrentTime().ticks << "] " << prefix;
@@ -262,9 +254,7 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     return MakeLogic4VecVal(arena, 1, 0);
   }
   if (name == "$exit") {
-    // §24.7: Terminate all initial procedures (and their descendants) in the
-    // program block this thread originated in; calls from outside any program
-    // initial are ignored.
+
     auto* cur = ctx.CurrentProcess();
     if (cur && cur->program_block_id != 0) {
       ctx.ExitProgramBlock(cur->program_block_id);
@@ -278,15 +268,12 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   return EvalMiscSysCall(expr, ctx, arena, name);
 }
 
-// --- Function call evaluation ---
-
-// §13.5.4: Resolve the call-site arg index for a given parameter index.
 static int ResolveArgIndex(const ModuleItem* func, const Expr* expr,
                            size_t param_idx) {
   if (expr->arg_names.empty()) {
     return (param_idx < expr->args.size()) ? static_cast<int>(param_idx) : -1;
   }
-  // §A.6.9: list_of_arguments allows positional args followed by named args.
+
   size_t positional_count = expr->args.size() - expr->arg_names.size();
   if (param_idx < positional_count) {
     return static_cast<int>(param_idx);
@@ -299,7 +286,6 @@ static int ResolveArgIndex(const ModuleItem* func, const Expr* expr,
   return -1;
 }
 
-// §13.5.2: Try to pass by reference. Returns true if aliased successfully.
 static bool TryBindRefArg(const Expr* expr, int arg_index,
                           std::string_view param_name, SimContext& ctx) {
   if (arg_index < 0) return false;
@@ -312,9 +298,6 @@ static bool TryBindRefArg(const Expr* expr, int arg_index,
   return true;
 }
 
-// §7.10.3: Try to bind a queue element (q[i]) by reference.
-// Creates a local variable with the current value; records a QueueRefBinding
-// for writeback on function return.
 static bool TryBindQueueElementRef(const Expr* expr, int arg_index,
                                    const FunctionArg& param, SimContext& ctx,
                                    Arena& arena) {
@@ -328,24 +311,21 @@ static bool TryBindQueueElementRef(const Expr* expr, int arg_index,
   if (!q || !call_arg->index) return false;
   auto idx = EvalExpr(call_arg->index, ctx, arena).ToUint64();
   if (idx >= q->elements.size()) return false;
-  // §6.22.2: Width must match for ref binding (skip for implicit types).
+
   if (param.data_type.kind != DataTypeKind::kImplicit) {
     uint32_t param_width = EvalTypeWidth(param.data_type);
     if (param_width != q->elem_width) return false;
   }
-  // Create a local variable initialized with the current element value.
+
   auto* var = ctx.CreateLocalVariable(param.name, q->elem_width);
   var->value = q->elements[idx];
-  // Record binding for writeback: capture the element's unique ID.
+
   if (idx < q->element_ids.size()) {
     ctx.RecordQueueRef({q, q->element_ids[idx], var});
   }
   return true;
 }
 
-// §7.10.3: Write back queue ref bindings. For each binding, search for the
-// captured element ID in the queue. If found, write back; otherwise the ref
-// is outdated (§13.5.2) and the write is suppressed.
 static void WritebackQueueRefs(SimContext& ctx) {
   auto bindings = ctx.PopQueueRefFrame();
   for (const auto& b : bindings) {
@@ -359,7 +339,6 @@ static void WritebackQueueRefs(SimContext& ctx) {
   }
 }
 
-// §13.5.3: Evaluate call-site arg, use default value, or X.
 static Logic4Vec ResolveArgValue(const FunctionArg& param, const Expr* expr,
                                  int arg_index, SimContext& ctx, Arena& arena) {
   if (arg_index >= 0 && expr->args[static_cast<size_t>(arg_index)] != nullptr) {
@@ -369,7 +348,6 @@ static Logic4Vec ResolveArgValue(const FunctionArg& param, const Expr* expr,
   return MakeLogic4Vec(arena, 32);
 }
 
-// §7.8: Copy associative array data when passing to a subroutine.
 static bool TryBindAssocArg(const Expr* call_arg, std::string_view param_name,
                             SimContext& ctx) {
   if (!call_arg || call_arg->kind != ExprKind::kIdentifier) return false;
@@ -387,8 +365,6 @@ static bool TryBindAssocArg(const Expr* call_arg, std::string_view param_name,
   return true;
 }
 
-// §13.4: Copy array elements when passing an unpacked array to a subroutine.
-// §7.7: Runtime size check when fixed-size formal receives dynamic/queue actual.
 static bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
                             SimContext& ctx, Arena& arena) {
   if (!call_arg || call_arg->kind != ExprKind::kIdentifier) return false;
@@ -396,8 +372,6 @@ static bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
   auto* info = ctx.FindArrayInfo(call_arg->text);
   if (!info) return false;
 
-  // §7.7: Fixed-size formal receiving dynamic/queue actual requires runtime
-  // size check.
   if (!formal.unpacked_dims.empty() && formal.unpacked_dims[0] != nullptr &&
       (info->is_dynamic || info->is_queue)) {
     auto formal_size = EvalExpr(formal.unpacked_dims[0], ctx, arena).ToUint64();
@@ -425,7 +399,6 @@ static bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
   return true;
 }
 
-// §13.5: Bind function arguments with named, default, and ref support.
 static void BindFunctionArgs(const ModuleItem* func, const Expr* expr,
                              SimContext& ctx, Arena& arena) {
   for (size_t i = 0; i < func->func_args.size(); ++i) {
@@ -452,7 +425,6 @@ static void BindFunctionArgs(const ModuleItem* func, const Expr* expr,
   }
 }
 
-// Write back output/inout args, respecting named binding (§13.5.4).
 static void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
                                 SimContext& ctx, Arena& arena) {
   for (size_t i = 0; i < func->func_args.size(); ++i) {
@@ -469,8 +441,6 @@ static void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
   }
 }
 
-// §13: Handle blocking assignment inside function/task body.
-// Write to an indexed LHS inside a function body (array/assoc element).
 static void ExecFuncSelectAssign(const Expr* lhs, const Logic4Vec& val,
                                  SimContext& ctx, Arena& arena) {
   if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return;
@@ -509,7 +479,7 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
     ExecFuncSelectAssign(stmt->lhs, val, ctx, arena);
     return;
   }
-  // §8.11: this.property = val
+
   if (stmt->lhs->kind == ExprKind::kMemberAccess && stmt->lhs->lhs &&
       stmt->lhs->lhs->kind == ExprKind::kIdentifier &&
       stmt->lhs->lhs->text == "this" && stmt->lhs->rhs &&
@@ -518,7 +488,7 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
     if (self) self->SetProperty(std::string(stmt->lhs->rhs->text), val);
     return;
   }
-  // §8.15: super.property = val
+
   if (stmt->lhs->kind == ExprKind::kMemberAccess && stmt->lhs->lhs &&
       stmt->lhs->lhs->kind == ExprKind::kIdentifier &&
       stmt->lhs->lhs->text == "super" && stmt->lhs->rhs &&
@@ -531,9 +501,6 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
   }
 }
 
-// Forward declarations for mutually recursive function body execution.
-// func_name is passed through for §13.4.2 mixed-lifetime local variable
-// support.
 static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
                          std::string_view func_name, SimContext& ctx,
                          Arena& arena);
@@ -577,7 +544,6 @@ static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var,
   return false;
 }
 
-// §13.8: For-loop execution inside function bodies.
 static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var,
                         std::string_view func_name, SimContext& ctx,
                         Arena& arena) {
@@ -617,7 +583,6 @@ static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var,
   return false;
 }
 
-// §13.4.2: Create or reinitialize a local variable with given width and init.
 static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
                                     const Expr* init, SimContext& ctx,
                                     Arena& arena) {
@@ -628,14 +593,12 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   return v;
 }
 
-// §13.4.2: Handle automatic var in static function.
 static void ExecFuncVarDeclAutomatic(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
   CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type, stmt->var_init, ctx,
                      arena);
 }
 
-// §13.4.2: Handle static var in automatic function.
 static void ExecFuncVarDeclStatic(const Stmt* stmt, std::string_view func_name,
                                   SimContext& ctx, Arena& arena) {
   auto* existing = ctx.FindStaticFuncVar(func_name, stmt->var_name);
@@ -648,7 +611,6 @@ static void ExecFuncVarDeclStatic(const Stmt* stmt, std::string_view func_name,
   ctx.SaveStaticFuncVar(func_name, stmt->var_name, v);
 }
 
-// §13.3.1/§13.4.2: Handle var declaration inside function body.
 static void ExecFuncVarDecl(const Stmt* stmt, std::string_view func_name,
                             SimContext& ctx, Arena& arena) {
   if (stmt->var_is_automatic) {
@@ -776,7 +738,6 @@ static bool ExecFuncForeach(const Stmt* stmt, Variable* ret_var,
   return false;
 }
 
-// Execute a single statement in a function body; returns true on 'return'.
 static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
                          std::string_view func_name, SimContext& ctx,
                          Arena& arena) {
@@ -822,8 +783,6 @@ static void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
   }
 }
 
-// §8.7: Initialize properties for a single class level to their explicit
-// defaults or zero if no default is provided.
 static void InitClassPropertyDefaults(const ClassTypeInfo* info,
                                       ClassObject* obj, SimContext& ctx,
                                       Arena& arena) {
@@ -834,8 +793,7 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
     std::string scoped = std::string(info->name) + "::" + std::string(prop.name);
     obj->properties[scoped] = val;
   }
-  // §8.5/§8.15: Populate parameter properties with default values.
-  // Store with scoped names so super.PARAM resolves to the base class value.
+
   if (info->decl) {
     for (const auto& [pname, pexpr] : info->decl->params) {
       if (pexpr) {
@@ -848,8 +806,6 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
   }
 }
 
-// §8.7: Run the constructor for a single class level. If the class has no
-// explicit constructor, this is a no-op (implicit constructor).
 static void RunConstructorForLevel(const ClassTypeInfo* info, ClassObject* obj,
                                    const Expr* args_expr, SimContext& ctx,
                                    Arena& arena) {
@@ -862,16 +818,6 @@ static void RunConstructorForLevel(const ClassTypeInfo* info, ClassObject* obj,
   ctx.PopScope();
 }
 
-// §8.7: Allocate a new class object, execute constructor, return handle.
-//
-// Construction order per §8.7:
-//  1. Call base class constructor (super.new).
-//  2. Initialize each property to its explicit default value or its
-//     uninitialized value if no default is provided.
-//  3. Execute the remaining code in the user-defined constructor.
-//
-// For implicit constructors (no user-defined new), steps 2-3 still apply;
-// the base class constructor is called automatically for derived classes.
 Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
                        SimContext& ctx, Arena& arena) {
   auto* info = ctx.FindClassType(class_type);
@@ -891,7 +837,6 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
   auto* obj = arena.Create<ClassObject>();
   obj->type = info;
 
-  // Collect the inheritance chain from base to most-derived.
   std::vector<const ClassTypeInfo*> chain;
   for (auto* cur = info; cur; cur = cur->parent) chain.push_back(cur);
   std::reverse(chain.begin(), chain.end());
@@ -899,14 +844,10 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
   auto handle = ctx.AllocateClassObject(obj);
   ctx.PushThis(obj);
 
-  // Walk base-to-derived: for each level, initialize property defaults then
-  // run its constructor. The most-derived constructor receives new_expr args;
-  // base constructors run with no args (explicit super.new args are handled
-  // when the constructor body executes a super.new() call).
   for (size_t i = 0; i < chain.size(); ++i) {
     InitClassPropertyDefaults(chain[i], obj, ctx, arena);
     const Expr* args = (i == chain.size() - 1) ? new_expr : nullptr;
-    // §8.17: Forward extends specifier args to base constructor.
+
     if (!args && i + 1 < chain.size() && chain[i + 1]->decl) {
       const auto* child_decl = chain[i + 1]->decl;
       if (!child_decl->extends_args.empty()) {
@@ -915,7 +856,7 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
         synth->args = child_decl->extends_args;
         args = synth;
       } else if (child_decl->extends_has_default && new_expr) {
-        // Find the position of 'default' in the child constructor's arg list.
+
         size_t default_pos = 0;
         for (const auto* m : child_decl->members) {
           if (m->kind == ClassMemberKind::kMethod && m->method &&
@@ -929,7 +870,7 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
             break;
           }
         }
-        // Determine base constructor arg count.
+
         size_t base_argc = 0;
         auto base_it = chain[i]->methods.find("new");
         if (base_it != chain[i]->methods.end() && base_it->second) {
@@ -952,8 +893,6 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
   return MakeLogic4VecVal(arena, 64, handle);
 }
 
-// §8.5: Override parameter properties on a class object with specialization
-// values stored for the given variable.
 void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
                               SimContext& ctx, Arena& arena) {
   auto* obj = ctx.GetClassObject(handle);
@@ -986,7 +925,6 @@ static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, result);
 }
 
-// Forward declaration for use in ExecInstanceMethodCall.
 static void ExecClassMethod(ModuleItem* method, const Expr* expr,
                             SimContext& ctx, Arena& arena, Logic4Vec& out);
 
@@ -995,7 +933,6 @@ struct InstanceMethodInfo {
   ModuleItem* method = nullptr;
 };
 
-// §8.22: Resolve a class instance and its method by name.
 static bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
                                   InstanceMethodInfo& info) {
   auto class_type = ctx.GetVariableClassType(parts.var_name);
@@ -1008,8 +945,7 @@ static bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
   if (!info.obj) return false;
   info.method = info.obj->ResolveVirtualMethod(parts.method_name);
   if (!info.method) {
-    // §8.14: Non-virtual methods resolve from the declared type, not the
-    // runtime type, so overridden members are hidden through base handles.
+
     auto* declared_type = ctx.FindClassType(class_type);
     if (declared_type) {
       info.method =
@@ -1021,7 +957,6 @@ static bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
   return info.method != nullptr;
 }
 
-// §8: Execute a resolved instance method call.
 static Logic4Vec ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
                                         const Expr* expr, SimContext& ctx,
                                         Arena& arena) {
@@ -1037,7 +972,6 @@ static Logic4Vec ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
   return out;
 }
 
-// §8.15: Dispatch a super.method() call from within a derived class.
 static bool TryEvalSuperMethodCall(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   MethodCallParts parts;
@@ -1052,7 +986,6 @@ static bool TryEvalSuperMethodCall(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §8: Dispatch a method call on a class object instance.
 static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   MethodCallParts parts;
@@ -1063,7 +996,6 @@ static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §13.8: Bind class parameters from specialization values into the scope.
 static void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
                             SimContext& ctx, Arena& arena) {
   if (!cls->decl) return;
@@ -1118,13 +1050,12 @@ static void ExecClassMethod(ModuleItem* method, const Expr* expr,
   out = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
 }
 
-// §8.23: Dispatch a non-parameterized class scope call — Class::method(args).
 static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
                                   Arena& arena, Logic4Vec& out) {
   ClassScopeInfo info;
   if (!ResolveClassScope(expr, ctx, info)) return false;
   if (!info.access->lhs->elements.empty()) return false;
-  // §8.8: Typed constructor call — Class::new(args).
+
   if (info.access->rhs->text == "new") {
     out = EvalClassNew(info.access->lhs->text, expr, ctx, arena);
     return true;
@@ -1135,7 +1066,6 @@ static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §13.8: Dispatch a parameterized class scope call — C#(N)::method(args).
 static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
                                           Arena& arena, Logic4Vec& out) {
   ClassScopeInfo info;
@@ -1143,7 +1073,7 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
   if (info.access->lhs->elements.empty()) return false;
   ctx.PushScope();
   BindClassParams(info.cls, info.access->lhs, ctx, arena);
-  // §8.8: Parameterized typed constructor call — C#(N)::new(args).
+
   if (info.access->rhs->text == "new") {
     out = EvalClassNew(info.access->lhs->text, expr, ctx, arena);
     ctx.PopScope();
@@ -1154,7 +1084,6 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §8.30.3/§8.30.4: Dispatch weak_reference get()/clear() method calls.
 static bool TryEvalWeakRefMethodCall(const Expr* expr, SimContext& ctx,
                                      Arena& arena, Logic4Vec& out) {
   MethodCallParts parts;
@@ -1177,7 +1106,6 @@ static bool TryEvalWeakRefMethodCall(const Expr* expr, SimContext& ctx,
   return false;
 }
 
-// §8.30.5: Dispatch weak_reference#(T)::get_id(obj) static call.
 static bool TryEvalWeakRefStaticCall(const Expr* expr, SimContext& ctx,
                                      Arena& arena, Logic4Vec& out) {
   if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
@@ -1193,7 +1121,6 @@ static bool TryEvalWeakRefStaticCall(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §9.7: Dispatch process::self() static call.
 static bool TryEvalProcessStaticCall(const Expr* expr, SimContext& ctx,
                                      Arena& arena, Logic4Vec& out) {
   if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
@@ -1212,16 +1139,12 @@ static bool TryEvalProcessStaticCall(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §9.7: kill/await/suspend/resume are restricted to processes created by an
-// initial procedure, always procedure, or fork block from one of those
-// procedures. Final blocks and continuous assignments are excluded.
 static bool IsRestrictedTarget(const Process* proc) {
   if (!proc) return false;
   return proc->kind == ProcessKind::kFinal ||
          proc->kind == ProcessKind::kContAssign;
 }
 
-// §9.7: Dispatch process instance method calls (status/kill/suspend/resume).
 static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
                                      Arena& arena, Logic4Vec& out) {
   MethodCallParts parts;
@@ -1251,7 +1174,7 @@ static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
         proc->sv_state != ProcessState::kKilled) {
       proc->active = false;
       proc->sv_state = ProcessState::kKilled;
-      // Kill all descendants recursively.
+
       std::vector<Process*> stack(proc->children.begin(), proc->children.end());
       while (!stack.empty()) {
         auto* child = stack.back();
@@ -1263,7 +1186,7 @@ static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
           for (auto* gc : child->children) stack.push_back(gc);
         }
       }
-      // Wake any processes waiting on await().
+
       for (auto& w : proc->await_waiters) {
         if (w) w.resume();
       }
@@ -1280,8 +1203,7 @@ static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
       out = MakeLogic4VecVal(arena, 1, 0);
       return true;
     }
-    // §9.7: "It shall be an error for a function to call suspend() on the
-    // current process, i.e., a function cannot suspend its own execution."
+
     if (proc && proc == ctx.CurrentProcess() && ctx.InFunction()) {
       ctx.GetDiag().Error(
           {}, "function cannot suspend its own execution");
@@ -1297,7 +1219,7 @@ static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
     return true;
   }
   if (parts.method_name == "srandom") {
-    // §9.7/§18.13.3: srandom() seeds the process's RNG with the given seed.
+
     if (proc && !expr->args.empty()) {
       auto seed_val = EvalExpr(expr->args[0], ctx, arena);
       proc->rng_seed = static_cast<uint32_t>(seed_val.ToUint64());
@@ -1318,7 +1240,7 @@ static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
       if (proc->sv_state == ProcessState::kSuspended) {
         proc->sv_state = ProcessState::kRunning;
       }
-      // Re-schedule the process to continue execution.
+
       auto* event = ctx.GetScheduler().GetEventPool().Acquire();
       Process* target = proc;
       event->callback = [target, &ctx]() {
@@ -1336,7 +1258,6 @@ static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
   return false;
 }
 
-// Try dispatching to built-in type methods (enum, string, array, queue).
 static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
   if (TryEvalProcessMethodCall(expr, ctx, arena, out)) return true;
@@ -1348,11 +1269,8 @@ static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
   return TryEvalAssocMethodCall(expr, ctx, arena, out);
 }
 
-// §11.12: Guard against recursive let expansion.
 static thread_local std::unordered_set<std::string_view> expanding_lets;
 
-// §11.12: Evaluate let actual arguments in the caller's scope.
-// Returns a vector of evaluated values, one per formal.
 static std::vector<Logic4Vec> EvalLetActuals(ModuleItem* decl, const Expr* call,
                                              SimContext& ctx, Arena& arena) {
   auto& formals = decl->func_args;
@@ -1379,7 +1297,7 @@ static std::vector<Logic4Vec> EvalLetActuals(ModuleItem* decl, const Expr* call,
         val = MakeLogic4Vec(arena, 32);
       }
     }
-    // §11.12: Typed formal — cast actual to formal's declared width.
+
     const auto& dt = formals[i].data_type;
     if (dt.kind != DataTypeKind::kImplicit && dt.packed_dim_left &&
         dt.packed_dim_right) {
@@ -1393,7 +1311,6 @@ static std::vector<Logic4Vec> EvalLetActuals(ModuleItem* decl, const Expr* call,
   return vals;
 }
 
-// §11.12: Bind pre-evaluated actual values to let formals in the current scope.
 static void BindLetArgs(ModuleItem* decl, const std::vector<Logic4Vec>& vals,
                         SimContext& ctx) {
   auto& formals = decl->func_args;
@@ -1403,18 +1320,14 @@ static void BindLetArgs(ModuleItem* decl, const std::vector<Logic4Vec>& vals,
   }
 }
 
-// §11.12/§F.4: Expand a let declaration by binding args and evaluating body.
-// §11.12: Free variables in the let body resolve from the declaration scope
-// (module-level), not the instantiation scope.
 static Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call,
                                   SimContext& ctx, Arena& arena) {
-  // §11.12: Recursive let instantiation is not permitted.
+
   if (expanding_lets.count(decl->name)) return MakeAllX(arena, 32);
   expanding_lets.insert(decl->name);
-  // §11.12: Evaluate actuals in the caller's scope before isolating.
+
   auto vals = EvalLetActuals(decl, call, ctx, arena);
-  // §11.12: Clear the scope stack so free variables in the let body
-  // resolve from the declaration (module-level) scope, not the caller's.
+
   auto saved_scopes = ctx.SwapScopeStack({});
   ctx.PushScope();
   BindLetArgs(decl, vals, ctx);
@@ -1425,8 +1338,6 @@ static Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call,
   return result;
 }
 
-// Try dispatching to method calls (builtin, class, parameterized scope)
-// or let expansion. Returns true if the call was handled.
 static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   if (TryBuiltinMethodCall(expr, ctx, arena, out)) return true;
@@ -1444,7 +1355,6 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   return false;
 }
 
-// §13: Dispatch function calls with lifetime and void support.
 Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec result;
   if (TryDispatchMethodOrLet(expr, ctx, arena, result)) return result;
@@ -1455,7 +1365,6 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   bool is_static = func->is_static && !func->is_automatic;
   bool is_void = (func->return_type.kind == DataTypeKind::kVoid);
 
-  // §13.3.1: Static functions reuse their variable frame across calls.
   if (is_static) {
     ctx.PushStaticScope(func->name);
   } else {
@@ -1465,8 +1374,6 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   ctx.PushQueueRefFrame();
   BindFunctionArgs(func, expr, ctx, arena);
 
-  // §13.4.1: Void functions have no implicit return variable.
-  // For static functions, reuse the existing return variable if present.
   Variable dummy_ret;
   Variable* ret_var = &dummy_ret;
   if (!is_void) {
@@ -1491,11 +1398,10 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   return result;
 }
 
-// §13: Set up task call scope for coroutine-based execution.
 const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (!expr) return nullptr;
-  // §A.6.9 footnote 42: tf_call without parentheses (bare identifier).
+
   if (expr->kind == ExprKind::kIdentifier) {
     auto* func = ctx.FindFunction(expr->text);
     if (!func) return nullptr;
@@ -1503,7 +1409,7 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
     bool is_void_func = func->kind == ModuleItemKind::kFunctionDecl &&
                         func->return_type.kind == DataTypeKind::kVoid;
     if (!is_task && !is_void_func) return nullptr;
-    // §13.3.1: Static tasks reuse their variable frame across calls.
+
     bool is_static = func->is_static && !func->is_automatic;
     if (is_static) {
       ctx.PushStaticScope(func->name);
@@ -1519,7 +1425,7 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
   if (expr->kind != ExprKind::kCall) return nullptr;
   auto* func = ctx.FindFunction(expr->callee);
   if (!func || func->kind != ModuleItemKind::kTaskDecl) return nullptr;
-  // §13.3.1: Static tasks reuse their variable frame across calls.
+
   bool is_static = func->is_static && !func->is_automatic;
   if (is_static) {
     ctx.PushStaticScope(func->name);
@@ -1548,7 +1454,6 @@ void TeardownTaskCall(const ModuleItem* func, const Expr* expr,
   }
 }
 
-// §6.21: Reject ref arguments in static subroutines.
 void ValidateRefLifetime(const ModuleItem* func, DiagEngine& diag) {
   if (!func) return;
   bool is_static = func->is_static && !func->is_automatic;
@@ -1626,4 +1531,4 @@ void ValidateConstRefWriteProtection(const ModuleItem* func,
   }
 }
 
-}  // namespace delta
+}

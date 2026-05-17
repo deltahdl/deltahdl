@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- R3: The simulated net shall take the delay specified for the dominating
-//     net ---
-
 TEST(DissimilarNetTypePortConnectionSimulation,
      ValuePropagatesThroughPortWhenInternalDominates) {
   SimFixture f;
@@ -48,9 +45,6 @@ TEST(DissimilarNetTypePortConnectionSimulation,
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// --- R4: If the dominating net is of the type trireg, any strength value
-//     specified for the trireg net shall apply to the simulated net ---
-
 TEST(DissimilarNetTypePortConnectionSimulation,
      TriregDominatingPortPropagatesValue) {
   SimFixture f;
@@ -70,4 +64,4 @@ TEST(DissimilarNetTypePortConnectionSimulation,
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

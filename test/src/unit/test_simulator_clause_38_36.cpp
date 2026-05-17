@@ -82,5 +82,5 @@ TEST_F(VpiCallbackSim, CbValueChangeWithWatcherFires) {
   EXPECT_TRUE(fired);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

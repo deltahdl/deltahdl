@@ -53,4 +53,4 @@ TEST(ClassSim, ForwardTypedefSelfReferentialLinkedList) {
       "endmodule\n", "result"), 2u);
 }
 
-}  // namespace
+}

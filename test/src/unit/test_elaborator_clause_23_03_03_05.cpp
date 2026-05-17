@@ -5,11 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1: For an unpacked array port, the port and the array connected to the
-//     port shall have the same number of unpacked dimensions, and each
-//     dimension shall have the same size as the corresponding dimension of the
-//     array being connected ---
-
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      UnpackedArrayPortMatchingDimensionsAccepted) {
   EXPECT_TRUE(
@@ -63,10 +58,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-// --- R2: If the size and type of the port connection match a single instance
-//     port, the connection shall be made to each instance in an array of
-//     instances ---
-
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      ScalarConnectionReplicatedToArrayOfInstances) {
   EXPECT_TRUE(
@@ -92,10 +83,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
              "  child c(.i(x), .o(y));\n"
              "endmodule\n"));
 }
-
-// --- R3: If the port connection is an unpacked array, the slowest varying
-//     dimensions shall be compared with the instance array dimensions. Matching
-//     size maps element to element; mismatch is an error ---
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      UnpackedArrayConnectionMatchingInstanceArrayAccepted) {
@@ -137,10 +124,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
              "  child c[8][4](.o(o), .i(i));\n"
              "endmodule\n"));
 }
-
-// --- R4: If the port connection is a packed array, each instance gets a
-//     part-select starting from the rightmost indices. Too many or too few bits
-//     is an error ---
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      PackedArrayConnectionMatchingBitCountAccepted) {
@@ -187,8 +170,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-// --- Edge cases ---
-
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      SingleElementInstanceArrayAccepted) {
   EXPECT_TRUE(
@@ -215,4 +196,4 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
              "endmodule\n"));
 }
 
-}  // namespace
+}

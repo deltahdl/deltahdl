@@ -1,4 +1,4 @@
-// §23.3.1
+
 
 #include "fixture_elaborator.h"
 
@@ -136,4 +136,4 @@ TEST(TopLevelModules, DollarRootMultiLevelPathResolves) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

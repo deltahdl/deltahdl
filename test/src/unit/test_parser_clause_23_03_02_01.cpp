@@ -149,4 +149,4 @@ TEST(ModuleInstantiationGrammar, OrderedPortWithTernaryExpression) {
   EXPECT_NE(item->inst_ports[1].second, nullptr);
 }
 
-}  // namespace
+}

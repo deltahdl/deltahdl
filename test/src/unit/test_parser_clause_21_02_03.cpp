@@ -51,4 +51,4 @@ TEST(IoSystemTaskParsing, MonitorbHexOctal) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

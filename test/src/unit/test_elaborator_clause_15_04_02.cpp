@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.2: num() call in initial block elaborates.
 TEST(MailboxNumElaborator, NumCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,7 +18,6 @@ TEST(MailboxNumElaborator, NumCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.2: num() result assigned to int elaborates.
 TEST(MailboxNumElaborator, NumResultAssigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -35,4 +33,4 @@ TEST(MailboxNumElaborator, NumResultAssigned) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

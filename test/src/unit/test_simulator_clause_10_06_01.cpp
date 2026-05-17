@@ -315,4 +315,4 @@ TEST(ProceduralContinuousAssignSim, ReAssignClearsOldRhsWatcher) {
   EXPECT_EQ(q->value.ToUint64(), 2u);
 }
 
-}  // namespace
+}

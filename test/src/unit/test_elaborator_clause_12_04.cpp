@@ -114,4 +114,4 @@ TEST(ConditionalElaboration, NestedIfElseInInitial) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

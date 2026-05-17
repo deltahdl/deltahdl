@@ -21,7 +21,6 @@ TEST(MultiplePathDeclarationParsing, MultipleSourceDestPorts) {
   VerifyFullPathPorts(si, {"a", "b", "c"}, {"x", "y"});
 }
 
-// §30.4.6: a multi-path declaration always records a full connection.
 TEST(MultiplePathDeclarationParsing, MultiPathIsFullConnection) {
   auto sp = ParseSpecifySingle(
       "module m(input a, b, output x, y);\n"
@@ -38,8 +37,6 @@ TEST(MultiplePathDeclarationParsing, MultiPathIsFullConnection) {
   EXPECT_EQ(si->path.dst_ports.size(), 2u);
 }
 
-// §30.4.6: source and destination lists may mix scalars and vectors of any
-// size.
 TEST(MultiplePathDeclarationParsing, MixedScalarVectorListsParse) {
   auto sp = ParseSpecifySingle(
       "module m(input a, input [3:0] b, input [7:0] c,\n"
@@ -57,4 +54,4 @@ TEST(MultiplePathDeclarationParsing, MixedScalarVectorListsParse) {
   EXPECT_EQ(si->path.dst_ports.size(), 2u);
 }
 
-}  // namespace
+}

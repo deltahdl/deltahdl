@@ -290,4 +290,4 @@ TEST(LoopStatementSim, ForCommaSeparatedInitAndStep) {
   EXPECT_EQ(val, 2u);
 }
 
-}  // namespace
+}

@@ -1,8 +1,4 @@
-// §3.2: A design element is a SystemVerilog module, program, interface,
-// checker, package, primitive, or configuration. These constructs are
-// introduced by the keywords module, program, interface, checker, package,
-// primitive, and config, respectively. The lexer recognises each of those
-// seven keywords as a distinct keyword token.
+
 
 #include "fixture_lexer.h"
 
@@ -46,8 +42,7 @@ TEST(DesignElementLexing, ConfigKeywordRecognised) {
 }
 
 TEST(DesignElementLexing, AllSevenKeywordsAreDistinctTokenKinds) {
-  // §3.2 enumerates seven distinct introducer keywords; the lexer shall map
-  // each to its own TokenKind so the parser can dispatch unambiguously.
+
   auto m = LexOne("module").token.kind;
   auto p = LexOne("program").token.kind;
   auto i = LexOne("interface").token.kind;
@@ -64,4 +59,4 @@ TEST(DesignElementLexing, AllSevenKeywordsAreDistinctTokenKinds) {
   }
 }
 
-}  // namespace
+}

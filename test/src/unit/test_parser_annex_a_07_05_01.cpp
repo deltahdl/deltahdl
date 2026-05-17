@@ -125,8 +125,6 @@ TEST(TimingCheckCommandParsing, SetupAsSpecifyItem) {
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
-// --- §A.7.5.1 structural: $nochange as SpecifyItem ---
-
 TEST(TimingCheckCommandParsing, NochangeAsSpecifyItem) {
   auto sp = ParseSpecifySingle(
       "module m(input clk, data);\n"
@@ -145,8 +143,6 @@ TEST(TimingCheckCommandParsing, NochangeAsSpecifyItem) {
   EXPECT_EQ(si->timing_check.data_terminal.name, "data");
   ASSERT_GE(si->timing_check.limits.size(), 2u);
 }
-
-// --- §A.7.5.1 error conditions ---
 
 TEST(TimingCheckCommandParsing, ErrorMissingCloseParen) {
   auto r = Parse(
@@ -168,4 +164,4 @@ TEST(TimingCheckCommandParsing, ErrorMissingSemicolon) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

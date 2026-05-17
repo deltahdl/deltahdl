@@ -43,8 +43,6 @@ TEST(SimpleStateDependentPathParsing, FullPath) {
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
 }
 
-// The `+` polarity operator belongs to the simple path grammar, so it must
-// remain usable underneath the `if (cond)` wrapper.
 TEST(SimpleStateDependentPathParsing, ParallelPathWithPolarity) {
   auto r = Parse(
       "module m;\n"
@@ -60,10 +58,6 @@ TEST(SimpleStateDependentPathParsing, ParallelPathWithPolarity) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
 }
 
-// The subclause explicitly allows several simple state-dependent paths to
-// coexist in one specify block so that each condition contributes its own
-// delay. The parser must accept the whole list without merging or rejecting
-// later entries.
 TEST(SimpleStateDependentPathParsing, MultipleCoexistingPaths) {
   auto r = Parse(
       "module m(input a, b, output y);\n"
@@ -77,8 +71,6 @@ TEST(SimpleStateDependentPathParsing, MultipleCoexistingPaths) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Parallel and full simple state-dependent paths should be mixable in the
-// same specify block since the subclause names both as legal descriptions.
 TEST(SimpleStateDependentPathParsing, MixedParallelAndFullCoexist) {
   auto r = Parse(
       "module m(input a, b, output y);\n"
@@ -91,4 +83,4 @@ TEST(SimpleStateDependentPathParsing, MixedParallelAndFullCoexist) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

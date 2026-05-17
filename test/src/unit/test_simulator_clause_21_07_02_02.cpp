@@ -44,5 +44,5 @@ TEST_F(VcdFourValueDumpSim, DumpChangedValuesOnlyEmitsChanged) {
   EXPECT_NE(content.find("1\""), std::string::npos);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

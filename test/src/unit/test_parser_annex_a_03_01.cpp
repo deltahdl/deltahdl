@@ -710,8 +710,6 @@ TEST(PrimitiveInstantiationParsing, GateInst_EnableWithDelay) {
   EXPECT_NE(g->gate_delay_decay, nullptr);
 }
 
-// --- Error conditions ---
-
 TEST(PrimitiveInstantiationParsing, Error_MissingSemicolon) {
   auto r = Parse(
       "module m;\n"
@@ -800,8 +798,6 @@ TEST(PrimitiveInstantiationParsing, Error_NInputGateSingleTerminal) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// --- Structural coverage ---
-
 TEST(PrimitiveInstantiationParsing, AllNineAlternativesInOneModule) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -831,4 +827,4 @@ TEST(PrimitiveInstantiationParsing, GateInGenerateBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- assertion_item_declaration / property_declaration ---
-
 TEST(AssertionDeclParsing, AssertionItemDecl_PropertyDecl) {
   auto r = Parse(
       "module m;\n"
@@ -129,8 +127,6 @@ TEST(AssertionDeclParsing, PropertyAndSequenceDeclsTogether) {
       nullptr);
 }
 
-// --- property_port_list / property_port_item ---
-
 TEST(AssertionDeclParsing, PropertyPortItem_DefaultValue) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -158,8 +154,6 @@ TEST(AssertionDeclParsing, PropertyPortItem_LocalInput) {
               "endmodule\n"));
 }
 
-// --- property_formal_type ---
-
 TEST(AssertionDeclParsing, PropertyFormalType_Property) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -186,8 +180,6 @@ TEST(AssertionDeclParsing, PropertyFormalType_Implicit) {
               "  endproperty\n"
               "endmodule\n"));
 }
-
-// --- property_spec ---
 
 TEST(AssertionDeclParsing, PropertySpec_ClockingEvent) {
   EXPECT_TRUE(
@@ -278,8 +270,6 @@ TEST(AssertionParsing, PropertyWithDisableIffDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- property_instance / property_list_of_arguments / property_actual_arg ---
-
 TEST(AssertionDeclParsing, PropertyInstance_InAssert) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -368,4 +358,4 @@ TEST(AssertionParsing, PropertyInstanceWithArgs) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

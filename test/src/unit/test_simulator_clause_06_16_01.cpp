@@ -22,4 +22,4 @@ TEST(StringMethods, LenBasic) {
   EXPECT_EQ(result.ToUint64(), 5u);
 }
 
-}  // namespace
+}

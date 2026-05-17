@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.3.1: new() with explicit keyCount elaborates with init_expr.
 TEST(SemaphoreNewElaborator, NewWithExplicitKeyCount) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,7 +19,6 @@ TEST(SemaphoreNewElaborator, NewWithExplicitKeyCount) {
   EXPECT_NE(mod->variables[0].init_expr, nullptr);
 }
 
-// §15.3.1: new() with no arguments (default keyCount = 0).
 TEST(SemaphoreNewElaborator, NewWithDefaultKeyCount) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -36,7 +34,6 @@ TEST(SemaphoreNewElaborator, NewWithDefaultKeyCount) {
   EXPECT_NE(mod->variables[0].init_expr, nullptr);
 }
 
-// §15.3.1: new() with zero keyCount.
 TEST(SemaphoreNewElaborator, NewWithZeroKeyCount) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -48,7 +45,6 @@ TEST(SemaphoreNewElaborator, NewWithZeroKeyCount) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.3.1: Multiple semaphores each with new().
 TEST(SemaphoreNewElaborator, MultipleNewInitializers) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -65,4 +61,4 @@ TEST(SemaphoreNewElaborator, MultipleNewInitializers) {
   EXPECT_NE(mod->variables[1].init_expr, nullptr);
 }
 
-}  // namespace
+}

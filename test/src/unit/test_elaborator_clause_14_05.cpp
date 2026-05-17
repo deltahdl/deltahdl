@@ -62,4 +62,4 @@ TEST(ClockingHierExprElab, MixedSignalsWithHierExprsElaborate) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -251,4 +251,4 @@ TEST(FinalProcedureElaboration, DisplayCallInFinalValid) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

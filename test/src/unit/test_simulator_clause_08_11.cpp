@@ -185,4 +185,4 @@ TEST(ClassSim, ThisMultipleProperties) {
   LowerRunAndCheck(f, design, {{"ra", 3u}, {"rb", 7u}});
 }
 
-}  // namespace
+}

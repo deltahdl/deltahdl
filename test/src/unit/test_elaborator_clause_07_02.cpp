@@ -64,10 +64,6 @@ TEST(StructDeclarationValidation, RandcInUnpackedStruct_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.2: "Unpacked structures can contain any data type." A packed struct
-// is restricted to packed/integer types (§7.2.1), but an unpacked struct
-// must accept arbitrary types — including reals, strings, dynamic-sized
-// 4-state vectors, and arrays — in the same declaration body.
 TEST(StructDeclarationValidation, UnpackedStructAcceptsAnyDataType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -85,11 +81,6 @@ TEST(StructDeclarationValidation, UnpackedStructAcceptsAnyDataType) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.2 footnote 20: positive counterpart of the void-member rule — `void`
-// is legal as a struct_union_member type within a tagged union. The
-// existing negative tests reject void in (un)packed structs; this test
-// pins the legal home of the form so the rule fires only on the disallowed
-// containers.
 TEST(StructDeclarationValidation, VoidMemberInTaggedUnion_Allowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -101,10 +92,6 @@ TEST(StructDeclarationValidation, VoidMemberInTaggedUnion_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.2 footnote 17: the union half of the rule allows `soft` as well as
-// `packed` to license a trailing packed dimension. The §6.8 elaborator
-// file already covers the packed-struct and packed-union variants; this
-// test pins the §7.2-specific soft-union variant.
 TEST(StructDeclarationValidation, SoftUnionWithPackedDim_Allowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -116,12 +103,6 @@ TEST(StructDeclarationValidation, SoftUnionWithPackedDim_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.2: "By default, structures are unpacked." A struct with no `packed`
-// keyword and a `real` member must elaborate cleanly — real is forbidden
-// in a packed struct (§7.2.1 restricts packed members to packed/integer
-// types), so the absence of an error proves the elaborator classified the
-// declaration as unpacked. If the default were packed, ValidatePackedStruct
-// MemberTypes would reject the real member.
 TEST(StructDeclarationValidation, BareStructWithRealMemberClassifiedUnpacked) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -133,4 +114,4 @@ TEST(StructDeclarationValidation, BareStructWithRealMemberClassifiedUnpacked) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

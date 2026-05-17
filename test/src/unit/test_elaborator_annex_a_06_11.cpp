@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- ClockingBlockElab: clocking_declaration elaboration ---
-
 TEST(ClockingBlockElab, PlainBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -98,8 +96,6 @@ TEST(ClockingBlockElab, EdgeKeywordInSkewElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- ClockingSkewElab: clocking_skew elaboration ---
-
 TEST(ClockingSkewElab, SkewVariationsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -152,8 +148,6 @@ TEST(ClockingSkewElab, InputOutputCombinedSkewElaborates) {
              "endmodule\n"));
 }
 
-// --- CycleDelayElab: cycle_delay elaboration ---
-
 TEST(CycleDelayElab, WithDefaultClockingElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -189,8 +183,6 @@ TEST(CycleDelayElab, ZeroCycleDelayWithDefaultClocking) {
              "  end\n"
              "endmodule\n"));
 }
-
-// --- DefaultClockingElab: default clocking elaboration ---
 
 TEST(DefaultClockingElab, InlineDefaultClockingElaborates) {
   EXPECT_TRUE(
@@ -230,8 +222,6 @@ TEST(DefaultClockingElab, DefaultClockingInInterfaceElaborates) {
              "endinterface\n"));
 }
 
-// --- GlobalClockingElab: global clocking elaboration ---
-
 TEST(GlobalClockingElab, BasicGlobalClockingElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -270,8 +260,6 @@ TEST(GlobalClockingElab, GlobalAndDefaultCoexist) {
              "  endclocking\n"
              "endmodule\n"));
 }
-
-// --- SyncDriveElab: clocking_drive elaboration ---
 
 TEST(SyncDriveElab, SimpleClockingDriveElaborates) {
   EXPECT_TRUE(
@@ -315,8 +303,6 @@ TEST(SyncDriveElab, MultipleDrivesToSameOutputElaborates) {
              "  end\n"
              "endmodule\n"));
 }
-
-// --- Additional coverage ---
 
 TEST(ClockingBlockElab, ClockingBlockInProgramElaborates) {
   EXPECT_TRUE(
@@ -367,4 +353,4 @@ TEST(CycleDelayElab, CycleDelayIdentifierWithDefaultClocking) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

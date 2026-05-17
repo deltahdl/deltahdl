@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §6.3.1 ¶4: `logic` declares an object of the basic 4-state data type. The
-// parser must record the variable's data type as DataTypeKind::kLogic.
 TEST(LogicValuesParser, LogicScalarDeclarationParsesAsKLogic) {
   auto r = Parse(
       "module t;\n"
@@ -22,9 +20,6 @@ TEST(LogicValuesParser, LogicScalarDeclarationParsesAsKLogic) {
   EXPECT_EQ(item->name, "v");
 }
 
-// §6.3.1 ¶4: `logic` may carry a packed dimension to declare a vector of the
-// basic 4-state type. The parser must still record kLogic and preserve the
-// packed-range expressions for the elaborator.
 TEST(LogicValuesParser, LogicVectorDeclarationParsesAsKLogicWithPackedDim) {
   auto r = Parse(
       "module t;\n"
@@ -39,10 +34,6 @@ TEST(LogicValuesParser, LogicVectorDeclarationParsesAsKLogicWithPackedDim) {
   EXPECT_NE(item->data_type.packed_dim_right, nullptr);
 }
 
-// §6.3.1 ¶4: `logic` may be used to construct other data types — here, a
-// typedef built from `logic`. The parser must accept the construction without
-// errors so that the elaborator can derive the user type from the 4-state
-// base.
 TEST(LogicValuesParser, TypedefBuiltFromLogicParses) {
   auto r = Parse(
       "module t;\n"
@@ -52,4 +43,4 @@ TEST(LogicValuesParser, TypedefBuiltFromLogicParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

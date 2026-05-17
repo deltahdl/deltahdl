@@ -92,9 +92,6 @@ TEST(EscapedIdentifierSim, EscapedIdentVariableResolves) {
   EXPECT_EQ(val, 99u);
 }
 
-// §5.6.1: rule (4) symmetry at simulation — a value written through the
-// simple-form reference must be readable from the variable declared in the
-// escaped form. Both forms map to the stored name "cpu3".
 TEST(EscapedIdentifierSim, EscapedDeclSimpleRefResolves) {
   auto result = RunAndGet(
       "module t;\n"

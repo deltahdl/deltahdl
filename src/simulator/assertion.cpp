@@ -10,10 +10,6 @@
 
 namespace delta {
 
-// =============================================================================
-// AssertionMonitor
-// =============================================================================
-
 void AssertionMonitor::AddProperty(SvaProperty prop) {
   AssertionEntry entry;
   entry.property = std::move(prop);
@@ -61,7 +57,7 @@ AssertionResult AssertionMonitor::Evaluate(std::string_view prop_name,
   return AssertionResult::kVacuousPass;
 }
 
-void AssertionMonitor::Tick(SimContext& /*ctx*/) {
+void AssertionMonitor::Tick(SimContext& ) {
   for (auto& entry : entries_) {
     ++entry.cycle_count;
   }
@@ -78,7 +74,6 @@ static AssertionResult PassIf(bool cond) {
   return cond ? AssertionResult::kPass : AssertionResult::kFail;
 }
 
-// Evaluate the property check for a single kind.
 static AssertionResult EvalPropertyKind(const SvaProperty& prop,
                                         uint64_t current_val, uint64_t prev) {
   switch (prop.kind) {
@@ -115,4 +110,4 @@ AssertionResult AssertionMonitor::EvaluateEntry(AssertionEntry& entry,
   return result;
 }
 
-}  // namespace delta
+}

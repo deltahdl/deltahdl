@@ -351,4 +351,4 @@ TEST(ModuleParametersAndPorts, AnsiPortMultipleUnpackedDims) {
   EXPECT_GE(r.cu->modules[0]->ports[0].unpacked_dims.size(), 2u);
 }
 
-}  // namespace
+}

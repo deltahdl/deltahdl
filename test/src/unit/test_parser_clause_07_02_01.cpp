@@ -563,9 +563,6 @@ TEST(PackedStructParsing, PackedStructPartSelect) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
 
-// §7.2.1: "The signing of unpacked structures is not allowed."
-// The grammar only consumes a signing keyword after `packed`, so the parser
-// must reject `struct signed { ... }` and `struct unsigned { ... }`.
 TEST(PackedStructParsing, UnpackedSignedStruct_Rejected) {
   auto r = Parse(
       "module t;\n"
@@ -582,4 +579,4 @@ TEST(PackedStructParsing, UnpackedUnsignedStruct_Rejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

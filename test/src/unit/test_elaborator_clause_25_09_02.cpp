@@ -136,4 +136,4 @@ TEST(VirtualInterfaceModportClockingElaboration,
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

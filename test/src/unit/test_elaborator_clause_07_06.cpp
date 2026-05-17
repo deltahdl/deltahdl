@@ -44,12 +44,6 @@ TEST(ArrayAssignmentValidation, WireToVarArrayAssign) {
              "endmodule\n"));
 }
 
-// §7.6: "An array of wires can be assigned to an array of variables, and
-// vice versa, if the source and target arrays' data types are assignment
-// compatible." The sibling WireToVarArrayAssign test exercises the vice-versa
-// direction (`assign w = v`, var → wire); this test exercises the primary
-// direction (wire → var) by reading the wire array `w` into the variable
-// array `v` through a procedural blocking assignment.
 TEST(ArrayAssignmentValidation, WireSourceToVarTargetArrayAssign) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -86,9 +80,6 @@ TEST(ArrayAssignmentValidation, FixedToDynamicAssign) {
              "endmodule\n"));
 }
 
-// §7.6: "Any vector expression can be assigned to any packed array. The
-// packed array bounds of the target packed array do not affect the
-// assignment." Verify a wider/narrower vector → packed target elaborates.
 TEST(ArrayAssignmentValidation, VectorToPackedIgnoresTargetBounds) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -101,11 +92,6 @@ TEST(ArrayAssignmentValidation, VectorToPackedIgnoresTargetBounds) {
              "endmodule\n"));
 }
 
-// §7.6: "The element types of source and target shall be equivalent."
-// §7.6 defers element equivalence to §6.22.2 rule (c): integral elements with
-// the same width, signedness, and state are equivalent even when their kinds
-// differ. `int` and `bit signed [31:0]` both denote a 32-bit, signed, 2-state
-// element, so element-wise array assignment shall elaborate.
 TEST(ArrayAssignmentValidation, IntAndBitSignedArrayAssignmentAccepted) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -115,8 +101,6 @@ TEST(ArrayAssignmentValidation, IntAndBitSignedArrayAssignmentAccepted) {
              "endmodule\n"));
 }
 
-// §7.6: "for two arrays to be assignment compatible it is necessary that they
-// have the same number of unpacked dimensions."
 TEST(ArrayAssignmentValidation, ArrayAssignDimensionCountMismatch) {
   ElabFixture f;
   ElaborateSrc(
@@ -129,10 +113,6 @@ TEST(ArrayAssignmentValidation, ArrayAssignDimensionCountMismatch) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.6: "Any faster-varying dimensions shall meet the requirements for
-// equivalence (see 6.22.2)." The slowest-varying dim is fine at [2] on both
-// sides, but the faster-varying dim differs ([3] vs [4]) and must be
-// rejected per §6.22.2(d) "equal size" applied to the faster-varying axis.
 TEST(ArrayAssignmentValidation, FasterVaryingDimSizeMismatchRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -145,7 +125,6 @@ TEST(ArrayAssignmentValidation, FasterVaryingDimSizeMismatchRejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.6: Multi-dim arrays whose faster-varying dim matches shall elaborate.
 TEST(ArrayAssignmentValidation, FasterVaryingDimSizeMatchAccepted) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -155,9 +134,6 @@ TEST(ArrayAssignmentValidation, FasterVaryingDimSizeMatchAccepted) {
              "endmodule\n"));
 }
 
-// §7.6: "A packed array cannot be directly assigned to an unpacked array
-// without an explicit cast." Assigning the bare packed source `p` to the
-// unpacked target `u` shall be rejected at elaboration.
 TEST(ArrayAssignmentValidation, PackedToUnpackedWithoutCastRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -170,8 +146,6 @@ TEST(ArrayAssignmentValidation, PackedToUnpackedWithoutCastRejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.6: "Associative arrays are assignment compatible only with associative
-// arrays." Each cross-kind direction must be rejected by the elaborator.
 TEST(ArrayAssignmentValidation, AssocToFixedArrayAssignRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -220,4 +194,4 @@ TEST(ArrayAssignmentValidation, DynamicArrayToAssocAssignRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

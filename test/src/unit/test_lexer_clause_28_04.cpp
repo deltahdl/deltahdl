@@ -1,4 +1,4 @@
-// §28.4
+
 
 #include <gtest/gtest.h>
 #include "fixture_lexer.h"
@@ -59,8 +59,6 @@ TEST(NInputGateLexing, UnnamedOrGateTokenSequence) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
 }
 
-// Each of the six n-input gate keywords must lex to its own token kind so
-// later stages can distinguish them.
 TEST(NInputGateLexing, NandKeyword) {
   auto tokens = Lex("nand");
   ASSERT_GE(tokens.size(), 1u);
@@ -85,4 +83,4 @@ TEST(NInputGateLexing, XnorKeyword) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwXnor);
 }
 
-}  // namespace
+}

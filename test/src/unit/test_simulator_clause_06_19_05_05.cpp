@@ -93,4 +93,4 @@ TEST(EnumMethods, NumEndToEndSingleMember) {
   EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- Req 1: Extern declaration shall not interfere with simulation ---
-
 TEST(ExternModuleSimulation, ExternDoesNotInterfereWithSimulation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -29,8 +27,6 @@ TEST(ExternModuleSimulation, ExternDoesNotInterfereWithSimulation) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
-
-// --- Req 2: .* port resolution from extern simulates correctly ---
 
 TEST(ExternModuleSimulation, WildcardPortsFromExternSimulate) {
   SimFixture f;
@@ -54,4 +50,4 @@ TEST(ExternModuleSimulation, WildcardPortsFromExternSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
-}  // namespace
+}

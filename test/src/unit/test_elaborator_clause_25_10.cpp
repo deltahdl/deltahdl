@@ -252,4 +252,4 @@ TEST(InterfaceObjectAccessElaboration,
       "endmodule\n"));
 }
 
-}  // namespace
+}

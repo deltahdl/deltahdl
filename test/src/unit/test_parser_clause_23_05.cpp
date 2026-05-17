@@ -100,8 +100,6 @@ TEST(ExternModuleParsing, ExternStaticLifetime) {
   EXPECT_FALSE(r.cu->modules[0]->is_automatic);
 }
 
-// --- Req 1: Both ANSI and non-ANSI, possibly with parameters ---
-
 TEST(ExternModuleParsing, MultipleExternDeclarations) {
   auto r = Parse(
       "extern module m (a, b, c, d);\n"
@@ -145,8 +143,6 @@ TEST(ExternModuleParsing, ExternAndSameNameDefinition) {
   EXPECT_FALSE(r.cu->modules[1]->is_extern);
 }
 
-// --- Error conditions ---
-
 TEST(ExternModuleParsing, ErrorMissingSemicolon) {
   EXPECT_FALSE(ParseOk("extern module m(input a)\n"));
 }
@@ -155,4 +151,4 @@ TEST(ExternModuleParsing, ErrorMissingModuleName) {
   EXPECT_FALSE(ParseOk("extern module ;\n"));
 }
 
-}  // namespace
+}

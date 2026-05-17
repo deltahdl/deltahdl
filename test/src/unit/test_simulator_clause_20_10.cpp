@@ -32,9 +32,6 @@ TEST(SeveritySystemTaskSim, SeverityToString) {
   EXPECT_EQ(SeverityToString(AssertionSeverity::kFatal), "FATAL");
 }
 
-// §20.10 "$fatal shall generate a run-time fatal error, which terminates the
-// simulation with an error code... Calling $fatal results in an implicit
-// call to $finish."
 TEST(SeveritySystemTaskSim, FatalRequestsStop) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -50,9 +47,6 @@ TEST(SeveritySystemTaskSim, FatalRequestsStop) {
   EXPECT_EQ(f.ctx.LastSeverity(), "FATAL");
 }
 
-// §20.10 "The first argument passed to $fatal shall be consistent with the
-// corresponding argument to the $finish system task". finish_number ∈
-// {0, 1, 2} must all drive the implicit-$finish termination.
 TEST(SeveritySystemTaskSim, FatalAllValidFinishNumbersStop) {
   for (int fn = 0; fn <= 2; ++fn) {
     SimFixture f;
@@ -70,7 +64,6 @@ TEST(SeveritySystemTaskSim, FatalAllValidFinishNumbersStop) {
   }
 }
 
-// §20.10 "$error shall generate a run-time error" — simulation continues.
 TEST(SeveritySystemTaskSim, ErrorRecordsButContinues) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -93,7 +86,6 @@ TEST(SeveritySystemTaskSim, ErrorRecordsButContinues) {
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-// §20.10 "$warning shall generate a run-time warning."
 TEST(SeveritySystemTaskSim, WarningRecordsAndContinues) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -109,7 +101,6 @@ TEST(SeveritySystemTaskSim, WarningRecordsAndContinues) {
   EXPECT_FALSE(f.ctx.StopRequested());
 }
 
-// §20.10 "$info shall generate a run-time message of no specific severity."
 TEST(SeveritySystemTaskSim, InfoRecordsAndContinues) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -125,10 +116,6 @@ TEST(SeveritySystemTaskSim, InfoRecordsAndContinues) {
   EXPECT_FALSE(f.ctx.StopRequested());
 }
 
-// §20.10 "All of the severity system tasks shall print a tool-specific
-// message... [including] the simulation run time at which the severity
-// system task is called." The shared helper captures the time alongside the
-// message; verify a runtime-issued task records the current sim time.
 TEST(SeveritySystemTaskSim, SeverityCapturesSimulationTime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -146,10 +133,6 @@ TEST(SeveritySystemTaskSim, SeverityCapturesSimulationTime) {
   EXPECT_EQ(f.ctx.LastSeverityTime().ticks, 5u);
 }
 
-// §20.10 "Each of the severity system tasks can include optional
-// user-defined information to be reported. The user-defined message shall
-// use the same syntax as the $display system task and thus can include any
-// number of arguments." — verify $display-style format arguments resolve.
 TEST(SeveritySystemTaskSim, ErrorWithFormatArgsRendersDisplaySyntax) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -169,8 +152,6 @@ TEST(SeveritySystemTaskSim, ErrorWithFormatArgsRendersDisplaySyntax) {
   EXPECT_EQ(f.ctx.LastSeverityMsg(), "v=7");
 }
 
-// §20.10 "The tool-specific message shall include the user-defined message
-// if specified." — verify the captured user message round-trips verbatim.
 TEST(SeveritySystemTaskSim, InfoIncludesUserDefinedMessage) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -186,4 +167,4 @@ TEST(SeveritySystemTaskSim, InfoIncludesUserDefinedMessage) {
   EXPECT_EQ(f.ctx.LastSeverityMsg(), "hello world");
 }
 
-}  // namespace
+}

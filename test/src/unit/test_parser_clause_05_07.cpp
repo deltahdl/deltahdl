@@ -20,4 +20,4 @@ TEST(NumberParsing, UnaryPlusBeforeSizedLiteral) {
                "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -1,9 +1,4 @@
-// §3.4: The program building block is enclosed between the keywords
-// program ... endprogram. A program block can contain data declarations,
-// class definitions, subroutine definitions, object instances, and one or
-// more initial or final procedures. It cannot contain always procedures,
-// primitive instances, module instances, interface instances, or other
-// program instances.
+
 
 #include <algorithm>
 #include <string_view>
@@ -15,8 +10,6 @@ using namespace delta;
 
 namespace {
 
-// --- Enclosure between program / endprogram ---
-
 TEST(ProgramBlockParsing, ProgramEndprogramEnclosureProducesProgramDecl) {
   auto r = Parse("program p; endprogram\n");
   ASSERT_NE(r.cu, nullptr);
@@ -27,18 +20,11 @@ TEST(ProgramBlockParsing, ProgramEndprogramEnclosureProducesProgramDecl) {
 }
 
 TEST(ProgramBlockParsing, ProgramBodyTerminatesOnlyAtEndprogram) {
-  // Without the endprogram keyword the parser cannot close the program block.
+
   auto r = Parse("program p; initial begin end\n");
   EXPECT_TRUE(r.has_errors);
 }
 
-// --- Scope encapsulation (§3.4 second purpose) ---
-
-// §3.4: "It creates a scope that encapsulates program-wide data, tasks,
-// and functions." Items declared in a program live inside that program's
-// own scope (its items list), so two distinct programs can each declare
-// items with the same name without a parse-time collision, and items
-// inside one program are not visible as siblings of the other.
 TEST(ProgramBlockParsing, ProgramScopeEncapsulatesItems) {
   auto r = Parse(
       "program p1;\n"
@@ -54,7 +40,7 @@ TEST(ProgramBlockParsing, ProgramScopeEncapsulatesItems) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 2u);
-  // Each program decl owns its own items list — that is the scope.
+
   const auto& p1 = *r.cu->programs[0];
   const auto& p2 = *r.cu->programs[1];
   EXPECT_EQ(p1.name, "p1");
@@ -77,8 +63,6 @@ TEST(ProgramBlockParsing, ProgramScopeEncapsulatesItems) {
   EXPECT_NE(std::find(p2_names.begin(), p2_names.end(), "t"), p2_names.end());
   EXPECT_NE(std::find(p2_names.begin(), p2_names.end(), "f"), p2_names.end());
 }
-
-// --- Permitted contents ---
 
 TEST(ProgramBlockParsing, ProgramAcceptsDataDeclaration) {
   auto r = Parse("program p; logic [7:0] data; endprogram\n");
@@ -134,10 +118,6 @@ TEST(ProgramBlockParsing, ProgramAcceptsMultipleInitialAndFinalProcedures) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §3.4 sample program declaration:
-//   program test (input clk, input [16:1] addr, inout [7:0] data);
-// A program declaration accepts a port list with direction-declared ports
-// just like the §3.4 example.
 TEST(ProgramBlockParsing, ProgramAcceptsPortListWithDirections) {
   auto r = Parse(
       "program test (input clk, input [16:1] addr, inout [7:0] data);\n"
@@ -157,8 +137,6 @@ TEST(ProgramBlockParsing, ProgramAcceptsPortListWithDirections) {
   EXPECT_EQ(prog.ports[2].name, "data");
   EXPECT_EQ(prog.ports[2].direction, Direction::kInout);
 }
-
-// --- Prohibited contents (§3.4) ---
 
 TEST(ProgramBlockParsing, ProgramRejectsAlwaysProcedure) {
   auto r = Parse("program p; always @(*) begin end endprogram\n");
@@ -224,4 +202,4 @@ TEST(ProgramBlockParsing, ProgramRejectsOtherProgramInstance) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

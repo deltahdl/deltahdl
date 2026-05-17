@@ -5,8 +5,6 @@
 
 namespace delta {
 
-// --- Types ---
-
 static bool IsNetTypeToken(TokenKind tk) {
   switch (tk) {
     case TokenKind::kKwWire:
@@ -90,7 +88,6 @@ static std::optional<DataTypeKind> TokenToTypeKind(TokenKind tk) {
   }
 }
 
-// §6.11.3 Table 6-8: Types that are signed by default.
 static bool IsDefaultSigned(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kByte:
@@ -104,7 +101,6 @@ static bool IsDefaultSigned(DataTypeKind kind) {
   }
 }
 
-// §6.3.2.2: Check if a token is a drive strength keyword.
 static bool IsStrengthToken(TokenKind k) {
   switch (k) {
     case TokenKind::kKwSupply0:
@@ -126,7 +122,7 @@ static bool IsStrengthToken(TokenKind k) {
 uint8_t Parser::ParseChargeStrength() {
   if (!Check(TokenKind::kLParen)) return 0;
   auto saved = lexer_.SavePos();
-  Consume();  // '('
+  Consume();
   uint8_t result = 0;
   if (Match(TokenKind::kKwSmall)) {
     result = 1;
@@ -143,7 +139,6 @@ uint8_t Parser::ParseChargeStrength() {
   return result;
 }
 
-// Virtual interface type: virtual [interface] ifc [#(params)] [.modport] (§25.9)
 DataType Parser::ParseVirtualInterfaceType() {
   DataType dtype;
   dtype.kind = DataTypeKind::kVirtualInterface;
@@ -159,7 +154,6 @@ DataType Parser::ParseVirtualInterfaceType() {
   return dtype;
 }
 
-// Parse packed dimensions: [a:b] ([c:d] ...)* (§7.4.1)
 void Parser::ParsePackedDims(DataType& dtype) {
   if (!Check(TokenKind::kLBracket)) return;
   Consume();
@@ -167,7 +161,7 @@ void Parser::ParsePackedDims(DataType& dtype) {
   Expect(TokenKind::kColon);
   dtype.packed_dim_right = ParseExpr();
   Expect(TokenKind::kRBracket);
-  // Additional packed dimensions: bit [3:0] [7:0] ...
+
   while (Check(TokenKind::kLBracket)) {
     auto saved = lexer_.SavePos();
     Consume();
@@ -183,7 +177,6 @@ void Parser::ParsePackedDims(DataType& dtype) {
   }
 }
 
-// §8.25: parse type parameter list — each element is a type or expression.
 std::vector<DataType> Parser::ParseTypeParamList() {
   std::vector<DataType> result;
   Expect(TokenKind::kLParen);
@@ -205,7 +198,6 @@ std::vector<DataType> Parser::ParseTypeParamList() {
   return result;
 }
 
-// §6.3.2: Parse charge strength (trireg) or drive strength (other nets).
 void Parser::ParseNetStrength(DataType& dtype) {
   if (dtype.kind == DataTypeKind::kTrireg) {
     dtype.charge_strength = ParseChargeStrength();
@@ -213,7 +205,7 @@ void Parser::ParseNetStrength(DataType& dtype) {
   }
   if (!dtype.is_net || !Check(TokenKind::kLParen)) return;
   auto saved = lexer_.SavePos();
-  Consume();  // '('
+  Consume();
   if (IsStrengthToken(CurrentToken().kind)) {
     ParseDriveStrength(dtype.drive_strength0, dtype.drive_strength1);
     Expect(TokenKind::kRParen);
@@ -222,20 +214,19 @@ void Parser::ParseNetStrength(DataType& dtype) {
   }
 }
 
-// §6.25/§8.26.3: Parse a named type with optional #(params) and :: scoping.
 DataType Parser::ParseNamedType() {
   DataType dtype;
   dtype.kind = DataTypeKind::kNamed;
   dtype.type_name = Consume().text;
-  // §6.25/§8.25: parameterized class type params come before ::
+
   if (Check(TokenKind::kHash)) {
     Consume();
     dtype.type_params = ParseTypeParamList();
   }
-  // §8.26.3 scope-resolved types: class_name::type_name
+
   while (Check(TokenKind::kColonColon)) {
     auto saved = lexer_.SavePos();
-    Consume();  // ::
+    Consume();
     if (!CheckIdentifier()) {
       lexer_.RestorePos(saved);
       break;
@@ -250,7 +241,6 @@ DataType Parser::ParseNamedType() {
   return dtype;
 }
 
-// Copy net-specific fields from outer net declaration into inner data type.
 static void ApplyNetInfo(DataType& inner, const DataType& net) {
   inner.is_net = true;
   inner.is_vectored = net.is_vectored;
@@ -260,18 +250,15 @@ static void ApplyNetInfo(DataType& inner, const DataType& net) {
   inner.charge_strength = net.charge_strength;
 }
 
-// §6.7.1: Try to parse explicit data_type after net keyword.
-// Returns true if an explicit type was parsed and merged into dtype.
-// Returns false for implicit_data_type (caller continues with signing + dims).
 bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
-  // §6.7.1: A net type keyword shall not be followed directly by 'reg'.
+
   if (!has_intervening && CurrentToken().kind == TokenKind::kKwReg) {
     diag_.Error(CurrentLoc(),
                 "net type keyword shall not be followed directly by 'reg'");
     Consume();
     return false;
   }
-  // Named type (user-defined): wire addressT w1; (or `wire \my-type w1;`)
+
   if (Check(TokenKind::kIdentifier) &&
       known_types_.count(CurrentToken().text) != 0) {
     auto inner = ParseNamedType();
@@ -279,7 +266,7 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
     dtype = inner;
     return true;
   }
-  // Struct/union type: wire struct packed { ... } [dims] memsig;
+
   if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
     auto inner = ParseStructOrUnionType();
     ParsePackedDims(inner);
@@ -287,9 +274,7 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
     dtype = inner;
     return true;
   }
-  // §6.8 footnote 18: a type_reference in a net declaration is permitted
-  // when preceded by a net type keyword — `wire type(x) y;`. Parse the
-  // type(expr) form and attach the expression to the net's data_type.
+
   if (Check(TokenKind::kKwType)) {
     Consume();
     Expect(TokenKind::kLParen);
@@ -297,7 +282,7 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
     Expect(TokenKind::kRParen);
     return true;
   }
-  // Enum type: wire enum { ... } [dims] e;
+
   if (Check(TokenKind::kKwEnum)) {
     auto inner = ParseEnumType();
     ParsePackedDims(inner);
@@ -305,7 +290,7 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
     dtype = inner;
     return true;
   }
-  // Non-net built-in type: wire logic [7:0] w; wire bit [3:0] b;
+
   auto inner_kind = TokenToTypeKind(CurrentToken().kind);
   if (inner_kind && !IsNetTypeToken(CurrentToken().kind)) {
     dtype.kind = *inner_kind;
@@ -336,7 +321,6 @@ DataType Parser::ParseDataType() {
     return named;
   }
 
-  // A.2.2.1: implicit_data_type ::= [signing] {packed_dimension}
   if (Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned)) {
     dtype.is_signed = Check(TokenKind::kKwSigned);
     Consume();
@@ -349,26 +333,22 @@ DataType Parser::ParseDataType() {
   if (!kind) return dtype;
   dtype.kind = *kind;
   dtype.is_net = IsNetTypeToken(tok_kind);
-  // §6.11.3 Table 6-8: Apply default signedness per type.
+
   dtype.is_signed = IsDefaultSigned(dtype.kind);
   Consume();
 
-  // §6.3.2: Parse charge or drive strength for net types.
   ParseNetStrength(dtype);
 
-  // vectored/scalared qualifiers (§6.6.9) — net types only
   dtype.is_vectored = dtype.is_net && Match(TokenKind::kKwVectored);
   if (dtype.is_net && !dtype.is_vectored) {
     dtype.is_scalared = Match(TokenKind::kKwScalared);
   }
 
-  // §6.7.1: data_type_or_implicit — check for explicit type after net keyword.
   bool has_intervening = dtype.drive_strength0 != 0 ||
                          dtype.charge_strength != 0 || dtype.is_vectored ||
                          dtype.is_scalared;
   if (dtype.is_net && TryParseNetDataType(dtype, has_intervening)) return dtype;
 
-  // §6.11.3: Explicit signed/unsigned overrides the default.
   if (Match(TokenKind::kKwSigned)) {
     dtype.is_signed = true;
   } else if (Match(TokenKind::kKwUnsigned)) {
@@ -379,9 +359,6 @@ DataType Parser::ParseDataType() {
   return dtype;
 }
 
-// --- Unpacked dimensions ---
-
-// Check if current token is a type keyword for associative array index (§7.8).
 static bool IsAssocIndexType(TokenKind tk) {
   return TokenToTypeKind(tk).has_value() && tk != TokenKind::kKwVoid;
 }
@@ -390,11 +367,11 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
   while (Check(TokenKind::kLBracket)) {
     Consume();
     if (Match(TokenKind::kRBracket)) {
-      dims.push_back(nullptr);  // dynamic array []
+      dims.push_back(nullptr);
       continue;
     }
     if (Match(TokenKind::kDollar)) {
-      // Queue: [$] or [$:N]
+
       auto* dim = arena_.Create<Expr>();
       dim->kind = ExprKind::kIdentifier;
       dim->text = "$";
@@ -406,7 +383,7 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
       continue;
     }
     if (Match(TokenKind::kStar)) {
-      // Associative: [*]
+
       auto* dim = arena_.Create<Expr>();
       dim->kind = ExprKind::kIdentifier;
       dim->text = "*";
@@ -414,7 +391,7 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
       Expect(TokenKind::kRBracket);
       continue;
     }
-    // Associative array with type index: [string], [int], [byte], etc. (§7.8)
+
     if (IsAssocIndexType(CurrentToken().kind)) {
       auto* dim = arena_.Create<Expr>();
       dim->kind = ExprKind::kIdentifier;
@@ -437,8 +414,6 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
     Expect(TokenKind::kRBracket);
   }
 }
-
-// --- Variable declaration list ---
 
 void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
                               const DataType& dtype) {
@@ -467,19 +442,16 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
   Expect(TokenKind::kSemicolon);
 }
 
-// --- Parameter declarations ---
-
-// type_parameter_declaration: type [forward_type] list_of_type_assignments
 void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items,
                                 SourceLoc loc, bool localparam) {
-  // Optional forward_type: enum | struct | union | class | interface class
+
   DataTypeKind fwd = DataTypeKind::kImplicit;
   if (Check(TokenKind::kKwEnum) || Check(TokenKind::kKwStruct) ||
       Check(TokenKind::kKwUnion) || Check(TokenKind::kKwClass) ||
       Check(TokenKind::kKwInterface)) {
     if (Match(TokenKind::kKwInterface)) {
       Expect(TokenKind::kKwClass);
-      fwd = DataTypeKind::kVoid;  // Reuse kVoid for interface class.
+      fwd = DataTypeKind::kVoid;
     } else {
       if (Check(TokenKind::kKwEnum)) fwd = DataTypeKind::kEnum;
       else if (Check(TokenKind::kKwStruct)) fwd = DataTypeKind::kStruct;
@@ -488,13 +460,13 @@ void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items,
       Consume();
     }
   }
-  // list_of_type_assignments: type_assignment { , type_assignment }
+
   do {
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kParamDecl;
     item->is_localparam = localparam;
     item->loc = loc;
-    item->data_type.kind = DataTypeKind::kVoid;  // Marker for type params.
+    item->data_type.kind = DataTypeKind::kVoid;
     item->forward_type_kind = fwd;
     auto name_tok = Expect(TokenKind::kIdentifier);
     item->name = name_tok.text;
@@ -508,9 +480,7 @@ void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items,
         item->init_expr = ParseExpr();
       }
     }
-    // §6.20.1 footnote 22: a type_assignment outside a parameter_port_list
-    // shall not omit its default data type. ParseTypeParamDecl is reached
-    // only from non-port-list contexts, so a missing default is illegal here.
+
     if (!has_default) {
       diag_.Error(name_tok.loc,
                   std::format("type parameter '{}' outside a parameter port "
@@ -526,17 +496,16 @@ void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items,
 void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
   bool localparam = Check(TokenKind::kKwLocalparam);
-  Consume();  // parameter or localparam
-  // §6.20.1: param_assignments in a generate block, package, class body, or
-  // compilation-unit scope shall become localparam declarations.
+  Consume();
+
   if (ForceLocalparam()) localparam = true;
-  // type_parameter_declaration: type [forward_type] list_of_type_assignments
+
   if (Match(TokenKind::kKwType)) {
     ParseTypeParamDecl(items, loc, localparam);
     return;
   }
   DataType dtype = ParseDataType();
-  // Handle implicit type with packed dims: localparam [10:0] p (§6.10)
+
   if (dtype.kind == DataTypeKind::kImplicit && Check(TokenKind::kLBracket)) {
     dtype.kind = DataTypeKind::kLogic;
     Consume();
@@ -545,7 +514,7 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
     dtype.packed_dim_right = ParseExpr();
     Expect(TokenKind::kRBracket);
   }
-  // list_of_param_assignments: param_assignment { , param_assignment }
+
   do {
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kParamDecl;
@@ -562,10 +531,9 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kSemicolon);
 }
 
-// §6.23 / A.2.2.1: type_reference used as data_type in declaration.
 bool Parser::TryParseTypeRef(std::vector<ModuleItem*>& items) {
   if (!Check(TokenKind::kKwType)) return false;
-  Consume();  // type
+  Consume();
   Expect(TokenKind::kLParen);
   auto* type_expr = ParseExpr();
   Expect(TokenKind::kRParen);
@@ -580,4 +548,4 @@ bool Parser::TryParseTypeRef(std::vector<ModuleItem*>& items) {
   return true;
 }
 
-}  // namespace delta
+}

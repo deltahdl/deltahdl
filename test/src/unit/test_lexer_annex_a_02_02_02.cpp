@@ -1,5 +1,4 @@
-// §A.2.2.2: lexer-stage coverage of the strength keyword set named in the
-// drive_strength, strength0, strength1, and charge_strength productions.
+
 
 #include <gtest/gtest.h>
 
@@ -9,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §A.2.2.2 strength0 keywords: each must lex to its own token kind so the
-// parser can branch on direction without rescanning identifier text.
 TEST(StrengthKeywordLexing, Supply0Keyword) {
   auto tokens = Lex("supply0");
   ASSERT_GE(tokens.size(), 1u);
@@ -35,16 +32,12 @@ TEST(StrengthKeywordLexing, Weak0Keyword) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwWeak0);
 }
 
-// §A.2.2.2 drive_strength alternatives 4-6 reference highz0 directly as a
-// terminal; it must lex to its own keyword kind.
 TEST(StrengthKeywordLexing, Highz0Keyword) {
   auto tokens = Lex("highz0");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwHighz0);
 }
 
-// §A.2.2.2 strength1 keywords: distinct from the strength0 set and from one
-// another.
 TEST(StrengthKeywordLexing, Supply1Keyword) {
   auto tokens = Lex("supply1");
   ASSERT_GE(tokens.size(), 1u);
@@ -75,8 +68,6 @@ TEST(StrengthKeywordLexing, Highz1Keyword) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwHighz1);
 }
 
-// §A.2.2.2 drive_strength is two strength tokens separated by a comma inside
-// parentheses; lexing must produce five distinct tokens, never one compound.
 TEST(StrengthKeywordLexing, StrengthPairProducesTwoKeywords) {
   auto tokens = Lex("(strong0, weak1)");
   ASSERT_GE(tokens.size(), 5u);
@@ -87,8 +78,6 @@ TEST(StrengthKeywordLexing, StrengthPairProducesTwoKeywords) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kRParen);
 }
 
-// §A.2.2.2 charge_strength keywords are unsuffixed (no 0/1) and must lex to
-// their own token kinds, distinct from the drive-strength set.
 TEST(StrengthKeywordLexing, SmallKeyword) {
   auto tokens = Lex("small");
   ASSERT_GE(tokens.size(), 1u);
@@ -107,4 +96,4 @@ TEST(StrengthKeywordLexing, LargeKeyword) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwLarge);
 }
 
-}  // namespace
+}

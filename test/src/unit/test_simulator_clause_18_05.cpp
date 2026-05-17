@@ -184,4 +184,4 @@ TEST(Constraint, LessThanConstraint) {
   EXPECT_LT(solver.GetValue("x"), 10);
 }
 
-}  // namespace
+}

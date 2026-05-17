@@ -160,4 +160,4 @@ TEST(PriorityIfViolationSim, PriorityIfChainMiddleBranchMatchNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-}  // namespace
+}

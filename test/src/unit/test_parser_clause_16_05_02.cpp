@@ -22,4 +22,4 @@ TEST(AssertionSemanticsParsing, NegedgeClocking) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-}  // namespace
+}

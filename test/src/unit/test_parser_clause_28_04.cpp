@@ -1,4 +1,4 @@
-// §28.4
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Minimum valid terminal counts ---
 TEST(NInputGates, MinimumTwoTerminals) {
   auto r = Parse(
       "module m;\n"
@@ -65,7 +64,6 @@ TEST(NInputGateParsing, AllNInputGates) {
   }
 }
 
-// --- Delay specification (delay2: zero, one, or two delays) ---
 TEST(NInputGateParsing, SingleDelayAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -82,7 +80,6 @@ TEST(NInputGateParsing, TwoDelaysAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// delay3 is allowed only for tri-state/MOS gates; n-input gates cap at two.
 TEST(NInputGateParsing, ThreeDelaysRejected) {
   auto r = Parse(
       "module m;\n"
@@ -91,7 +88,6 @@ TEST(NInputGateParsing, ThreeDelaysRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// --- Terminal count lower bound (one output + at least one input) ---
 TEST(NInputGateParsing, SingleTerminalRejected) {
   auto r = Parse(
       "module m;\n"
@@ -100,7 +96,6 @@ TEST(NInputGateParsing, SingleTerminalRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// --- First terminal must be a net lvalue (output position) ---
 TEST(NInputGateParsing, OutputMustBeNetLvalue) {
   auto r = Parse(
       "module m;\n"
@@ -109,4 +104,4 @@ TEST(NInputGateParsing, OutputMustBeNetLvalue) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -33,4 +33,4 @@ TEST(InterfaceClockingElab, ClockingWithInterfaceHierExprElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

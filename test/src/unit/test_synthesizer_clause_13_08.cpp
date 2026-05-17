@@ -47,4 +47,4 @@ TEST(ParameterizedSubroutineSynthesis, DifferentSpecializationsSynthesize) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

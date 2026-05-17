@@ -118,4 +118,4 @@ TEST(ArrayLiteralElaboration, KeyedPatternUncoveredElementError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

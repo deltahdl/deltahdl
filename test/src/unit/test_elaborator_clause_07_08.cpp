@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §7.8: Associative array is marked is_assoc in RTLIR.
 TEST(AssocArrayElaboration, MarkedAssociative) {
   ElabFixture f;
   auto* design = Elaborate("module m; int aa[int]; endmodule\n", f);
@@ -17,7 +16,6 @@ TEST(AssocArrayElaboration, MarkedAssociative) {
   EXPECT_TRUE(mod->variables[0].is_assoc);
 }
 
-// §7.8: Element width is correctly stored for vector element types.
 TEST(AssocArrayElaboration, ElementWidth) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic [7:0] aa[int]; endmodule\n", f);
@@ -34,7 +32,6 @@ TEST(AssocArrayElaboration, ElementWidth) {
   EXPECT_TRUE(found);
 }
 
-// §7.8: Multiple associative arrays elaborate without errors.
 TEST(AssocArrayElaboration, MultipleArrays) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -43,4 +40,4 @@ TEST(AssocArrayElaboration, MultipleArrays) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

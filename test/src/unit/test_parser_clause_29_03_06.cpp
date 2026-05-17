@@ -26,7 +26,6 @@ TEST(UdpSymbols, CombinationalQuestionMarkWildcard) {
   EXPECT_EQ(state.Evaluate({'1', '1', '1'}), '1');
 }
 
-// ? is an iteration of 0/1/x and may not stand in for an output state.
 TEST(UdpSymbols, QuestionMarkInOutputFieldRejected) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -38,7 +37,6 @@ TEST(UdpSymbols, QuestionMarkInOutputFieldRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// b is an iteration of 0/1 and may not stand in for an output state.
 TEST(UdpSymbols, BSymbolInOutputFieldRejected) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -50,8 +48,6 @@ TEST(UdpSymbols, BSymbolInOutputFieldRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// - means "no change" and is only meaningful as the next-state field of a
-// sequential UDP; a combinational UDP has no prior output to hold.
 TEST(UdpSymbols, MinusInCombinationalOutputRejected) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -63,8 +59,6 @@ TEST(UdpSymbols, MinusInCombinationalOutputRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// - is confined to the output field, so it is not legal in the current-state
-// field of a sequential row.
 TEST(UdpSymbols, MinusInSequentialCurrentStateRejected) {
   auto r = Parse(
       "primitive p(output reg q, input d, input en);\n"
@@ -75,7 +69,6 @@ TEST(UdpSymbols, MinusInSequentialCurrentStateRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// - is confined to the output field, so it is not legal as an input symbol.
 TEST(UdpSymbols, MinusInInputFieldRejected) {
   auto r = Parse(
       "primitive p(output reg q, input a, input b);\n"
@@ -86,8 +79,6 @@ TEST(UdpSymbols, MinusInInputFieldRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Edge symbols describe transitions on inputs and are not next-state values;
-// placing r (or any edge) in the output field is rejected.
 TEST(UdpSymbols, EdgeSymbolInOutputFieldRejected) {
   auto r = Parse(
       "primitive p(output reg q, input a);\n"
@@ -98,8 +89,6 @@ TEST(UdpSymbols, EdgeSymbolInOutputFieldRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// The current-state field holds a level, not a transition, so edge symbols
-// are not permitted there either.
 TEST(UdpSymbols, EdgeSymbolInCurrentStateFieldRejected) {
   auto r = Parse(
       "primitive p(output reg q, input a);\n"
@@ -110,8 +99,6 @@ TEST(UdpSymbols, EdgeSymbolInCurrentStateFieldRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Inside a (vw) edge, both endpoints must be level symbols drawn from
-// {0, 1, x, ?, b}; r is not a level symbol.
 TEST(UdpSymbols, ParenthesizedEdgeWithInvalidSymbolRejected) {
   auto r = Parse(
       "primitive p(output reg q, input a);\n"
@@ -122,4 +109,4 @@ TEST(UdpSymbols, ParenthesizedEdgeWithInvalidSymbolRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -45,4 +45,4 @@ TEST(DefparamEarlyNameResolution, RenamedGenerateBlockRemovesAmbiguity) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

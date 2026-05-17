@@ -19,11 +19,6 @@ TEST(TaskLifetimeParsing, AutomaticTaskWithInputPort) {
   EXPECT_EQ(item->name, "drive");
 }
 
-// Lifetime-keyword acceptance on task declarations is a §6.21 rule;
-// the corresponding parser tests (TaskDeclLifetimeAutomatic,
-// TaskDeclLifetimeStatic, and the default-lifetime case) live in
-// test_parser_clause_06_21.cpp.
-
 TEST(TaskDeclParsing, AutomaticTaskWithoutParens) {
   auto r = Parse(
       "module m;\n"
@@ -180,8 +175,4 @@ TEST(TaskLifetimeParsing, AutoTaskWithVariousTypes) {
   EXPECT_EQ(t->func_body_stmts[2]->var_decl_type.kind, DataTypeKind::kReal);
 }
 
-// The static-var-in-auto-task, auto-var-in-static-task,
-// static-var-in-static-task, and auto-var-in-auto-task cases are §6.21
-// lifetime-semantics tests; they live in test_parser_clause_06_21.cpp.
-
-}  // namespace
+}

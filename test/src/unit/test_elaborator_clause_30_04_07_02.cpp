@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §30.4.7.2: elaborator accepts a positive-polarity parallel path.
 TEST(PositivePolarityElaboration, ParallelPathWithPlusOperator) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -18,7 +17,6 @@ TEST(PositivePolarityElaboration, ParallelPathWithPlusOperator) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.7.2: elaborator accepts a positive-polarity full path.
 TEST(PositivePolarityElaboration, FullPathWithPlusOperator) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -32,4 +30,4 @@ TEST(PositivePolarityElaboration, FullPathWithPlusOperator) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

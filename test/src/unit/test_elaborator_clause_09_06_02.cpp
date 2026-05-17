@@ -120,10 +120,6 @@ TEST(DisableStatementElaboration, DisableAutoTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.6.2 R8: A disable inside a function that targets a block or task that
-// called the function has UNDEFINED behavior — meaning the implementation may
-// do anything, but the construct itself is not illegal. The elaborator must
-// accept it (no error), while only R7b (disabling a function) is rejected.
 TEST(DisableStatementElaboration, DisableOuterBlockFromInsideFunctionAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -163,4 +159,4 @@ TEST(DisableStatementElaboration, DisableOuterTaskFromInsideFunctionAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

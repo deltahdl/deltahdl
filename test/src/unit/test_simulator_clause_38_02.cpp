@@ -39,5 +39,5 @@ TEST_F(VpiErrorCheckSim, ChkErrorNullDoesNotCrash) {
   EXPECT_EQ(result, 0);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

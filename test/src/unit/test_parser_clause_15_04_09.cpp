@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.9: mailbox #(type) declaration parses.
 TEST(MailboxParameterizedParser, ParameterizedDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -18,7 +17,6 @@ TEST(MailboxParameterizedParser, ParameterizedDeclaration) {
   EXPECT_EQ(items[0]->name, "m_box");
 }
 
-// §15.4.9: mailbox #(string) with new parses.
 TEST(MailboxParameterizedParser, ParameterizedStringWithNew) {
   auto r = Parse(
       "module m;\n"
@@ -32,7 +30,6 @@ TEST(MailboxParameterizedParser, ParameterizedStringWithNew) {
   ASSERT_FALSE(r.cu->modules[0]->items.empty());
 }
 
-// §15.4.9: mailbox #(int) with new(bound) parses.
 TEST(MailboxParameterizedParser, ParameterizedIntWithBound) {
   auto r = Parse(
       "module m;\n"
@@ -45,7 +42,6 @@ TEST(MailboxParameterizedParser, ParameterizedIntWithBound) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §15.4.9: mailbox #(int) inline declaration with new and method calls.
 TEST(MailboxParameterizedParser, ParameterizedWithMethodCalls) {
   auto r = Parse(
       "module m;\n"
@@ -58,7 +54,6 @@ TEST(MailboxParameterizedParser, ParameterizedWithMethodCalls) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §15.4.9: typedef mailbox #(type) parses.
 TEST(MailboxParameterizedParser, TypedefParameterizedMailbox) {
   auto r = Parse(
       "module m;\n"
@@ -72,7 +67,6 @@ TEST(MailboxParameterizedParser, TypedefParameterizedMailbox) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.9: Default (unparameterized) mailbox is typeless.
 TEST(MailboxParameterizedParser, UnparameterizedMailboxParses) {
   auto r = Parse(
       "module m;\n"
@@ -82,4 +76,4 @@ TEST(MailboxParameterizedParser, UnparameterizedMailboxParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

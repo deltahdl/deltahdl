@@ -96,10 +96,6 @@ TEST(LexicalConventionSim, LongStringNoLimit) {
   EXPECT_EQ(v, 0x4142434445464748u);
 }
 
-// §5.9: "A string literal can be assigned to an unpacked array of bytes. If
-// the size differs, it is left justified."  byte c3[0:12] = "hello world\n";
-// has 12 source bytes and 13 destination slots, so c3[0..11] hold the literal
-// and c3[12] is zero-padded on the right.
 TEST(LexicalConventionSim, UnpackedByteArrayLeftJustifiedFirst) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -144,4 +140,4 @@ TEST(LexicalConventionSim, UnpackedByteArrayLeftJustifiedPadding) {
   EXPECT_EQ(v->value.ToUint64(), 0u);
 }
 
-}  // namespace
+}

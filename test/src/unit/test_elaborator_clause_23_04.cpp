@@ -2,8 +2,6 @@
 
 namespace {
 
-// --- Req 1: A module can be declared within another module ---
-
 TEST(NestedModuleElaboration, NestedModuleDoesNotAffectParent) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -58,8 +56,6 @@ TEST(NestedModuleElaboration, MultipleNestedModulesElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Req 2: Outer scope visibility / local name shadowing ---
-
 TEST(NestedModuleElaboration, OuterScopeWireVisibleInNestedModule) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -106,8 +102,6 @@ TEST(NestedModuleElaboration, LocalNameShadowsOuterName) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Req 3: Same module name in different scopes ---
-
 TEST(NestedModuleElaboration, SameNameInDifferentParents) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -123,8 +117,6 @@ TEST(NestedModuleElaboration, SameNameInDifferentParents) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- Req 4: Portless nested modules implicitly instantiated ---
 
 TEST(NestedModuleElaboration, PortlessNestedModuleImplicitlyInstantiated) {
   ElabFixture f;
@@ -178,8 +170,6 @@ TEST(NestedModuleElaboration, PortlessExplicitlyInstantiatedNotDuplicated) {
   EXPECT_EQ(mod->children[0].inst_name, "i1");
 }
 
-// --- Req 5: Ported nested modules not instantiated are ignored ---
-
 TEST(NestedModuleElaboration, PortedNestedModuleNotInstantiatedIsIgnored) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -212,8 +202,6 @@ TEST(NestedModuleElaboration, PortedNestedModuleExplicitlyInstantiated) {
   EXPECT_EQ(design->top_modules[0]->children[0].inst_name, "i1");
 }
 
-// --- Mixed: portless and ported in same parent ---
-
 TEST(NestedModuleElaboration, MixedPortlessAndPortedNested) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -233,4 +221,4 @@ TEST(NestedModuleElaboration, MixedPortlessAndPortedNested) {
   EXPECT_EQ(mod->children[0].inst_name, "portless");
 }
 
-}  // namespace
+}

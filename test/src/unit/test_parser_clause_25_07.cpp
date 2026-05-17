@@ -532,4 +532,4 @@ TEST(InterfaceItemsParsing, ExternForkjoinFunctionIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

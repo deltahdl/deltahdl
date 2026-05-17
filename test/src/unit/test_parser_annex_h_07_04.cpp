@@ -23,4 +23,4 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportChandle) {
   EXPECT_EQ(items[1]->func_args[0].data_type.kind, DataTypeKind::kChandle);
 }
 
-}  // namespace
+}

@@ -71,4 +71,4 @@ TEST(QueuePopBack, EmptyQueueDoesNotIncrementGeneration) {
   EXPECT_EQ(q->generation, gen_before);
 }
 
-}  // namespace
+}

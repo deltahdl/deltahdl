@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.6: try_get() call in initial block elaborates.
 TEST(MailboxTryGetElaborator, TryGetCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,7 +19,6 @@ TEST(MailboxTryGetElaborator, TryGetCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.6: try_get() result assigned to variable elaborates.
 TEST(MailboxTryGetElaborator, TryGetResultAssigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -36,4 +34,4 @@ TEST(MailboxTryGetElaborator, TryGetResultAssigned) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

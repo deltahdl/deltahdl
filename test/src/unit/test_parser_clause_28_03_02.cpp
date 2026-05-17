@@ -35,7 +35,6 @@ TEST(PullGateStrength, StrengthWrongType) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// strength0 keyword encoding on a gate instance, paired with a strength1.
 TEST(GateInstStrengthParsing, Strength0Strength1KeywordEncoding) {
   auto r = Parse(
       "module m;\n"
@@ -49,7 +48,6 @@ TEST(GateInstStrengthParsing, Strength0Strength1KeywordEncoding) {
   EXPECT_EQ(item->drive_strength1, 2u);
 }
 
-// The strength specification must parse before the delay specification.
 TEST(GateInstStrengthParsing, StrengthPrecedesDelay) {
   auto r = Parse(
       "module m;\n"
@@ -65,7 +63,6 @@ TEST(GateInstStrengthParsing, StrengthPrecedesDelay) {
   EXPECT_EQ(item->gate_delay->int_val, 5u);
 }
 
-// Writing the delay before the strength violates the mandated ordering.
 TEST(GateInstStrengthParsing, DelayBeforeStrengthRejected) {
   auto r = Parse(
       "module m;\n"
@@ -75,8 +72,6 @@ TEST(GateInstStrengthParsing, DelayBeforeStrengthRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Non-pullup/pulldown gates require both a strength0 and a strength1 keyword;
-// a single-strength form is only permitted for pullup/pulldown.
 TEST(GateInstStrengthParsing, SingleStrengthRejectedOnNonPullGate) {
   auto r = Parse(
       "module m;\n"
@@ -95,7 +90,6 @@ TEST(GateInstStrengthParsing, SingleStrength1RejectedOnNonPullGate) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// strength1 may appear before strength0; the encoding must still be correct.
 TEST(GateInstStrengthParsing, Strength1BeforeStrength0Encoding) {
   auto r = Parse(
       "module m;\n"
@@ -109,4 +103,4 @@ TEST(GateInstStrengthParsing, Strength1BeforeStrength0Encoding) {
   EXPECT_EQ(item->drive_strength1, 3u);
 }
 
-}  // namespace
+}

@@ -90,4 +90,4 @@ TEST(SpecifyPathSim, TerminalBitSelectSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 17u);
 }
 
-}  // namespace
+}

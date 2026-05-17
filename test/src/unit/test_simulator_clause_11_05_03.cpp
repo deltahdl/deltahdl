@@ -31,4 +31,4 @@ TEST(BlockingAssignMemberAccess, BlockingAssignMemberAccess) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

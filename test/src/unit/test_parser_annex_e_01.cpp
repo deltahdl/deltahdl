@@ -21,4 +21,4 @@ TEST(OptionalDirectiveExtendedParsing, AllDirectivesCombined) {
   }
 }
 
-}  // namespace
+}

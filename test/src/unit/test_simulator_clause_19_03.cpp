@@ -34,4 +34,4 @@ TEST(Coverage, MultipleGroupInstances) {
   EXPECT_EQ(db.FindGroup("cg2")->name, "cg2");
 }
 
-}  // namespace
+}

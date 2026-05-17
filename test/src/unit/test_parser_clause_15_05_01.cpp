@@ -74,7 +74,6 @@ TEST(EventTriggerParser, BlockingWithDeclaration) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
 }
 
-
 TEST(EventTriggerParser, BlockingTriggerNamedEvent) {
   auto r = Parse(
       "module t;\n"
@@ -89,7 +88,6 @@ TEST(EventTriggerParser, BlockingTriggerNamedEvent) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-// §15.5.1: Nonblocking trigger with delay control.
 TEST(EventTriggerParser, NonblockingWithDelay) {
   auto r = Parse(
       "module m;\n"
@@ -106,7 +104,6 @@ TEST(EventTriggerParser, NonblockingWithDelay) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-// §15.5.1: Nonblocking trigger with parenthesized delay.
 TEST(EventTriggerParser, NonblockingWithParenDelay) {
   auto r = Parse(
       "module m;\n"
@@ -122,7 +119,6 @@ TEST(EventTriggerParser, NonblockingWithParenDelay) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-// §15.5.1: Nonblocking trigger without delay has null delay.
 TEST(EventTriggerParser, NonblockingNoDelayHasNullDelay) {
   auto r = Parse(
       "module m;\n"
@@ -137,4 +133,4 @@ TEST(EventTriggerParser, NonblockingNoDelayHasNullDelay) {
   EXPECT_EQ(stmt->delay, nullptr);
 }
 
-}  // namespace
+}

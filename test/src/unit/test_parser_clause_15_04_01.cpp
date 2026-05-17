@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.1: new() on an untyped variable parses.
 TEST(MailboxNewParser, NewOnUntypedVariable) {
   auto r = Parse(
       "module m;\n"
@@ -16,7 +15,6 @@ TEST(MailboxNewParser, NewOnUntypedVariable) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §15.4.1: new() with no bound (default 0, unbounded) parses.
 TEST(MailboxNewParser, NewUnbounded) {
   auto r = Parse(
       "module m;\n"
@@ -30,7 +28,6 @@ TEST(MailboxNewParser, NewUnbounded) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 1u);
 }
 
-// §15.4.1: new(bound) with explicit positive bound parses.
 TEST(MailboxNewParser, NewBounded) {
   auto r = Parse(
       "module m;\n"
@@ -43,7 +40,6 @@ TEST(MailboxNewParser, NewBounded) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §15.4.1: Inline declaration with new() parses.
 TEST(MailboxNewParser, InlineDeclarationWithNew) {
   auto r = Parse(
       "module m;\n"
@@ -53,4 +49,4 @@ TEST(MailboxNewParser, InlineDeclarationWithNew) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

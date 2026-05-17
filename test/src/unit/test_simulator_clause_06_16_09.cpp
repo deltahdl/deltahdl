@@ -86,4 +86,4 @@ TEST(StringMethods, AtoiReturns32Bit) {
   EXPECT_EQ(result.width, 32u);
 }
 
-}  // namespace
+}

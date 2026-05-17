@@ -147,14 +147,12 @@ TEST(PrimaryParsing, PrimaryConcatenationWithRange) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4: multiple_concatenation [ [ range_expression ] ]
 TEST(PrimaryParsing, MultiConcatenationWithRange) {
   auto r = Parse("module m; initial x = {2{a}}[3:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4: function_subroutine_call [ [ range_expression ] ]
 TEST(PrimaryParsing, FunctionCallWithRange) {
   auto r = Parse(
       "module m;\n"
@@ -165,7 +163,6 @@ TEST(PrimaryParsing, FunctionCallWithRange) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4: function_subroutine_call with bit_select postfix
 TEST(PrimaryParsing, FunctionCallWithBitSelect) {
   auto r = Parse(
       "module m;\n"
@@ -176,7 +173,6 @@ TEST(PrimaryParsing, FunctionCallWithBitSelect) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4: implicit_class_handle — super
 TEST(PrimaryParsing, ImplicitClassHandleSuper) {
   auto r = Parse(
       "class C extends B;\n"
@@ -188,7 +184,6 @@ TEST(PrimaryParsing, ImplicitClassHandleSuper) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4: implicit_class_handle — this.super
 TEST(PrimaryParsing, ImplicitClassHandleThisDotSuper) {
   auto r = Parse(
       "class C extends B;\n"
@@ -200,7 +195,6 @@ TEST(PrimaryParsing, ImplicitClassHandleThisDotSuper) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4: primary_literal — sized integer literal
 TEST(PrimaryParsing, PrimaryLiteralSizedInteger) {
   auto r = Parse("module m; initial x = 8'hFF; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -210,7 +204,6 @@ TEST(PrimaryParsing, PrimaryLiteralSizedInteger) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// §A.8.4: primary_literal — binary literal
 TEST(PrimaryParsing, PrimaryLiteralBinary) {
   auto r = Parse("module m; initial x = 4'b1010; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -220,7 +213,6 @@ TEST(PrimaryParsing, PrimaryLiteralBinary) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// §A.8.4: time_literal — various time units
 TEST(PrimaryParsing, TimeLiteralNanoseconds) {
   auto r = Parse("module m; initial #100ns; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -245,7 +237,6 @@ TEST(PrimaryParsing, TimeLiteralFixedPoint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4: unbased_unsized_literal — 'x and 'z
 TEST(PrimaryParsing, PrimaryUnbasedUnsizedLiteralX) {
   auto r = Parse("module m; initial x = 'x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -264,7 +255,6 @@ TEST(PrimaryParsing, PrimaryUnbasedUnsizedLiteralZ) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-// §A.8.4: streaming_concatenation as primary
 TEST(PrimaryParsing, PrimaryStreamingConcatenation) {
   auto r = Parse(
       "module m;\n"
@@ -279,7 +269,6 @@ TEST(PrimaryParsing, PrimaryStreamingConcatenation) {
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
 }
 
-// §A.8.4: type_reference as primary
 TEST(PrimaryParsing, PrimaryTypeReference) {
   auto r = Parse(
       "module m;\n"
@@ -290,7 +279,6 @@ TEST(PrimaryParsing, PrimaryTypeReference) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4: constant_primary — specparam_identifier
 TEST(PrimaryParsing, ConstantPrimarySpecparam) {
   auto r = Parse(
       "module m(input a, output b);\n"
@@ -303,7 +291,6 @@ TEST(PrimaryParsing, ConstantPrimarySpecparam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4: constant_primary — genvar_identifier
 TEST(PrimaryParsing, ConstantPrimaryGenvar) {
   auto r = Parse(
       "module m;\n"
@@ -316,7 +303,6 @@ TEST(PrimaryParsing, ConstantPrimaryGenvar) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4: class_qualifier — package_scope
 TEST(PrimaryParsing, ClassQualifierPackageScope) {
   auto r = Parse(
       "package pkg;\n"
@@ -329,12 +315,6 @@ TEST(PrimaryParsing, ClassQualifierPackageScope) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4 constant_primary ::= [ package_scope | class_scope ] enum_identifier
-// — accessing an enum member through the package_scope production from
-// §A.9.3.  The enum itself is declared via the data_type ::= enum form in
-// §A.2.2.1, so this one test braids A.8.4 + A.9.3 + A.2.2.1 together: the
-// type is owned by A.2.2.1, the scope prefix by A.9.3, and the primary-slot
-// usage by A.8.4.
 TEST(PrimaryParsing, ConstantPrimaryPackageScopedEnumIdentifier) {
   auto r = Parse(
       "package pkg;\n"
@@ -347,7 +327,6 @@ TEST(PrimaryParsing, ConstantPrimaryPackageScopedEnumIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4: select — chained member access with bit select
 TEST(PrimaryParsing, SelectChainedMemberAccess) {
   auto r = Parse(
       "module m;\n"
@@ -357,7 +336,6 @@ TEST(PrimaryParsing, SelectChainedMemberAccess) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4: select — member access with part_select_range
 TEST(PrimaryParsing, SelectMemberWithPartSelect) {
   auto r = Parse(
       "module m;\n"
@@ -367,7 +345,6 @@ TEST(PrimaryParsing, SelectMemberWithPartSelect) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4: nonrange_select — member access without part select
 TEST(PrimaryParsing, NonrangeSelectMemberAccess) {
   auto r = Parse(
       "module m;\n"
@@ -377,7 +354,6 @@ TEST(PrimaryParsing, NonrangeSelectMemberAccess) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4: module_path_primary — parenthesized mintypmax
 TEST(PrimaryParsing, ModulePathPrimaryParenthesizedMintypMax) {
   auto r = Parse(
       "module m(input a, output b);\n"
@@ -389,30 +365,22 @@ TEST(PrimaryParsing, ModulePathPrimaryParenthesizedMintypMax) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4: Error — unclosed parenthesized expression
 TEST(PrimaryParsing, ErrorUnclosedParenthesizedExpr) {
   EXPECT_FALSE(ParseOk("module m; initial x = (1 + 2; endmodule\n"));
 }
 
-// §A.8.4 primary ::= this — the bare `this` keyword as a primary expression.
 TEST(PrimaryParsing, PrimaryThis) {
   auto r = Parse("module m; initial x = this; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4 implicit_class_handle ::= this — `this.member` form.  Combined with
-// the surrounding `primary ::= [class_qualifier|package_scope]
-// hierarchical_identifier select` slot, this exercises implicit_class_handle
-// reaching a member through the dot operator.
 TEST(PrimaryParsing, ImplicitClassHandleThisMember) {
   auto r = Parse("module m; initial x = this.field; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4 constant_primary ::= [package_scope|class_scope] enum_identifier —
-// a bare enum_identifier in a constant context (a parameter initializer).
 TEST(PrimaryParsing, ConstantPrimaryEnumIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -423,8 +391,6 @@ TEST(PrimaryParsing, ConstantPrimaryEnumIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.4 constant_primary ::= ( constant_mintypmax_expression ) — a
-// parenthesised constant expression in a parameter initializer.
 TEST(PrimaryParsing, ConstantPrimaryParenthesized) {
   auto r = Parse("module m; parameter int P = (1 + 2); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -434,13 +400,10 @@ TEST(PrimaryParsing, ConstantPrimaryParenthesized) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kBinary);
 }
 
-// §A.8.4: Error — unclosed bit select bracket
 TEST(PrimaryParsing, ErrorUnclosedBitSelect) {
   EXPECT_FALSE(ParseOk("module m; initial x = a[3; endmodule\n"));
 }
 
-// §A.8.4 primary ::= assignment_pattern_expression — the `'{ ... }` form
-// in a procedural assignment slot.
 TEST(PrimaryParsing, PrimaryAssignmentPattern) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -450,8 +413,6 @@ TEST(PrimaryParsing, PrimaryAssignmentPattern) {
               "endmodule\n"));
 }
 
-// §A.8.4 primary ::= let_expression — a let-declared name used in an
-// expression slot.
 TEST(PrimaryParsing, PrimaryLetExpression) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -461,4 +422,4 @@ TEST(PrimaryParsing, PrimaryLetExpression) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

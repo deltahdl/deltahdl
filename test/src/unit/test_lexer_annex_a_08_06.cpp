@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §A.8.6: unary_operator — all 11 tokens
-
 TEST(OperatorLexing, UnaryPlus) {
   auto tokens = Lex("+a");
   ASSERT_GE(tokens.size(), 2u);
@@ -75,8 +73,6 @@ TEST(OperatorLexing, UnaryCaretTilde) {
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kCaretTilde);
 }
-
-// §A.8.6: binary_operator — all tokens including multi-char
 
 TEST(OperatorLexing, BinaryEqEq) {
   auto tokens = Lex("a == b");
@@ -198,8 +194,6 @@ TEST(OperatorLexing, BinaryGtEq) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kGtEq);
 }
 
-// §A.8.6: inc_or_dec_operator
-
 TEST(OperatorLexing, IncOperatorPlusPlus) {
   auto tokens = Lex("a++");
   ASSERT_GE(tokens.size(), 2u);
@@ -211,8 +205,6 @@ TEST(OperatorLexing, DecOperatorMinusMinus) {
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[1].kind, TokenKind::kMinusMinus);
 }
-
-// §A.8.6: disambiguation — multi-char operators not consumed as shorter tokens
 
 TEST(OperatorLexing, PowerNotTwoStars) {
   auto tokens = Lex("a**b");
@@ -284,10 +276,6 @@ TEST(OperatorLexing, MinusMinusNotTwoMinus) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
 }
 
-// §A.8.6: multi-char operator tokens are atomic. Whitespace separating their
-// constituent characters must yield two distinct single-char tokens, not the
-// merged operator.
-
 TEST(OperatorLexing, WhitespaceBreaksLtEq) {
   auto tokens = Lex("a < = b");
   ASSERT_GE(tokens.size(), 4u);
@@ -352,9 +340,6 @@ TEST(OperatorLexing, WhitespaceBreaksLtDashGt) {
   EXPECT_EQ(tokens[3].kind, TokenKind::kGt);
 }
 
-// §A.8.6: token-set closure — character pairs not listed as operators must not
-// collapse into single tokens.
-
 TEST(OperatorLexing, AdjacentTildesAreSeparate) {
   auto tokens = Lex("~~a");
   ASSERT_GE(tokens.size(), 3u);
@@ -370,9 +355,6 @@ TEST(OperatorLexing, AdjacentBangsAreSeparate) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kBang);
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
 }
-
-// §A.8.6: greedy maximal-munch keeps the longest §A.8.6 token and leaves the
-// remainder for the next token.
 
 TEST(OperatorLexing, GreedyTriplePlusKeepsIncrementThenPlus) {
   auto tokens = Lex("+++a");
@@ -390,4 +372,4 @@ TEST(OperatorLexing, GreedyTripleMinusKeepsDecrementThenMinus) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
 }
 
-}  // namespace
+}

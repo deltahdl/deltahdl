@@ -9,12 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §32.3 sentence 1: "It shall issue a warning for any data it is unable
-// to annotate." A PATHPULSE construct lives inside the DELAY section of
-// a CELL — clearly timing data, since §32.4.1 Table 32-1 maps it to
-// SystemVerilog specify path pulse limits — but the parser does not yet
-// decode it, so the annotator must surface a warning rather than
-// dropping it on the floor.
 TEST(SdfAnnotator, WarnsForDataItIsUnableToAnnotate) {
   SdfFile file;
   std::string sdf = R"(
@@ -39,8 +33,6 @@ TEST(SdfAnnotator, WarnsForDataItIsUnableToAnnotate) {
   EXPECT_FALSE(result.warnings.empty());
 }
 
-// §32.3: the converse of sentence 1 — when every construct in the SDF
-// file is one the annotator handles, no warnings are issued.
 TEST(SdfAnnotator, NoWarningsForFullySupportedFile) {
   SdfFile file;
   std::string sdf = R"(
@@ -61,9 +53,6 @@ TEST(SdfAnnotator, NoWarningsForFullySupportedFile) {
   EXPECT_TRUE(result.warnings.empty());
 }
 
-// §32.3 sentence 3: "All constructs unrelated to SystemVerilog timing
-// shall be ignored without any warnings issued." The TIMINGENV section
-// is the LRM's named example.
 TEST(SdfAnnotator, TimingenvIsIgnoredWithoutWarnings) {
   SdfFile file;
   std::string sdf = R"(
@@ -88,11 +77,6 @@ TEST(SdfAnnotator, TimingenvIsIgnoredWithoutWarnings) {
   EXPECT_TRUE(mgr.HasPathDelay("a", "y"));
 }
 
-// §32.3 sentence 4: "Any SystemVerilog timing value for which the SDF
-// file does not provide a value shall not be modified during the
-// backannotation process, and its prebackannotation value shall be
-// unchanged." A path delay loaded into the manager before annotation
-// must survive an annotation pass that names a different path.
 TEST(SdfAnnotator, UnspecifiedPathDelayIsPreserved) {
   SpecifyManager mgr;
   PathDelay pd;
@@ -117,10 +101,6 @@ TEST(SdfAnnotator, UnspecifiedPathDelayIsPreserved) {
   EXPECT_EQ(mgr.GetPathDelay("a", "y"), 42u);
 }
 
-// §32.3 sentence 1 (quantifier edge case): "any data" — when several
-// distinct unannotatable constructs share a single DELAY section, each
-// must produce its own warning rather than collapsing to one. PATHPULSE
-// and DEVICE are both Table 32-1 rows the parser does not yet decode.
 TEST(SdfAnnotator, EachUnannotatableConstructProducesItsOwnWarning) {
   SdfFile file;
   std::string sdf = R"(
@@ -146,9 +126,6 @@ TEST(SdfAnnotator, EachUnannotatableConstructProducesItsOwnWarning) {
   EXPECT_GE(result.warnings.size(), 2u);
 }
 
-// §32.3 sentence 4 edge case: an SDF file with no cells (so no value
-// updates whatsoever) leaves a populated SpecifyManager fully intact
-// across all four §32.2 categories.
 TEST(SdfAnnotator, EmptySdfPreservesPopulatedManager) {
   SpecifyManager mgr;
 
@@ -192,13 +169,6 @@ TEST(SdfAnnotator, EmptySdfPreservesPopulatedManager) {
   EXPECT_EQ(mgr.GetInterconnectDelays()[0].rise, 7u);
 }
 
-// §32.3 integration: a single SDF file mixes a silent TIMINGENV section
-// (sentence 2), an unannotatable construct (sentence 1), an annotated
-// IOPATH (the happy path), while the manager already holds a
-// prebackannotation path delay the file does not name (sentence 4). All
-// three rules must hold simultaneously and independently. PATHPULSE
-// stands in for the unannotatable construct because §32.4.1 has since
-// taken ownership of COND/CONDELSE-wrapped IOPATHs.
 TEST(SdfAnnotator, SilentIgnoredWarnedAndAnnotatedAllCoexist) {
   SpecifyManager mgr;
   PathDelay pre;
@@ -236,4 +206,4 @@ TEST(SdfAnnotator, SilentIgnoredWarnedAndAnnotatedAllCoexist) {
   EXPECT_EQ(mgr.GetPathDelay("x", "w"), 99u);
 }
 
-}  // namespace
+}

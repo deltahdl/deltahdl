@@ -61,4 +61,4 @@ TEST(BuiltinMethodLexing, MethodWithMultipleArgTokens) {
   EXPECT_EQ(tokens[7].kind, TokenKind::kRParen);
 }
 
-}  // namespace
+}

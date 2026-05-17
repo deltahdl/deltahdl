@@ -1,9 +1,4 @@
-// §3.2: A design element is a SystemVerilog module, program, interface,
-// checker, package, primitive, or configuration. The keywords module,
-// program, interface, checker, package, primitive, and config introduce
-// each respective design element. The parser dispatches on each of these
-// keywords at the top level and lands the resulting declaration in the
-// CompilationUnit collection that corresponds to its design-element kind.
+
 
 #include "fixture_parser.h"
 
@@ -70,8 +65,7 @@ TEST(DesignElementParsing, PrimitiveKeywordIntroducesPrimitiveDesignElement) {
 }
 
 TEST(DesignElementParsing, ConfigKeywordIntroducesConfigurationDesignElement) {
-  // §3.2 lists "configuration" as the seventh design element; per the same
-  // sentence its introducer keyword is config (not configuration).
+
   auto r = Parse(
       "module m; endmodule\n"
       "config cfg;\n"
@@ -83,8 +77,6 @@ TEST(DesignElementParsing, ConfigKeywordIntroducesConfigurationDesignElement) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-// §3.2 declares the seven design-element introducer keywords distinct from
-// one another, so a compilation unit may carry one of each side by side.
 TEST(DesignElementParsing, AllSevenDesignElementsCoexistInOneCompilationUnit) {
   auto r = Parse(
       "module m; endmodule\n"
@@ -107,4 +99,4 @@ TEST(DesignElementParsing, AllSevenDesignElementsCoexistInOneCompilationUnit) {
   EXPECT_EQ(r.cu->configs.size(), 1u);
 }
 
-}  // namespace
+}

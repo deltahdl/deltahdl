@@ -1,4 +1,4 @@
-// §26.3
+
 
 #include "fixture_elaborator.h"
 
@@ -68,12 +68,6 @@ TEST(PackageImport, ImportedIdentifierNotVisibleViaHierarchicalRef) {
              "endmodule\n"));
 }
 
-// §26.3 opens by stating that the compilation of a package shall precede
-// the compilation of scopes in which the package is imported.  In a
-// single-compilation-unit model that translates to: an import from a
-// package name that has not been declared in this compilation unit is
-// illegal at elaboration time, because no compiled package supplies the
-// requested symbols.
 TEST(PackageImport, WildcardImportFromUnknownPackageIsError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -88,9 +82,6 @@ TEST(PackageImport, ExplicitImportFromUnknownPackageIsError) {
              "endmodule\n"));
 }
 
-// §26.3: "Importing an identifier from the same package multiple times is
-// allowed."  Two `import pkg::x;` statements in the same scope must not
-// collide with each other.
 TEST(PackageImport, RepeatedExplicitImportFromSamePackageIsAllowed) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
@@ -102,8 +93,6 @@ TEST(PackageImport, RepeatedExplicitImportFromSamePackageIsAllowed) {
              "endmodule\n"));
 }
 
-// §26.3: "An explicit import shall be illegal if the imported identifier is
-// declared in the same scope or explicitly imported from another package."
 TEST(PackageImport, ExplicitImportCollidesWithExistingLocalDeclaration) {
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
@@ -129,9 +118,6 @@ TEST(PackageImport, ExplicitImportCollidesWithExplicitImportFromAnotherPackage) 
              "endmodule\n"));
 }
 
-// §26.3: "It shall be illegal if the wildcard import of more than one package
-// within the same scope defines the same potentially locally visible
-// identifier and a search for a reference matches that identifier."
 TEST(PackageImport, WildcardAmbiguityBetweenTwoPackagesIsError) {
   EXPECT_FALSE(
       ElabOk("package p1;\n"
@@ -148,9 +134,6 @@ TEST(PackageImport, WildcardAmbiguityBetweenTwoPackagesIsError) {
              "endmodule\n"));
 }
 
-// §26.3: "If a wildcard imported symbol is made locally visible in a scope,
-// any later locally visible declaration of the same name in that scope shall
-// be illegal."
 TEST(PackageImport, DeclarationAfterWildcardClaimIsError) {
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
@@ -164,11 +147,6 @@ TEST(PackageImport, DeclarationAfterWildcardClaimIsError) {
              "endmodule\n"));
 }
 
-// §26.3: "A wildcard import allows all identifiers declared within a package
-// to be imported provided the identifier is not otherwise defined in the
-// importing scope."  A local declaration that precedes the wildcard import
-// keeps the wildcard candidate from binding to that name — the reference
-// resolves to the local decl, and the module is well-formed.
 TEST(PackageImport, LocalDeclShadowsWildcardImportedName) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
@@ -182,9 +160,6 @@ TEST(PackageImport, LocalDeclShadowsWildcardImportedName) {
              "endmodule\n"));
 }
 
-// §26.3: "One way to use declarations made in a package is to reference them
-// using the package scope resolution operator ::."  A package parameter
-// referenced via `pkg::WIDTH` in a dimension must resolve at elaboration.
 TEST(PackageScopeReference, PackageScopeParamResolution) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
@@ -195,7 +170,6 @@ TEST(PackageScopeReference, PackageScopeParamResolution) {
              "endmodule\n"));
 }
 
-// §26.3 scope resolution applied to a package-declared type.
 TEST(PackageScopeReference, PackageScopeTypeResolution) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
@@ -206,9 +180,6 @@ TEST(PackageScopeReference, PackageScopeTypeResolution) {
              "endmodule\n"));
 }
 
-// §26.3: explicit `import pkg::WIDTH;` makes the imported identifier
-// directly visible in the importing scope (an unqualified `WIDTH` resolves
-// in the dimension below).
 TEST(PackageImport, ExplicitImportIdentVisibleUnqualified) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
@@ -220,9 +191,6 @@ TEST(PackageImport, ExplicitImportIdentVisibleUnqualified) {
              "endmodule\n"));
 }
 
-// §26.3 opens with the example `ComplexPkg::Complex cout = ComplexPkg::mul(a,
-// b);` — the scope resolution operator must work for package-declared
-// functions, not just types and parameters.
 TEST(PackageScopeReference, PackageScopedFunctionCall) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
@@ -234,13 +202,6 @@ TEST(PackageScopeReference, PackageScopedFunctionCall) {
              "endmodule\n"));
 }
 
-// §26.3: "If the reference is a function or task call, all of the locally
-// visible identifiers to the end of the current scope shall be searched."
-// A function call appearing before the function's textual definition in
-// the same module scope must still bind to that function — the search
-// extends to the end of the current scope for function/task calls,
-// distinguishing the rule from the point-of-reference rule used for other
-// identifier references.
 TEST(PackageImport, FunctionCallBindsToLaterFunctionInSameScope) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -250,11 +211,6 @@ TEST(PackageImport, FunctionCallBindsToLaterFunctionInSameScope) {
              "endmodule\n"));
 }
 
-// §26.3: "If the reference is not found within the current scope, the next
-// outer lexical scope shall be searched."  A name declared at the
-// compilation-unit (outer) scope must be reachable from a module's inner
-// scope by the outer-scope search step (linking §26.3 search to §3.13(c)
-// compilation-unit scope).
 TEST(PackageImport, OuterScopeSearchFindsCompilationUnitName) {
   EXPECT_TRUE(
       ElabOk("localparam int WIDTH = 8;\n"
@@ -263,14 +219,6 @@ TEST(PackageImport, OuterScopeSearchFindsCompilationUnitName) {
              "endmodule\n"));
 }
 
-// §26.3: "The search algorithm shall be repeated for each outer lexical
-// scope until an identifier is found that matches the reference or there
-// are no more outer lexical scopes, the compilation-unit scope being the
-// final scope searched.  For a reference to an identifier other than
-// function or task call, it shall be illegal if no identifier can be
-// found that matches the reference."  A bare reference whose name is
-// neither locally declared nor brought in by any wildcard import nor
-// present in an outer scope must be rejected.
 TEST(PackageImport, UnresolvedReferenceIsError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -279,4 +227,4 @@ TEST(PackageImport, UnresolvedReferenceIsError) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

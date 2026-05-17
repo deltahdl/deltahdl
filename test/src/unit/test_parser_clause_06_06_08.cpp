@@ -85,4 +85,4 @@ TEST(InterconnectParsing, MultipleNetsOneLine) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-}  // namespace
+}

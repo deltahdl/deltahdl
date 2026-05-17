@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §A.9.4: white_space ::= space | tab | newline | formfeed | eof — observed at
-// the synthesizer stage: each non-EOF alternative must successfully separate
-// tokens in a source that lowers to an AIG.
-
 TEST(WhiteSpaceSynthesis, SpaceDelimiterSynthesizes) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f, "module m; logic a; assign a = 1'b0; endmodule");
@@ -50,8 +46,6 @@ TEST(WhiteSpaceSynthesis, FormfeedDelimiterSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-// §A.9.4 eof alternative: source ending at EOF — no trailing whitespace after
-// the closing `endmodule` — must elaborate and synthesize to an AIG.
 TEST(WhiteSpaceSynthesis, EndOfFileTerminatesSynthesis) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f, "module m; logic a, b; assign a = b; endmodule");
@@ -61,4 +55,4 @@ TEST(WhiteSpaceSynthesis, EndOfFileTerminatesSynthesis) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

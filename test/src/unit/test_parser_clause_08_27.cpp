@@ -83,4 +83,4 @@ TEST(ClassParsing, ForwardTypedefParameterizedClass) {
   EXPECT_EQ(r.cu->classes[0]->name, "C");
 }
 
-}  // namespace
+}

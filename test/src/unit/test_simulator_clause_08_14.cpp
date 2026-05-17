@@ -11,10 +11,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Unit tests: ClassObject / ClassTypeInfo API
-// ---------------------------------------------------------------------------
-
 TEST(OverriddenMemberSimulation, SubclassIsValidBaseObject) {
   SimFixture f;
   auto* packet = MakeClassType(f, "Packet", {"i"});
@@ -93,10 +89,6 @@ TEST(OverriddenMemberSimulation, VirtualMethodDispatchesThroughVtable) {
   EXPECT_EQ(obj->ResolveVirtualMethod("get"), derived_get);
   EXPECT_EQ(obj->ResolveMethod("get"), nullptr);
 }
-
-// ---------------------------------------------------------------------------
-// End-to-end tests: full pipeline (parse -> elaborate -> lower -> run)
-// ---------------------------------------------------------------------------
 
 TEST(OverriddenMemberSimulation, E2eSubclassHandleAssignedToBaseVariable) {
   SimFixture f;
@@ -236,4 +228,4 @@ TEST(OverriddenMemberSimulation, E2eNonOverriddenMemberAccessibleThroughBase) {
       "endmodule\n", "result"), 5u);
 }
 
-}  // namespace
+}

@@ -6,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §31.3 classifies exactly these six timing checks as the stability-window
-// group. Each is listed by the subclause alongside the generic three-step
-// procedure (define window, check data transition, report violation).
 TEST(StabilityWindowClassification, IncludesAllSixListedChecks) {
   EXPECT_TRUE(IsStabilityWindowTimingCheck(TimingCheckKind::kSetup));
   EXPECT_TRUE(IsStabilityWindowTimingCheck(TimingCheckKind::kHold));
@@ -18,8 +15,6 @@ TEST(StabilityWindowClassification, IncludesAllSixListedChecks) {
   EXPECT_TRUE(IsStabilityWindowTimingCheck(TimingCheckKind::kRecrem));
 }
 
-// The other six timing-check kinds belong to §31.4 (event-based group) and
-// must not be classified as stability-window checks.
 TEST(StabilityWindowClassification, ExcludesEventBasedChecks) {
   EXPECT_FALSE(IsStabilityWindowTimingCheck(TimingCheckKind::kSkew));
   EXPECT_FALSE(IsStabilityWindowTimingCheck(TimingCheckKind::kTimeskew));
@@ -29,4 +24,4 @@ TEST(StabilityWindowClassification, ExcludesEventBasedChecks) {
   EXPECT_FALSE(IsStabilityWindowTimingCheck(TimingCheckKind::kNochange));
 }
 
-}  // namespace
+}

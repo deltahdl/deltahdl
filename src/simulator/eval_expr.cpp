@@ -16,8 +16,6 @@
 
 namespace delta {
 
-// --- Method call extraction ---
-
 bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out) {
   if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
   auto* access = expr->lhs;
@@ -28,9 +26,6 @@ bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out) {
   return true;
 }
 
-// --- Replication ({n{expr}}) ---
-
-// Evaluate inner elements and pack into a single 64-bit aval/bval pair.
 struct ReplicateInner {
   uint64_t aval = 0;
   uint64_t bval = 0;
@@ -61,7 +56,7 @@ Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t count = static_cast<uint32_t>(
       EvalExpr(expr->repeat_count, ctx, arena).ToUint64());
   if (count == 0) {
-    // §11.4.12.1: Each operand shall be evaluated exactly once.
+
     EvalReplicateInner(expr, ctx, arena);
     return MakeLogic4Vec(arena, 0);
   }
@@ -89,13 +84,11 @@ Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {
   return result;
 }
 
-// --- Prefix increment/decrement (§11.4.2) ---
-
 Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto old_val = EvalExpr(expr->lhs, ctx, arena);
   Logic4Vec new_val;
   if (old_val.is_real) {
-    // §11.4.2: Real increment/decrement by 1.0.
+
     double d = 0.0;
     uint64_t bits = old_val.ToUint64();
     std::memcpy(&d, &bits, sizeof(double));
@@ -114,10 +107,8 @@ Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
   } else if (expr->lhs->kind == ExprKind::kSelect) {
     TryAssocIndexedWrite(expr->lhs, new_val, ctx, arena);
   }
-  return new_val;  // Return new value (prefix semantics).
+  return new_val;
 }
-
-// --- Postfix increment/decrement (§11.4.2) ---
 
 Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto old_val = EvalExpr(expr->lhs, ctx, arena);
@@ -141,10 +132,8 @@ Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
   } else if (expr->lhs->kind == ExprKind::kSelect) {
     TryAssocIndexedWrite(expr->lhs, new_val, ctx, arena);
   }
-  return old_val;  // Return original value (postfix semantics).
+  return old_val;
 }
-
-// --- Member access (a.b) ---
 
 static void BuildMemberName(const Expr* expr, std::string& out) {
   if (expr->kind == ExprKind::kIdentifier) {
@@ -174,7 +163,6 @@ static std::string StripRootPrefix(const std::string& name) {
   return name;
 }
 
-// §7.2: Extract a packed struct/union field from the base variable.
 static Logic4Vec ExtractStructField(Variable* base_var,
                                     const StructTypeInfo* info,
                                     std::string_view field, Arena& arena) {
@@ -188,7 +176,6 @@ static Logic4Vec ExtractStructField(Variable* base_var,
   return MakeLogic4Vec(arena, 1);
 }
 
-// §7.12/§7.10/§7.8: Try collection property/method access.
 static bool TryCollectionAccess(std::string_view base, std::string_view field,
                                 SimContext& ctx, Arena& arena, Logic4Vec& out) {
   if (TryEvalArrayProperty(base, field, ctx, arena, out)) return true;
@@ -209,9 +196,6 @@ static bool TryCollectionAccess(std::string_view base, std::string_view field,
   return false;
 }
 
-// §8: Try class object property access.
-// §8.14: When the declared type differs from the runtime type, access
-// resolves to the declared type's version (overridden members are hidden).
 static bool TryClassPropertyAccess(Variable* base_var,
                                    std::string_view field_name,
                                    std::string_view var_name, SimContext& ctx,
@@ -232,7 +216,6 @@ static bool TryClassPropertyAccess(Variable* base_var,
   return true;
 }
 
-// §8.5: Try class enum member access via instance (e.g., p.ERR_OVERFLOW).
 static bool TryClassEnumAccess(Variable* base_var, std::string_view field_name,
                                SimContext& ctx, Arena& arena, Logic4Vec& out) {
   if (!base_var) return false;
@@ -245,9 +228,6 @@ static bool TryClassEnumAccess(Variable* base_var, std::string_view field_name,
   return true;
 }
 
-// §8.23/§8.26.3: Try class scope resolution for static members, enumerations,
-// and parameters.  For interface classes, walks extended_interfaces to find
-// inherited members.
 static bool TryStaticMemberAccess(std::string_view base_name,
                                   std::string_view field_name, SimContext& ctx,
                                   Arena& arena, Logic4Vec& out) {
@@ -263,7 +243,7 @@ static bool TryStaticMemberAccess(std::string_view base_name,
     out = MakeLogic4VecVal(arena, 32, eit->second);
     return true;
   }
-  // §8.26.3: Walk extended interface hierarchy for inherited members.
+
   if (cls_type->is_interface) {
     std::vector<const ClassTypeInfo*> stack;
     if (cls_type->parent && cls_type->parent->is_interface)
@@ -295,13 +275,13 @@ static bool TryStaticMemberAccess(std::string_view base_name,
 static Logic4Vec ResolveMemberByType(std::string_view base_name,
                                      std::string_view field_name,
                                      SimContext& ctx, Arena& arena) {
-  // §8.11: 'this' refers to the current instance.
+
   if (base_name == "this") {
     auto* self = ctx.CurrentThis();
     if (self) return self->GetProperty(field_name, arena);
     return MakeLogic4Vec(arena, 1);
   }
-  // §8.15: 'super' refers to the base class of the current instance.
+
   if (base_name == "super") {
     auto* self = ctx.CurrentThis();
     if (self && self->type && self->type->parent) {
@@ -312,7 +292,7 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   auto* base_var = ctx.FindVariable(base_name);
   auto* sinfo = ctx.GetVariableStructType(base_name);
   Logic4Vec out;
-  // §7.2/§11.9: Struct/union field access.
+
   if (base_var && sinfo) {
     if (sinfo->is_union) {
       auto tag = ctx.GetVariableTag(base_name);
@@ -332,13 +312,12 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
     }
     return ExtractStructField(base_var, sinfo, field_name, arena);
   }
-  // §15.5.3: event.triggered returns 1'b1 if triggered in current time step.
+
   if (base_var && base_var->is_event && field_name == "triggered") {
     return MakeLogic4VecVal(arena, 1,
                             ctx.IsEventTriggered(base_name) ? 1u : 0u);
   }
-  // §9.4.4: sequence.triggered returns 1'b1 when the sequence has reached
-  // its endpoint in the current time step.
+
   if (!base_var && field_name == "triggered" &&
       ctx.FindSequenceDecl(base_name)) {
     std::string ep_name = std::string("__seq_") + std::string(base_name);
@@ -368,8 +347,6 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   return ResolveMemberByType(base_name, field_name, ctx, arena);
 }
 
-// --- Cast (type'(expr)) (§6.24) ---
-
 static uint32_t CastWidth(std::string_view type_name) {
   if (type_name == "byte") return 8;
   if (type_name == "shortint") return 16;
@@ -381,8 +358,8 @@ static uint32_t CastWidth(std::string_view type_name) {
   if (type_name == "bit") return 1;
   if (type_name == "logic") return 1;
   if (type_name == "reg") return 1;
-  if (type_name == "string") return 0;  // String cast handled separately.
-  // §6.24.1: Numeric size cast (e.g., 17'(x)).
+  if (type_name == "string") return 0;
+
   if (!type_name.empty() && type_name[0] >= '0' && type_name[0] <= '9') {
     uint32_t w = 0;
     for (char c : type_name) {
@@ -393,7 +370,7 @@ static uint32_t CastWidth(std::string_view type_name) {
     }
     if (w > 0) return w;
   }
-  return 0;  // Unknown type — caller must resolve via SimContext.
+  return 0;
 }
 
 static bool IsRealCastTarget(std::string_view name) {
@@ -407,7 +384,6 @@ static double ExtractDouble(const Logic4Vec& vec) {
   return d;
 }
 
-// §6.24.3: Pack unpacked array elements into a bitvector (index 0 at MSBs).
 static Logic4Vec PackArrayBitStream(std::string_view name,
                                     const ArrayInfo& info, SimContext& ctx,
                                     Arena& arena) {
@@ -425,7 +401,6 @@ static Logic4Vec PackArrayBitStream(std::string_view name,
   return MakeLogic4VecVal(arena, total_bits, packed);
 }
 
-// §6.12.1: Handle real↔integer conversion in cast.
 static Logic4Vec CastRealConversion(const Logic4Vec& inner,
                                     std::string_view type_name,
                                     uint32_t target_width, Arena& arena) {
@@ -445,17 +420,16 @@ static Logic4Vec CastRealConversion(const Logic4Vec& inner,
   return result;
 }
 
-// §6.24.3: Resolve the target width for a cast, checking user-defined types.
 static uint32_t ResolveCastWidth(std::string_view type_name, SimContext& ctx) {
   uint32_t w = CastWidth(type_name);
   if (w > 0) return w;
-  // §6.24.3: Look up user-defined type width (typedef'd structs, enums, etc.).
+
   uint32_t tw = ctx.FindTypeWidth(type_name);
   return tw > 0 ? tw : 32;
 }
 
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
-  // §6.24.3: Detect bit-stream source (unpacked array).
+
   if (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier) {
     auto* arr_info = ctx.FindArrayInfo(expr->lhs->text);
     if (arr_info && arr_info->size > 0) {
@@ -468,7 +442,7 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   auto inner = EvalExpr(expr->lhs, ctx, arena);
   std::string_view type_name = expr->text;
-  // §6.24.1: signed'(x) / unsigned'(x) change signedness, not width.
+
   if (type_name == "signed") {
     inner.is_signed = true;
     return inner;
@@ -484,7 +458,7 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
     return MakeLogic4Vec(arena, 0);
   }
   uint32_t target_width = ResolveCastWidth(type_name, ctx);
-  // §6.12.1: real↔integer conversion.
+
   if (inner.is_real != IsRealCastTarget(type_name)) {
     return CastRealConversion(inner, type_name, target_width, arena);
   }
@@ -493,16 +467,12 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, target_width, val);
 }
 
-// --- Inside operator (§11.4.13) ---
-
-// Resolve a $ bound to type min (lower=true) or type max (lower=false).
 static uint64_t ResolveDollarBound(uint32_t width, bool lower) {
   if (lower) return 0;
   if (width >= 64) return ~uint64_t{0};
   return (uint64_t{1} << width) - 1;
 }
 
-// Compute tolerance range bounds: [A +/- B] or [A +%- B].
 static void ComputeToleranceBounds(uint64_t a, uint64_t b, TokenKind op,
                                    uint64_t& lo, uint64_t& hi) {
   uint64_t tol = b;
@@ -512,7 +482,6 @@ static void ComputeToleranceBounds(uint64_t a, uint64_t b, TokenKind op,
   if (lo > hi) std::swap(lo, hi);
 }
 
-// Returns: 1=match, 0=no-match, 2=ambiguous.
 static int InsideMatchTolerance(uint64_t lv, const Expr* elem, SimContext& ctx,
                                 Arena& arena) {
   auto a_v = EvalExpr(elem->index, ctx, arena);
@@ -532,12 +501,12 @@ static int InsideMatchRange(Logic4Vec lhs, const Expr* elem, SimContext& ctx,
                             Arena& arena) {
   if (!lhs.IsKnown()) return 2;
   uint64_t lv = lhs.ToUint64();
-  // §11.4.13: Tolerance range [A +/- B] or [A +%- B].
+
   if (elem->op == TokenKind::kPlusSlashMinus ||
       elem->op == TokenKind::kPlusPercentMinus) {
     return InsideMatchTolerance(lv, elem, ctx, arena);
   }
-  // §11.4.13: Normal range with possible $ bounds.
+
   uint64_t lo = IsDollarExpr(elem->index)
                     ? ResolveDollarBound(lhs.width, true)
                     : EvalExpr(elem->index, ctx, arena).ToUint64();
@@ -579,9 +548,6 @@ Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// --- Streaming concatenation (§11.4.14) ---
-
-// Parse a numeric string to uint32_t. Returns 0 if not a digit string.
 static uint32_t ParseDigitStr(std::string_view text) {
   if (text.empty() || text[0] < '0' || text[0] > '9') return 0;
   uint32_t n = 0;
@@ -591,7 +557,6 @@ static uint32_t ParseDigitStr(std::string_view text) {
   return n;
 }
 
-// §11.4.14: Determine the slice size from the optional type/expression.
 static uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx,
                                 Arena& arena) {
   if (!size_expr) return 1;
@@ -609,7 +574,6 @@ static uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx,
   return static_cast<uint32_t>(val);
 }
 
-// Extract a slice of `slice_size` bits starting at `start_bit` from `src`.
 static uint64_t ExtractSlice(const Logic4Vec& src, uint32_t start_bit,
                              uint32_t slice_size) {
   uint64_t result = 0;
@@ -631,7 +595,6 @@ static uint64_t ExtractSlice(const Logic4Vec& src, uint32_t start_bit,
   return result;
 }
 
-// Place a `slice_size`-bit value at `start_bit` in `dst`.
 static void PlaceSlice(Logic4Vec& dst, uint32_t start_bit, uint64_t val,
                        uint32_t slice_size) {
   uint32_t bits_left = slice_size;
@@ -651,8 +614,6 @@ static void PlaceSlice(Logic4Vec& dst, uint32_t start_bit, uint64_t val,
   }
 }
 
-// §11.4.14.4: Resolve a with-clause range into (start, count) indices.
-// Returns false if the range is invalid.
 static bool ResolveWithRange(const Expr* with_expr, SimContext& ctx,
                              Arena& arena, uint32_t array_size,
                              uint32_t array_lo, uint32_t& out_start,
@@ -664,7 +625,7 @@ static bool ResolveWithRange(const Expr* with_expr, SimContext& ctx,
   }
   int64_t idx = static_cast<int64_t>(EvalExpr(with_expr->index, ctx, arena).ToUint64());
   if (!with_expr->index_end) {
-    // Simple index: with [N] — select single element.
+
     int64_t rel = idx - static_cast<int64_t>(array_lo);
     if (rel < 0 || static_cast<uint32_t>(rel) >= array_size) {
       out_start = 0;
@@ -677,19 +638,19 @@ static bool ResolveWithRange(const Expr* with_expr, SimContext& ctx,
   }
   int64_t idx2 = static_cast<int64_t>(EvalExpr(with_expr->index_end, ctx, arena).ToUint64());
   if (with_expr->is_part_select_plus) {
-    // with [base +: width]
+
     int64_t rel = idx - static_cast<int64_t>(array_lo);
     out_start = (rel < 0) ? 0 : static_cast<uint32_t>(rel);
     out_count = (idx2 < 0) ? 0 : static_cast<uint32_t>(idx2);
   } else if (with_expr->is_part_select_minus) {
-    // with [base -: width]
+
     uint32_t width = (idx2 < 0) ? 0 : static_cast<uint32_t>(idx2);
     int64_t lo_idx = idx - static_cast<int64_t>(width) + 1;
     int64_t rel = lo_idx - static_cast<int64_t>(array_lo);
     out_start = (rel < 0) ? 0 : static_cast<uint32_t>(rel);
     out_count = width;
   } else {
-    // with [lo : hi] — fixed range.
+
     int64_t lo = idx, hi = idx2;
     if (lo > hi) std::swap(lo, hi);
     int64_t rel_lo = lo - static_cast<int64_t>(array_lo);
@@ -699,7 +660,6 @@ static bool ResolveWithRange(const Expr* with_expr, SimContext& ctx,
   return true;
 }
 
-// §11.4.14.1: Expand an unpacked array identifier into its element values.
 static void ExpandArrayElements(std::string_view name, SimContext& ctx,
                                 std::vector<Logic4Vec>& parts,
                                 uint32_t& total_width) {
@@ -718,7 +678,6 @@ static void ExpandArrayElements(std::string_view name, SimContext& ctx,
   }
 }
 
-// §11.4.14.4: Expand a subset of unpacked array elements selected by with-clause.
 static void ExpandArrayElementsSliced(std::string_view name, SimContext& ctx,
                                       std::vector<Logic4Vec>& parts,
                                       uint32_t& total_width,
@@ -737,14 +696,13 @@ static void ExpandArrayElementsSliced(std::string_view name, SimContext& ctx,
         parts.push_back(MakeLogic4Vec(ctx.GetArena(), info->elem_width));
       }
     } else {
-      // §11.4.14.4: Range larger than array — use default value.
+
       parts.push_back(MakeLogic4Vec(ctx.GetArena(), info->elem_width));
     }
     total_width += info->elem_width;
   }
 }
 
-// §11.4.14.1: Expand a queue into its element values (left-to-right order).
 static void ExpandQueueElements(QueueObject* queue,
                                 std::vector<Logic4Vec>& parts,
                                 uint32_t& total_width, Arena& arena) {
@@ -754,7 +712,6 @@ static void ExpandQueueElements(QueueObject* queue,
   }
 }
 
-// §11.4.14.4: Expand a subset of queue elements selected by with-clause.
 static void ExpandQueueElementsSliced(QueueObject* queue,
                                       std::vector<Logic4Vec>& parts,
                                       uint32_t& total_width, Arena& arena,
@@ -763,14 +720,13 @@ static void ExpandQueueElementsSliced(QueueObject* queue,
     if (start + i < queue->elements.size()) {
       parts.push_back(queue->elements[start + i]);
     } else {
-      // §11.4.14.4: Range larger than array — use default value.
+
       parts.push_back(MakeLogic4Vec(arena, queue->elem_width));
     }
     total_width += queue->elem_width;
   }
 }
 
-// §11.4.14.1: Expand an associative array in index-sorted order.
 static void ExpandAssocArrayElements(AssocArrayObject* aa,
                                      std::vector<Logic4Vec>& parts,
                                      uint32_t& total_width) {
@@ -787,7 +743,6 @@ static void ExpandAssocArrayElements(AssocArrayObject* aa,
   }
 }
 
-// §11.4.14.1: Expand a packed struct's fields in declaration order.
 static void ExpandStructFields(Variable* var, const StructTypeInfo* sinfo,
                                std::vector<Logic4Vec>& parts,
                                uint32_t& total_width, Arena& arena) {
@@ -800,7 +755,6 @@ static void ExpandStructFields(Variable* var, const StructTypeInfo* sinfo,
   }
 }
 
-// §11.4.14.1: For an untagged union, apply to first declared member only.
 static void ExpandUnionFirstMember(Variable* var, const StructTypeInfo* sinfo,
                                    std::vector<Logic4Vec>& parts,
                                    uint32_t& total_width, Arena& arena) {
@@ -813,11 +767,10 @@ static void ExpandUnionFirstMember(Variable* var, const StructTypeInfo* sinfo,
   total_width += f.width;
 }
 
-// §11.4.14.1: Expand class object properties base-to-derived, declaration order.
 static void ExpandClassProperties(ClassObject* obj,
                                   std::vector<Logic4Vec>& parts,
                                   uint32_t& total_width, Arena& arena) {
-  // Collect type chain from base to derived.
+
   std::vector<const ClassTypeInfo*> chain;
   for (auto* t = obj->type; t; t = t->parent) chain.push_back(t);
   std::reverse(chain.begin(), chain.end());
@@ -837,15 +790,15 @@ static void ExpandClassProperties(ClassObject* obj,
 }
 
 Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
-  // Concatenate all elements MSB-first (left-to-right = most significant).
+
   uint32_t total_width = 0;
   std::vector<Logic4Vec> parts;
   for (auto* elem : expr->elements) {
     if (elem->kind == ExprKind::kIdentifier) {
-      // §11.4.14.1 branch 2: unpacked array → expand each element.
+
       if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
         if (elem->with_expr) {
-          // §11.4.14.4: with-clause limits elements to a slice.
+
           uint32_t start = 0, count = 0;
           ResolveWithRange(elem->with_expr, ctx, arena, ainfo->size,
                            ainfo->lo, start, count);
@@ -856,10 +809,10 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
         }
         continue;
       }
-      // §11.4.14.1 branch 2: queue → expand each element in order.
+
       if (auto* queue = ctx.FindQueue(elem->text)) {
         if (elem->with_expr) {
-          // §11.4.14.4: with-clause limits elements to a slice.
+
           uint32_t start = 0, count = 0;
           ResolveWithRange(elem->with_expr, ctx, arena,
                            static_cast<uint32_t>(queue->elements.size()), 0,
@@ -871,36 +824,36 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
         }
         continue;
       }
-      // §11.4.14.1 branch 2: associative array → expand in index-sorted order.
+
       if (auto* aa = ctx.FindAssocArray(elem->text)) {
         ExpandAssocArrayElements(aa, parts, total_width);
         continue;
       }
-      // §11.4.14.1 branches 3/4: struct or untagged union.
+
       if (auto* sinfo = ctx.GetVariableStructType(elem->text)) {
         auto* var = ctx.FindVariable(elem->text);
         if (var) {
           if (sinfo->is_union) {
-            // §11.4.14.1 branch 4: untagged union → first declared member.
+
             ExpandUnionFirstMember(var, sinfo, parts, total_width, arena);
           } else {
-            // §11.4.14.1 branch 3: struct → each member in declaration order.
+
             ExpandStructFields(var, sinfo, parts, total_width, arena);
           }
           continue;
         }
       }
-      // §11.4.14.1 branches 5/6: class handle.
+
       if (auto class_type = ctx.GetVariableClassType(elem->text);
           !class_type.empty()) {
         auto* var = ctx.FindVariable(elem->text);
         if (var) {
           uint64_t handle = var->value.ToUint64();
           if (handle == kNullClassHandle) {
-            // §11.4.14.1 branch 5: null class handle → skip.
+
             continue;
           }
-          // §11.4.14.1 branch 6: non-null class handle → expand properties.
+
           auto* obj = ctx.GetClassObject(handle);
           if (obj) {
             ExpandClassProperties(obj, parts, total_width, arena);
@@ -909,7 +862,7 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
         }
       }
     }
-    // §11.4.14.1 branch 1: bit-stream type or nested streaming_concatenation.
+
     parts.push_back(EvalExpr(elem, ctx, arena));
     total_width += parts.back().width;
   }
@@ -922,10 +875,8 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
     bit_pos += it->width;
   }
 
-  // Right-shift streaming (>>) returns concatenation as-is.
   if (expr->op != TokenKind::kLtLt) return concat;
 
-  // Left-shift streaming (<<): reverse order of slice_size-bit chunks.
   uint32_t ss = StreamSliceSize(expr->lhs, ctx, arena);
   uint32_t nslices = (total_width + ss - 1) / ss;
   auto result = MakeLogic4Vec(arena, total_width);
@@ -939,13 +890,10 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   return result;
 }
 
-// --- Assignment pattern (§10.9) ---
-
 Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (expr->elements.empty()) return MakeLogic4Vec(arena, 0);
 
-  // Evaluate all elements and compute total width.
   std::vector<Logic4Vec> parts;
   uint32_t total_width = 0;
   for (auto* elem : expr->elements) {
@@ -954,12 +902,8 @@ Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
   }
   if (total_width == 0) return MakeLogic4Vec(arena, 0);
 
-  // Pack elements MSB-first (left-to-right = most significant first),
-  // same as concatenation per IEEE 1800-2023 §10.9.1.
   return AssembleConcatParts(parts, total_width, arena);
 }
-
-// --- Structure assignment pattern (§10.9.2) ---
 
 static void PlaceFieldValue(Logic4Vec& result, const StructFieldInfo& f,
                             uint64_t val) {
@@ -999,7 +943,6 @@ struct PatternState {
   Arena& arena;
 };
 
-// Pass 1: Assign fields by explicit member name (highest precedence).
 static void ApplyMemberKeys(const Expr* expr, const StructTypeInfo* info,
                             PatternState& s) {
   for (size_t i = 0; i < expr->pattern_keys.size(); ++i) {
@@ -1015,9 +958,6 @@ static void ApplyMemberKeys(const Expr* expr, const StructTypeInfo* info,
   }
 }
 
-// Pass 2: Assign unset fields by type key (middle precedence).
-// §10.9.2: If the same type key appears more than once, the last value is
-// used.  Scan backwards so only the final occurrence of each kind is applied.
 static void ApplyTypeKeys(const Expr* expr, const StructTypeInfo* info,
                           PatternState& s) {
   size_t n = std::min(expr->pattern_keys.size(), expr->elements.size());
@@ -1038,7 +978,6 @@ static void ApplyTypeKeys(const Expr* expr, const StructTypeInfo* info,
   }
 }
 
-// Pass 3: Assign all remaining unset fields from 'default' key.
 static void ApplyDefaultKey(const Expr* expr, const StructTypeInfo* info,
                             PatternState& s) {
   for (size_t i = 0; i < expr->pattern_keys.size(); ++i) {
@@ -1064,29 +1003,19 @@ Logic4Vec EvalStructPattern(const Expr* expr, const StructTypeInfo* info,
   return result;
 }
 
-// --- Matches operator (§12.6) ---
-
 Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto lhs_val = EvalExpr(expr->lhs, ctx, arena);
   auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
 
-  // §12.6: The matches operator compares the expression against a pattern.
-  // For scalar/vector patterns, this is equality comparison.
-  // X/Z bits in the pattern act as wildcards (don't-care).
   uint64_t la = lhs_val.ToUint64();
   uint64_t ra = rhs_val.ToUint64();
   uint64_t rb = (rhs_val.nwords > 0) ? rhs_val.words[0].bval : 0;
 
-  // Mask out bits where the pattern has X or Z.
   uint64_t mask = ~rb;
   bool match = (la & mask) == (ra & mask);
   return MakeLogic4VecVal(arena, 1, match ? 1 : 0);
 }
 
-// --- Select (bit/part) ---
-
-// §7.10: Resolve a queue index with $ = last element index.
-// Sets *has_xz to true if the index contains x/z bits.
 static uint64_t ResolveQueueIdx(const Expr* idx_expr, QueueObject* q,
                                 SimContext& ctx, Arena& arena,
                                 bool* has_xz = nullptr) {
@@ -1106,7 +1035,7 @@ static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   if (expr->index_end) return false;
   auto* q = ctx.FindQueue(expr->base->text);
   if (!q) return false;
-  // §7.10.1: x/z index returns default value (all-X).
+
   bool idx_xz = false;
   auto idx = ResolveQueueIdx(expr->index, q, ctx, arena, &idx_xz);
   if (idx_xz) {
@@ -1118,7 +1047,6 @@ static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §11.5.2: Walk a chain of kSelect nodes to the root identifier's ArrayInfo.
 static const ArrayInfo* FindRootArrayInfo(const Expr* expr, SimContext& ctx) {
   const Expr* root = expr->base;
   while (root && root->kind == ExprKind::kSelect) root = root->base;
@@ -1155,7 +1083,7 @@ static bool BuildCompoundName(const Expr* expr, SimContext& ctx, Arena& arena,
   if (expr->kind != ExprKind::kSelect || expr->index_end) return false;
   if (!BuildCompoundName(expr->base, ctx, arena, name, has_xz)) return false;
   auto idx_val = EvalExpr(expr->index, ctx, arena);
-  // §11.5.2: x/z in any dimension invalidates the compound reference.
+
   if (HasUnknownBits(idx_val)) {
     if (has_xz) *has_xz = true;
     return false;
@@ -1172,7 +1100,7 @@ static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
   bool xz = false;
   if (!BuildCompoundName(expr, ctx, arena, compound, &xz)) {
     if (!xz) return false;
-    // §11.5.2: x/z in any dimension → element-width X per §7.4.5.
+
     if (auto* info = FindRootArrayInfo(expr, ctx)) {
       out = info->is_4state ? MakeAllX(arena, info->elem_width)
                             : MakeLogic4VecVal(arena, info->elem_width, 0);
@@ -1182,7 +1110,7 @@ static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
   }
   auto* elem = ctx.FindVariable(compound);
   if (!elem) {
-    // §11.5.2: OOB multi-dim access → element-width X per §7.4.5.
+
     if (auto* info = FindRootArrayInfo(expr, ctx)) {
       out = info->is_4state ? MakeAllX(arena, info->elem_width)
                             : MakeLogic4VecVal(arena, info->elem_width, 0);
@@ -1226,7 +1154,7 @@ static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, uint64_t idx,
   uint64_t val = base_val.ToUint64() >> lo;
   uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
   auto result = MakeLogic4VecVal(arena, width, val & mask);
-  // §11.5.1: OOB bits → X. Mark bits beyond base_val.width as X.
+
   if (hi >= base_val.width && result.nwords > 0) {
     uint32_t first_oob = (base_val.width > lo) ? base_val.width - lo : 0;
     for (uint32_t b = first_oob; b < width && b < 64; ++b) {
@@ -1323,14 +1251,14 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TryAssocSelect(expr, ctx, arena, result)) return result;
   auto idx_val = EvalExpr(expr->index, ctx, arena);
   if (HasUnknownBits(idx_val)) {
-    // §11.5.2: x/z index on array → element-width X per §7.4.5.
+
     if (!expr->index_end) {
       if (auto* info = FindRootArrayInfo(expr, ctx)) {
         return info->is_4state ? MakeAllX(arena, info->elem_width)
                                : MakeLogic4VecVal(arena, info->elem_width, 0);
       }
     }
-    // §11.5.1: X/Z index → return X for packed bit/part-select.
+
     if (expr->index_end) {
       auto w = static_cast<uint32_t>(
           EvalExpr(expr->index_end, ctx, arena).ToUint64());
@@ -1343,7 +1271,7 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TryCompoundArraySelect(expr, ctx, arena, result)) return result;
   if (TryArraySliceSelect(expr, ctx, arena, result)) return result;
   auto base_val = EvalExpr(expr->base, ctx, arena);
-  // §6.16 Table 6-9: String indexing returns byte at given index.
+
   if (base_val.is_string && !expr->index_end) {
     uint32_t nbytes = base_val.width / 8;
     if (idx >= nbytes) return MakeLogic4VecVal(arena, 8, 0);
@@ -1360,8 +1288,6 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (idx >= base_val.width) return MakeAllX(arena, 1);
   return MakeLogic4VecVal(arena, 1, (base_val.ToUint64() >> idx) & 1);
 }
-
-// --- Compound assignment operators (§11.4.1) ---
 
 TokenKind CompoundAssignBaseOp(TokenKind op) {
   switch (op) {
@@ -1412,4 +1338,4 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
   return result;
 }
 
-}  // namespace delta
+}

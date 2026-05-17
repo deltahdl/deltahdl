@@ -160,4 +160,4 @@ TEST(ValueParameters, DependentParamResolvesValue) {
   EXPECT_EQ(mask.resolved_value, 255);
 }
 
-}  // namespace
+}

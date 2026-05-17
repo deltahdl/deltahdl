@@ -98,4 +98,4 @@ TEST(ConfigParsing, IfndefSelectsElseBranch) {
   EXPECT_EQ(r.cu->configs[0]->rules[0]->liblist[0], "fallback_lib");
 }
 
-}  // namespace
+}

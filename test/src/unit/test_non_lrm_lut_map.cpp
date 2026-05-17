@@ -225,4 +225,4 @@ TEST(AdvSynth, IterativeAreaDelayZeroIterationsReturnsMappingForDelay) {
   EXPECT_FALSE(mapping.cells.empty());
 }
 
-}  // namespace
+}

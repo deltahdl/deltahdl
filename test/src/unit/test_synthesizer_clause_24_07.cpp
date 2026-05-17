@@ -19,4 +19,4 @@ TEST(ProgramControlTasksSynth, ExitInAlwaysCombRejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

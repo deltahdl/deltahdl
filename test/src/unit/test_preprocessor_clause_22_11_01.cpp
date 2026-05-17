@@ -104,4 +104,4 @@ TEST(Preprocessor, Pragma_ResetFollowedByResetall_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

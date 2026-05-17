@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.3.1: Packed unions allow cross-member read — write one member, read
-// another.
 TEST(PackedUnionSimulation, CrossMemberReadBack) {
   auto v = RunAndGet(
       "module t;\n"
@@ -20,7 +18,6 @@ TEST(PackedUnionSimulation, CrossMemberReadBack) {
   EXPECT_EQ(v, 0xA5u);
 }
 
-// §7.3.1: Packed union used as a primary in arithmetic.
 TEST(PackedUnionSimulation, ArithmeticOnPackedUnion) {
   auto v = RunAndGet(
       "module t;\n"
@@ -35,7 +32,6 @@ TEST(PackedUnionSimulation, ArithmeticOnPackedUnion) {
   EXPECT_EQ(v, 15u);
 }
 
-// §7.3.1: Bit-select on packed union as if it were a packed array [n-1:0].
 TEST(PackedUnionSimulation, BitSelectOnPackedUnion) {
   auto v = RunAndGet(
       "module t;\n"
@@ -50,7 +46,6 @@ TEST(PackedUnionSimulation, BitSelectOnPackedUnion) {
   EXPECT_EQ(v, 0x5u);
 }
 
-// §7.3.1: Packed union is unsigned by default.
 TEST(PackedUnionSimulation, DefaultUnsigned) {
   auto v = RunAndGet(
       "module t;\n"
@@ -65,8 +60,6 @@ TEST(PackedUnionSimulation, DefaultUnsigned) {
   EXPECT_EQ(v, 255u);
 }
 
-// §7.3.1: Soft packed union — read narrow member after writing wide member.
-// Narrow member is right-justified (LSB-aligned).
 TEST(PackedUnionSimulation, SoftPackedUnionCrossMemberRead) {
   auto v = RunAndGet(
       "module t;\n"
@@ -85,7 +78,6 @@ TEST(PackedUnionSimulation, SoftPackedUnionCrossMemberRead) {
   EXPECT_EQ(v, 0xCDu);
 }
 
-// §7.3.1: Soft packed union — writing narrow member leaves MSBs unaffected.
 TEST(PackedUnionSimulation, SoftPackedUnionMSBsUnaffected) {
   auto v = RunAndGet(
       "module t;\n"
@@ -105,4 +97,4 @@ TEST(PackedUnionSimulation, SoftPackedUnionMSBsUnaffected) {
   EXPECT_EQ(v, 0xFF42u);
 }
 
-}  // namespace
+}

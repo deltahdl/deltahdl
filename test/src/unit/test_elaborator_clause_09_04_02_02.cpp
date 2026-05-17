@@ -704,8 +704,6 @@ TEST(AlwaysStarElab, PlainAlwaysWithStarSensitivity) {
   EXPECT_FALSE(mod->processes[0].sensitivity.empty());
 }
 
-// §9.4.2.2 Example 5: LHS index variable included in sensitivity.
-// y[a] = !en  →  sensitivity includes 'a' (index) and 'en' (RHS).
 TEST(AlwaysStarElab, LhsIndexVarInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -734,8 +732,6 @@ TEST(AlwaysStarElab, LhsIndexVarInSensitivity) {
   EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
 }
 
-// §9.4.2.2 Example 2: Variables appearing on both LHS and RHS (read-after-write
-// intermediates at module scope) are included in the sensitivity list.
 TEST(AlwaysStarElab, ReadAfterWriteIntermediateInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -769,7 +765,6 @@ TEST(AlwaysStarElab, ReadAfterWriteIntermediateInSensitivity) {
       << "tmp2 (read-after-write intermediate) must be in sensitivity";
 }
 
-// Variable used on both LHS and RHS of same assignment (read-modify-write).
 TEST(AlwaysStarElab, ReadModifyWriteInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -795,8 +790,6 @@ TEST(AlwaysStarElab, ReadModifyWriteInSensitivity) {
       << "a (appears on RHS) must be in sensitivity even though also on LHS";
 }
 
-// §9.4.2.2 Example 6: Case item expressions include variables in sensitivity.
-// case (1'b1) state[IDLE]: ...  →  'state' is in sensitivity.
 TEST(AlwaysStarElab, CaseItemVarsInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -831,7 +824,6 @@ TEST(AlwaysStarElab, CaseItemVarsInSensitivity) {
       << "go (conditional expr) must be in sensitivity";
 }
 
-// Conditional (if) expression is in sensitivity, not just RHS.
 TEST(AlwaysStarElab, ConditionalExprInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -860,7 +852,6 @@ TEST(AlwaysStarElab, ConditionalExprInSensitivity) {
   EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
 }
 
-// Case selector expression is in sensitivity.
 TEST(AlwaysStarElab, CaseSelectorExprInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -891,7 +882,6 @@ TEST(AlwaysStarElab, CaseSelectorExprInSensitivity) {
   EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
 }
 
-// Subroutine argument is in sensitivity.
 TEST(AlwaysStarElab, SubroutineArgInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -918,7 +908,6 @@ TEST(AlwaysStarElab, SubroutineArgInSensitivity) {
   EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
 }
 
-// Block-local variables are excluded from sensitivity.
 TEST(AlwaysStarElab, BlockLocalExcludedFromSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -948,7 +937,6 @@ TEST(AlwaysStarElab, BlockLocalExcludedFromSensitivity) {
   EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
 }
 
-// @* and @(*) produce identical sensitivity lists.
 TEST(AlwaysStarElab, AtStarAndAtStarParenEquivalent) {
   ElabFixture f1;
   auto* d1 = ElaborateSrc(
@@ -979,4 +967,4 @@ TEST(AlwaysStarElab, AtStarAndAtStarParenEquivalent) {
   EXPECT_EQ(n1, n2);
 }
 
-}  // namespace
+}

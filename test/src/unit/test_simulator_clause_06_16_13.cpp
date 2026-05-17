@@ -30,4 +30,4 @@ TEST(StringMethods, OcttoaOverwritesExisting) {
   EXPECT_EQ(VecToString(var->value), "100");
 }
 
-}  // namespace
+}

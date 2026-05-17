@@ -11,8 +11,6 @@ using namespace delta;
 
 namespace {
 
-// --- Left-to-right processing, append to right-hand end of generic stream ---
-
 TEST(StreamExpressionConcat, StreamingMultipleElements) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -97,8 +95,6 @@ TEST(StreamExpressionConcat, UnequalWidthElementsLeftToRight) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABCu);
 }
-
-// --- Branch 1: bit-stream type expression ---
 
 TEST(StreamExpressionConcat, PackSingleElementPreservesValue) {
   SimFixture f;
@@ -186,8 +182,6 @@ TEST(StreamExpressionConcat, NestedStreamingConcatBitStreamCast) {
   EXPECT_EQ(result.width, 16u);
   EXPECT_EQ(result.ToUint64(), 0xCDABu);
 }
-
-// --- Branch 2: unpacked array → apply to each element ---
 
 TEST(StreamExpressionConcat, StreamingUnpackedArrayConcat) {
   SimFixture f;
@@ -338,8 +332,6 @@ TEST(StreamExpressionConcat, UnpackedArraySingleElement) {
   EXPECT_EQ(result.ToUint64(), 0xBEEFu);
 }
 
-// --- Edge cases ---
-
 TEST(StreamExpressionConcat, EmptyStreamReturnsMinWidth) {
   SimFixture f;
 
@@ -374,4 +366,4 @@ TEST(StreamExpressionConcat, ScalarAfterArrayAppendsToRight) {
   EXPECT_EQ(result.ToUint64(), 0xAABBCCu);
 }
 
-}  // namespace
+}

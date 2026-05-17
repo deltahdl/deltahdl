@@ -47,4 +47,4 @@ TEST(ImplicitNamedPortConnectionParsing, ImplicitConnectionDistinctFromEmptyExpl
             item_explicit->inst_ports[0].second);
 }
 
-}  // namespace
+}

@@ -42,4 +42,4 @@ TEST(IoSystemTaskParsing, FstrobeAndFmonitor) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -30,4 +30,4 @@ TEST(SourceText, ClassCovergroupDecl) {
   EXPECT_EQ(members[0]->name, "cg");
 }
 
-}  // namespace
+}

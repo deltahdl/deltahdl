@@ -53,4 +53,4 @@ TEST(DefaultClockingSim, DefaultClockingInitiallyEmpty) {
   EXPECT_TRUE(cmgr.GetDefaultClocking().empty());
 }
 
-}  // namespace
+}

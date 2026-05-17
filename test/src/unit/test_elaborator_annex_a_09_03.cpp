@@ -180,9 +180,6 @@ TEST(IdentifierElaboration, NestedHierarchicalIdentResolution) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §A.9.3 simple_identifier ::= [a-zA-Z_]{[a-zA-Z0-9_$]} — the body alphabet
-// permits `$`; the elaborator must accept and resolve an identifier such as
-// `n$657` as a normal user-defined name.
 TEST(IdentifierElaboration, IdentifierWithDollarElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -191,8 +188,6 @@ TEST(IdentifierElaboration, IdentifierWithDollarElaborates) {
              "endmodule\n"));
 }
 
-// §A.9.3 simple_identifier ::= [a-zA-Z_]{[a-zA-Z0-9_$]} — the leading
-// alphabet permits `_`; the elaborator must accept and resolve `_bus3`.
 TEST(IdentifierElaboration, IdentifierStartingWithUnderscoreElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -201,10 +196,6 @@ TEST(IdentifierElaboration, IdentifierStartingWithUnderscoreElaborates) {
              "endmodule\n"));
 }
 
-// §A.9.3 ps_type_identifier ::= [local::] | [package_scope|class_scope]
-// type_identifier — the elaborator must resolve the package-scoped typedef
-// to its underlying packed type so the variable's width and signedness
-// are correctly evaluated for the declaration.
 TEST(IdentifierElaboration, PsTypeIdentifierFromPackageResolves) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
@@ -216,4 +207,4 @@ TEST(IdentifierElaboration, PsTypeIdentifierFromPackageResolves) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

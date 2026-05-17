@@ -30,4 +30,4 @@ TEST(StringMethods, BintoaOverwritesExisting) {
   EXPECT_EQ(VecToString(var->value), "101");
 }
 
-}  // namespace
+}

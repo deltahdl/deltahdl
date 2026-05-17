@@ -83,11 +83,6 @@ TEST(TaskElaboration, TaskWithRefArgElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3: "The const and static qualifiers on the ref direction are
-// included in this default." When a formal inherits the ref direction
-// from a previous formal, it shall also inherit `static`. The elaborator
-// must surface the inherited flag so downstream stages (which key off
-// is_ref_static for §13.5.2 ref-arg validation) see the right value.
 TEST(TaskElaboration, RefStaticQualifierStickyInheritedAtElaboration) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -108,4 +103,4 @@ TEST(TaskElaboration, RefStaticQualifierStickyInheritedAtElaboration) {
   EXPECT_TRUE(tk->func_args[1].is_ref_static);
 }
 
-}  // namespace
+}

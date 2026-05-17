@@ -26,4 +26,4 @@ TEST(AssertionStatementSim, DeferredAssertHash0) {
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
-}  // namespace
+}

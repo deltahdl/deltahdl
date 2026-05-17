@@ -114,4 +114,4 @@ TEST(TaskAndFunctionNameResolutionElaboration,
              "endmodule\n"));
 }
 
-}  // namespace
+}

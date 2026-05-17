@@ -402,9 +402,6 @@ TEST(ScopeAndLifetimeParsing, AutoVarInStaticFunc) {
   EXPECT_FALSE(var_stmt->var_is_static);
 }
 
-// §6.21: A static function may also carry an explicit-static local
-// variable. This is the static+static counterpart to AutoVarInStaticFunc
-// and StaticVarInAutoFunc.
 TEST(ScopeAndLifetimeParsing, StaticVarInStaticFunc) {
   auto r = Parse(
       "module m;\n"
@@ -476,8 +473,6 @@ TEST(ScopeAndLifetimeParsing, CuScopeFuncStaticDefault) {
   EXPECT_FALSE(r.cu->cu_items[0]->is_automatic);
 }
 
-// §6.21: A module-level variable may carry an explicit static lifetime
-// keyword; the parser records the flag on the resulting var_decl.
 TEST(ScopeAndLifetimeParsing, LifetimeStaticOnModuleItem) {
   auto r = Parse("module m; static int x = 0; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -487,8 +482,6 @@ TEST(ScopeAndLifetimeParsing, LifetimeStaticOnModuleItem) {
   EXPECT_TRUE(item->is_static);
 }
 
-// §6.21: The same module-level form is accepted with the automatic
-// lifetime keyword (the elaborator separately enforces footnote 14a).
 TEST(ScopeAndLifetimeParsing, LifetimeAutomaticOnModuleItem) {
   auto r = Parse("module m; automatic int y = 0; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -498,8 +491,6 @@ TEST(ScopeAndLifetimeParsing, LifetimeAutomaticOnModuleItem) {
   EXPECT_TRUE(item->is_automatic);
 }
 
-// §6.21: A function may carry an automatic lifetime keyword, which the
-// parser records on the declaration.
 TEST(ScopeAndLifetimeParsing, FunctionDeclLifetimeAutomatic) {
   auto r = Parse(
       "module m;\n"
@@ -513,7 +504,6 @@ TEST(ScopeAndLifetimeParsing, FunctionDeclLifetimeAutomatic) {
   EXPECT_FALSE(item->is_static);
 }
 
-// §6.21: A function may also carry an explicit static lifetime keyword.
 TEST(ScopeAndLifetimeParsing, FunctionDeclLifetimeStatic) {
   auto r = Parse(
       "module m;\n"
@@ -527,9 +517,6 @@ TEST(ScopeAndLifetimeParsing, FunctionDeclLifetimeStatic) {
   EXPECT_TRUE(item->is_static);
 }
 
-// §6.21: A function with no explicit lifetime keyword carries neither
-// flag at the parser stage; the default-static rule is applied later
-// by the elaborator when it inherits from the enclosing scope.
 TEST(ScopeAndLifetimeParsing, FunctionDeclLifetimeDefault) {
   auto r = Parse(
       "module m;\n"
@@ -543,7 +530,6 @@ TEST(ScopeAndLifetimeParsing, FunctionDeclLifetimeDefault) {
   EXPECT_FALSE(item->is_static);
 }
 
-// §6.21: A task may carry an automatic lifetime keyword.
 TEST(ScopeAndLifetimeParsing, TaskDeclLifetimeAutomatic) {
   auto r = Parse(
       "module m;\n"
@@ -558,7 +544,6 @@ TEST(ScopeAndLifetimeParsing, TaskDeclLifetimeAutomatic) {
   EXPECT_FALSE(item->is_static);
 }
 
-// §6.21: A task may also carry an explicit static lifetime keyword.
 TEST(ScopeAndLifetimeParsing, TaskDeclLifetimeStatic) {
   auto r = Parse(
       "module m;\n"
@@ -572,9 +557,6 @@ TEST(ScopeAndLifetimeParsing, TaskDeclLifetimeStatic) {
   EXPECT_FALSE(item->is_automatic);
 }
 
-// §6.21: A task with no explicit lifetime keyword carries neither flag at
-// the parser stage; the default-static rule is applied later by the
-// elaborator when it inherits from the enclosing scope.
 TEST(ScopeAndLifetimeParsing, TaskDeclLifetimeDefault) {
   auto r = Parse(
       "module m;\n"
@@ -588,8 +570,6 @@ TEST(ScopeAndLifetimeParsing, TaskDeclLifetimeDefault) {
   EXPECT_FALSE(item->is_static);
 }
 
-// §6.21: An automatic task may carry an explicit-automatic local
-// variable; the parser preserves both flags.
 TEST(ScopeAndLifetimeParsing, AutoTaskExplicitAutoLocals) {
   auto r = Parse(
       "module m;\n"
@@ -610,8 +590,6 @@ TEST(ScopeAndLifetimeParsing, AutoTaskExplicitAutoLocals) {
   EXPECT_NE(t->func_body_stmts[0]->var_init, nullptr);
 }
 
-// §6.21: Inside an automatic task, a specific variable can be made
-// static with the explicit static keyword.
 TEST(ScopeAndLifetimeParsing, StaticVarInAutoTask) {
   auto r = Parse(
       "module m;\n"
@@ -630,8 +608,6 @@ TEST(ScopeAndLifetimeParsing, StaticVarInAutoTask) {
   EXPECT_TRUE(t->func_body_stmts[0]->var_is_static);
 }
 
-// §6.21: Inside a static task, a specific variable can be made
-// automatic with the explicit automatic keyword.
 TEST(ScopeAndLifetimeParsing, AutoVarInStaticTask) {
   auto r = Parse(
       "module m;\n"
@@ -650,8 +626,6 @@ TEST(ScopeAndLifetimeParsing, AutoVarInStaticTask) {
   EXPECT_TRUE(t->func_body_stmts[0]->var_is_automatic);
 }
 
-// §6.21: A static task may carry an explicit-static local variable;
-// the redundant keyword is accepted and the parser flag is preserved.
 TEST(ScopeAndLifetimeParsing, StaticVarInStaticTask) {
   auto r = Parse(
       "module m;\n"
@@ -670,4 +644,4 @@ TEST(ScopeAndLifetimeParsing, StaticVarInStaticTask) {
   EXPECT_TRUE(t->func_body_stmts[0]->var_is_static);
 }
 
-}  // namespace
+}

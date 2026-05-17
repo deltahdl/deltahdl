@@ -76,4 +76,4 @@ TEST(ContAssignStatementSynth, ConstantZeroOutputCount) {
   EXPECT_EQ(aig->outputs.size(), 1);
 }
 
-}  // namespace
+}

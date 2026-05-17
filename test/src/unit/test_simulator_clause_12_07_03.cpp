@@ -377,4 +377,4 @@ TEST(LoopStatementSim, ForeachWriteArrayElements) {
   EXPECT_EQ(a2->value.ToUint64(), 12u);
 }
 
-}  // namespace
+}

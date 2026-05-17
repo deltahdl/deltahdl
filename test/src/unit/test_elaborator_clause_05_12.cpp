@@ -276,4 +276,4 @@ TEST(LexicalConventionElaboration, ModuleWithAttributeElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

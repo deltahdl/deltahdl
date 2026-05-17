@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- library_text ::= { library_description } ---
-
 TEST(LibraryText, EmptyInput) {
   auto r = ParseLibrary("");
   ASSERT_NE(r.cu, nullptr);
@@ -105,8 +103,6 @@ TEST(LibraryText, CommentsOnlyInput) {
   EXPECT_TRUE(r.cu->configs.empty());
 }
 
-// --- library_description ::= config_declaration ---
-
 TEST(LibraryText, ConfigInLibraryText) {
   auto r = ParseLibrary(
       "config cfg;\n"
@@ -131,8 +127,6 @@ TEST(LibraryText, ConfigWithLibraryDecl) {
   ASSERT_EQ(r.cu->configs.size(), 1u);
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
-
-// --- library_declaration ---
 
 TEST(LibraryText, SingleLibraryDecl) {
   auto r = ParseLibrary("library mylib \"file.sv\";\n");
@@ -214,8 +208,6 @@ TEST(LibraryText, LibraryDeclHasSourceRange) {
   EXPECT_NE(r.cu->libraries[0]->range.start.line, 0u);
 }
 
-// --- library_declaration -incdir clause ---
-
 TEST(LibraryText, LibraryDeclWithIncdir) {
   auto r =
       ParseLibrary("library mylib \"rtl/*.sv\" -incdir \"inc1\", \"inc2\";\n");
@@ -263,8 +255,6 @@ TEST(LibraryText, LibraryDeclFullForm) {
   EXPECT_EQ(r.cu->libraries[0]->incdir_paths[0], "/proj/inc");
   EXPECT_EQ(r.cu->libraries[0]->incdir_paths[1], "/proj/common");
 }
-
-// --- file_path_spec variants ---
 
 TEST(LibraryText, FilePathSpecWildcard) {
   auto r = ParseLibrary("library rtlLib *.v;\n");
@@ -330,8 +320,6 @@ TEST(LibraryText, QuotedFilePathValue) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "\"src/*.sv\"");
 }
 
-// --- include_statement ---
-
 TEST(LibraryText, IncludeStatement) {
   auto r = ParseLibrary("include \"extra.svlib\";\n");
   ASSERT_NE(r.cu, nullptr);
@@ -376,8 +364,6 @@ TEST(LibraryText, MultipleIncludeStatements) {
   EXPECT_EQ(r.cu->lib_includes[2]->file_path, "/proj/c.map");
 }
 
-// --- Error conditions ---
-
 TEST(LibraryText, ErrorMissingSemicolon) {
   auto r = ParseLibrary("library lib /proj/*.v\n");
   EXPECT_TRUE(r.has_errors);
@@ -408,4 +394,4 @@ TEST(LibraryText, ErrorTrailingCommaInFileList) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

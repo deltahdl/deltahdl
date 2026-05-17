@@ -49,4 +49,4 @@ TEST(WhiteSpaceElaboration, TabsInStringLiteralElaborate) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

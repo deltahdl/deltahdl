@@ -97,4 +97,4 @@ TEST(AssocTraversal, FirstNoRefArgReturnsZero) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
-}  // namespace
+}

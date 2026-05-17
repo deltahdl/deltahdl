@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §31.3.4 Syntax 31-6: the three-argument form with no notifier parses and
-// dispatches as $removal.
 TEST(TimingCheckCommandParsing, RemovalBasic) {
   auto r = Parse(
       "module m;\n"
@@ -20,8 +18,6 @@ TEST(TimingCheckCommandParsing, RemovalBasic) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kRemoval);
 }
 
-// §31.3.4 Table 31-4: the optional notifier argument is captured as a
-// variable identifier on the timing check entry.
 TEST(TimingCheckCommandParsing, RemovalWithNotifier) {
   auto r = Parse(
       "module m;\n"
@@ -36,9 +32,6 @@ TEST(TimingCheckCommandParsing, RemovalWithNotifier) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-// §31.3.4 Syntax 31-6 as a specify-block item: edge-qualified reference
-// first (timecheck event) and edge-qualified data second (timestamp event),
-// both captured with their respective edges.
 TEST(TimingCheckCommandParsing, RemovalAsSpecifyItem) {
   auto sp = ParseSpecifySingle(
       "module m(input rst, clk);\n"
@@ -58,8 +51,6 @@ TEST(TimingCheckCommandParsing, RemovalAsSpecifyItem) {
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
-// §31.3.4 Table 31-4: the limit is a constant expression, not just a
-// literal. A specparam reference in the limit slot must parse.
 TEST(TimingCheckCommandParsing, RemovalLimitIsExpression) {
   auto r = Parse(
       "module m;\n"
@@ -75,8 +66,6 @@ TEST(TimingCheckCommandParsing, RemovalLimitIsExpression) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
-// §31.3.4 Syntax 31-6: the timing_check_limit argument is required, not
-// optional. Omitting it must produce a parse error.
 TEST(TimingCheckCommandParsing, ErrorRemovalMissingLimit) {
   auto r = Parse(
       "module m;\n"
@@ -87,4 +76,4 @@ TEST(TimingCheckCommandParsing, ErrorRemovalMissingLimit) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

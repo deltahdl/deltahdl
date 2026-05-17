@@ -129,4 +129,4 @@ TEST(InterfaceClassMethodDefaultsSim, InheritedDefaultArgViaExtends) {
       "endmodule\n", "result"), 25u);
 }
 
-}  // namespace
+}

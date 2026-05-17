@@ -39,4 +39,4 @@ TEST(IoSystemTaskParsing, FullVcdWorkflow) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

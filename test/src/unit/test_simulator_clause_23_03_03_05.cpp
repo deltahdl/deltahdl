@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- R2: If the size and type of the port connection match a single instance
-//     port, the connection shall be made to each instance in an array of
-//     instances ---
-
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      ScalarConnectionReplicatedToAllInstances) {
   SimFixture f;
@@ -33,8 +29,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
   EXPECT_EQ(v0->value.ToUint64(), 0xABu);
   EXPECT_EQ(v1->value.ToUint64(), 0xABu);
 }
-
-// --- R3: Unpacked array connection maps elements to instances ---
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      UnpackedArrayConnectionMapsElementsToInstances) {
@@ -63,8 +57,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
   EXPECT_EQ(v1->value.ToUint64(), 0x21u);
 }
 
-// --- R4: Packed array connection part-selects bits across instances ---
-
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      PackedArrayConnectionPartSelectsAcrossInstances) {
   SimFixture f;
@@ -85,4 +77,4 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
-}  // namespace
+}

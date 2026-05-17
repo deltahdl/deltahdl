@@ -43,4 +43,4 @@ TEST(TimingCheckEventDefElaboration, TimingCheckEventNoEdgeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

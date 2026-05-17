@@ -94,7 +94,6 @@ TEST(ClockingBlockEventSim, EventNotTriggeredOnWrongEdge) {
     return true;
   });
 
-  // Only trigger negedge — should NOT fire posedge block event.
   ScheduleNegedge(f, clk, 10);
   f.scheduler.Run();
 
@@ -115,8 +114,6 @@ TEST(ClockingBlockEventSim, EventFiresInObservedRegion) {
   block.default_output_skew = SimTime{0};
   cmgr.Register(block);
 
-  // Track execution order: Active region callback runs first,
-  // then Observed region (where block event fires).
   std::vector<std::string> order;
 
   auto* active_ev = f.scheduler.GetEventPool().Acquire();
@@ -131,7 +128,6 @@ TEST(ClockingBlockEventSim, EventFiresInObservedRegion) {
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
 
-  // Active region event should run before Observed region block event.
   ASSERT_GE(order.size(), 2u);
   EXPECT_EQ(order[0], "active");
   EXPECT_EQ(order[1], "observed");
@@ -215,7 +211,6 @@ TEST(ClockingBlockEventSim, MultipleBlocksTriggerIndependentEvents) {
     return true;
   });
 
-  // Posedge only on clk1 — only cb1's named event should trigger.
   SchedulePosedge(f, clk1, 10);
   f.scheduler.Run();
 
@@ -237,8 +232,6 @@ TEST(ClockingBlockEventSim, EventFiresAfterNBARegion) {
   block.default_output_skew = SimTime{0};
   cmgr.Register(block);
 
-  // Verify region ordering: an NBA probe scheduled at the same time as the
-  // clock posedge must run before the block event fires in Observed.
   std::vector<std::string> order;
 
   auto* nba_ev = f.scheduler.GetEventPool().Acquire();
@@ -340,7 +333,6 @@ TEST(ClockingBlockEventSim, SharedClockBothBlocksFireEvents) {
     return true;
   });
 
-  // One posedge on the shared clock — both block events must fire.
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
 
@@ -348,4 +340,4 @@ TEST(ClockingBlockEventSim, SharedClockBothBlocksFireEvents) {
   EXPECT_TRUE(ev2_fired);
 }
 
-}  // namespace
+}

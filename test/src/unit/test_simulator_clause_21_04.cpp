@@ -51,4 +51,4 @@ TEST(IoSystemTaskTest, ReadmembBasic) {
   std::remove(tmp_path.c_str());
 }
 
-}  // namespace
+}

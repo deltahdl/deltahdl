@@ -2,8 +2,6 @@
 
 namespace {
 
-// --- Requirement 1: :: prefix resolves downward ---
-
 TEST(ScopeResolutionPrefixElaboration, PackagePrefixResolvesDownward) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
@@ -35,8 +33,6 @@ TEST(ScopeResolutionPrefixElaboration, ChainedPrefixResolvesDownward) {
              "  Outer::Inner::deep_type x;\n"
              "endmodule\n"));
 }
-
-// --- Requirement 3: class vs. package disambiguation ---
 
 TEST(ScopeResolutionPrefixElaboration, ClassAndPackagePrefixesCoexist) {
   EXPECT_TRUE(
@@ -72,4 +68,4 @@ TEST(ScopeResolutionPrefixElaboration, UnresolvablePrefixDenotesPackageScope) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

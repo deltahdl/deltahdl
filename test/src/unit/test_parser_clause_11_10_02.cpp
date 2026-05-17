@@ -36,4 +36,4 @@ TEST(StringLiteralPaddedParsing, PaddingComparedToExplicitNulParses) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1: .* implicitly connects all ports where name and type match ---
-
 TEST(WildcardPortConnectionSimulation, WildcardInputPropagatesValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -53,8 +51,6 @@ TEST(WildcardPortConnectionSimulation, WildcardMultiplePortsPropagate) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-// --- R2: Named override takes precedence over .* ---
-
 TEST(WildcardPortConnectionSimulation, NamedOverrideTakesPrecedence) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -78,8 +74,6 @@ TEST(WildcardPortConnectionSimulation, NamedOverrideTakesPrecedence) {
   EXPECT_EQ(var->value.ToUint64(), 119u);
 }
 
-// --- R4a: .* uses default value when name not in scope ---
-
 TEST(WildcardPortConnectionSimulation, DefaultValueUsedForMissingSignal) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -102,4 +96,4 @@ TEST(WildcardPortConnectionSimulation, DefaultValueUsedForMissingSignal) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-}  // namespace
+}

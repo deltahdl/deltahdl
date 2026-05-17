@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §6.22.2(a): "If two types match, they are equivalent."
 TEST(EquivalentTypesElaboration, MatchingTypesAreEquivalent) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,19 +19,11 @@ TEST(EquivalentTypesElaboration, MatchingTypesAreEquivalent) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.2(c): "Packed arrays, packed structures, packed unions, and built-in
-// integral types are equivalent if they contain the same number of total
-// bits, are either all 2-state or all 4-state, and are either all signed or
-// all unsigned." Two integral element types satisfying those constraints are
-// equivalent per the element-equivalence predicate used by §7.6.
 TEST(EquivalentTypesElaboration, PackedSameBitsSameStateAreEquivalent) {
   EXPECT_TRUE(ElementTypesEquivalent(DataTypeKind::kInt, 32, true, false,
                                      DataTypeKind::kBit, 32, true, false));
 }
 
-// §6.22.2(c) NOTE: "If any bit of a packed structure or union is 4-state, the
-// entire structure or union is considered 4-state." Mixed 2/4-state types
-// shall not be equivalent.
 TEST(EquivalentTypesElaboration, DifferentStateNotEquivalent) {
   DataType a;
   a.kind = DataTypeKind::kBit;
@@ -41,8 +32,6 @@ TEST(EquivalentTypesElaboration, DifferentStateNotEquivalent) {
   EXPECT_FALSE(TypesEquivalent(a, b));
 }
 
-// §6.22.2(c): same width, same state, different signedness shall not be
-// equivalent.
 TEST(EquivalentTypesElaboration, DifferentSignednessNotEquivalent) {
   DataType a;
   a.kind = DataTypeKind::kInt;
@@ -53,8 +42,6 @@ TEST(EquivalentTypesElaboration, DifferentSignednessNotEquivalent) {
   EXPECT_FALSE(TypesEquivalent(a, b));
 }
 
-// §6.22.2(c): different width shall not be equivalent even when state and
-// signedness match.
 TEST(EquivalentTypesElaboration, DifferentWidthNotEquivalent) {
   DataType a;
   a.kind = DataTypeKind::kByte;
@@ -65,9 +52,6 @@ TEST(EquivalentTypesElaboration, DifferentWidthNotEquivalent) {
   EXPECT_FALSE(TypesEquivalent(a, b));
 }
 
-// §6.22.2: elaborating an assignment between equivalent packed types shall
-// succeed without diagnostics, since the elaborator delegates to
-// TypesEquivalent / IsAssignmentCompatible to gate the assignment.
 TEST(EquivalentTypesElaboration, EquivalentPackedAssignmentElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -81,10 +65,6 @@ TEST(EquivalentTypesElaboration, EquivalentPackedAssignmentElaborates) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.2(b): "An anonymous enum, unpacked struct, or unpacked union type is
-// equivalent to itself among data objects declared within the same
-// declaration statement and no other data types." Two objects of the same
-// anonymous declaration shall elaborate-and-assign cleanly.
 TEST(EquivalentTypesElaboration, AnonymousStructSameDeclEquivalent) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -97,10 +77,6 @@ TEST(EquivalentTypesElaboration, AnonymousStructSameDeclEquivalent) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.2(d): "Unpacked fixed-size array types are equivalent if they have
-// equivalent element types and equal size; the actual range bounds may
-// differ." Two unpacked arrays of the same length and equivalent elements
-// shall elaborate as equivalent.
 TEST(EquivalentTypesElaboration, UnpackedFixedSizeArraySameSizeEquivalent) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -114,4 +90,4 @@ TEST(EquivalentTypesElaboration, UnpackedFixedSizeArraySameSizeEquivalent) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

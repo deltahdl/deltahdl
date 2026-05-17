@@ -4,9 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- data_declaration: [const] [var] [lifetime] data_type_or_implicit
-//     list_of_variable_decl_assignments ; ---
-
 TEST(TypeDeclParsing, DataDeclTypeDeclaration) {
   auto r = Parse("module m; typedef int my_int_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -55,8 +52,6 @@ TEST(TypeDeclParsing, DataDeclMultipleAssignments) {
   EXPECT_GE(count, 3);
 }
 
-// --- package_import_declaration ---
-
 TEST(TypeDeclParsing, PackageImportWildcard) {
   auto r = Parse(
       "package pkg; endpackage\n"
@@ -87,8 +82,6 @@ TEST(TypeDeclParsing, PackageImportMultipleItems) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- genvar_declaration ---
-
 TEST(TypeDeclParsing, GenvarDeclSingle) {
   auto r = Parse("module m; genvar i; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -106,8 +99,6 @@ TEST(TypeDeclParsing, GenvarDeclMultiple) {
   EXPECT_EQ(r.cu->modules[0]->items[1]->name, "j");
   EXPECT_EQ(r.cu->modules[0]->items[2]->name, "k");
 }
-
-// --- net_declaration ---
 
 TEST(TypeDeclParsing, NetDeclWire) {
   auto r = Parse("module m; wire w; endmodule");
@@ -163,8 +154,6 @@ TEST(TypeDeclParsing, NetDeclMultiple) {
   EXPECT_GE(count, 3);
 }
 
-// --- net_declaration with drive_strength (§A.2.1.3 alternative 1) ---
-
 TEST(TypeDeclParsing, NetDeclWithDriveStrength) {
   auto r = Parse("module m; wire (strong0, weak1) w = 1'b1; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -173,8 +162,6 @@ TEST(TypeDeclParsing, NetDeclWithDriveStrength) {
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
 }
 
-// --- net_declaration with charge_strength on a trireg ---
-
 TEST(TypeDeclParsing, NetDeclTriregWithChargeStrength) {
   auto r = Parse("module m; trireg (small) cap; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -182,8 +169,6 @@ TEST(TypeDeclParsing, NetDeclTriregWithChargeStrength) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
 }
-
-// --- net_declaration with vectored / scalared ---
 
 TEST(TypeDeclParsing, NetDeclVectored) {
   auto r = Parse("module m; wire vectored [7:0] bus; endmodule");
@@ -201,8 +186,6 @@ TEST(TypeDeclParsing, NetDeclScalared) {
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
 }
 
-// --- net_declaration with delay3 ---
-
 TEST(TypeDeclParsing, NetDeclWithDelay3) {
   auto r = Parse("module m; wire #(1, 2, 3) w; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -212,8 +195,7 @@ TEST(TypeDeclParsing, NetDeclWithDelay3) {
 }
 
 TEST(TypeDeclParsing, NetDeclWireWithExplicitDataType) {
-  // §A.2.1.3: net_declaration's data_type_or_implicit alternative permits an
-  // explicit data type (e.g., `logic [7:0]`) following the net_type keyword.
+
   auto r = Parse("module m; wire logic [7:0] bus; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -222,8 +204,7 @@ TEST(TypeDeclParsing, NetDeclWireWithExplicitDataType) {
 }
 
 TEST(TypeDeclParsing, NetDeclInterconnectWithDelay) {
-  // §A.2.1.3: interconnect alternative permits `# delay_value` between the
-  // implicit_data_type and the first net_identifier.
+
   auto r = Parse("module m; interconnect #5 x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -245,7 +226,7 @@ TEST(TypeDeclParsing, NetDeclInterconnectMultipleNetIdentifiers) {
 }
 
 TEST(TypeDeclParsing, TypedefWithVariableDimension) {
-  // §A.2.1.3: typedef ... type_identifier { variable_dimension } ;
+
   auto r = Parse("module m; typedef int arr_t [10]; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -256,9 +237,7 @@ TEST(TypeDeclParsing, TypedefWithVariableDimension) {
 }
 
 TEST(TypeDeclParsing, NettypeDeclAliasForm) {
-  // §A.2.1.3 second nettype_declaration alternative:
-  // nettype [ package_scope | class_scope ] nettype_identifier
-  //         nettype_identifier ;
+
   auto r = Parse(
       "module m;\n"
       "  nettype real base_nt;\n"
@@ -274,7 +253,7 @@ TEST(TypeDeclParsing, NettypeDeclAliasForm) {
 }
 
 TEST(TypeDeclParsing, DataDeclStaticLifetime) {
-  // §A.2.1.3: data_declaration includes the optional [lifetime] qualifier.
+
   auto r = Parse(
       "module m;\n"
       "  function void f();\n"
@@ -295,8 +274,6 @@ TEST(TypeDeclParsing, DataDeclAutomaticLifetime) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-// --- type_declaration (typedef) ---
 
 TEST(TypeDeclParsing, TypedefDataType) {
   auto r = Parse("module m; typedef logic [7:0] byte_t; endmodule");
@@ -330,8 +307,6 @@ TEST(TypeDeclParsing, TypedefStructType) {
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
   EXPECT_EQ(item->name, "pair_t");
 }
-
-// --- forward_type ---
 
 TEST(TypeDeclParsing, ForwardTypedefEnum) {
   auto r = Parse("module m; typedef enum color_t; endmodule");
@@ -404,8 +379,6 @@ TEST(TypeDeclParsing, TypedefInterfacePortNoBitSelect) {
   EXPECT_TRUE(item->unpacked_dims.empty());
 }
 
-// --- data_declaration ::= nettype_declaration ---
-
 TEST(TypeDeclParsing, DataDeclNettypeDeclaration) {
   auto r = Parse("module m; nettype real real_net; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -426,8 +399,6 @@ TEST(TypeDeclParsing, NettypeDeclWithResolutionFunction) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- package_export_declaration ::= export *::* ; ---
-
 TEST(TypeDeclParsing, PackageExportStarStar) {
   auto r = Parse(
       "package pkg; endpackage\n"
@@ -438,9 +409,6 @@ TEST(TypeDeclParsing, PackageExportStarStar) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-// --- package_export_declaration ::= export package_import_item
-//     { , package_import_item } ; ---
 
 TEST(TypeDeclParsing, PackageExportItemNamed) {
   auto r = Parse(
@@ -480,9 +448,6 @@ TEST(TypeDeclParsing, PackageExportMultipleItems) {
   EXPECT_EQ(export_count, 2);
 }
 
-// --- net_declaration ::= nettype_identifier [delay_control]
-//     list_of_net_decl_assignments ; ---
-
 TEST(TypeDeclParsing, NetDeclWithNettypeIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -492,10 +457,6 @@ TEST(TypeDeclParsing, NetDeclWithNettypeIdentifier) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-// --- net_declaration ::= interconnect implicit_data_type [# delay_value]
-//     net_identifier { unpacked_dimension } [ , net_identifier
-//     { unpacked_dimension } ] ; ---
 
 TEST(TypeDeclParsing, NetDeclInterconnect) {
   auto r = Parse("module m; interconnect w; endmodule");
@@ -514,8 +475,6 @@ TEST(TypeDeclParsing, NetDeclInterconnectWithPackedDim) {
   EXPECT_TRUE(item->data_type.is_interconnect);
   EXPECT_NE(item->data_type.packed_dim_left, nullptr);
 }
-
-// --- Error conditions ---
 
 TEST(TypeDeclParsing, ErrorTypedefMissingSemicolon) {
   auto r = Parse("module m; typedef int my_t endmodule");
@@ -549,4 +508,4 @@ TEST(TypeDeclParsing, ErrorNettypeMissingSemicolon) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

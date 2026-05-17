@@ -36,7 +36,6 @@ TEST(PullSourceElaboration, PulldownLowersToLiteralZero) {
   EXPECT_EQ(mod->assigns[0].rhs->int_val, 0);
 }
 
-// R4: absent strength spec → pull (encoding 3) on the driving side only.
 TEST(PullSourceElaboration, PullupDefaultStrengthIsPull) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -65,8 +64,6 @@ TEST(PullSourceElaboration, PulldownDefaultStrengthIsPull) {
   EXPECT_EQ(mod->assigns[0].drive_strength0, 3u);
 }
 
-// R5: an explicit strength on the driving side is propagated through to the
-// continuous assignment.
 TEST(PullSourceElaboration, PullupExplicitStrength1Propagates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -95,8 +92,6 @@ TEST(PullSourceElaboration, PulldownExplicitStrength0Propagates) {
   EXPECT_EQ(mod->assigns[0].drive_strength0, 5u);
 }
 
-// R6: the non-driving side is always zeroed — pullup never drives 0, so its
-// strength0 field must not carry an effective strength into the assignment.
 TEST(PullSourceElaboration, PullupDriveStrength0IsZero) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -125,4 +120,4 @@ TEST(PullSourceElaboration, PulldownDriveStrength1IsZero) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 0u);
 }
 
-}  // namespace
+}

@@ -114,4 +114,4 @@ TEST(Lexical, Timeunit_StoredInModuleDecl_Flags) {
   EXPECT_TRUE(mod->has_timeprecision);
 }
 
-}  // namespace
+}

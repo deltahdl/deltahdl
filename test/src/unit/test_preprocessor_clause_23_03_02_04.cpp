@@ -61,4 +61,4 @@ TEST(WildcardPortConnectionPreprocessing, WildcardWithConditionalCompilation) {
   EXPECT_TRUE(inst->inst_wildcard);
 }
 
-}  // namespace
+}

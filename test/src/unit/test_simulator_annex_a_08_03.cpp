@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §A.8.3: conditional_expression simulates
 TEST(ExpressionSim, ConditionalExpressionSimulates) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -14,7 +13,6 @@ TEST(ExpressionSim, ConditionalExpressionSimulates) {
       "x"), 42u);
 }
 
-// §A.8.3: conditional_expression — false branch
 TEST(ExpressionSim, ConditionalExpressionFalseBranch) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -24,7 +22,6 @@ TEST(ExpressionSim, ConditionalExpressionFalseBranch) {
       "x"), 99u);
 }
 
-// §A.8.3: inc_or_dec_expression — postfix increment
 TEST(ExpressionSim, PostfixIncrementSimulates) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -37,7 +34,6 @@ TEST(ExpressionSim, PostfixIncrementSimulates) {
       "i"), 6u);
 }
 
-// §A.8.3: inc_or_dec_expression — prefix decrement
 TEST(ExpressionSim, PrefixDecrementSimulates) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -50,7 +46,6 @@ TEST(ExpressionSim, PrefixDecrementSimulates) {
       "i"), 4u);
 }
 
-// §A.8.3: constant_expression in parameter used at simulation
 TEST(ExpressionSim, ConstantExpressionInParameterSimulates) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -61,7 +56,6 @@ TEST(ExpressionSim, ConstantExpressionInParameterSimulates) {
       "x"), 7u);
 }
 
-// §A.8.3: constant_expression — ternary in parameter
 TEST(ExpressionSim, ConstantTernaryInParameterSimulates) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -73,7 +67,6 @@ TEST(ExpressionSim, ConstantTernaryInParameterSimulates) {
       "x"), 10u);
 }
 
-// §A.8.3: expression — binary operators simulate correctly
 TEST(ExpressionSim, BinaryOperatorsSimulate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -97,7 +90,6 @@ TEST(ExpressionSim, BinaryOperatorsSimulate) {
   });
 }
 
-// §A.8.3: expression — unary operators simulate correctly
 TEST(ExpressionSim, UnaryOperatorsSimulate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -115,7 +107,6 @@ TEST(ExpressionSim, UnaryOperatorsSimulate) {
   });
 }
 
-// §A.8.3: part_select_range simulates
 TEST(ExpressionSim, PartSelectRangeSimulates) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -129,7 +120,6 @@ TEST(ExpressionSim, PartSelectRangeSimulates) {
       "x"), 0xABu);
 }
 
-// §A.8.3: indexed_range — ascending part select simulates
 TEST(ExpressionSim, IndexedRangePlusSimulates) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -143,7 +133,6 @@ TEST(ExpressionSim, IndexedRangePlusSimulates) {
       "x"), 0xABu);
 }
 
-// §A.8.3: indexed_range — descending part select simulates
 TEST(ExpressionSim, IndexedRangeMinusSimulates) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -157,7 +146,6 @@ TEST(ExpressionSim, IndexedRangeMinusSimulates) {
       "x"), 0xABu);
 }
 
-// §A.8.3: nested conditional expression simulates
 TEST(ExpressionSim, NestedTernarySimulates) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -167,7 +155,6 @@ TEST(ExpressionSim, NestedTernarySimulates) {
       "x"), 2u);
 }
 
-// §A.8.3: inside_expression — value hits the set, simulator yields 1.
 TEST(ExpressionSim, InsideExpressionHitSimulates) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -181,7 +168,6 @@ TEST(ExpressionSim, InsideExpressionHitSimulates) {
       "hit"), 1u);
 }
 
-// §A.8.3: inside_expression — value misses the set, simulator yields 0.
 TEST(ExpressionSim, InsideExpressionMissSimulates) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -195,9 +181,6 @@ TEST(ExpressionSim, InsideExpressionMissSimulates) {
       "hit"), 0u);
 }
 
-// §A.8.3 → §A.2.2.1 cross-link: tagged_union_expression carries the value
-// of the tagged member into the destination — the §A.2.2.1 tagged union
-// type and the §A.8.3 tagged expression meet at runtime.
 TEST(ExpressionSim, TaggedUnionExpressionSimulates) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -207,9 +190,6 @@ TEST(ExpressionSim, TaggedUnionExpressionSimulates) {
       "x"), 42u);
 }
 
-// §A.8.3 ↔ §A.6.2 cross-link: expression ::= ( operator_assignment ).
-// At runtime, `(y += 2)` updates y in place and yields the post-update
-// value as the value of the outer expression.
 TEST(ExpressionSim, ExprOperatorAssignmentSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -227,4 +207,4 @@ TEST(ExpressionSim, ExprOperatorAssignmentSimulates) {
   });
 }
 
-}  // namespace
+}

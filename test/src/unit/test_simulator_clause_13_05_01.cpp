@@ -102,4 +102,4 @@ TEST(PassByValueSim, MultipleArgsCopiedIndependently) {
   LowerRunAndCheck(f, design, {{"a", 3u}, {"b", 7u}, {"result", 10u}});
 }
 
-}  // namespace
+}

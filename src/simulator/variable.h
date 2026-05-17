@@ -10,8 +10,6 @@ namespace delta {
 
 struct Expr;
 
-// --- Variable: storage for reg/logic/integer simulation objects ---
-
 struct Variable {
   Logic4Vec value{};
   Logic4Vec prev_value{};
@@ -25,15 +23,10 @@ struct Variable {
   bool is_4state = true;
   uint64_t triggered_ticks = UINT64_MAX;
 
-  // §10.6: RHS expression of the active procedural continuous assignment
-  // (assign/force). Used by watchers to reevaluate on RHS variable changes.
   const Expr* proc_cont_rhs = nullptr;
 
-  // RHS of an active assign procedural continuous assignment, preserved across
-  // force so that release can reestablish it.
   const Expr* assign_cont_rhs = nullptr;
 
-  // Watchers return true if consumed (should be removed), false to keep.
   std::vector<std::function<bool()>> watchers;
 
   void AddWatcher(std::function<bool()> cb) {
@@ -48,4 +41,4 @@ struct Variable {
   }
 };
 
-}  // namespace delta
+}

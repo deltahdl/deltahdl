@@ -60,4 +60,4 @@ TEST(ConfigKeywordLexing, KeywordsNotIdentifiers) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
 }
 
-}  // namespace
+}

@@ -45,11 +45,11 @@ TEST(SignedUnsignedArithmetic, SignedModulusNegativeDivisor) {
   SimFixture f;
 
   MakeSignedVarAdv(f, "sm2", 8, 11);
-  MakeSignedVarAdv(f, "sn2", 8, 0xFD);  // -3
+  MakeSignedVarAdv(f, "sn2", 8, 0xFD);
   auto* expr = MakeBinary(f.arena, TokenKind::kPercent, MakeId(f.arena, "sm2"),
                           MakeId(f.arena, "sn2"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  // 11 % -3 = 2 (sign follows first operand, which is positive)
+
   EXPECT_EQ(result.ToUint64() & 0xFF, 2u);
   EXPECT_TRUE(result.is_signed);
 }
@@ -128,7 +128,7 @@ TEST(SignedUnsignedArithmetic, PowerNegativeOneEvenExponentReturnsOne) {
 TEST(SignedUnsignedArithmetic, PowerNegativeBasePositiveExponent) {
   SimFixture f;
 
-  MakeSignedVarAdv(f, "nb", 8, 0xFD);  // -3
+  MakeSignedVarAdv(f, "nb", 8, 0xFD);
   MakeSignedVarAdv(f, "ne", 8, 3);
   auto* expr = f.arena.Create<Expr>();
   expr->kind = ExprKind::kBinary;
@@ -136,7 +136,7 @@ TEST(SignedUnsignedArithmetic, PowerNegativeBasePositiveExponent) {
   expr->lhs = MakeId(f.arena, "nb");
   expr->rhs = MakeId(f.arena, "ne");
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  // (-3) ** 3 = -27, in 8-bit two's complement: 0xE5
+
   EXPECT_EQ(result.ToUint64() & 0xFF, 0xE5u);
   EXPECT_TRUE(result.is_signed);
 }
@@ -144,8 +144,8 @@ TEST(SignedUnsignedArithmetic, PowerNegativeBasePositiveExponent) {
 TEST(SignedUnsignedArithmetic, PowerNegativeBaseNegativeExponentReturnsZero) {
   SimFixture f;
 
-  MakeSignedVarAdv(f, "nb2", 8, 0xFD);  // -3
-  MakeSignedVarAdv(f, "ne2", 8, 0xFF);  // -1
+  MakeSignedVarAdv(f, "nb2", 8, 0xFD);
+  MakeSignedVarAdv(f, "ne2", 8, 0xFF);
   auto* expr = f.arena.Create<Expr>();
   expr->kind = ExprKind::kBinary;
   expr->op = TokenKind::kPower;
@@ -159,7 +159,7 @@ TEST(SignedUnsignedArithmetic, PowerOneBaseNegativeExponentReturnsOne) {
   SimFixture f;
 
   MakeSignedVarAdv(f, "ob", 8, 1);
-  MakeSignedVarAdv(f, "oe", 8, 0xFE);  // -2
+  MakeSignedVarAdv(f, "oe", 8, 0xFE);
   auto* expr = f.arena.Create<Expr>();
   expr->kind = ExprKind::kBinary;
   expr->op = TokenKind::kPower;
@@ -172,8 +172,8 @@ TEST(SignedUnsignedArithmetic, PowerOneBaseNegativeExponentReturnsOne) {
 TEST(SignedUnsignedArithmetic, PowerNegativeOneNegativeOddExponentReturnsNegativeOne) {
   SimFixture f;
 
-  MakeSignedVarAdv(f, "n1a", 8, 0xFF);  // -1
-  MakeSignedVarAdv(f, "n3a", 8, 0xFD);  // -3
+  MakeSignedVarAdv(f, "n1a", 8, 0xFF);
+  MakeSignedVarAdv(f, "n3a", 8, 0xFD);
   auto* expr = f.arena.Create<Expr>();
   expr->kind = ExprKind::kBinary;
   expr->op = TokenKind::kPower;
@@ -187,8 +187,8 @@ TEST(SignedUnsignedArithmetic, PowerNegativeOneNegativeOddExponentReturnsNegativ
 TEST(SignedUnsignedArithmetic, PowerNegativeOneNegativeEvenExponentReturnsOne) {
   SimFixture f;
 
-  MakeSignedVarAdv(f, "n1b", 8, 0xFF);  // -1
-  MakeSignedVarAdv(f, "n4b", 8, 0xFC);  // -4
+  MakeSignedVarAdv(f, "n1b", 8, 0xFF);
+  MakeSignedVarAdv(f, "n4b", 8, 0xFC);
   auto* expr = f.arena.Create<Expr>();
   expr->kind = ExprKind::kBinary;
   expr->op = TokenKind::kPower;
@@ -201,12 +201,12 @@ TEST(SignedUnsignedArithmetic, PowerNegativeOneNegativeEvenExponentReturnsOne) {
 
 TEST(SignedUnsignedArithmetic, SignedAdditionProducesSignedResult) {
   SimFixture f;
-  MakeSignedVarAdv(f, "sa", 8, 0xFE);  // -2
-  MakeSignedVarAdv(f, "sb", 8, 0xFD);  // -3
+  MakeSignedVarAdv(f, "sa", 8, 0xFE);
+  MakeSignedVarAdv(f, "sb", 8, 0xFD);
   auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "sa"),
                           MakeId(f.arena, "sb"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  // -2 + -3 = -5, in 8-bit two's complement: 0xFB
+
   EXPECT_EQ(result.ToUint64() & 0xFF, 0xFBu);
   EXPECT_TRUE(result.is_signed);
 }
@@ -218,19 +218,19 @@ TEST(SignedUnsignedArithmetic, SignedSubtractionProducesSignedResult) {
   auto* expr = MakeBinary(f.arena, TokenKind::kMinus, MakeId(f.arena, "sa"),
                           MakeId(f.arena, "sb"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  // 3 - 5 = -2, in 8-bit two's complement: 0xFE
+
   EXPECT_EQ(result.ToUint64() & 0xFF, 0xFEu);
   EXPECT_TRUE(result.is_signed);
 }
 
 TEST(SignedUnsignedArithmetic, MixedSignednessProducesUnsignedResult) {
   SimFixture f;
-  MakeSignedVarAdv(f, "sv", 8, 0xFE);  // -2 as signed
-  MakeVar(f, "uv", 8, 2);              // 2 as unsigned
+  MakeSignedVarAdv(f, "sv", 8, 0xFE);
+  MakeVar(f, "uv", 8, 2);
   auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "sv"),
                           MakeId(f.arena, "uv"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  // Mixed: unsigned arithmetic. 0xFE + 2 = 0x100, truncated to 8 bits = 0.
+
   EXPECT_FALSE(result.is_signed);
 }
 
@@ -241,7 +241,7 @@ TEST(SignedUnsignedArithmetic, UnsignedAdditionProducesUnsignedResult) {
   auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "ua"),
                           MakeId(f.arena, "ub"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64() & 0xFF, 0x2Cu);  // 300 & 0xFF = 44
+  EXPECT_EQ(result.ToUint64() & 0xFF, 0x2Cu);
   EXPECT_FALSE(result.is_signed);
 }
 
@@ -272,7 +272,7 @@ TEST(SignedUnsignedArithmetic, EndToEndSignedDivision) {
   LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("r");
   ASSERT_NE(var, nullptr);
-  // -12 / 3 = -4, stored as 32-bit two's complement
+
   EXPECT_EQ(var->value.ToUint64(), static_cast<uint64_t>(static_cast<uint32_t>(-4)));
   EXPECT_TRUE(var->is_signed);
 }
@@ -293,7 +293,7 @@ TEST(SignedUnsignedArithmetic, EndToEndSignedModulus) {
   LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("r");
   ASSERT_NE(var, nullptr);
-  // -10 % 3 = -1 (sign follows first operand)
+
   EXPECT_EQ(var->value.ToUint64(),
             static_cast<uint64_t>(static_cast<uint32_t>(-1)));
 }
@@ -313,7 +313,7 @@ TEST(SignedUnsignedArithmetic, EndToEndUnsignedHighBitInterpretation) {
   LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("r");
   ASSERT_NE(var, nullptr);
-  // Unsigned: 0xF0 / 2 = 120
+
   EXPECT_EQ(var->value.ToUint64(), 120u);
 }
 
@@ -350,23 +350,23 @@ TEST(SignedUnsignedArithmetic, SignedNetPropagatesSignednessToSimVariable) {
 TEST(SignedUnsignedArithmetic,
      SameBitPatternDifferentInterpretationSignedVsUnsigned) {
   SimFixture f;
-  // 0xF9 as unsigned = 249, as signed 8-bit = -7
+
   MakeSignedVarAdv(f, "sv", 8, 0xF9);
   MakeVar(f, "uv", 8, 0xF9);
 
   auto* sdiv = MakeBinary(f.arena, TokenKind::kSlash, MakeId(f.arena, "sv"),
                            MakeId(f.arena, "sv"));
   auto sresult = EvalExpr(sdiv, f.ctx, f.arena);
-  // -7 / -7 = 1 (signed)
+
   EXPECT_EQ(sresult.ToUint64(), 1u);
   EXPECT_TRUE(sresult.is_signed);
 
   auto* udiv = MakeBinary(f.arena, TokenKind::kSlash, MakeId(f.arena, "uv"),
                            MakeId(f.arena, "uv"));
   auto uresult = EvalExpr(udiv, f.ctx, f.arena);
-  // 249 / 249 = 1 (unsigned)
+
   EXPECT_EQ(uresult.ToUint64(), 1u);
   EXPECT_FALSE(uresult.is_signed);
 }
 
-}  // namespace
+}

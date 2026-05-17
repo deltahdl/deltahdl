@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- modport_declaration ---
-
 TEST(ModportDeclarationParsing, ModportSingleItem) {
   auto r = Parse(
       "interface ifc;\n"
@@ -195,8 +193,6 @@ TEST(ModportDeclarationParsing, MasterSlaveDirections) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "slave");
 }
 
-// --- modport_simple_ports_declaration ---
-
 TEST(ModportDeclarationParsing, ModportSimplePortsInput) {
   auto r = Parse(
       "interface ifc;\n"
@@ -318,8 +314,6 @@ TEST(ModportDeclarationParsing, InputAndOutputMixed) {
   EXPECT_EQ(mp->ports[2].direction, Direction::kOutput);
 }
 
-// --- modport_simple_port ---
-
 TEST(ModportDeclarationParsing, DotNotationModportName) {
   auto r = Parse(
       "interface bus;\n"
@@ -332,8 +326,6 @@ TEST(ModportDeclarationParsing, DotNotationModportName) {
   auto* mp = iface->modports[0];
   EXPECT_EQ(mp->name, "target");
 }
-
-// --- modport_ports_declaration (mixed alternatives, attributes) ---
 
 TEST(ModportDeclarationParsing, ModportMixedDirections) {
   auto r = Parse(
@@ -496,8 +488,6 @@ TEST(ModportDeclarationParsing, AllAlternativesTogether) {
               "endinterface\n"));
 }
 
-// --- Error conditions ---
-
 TEST(ModportDeclarationParsing, MissingModportName) {
   EXPECT_FALSE(
       ParseOk("interface ifc;\n"
@@ -529,4 +519,4 @@ TEST(ModportDeclarationParsing, MissingSemicolon) {
               "endinterface\n"));
 }
 
-}  // namespace
+}

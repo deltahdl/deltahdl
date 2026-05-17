@@ -92,4 +92,4 @@ TEST(PortDeclElaboration, InputIntegerTypePortWidth) {
   EXPECT_EQ(mod->ports[0].width, 32u);
 }
 
-}  // namespace
+}

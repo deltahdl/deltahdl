@@ -65,4 +65,4 @@ TEST(NamedPortSynthesis, NamedPortWithExpressionSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

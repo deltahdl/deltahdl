@@ -6,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §11.4.1: SystemVerilog includes the C assignment operators and special
-// bitwise assignment operators: +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=,
-// <<<=, and >>>=.  Each must lex to its own dedicated token (the parser
-// dispatches on TokenKind for compound assignment).  The lvalue/rvalue
-// must also lex as separate identifier tokens so the parser sees
-// `variable_lvalue assignment_operator expression` (§10.4.1
-// operator_assignment BNF).
-
 TEST(AssignmentOperatorLexing, PlusEq) {
   auto tokens = Lex("a += 1");
   ASSERT_GE(tokens.size(), 3u);
@@ -88,9 +80,6 @@ TEST(AssignmentOperatorLexing, GtGtGtEq) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kGtGtGtEq);
 }
 
-// No spaces between the lvalue, operator, and rvalue: all 12 must still
-// lex as distinct compound operator tokens, distinct from `=` (kEq) and
-// from their binary counterparts (kPlus, kMinus, kLtLt, etc.).
 TEST(AssignmentOperatorLexing, NoSpacesAroundOperator) {
   auto tokens = Lex("a+=b");
   ASSERT_GE(tokens.size(), 3u);
@@ -110,4 +99,4 @@ TEST(AssignmentOperatorLexing, CompoundOpsDistinctFromBinaryCounterparts) {
   EXPECT_EQ(tokens[5].kind, TokenKind::kLtLtLtEq);
 }
 
-}  // namespace
+}

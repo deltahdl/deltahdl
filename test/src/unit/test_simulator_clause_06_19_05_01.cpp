@@ -28,4 +28,4 @@ TEST(EnumMethods, FirstWithNonZeroStart) {
   EXPECT_EQ(result.ToUint64(), 5u);
 }
 
-}  // namespace
+}

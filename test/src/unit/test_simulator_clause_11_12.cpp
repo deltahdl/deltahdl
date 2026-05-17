@@ -249,8 +249,6 @@ TEST(LetExpansionSimulation, LetExpandOverridesDefault) {
   EXPECT_EQ(result.ToUint64(), 55u);
 }
 
-// --- End-to-end simulation tests ---
-
 TEST(LetExpansionSimulation, EndToEndLetCallInInitialBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -381,9 +379,7 @@ TEST(LetExpansionSimulation, EndToEndLetNestedCalls) {
 
 TEST(LetExpansionSimulation, EndToEndLetParenthesizedPrecedence) {
   SimFixture f;
-  // The expansion of `add(2, 3)` is parenthesized as `(2 + 3)`,
-  // so `add(2, 3) * 4` evaluates as `(2 + 3) * 4 = 20`,
-  // not `2 + 3 * 4 = 14`.
+
   auto* design = ElaborateSrc(
       "module t;\n"
       "  let add(a, b) = a + b;\n"
@@ -401,8 +397,6 @@ TEST(LetExpansionSimulation, EndToEndLetParenthesizedPrecedence) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// --- Unit-level: named argument binding ---
-
 TEST(LetExpansionSimulation, LetExpandNamedArgs) {
   SimFixture f;
 
@@ -418,7 +412,6 @@ TEST(LetExpansionSimulation, LetExpandNamedArgs) {
   auto* decl = MakeLetDecl(f.arena, "diff", body, {arg_a, arg_b});
   f.ctx.RegisterLetDecl("diff", decl);
 
-  // Call with named args: diff(.b(3), .a(10)) => 10 - 3 = 7
   auto* call = f.arena.Create<Expr>();
   call->kind = ExprKind::kCall;
   call->callee = "diff";
@@ -428,34 +421,25 @@ TEST(LetExpansionSimulation, LetExpandNamedArgs) {
   EXPECT_EQ(result.ToUint64(), 7u);
 }
 
-// --- Unit-level: declarative scope negative test ---
-
 TEST(LetExpansionSimulation, LetDeclarativeScopeIgnoresInstantiationVar) {
   SimFixture f;
 
-  // Create variable 'K' = 42 in module scope (declaration context).
   MakeVar(f, "K", 32, 42);
 
-  // let body references 'K'.
   auto* body = MakeId(f.arena, "K");
   auto* decl = MakeLetDecl(f.arena, "get_k", body);
   f.ctx.RegisterLetDecl("get_k", decl);
 
-  // Push a new scope (simulating entering a block) and create a shadowing 'K'.
   f.ctx.PushScope();
   auto* local_k = f.ctx.CreateLocalVariable("K", 32);
   local_k->value = MakeLogic4VecVal(f.arena, 32, 999);
 
-  // The let body should resolve 'K' from the declaration scope (42),
-  // not the instantiation scope (999).
   auto* call = MakeCall(f.arena, "get_k", {});
   auto result = EvalExpr(call, f.ctx, f.arena);
 
   f.ctx.PopScope();
 
-  // §11.12: Free variables resolve from the declaration scope (42),
-  // not the instantiation scope (999).
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-}  // namespace
+}

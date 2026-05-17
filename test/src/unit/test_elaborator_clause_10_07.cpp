@@ -127,4 +127,4 @@ TEST(AssignmentExtensionTruncation, ContAssignInfersLhsWidthWhenNarrowerThanRhs)
   EXPECT_EQ(mod->assigns[0].width, 4);
 }
 
-}  // namespace
+}

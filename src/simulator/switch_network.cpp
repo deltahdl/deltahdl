@@ -34,8 +34,7 @@ void ResolveAmbiguousTerminal(Variable& terminal_var,
   uint8_t off_a = term_is_driven ? t_a : 1;
   uint8_t off_b = term_is_driven ? t_b : 1;
   if ((on_a != off_a || on_b != off_b) && !term_is_driven) {
-    // The on-vs-off solutions disagree on this node, so the §4.9.5 rule
-    // gives steady-state x.
+
     terminal_var.value.words[0].aval = 0;
     terminal_var.value.words[0].bval = 1;
   }
@@ -89,14 +88,12 @@ void FirstPass(std::vector<BidirSwitchInst>& switches) {
     } else if (conducts && !unknown) {
       PropagateAcrossClosedSwitch(sw);
     }
-    // user-defined nets with x/z control: switch is off, nets stay separate.
+
   }
 }
 
 void ChainPropagate(std::vector<BidirSwitchInst>& switches) {
-  // Iterate to a fixed point so the result depends on the network topology
-  // rather than the order switches happen to appear in `switches`. A single
-  // sweep would miss a node whose feeder switch sits later in the vector.
+
   bool changed = true;
   while (changed) {
     changed = false;
@@ -117,7 +114,7 @@ void ChainPropagate(std::vector<BidirSwitchInst>& switches) {
   }
 }
 
-}  // namespace
+}
 
 bool BidirSwitchConducts(BidirSwitchKind kind, Logic4Word control) {
   uint8_t c_aval = control.aval & 1;
@@ -146,10 +143,10 @@ bool BidirSwitchControlIsUnknown(BidirSwitchKind kind, Logic4Word control) {
 }
 
 void ResolveBidirSwitchNetwork(std::vector<BidirSwitchInst>& switches,
-                               Arena& /*arena*/) {
+                               Arena& ) {
   InitialiseTerminals(switches);
   FirstPass(switches);
   ChainPropagate(switches);
 }
 
-}  // namespace delta
+}

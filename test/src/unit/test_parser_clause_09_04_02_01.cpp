@@ -179,4 +179,4 @@ TEST(EventOrOperatorParsing, InterleavedOrGroupsWithComma) {
   ASSERT_EQ(item->sensitivity.size(), 5u);
 }
 
-}  // namespace
+}

@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.4.4: Packed dims before name combined with unpacked dims after name.
 TEST(MultidimensionalArraySimulation, PackedAndUnpackedDims) {
   auto v = RunAndGet(
       "module t;\n"
@@ -19,4 +18,4 @@ TEST(MultidimensionalArraySimulation, PackedAndUnpackedDims) {
   EXPECT_EQ(v, 0xDEADBEEFu);
 }
 
-}  // namespace
+}

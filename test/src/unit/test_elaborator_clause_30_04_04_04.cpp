@@ -30,7 +30,6 @@ TEST(IfnoneConditionElaboration, FullPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// R3: ifnone source/destination must match companion if(cond) paths.
 TEST(IfnoneConditionElaboration, ErrorEndpointMismatch) {
   ElabFixture f;
   ElaborateSrc(
@@ -44,7 +43,6 @@ TEST(IfnoneConditionElaboration, ErrorEndpointMismatch) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// R5: cannot mix ifnone with an unconditional path on the same endpoints.
 TEST(IfnoneConditionElaboration, ErrorCoexistsWithUnconditional) {
   ElabFixture f;
   ElaborateSrc(
@@ -58,4 +56,4 @@ TEST(IfnoneConditionElaboration, ErrorCoexistsWithUnconditional) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

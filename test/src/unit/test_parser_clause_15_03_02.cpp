@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.3.2: put() with explicit keyCount parses.
 TEST(SemaphorePutParser, PutWithExplicitKeyCount) {
   auto r = Parse(
       "module m;\n"
@@ -16,7 +15,6 @@ TEST(SemaphorePutParser, PutWithExplicitKeyCount) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3.2: put() with no arguments (default keyCount = 1).
 TEST(SemaphorePutParser, PutWithDefaultKeyCount) {
   auto r = Parse(
       "module m;\n"
@@ -28,7 +26,6 @@ TEST(SemaphorePutParser, PutWithDefaultKeyCount) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3.2: put() called on a declared semaphore variable.
 TEST(SemaphorePutParser, PutOnDeclaredSemaphore) {
   auto r = Parse(
       "module m;\n"
@@ -41,7 +38,6 @@ TEST(SemaphorePutParser, PutOnDeclaredSemaphore) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3.2: multiple put() calls in sequence.
 TEST(SemaphorePutParser, MultiplePutCalls) {
   auto r = Parse(
       "module m;\n"
@@ -55,4 +51,4 @@ TEST(SemaphorePutParser, MultiplePutCalls) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -5,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §31.9: the allowance for negative values in $setuphold originates
-// here, not in §31.3.3. Exercising both limit slots simultaneously
-// proves the parser carries the unary minus through each slot in one
-// go, which subsumes the two single-slot permutations.
 TEST(NegativeTimingChecks, SetupholdAcceptsBothNegativeLimits) {
   auto r = Parse(
       "module m;\n"
@@ -23,8 +19,6 @@ TEST(NegativeTimingChecks, SetupholdAcceptsBothNegativeLimits) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-// §31.9: $recrem inherits the same "negative values are allowed" rule
-// as $setuphold; a negative recovery_limit must parse cleanly.
 TEST(NegativeTimingChecks, RecremAcceptsNegativeRecoveryLimit) {
   auto r = Parse(
       "module m;\n"
@@ -39,9 +33,6 @@ TEST(NegativeTimingChecks, RecremAcceptsNegativeRecoveryLimit) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-// §31.9: mirror for $recrem — a negative removal_limit must parse
-// cleanly, matching the identical-behaviour rule the main clause
-// states for $setuphold and $recrem.
 TEST(NegativeTimingChecks, RecremAcceptsNegativeRemovalLimit) {
   auto r = Parse(
       "module m;\n"
@@ -55,4 +46,4 @@ TEST(NegativeTimingChecks, RecremAcceptsNegativeRemovalLimit) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-}  // namespace
+}

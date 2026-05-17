@@ -91,4 +91,4 @@ TEST(ProceduralBlockPreprocessor, ConditionalCompilationAlwaysVariant) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

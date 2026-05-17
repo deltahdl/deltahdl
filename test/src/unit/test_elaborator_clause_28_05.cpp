@@ -35,8 +35,6 @@ TEST(BufNotElaboration, ElaborateNotGate) {
   EXPECT_EQ(mod->assigns[0].rhs->op, TokenKind::kTilde);
 }
 
-// §28.5: the LAST terminal is the input; single-output elaboration must
-// wire the rhs from that last terminal's identifier.
 TEST(BufNotElaboration, LastTerminalIsInput) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -55,9 +53,6 @@ TEST(BufNotElaboration, LastTerminalIsInput) {
   EXPECT_EQ(rhs->text, "in");
 }
 
-// §28.5: buf and not can have one input and ONE OR MORE outputs; every
-// output must receive a separate continuous assignment driven by the
-// same input expression.
 TEST(BufNotElaboration, MultiOutputBufEmitsOneAssignPerOutput) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -99,4 +94,4 @@ TEST(BufNotElaboration, MultiOutputNotEmitsInvertedAssignsPerOutput) {
   }
 }
 
-}  // namespace
+}

@@ -388,4 +388,4 @@ TEST(PrimitiveStrengthParsing, Error_PullupSingleSupply0) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

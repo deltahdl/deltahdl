@@ -10,4 +10,4 @@ TEST(SvVpiUser, ThreadCallbackReasons) {
   EXPECT_EQ(cbCreateObj, 700);
 }
 
-}  // namespace
+}

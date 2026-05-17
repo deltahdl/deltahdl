@@ -138,4 +138,4 @@ TEST(PatternParsing, PatternDotBindingInIfMatches) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

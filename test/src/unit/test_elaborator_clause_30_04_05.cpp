@@ -4,9 +4,6 @@ using namespace delta;
 
 namespace {
 
-// Module paths may connect any combination of vectors and scalars.
-// A specify block mixing scalar-to-scalar, vector-to-vector, and
-// scalar-to-vector paths must elaborate cleanly.
 TEST(FullAndParallelConnectionElaboration, VectorAndScalarEndpointsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,8 +19,6 @@ TEST(FullAndParallelConnectionElaboration, VectorAndScalarEndpointsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.5: a full connection does not constrain the relative widths of the
-// source and destination vectors.
 TEST(FullAndParallelConnectionElaboration, FullAllowsDifferentWidthVectors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -37,7 +32,6 @@ TEST(FullAndParallelConnectionElaboration, FullAllowsDifferentWidthVectors) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.5: a full connection may bridge a vector and a scalar.
 TEST(FullAndParallelConnectionElaboration, FullAllowsVectorToScalar) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,8 +45,6 @@ TEST(FullAndParallelConnectionElaboration, FullAllowsVectorToScalar) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.5: either operator may be used between two scalars because each
-// side is a single bit.
 TEST(FullAndParallelConnectionElaboration, ScalarPairAcceptsEitherOperator) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -67,7 +59,6 @@ TEST(FullAndParallelConnectionElaboration, ScalarPairAcceptsEitherOperator) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.5: a parallel connection requires matching bit counts on both sides.
 TEST(FullAndParallelConnectionElaboration, ErrorParallelWidthMismatch) {
   ElabFixture f;
   ElaborateSrc(
@@ -80,7 +71,6 @@ TEST(FullAndParallelConnectionElaboration, ErrorParallelWidthMismatch) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §30.4.5: a scalar and a multi-bit vector cannot form a parallel connection.
 TEST(FullAndParallelConnectionElaboration, ErrorParallelScalarToVector) {
   ElabFixture f;
   ElaborateSrc(
@@ -93,4 +83,4 @@ TEST(FullAndParallelConnectionElaboration, ErrorParallelScalarToVector) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

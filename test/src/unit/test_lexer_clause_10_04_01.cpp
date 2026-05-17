@@ -6,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §10.4.1 BNF: blocking_assignment ::= variable_lvalue = ... .  The simple
-// `=` assignment operator is the head token that distinguishes a blocking
-// procedural assignment from a nonblocking one.
 TEST(BlockingAssignLexing, EqualsOperatorToken) {
   auto r = LexOne("= ");
   EXPECT_EQ(r.token.kind, TokenKind::kEq);
@@ -34,9 +31,6 @@ TEST(BlockingAssignLexing, NoSpacesAroundOperator) {
   EXPECT_EQ(tokens[3].kind, TokenKind::kSemicolon);
 }
 
-// §10.4.1: intra-assignment timing control is a `=` followed by `#delay`.
-// The lexer must split this into kEq, kHash, kIntLiteral so the parser can
-// pick up the optional delay_or_event_control.
 TEST(BlockingAssignLexing, WithIntraDelayTokenSequence) {
   auto tokens = Lex("a = #5 b ;");
   ASSERT_GE(tokens.size(), 6u);
@@ -55,4 +49,4 @@ TEST(BlockingAssignLexing, EqualsDistinctFromLtEq) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kLtEq);
 }
 
-}  // namespace
+}

@@ -36,14 +36,6 @@ TEST(InactiveRegionSim, AllActiveEventsCompleteBeforeInactive) {
   EXPECT_EQ(order[3], "inactive");
 }
 
-// §4.4.2.3 ¶1: "after **all** the Active events are processed" — including
-// Active events scheduled into the same time slot from inside another Active
-// callback. Distinct from AllActiveEventsCompleteBeforeInactive, which
-// pre-queues every active before Run() and so never exercises the
-// reentrant-push path through DrainQueue's `while (!queue.empty())` loop. If
-// the loop snapshotted queue length at entry (instead of testing emptiness on
-// each pop), the mid-drain active2 would defer past Inactive and the
-// observed order would put "inactive" before "active2".
 TEST(InactiveRegionSim, ActivesScheduledDuringDrainRunBeforeInactive) {
   Arena arena;
   Scheduler sched(arena);
@@ -189,13 +181,6 @@ TEST(InactiveRegionSim, InactiveRegionHoldsMultipleEvents) {
   EXPECT_EQ(count, 5);
 }
 
-// §4.4.2.3 ¶2: production `#0` from the active region set suspends the
-// process, schedules the resume into Inactive, and resumes it on the next
-// Inactive→Active iteration. The NBA `b <= 9` is queued before `#0`; if the
-// resume were routed past NBA (or the process were not suspended at all) the
-// post-resume read of `b` would observe 9. Reading 0 confirms the resume
-// fires from Inactive — strictly between Active and NBA — and that control
-// re-enters Active before the post-`#0` statement runs.
 TEST(InactiveRegionSim, ZeroDelaySuspendsProcessAndResumesViaInactive) {
   SimFixture f;
   auto* design = ElaborateSrc(

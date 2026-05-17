@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.5.5.2: Event initialized to null elaborates without error.
 TEST(NamedEventElaborator, EventInitializedToNull) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -12,7 +11,6 @@ TEST(NamedEventElaborator, EventInitializedToNull) {
       "endmodule\n"));
 }
 
-// §15.5.5.2: Imperative event = null elaborates without error.
 TEST(NamedEventElaborator, ImperativeEventAssignNull) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -25,4 +23,4 @@ TEST(NamedEventElaborator, ImperativeEventAssignNull) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

@@ -75,4 +75,4 @@ TEST(StreamReorderingElaboration, NegativeSliceSizeIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

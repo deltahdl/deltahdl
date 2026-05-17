@@ -203,4 +203,4 @@ TEST(ProgramInstantiationGrammar, Error_MissingSemicolon) {
       "module m; my_prog u0() endmodule\n"));
 }
 
-}  // namespace
+}

@@ -60,4 +60,4 @@ TEST(StringIndexAssocArrayParsing, AssociativeArrayTypedIndex) {
   EXPECT_EQ(item->name, "aa");
 }
 
-}  // namespace
+}

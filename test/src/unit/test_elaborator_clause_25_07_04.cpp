@@ -159,4 +159,4 @@ TEST(MultipleTaskExports,
   EXPECT_TRUE(ElabOk(src));
 }
 
-}  // namespace
+}

@@ -103,4 +103,4 @@ TEST(OperatorParsing, BinaryGreaterEq) {
   EXPECT_EQ(rhs->op, TokenKind::kGtEq);
 }
 
-}  // namespace
+}

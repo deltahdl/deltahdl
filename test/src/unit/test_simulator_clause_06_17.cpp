@@ -116,4 +116,4 @@ TEST(Simulator, EventInitializedWithNullFlag) {
   EXPECT_TRUE(var->is_null_event);
 }
 
-}  // namespace
+}

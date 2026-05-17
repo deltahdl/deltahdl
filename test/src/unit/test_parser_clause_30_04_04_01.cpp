@@ -235,8 +235,6 @@ TEST(OperatorParsing, ModulePathTernary) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Operand classes ---
-
 TEST(OperatorParsing, ModulePathOperandSpecparam) {
   auto r = Parse(
       "module m(input a, output y);\n"
@@ -294,4 +292,4 @@ TEST(OperatorParsing, ModulePathOperandPartSelect) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

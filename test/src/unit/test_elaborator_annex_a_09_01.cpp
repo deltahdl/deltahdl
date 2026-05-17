@@ -1,7 +1,4 @@
-// §A.9.1: elaborator-stage coverage of attribute instances. The parser
-// captures the §A.9.1 BNF into a vector<Attribute>; the elaborator's
-// ResolveAttributes pass folds each attr_spec's constant_expression and
-// surfaces the result as a ResolvedAttribute on the corresponding RTLIR node.
+
 
 #include "fixture_elaborator.h"
 
@@ -9,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §A.9.1: attribute_instance ::= (* attr_spec { , attr_spec } *) — a single
-// attr_spec with no value resolves to value 1 (the §5.12 default).
 TEST(AttributeInstanceElaboration, SingleAttrNoValueResolves) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -29,8 +24,6 @@ TEST(AttributeInstanceElaboration, SingleAttrNoValueResolves) {
   EXPECT_EQ(*m.attrs[0].resolved_value, 1);
 }
 
-// §A.9.1: attr_spec ::= attr_name [ = constant_expression ] — a value form
-// folds through ConstEvalInt during ResolveAttributes.
 TEST(AttributeInstanceElaboration, AttrSpecConstantExpressionFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -48,8 +41,6 @@ TEST(AttributeInstanceElaboration, AttrSpecConstantExpressionFolds) {
   EXPECT_EQ(*m.attrs[0].resolved_value, 5);
 }
 
-// §A.9.1: attribute_instance with multiple attr_specs separated by ',' —
-// every attr_spec lands as its own ResolvedAttribute in BNF order.
 TEST(AttributeInstanceElaboration, MultipleAttrSpecsResolveInOrder) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -66,9 +57,6 @@ TEST(AttributeInstanceElaboration, MultipleAttrSpecsResolveInOrder) {
   EXPECT_EQ(m.attrs[1].name, "parallel_case");
 }
 
-// §A.9.1 ↔ §A.8.3 cross-link: attr_spec's optional value is a §A.8.3
-// constant_expression. A non-trivial expression must fold to a constant at
-// elaboration.
 TEST(AttributeInstanceElaboration, AttrValueConstantExpressionCrossLink) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -81,7 +69,7 @@ TEST(AttributeInstanceElaboration, AttrValueConstantExpressionCrossLink) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   auto& m = *design->top_modules[0];
-  // The attribute is on the logic variable, which lives in variables.
+
   bool found = false;
   for (auto& v : m.variables) {
     for (auto& a : v.attrs) {
@@ -95,9 +83,6 @@ TEST(AttributeInstanceElaboration, AttrValueConstantExpressionCrossLink) {
   EXPECT_TRUE(found);
 }
 
-// §A.9.1: attr_spec ::= attr_name [ = constant_expression ] — a string
-// literal is a valid constant_expression and surfaces as the string_value
-// slot on the ResolvedAttribute.
 TEST(AttributeInstanceElaboration, AttrStringValueResolves) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -114,4 +99,4 @@ TEST(AttributeInstanceElaboration, AttrStringValueResolves) {
   EXPECT_EQ(m.attrs[0].string_value, "synplify");
 }
 
-}  // namespace
+}

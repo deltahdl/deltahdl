@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- delay_control elaboration ---
-
 TEST(TimingControlElaboration, DelayInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -73,14 +71,6 @@ TEST(TimingControlElaboration, DelayInFunctionError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// --- event_control elaboration ---
-//
-// `@(posedge clk)` elaborating in an initial / always block is governed
-// by §9.4.2 (posedge keyword) and is covered by
-// test_elaborator_clause_09_04_02.cpp::PosedgeEventControlElaborates and
-// peers. Only host-subclause rules (always_comb / always_latch / function
-// body restrictions) remain here.
-
 TEST(TimingControlElaboration, EventControlStarInAlwaysElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -131,8 +121,6 @@ TEST(TimingControlElaboration, EventControlInFunctionError) {
       f);
   EXPECT_TRUE(f.has_errors);
 }
-
-// --- wait_statement elaboration ---
 
 TEST(TimingControlElaboration, WaitInAlwaysCombError) {
   ElabFixture f;
@@ -214,8 +202,6 @@ TEST(TimingControlElaboration, WaitOrderInFunctionError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// --- jump_statement elaboration ---
-
 TEST(TimingControlElaboration, ReturnWithValueInVoidFunctionError) {
   ElabFixture f;
   ElaborateSrc(
@@ -254,8 +240,6 @@ TEST(TimingControlElaboration, ReturnWithValueInIntFunctionOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- cycle_delay elaboration ---
-
 TEST(TimingControlElaboration, CycleDelayInFunctionError) {
   ElabFixture f;
   ElaborateSrc(
@@ -268,8 +252,6 @@ TEST(TimingControlElaboration, CycleDelayInFunctionError) {
       f);
   EXPECT_TRUE(f.has_errors);
 }
-
-// --- Timing controls nested in control flow still detected ---
 
 TEST(TimingControlElaboration, DelayNestedInIfAlwaysCombError) {
   ElabFixture f;
@@ -311,4 +293,4 @@ TEST(TimingControlElaboration, EventControlNestedInForeverFuncError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

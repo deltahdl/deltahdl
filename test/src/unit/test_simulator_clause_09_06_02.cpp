@@ -18,8 +18,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1: disable shall terminate the activity of a named block ---
-
 TEST(DisableStatementExecution, DisableReturnsKDone) {
   StmtFixture f;
   auto* stmt = f.arena.Create<Stmt>();
@@ -29,8 +27,6 @@ TEST(DisableStatementExecution, DisableReturnsKDone) {
   auto result = RunStmt(stmt, f.ctx, f.arena);
   EXPECT_EQ(result, StmtResult::kDone);
 }
-
-// --- R1/R7: Self-disable terminates the containing block ---
 
 TEST(DisableStatementExecution, SelfDisableSkipsRemainingStatements) {
   SimFixture f;
@@ -46,8 +42,6 @@ TEST(DisableStatementExecution, SelfDisableSkipsRemainingStatements) {
       f);
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 0u}});
 }
-
-// --- R2: Execution resumes after the block ---
 
 TEST(DisableStatementExecution, ExecutionResumesAfterDisabledBlock) {
   SimFixture f;
@@ -67,8 +61,6 @@ TEST(DisableStatementExecution, ExecutionResumesAfterDisabledBlock) {
   LowerRunAndCheck(f, design, {{"x", 10u}, {"y", 20u}});
 }
 
-// --- R1/R2: Disable terminates a named block from another process ---
-
 TEST(DisableStatementExecution, DisableBlockFromOtherProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -85,8 +77,6 @@ TEST(DisableStatementExecution, DisableBlockFromOtherProcess) {
       f);
   LowerRunAndCheck(f, design, {{"x", 0u}});
 }
-
-// --- R1: Disable terminates a task ---
 
 TEST(DisableStatementExecution, DisableTerminatesTask) {
   SimFixture f;
@@ -107,8 +97,6 @@ TEST(DisableStatementExecution, DisableTerminatesTask) {
       f);
   LowerRunAndCheck(f, design, {{"x", 0u}});
 }
-
-// --- R2: Execution resumes after task-enabling statement ---
 
 TEST(DisableStatementExecution, ExecutionResumesAfterTaskEnablingStatement) {
   SimFixture f;
@@ -131,8 +119,6 @@ TEST(DisableStatementExecution, ExecutionResumesAfterTaskEnablingStatement) {
   LowerRunAndCheck(f, design, {{"x", 0u}, {"y", 1u}});
 }
 
-// --- R3: All activities within the block are terminated ---
-
 TEST(DisableStatementExecution, DisableTerminatesNestedActivities) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -151,8 +137,6 @@ TEST(DisableStatementExecution, DisableTerminatesNestedActivities) {
       f);
   LowerRunAndCheck(f, design, {{"x", 0u}});
 }
-
-// --- R4: Nested task chains are disabled downward ---
 
 TEST(DisableStatementExecution, DisableNestedTaskChain) {
   SimFixture f;
@@ -177,8 +161,6 @@ TEST(DisableStatementExecution, DisableNestedTaskChain) {
   LowerRunAndCheck(f, design, {{"x", 0u}});
 }
 
-// --- R5: Disabling a multiply-enabled task disables all activations ---
-
 TEST(DisableStatementExecution, DisableAllActivationsOfTask) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -200,8 +182,6 @@ TEST(DisableStatementExecution, DisableAllActivationsOfTask) {
   LowerRunAndCheck(f, design, {{"a", 0u}, {"b", 0u}});
 }
 
-// --- R7: Block disabling itself (forward goto pattern) ---
-
 TEST(DisableStatementExecution, DisableAsForwardGoto) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -222,8 +202,6 @@ TEST(DisableStatementExecution, DisableAsForwardGoto) {
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 0u}, {"c", 1u}});
 }
 
-// --- R7: Disable as continue (inner block in loop) ---
-
 TEST(DisableStatementExecution, DisableAsContinueInLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -238,11 +216,9 @@ TEST(DisableStatementExecution, DisableAsContinueInLoop) {
       "  end\n"
       "endmodule\n",
       f);
-  // i=0: count=1, i=1: count=2, i=2: disabled (skip), i=3: count=3
+
   LowerRunAndCheck(f, design, {{"count", 3u}});
 }
-
-// --- R7: Disable as break (outer block around loop) ---
 
 TEST(DisableStatementExecution, DisableAsBreakFromLoop) {
   SimFixture f;
@@ -258,11 +234,9 @@ TEST(DisableStatementExecution, DisableAsBreakFromLoop) {
       "  end\n"
       "endmodule\n",
       f);
-  // i=0: count=1, i=1: count=2, i=2: count=3, i=3: disable outer
+
   LowerRunAndCheck(f, design, {{"count", 3u}});
 }
-
-// --- R7: Task disabling itself (early return pattern) ---
 
 TEST(DisableStatementExecution, TaskDisablesItself) {
   SimFixture f;
@@ -280,8 +254,6 @@ TEST(DisableStatementExecution, TaskDisablesItself) {
       f);
   LowerRunAndCheck(f, design, {{"x", 1u}});
 }
-
-// --- R9: Automatic task disable ---
 
 TEST(DisableStatementExecution, DisableAutomaticTask) {
   SimFixture f;
@@ -303,10 +275,6 @@ TEST(DisableStatementExecution, DisableAutomaticTask) {
       f);
   LowerRunAndCheck(f, design, {{"a", 0u}, {"b", 0u}});
 }
-
-// --- U1: Results UNSPECIFIED when a disabled task has in-flight effects.
-// These tests assert only liveness — that the simulator does not crash. The
-// final values of outputs / pending NBAs / PCAs are unspecified per §9.6.2.
 
 TEST(DisableStatementExecution, DisableTaskWithOutputArgumentDoesNotCrash) {
   SimFixture f;
@@ -374,4 +342,4 @@ TEST(DisableStatementExecution, DisableTaskWithProceduralAssignDoesNotCrash) {
   LowerAndRun(design, f);
 }
 
-}  // namespace
+}

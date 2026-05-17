@@ -44,5 +44,5 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexOutOfRangeReturnsNullptr) {
   EXPECT_EQ(result, nullptr);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

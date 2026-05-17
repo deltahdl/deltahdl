@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// A.7.5.3 timing_check_event_control: `negedge` on the reference event
-// elaborates to a valid specify_item.
 TEST(TimingCheckEventDefElaboration, TimingCheckEventNegedgeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,7 +17,6 @@ TEST(TimingCheckEventDefElaboration, TimingCheckEventNegedgeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A.7.5.3 timing_check_event_control: `posedge` on the data event.
 TEST(TimingCheckEventDefElaboration, TimingCheckEventPosedgeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -33,7 +30,6 @@ TEST(TimingCheckEventDefElaboration, TimingCheckEventPosedgeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A.7.5.3 specify_terminal_descriptor: part-select on the event signal.
 TEST(TimingCheckEventDefElaboration, TerminalPartSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -47,7 +43,6 @@ TEST(TimingCheckEventDefElaboration, TerminalPartSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A.7.5.3 specify_terminal_descriptor: bit-select on the event signal.
 TEST(TimingCheckEventDefElaboration, TerminalBitSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -61,4 +56,4 @@ TEST(TimingCheckEventDefElaboration, TerminalBitSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

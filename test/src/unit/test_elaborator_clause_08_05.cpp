@@ -124,4 +124,4 @@ TEST(ObjectPropertyElaboration, TypeParamAccessViaHandleIsIllegal) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

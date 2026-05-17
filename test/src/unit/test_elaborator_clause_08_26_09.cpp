@@ -232,4 +232,4 @@ TEST(InterfaceClassPrePostRandomize, PrePostRandomizeNoConflictMultipleInterface
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -25,14 +25,12 @@ TEST(IpcSync, MailboxNewBounded) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-// §15.4.1: Negative bound is illegal; clamp to 0 (unbounded).
 TEST(IpcSync, MailboxNewNegativeBoundClampsToZero) {
   MailboxObject mb(-3);
   EXPECT_EQ(mb.bound, 0);
   EXPECT_FALSE(mb.IsFull());
 }
 
-// §15.4.1: Bound of 1 creates a single-slot mailbox.
 TEST(IpcSync, MailboxNewBoundOne) {
   MailboxObject mb(1);
   EXPECT_EQ(mb.bound, 1);
@@ -41,7 +39,6 @@ TEST(IpcSync, MailboxNewBoundOne) {
   EXPECT_EQ(mb.TryPut(99), 0);
 }
 
-// §15.4.1: CreateMailbox in context with bound 0 is unbounded.
 TEST(IpcSync, MailboxNewContextUnbounded) {
   SyncFixture f;
   auto* mb = f.ctx.CreateMailbox("mb_ub", 0);
@@ -50,4 +47,4 @@ TEST(IpcSync, MailboxNewContextUnbounded) {
   EXPECT_FALSE(mb->IsFull());
 }
 
-}  // namespace
+}

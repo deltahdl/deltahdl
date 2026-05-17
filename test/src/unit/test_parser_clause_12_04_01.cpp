@@ -129,7 +129,7 @@ TEST(ConditionalSyntaxParsing, DeepIfElseIfChain) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  // Walk the chain: 4 levels of if
+
   auto* s1 = stmt->else_branch;
   ASSERT_NE(s1, nullptr);
   EXPECT_EQ(s1->kind, StmtKind::kIf);
@@ -172,4 +172,4 @@ TEST(IfElseIfParsing, IfElseIfWithBlockBodies) {
   EXPECT_EQ(stmt->else_branch->else_branch->kind, StmtKind::kBlock);
 }
 
-}  // namespace
+}

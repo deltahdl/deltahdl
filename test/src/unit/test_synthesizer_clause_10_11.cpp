@@ -33,4 +33,4 @@ TEST(NetAliasSynth, AliasThreeNets) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

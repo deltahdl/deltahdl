@@ -45,9 +45,6 @@ TEST(ScopeAndLifetimeSimulation, ExplicitAutoInStaticFuncBlockFresh) {
   EXPECT_EQ(val, 11u);
 }
 
-// §6.21: A declared for-loop variable is automatic by default and lives in a
-// scope local to the loop. Assigning to a same-named variable inside the loop
-// shall not perturb a homonymous variable in the enclosing scope.
 TEST(ScopeAndLifetimeSimulation, ForLoopVarHasLocalScope) {
   auto val = RunAndGet(
       "module t;\n"
@@ -62,8 +59,6 @@ TEST(ScopeAndLifetimeSimulation, ForLoopVarHasLocalScope) {
   EXPECT_EQ(val, 100u);
 }
 
-// §6.21: Locals of a static function retain their value between calls
-// because static lifetime spans the whole simulation.
 TEST(ScopeAndLifetimeSimulation, StaticFunctionVarsPersist) {
   auto val = RunAndGet(
       "module t;\n"
@@ -83,8 +78,6 @@ TEST(ScopeAndLifetimeSimulation, StaticFunctionVarsPersist) {
   EXPECT_EQ(val, 3u);
 }
 
-// §6.21: Locals of an automatic function are reinitialised on every
-// call, so no value carries over across invocations.
 TEST(ScopeAndLifetimeSimulation, AutomaticFunctionVarsFresh) {
   auto val = RunAndGet(
       "module t;\n"
@@ -104,8 +97,6 @@ TEST(ScopeAndLifetimeSimulation, AutomaticFunctionVarsFresh) {
   EXPECT_EQ(val, 1u);
 }
 
-// §6.21: When no lifetime keyword is given on a function, the default
-// lifetime is static; this is observable as cross-call accumulation.
 TEST(ScopeAndLifetimeSimulation, DefaultFunctionIsStatic) {
   auto val = RunAndGet(
       "module t;\n"
@@ -124,9 +115,6 @@ TEST(ScopeAndLifetimeSimulation, DefaultFunctionIsStatic) {
   EXPECT_EQ(val, 2u);
 }
 
-// §6.21: A function inside a module declared automatic inherits that
-// default lifetime, so its locals reinitialise per call even without
-// an explicit automatic keyword on the function itself.
 TEST(ScopeAndLifetimeSimulation, DefaultLifetimeInAutoModuleIsAutomatic) {
   auto val = RunAndGet(
       "module automatic t;\n"
@@ -146,4 +134,4 @@ TEST(ScopeAndLifetimeSimulation, DefaultLifetimeInAutoModuleIsAutomatic) {
   EXPECT_EQ(val, 1u);
 }
 
-}  // namespace
+}

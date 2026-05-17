@@ -651,7 +651,7 @@ TEST(NonblockingAssignSim, DynamicArrayElementNbaIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}
 TEST(NonblockingAssignment, VarLvalueNonblocking) {
   SimFixture f;
   auto* design = ElaborateSrc(

@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §A.9.1: attribute_instance delimiters (* and *)
-
 TEST(AttributeTokenLexing, AttrStartToken) {
   auto tokens = Lex("(* foo *)");
   ASSERT_GE(tokens.size(), 3u);
@@ -23,7 +21,7 @@ TEST(AttributeTokenLexing, AttrEndToken) {
 }
 
 TEST(AttributeTokenLexing, AttrStartNotParenStar) {
-  // (* should be kAttrStart, not kLParen + kStar
+
   auto tokens = Lex("(* x *)");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
@@ -52,7 +50,7 @@ TEST(AttributeTokenLexing, AttrWithValue) {
 }
 
 TEST(AttributeTokenLexing, AttrStartNoSpaceBetweenParenStar) {
-  // (* with no space is one token
+
   auto tokens = Lex("(*foo*)");
   ASSERT_GE(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
@@ -60,15 +58,13 @@ TEST(AttributeTokenLexing, AttrStartNoSpaceBetweenParenStar) {
 }
 
 TEST(AttributeTokenLexing, ParenStarParenNotAttribute) {
-  // (*) is not an attribute — the * followed by ) means kAttrStart should
-  // not be emitted if it would immediately see *)
+
   auto tokens = Lex("(a * b)");
   EXPECT_NE(tokens[0].kind, TokenKind::kAttrStart);
 }
 
 TEST(AttributeTokenLexing, AttrWithStringValue) {
-  // §A.9.1: attr_spec ::= attr_name [ = constant_expression ] — value may
-  // be a string-literal constant_expression.
+
   auto tokens = Lex("(* mode = \"cla\" *)");
   ASSERT_GE(tokens.size(), 5u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
@@ -77,8 +73,7 @@ TEST(AttributeTokenLexing, AttrWithStringValue) {
 }
 
 TEST(AttributeTokenLexing, AttrWithExprValueTokens) {
-  // §A.9.1: attr_spec ::= attr_name [ = constant_expression ] — value may
-  // be a multi-token arithmetic constant_expression.
+
   auto tokens = Lex("(* depth = 3 + 1 *)");
   ASSERT_GE(tokens.size(), 7u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
@@ -88,4 +83,4 @@ TEST(AttributeTokenLexing, AttrWithExprValueTokens) {
   EXPECT_EQ(tokens[6].kind, TokenKind::kAttrEnd);
 }
 
-}  // namespace
+}

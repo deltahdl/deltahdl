@@ -47,7 +47,7 @@ TEST(MinTypMaxEval, SelectsMax) {
 }
 TEST(MinTypMaxEval, SubExpressionsAddedPerMode) {
   SimFixture f;
-  // LRM Example 1: (a:b:c) + (d:e:f) => min=a+d, typ=b+e, max=c+f
+
   auto* lhs_mtm = f.arena.Create<Expr>();
   lhs_mtm->kind = ExprKind::kMinTypMax;
   lhs_mtm->lhs = MakeInt(f.arena, 1);
@@ -97,4 +97,4 @@ TEST(MinTypMaxEval, AllThreeValuesSame) {
   EXPECT_EQ(EvalExpr(mtm, f.ctx, f.arena).ToUint64(), 7u);
 }
 
-}  // namespace
+}

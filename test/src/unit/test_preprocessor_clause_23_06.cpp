@@ -5,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §23.6: "The period character shall be used to separate each of the names in
-// the hierarchy."  Preprocessor must preserve a hierarchical_identifier's
-// dot-separated text so downstream lexing still sees the path.
 TEST(HierarchicalNamePreprocessing, DotSeparatedPathSurvivesPreprocessing) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -19,10 +16,6 @@ TEST(HierarchicalNamePreprocessing, DotSeparatedPathSurvivesPreprocessing) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §23.6: escaped identifiers in a hierarchical name reference "are followed
-// by separators composed of white space and a period-character."  The
-// preprocessor must keep the required whitespace between an escaped
-// identifier and the trailing dot.
 TEST(HierarchicalNamePreprocessing, EscapedIdentifierWhitespaceDotPreserved) {
   PreprocFixture f;
   auto out = Preprocess("\\esc .b", f);
@@ -31,8 +24,6 @@ TEST(HierarchicalNamePreprocessing, EscapedIdentifierWhitespaceDotPreserved) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §23.6: A hierarchical name reference text remains intact through
-// `define-driven macro expansion so subsequent parsing can resolve it.
 TEST(HierarchicalNamePreprocessing, HierarchicalRefViaMacroExpansion) {
   auto r = ParseWithPreprocessor(
       "`define PATH top.sub.sig\n"
@@ -43,7 +34,6 @@ TEST(HierarchicalNamePreprocessing, HierarchicalRefViaMacroExpansion) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §23.6: `$root` prefix on a hierarchical_identifier survives preprocessing.
 TEST(HierarchicalNamePreprocessing, RootPrefixSurvivesPreprocessing) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -55,4 +45,4 @@ TEST(HierarchicalNamePreprocessing, RootPrefixSurvivesPreprocessing) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

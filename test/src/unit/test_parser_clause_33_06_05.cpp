@@ -4,16 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §33.6.5 demonstrates hierarchical config delegation through the form
-// `instance <path> use <lib>.<cfg>:config;`.  These parser tests pin
-// the AST shape downstream elaboration depends on: the instance rule
-// must round-trip with `use_config` set so the elaborator can tell a
-// liblist override from a config delegation, and `use_lib`/`use_cell`
-// must hold the named inner configuration.
-
-// Single instance rule with the `:config` suffix.  Tracks that the
-// suffix flips `use_config` and that the cell name parses as the
-// inner config's identifier (not as a module).
 TEST(HierarchicalConfigParsing, InstanceRuleUseConfigSetsFlag) {
   auto r = Parse(R"(
     config cfg1;
@@ -32,10 +22,6 @@ TEST(HierarchicalConfigParsing, InstanceRuleUseConfigSetsFlag) {
   EXPECT_TRUE(inst_rule->use_config);
 }
 
-// Two configs in one compilation unit, mirroring §33.6.5's cfg5/cfg6
-// pair: an outer config delegates a subhierarchy to an inner config
-// declared in the same unit.  Verifies both configs land in the AST
-// and the outer instance rule preserves the delegation linkage.
 TEST(HierarchicalConfigParsing, OuterAndInnerConfigsBothParse) {
   auto r = Parse(R"(
     config bot;
@@ -61,9 +47,6 @@ TEST(HierarchicalConfigParsing, OuterAndInnerConfigsBothParse) {
   EXPECT_TRUE(rule->use_config);
 }
 
-// Bare `:config` instance rule with no `use_params` — the
-// hierarchical-config form §33.6.5 leans on must parse without
-// mistakenly populating the parameter override list.
 TEST(HierarchicalConfigParsing, UseConfigSuffixWithoutParams) {
   auto r = Parse(
       "config cfg;\n"
@@ -79,4 +62,4 @@ TEST(HierarchicalConfigParsing, UseConfigSuffixWithoutParams) {
   EXPECT_EQ(rule->use_params.size(), 0u);
 }
 
-}  // namespace
+}

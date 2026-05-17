@@ -107,9 +107,6 @@ TEST(StructuredProcedureElaboration, NoProcessesInEmptyModule) {
   EXPECT_TRUE(design->top_modules[0]->processes.empty());
 }
 
-// §9.2 footnote 25: dynamic_override_specifiers shall only be legal on method
-// declarations inside a non-interface class scope. A module-level function
-// declaration cannot carry :initial.
 TEST(StructuredProcedureElaboration,
      DynamicOverrideRejectedOnModuleLevelFunction) {
   ElabFixture f;
@@ -121,7 +118,6 @@ TEST(StructuredProcedureElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2 footnote 25: a module-level task declaration cannot carry :final.
 TEST(StructuredProcedureElaboration,
      DynamicOverrideRejectedOnModuleLevelTask) {
   ElabFixture f;
@@ -133,7 +129,6 @@ TEST(StructuredProcedureElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2 footnote 25: the same rule rejects :extends on a module-level task.
 TEST(StructuredProcedureElaboration,
      DynamicOverrideExtendsRejectedOnModuleLevelTask) {
   ElabFixture f;
@@ -145,4 +140,4 @@ TEST(StructuredProcedureElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

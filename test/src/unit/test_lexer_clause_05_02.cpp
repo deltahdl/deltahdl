@@ -208,4 +208,4 @@ TEST(LexicalConventionLexing, EmptyInputProducesEofOnly) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-}  // namespace
+}

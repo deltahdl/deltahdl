@@ -76,4 +76,4 @@ TEST(DynamicArraySizeSimulation, SizeAfterDeleteIsZero) {
   EXPECT_EQ(v, 0u);
 }
 
-}  // namespace
+}

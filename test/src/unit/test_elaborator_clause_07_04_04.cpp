@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §7.4.4: Multiple packed dims produce correct total width.
 TEST(MultidimensionalArrayValidation, MultiPackedDimWidth) {
   ElabFixture f;
   auto* design =
@@ -18,7 +17,6 @@ TEST(MultidimensionalArrayValidation, MultiPackedDimWidth) {
   EXPECT_EQ(mod->variables[0].width, 32u);
 }
 
-// §7.4.4: Two-dim unpacked array elaborates without error.
 TEST(MultidimensionalArrayValidation, TwoDimUnpackedElaborates) {
   ElabFixture f;
   auto* design = Elaborate("module m; int matrix[4][8]; endmodule\n", f);
@@ -28,7 +26,6 @@ TEST(MultidimensionalArrayValidation, TwoDimUnpackedElaborates) {
   ASSERT_GE(mod->variables.size(), 1u);
 }
 
-// §7.4.4: Comma-separated declarations share packed dims.
 TEST(MultidimensionalArrayValidation, CommaSeparatedSharePackedDims) {
   ElabFixture f;
   auto* design =
@@ -40,4 +37,4 @@ TEST(MultidimensionalArrayValidation, CommaSeparatedSharePackedDims) {
   EXPECT_EQ(mod->variables[0].width, mod->variables[1].width);
 }
 
-}  // namespace
+}

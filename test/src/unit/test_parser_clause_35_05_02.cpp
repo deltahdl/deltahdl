@@ -55,4 +55,4 @@ TEST(TaskAndFunctionParsing, DpiImportPureFunction) {
   EXPECT_FALSE(dpi->dpi_is_context);
 }
 
-}  // namespace
+}

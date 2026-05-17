@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
@@ -707,10 +707,7 @@ TEST(IntegerLiteralSim, LeftPadZWhenLeftmostIsZ) {
       "  initial x = 8'hz5;\n"
       "endmodule\n",
       "x");
-  // z digits pad with z from left — low nibble should be 5 (known)
-  // but top nibble is z so aval top bits = 0, bval top bits = F
-  // RunAndGet only returns aval, so value should reflect just known bits
-  // x is 8'hz5 => top 4 bits z, bottom 4 bits 0101 => aval=0x05
+
   EXPECT_EQ(result & 0x0Fu, 0x05u);
 }
 
@@ -822,4 +819,4 @@ TEST(IntegerLiteralSim, SizedHexLiteralValue) {
   EXPECT_EQ(result, 0x837FFu);
 }
 
-}  // namespace
+}

@@ -298,4 +298,4 @@ TEST(VirtualMethodElaboration, OverrideDefaultValueDifferentOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

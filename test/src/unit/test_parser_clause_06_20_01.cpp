@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Walk a generate construct's bodies recursively and return the first nested
-// parameter declaration, if any.
 const ModuleItem* FindParamInGenerate(const ModuleItem* item) {
   if (!item) return nullptr;
   for (const auto* child : item->gen_body) {
@@ -129,8 +127,6 @@ TEST(ParameterDeclarations, ParameterAndLocalparam) {
   EXPECT_EQ(param_count, 2);
 }
 
-// §6.20.1: param_assignments inside a class body shall become localparam
-// declarations regardless of the presence or absence of a parameter_port_list.
 TEST(ParameterDeclarations, ClassBodyParameterPromotedToLocalparam) {
   auto r = Parse(
       "class c;\n"
@@ -149,8 +145,6 @@ TEST(ParameterDeclarations, ClassBodyParameterPromotedToLocalparam) {
   ASSERT_NE(prop, nullptr);
 }
 
-// §6.20.1: param_assignments inside a package shall become localparam
-// declarations.
 TEST(ParameterDeclarations, PackageBodyParameterPromotedToLocalparam) {
   auto r = Parse(
       "package p;\n"
@@ -170,8 +164,6 @@ TEST(ParameterDeclarations, PackageBodyParameterPromotedToLocalparam) {
   EXPECT_TRUE(item->is_localparam);
 }
 
-// §6.20.1: param_assignments in compilation-unit scope shall become localparam
-// declarations.
 TEST(ParameterDeclarations, CompilationUnitParameterPromotedToLocalparam) {
   auto r = Parse("parameter int X = 42;\nmodule m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -182,22 +174,16 @@ TEST(ParameterDeclarations, CompilationUnitParameterPromotedToLocalparam) {
   EXPECT_TRUE(r.cu->cu_items[0]->is_localparam);
 }
 
-// §6.20.1 footnote 22: it is not legal to omit the default value from a
-// localparam declaration in a parameter_port_list.
 TEST(ParameterPortListParsing, LocalparamPortRequiresDefaultValue) {
   auto r = Parse("module m #(localparam int X); endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
 
-// §6.20.1 footnote 22: it is not legal to omit the default type from a
-// localparam type_assignment in a parameter_port_list.
 TEST(ParameterPortListParsing, LocalparamTypePortRequiresDefaultType) {
   auto r = Parse("module m #(localparam type T); endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
 
-// §6.20.1: param_assignments inside a generate block shall become localparam
-// declarations.
 TEST(ParameterDeclarations, ParameterPromotedToLocalparamInGenerateIf) {
   auto r = Parse(
       "module m;\n"
@@ -279,8 +265,6 @@ TEST(ParameterDeclarations, ParameterPromotedInSingleItemGenerateBody) {
   EXPECT_TRUE(p->is_localparam);
 }
 
-// §6.20.1: rule 5 covers generate block, package, and CU scope only — a
-// module-scope parameter outside any generate block is not promoted.
 TEST(ParameterDeclarations, ParameterAtModuleScopeNotPromoted) {
   auto r = Parse(
       "module m;\n"
@@ -293,10 +277,6 @@ TEST(ParameterDeclarations, ParameterAtModuleScopeNotPromoted) {
   EXPECT_FALSE(item->is_localparam);
 }
 
-// §6.20.1: list_of_param_assignments may appear in an interface declaration.
-// An interface body parameter without an enclosing parameter_port_list keeps
-// its `parameter` semantics (the elaborator-stage promotion driven by the
-// presence of a port list is exercised in test_elaborator_clause_06_20_01).
 TEST(ParameterDeclarations, InterfaceBodyParameterParses) {
   auto r = Parse(
       "interface i;\n"
@@ -316,7 +296,6 @@ TEST(ParameterDeclarations, InterfaceBodyParameterParses) {
   EXPECT_FALSE(item->is_localparam);
 }
 
-// §6.20.1: list_of_param_assignments may appear in a program declaration.
 TEST(ParameterDeclarations, ProgramBodyParameterParses) {
   auto r = Parse(
       "program p;\n"
@@ -336,8 +315,6 @@ TEST(ParameterDeclarations, ProgramBodyParameterParses) {
   EXPECT_FALSE(item->is_localparam);
 }
 
-// §6.20.1 rule 8: a type_assignment in a parameter_port_list may omit its
-// default data_type.
 TEST(ParameterPortListParsing, TypeAssignmentNoDefaultParses) {
   auto r = Parse("module m #(parameter type T)(); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -346,8 +323,6 @@ TEST(ParameterPortListParsing, TypeAssignmentNoDefaultParses) {
   EXPECT_EQ(r.cu->modules[0]->params[0].first, "T");
 }
 
-// §6.20.1 footnote 22: outside a parameter_port_list, a type_assignment may
-// not omit its default data_type.
 TEST(DeclarationAssignmentParsing, BodyTypeAssignmentRequiresDefault) {
   auto r = Parse(
       "module m;\n"
@@ -356,4 +331,4 @@ TEST(DeclarationAssignmentParsing, BodyTypeAssignmentRequiresDefault) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

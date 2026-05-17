@@ -57,4 +57,4 @@ TEST(AnonymousProgramNameSpaceSharing, CompilationUnitItemsIncludeAnonymousMembe
   EXPECT_EQ(CountItemsByKind(r.cu->cu_items, ModuleItemKind::kFunctionDecl), 1u);
 }
 
-}  // namespace
+}

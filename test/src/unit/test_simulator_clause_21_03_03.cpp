@@ -16,4 +16,4 @@ TEST(UtilitySystemTaskTest, SformatfBasic) {
   EXPECT_EQ(result.width, 48u);
 }
 
-}  // namespace
+}

@@ -9,10 +9,6 @@ using namespace delta;
 
 namespace {
 
-// R5 control: the same conflicting Strong/Weak driver pair on a net whose
-// is_user_nettype flag is false must still honor strength and return the
-// Strong driver's value. Pins down that the R5 bypass is conditioned on the
-// flag, not an accidental side effect of the resolve path.
 TEST(UserNettypeStrength, NonUserNettypeStillHonorsStrength) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -32,9 +28,6 @@ TEST(UserNettypeStrength, NonUserNettypeStillHonorsStrength) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// A single-driver user-nettype net should surface that driver's value whether
-// or not an incidental strength entry is present — strength simply plays no
-// role in the resolution of a user-defined nettype.
 TEST(UserNettypeStrength, UserNettypeSingleDriverUsesValueOnly) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -48,16 +41,9 @@ TEST(UserNettypeStrength, UserNettypeSingleDriverUsesValueOnly) {
   net.driver_strengths.push_back({Strength::kHighz, Strength::kHighz});
   net.Resolve(arena);
 
-  // Even with highz strength — which the strength-aware path would discard —
-  // the user-nettype net must still surface the raw value 1.
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// R5 per bit on a multi-bit net: agreeing bits must carry the common value,
-// disagreeing bits must become x. If R5 leaked into the per-bit path, the
-// strength-aware resolver would have returned the Strong driver's value
-// (0b1100) uniformly — the value-only wire fallback yields bit-level x only
-// on the two bits where the drivers disagree.
 TEST(UserNettypeStrength, UserNettypeIgnoresStrengthPerBit) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -74,17 +60,10 @@ TEST(UserNettypeStrength, UserNettypeIgnoresStrengthPerBit) {
   net.driver_strengths.push_back({Strength::kWeak, Strength::kWeak});
   net.Resolve(arena);
 
-  // Bit 3: both 1 → 1. Bit 0: both 0 → 0. Bits 1-2: disagree → x.
   EXPECT_EQ(var->value.words[0].aval & 0xFu, 0b1000u);
   EXPECT_EQ(var->value.words[0].bval & 0xFu, 0b0110u);
 }
 
-// R3 direct — a user-nettype net's resolved_strength field must be left at
-// its default (all-highz, both sides equal) after Resolve, even when driver
-// strengths would otherwise populate it with a concrete level. The parent-
-// clause "shall not have strength levels" rule lives in the skipped
-// ComputeSingleBitStrength call; observing the default state confirms the
-// UDNT guard suppresses population, not merely overwrites with highz.
 TEST(UserNettypeStrength, UserNettypeResolveLeavesResolvedStrengthAtDefault) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -105,10 +84,6 @@ TEST(UserNettypeStrength, UserNettypeResolveLeavesResolvedStrengthAtDefault) {
   EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
 }
 
-// R5 across more than two drivers: the pairwise wire-word fold must still
-// ignore every driver's strength. A strength-aware resolver would have picked
-// the Supply-0 driver as dominant and returned 0; the value-only fold over
-// conflicting drivers instead propagates x.
 TEST(UserNettypeStrength, UserNettypeIgnoresStrengthWithThreeDrivers) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -132,10 +107,6 @@ TEST(UserNettypeStrength, UserNettypeIgnoresStrengthWithThreeDrivers) {
   EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
 }
 
-// R1 disjunction — unambiguous branch. After resolving drivers that all carry
-// single strength levels, the net's resolved strength must report a single
-// level (hi == lo on the value's side, other side unused) and must not read as
-// ambiguous.
 TEST(NetStrengthDisjunction, UnambiguousDriversYieldUnambiguousNetStrength) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -153,11 +124,6 @@ TEST(NetStrengthDisjunction, UnambiguousDriversYieldUnambiguousNetStrength) {
   EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kStrong);
 }
 
-// R1 mirror — unambiguous branch for a value-0 dominant driver. The
-// production helper has separate code paths for max_val==0 and max_val==1,
-// and the paired UnambiguousDriversYieldUnambiguousNetStrength test only
-// exercises the value-1 side; without this test the s0 branch of
-// ComputeSingleBitStrength would go unobserved by any test.
 TEST(NetStrengthDisjunction, ValueZeroDominantDriverRecordsStrengthOnSide0) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -180,10 +146,6 @@ TEST(NetStrengthDisjunction, ValueZeroDominantDriverRecordsStrengthOnSide0) {
   EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
 }
 
-// R1 disjunction — ambiguous branch must be representable. The net-strength
-// type has to distinguish a range of levels from a single level; without this,
-// §28.12.2+ has no surface on which to record the "strength levels of both
-// signals and all the smaller strength levels" outcomes.
 TEST(NetStrengthDisjunction, AmbiguousNetStrengthIsRepresentable) {
   NetStrength ns;
   ns.s1_hi = Strength::kStrong;
@@ -196,10 +158,6 @@ TEST(NetStrengthDisjunction, AmbiguousNetStrengthIsRepresentable) {
   EXPECT_FALSE(single.IsAmbiguous());
 }
 
-// R1 exclusivity — a net cannot be in both states at once. The default state
-// (all highz, both sides equal) is unambiguous; flipping one side's hi-above-lo
-// moves it to the ambiguous state; equalising again returns it to unambiguous.
-// Demonstrates the either/or contract the disjunction promises.
 TEST(NetStrengthDisjunction, NetStrengthMutationTogglesIsAmbiguous) {
   NetStrength ns;
   EXPECT_FALSE(ns.IsAmbiguous());
@@ -212,4 +170,4 @@ TEST(NetStrengthDisjunction, NetStrengthMutationTogglesIsAmbiguous) {
   EXPECT_FALSE(ns.IsAmbiguous());
 }
 
-}  // namespace
+}

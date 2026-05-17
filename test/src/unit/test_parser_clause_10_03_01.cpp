@@ -55,4 +55,4 @@ TEST(DeclarationAssignmentParsing, TriNetDeclAssignment) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-}  // namespace
+}

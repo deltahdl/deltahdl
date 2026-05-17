@@ -27,4 +27,4 @@ TEST(EnumMethods, LastWithGaps) {
   EXPECT_EQ(result.ToUint64(), 100u);
 }
 
-}  // namespace
+}

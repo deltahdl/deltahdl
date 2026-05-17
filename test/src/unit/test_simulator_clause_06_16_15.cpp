@@ -56,4 +56,4 @@ TEST(StringMethods, RealtoaIntegerValuedReal) {
   EXPECT_NE(VecToString(var->value).find("42"), std::string::npos);
 }
 
-}  // namespace
+}

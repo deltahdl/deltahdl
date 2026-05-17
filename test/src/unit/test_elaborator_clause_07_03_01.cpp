@@ -84,7 +84,6 @@ TEST(PackedUnionValidation, PackedUnionChandleMember_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.3.1: soft without packed keyword — treated as packed for validation.
 TEST(PackedUnionValidation, SoftWithoutPackedKeyword_ValidatedAsPacked) {
   ElabFixture f;
   ElaborateSrc(
@@ -95,7 +94,6 @@ TEST(PackedUnionValidation, SoftWithoutPackedKeyword_ValidatedAsPacked) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.3.1: soft union still requires integral member types.
 TEST(PackedUnionValidation, SoftUnionRealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -106,7 +104,6 @@ TEST(PackedUnionValidation, SoftUnionRealMember_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.3.1: nested packed struct inside packed union is integral — allowed.
 TEST(PackedUnionValidation, NestedPackedStructInPackedUnion_Allowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -120,7 +117,6 @@ TEST(PackedUnionValidation, NestedPackedStructInPackedUnion_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.3.1: enum member in packed union — integral type, allowed.
 TEST(PackedUnionValidation, EnumMemberInPackedUnion_Allowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -132,7 +128,6 @@ TEST(PackedUnionValidation, EnumMemberInPackedUnion_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.3.1: hard packed union with three members, all same width — OK.
 TEST(PackedUnionValidation, HardPackedThreeMembers_SameWidth_OK) {
   ElabFixture f;
   ElaborateSrc(
@@ -143,7 +138,6 @@ TEST(PackedUnionValidation, HardPackedThreeMembers_SameWidth_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.3.1: hard packed union — third member differs in width.
 TEST(PackedUnionValidation, HardPackedThreeMembers_ThirdDiffers_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -154,4 +148,4 @@ TEST(PackedUnionValidation, HardPackedThreeMembers_ThirdDiffers_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

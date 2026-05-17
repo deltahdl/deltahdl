@@ -217,4 +217,4 @@ TEST(ContAssignStatementElaboration, VarOutputPortWithInitializerErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

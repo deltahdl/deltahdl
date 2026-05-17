@@ -22,4 +22,4 @@ TEST(NettypeElaboration, NettypeDeclRegistersType) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

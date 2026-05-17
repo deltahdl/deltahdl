@@ -1,4 +1,4 @@
-// §28.10
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -49,7 +49,6 @@ TEST(PullSources, PulldownGateKindAndSingleTerminal) {
   EXPECT_EQ(item->gate_terminals.size(), 1);
 }
 
-// §28.10 explicitly forbids delay specifications on pullup/pulldown.
 TEST(PullSources, PullupRejectsDelay) {
   auto r = Parse(
       "module m;\n"
@@ -66,4 +65,4 @@ TEST(PullSources, PulldownRejectsDelay) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

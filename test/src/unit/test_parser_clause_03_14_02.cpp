@@ -22,4 +22,4 @@ TEST(DesignBuildingBlockParsing, BothMechanismsMagnitudes) {
       ParseTimescale31402("module m; timeunit 100ns; endmodule\n").has_errors);
 }
 
-}  // namespace
+}

@@ -86,4 +86,4 @@ TEST(DefaultArgumentElaboration, DefaultOnNonAnsiDeclError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

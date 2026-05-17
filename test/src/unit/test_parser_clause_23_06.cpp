@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- R7/R14: Hierarchical name read in expression ---
-
 TEST(HierarchicalNameParsing, HierarchicalReferenceSyntax) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -15,8 +13,6 @@ TEST(HierarchicalNameParsing, HierarchicalReferenceSyntax) {
               "  end\n"
               "endmodule\n"));
 }
-
-// --- R14: Hierarchical name written in procedural assignment ---
 
 TEST(HierarchicalNameParsing, HierarchicalNameAsProceduralLhs) {
   EXPECT_TRUE(
@@ -27,8 +23,6 @@ TEST(HierarchicalNameParsing, HierarchicalNameAsProceduralLhs) {
               "endmodule\n"));
 }
 
-// --- R14: Hierarchical name triggered off in event expression ---
-
 TEST(HierarchicalNameParsing, HierarchicalNameInEventControl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -38,8 +32,6 @@ TEST(HierarchicalNameParsing, HierarchicalNameInEventControl) {
               "endmodule\n"));
 }
 
-// --- R14: Hierarchical name used to reference subroutine ---
-
 TEST(HierarchicalNameParsing, HierarchicalNameAsSubroutineCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -48,8 +40,6 @@ TEST(HierarchicalNameParsing, HierarchicalNameAsSubroutineCall) {
               "  end\n"
               "endmodule\n"));
 }
-
-// --- R3: Named begin-end block is referenceable through hierarchical path ---
 
 TEST(HierarchicalNameParsing, HierarchicalPathThroughNamedBlock) {
   EXPECT_TRUE(
@@ -64,8 +54,6 @@ TEST(HierarchicalNameParsing, HierarchicalPathThroughNamedBlock) {
               "endmodule\n"));
 }
 
-// --- R3: Named fork-join block is referenceable through hierarchical path ---
-
 TEST(HierarchicalNameParsing, HierarchicalPathThroughNamedForkBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -78,8 +66,6 @@ TEST(HierarchicalNameParsing, HierarchicalPathThroughNamedForkBlock) {
               "endmodule\n"));
 }
 
-// --- R14: Hierarchical name on LHS of continuous assignment ---
-
 TEST(HierarchicalNameParsing, HierarchicalNameInContinuousAssignLhs) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -87,8 +73,6 @@ TEST(HierarchicalNameParsing, HierarchicalNameInContinuousAssignLhs) {
               "  assign top.sub.net1 = val;\n"
               "endmodule\n"));
 }
-
-// --- R14: Hierarchical name on LHS of nonblocking assignment ---
 
 TEST(HierarchicalNameParsing, HierarchicalNameInNonblockingAssignLhs) {
   EXPECT_TRUE(
@@ -99,10 +83,6 @@ TEST(HierarchicalNameParsing, HierarchicalNameInNonblockingAssignLhs) {
               "endmodule\n"));
 }
 
-// §23.6 Syntax 23-7: hierarchical_identifier ::= [ $root . ] { identifier
-// constant_bit_select . } identifier.  The optional `$root .` prefix marks
-// the absolute root of the design; the parser must accept it on a
-// hierarchical reference.
 TEST(HierarchicalNameParsing, RootPrefixedHierarchicalReference) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -112,10 +92,6 @@ TEST(HierarchicalNameParsing, RootPrefixedHierarchicalReference) {
               "endmodule\n"));
 }
 
-// §23.6 Syntax 23-7: each non-final identifier in a hierarchical name may
-// be followed by a constant_bit_select (the §23.6 "instance select"
-// expression for array elements).  The parser must accept a hierarchical
-// reference whose interior component carries a bit-select.
 TEST(HierarchicalNameParsing, HierarchicalReferenceWithInstanceSelect) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -125,4 +101,4 @@ TEST(HierarchicalNameParsing, HierarchicalReferenceWithInstanceSelect) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

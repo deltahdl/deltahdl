@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.28(a): Structs are strictly static objects — usable without new.
 TEST(ClassesAndStructures, StructUsableWithoutNew) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -17,7 +16,6 @@ TEST(ClassesAndStructures, StructUsableWithoutNew) {
              "endmodule\n"));
 }
 
-// §8.28(a): Class declaration does not create the object — new is required.
 TEST(ClassesAndStructures, ClassDeclarationDoesNotCreateObject) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -32,7 +30,6 @@ TEST(ClassesAndStructures, ClassDeclarationDoesNotCreateObject) {
              "endmodule\n"));
 }
 
-// §8.28(b): Casting a class handle onto int is disallowed.
 TEST(ClassesAndStructures, CastClassHandleToIntError) {
   ElabFixture f;
   ElaborateSrc(
@@ -49,7 +46,6 @@ TEST(ClassesAndStructures, CastClassHandleToIntError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §8.28(b): Casting a class handle onto a logic vector is disallowed.
 TEST(ClassesAndStructures, CastClassHandleToLogicError) {
   ElabFixture f;
   ElaborateSrc(
@@ -66,7 +62,6 @@ TEST(ClassesAndStructures, CastClassHandleToLogicError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §8.28(b): Assigning a class handle to an int variable is disallowed.
 TEST(ClassesAndStructures, ClassHandleAssignToIntError) {
   ElabFixture f;
   ElaborateSrc(
@@ -83,7 +78,6 @@ TEST(ClassesAndStructures, ClassHandleAssignToIntError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §8.28(b): Assigning an integer literal to a class handle is disallowed.
 TEST(ClassesAndStructures, IntAssignToClassHandleError) {
   ElabFixture f;
   ElaborateSrc(
@@ -98,7 +92,6 @@ TEST(ClassesAndStructures, IntAssignToClassHandleError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §8.28(b): Casting an int onto a class handle is disallowed.
 TEST(ClassesAndStructures, CastIntToClassHandleError) {
   ElabFixture f;
   ElaborateSrc(
@@ -113,4 +106,4 @@ TEST(ClassesAndStructures, CastIntToClassHandleError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -47,4 +47,4 @@ TEST(UserDefinedTypeAssocArrayParsing, StructTypedefIndexParsed) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -133,4 +133,4 @@ TEST(AssertionApiParsing, AssertionControlSequence) {
   )"));
 }
 
-}  // namespace
+}

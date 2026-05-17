@@ -16,4 +16,4 @@ TEST(IoSystemTaskParsing, DumpportsOffOnFlush) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

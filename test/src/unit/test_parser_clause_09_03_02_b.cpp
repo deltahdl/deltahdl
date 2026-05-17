@@ -278,4 +278,4 @@ TEST(ParallelBlockParsing, MultipleBlockItemDeclarationsBeforeStmts) {
   EXPECT_EQ(stmt->fork_stmts[3]->kind, StmtKind::kBlockingAssign);
 }
 
-}  // namespace
+}

@@ -1,4 +1,4 @@
-// §28.8
+
 
 #include "fixture_elaborator.h"
 
@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Bidirectional pass switches must not lower to a continuous assignment —
-// they have no unique driven terminal from which to drive the other.
 TEST(GateElaboration, TranEmitsZeroContinuousAssigns) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -92,7 +90,6 @@ TEST(GateElaboration, Rtranif1EmitsZeroContinuousAssigns) {
   EXPECT_EQ(design->top_modules[0]->assigns.size(), 0u);
 }
 
-// Resistive bidirectional terminal restriction: scalar nets are accepted.
 TEST(BidirectionalSwitchTerminals, RtranAcceptsScalarNets) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -105,8 +102,6 @@ TEST(BidirectionalSwitchTerminals, RtranAcceptsScalarNets) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Resistive bidirectional terminal restriction: bit-selects of vector nets
-// are accepted.
 TEST(BidirectionalSwitchTerminals, RtranAcceptsBitSelectOfVector) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -120,7 +115,6 @@ TEST(BidirectionalSwitchTerminals, RtranAcceptsBitSelectOfVector) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Resistive bidirectional terminal restriction: whole vector net rejected.
 TEST(BidirectionalSwitchTerminals, RtranRejectsWholeVector) {
   ElabFixture f;
   Elaborate(
@@ -133,7 +127,6 @@ TEST(BidirectionalSwitchTerminals, RtranRejectsWholeVector) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// Resistive bidirectional terminal restriction: part-select rejected.
 TEST(BidirectionalSwitchTerminals, RtranRejectsPartSelect) {
   ElabFixture f;
   Elaborate(
@@ -170,10 +163,6 @@ TEST(BidirectionalSwitchTerminals, Rtranif1RejectsPartSelect) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// The resistive variants do not get the user-defined-net-type carve-out that
-// tran/tranif* enjoy, so a rtran whose terminals are UDNT nets must be
-// rejected — even when the UDNT is scalar and would otherwise satisfy the
-// scalar/bit-select rule.
 TEST(BidirectionalSwitchTerminals, RtranRejectsUdnt) {
   ElabFixture f;
   Elaborate(
@@ -212,8 +201,6 @@ TEST(BidirectionalSwitchTerminals, Rtranif1RejectsUdnt) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// Non-resistive bidirectional switches are not subject to the scalar/bit-select
-// rule and may connect whole vector nets.
 TEST(BidirectionalSwitchTerminals, TranAcceptsWholeVector) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -226,7 +213,6 @@ TEST(BidirectionalSwitchTerminals, TranAcceptsWholeVector) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// UDNT mixing rule: same UDNT on both bidirectional terminals is allowed.
 TEST(BidirectionalSwitchUdnt, TranAcceptsSameUdntOnBothSides) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -240,8 +226,6 @@ TEST(BidirectionalSwitchUdnt, TranAcceptsSameUdntOnBothSides) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// UDNT mixing rule: a UDNT terminal cannot be connected to a built-in net
-// terminal.
 TEST(BidirectionalSwitchUdnt, TranRejectsUdntWithBuiltin) {
   ElabFixture f;
   Elaborate(
@@ -255,7 +239,6 @@ TEST(BidirectionalSwitchUdnt, TranRejectsUdntWithBuiltin) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// UDNT mixing rule: terminals connected to two different UDNTs are rejected.
 TEST(BidirectionalSwitchUdnt, TranRejectsDifferentUdnts) {
   ElabFixture f;
   Elaborate(
@@ -270,7 +253,6 @@ TEST(BidirectionalSwitchUdnt, TranRejectsDifferentUdnts) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// UDNT mixing rule applies to enable variants too.
 TEST(BidirectionalSwitchUdnt, Tranif1RejectsUdntWithBuiltin) {
   ElabFixture f;
   Elaborate(
@@ -284,8 +266,6 @@ TEST(BidirectionalSwitchUdnt, Tranif1RejectsUdntWithBuiltin) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// Control input acceptance: nets are 4-state by default and may serve as
-// the control input of a pass-enable switch.
 TEST(BidirectionalSwitchControlType, Tranif1AcceptsWireControl) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -298,7 +278,6 @@ TEST(BidirectionalSwitchControlType, Tranif1AcceptsWireControl) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Control input acceptance: a 4-state variable (logic) is permitted.
 TEST(BidirectionalSwitchControlType, Tranif1AcceptsLogicVariableControl) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -312,7 +291,6 @@ TEST(BidirectionalSwitchControlType, Tranif1AcceptsLogicVariableControl) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Control input acceptance: a 2-state variable (bit) is permitted.
 TEST(BidirectionalSwitchControlType, Tranif0AcceptsBitVariableControl) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -326,8 +304,6 @@ TEST(BidirectionalSwitchControlType, Tranif0AcceptsBitVariableControl) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Control input rejection: a real variable is not one of the three permitted
-// control input types.
 TEST(BidirectionalSwitchControlType, Tranif1RejectsRealControl) {
   ElabFixture f;
   Elaborate(
@@ -376,4 +352,4 @@ TEST(BidirectionalSwitchControlType, Rtranif1RejectsEventControl) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

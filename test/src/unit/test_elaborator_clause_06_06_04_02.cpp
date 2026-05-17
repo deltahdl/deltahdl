@@ -24,4 +24,4 @@ TEST(ChargeDecayElaboration, DecayTimeZeroIsIdeal) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

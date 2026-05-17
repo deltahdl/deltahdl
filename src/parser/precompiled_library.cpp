@@ -17,10 +17,6 @@ namespace delta {
 
 namespace {
 
-// Tool-specific magic identifying our precompiled-library archive.
-// The format is intentionally simple: a fixed 8-byte header followed
-// by zero or more chunks, each storing one Save call's library tag and
-// source bytes with little-endian length prefixes.
 constexpr char kMagic[] = "DPLIB001";
 constexpr std::streamsize kMagicLen = 8;
 
@@ -50,10 +46,6 @@ bool ReadBytes(std::ifstream& is, std::string& out, uint32_t n) {
   return static_cast<bool>(is.read(out.data(), n));
 }
 
-// Run the parser on `source` with a throwaway diagnostics engine; the
-// §33.5.3 mandate "shall be parsed and compiled into the library"
-// means we must reject ill-formed source at Save time rather than let
-// it silently accumulate on disk.
 bool ParsesCleanly(std::string_view source) {
   SourceManager mgr;
   Arena arena;
@@ -65,10 +57,6 @@ bool ParsesCleanly(std::string_view source) {
   return !diag.HasErrors();
 }
 
-// Stamp every cell-kind element of `cu` with `library`, mirroring the
-// §33.3.3 tagging step that LibraryMap performs on freshly parsed
-// source.  The library identifier is stored in `arena` so its lifetime
-// matches the AST nodes that point at it.
 void TagCells(CompilationUnit& cu, std::string_view library, Arena& arena) {
   auto* buf = static_cast<char*>(arena.Allocate(library.size(), 1));
   std::copy_n(library.data(), library.size(), buf);
@@ -95,7 +83,7 @@ void AppendCells(CompilationUnit& target, const CompilationUnit& src) {
                         src.configs.end());
 }
 
-}  // namespace
+}
 
 bool PrecompiledLibrary::Save(std::string_view source,
                               std::string_view library,
@@ -155,4 +143,4 @@ bool PrecompiledLibrary::Load(const std::filesystem::path& path,
   return true;
 }
 
-}  // namespace delta
+}

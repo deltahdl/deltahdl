@@ -27,7 +27,7 @@ static uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   return (val > UINT32_MAX) ? 64 : 32;
 }
 Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena) {
-  // §5.7.1: '0, '1, 'x, 'z — return 64-bit fill pattern for ResizeToWidth.
+
   auto text = expr->text;
   if (text.size() >= 2 && text[0] == '\'') {
     char c = text[1];
@@ -47,7 +47,7 @@ static bool TextHasXZ(std::string_view text) {
     if (IsXChar(text[i]) || IsZChar(text[i])) return true;
   return false;
 }
-// Bits per digit for each base letter.
+
 static int BitsPerDigit(char base_letter) {
   switch (base_letter) {
     case 'h':
@@ -63,14 +63,14 @@ static int BitsPerDigit(char base_letter) {
       return 0;
   }
 }
-// Parse a digit's numeric value (0-15), or -1 for x/z.
+
 static int DigitValue(char c) {
   if (c >= '0' && c <= '9') return c - '0';
   if (c >= 'a' && c <= 'f') return c - 'a' + 10;
   if (c >= 'A' && c <= 'F') return c - 'A' + 10;
   return -1;
 }
-// Set bit_count bits starting at bit_pos in vec for an x/z/normal digit.
+
 static void SetDigitBits(Logic4Vec& vec, uint32_t& bit_pos, int bit_count,
                          char digit, uint32_t width) {
   bool is_x = IsXChar(digit);
@@ -118,7 +118,7 @@ static Logic4Vec ParseBasedXZLiteral(std::string_view text, uint32_t width,
   size_t i = ParseLiteralBase(text, buf, bpd);
   if (i == 0) return vec;
   if (bpd == 0) {
-    // §5.7.1: Decimal single-digit x/z fills all bits.
+
     ++i;
     char first = (i < buf.size()) ? buf[i] : '\0';
     if (IsXChar(first) || IsZChar(first)) FillXZ(vec, 0, width, IsXChar(first));
@@ -128,7 +128,7 @@ static Logic4Vec ParseBasedXZLiteral(std::string_view text, uint32_t width,
   uint32_t bit_pos = 0;
   for (auto j = buf.size(); j > i && bit_pos < width; --j)
     SetDigitBits(vec, bit_pos, bpd, buf[j - 1], width);
-  // §5.7.1: Left-pad remaining bits with x or z if leftmost digit is x/z.
+
   if (bit_pos < width && i < buf.size()) {
     char lm = buf[i];
     if (IsXChar(lm) || IsZChar(lm)) FillXZ(vec, bit_pos, width, IsXChar(lm));
@@ -137,7 +137,7 @@ static Logic4Vec ParseBasedXZLiteral(std::string_view text, uint32_t width,
 }
 static bool IsSignedLiteral(std::string_view text) {
   auto tick = text.find('\'');
-  if (tick == std::string_view::npos) return true;  // Simple decimal is signed.
+  if (tick == std::string_view::npos) return true;
   if (tick + 1 >= text.size()) return false;
   char c = text[tick + 1];
   return c == 's' || c == 'S';
@@ -154,14 +154,14 @@ Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena) {
   vec.is_signed = is_signed;
   return vec;
 }
-// §5.9.1: Decode hex digit or return -1.
+
 static int HexDigitVal(char c) {
   if (c >= '0' && c <= '9') return c - '0';
   if (c >= 'a' && c <= 'f') return c - 'a' + 10;
   if (c >= 'A' && c <= 'F') return c - 'A' + 10;
   return -1;
 }
-// §5.9.1 Table 5-1: Map single-char escape to its value, or 0 if not simple.
+
 static uint8_t SimpleEscapeChar(char c) {
   switch (c) {
     case 'n':
@@ -182,7 +182,7 @@ static uint8_t SimpleEscapeChar(char c) {
       return 0;
   }
 }
-// §5.9.1: Parse \xdd hex escape, advancing i past consumed digits.
+
 static uint8_t ParseHexEscape(std::string_view text, size_t& i) {
   uint8_t val = 0;
   for (int j = 0; j < 2 && i + 1 < text.size(); ++j) {
@@ -193,7 +193,7 @@ static uint8_t ParseHexEscape(std::string_view text, size_t& i) {
   }
   return val;
 }
-// §5.9.1: Parse \ddd octal escape starting with first digit c.
+
 static uint8_t ParseOctalEscape(char c, std::string_view text, size_t& i) {
   auto val = static_cast<uint8_t>(c - '0');
   for (int j = 0;
@@ -202,7 +202,7 @@ static uint8_t ParseOctalEscape(char c, std::string_view text, size_t& i) {
     val = val * 8 + static_cast<uint8_t>(text[++i] - '0');
   return val;
 }
-// §5.9.1: Decode string escape sequences into raw bytes.
+
 static std::vector<uint8_t> DecodeStringBody(std::string_view text) {
   std::vector<uint8_t> bytes;
   for (size_t i = 0; i < text.size(); ++i) {
@@ -248,4 +248,4 @@ Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena) {
   return vec;
 }
 
-}  // namespace delta
+}

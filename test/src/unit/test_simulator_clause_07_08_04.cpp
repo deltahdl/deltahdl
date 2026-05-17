@@ -22,7 +22,6 @@ static Expr* MakeAssocSelect(Arena& arena, std::string_view base_name,
 
 namespace {
 
-// §7.8.4: Write and read with integral index.
 TEST(IntegralIndexAssocArraySimulation, WriteAndRead) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 32);
@@ -31,7 +30,6 @@ TEST(IntegralIndexAssocArraySimulation, WriteAndRead) {
   EXPECT_EQ(aa->int_data[5].ToUint64(), 42u);
 }
 
-// §7.8.4: Multiple integral keys stored independently.
 TEST(IntegralIndexAssocArraySimulation, MultipleKeys) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 32);
@@ -45,7 +43,6 @@ TEST(IntegralIndexAssocArraySimulation, MultipleKeys) {
   EXPECT_EQ(aa->int_data[3].ToUint64(), 30u);
 }
 
-// §7.8.4: Overwriting an existing integral key.
 TEST(IntegralIndexAssocArraySimulation, OverwriteKey) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 32);
@@ -55,7 +52,6 @@ TEST(IntegralIndexAssocArraySimulation, OverwriteKey) {
   EXPECT_EQ(aa->int_data[7].ToUint64(), 200u);
 }
 
-// §7.8.4: Signed ordering — negative keys sort before positive.
 TEST(IntegralIndexAssocArraySimulation, SignedOrdering) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 32);
@@ -71,7 +67,6 @@ TEST(IntegralIndexAssocArraySimulation, SignedOrdering) {
   EXPECT_EQ(it->first, 10);
 }
 
-// §7.8.4: Negative keys work with signed int index.
 TEST(IntegralIndexAssocArraySimulation, NegativeKeyAccess) {
   SimFixture f;
   f.ctx.CreateAssocArray("aa", 32, false, 32);
@@ -90,4 +85,4 @@ TEST(IntegralIndexAssocArraySimulation, NegativeKeyAccess) {
   EXPECT_EQ(result.ToUint64(), 77u);
 }
 
-}  // namespace
+}

@@ -68,4 +68,4 @@ TEST(ClassConstraintElaboration, WeakReferenceAsTaskArgOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -44,4 +44,4 @@ TEST(FinalProcedureSynthesis, RejectFinalWithDisplay) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

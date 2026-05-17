@@ -157,4 +157,4 @@ TEST(ModportExpressionParsing, ConstantPortExpression) {
   EXPECT_NE(mp->ports[0].expr, nullptr);
 }
 
-}  // namespace
+}

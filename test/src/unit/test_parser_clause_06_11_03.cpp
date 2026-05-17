@@ -459,10 +459,6 @@ TEST(SignedAndUnsigned, UnsignedVector) {
   EXPECT_EQ(item->name, "uv");
 }
 
-// "The data types time, bit, reg, and logic default to unsigned, as do arrays
-// of these types." A packed array of an unsigned-by-default integer type must
-// still carry the unsigned default with no explicit keyword.
-
 TEST(SignedAndUnsigned, BitPackedArrayDefaultUnsigned) {
   auto r = Parse(
       "module t;\n"
@@ -533,4 +529,4 @@ TEST(SignedAndUnsigned, BitMultiDimPackedDefaultUnsigned) {
   EXPECT_FALSE(item->data_type.extra_packed_dims.empty());
 }
 
-}  // namespace
+}

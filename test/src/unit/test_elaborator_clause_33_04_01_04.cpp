@@ -2,8 +2,6 @@
 
 namespace {
 
-// §33.4.1.4: a cell clause that includes a library qualifier on the
-// cell name and uses a liblist expansion clause is an error.
 TEST(ConfigCellClause, LibQualifiedCellWithLiblistRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -16,8 +14,6 @@ TEST(ConfigCellClause, LibQualifiedCellWithLiblistRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// Positive control: a cell clause without a library qualifier may use a
-// liblist expansion clause.
 TEST(ConfigCellClause, UnqualifiedCellWithLiblistAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -30,8 +26,6 @@ TEST(ConfigCellClause, UnqualifiedCellWithLiblistAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Positive control: a cell clause with a library qualifier paired with
-// a use expansion clause is the intended shape and should be accepted.
 TEST(ConfigCellClause, LibQualifiedCellWithUseClauseAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -44,4 +38,4 @@ TEST(ConfigCellClause, LibQualifiedCellWithUseClauseAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -227,8 +227,6 @@ TEST(PassByRefParsing, RefArgWithUnpackedArrayDims) {
   EXPECT_FALSE(fn->func_args[0].unpacked_dims.empty());
 }
 
-// §13.5.2: "Combining ref with any other directional qualifier shall be
-// illegal." LRM example: `task automatic incr( ref input int a );`
 TEST(PassByRefParsing, RefInputCombinationRejected) {
   auto r = Parse(
       "module m;\n"
@@ -318,4 +316,4 @@ TEST(PassByRefParsing, RefIsNotConstByDefault) {
   EXPECT_FALSE(fn->func_args[2].is_const);
 }
 
-}  // namespace
+}

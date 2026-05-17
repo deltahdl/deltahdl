@@ -4,8 +4,6 @@
 using namespace delta;
 namespace {
 
-// --- Left-to-right element list parsing ---
-
 TEST(StreamExpressionConcatParsing, StreamingRightDetails) {
   auto r = Parse(
       "module t;\n"
@@ -42,8 +40,6 @@ TEST(StreamExpressionConcatParsing, ElementOrderPreserved) {
   EXPECT_EQ(rhs->elements[3]->text, "delta");
 }
 
-// --- Branch 1: nested streaming_concatenation as stream_expression ---
-
 TEST(StreamExpressionConcatParsing, NestedStreamingConcatParsed) {
   auto r = Parse(
       "module t;\n"
@@ -59,8 +55,6 @@ TEST(StreamExpressionConcatParsing, NestedStreamingConcatParsed) {
   EXPECT_EQ(rhs->elements[0]->op, TokenKind::kLtLt);
   EXPECT_EQ(rhs->elements[1]->kind, ExprKind::kIdentifier);
 }
-
-// --- Branch 1: expression types (literals, identifiers) ---
 
 TEST(StreamExpressionConcatParsing, LiteralElementsParsed) {
   auto r = Parse(
@@ -90,4 +84,4 @@ TEST(StreamExpressionConcatParsing, MixedExpressionTypes) {
   EXPECT_EQ(rhs->elements[2]->kind, ExprKind::kBinary);
 }
 
-}  // namespace
+}

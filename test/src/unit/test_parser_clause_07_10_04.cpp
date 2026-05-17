@@ -110,4 +110,4 @@ TEST(QueueAssignParsing, ConcatInsertAtPosition) {
   EXPECT_EQ(stmt->rhs->elements.size(), 3u);
 }
 
-}  // namespace
+}

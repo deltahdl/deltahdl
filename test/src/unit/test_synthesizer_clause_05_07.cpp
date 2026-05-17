@@ -77,4 +77,4 @@ TEST(NumberSynthesis, QuestionMarkAsZSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

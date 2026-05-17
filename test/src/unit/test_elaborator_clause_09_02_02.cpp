@@ -65,4 +65,4 @@ TEST(AlwaysProcedureElaboration, MultipleAlwaysCombElaborate) {
   EXPECT_EQ(comb_count, 2);
 }
 
-}  // namespace
+}

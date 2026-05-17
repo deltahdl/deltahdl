@@ -161,4 +161,4 @@ TEST(LevelSensitiveEventSimulation, WaitZeroConditionNeverUnblocks) {
   EXPECT_EQ(val, 0u);
 }
 
-}  // namespace
+}

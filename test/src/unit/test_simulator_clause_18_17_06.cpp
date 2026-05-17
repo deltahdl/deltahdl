@@ -30,4 +30,4 @@ TEST(RandsequenceSim, BreakTerminatesRandsequence) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

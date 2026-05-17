@@ -150,4 +150,4 @@ TEST(ArrayAddressing, PartSelectAfterArrayElement) {
   EXPECT_EQ(v, 0x5u);
 }
 
-}  // namespace
+}

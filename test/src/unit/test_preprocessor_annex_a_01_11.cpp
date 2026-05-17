@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- Moved from test_preprocessor_clause_26_02.cpp ---
-
 TEST(PackageItemsParsing, PackageItemTimeunitsDecl) {
   auto r = ParseWithPreprocessor(
       "package pkg;\n"
@@ -55,4 +53,4 @@ TEST(PackageItemsParsing, MacroExpandedPackageItem) {
   EXPECT_FALSE(r.cu->packages[0]->items.empty());
 }
 
-}  // namespace
+}

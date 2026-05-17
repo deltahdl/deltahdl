@@ -19,9 +19,6 @@
 
 namespace delta {
 
-// --- LHS resolution helpers ---
-
-// Build a dotted name from a MemberAccess expression tree (e.g., "s.a.b").
 void BuildLhsName(const Expr* expr, std::string& out) {
   if (expr->kind == ExprKind::kIdentifier) {
     if (!expr->scope_prefix.empty()) {
@@ -50,20 +47,17 @@ static std::string StripRootPrefix(const std::string& name) {
   return name;
 }
 
-// §7.4: Try to resolve an array element variable (e.g. "A[0]").
-// Returns the element variable if found, null otherwise.
 Variable* TryResolveArrayElement(const Expr* lhs, SimContext& ctx) {
   if (lhs->kind != ExprKind::kSelect || !lhs->base || !lhs->index)
     return nullptr;
   if (lhs->base->kind != ExprKind::kIdentifier) return nullptr;
-  if (lhs->index_end) return nullptr;  // Part-select, not array index.
+  if (lhs->index_end) return nullptr;
   auto idx = EvalExpr(lhs->index, ctx, ctx.GetArena());
   auto elem_name =
       std::string(lhs->base->text) + "[" + std::to_string(idx.ToUint64()) + "]";
   return ctx.FindVariable(elem_name);
 }
 
-// §7.4: Build a compound name from chained selects (e.g., mem[i][j]).
 bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx, Arena& arena,
                           std::string& name) {
   if (expr->kind == ExprKind::kIdentifier) {
@@ -77,7 +71,6 @@ bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §7.4: Multi-dim array element write — create element lazily.
 Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
                                     Arena& arena) {
   if (lhs->kind != ExprKind::kSelect || !lhs->base) return nullptr;
@@ -91,7 +84,6 @@ Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
                             32);
 }
 
-// Find the target variable for a compound LHS expression.
 Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
   if (lhs->kind == ExprKind::kIdentifier) return ctx.FindVariable(lhs->text);
   if (lhs->kind == ExprKind::kMemberAccess) {
@@ -106,7 +98,6 @@ Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
   return nullptr;
 }
 
-// §7.2: Write to a packed struct/union field by name.
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
                       SimContext& ctx, Arena& arena) {
   std::string name;
@@ -115,7 +106,7 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
   if (dot == std::string::npos) return false;
   auto base_name = std::string_view(name).substr(0, dot);
   auto field_name = std::string_view(name).substr(dot + 1);
-  // §8.11: 'this' refers to the current instance.
+
   if (base_name == "this") {
     auto* self = ctx.CurrentThis();
     if (self) {
@@ -124,7 +115,7 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
     }
     return false;
   }
-  // §8.15: 'super' refers to the base class of the current instance.
+
   if (base_name == "super") {
     auto* self = ctx.CurrentThis();
     if (self && self->type && self->type->parent) {
@@ -134,7 +125,7 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
     }
     return false;
   }
-  // §8.23: Write to a static property via class scope resolution (Class::prop).
+
   auto* cls_type = ctx.FindClassType(base_name);
   if (cls_type) {
     auto sit = cls_type->static_properties.find(std::string(field_name));
@@ -180,28 +171,25 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
   auto handle = base_var->value.ToUint64();
   auto* obj = ctx.GetClassObject(handle);
   if (obj) {
-    // §8.14: Write through the declared type so overridden members are scoped.
+
     auto declared = ctx.GetVariableClassType(base_name);
     if (!declared.empty()) {
       auto* declared_type = ctx.FindClassType(declared);
       if (declared_type) {
         obj->SetPropertyForType(field_name, declared_type, rhs_val);
-        // §9.4.2: Changing the value of object data members shall cause the
-        // event expression to be reevaluated. Notify watchers on the handle
-        // variable so @(c.method()) re-runs the method when c.field changes.
+
         base_var->NotifyWatchers();
         return true;
       }
     }
     obj->SetProperty(std::string(field_name), rhs_val);
-    // §9.4.2: Same rule for the un-declared-type write path.
+
     base_var->NotifyWatchers();
     return true;
   }
   return false;
 }
 
-// Write a range of bits [hi:lo] into var.
 static void WritePartSelect(Variable* var, uint32_t lo, uint32_t width,
                             const Logic4Vec& rhs_val, Arena& arena) {
   uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
@@ -211,7 +199,6 @@ static void WritePartSelect(Variable* var, uint32_t lo, uint32_t width,
   var->value = MakeLogic4VecVal(arena, var->value.width, cleared | new_bits);
 }
 
-// Write rhs_val to var at the bit position(s) indicated by a Select LHS.
 void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
                     SimContext& ctx, Arena& arena) {
   auto idx_val = EvalExpr(lhs->index, ctx, arena);
@@ -226,13 +213,13 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
         MakeLogic4VecVal(arena, var->value.width, cleared | (bit << idx));
     return;
   }
-  // Part-select: compute (lo, width).
+
   uint32_t lo = idx;
   auto end_val =
       static_cast<uint32_t>(EvalExpr(lhs->index_end, ctx, arena).ToUint64());
   uint32_t w = end_val;
   if (lhs->is_part_select_plus) {
-    // [idx +: w] — lo stays idx.
+
   } else if (lhs->is_part_select_minus) {
     lo = (idx >= w - 1) ? idx - w + 1 : 0;
   } else {
@@ -248,15 +235,13 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
   WritePartSelect(var, lo, w, rhs_val, arena);
 }
 
-// §11.8.2: Resize value to target width, sign-extending when signed.
 Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena) {
   if (val.width == target_width || target_width == 0) return val;
-  // Check for x/z bits that need preserving.
+
   bool has_xz = false;
   for (uint32_t i = 0; i < val.nwords && !has_xz; ++i)
     has_xz = val.words[i].bval != 0;
-  // Single-word fast path. ToUint64() only returns word[0], so >64-bit values
-  // must fall through to the multi-word path below to preserve upper words.
+
   if (!has_xz && val.width <= 64 && target_width <= 64) {
     uint64_t v = val.ToUint64();
     if (val.is_signed && target_width > val.width && val.width > 0 &&
@@ -266,7 +251,7 @@ Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena) {
     }
     return MakeLogic4VecVal(arena, target_width, v);
   }
-  // Preserve x/z bits during resize.
+
   auto result = MakeLogic4Vec(arena, target_width);
   result.is_signed = val.is_signed;
   uint32_t copy_words = std::min(val.nwords, result.nwords);
@@ -293,7 +278,7 @@ Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena) {
       }
     }
   }
-  // Mask off bits beyond target_width in the last word.
+
   uint32_t last_bit = target_width % 64;
   if (last_bit != 0) {
     uint32_t last_word = (target_width - 1) / 64;
@@ -304,7 +289,6 @@ Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena) {
   return result;
 }
 
-// §7.6: Copy elements from one array to another (B = A).
 static void CopyArrayElements(std::string_view dst_name, const ArrayInfo& dst,
                               std::string_view src_name, const ArrayInfo& src,
                               SimContext& ctx) {
@@ -325,7 +309,6 @@ static void CopyArrayElements(std::string_view dst_name, const ArrayInfo& dst,
   }
 }
 
-// §10.9.1: Check if a pattern key is a type keyword (int, logic, etc.).
 static bool IsTypeKeyword(std::string_view key) {
   return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
          key == "byte" || key == "shortint" || key == "longint" ||
@@ -333,7 +316,6 @@ static bool IsTypeKeyword(std::string_view key) {
          key == "time" || key == "realtime" || key == "string";
 }
 
-// §10.9.1: Check if a type keyword string matches a DataTypeKind.
 static bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kInt: return key == "int";
@@ -353,11 +335,10 @@ static bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind) {
   }
 }
 
-// §10.9.1: Find value for array index from named pattern (index/type/default keys).
 static Logic4Vec FindArrayKeyedValue(const Expr* rhs, uint32_t idx,
                                      uint32_t width, DataTypeKind elem_type,
                                      SimContext& ctx, Arena& arena) {
-  // Pass 1: explicit index key.
+
   for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
     if (i >= rhs->elements.size()) break;
     auto& key = rhs->pattern_keys[i];
@@ -365,14 +346,14 @@ static Logic4Vec FindArrayKeyedValue(const Expr* rhs, uint32_t idx,
     if (static_cast<uint32_t>(std::stoul(std::string(key))) == idx)
       return EvalExpr(rhs->elements[i], ctx, arena);
   }
-  // Pass 2: type key — matches if element type matches the keyword.
+
   for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
     if (i >= rhs->elements.size()) break;
     auto& key = rhs->pattern_keys[i];
     if (IsTypeKeyword(key) && TypeKeyMatchesKind(key, elem_type))
       return EvalExpr(rhs->elements[i], ctx, arena);
   }
-  // Pass 3: default key.
+
   for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
     if (i >= rhs->elements.size()) break;
     if (rhs->pattern_keys[i] == "default")
@@ -381,7 +362,6 @@ static Logic4Vec FindArrayKeyedValue(const Expr* rhs, uint32_t idx,
   return MakeLogic4VecVal(arena, width, 0);
 }
 
-// §7.4: Distribute assignment pattern elements to array element variables.
 static void DistributePatternToArray(std::string_view arr_name,
                                      const ArrayInfo& info, const Expr* rhs,
                                      SimContext& ctx, Arena& arena) {
@@ -419,7 +399,6 @@ static void CollectFixedArrayElements(std::string_view name,
                                       const ArrayInfo& ai, SimContext& ctx,
                                       std::vector<Logic4Vec>& out);
 
-// §10.10: Collect flattened elements from an unpacked array concatenation.
 static std::vector<Logic4Vec> CollectConcatElements(const Expr* rhs,
                                                     SimContext& ctx,
                                                     Arena& arena) {
@@ -442,7 +421,6 @@ static std::vector<Logic4Vec> CollectConcatElements(const Expr* rhs,
   return elems;
 }
 
-// §10.10: Distribute unpacked array concatenation elements to array variables.
 static void DistributeConcatToArray(std::string_view arr_name,
                                     const ArrayInfo& info, const Expr* rhs,
                                     SimContext& ctx, Arena& arena) {
@@ -465,7 +443,6 @@ static void DistributeConcatToArray(std::string_view arr_name,
   }
 }
 
-// §7.4/§7.6: Try array-level blocking assignment (pattern, concat, or copy).
 bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
   if (stmt->rhs && stmt->rhs->kind == ExprKind::kAssignmentPattern) {
@@ -475,7 +452,7 @@ bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return true;
     }
   }
-  // §10.10: Unpacked array concatenation assigned to fixed-size array.
+
   if (stmt->rhs && stmt->rhs->kind == ExprKind::kConcatenation) {
     auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
     if (ainfo) {
@@ -486,9 +463,7 @@ bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->rhs->kind == ExprKind::kIdentifier) {
     auto* dst = ctx.FindArrayInfo(stmt->lhs->text);
     auto* src = ctx.FindArrayInfo(stmt->rhs->text);
-    // §7.6: A queue source has no ArrayInfo record; resolve through the queue
-    // store so the "dynamic array or queue" disjunction in the rule both
-    // applies to and copies from queue sources.
+
     auto* src_q = ctx.FindQueue(stmt->rhs->text);
     if (dst) {
       bool src_is_aggregate = (src != nullptr) || (src_q != nullptr);
@@ -497,9 +472,7 @@ bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       uint32_t src_size = src_resizable
                               ? static_cast<uint32_t>(src_q->elements.size())
                               : src->size;
-      // §7.6: "An attempt to copy a dynamic array or queue into a fixed-size
-      // array target having a different number of elements shall result in a
-      // run-time error and no operation shall be performed."
+
       if (!dst->is_dynamic && !dst->is_queue && src_resizable &&
           dst->size != src_size) {
         ctx.GetDiag().Error(
@@ -528,7 +501,6 @@ bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return false;
 }
 
-// §7.8: Associative array indexed write (aa[key] = val).
 bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
                           SimContext& ctx, Arena& arena) {
   if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return false;
@@ -558,22 +530,21 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   return true;
 }
 
-// §7.10.1: Queue indexed write (q[i] = val).
 bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
-                          SimContext& ctx, Arena& /*arena*/) {
+                          SimContext& ctx, Arena& ) {
   if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return false;
   auto* q = ctx.FindQueue(lhs->base->text);
   if (!q || !lhs->index) return false;
   auto& arena = ctx.GetArena();
   bool idx_xz = false;
   auto idx = EvalQueueIndex(lhs->index, q, ctx, arena, &idx_xz);
-  // §7.10.1: x/z index — ignore write with warning.
+
   if (idx_xz) {
     ctx.GetDiag().Warning({}, "queue write index contains x/z");
     return true;
   }
   auto sz = static_cast<int64_t>(q->elements.size());
-  // §7.10.1: Writing to Q[$+1] is legal — append.
+
   if (idx == sz) {
     bool has_room =
         (q->max_size < 0) || (static_cast<int32_t>(q->elements.size()) <
@@ -591,13 +562,11 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
     q->elements[static_cast<size_t>(idx)] = rhs_val;
     return true;
   }
-  // §7.10.1: Invalid index (negative or beyond $+1) — ignore with warning.
+
   ctx.GetDiag().Warning({}, "queue write index out of bounds");
   return true;
 }
 
-// §7.10: Evaluate a queue index expression with $ = last index.
-// Sets *has_xz to true if the index contains x/z bits.
 static int64_t EvalQueueIndex(const Expr* expr, QueueObject* q, SimContext& ctx,
                               Arena& arena, bool* has_xz = nullptr) {
   ctx.PushScope();
@@ -616,7 +585,6 @@ static int64_t EvalQueueIndex(const Expr* expr, QueueObject* q, SimContext& ctx,
   return static_cast<int64_t>(raw);
 }
 
-// §7.10.1: Collect elements from a queue slice (q[lo:hi]).
 static bool CollectFromQueueSlice(const Expr* expr, SimContext& ctx,
                                   Arena& arena, std::vector<Logic4Vec>& out) {
   if (expr->kind != ExprKind::kSelect || !expr->base || !expr->index_end)
@@ -627,20 +595,19 @@ static bool CollectFromQueueSlice(const Expr* expr, SimContext& ctx,
   bool lo_xz = false, hi_xz = false;
   auto lo = EvalQueueIndex(expr->index, q, ctx, arena, &lo_xz);
   auto hi = EvalQueueIndex(expr->index_end, q, ctx, arena, &hi_xz);
-  // §7.10.1: If either bound contains x/z, yield empty queue.
+
   if (lo_xz || hi_xz) return true;
-  // §7.10.1: a < 0 → same as Q[0:b].
+
   if (lo < 0) lo = 0;
   auto qsz = static_cast<int64_t>(q->elements.size());
-  // §7.10.1: b > $ → same as Q[a:$].
+
   if (hi >= qsz) hi = qsz - 1;
-  // §7.10.1: a > b → empty queue (loop simply doesn't execute).
+
   for (int64_t i = lo; i <= hi; ++i)
     out.push_back(q->elements[static_cast<size_t>(i)]);
   return true;
 }
 
-// §7.10: Collect a single queue element (q[i]) with $ support.
 static bool CollectFromQueueElem(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::vector<Logic4Vec>& out) {
   if (expr->kind != ExprKind::kSelect || !expr->base || expr->index_end)
@@ -654,8 +621,6 @@ static bool CollectFromQueueElem(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §7.10: Collect elements from an expression for queue assignment.
-// §7.6: Collect elements from a fixed-size array for cross-type assignment.
 static void CollectFixedArrayElements(std::string_view name,
                                       const ArrayInfo& ai, SimContext& ctx,
                                       std::vector<Logic4Vec>& out) {
@@ -682,7 +647,7 @@ static void CollectQueueElements(const Expr* expr, SimContext& ctx,
       out.insert(out.end(), q->elements.begin(), q->elements.end());
       return;
     }
-    // §7.6: Fixed-size array → queue/dynamic array assignment.
+
     auto* ai = ctx.FindArrayInfo(expr->text);
     if (ai) {
       CollectFixedArrayElements(expr->text, *ai, ctx, out);
@@ -693,7 +658,6 @@ static void CollectQueueElements(const Expr* expr, SimContext& ctx,
   out.push_back(EvalExpr(expr, ctx, arena));
 }
 
-// §7.5.1: Copy source array into new[size](src) target.
 static void CopyNewInit(const Expr* rhs, QueueObject* q,
                         const std::vector<Logic4Vec>& saved, SimContext& ctx) {
   if (rhs->args.size() < 2) return;
@@ -701,13 +665,12 @@ static void CopyNewInit(const Expr* rhs, QueueObject* q,
   if (!init_expr || init_expr->kind != ExprKind::kIdentifier) return;
   auto* src = ctx.FindQueue(init_expr->text);
   if (!src) return;
-  // §7.5.1: Self-reference (d = new[N](d)) — use saved snapshot.
+
   const auto& src_elems = (src == q) ? saved : src->elements;
   size_t copy_len = std::min(q->elements.size(), src_elems.size());
   for (size_t i = 0; i < copy_len; ++i) q->elements[i] = src_elems[i];
 }
 
-// §7.10.4: Queue assignment from concatenation, slice, or literal.
 bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
   auto* q = ctx.FindQueue(stmt->lhs->text);
@@ -723,12 +686,12 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       !stmt->rhs->args.empty()) {
     auto sz_val = EvalExpr(stmt->rhs->args[0], ctx, arena);
     int64_t sz = SignExtend(sz_val.ToUint64(), sz_val.width);
-    // §7.5.1: Negative size is a runtime error.
+
     if (sz < 0) {
       ctx.GetDiag().Error({}, "dynamic array new[] size is negative");
       return true;
     }
-    // §7.5.1: Snapshot for self-reference (d = new[N](d)).
+
     auto saved = q->elements;
     q->elements.resize(static_cast<size_t>(sz),
                        MakeLogic4VecVal(arena, q->elem_width, 0));
@@ -749,4 +712,4 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return true;
 }
 
-}  // namespace delta
+}

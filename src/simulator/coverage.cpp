@@ -8,10 +8,6 @@
 
 namespace delta {
 
-// =============================================================================
-// Bin matching helpers (must precede methods that call them)
-// =============================================================================
-
 static bool MatchesBinValues(const CoverBin& bin, int64_t value) {
   for (int64_t v : bin.values) {
     if (v == value) return true;
@@ -24,7 +20,6 @@ static bool MatchesBin(const CoverBin& bin, int64_t value) {
   return MatchesBinValues(bin, value);
 }
 
-// Find the sample value for a named coverpoint, or return false if absent.
 static bool FindSampleValue(
     const std::vector<std::pair<std::string, int64_t>>& vals,
     const std::string& cp_name, int64_t& out) {
@@ -37,7 +32,6 @@ static bool FindSampleValue(
   return false;
 }
 
-// Check if a value appears in a set of integers.
 static bool IsInValueSet(const std::vector<int64_t>& set, int64_t val) {
   for (int64_t v : set) {
     if (v == val) return true;
@@ -57,10 +51,6 @@ static bool MatchesCrossBin(
   return true;
 }
 
-// =============================================================================
-// CoverageDB: group management
-// =============================================================================
-
 CoverGroup* CoverageDB::CreateGroup(std::string name) {
   size_t idx = groups_.size();
   groups_.push_back(CoverGroup{std::move(name), {}, {}, CoverOptions{}, 0});
@@ -78,10 +68,6 @@ uint32_t CoverageDB::GroupCount() const {
   return static_cast<uint32_t>(groups_.size());
 }
 
-// =============================================================================
-// CoverPoint and bin management
-// =============================================================================
-
 CoverPoint* CoverageDB::AddCoverPoint(CoverGroup* group, std::string name) {
   group->coverpoints.push_back(CoverPoint{
       std::move(name), {}, false, true, 0, 0, group->options.auto_bin_max});
@@ -92,10 +78,6 @@ CoverBin* CoverageDB::AddBin(CoverPoint* cp, CoverBin bin) {
   cp->bins.push_back(std::move(bin));
   return &cp->bins.back();
 }
-
-// =============================================================================
-// S19.5.1-19.5.3: Auto bin creation
-// =============================================================================
 
 void CoverageDB::AutoCreateBins(CoverPoint* cp, int64_t min_val,
                                 int64_t max_val) {
@@ -125,18 +107,10 @@ void CoverageDB::AutoCreateBins(CoverPoint* cp, int64_t min_val,
   }
 }
 
-// =============================================================================
-// S19.6: Cross coverage
-// =============================================================================
-
 CrossCover* CoverageDB::AddCross(CoverGroup* group, CrossCover cross) {
   group->crosses.push_back(std::move(cross));
   return &group->crosses.back();
 }
-
-// =============================================================================
-// S19.8: Sampling
-// =============================================================================
 
 void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
   if (cp->has_iff_guard && !cp->iff_guard_value) return;
@@ -175,10 +149,6 @@ void CoverageDB::Sample(
     SampleCross(&cross, values);
   }
 }
-
-// =============================================================================
-// S19.8: Coverage computation
-// =============================================================================
 
 double CoverageDB::GetPointCoverage(const CoverPoint* cp) {
   if (cp->bins.empty()) return 100.0;
@@ -238,4 +208,4 @@ double CoverageDB::GetGlobalCoverage() const {
   return sum / static_cast<double>(total_weight);
 }
 
-}  // namespace delta
+}

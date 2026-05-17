@@ -124,4 +124,4 @@ TEST(EqualityOperatorSim, BlockingAssignComparisonOps) {
   EXPECT_EQ(r_ge->value.ToUint64(), 0u);
 }
 
-}  // namespace
+}

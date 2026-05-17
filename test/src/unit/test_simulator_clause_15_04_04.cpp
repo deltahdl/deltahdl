@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.4: try_put on unbounded mailbox always returns positive.
 TEST(IpcSync, MailboxTryPutUnboundedSucceeds) {
   MailboxObject mb;
   EXPECT_EQ(mb.TryPut(42), 1);
@@ -16,7 +15,6 @@ TEST(IpcSync, MailboxTryPutUnboundedSucceeds) {
   EXPECT_EQ(mb.Num(), 2);
 }
 
-// §15.4.4: try_put on bounded mailbox with room returns positive.
 TEST(IpcSync, MailboxTryPutBoundedWithRoom) {
   MailboxObject mb(2);
   EXPECT_EQ(mb.TryPut(10), 1);
@@ -24,7 +22,6 @@ TEST(IpcSync, MailboxTryPutBoundedWithRoom) {
   EXPECT_EQ(mb.Num(), 2);
 }
 
-// §15.4.4: try_put on bounded mailbox when full returns 0.
 TEST(IpcSync, MailboxTryPutBoundedFullReturnsZero) {
   MailboxObject mb(1);
   EXPECT_EQ(mb.TryPut(10), 1);
@@ -32,7 +29,6 @@ TEST(IpcSync, MailboxTryPutBoundedFullReturnsZero) {
   EXPECT_EQ(mb.Num(), 1);
 }
 
-// §15.4.4: try_put stores messages in FIFO order.
 TEST(IpcSync, MailboxTryPutFifoOrder) {
   MailboxObject mb;
   mb.TryPut(100);
@@ -47,7 +43,6 @@ TEST(IpcSync, MailboxTryPutFifoOrder) {
   EXPECT_EQ(msg, 300u);
 }
 
-// §15.4.4: Unbounded mailboxes are never full — try_put always succeeds.
 TEST(IpcSync, MailboxTryPutUnboundedNeverFull) {
   MailboxObject mb;
   for (int i = 0; i < 100; ++i) {
@@ -56,7 +51,6 @@ TEST(IpcSync, MailboxTryPutUnboundedNeverFull) {
   EXPECT_EQ(mb.Num(), 100);
 }
 
-// §15.4.4: try_put succeeds after space freed by get on bounded mailbox.
 TEST(IpcSync, MailboxTryPutSucceedsAfterGetFreesSpace) {
   MailboxObject mb(1);
   EXPECT_EQ(mb.TryPut(10), 1);
@@ -67,4 +61,4 @@ TEST(IpcSync, MailboxTryPutSucceedsAfterGetFreesSpace) {
   EXPECT_EQ(mb.Num(), 1);
 }
 
-}  // namespace
+}

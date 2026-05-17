@@ -107,4 +107,4 @@ TEST(PackageImportSim, WildcardImportResolvesValueReference) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 77u);
 }
 
-}  // namespace
+}

@@ -26,8 +26,6 @@ inline FilePathResult LexFilePathSpec(const std::string& src) {
   return r;
 }
 
-// --- file_path_spec basic paths ---
-
 TEST(FilePathSpecLexing, SimpleFilename) {
   auto r = LexFilePathSpec("file.v");
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
@@ -112,8 +110,6 @@ TEST(FilePathSpecLexing, TildePath) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Delimiter handling ---
-
 TEST(FilePathSpecLexing, StopsAtSpace) {
   auto r = LexFilePathSpec("path.v rest");
   EXPECT_EQ(r.token.text, "path.v");
@@ -144,8 +140,6 @@ TEST(FilePathSpecLexing, StopsAtSemicolon) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Whitespace and comment skipping ---
-
 TEST(FilePathSpecLexing, SkipsLeadingSpaces) {
   auto r = LexFilePathSpec("   path.v");
   EXPECT_EQ(r.token.text, "path.v");
@@ -163,8 +157,6 @@ TEST(FilePathSpecLexing, SkipsLeadingBlockComment) {
   EXPECT_EQ(r.token.text, "path.v");
   EXPECT_FALSE(r.has_errors);
 }
-
-// --- Source location ---
 
 TEST(FilePathSpecLexing, SourceLocationAtStart) {
   auto r = LexFilePathSpec("path.v");
@@ -184,8 +176,6 @@ TEST(FilePathSpecLexing, SourceLocationAfterComment) {
   EXPECT_EQ(r.token.loc.column, 1u);
 }
 
-// --- Empty/EOF ---
-
 TEST(FilePathSpecLexing, EmptyInput) {
   auto r = LexFilePathSpec("");
   EXPECT_EQ(r.token.kind, TokenKind::kEof);
@@ -204,8 +194,6 @@ TEST(FilePathSpecLexing, CommentOnly) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Error conditions ---
-
 TEST(FilePathSpecLexing, ErrorCommaImmediate) {
   auto r = LexFilePathSpec(",rest");
   EXPECT_EQ(r.token.kind, TokenKind::kEof);
@@ -217,8 +205,6 @@ TEST(FilePathSpecLexing, ErrorSemicolonImmediate) {
   EXPECT_EQ(r.token.kind, TokenKind::kEof);
   EXPECT_TRUE(r.has_errors);
 }
-
-// --- Consecutive calls ---
 
 TEST(FilePathSpecLexing, ConsecutiveCallsSeparatedByWhitespace) {
   SourceManager mgr;
@@ -246,4 +232,4 @@ TEST(FilePathSpecLexing, ConsecutiveCallsWithEof) {
   EXPECT_EQ(tok2.kind, TokenKind::kEof);
 }
 
-}  // namespace
+}

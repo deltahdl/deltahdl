@@ -181,4 +181,4 @@ TEST(ClassAssignRenameParsing, HandleAssignmentAfterPropertyMutation) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

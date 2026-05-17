@@ -64,4 +64,4 @@ TEST(ParameterizedInterfaceSynthesis, MultipleInstancesWithDifferentOverrides) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

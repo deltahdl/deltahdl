@@ -111,4 +111,4 @@ TEST(LexicalConventionLexing, NotTimeLiteralIfMoreChars) {
   EXPECT_NE(r.token.kind, TokenKind::kTimeLiteral);
 }
 
-}  // namespace
+}

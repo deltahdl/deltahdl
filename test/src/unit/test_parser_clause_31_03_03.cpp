@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §31.3.3 Syntax 31-5: `$setuphold` requires two timing_check_limits
-// between the data_event and the optional notifier.
 TEST(TimingCheckCommandParsing, SetupholdTwoLimits) {
   auto r = Parse(
       "module m;\n"
@@ -21,9 +19,6 @@ TEST(TimingCheckCommandParsing, SetupholdTwoLimits) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-// §31.3.3 Syntax 31-5: every optional argument after the notifier is
-// captured, including the pair of delayed signal identifiers that the
-// negative-limit form of §31.9 depends on.
 TEST(TimingCheckCommandParsing, SetupholdFullArgs) {
   auto r = Parse(
       "module m;\n"
@@ -40,8 +35,6 @@ TEST(TimingCheckCommandParsing, SetupholdFullArgs) {
   EXPECT_EQ(tc->delayed_data, "dDATA");
 }
 
-// §31.3.3 Syntax 31-5 as a specify-block item: edge-qualified reference
-// first, bare data terminal second, both limits captured.
 TEST(TimingCheckCommandParsing, SetupholdAsSpecifyItem) {
   auto sp = ParseSpecifySingle(
       "module m(input d, clk);\n"
@@ -61,8 +54,6 @@ TEST(TimingCheckCommandParsing, SetupholdAsSpecifyItem) {
   ASSERT_EQ(si->timing_check.limits.size(), 2u);
 }
 
-// §31.3.3 Syntax 31-5: the notifier is optional and may appear without any
-// of the trailing negative-timing-check arguments.
 TEST(TimingCheckCommandParsing, SetupholdWithNotifierOnly) {
   auto r = Parse(
       "module m;\n"
@@ -82,8 +73,6 @@ TEST(TimingCheckCommandParsing, SetupholdWithNotifierOnly) {
   EXPECT_TRUE(tc->delayed_data.empty());
 }
 
-// §31.3.3 Syntax 31-5 requires two timing_check_limit arguments; providing
-// only one is ill-formed.
 TEST(TimingCheckCommandParsing, ErrorSetupholdMissingSecondLimit) {
   auto r = Parse(
       "module m;\n"
@@ -94,8 +83,6 @@ TEST(TimingCheckCommandParsing, ErrorSetupholdMissingSecondLimit) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §31.3.3 Syntax 31-5 requires two timing_check_limit arguments; omitting
-// both is ill-formed.
 TEST(TimingCheckCommandParsing, ErrorSetupholdMissingBothLimits) {
   auto r = Parse(
       "module m;\n"
@@ -106,8 +93,6 @@ TEST(TimingCheckCommandParsing, ErrorSetupholdMissingBothLimits) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §31.3.3 Table 31-3: setup_limit and hold_limit are constant expressions,
-// so compound arithmetic must parse in either limit slot.
 TEST(TimingCheckCommandParsing, SetupholdConstantExpressionLimits) {
   auto r = Parse(
       "module m;\n"
@@ -121,4 +106,4 @@ TEST(TimingCheckCommandParsing, SetupholdConstantExpressionLimits) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-}  // namespace
+}

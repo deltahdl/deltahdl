@@ -109,4 +109,4 @@ TEST(ParameterizedModules, LocalparamDerivedViaShiftExpression) {
   EXPECT_EQ(top->params[1].resolved_value, 8);
 }
 
-}  // namespace
+}

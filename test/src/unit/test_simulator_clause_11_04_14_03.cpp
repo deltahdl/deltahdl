@@ -282,4 +282,4 @@ TEST(StreamingUnpack, SourceWiderConsumesMsbWithMixedWidths) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xEFu);
 }
 
-}  // namespace
+}

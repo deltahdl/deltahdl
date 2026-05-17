@@ -25,4 +25,4 @@ TEST(ArrayMap, MapDoubleElements) {
   EXPECT_EQ(out[2].ToUint64(), 30u);
 }
 
-}  // namespace
+}

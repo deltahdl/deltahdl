@@ -128,11 +128,6 @@ TEST(NameSpacePreprocessing, AllEightNameSpaces) {
   EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "keep"));
 }
 
-// §3.13(d): "Subsequent definitions of the same name override the
-// previous definitions for the balance of the input files."  The
-// preprocessor's text-macro name space must reflect the most-recent
-// definition when expanding subsequent references — defining a macro
-// twice with different bodies must make the second body win.
 TEST(NameSpacePreprocessing, TextMacroLaterDefinitionOverridesEarlier) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -145,4 +140,4 @@ TEST(NameSpacePreprocessing, TextMacroLaterDefinitionOverridesEarlier) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

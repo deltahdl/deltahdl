@@ -133,7 +133,6 @@ TEST(LexicalConventionLexing, EscapedAndSimpleIdentLexToSameText) {
   EXPECT_EQ(escaped.token.text, "cpu3");
 }
 
-// §5.6.1: white space terminator covers carriage return.
 TEST(LexicalConventionLexing, EscapedIdentifierTerminatedByCarriageReturn) {
   auto tokens = Lex("\\abc\rdef");
   ASSERT_GE(tokens.size(), 3u);
@@ -143,22 +142,18 @@ TEST(LexicalConventionLexing, EscapedIdentifierTerminatedByCarriageReturn) {
   EXPECT_EQ(tokens[1].text, "def");
 }
 
-// §5.6.1: escaped body may begin with a digit (simple identifiers cannot).
 TEST(LexicalConventionLexing, EscapedIdentifierStartingWithDigit) {
   auto r = LexOne("\\1234 ");
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
   EXPECT_EQ(r.token.text, "1234");
 }
 
-// §5.6.1: lexer preserves case of body characters verbatim.
 TEST(LexicalConventionLexing, EscapedIdentifierPreservesCase) {
   auto r = LexOne("\\AbCdEf ");
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
   EXPECT_EQ(r.token.text, "AbCdEf");
 }
 
-// §5.6.1: body restricted to printable ASCII (33-126). Non-whitespace
-// control characters below 33 are rejected.
 TEST(LexicalConventionLexing, EscapedIdentifierRejectsControlCharBelow33) {
   std::string src = "\\ab";
   src += '\x01';
@@ -167,7 +162,6 @@ TEST(LexicalConventionLexing, EscapedIdentifierRejectsControlCharBelow33) {
   EXPECT_TRUE(errors);
 }
 
-// §5.6.1: DEL (0x7F = 127) is outside the printable ASCII range.
 TEST(LexicalConventionLexing, EscapedIdentifierRejectsDel) {
   std::string src = "\\ab";
   src += '\x7F';
@@ -176,7 +170,6 @@ TEST(LexicalConventionLexing, EscapedIdentifierRejectsDel) {
   EXPECT_TRUE(errors);
 }
 
-// §5.6.1: Bytes with the high bit set are outside the printable ASCII range.
 TEST(LexicalConventionLexing, EscapedIdentifierRejectsHighByte) {
   std::string src = "\\ab";
   src += static_cast<char>(0x80);
@@ -185,9 +178,6 @@ TEST(LexicalConventionLexing, EscapedIdentifierRejectsHighByte) {
   EXPECT_TRUE(errors);
 }
 
-// §5.6.1: an escaped identifier whose terminator immediately follows the
-// leading backslash has an empty body (zero characters between \ and the
-// terminating whitespace).
 TEST(LexicalConventionLexing, EscapedIdentifierEmptyBodyAtSpace) {
   auto [tokens, errors] = LexWithDiag("\\ foo");
   ASSERT_GE(tokens.size(), 2u);
@@ -195,9 +185,6 @@ TEST(LexicalConventionLexing, EscapedIdentifierEmptyBodyAtSpace) {
   EXPECT_TRUE(tokens[0].text.empty());
 }
 
-// §5.6.1: leading backslash and terminating whitespace are not part of the
-// identifier, even when the escaped form is interleaved with simple
-// identifiers in a token stream.
 TEST(LexicalConventionLexing, SimpleAndEscapedInStream) {
   auto tokens = Lex("abc \\def ghi");
   ASSERT_GE(tokens.size(), 4u);
@@ -209,9 +196,6 @@ TEST(LexicalConventionLexing, SimpleAndEscapedInStream) {
   EXPECT_EQ(tokens[2].text, "ghi");
 }
 
-// §5.6.1: a `+` sign embedded in the body is part of the escaped identifier;
-// inserting whitespace before the `+` terminates the escaped identifier and
-// the `+` becomes its own operator token.
 TEST(LexicalConventionLexing, EscapedIdentifierWhitespaceIsSignificant) {
   auto without_ws = Lex("\\foo+bar ");
   ASSERT_GE(without_ws.size(), 2u);
@@ -227,24 +211,12 @@ TEST(LexicalConventionLexing, EscapedIdentifierWhitespaceIsSignificant) {
   EXPECT_EQ(with_ws[2].text, "bar");
 }
 
-// §5.6.1: rule (1) "end with white space" combined with rule (2) "any printable
-// ASCII except white space" implies the body absorbs every non-whitespace
-// printable byte — including the bytes that would normally begin a string
-// literal ("), a line comment (//), a block comment (/*), or a number-base
-// apostrophe ('). The lexer must not dispatch to string or comment handling
-// from inside an escaped identifier body; it must continue scanning until the
-// first whitespace.
 TEST(LexicalConventionLexing, EscapedIdentifierBodyAbsorbsStructuralDelimiters) {
   auto r = LexOne("\\foo\"bar/*baz//qux'end ");
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
   EXPECT_EQ(r.token.text, "foo\"bar/*baz//qux'end");
 }
 
-// §5.6.1: rule (1) "shall start with the backslash character (\) and end with
-// white space" combined with §5.3's inclusion of end-of-file in the white
-// space category implies that a bare backslash followed only by EOF is a
-// well-formed escaped identifier with an empty body. Production code must
-// not over-read past the source buffer.
 TEST(LexicalConventionLexing, EscapedIdentifierBareBackslashAtEof) {
   auto [tokens, errors] = LexWithDiag("\\");
   EXPECT_FALSE(errors);
@@ -254,4 +226,4 @@ TEST(LexicalConventionLexing, EscapedIdentifierBareBackslashAtEof) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
 }
 
-}  // namespace
+}

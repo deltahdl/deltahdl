@@ -172,4 +172,4 @@ TEST(StreamingUnpackSimulation, SourceWiderConsumesMsbMultipleElements) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xCDu);
 }
 
-}  // namespace
+}

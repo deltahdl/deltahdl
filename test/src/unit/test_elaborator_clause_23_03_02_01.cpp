@@ -206,4 +206,4 @@ TEST(OrderedPortElaboration, OrderedOutputPortNotToVariable) {
   EXPECT_EQ(bindings[1].direction, delta::Direction::kOutput);
 }
 
-}  // namespace
+}

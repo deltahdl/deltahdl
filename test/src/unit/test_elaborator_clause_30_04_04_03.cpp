@@ -17,8 +17,6 @@ TEST(EdgeSensitiveStateDependentPathElaboration, FullPathWithDataSourceElaborate
   EXPECT_FALSE(f.has_errors);
 }
 
-// Two edge-sensitive state-dependent declarations targeting the same port
-// are a legal configuration when the edge makes each unique.
 TEST(EdgeSensitiveStateDependentPathElaboration, CoexistingUniqueByEdgeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -33,8 +31,6 @@ TEST(EdgeSensitiveStateDependentPathElaboration, CoexistingUniqueByEdgeElaborate
   EXPECT_FALSE(f.has_errors);
 }
 
-// Two edge-sensitive state-dependent declarations targeting the same port
-// and edge are legal when the condition makes each unique.
 TEST(EdgeSensitiveStateDependentPathElaboration, CoexistingUniqueByConditionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -49,4 +45,4 @@ TEST(EdgeSensitiveStateDependentPathElaboration, CoexistingUniqueByConditionElab
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

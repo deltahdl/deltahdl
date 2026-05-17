@@ -7,11 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §32.2 names four categories of timing values that SDF backannotation
-// updates: specify path delays, specparam values, timing check constraint
-// values, and interconnect delays. The tests below pin the backannotation
-// entry point to all four.
-
 TEST(SdfBackannotation, UpdatesSpecifyPathDelays) {
   SdfFile file;
   SdfCell cell;
@@ -90,8 +85,6 @@ TEST(SdfBackannotation, UpdatesInterconnectDelays) {
   EXPECT_EQ(got.fall, 9u);
 }
 
-// §32.2 also says that timing values from SDF "update" — i.e. the selected
-// MTM column applies uniformly to every category named in the clause.
 TEST(SdfBackannotation, MtmSelectionAppliesToAllCategories) {
   SdfFile file;
   SdfCell cell;
@@ -137,11 +130,6 @@ TEST(SdfBackannotation, MtmSelectionAppliesToAllCategories) {
   EXPECT_EQ(mgr.GetInterconnectDelays()[0].fall, 3000u);
 }
 
-// §32.2: "Any SystemVerilog timing value for which the SDF file does not
-// provide a value shall not be modified" is a §32.3 statement, but the
-// converse — that backannotation only writes the four named categories and
-// leaves SpecifyManager untouched when an SDF cell carries none of them —
-// is implicit in §32.2's definition of what backannotation is.
 TEST(SdfBackannotation, EmptyCellLeavesManagerUntouched) {
   SdfFile file;
   file.cells.push_back(SdfCell{});
@@ -155,9 +143,6 @@ TEST(SdfBackannotation, EmptyCellLeavesManagerUntouched) {
   EXPECT_TRUE(mgr.GetInterconnectDelays().empty());
 }
 
-// Edge case: a file with no cells at all. §32.2 defines backannotation as
-// applying values "from the SDF file" — with zero cells, the update set is
-// empty and the manager stays at its prebackannotation state.
 TEST(SdfBackannotation, EmptyFileProducesNoUpdates) {
   SdfFile file;
 
@@ -170,8 +155,6 @@ TEST(SdfBackannotation, EmptyFileProducesNoUpdates) {
   EXPECT_TRUE(mgr.GetInterconnectDelays().empty());
 }
 
-// Edge case: the cell list is iterated in full. With two cells carrying
-// non-overlapping timing content, both contributions appear on the manager.
 TEST(SdfBackannotation, MultipleCellsAllContribute) {
   SdfFile file;
 
@@ -201,9 +184,6 @@ TEST(SdfBackannotation, MultipleCellsAllContribute) {
   EXPECT_EQ(mgr.GetInterconnectDelays()[0].src_port, "u1.q");
 }
 
-// Edge case: several entries of the same category inside a single cell are
-// each applied. Backannotation is not limited to one update per category
-// per cell — every value in the SDF file reaches the manager.
 TEST(SdfBackannotation, MultipleEntriesPerCategoryApplied) {
   SdfFile file;
   SdfCell cell;
@@ -243,4 +223,4 @@ TEST(SdfBackannotation, MultipleEntriesPerCategoryApplied) {
   EXPECT_EQ(mgr.GetInterconnectDelays().size(), 2u);
 }
 
-}  // namespace
+}

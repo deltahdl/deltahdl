@@ -186,4 +186,4 @@ TEST(ImplicitSensitivity, LhsIndexWithTimingControl) {
   EXPECT_EQ(result[0], "idx");
 }
 
-}  // namespace
+}

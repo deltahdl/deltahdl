@@ -51,14 +51,14 @@ from lib.python.lrm import build_lrm_read_instruction
 
 
 # Bare-command patterns the PreToolUse hook denies for both sub-Claude
-# contexts. `gh` is the orchestrator's tool for issue closure; the
-# build/test tools are the orchestrator's CI-equivalent gate; the PDF
-# readers are unnecessary because the LRM is supplied through the
-# read-instruction helper. The clang variants are listed individually
-# because the deny hook matches on first-token equality, so `clang`
-# alone would not block `clang-format` or `clang++`.
+# contexts. `git` and `gh` are the orchestrator's tools for committing,
+# pushing, and closing issues; the build/test tools are the orchestrator's
+# CI-equivalent gate; the PDF readers are unnecessary because the LRM is
+# supplied through the read-instruction helper. The clang variants are
+# listed individually because the deny hook matches on first-token equality,
+# so `clang` alone would not block `clang-format` or `clang++`.
 _SHARED_DENY_PATTERNS = [
-    "gh",
+    "git", "gh",
     "cmake", "make", "ninja",
     "ctest", "pytest",
     "clang", "clang++", "clang-format", "clang-tidy", "clangd",
@@ -72,13 +72,15 @@ _SHARED_DENY_PATTERNS = [
 # git status --porcelain after the eight-step pass and translates the
 # deleted set into git rm at commit time, so on-disk rm/mv by the
 # mutator is the supported path for Steps 4 and 6.
-MUTATOR_DENY_PATTERNS = ["git", *_SHARED_DENY_PATTERNS]
+MUTATOR_DENY_PATTERNS = list(_SHARED_DENY_PATTERNS)
 
 
 # The commit-body generator narrates what the eight-step session
-# already did, so `git diff` / `git log` / `git show` are exactly the
-# tools it needs to describe each porcelain entry in its own words —
-# `git` is therefore NOT carried over from the shared base.
+# already did, working from the porcelain file list in the prompt plus
+# the --continue session context. Allowing `git` once let a body
+# session run `git add`/`git commit`/`git push` to land an unrelated
+# "Dedup §X tests" follow-up commit, splitting one logical change
+# across two SHAs — so `git` is denied here too.
 COMMIT_BODY_DENY_PATTERNS = list(_SHARED_DENY_PATTERNS)
 
 
@@ -413,6 +415,7 @@ def _build_constraints(subclauses: list[str]) -> str:
         " Pipeline stages come from the project's stage-to-file mapping;"
         " the stage where a rule applies is the stage whose source file"
         " carries the rule and whose test file covers it."
+        f" {COPYRIGHT_REASON}"
     )
 
 

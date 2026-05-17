@@ -76,4 +76,4 @@ TEST(LexicalConventionSim, FixedPointPs) {
   EXPECT_DOUBLE_EQ(v, 0.0035);
 }
 
-}  // namespace
+}

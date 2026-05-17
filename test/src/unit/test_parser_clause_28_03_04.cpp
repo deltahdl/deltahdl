@@ -1,7 +1,4 @@
-// §28.3.4 — The primitive instance identifier.
-// Each test here exercises the optional-name rule: gate/switch primitive
-// instances may or may not carry an identifier, independently per instance
-// within a comma-separated list.
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -196,8 +193,6 @@ TEST(PrimitiveInstantiationParsing, PullGateInst_PullupUnnamed) {
   EXPECT_TRUE(g->gate_inst_name.empty());
 }
 
-// A single comma-separated list may mix named and unnamed instances; each
-// instance independently exercises the §28.3.4 optional-name rule.
 TEST(EnableGates, MultipleInstancesMixed) {
   auto r = Parse(
       "module m;\n"
@@ -211,10 +206,6 @@ TEST(EnableGates, MultipleInstancesMixed) {
   EXPECT_TRUE(gates[1]->gate_inst_name.empty());
 }
 
-// §28.3.4: "If multiple instances are declared as an array of instances,
-// an identifier shall be used to name the instances." The range may only
-// appear as the unpacked_dimension of a name_of_instance, so omitting the
-// identifier makes the form unparseable.
 TEST(PrimitiveInstantiationParsing, ArrayInstanceWithoutIdentifierIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -223,4 +214,4 @@ TEST(PrimitiveInstantiationParsing, ArrayInstanceWithoutIdentifierIsRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -178,10 +178,6 @@ TEST(BlockingAssignParsing, ComplexLhsRhsCombinations) {
   EXPECT_EQ(s1->rhs->kind, ExprKind::kBinary);
 }
 
-// §10.4.1 BNF: blocking_assignment ::= variable_lvalue =
-//     delay_or_event_control expression .  The intra-assignment delay
-// form must reduce to a kBlockingAssign with stmt->delay populated and
-// the RHS expression still attached.
 TEST(BlockingAssignParsing, IntraAssignmentDelayForm) {
   auto r = Parse(
       "module m;\n"
@@ -198,10 +194,6 @@ TEST(BlockingAssignParsing, IntraAssignmentDelayForm) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-// §10.4.1 BNF: the delay_or_event_control alternative also covers the
-// `@event` form (variable_lvalue = @(posedge clk) expression).  Verify
-// the parser populates stmt->events with at least one entry while still
-// classifying the statement as a blocking assignment.
 TEST(BlockingAssignParsing, IntraAssignmentEventControlForm) {
   auto r = Parse(
       "module m;\n"
@@ -218,4 +210,4 @@ TEST(BlockingAssignParsing, IntraAssignmentEventControlForm) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-}  // namespace
+}

@@ -68,4 +68,4 @@ TEST(AlwaysProcedureSimulation, AlwaysFFRepeatsContinuously) {
   EXPECT_EQ(val, 2u);
 }
 
-}  // namespace
+}

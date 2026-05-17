@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §6.19.2 Enumerated type ranges
-
 TEST(Elaboration, EnumRangeNExpandsNames) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -138,4 +136,4 @@ TEST(Elaboration, EnumRangeLrmExample) {
   EXPECT_EQ(it->second[8].value, 18);
 }
 
-}  // namespace
+}

@@ -39,10 +39,6 @@ static Expr* MakeAssocSelectStr(Arena& arena, std::string_view base_name,
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Req 1/2: Literal initialization with '{key:value, default:val}
-// ---------------------------------------------------------------------------
-
 TEST(AssocMethods, LiteralInitIntKeys) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -87,10 +83,6 @@ TEST(AssocMethods, LiteralInitDefaultOnly) {
   EXPECT_EQ(aa->default_value.ToUint64(), 42u);
 }
 
-// ---------------------------------------------------------------------------
-// Req 2: End-to-end literal initialization through parse/elaborate/lower/run
-// ---------------------------------------------------------------------------
-
 TEST(AssocMethods, EndToEndLiteralIntKeysWithDefault) {
   auto v = RunAndGet(
       "module t;\n"
@@ -124,10 +116,6 @@ TEST(AssocMethods, EndToEndLiteralStringKeyDefault) {
       "result");
   EXPECT_EQ(v, 5u);
 }
-
-// ---------------------------------------------------------------------------
-// Req 3: Default value – reading nonexistent yields default, no warning
-// ---------------------------------------------------------------------------
 
 TEST(AssocMethods, ReadMissingKeyWithDefaultReturnsDefaultNoWarning) {
   SimFixture f;
@@ -170,10 +158,6 @@ TEST(AssocMethods, ReadMissingKeyFromEmptyArrayWithDefaultNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), before);
 }
 
-// ---------------------------------------------------------------------------
-// Req 4: Without default, Table 7-1 value returned (zero for 2-state int)
-// ---------------------------------------------------------------------------
-
 TEST(AssocMethods, ReadMissingKeyWithoutDefaultReturnsZero) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -195,10 +179,6 @@ TEST(AssocMethods, ReadMissingStringKeyWithoutDefaultReturnsZero) {
   auto result = EvalExpr(sel, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
-
-// ---------------------------------------------------------------------------
-// Req 5: Default does not affect associative array methods
-// ---------------------------------------------------------------------------
 
 TEST(AssocMethods, DefaultDoesNotAffectNum) {
   SimFixture f;
@@ -298,4 +278,4 @@ TEST(AssocMethods, DefaultDoesNotAffectDelete) {
   EXPECT_TRUE(aa->has_default);
 }
 
-}  // namespace
+}

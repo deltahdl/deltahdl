@@ -81,4 +81,4 @@ TEST(BlockingAssignSim, BlockingAssignSysClog2) {
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-}  // namespace
+}

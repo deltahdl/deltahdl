@@ -96,7 +96,7 @@ TEST(QueueDelete, XzIndexIsNoop) {
   auto* idx_var = f.ctx.CreateVariable("idx", 32);
   idx_var->value = MakeLogic4Vec(f.arena, 32);
   idx_var->value.words[0].aval = 0;
-  idx_var->value.words[0].bval = 1;  // x value
+  idx_var->value.words[0].bval = 1;
   auto* call =
       MakeMethodCall(f.arena, "q", "delete", {MakeId(f.arena, "idx")});
   TryExecQueueMethodStmt(call, f.ctx, f.arena);
@@ -110,7 +110,7 @@ TEST(QueueDelete, NegativeIndexIsNoop) {
   auto* q = MakeQueue(f, "q", {10, 20});
   auto* idx_var = f.ctx.CreateVariable("idx", 32);
   idx_var->value = MakeLogic4Vec(f.arena, 32);
-  idx_var->value.words[0].aval = static_cast<uint64_t>(-1);  // -1 as signed
+  idx_var->value.words[0].aval = static_cast<uint64_t>(-1);
   idx_var->value.words[0].bval = 0;
   idx_var->value.is_signed = true;
   auto* call =
@@ -129,4 +129,4 @@ TEST(QueueDelete, DeleteOnEmptyQueueWithIndexIsNoop) {
   EXPECT_EQ(q->elements.size(), 0u);
 }
 
-}  // namespace
+}

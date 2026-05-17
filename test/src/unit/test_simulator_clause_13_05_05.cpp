@@ -104,4 +104,4 @@ TEST(ArgumentBindingSim, TaskMultipleDefaultsNoParens) {
   LowerRunAndCheck(f, design, {{"x", 10u}});
 }
 
-}  // namespace
+}

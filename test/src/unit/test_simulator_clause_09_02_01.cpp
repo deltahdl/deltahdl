@@ -155,4 +155,4 @@ TEST(InitialProcedureSimulation, NullStatementInitialCompletes) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 55u);
 }
 
-}  // namespace
+}

@@ -1,6 +1,4 @@
-// §28.3.5 — The range specification on gate/switch primitive instances.
-// Each test here exercises parsing of the optional [lhi:rhi] array-of-instances
-// syntax that follows the instance identifier.
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -80,9 +78,6 @@ TEST(GateLevelModelingParsing, GateArrayEqualBounds) {
   EXPECT_NE(g->inst_range_right, nullptr);
 }
 
-// "Neither of the two constant expressions are required to be zero, and
-// lhi is not required to be larger than rhi." Cover the case the other tests
-// miss: both bounds non-zero with lhi < rhi.
 TEST(GateLevelModelingParsing, GateArrayBothBoundsNonZero) {
   auto r = Parse(
       "module m;\n"
@@ -133,9 +128,6 @@ TEST(GateLevelModelingParsing, GateArrayDuplicateIdentifierIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §28.3.5 LRM corrective example: two arrays with unique names of four
-// elements each may be declared in a single statement. Observes the
-// pass-through branch of the identifier-uniqueness check in ParseGateInst.
 TEST(GateLevelModelingParsing, GateArrayTwoUniqueArrayNamesInOneDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -152,4 +144,4 @@ TEST(GateLevelModelingParsing, GateArrayTwoUniqueArrayNamesInOneDeclaration) {
   EXPECT_NE(gates[1]->inst_range_right, nullptr);
 }
 
-}  // namespace
+}

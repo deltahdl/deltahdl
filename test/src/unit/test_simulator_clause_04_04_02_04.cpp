@@ -39,14 +39,6 @@ TEST(NbaRegionSim, AllInactiveEventsCompleteBeforeNBA) {
   EXPECT_EQ(order[3], "nba");
 }
 
-// §4.4.2.4 ¶1: "after **all** the Inactive events are processed" — including
-// Inactive events scheduled into the same time slot from inside another
-// Inactive callback. Distinct from AllInactiveEventsCompleteBeforeNBA, which
-// pre-queues every inactive before Run() and so never exercises the
-// reentrant-push path through DrainQueue's `while (!queue.empty())` loop. If
-// that loop snapshotted queue length on entry (instead of testing emptiness
-// on each pop), the mid-drain inactive2 would defer past NBA and the observed
-// order would put "nba" before "inactive2".
 TEST(NbaRegionSim, InactivesScheduledDuringDrainRunBeforeNBA) {
   Arena arena;
   Scheduler sched(arena);
@@ -120,12 +112,6 @@ TEST(NbaRegionSim, NBARegionHoldsMultipleEvents) {
   EXPECT_EQ(count, 5);
 }
 
-// §4.4.2.4 ¶2: a nonblocking assignment from the active region set creates
-// an event in the NBA region. Lowering `a <= 8'd99` from an `initial` (Active)
-// process must defer the write until after every blocking assignment in the
-// same time slot — `b = a + 8'd2` reads the pre-NBA value (1, giving 3) and
-// `a = a + 8'd5` continues the active-set chain. Only after the active set
-// drains does the NBA event fire and overwrite `a` with 99.
 TEST(NbaRegionSim, NonblockingAssignFromActiveSetSchedulesNBA) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -147,10 +133,6 @@ TEST(NbaRegionSim, NonblockingAssignFromActiveSetSchedulesNBA) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 3u);
 }
 
-// §4.4.2.4 ¶2: the NBA event may be scheduled for a later simulation time.
-// Lowering `b <= #5 8'd99` enqueues the NBA event at t=5; the scheduler
-// advances time before draining NBA, so on completion the simulator's current
-// time reflects the deferred slot.
 TEST(NbaRegionSim, NonblockingAssignWithDelaySchedulesNBALater) {
   SimFixture f;
   auto* design = ElaborateSrc(

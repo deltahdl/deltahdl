@@ -38,8 +38,7 @@ struct CliOptions {
   std::vector<std::string> include_dirs;
   std::vector<std::string> lib_dirs;
   std::vector<std::string> lib_files;
-  // §33.8.1: command-line library search order; overrides the lib.map
-  // declaration order when non-empty.
+
   std::vector<std::string> lib_search_order;
   std::vector<std::pair<std::string, std::string>> defines;
   uint64_t max_time = 0;
@@ -236,8 +235,7 @@ bool TryParseLibArg(std::string_view arg, int& i, int argc,
     opts.lib_dirs.emplace_back(argv[++i]);
     return true;
   }
-  // §33.8.1: -L names a library and pushes it onto the search-order
-  // override.  Order matters — the first -L is searched first.
+
   if (arg == "-L" && i + 1 < argc) {
     opts.lib_search_order.emplace_back(argv[++i]);
     return true;
@@ -340,15 +338,15 @@ struct PreprocResult {
   std::string source;
   delta::NetType default_nettype = delta::NetType::kWire;
   delta::NetType unconnected_drive = delta::NetType::kWire;
-  std::vector<std::string> cell_module_names;  // §22.10
-  // §E.2
+  std::vector<std::string> cell_module_names;
+
   uint64_t default_decay_time = 0;
   double default_decay_time_real = 0.0;
   bool default_decay_time_infinite = true;
-  // §E.3
+
   uint32_t default_trireg_strength = 0;
   bool has_default_trireg_strength = false;
-  // §E.4-E.7
+
   delta::DelayModeDirective delay_mode_directive =
       delta::DelayModeDirective::kNone;
 };
@@ -446,9 +444,7 @@ const delta::RtlirDesign* ElaborateDesign(const CliOptions& opts,
                                           delta::DiagEngine& diag,
                                           delta::Arena& arena) {
   delta::Elaborator elaborator(arena, diag, cu);
-  // §33.8.1: in the absence of a configuration, the -L list (if any)
-  // overrides the lib.map's declaration order.  An empty override
-  // leaves the lib.map's order in effect.
+
   delta::LibraryMap lib_map;
   auto effective_order = lib_map.ResolveSearchOrder(opts.lib_search_order);
   if (!effective_order.empty()) {
@@ -510,7 +506,7 @@ int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
   return diag.HasErrors() ? 1 : 0;
 }
 
-}  // anonymous namespace
+}
 
 int main(int argc, char* argv[]) {
   CliOptions opts;
@@ -544,7 +540,7 @@ int main(int argc, char* argv[]) {
   }
   cu->default_nettype = pp.default_nettype;
   cu->unconnected_drive = pp.unconnected_drive;
-  // §22.10: Tag cell modules.
+
   for (auto* mod : cu->modules) {
     for (const auto& cell_name : pp.cell_module_names) {
       if (mod->name == cell_name) {

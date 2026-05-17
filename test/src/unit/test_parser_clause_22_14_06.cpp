@@ -22,4 +22,4 @@ TEST(CompilerDirectiveParsing, BeginKeywords1800_2005_InterfaceIsKeyword) {
                               "`end_keywords\n"));
 }
 
-}  // namespace
+}

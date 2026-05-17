@@ -38,4 +38,4 @@ TEST(ScopeResolutionPrefixPreprocessing, ChainedPrefixSurvives) {
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
 }
 
-}  // namespace
+}

@@ -8,7 +8,6 @@
 
 namespace delta {
 
-/// Collect path components from a member-access chain (a.b.c -> [a, b, c]).
 static void CollectPathComponents(const Expr* expr,
                                   std::vector<std::string_view>& out) {
   if (expr->kind == ExprKind::kMemberAccess) {
@@ -21,13 +20,6 @@ static void CollectPathComponents(const Expr* expr,
   }
 }
 
-// §23.10.1: "The expression on the right-hand side of defparam assignments
-// shall be a constant expression involving only numbers and references to
-// parameters. The referenced parameters (on the right-hand side of the
-// defparam) shall be declared in the same module as the defparam statement."
-// A hierarchical reference (member-access chain) or a packaged/$unit-scoped
-// identifier reaches outside the local scope and is rejected as a violation
-// of the same-module constraint.
 static bool RhsContainsHierarchicalRef(const Expr* e) {
   if (!e) return false;
   if (e->kind == ExprKind::kMemberAccess) return true;
@@ -57,7 +49,6 @@ RtlirParamDecl* Elaborator::ResolveDefparamPath(RtlirModule* root,
   CollectPathComponents(path_expr, parts);
   if (parts.size() < 2) return nullptr;
 
-  // Walk hierarchy: parts[0..n-2] are instance names, parts[n-1] is param.
   RtlirModule* cur = root;
   for (size_t i = 0; i + 1 < parts.size(); ++i) {
     bool found = false;
@@ -131,11 +122,11 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
         applied_defparams_.insert(key);
         continue;
       }
-      // §23.10: defparam wins over a module instance parameter assignment.
+
       param->resolved_value = ConvertOverrideValue(*val, *param);
       param->is_resolved = true;
       param->from_override = true;
-      // §23.10.3: recompute dependent parameters now that the source changed.
+
       RecomputeDependentParams(target_mod);
       applied_defparams_.insert(key);
       early_defparam_resolutions_.push_back(
@@ -183,4 +174,4 @@ void Elaborator::WarnUnresolvedDefparams(RtlirModule* mod) {
   }
 }
 
-}  // namespace delta
+}

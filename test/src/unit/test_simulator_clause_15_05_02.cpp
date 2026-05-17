@@ -8,8 +8,6 @@
 
 namespace {
 
-// --- §15.5.2 event triggered state (moved from test_simulator_clause_15_05_03) ---
-
 TEST(IpcSync, EventTriggeredDefault) {
   SyncFixture f;
   EXPECT_FALSE(f.ctx.IsEventTriggered("ev1"));
@@ -62,9 +60,6 @@ TEST(IpcSync, EventTriggeredStickyWithinTimeslot) {
   EXPECT_FALSE(f.ctx.IsEventTriggered("ev2"));
 }
 
-// --- §15.5.2 waiting-for-event simulation tests ---
-
-// §15.5.2: @ blocks until trigger fires (wait-then-trigger ordering).
 TEST(IpcSync, WaitBlocksUntilTrigger) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -92,7 +87,6 @@ TEST(IpcSync, WaitBlocksUntilTrigger) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §15.5.2: If trigger fires before @ executes, waiter remains blocked.
 TEST(IpcSync, TriggerBeforeWaitLeavesProcessBlocked) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -121,7 +115,6 @@ TEST(IpcSync, TriggerBeforeWaitLeavesProcessBlocked) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §15.5.2: @ with body statement executes body after trigger.
 TEST(IpcSync, WaitWithBodyExecutesAfterTrigger) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -147,9 +140,6 @@ TEST(IpcSync, WaitWithBodyExecutesAfterTrigger) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §15.5.2: The bare-form syntax `@ hierarchical_event_identifier;` (without
-// parentheses) is the same wait mechanism as `@(ev)` and likewise blocks
-// the calling process until the event is triggered.
 TEST(IpcSync, BareAtSyntaxBlocksUntilTrigger) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -177,7 +167,6 @@ TEST(IpcSync, BareAtSyntaxBlocksUntilTrigger) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §15.5.2: Repeated @ in a loop catches successive triggers.
 TEST(IpcSync, RepeatedWaitCatchesSuccessiveTriggers) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -209,9 +198,6 @@ TEST(IpcSync, RepeatedWaitCatchesSuccessiveTriggers) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §15.5.2: The wait syntax permits a hierarchical_event_identifier; the @
-// operator must block the calling process until the trigger fires on the
-// named event reached through a hierarchical reference.
 TEST(IpcSync, HierarchicalEventWaitBlocksUntilTrigger) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -242,11 +228,6 @@ TEST(IpcSync, HierarchicalEventWaitBlocksUntilTrigger) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §15.5.2: The wait syntax is literally "@ hierarchical_event_identifier;"
-// — a bare @ (no parentheses) followed by a hierarchical reference to a
-// named event in another instance. Combines the bare-form syntax with a
-// hierarchical reference; the @ operator must block until the trigger
-// fires on the referenced named event.
 TEST(IpcSync, BareAtSyntaxWithHierarchicalEventBlocksUntilTrigger) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -277,13 +258,6 @@ TEST(IpcSync, BareAtSyntaxWithHierarchicalEventBlocksUntilTrigger) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §15.5.2 ↔ §9.4.2 cross-reference: §9.4.2 lists "the occurrence of a named
-// event (see 15.5.2)" as one of the synchronization sources for the same @
-// event control operator that handles posedge / negedge / value-change.
-// A single procedural block that uses both forms back-to-back must
-// dispatch each correctly: @(posedge clk) resumes on a 0->1 edge (the
-// §9.4.2 implicit-event/edge path) and @(ev) resumes on ->ev (the §15.5.2
-// named-event path).
 TEST(IpcSync, EventControlOperatorDispatchesEdgeAndNamedEvent) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -317,4 +291,4 @@ TEST(IpcSync, EventControlOperatorDispatchesEdgeAndNamedEvent) {
   EXPECT_EQ(vb->value.ToUint64(), 22u);
 }
 
-}  // namespace
+}

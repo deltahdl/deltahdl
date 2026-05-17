@@ -275,4 +275,4 @@ TEST(ArrayLocator, MaxReturnsLargest) {
   EXPECT_EQ(out.ToUint64(), 50u);
 }
 
-}  // namespace
+}

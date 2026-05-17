@@ -1,4 +1,4 @@
-// §28.6
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -16,8 +16,6 @@ TEST(TristateGateParsing, TooManyTerminals) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §28.6: tri-state gates require exactly three terminals; fewer must fail
-// at parse.
 TEST(TristateGateParsing, SingleTerminalRejected) {
   auto r = Parse(
       "module m;\n"
@@ -34,8 +32,6 @@ TEST(TristateGateParsing, TwoTerminalsRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §28.6: zero-delay form (no #spec) is legal and leaves the delay fields
-// null.
 TEST(TristateGateParsing, NoDelaySpecLeavesDelayNull) {
   auto r = Parse(
       "module m;\n"
@@ -49,8 +45,6 @@ TEST(TristateGateParsing, NoDelaySpecLeavesDelayNull) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-// §28.6: a single delay applies to all transitions; only the rise field
-// captures the value.
 TEST(TristateGateParsing, SingleValueDelay) {
   auto r = Parse(
       "module m;\n"
@@ -65,7 +59,6 @@ TEST(TristateGateParsing, SingleValueDelay) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-// §28.6: two delays express rise and fall; the turn-off field stays null.
 TEST(TristateGateParsing, TwoValueDelayAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -81,7 +74,6 @@ TEST(TristateGateParsing, TwoValueDelayAccepted) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-// §28.6: delay3 is the cap — four delays must be rejected.
 TEST(TristateGateParsing, FourValueDelayRejected) {
   auto r = Parse(
       "module m;\n"
@@ -177,4 +169,4 @@ TEST(TristateGateParsing, Notif1ThreeValueDelay) {
   ASSERT_NE(g->gate_delay_decay, nullptr);
 }
 
-}  // namespace
+}

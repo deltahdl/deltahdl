@@ -20,4 +20,4 @@ TEST(IoSystemTaskTest, SscanfDecimal) {
   EXPECT_EQ(dest->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

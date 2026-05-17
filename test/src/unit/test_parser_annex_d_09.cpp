@@ -37,4 +37,4 @@ TEST(OptionalSystemTaskExtendedParsing, IncsaveExpr) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
 
-}  // namespace
+}

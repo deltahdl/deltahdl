@@ -48,7 +48,6 @@ TEST(ClassSim, WeakRefGetReturnsSameHandleAsInit) {
   WeakReference wr;
   wr.referent_handle = handle;
 
-  // get() returns the exact value used to initialize (the referent handle).
   EXPECT_EQ(wr.Get(), handle);
   EXPECT_NE(wr.Get(), kNullClassHandle);
 }
@@ -62,8 +61,6 @@ TEST(ClassSim, WeakRefGetMakesReferentStronglyReachable) {
   wr.referent_handle = handle;
   f.ctx.RegisterWeakReference(&wr);
 
-  // Retrieve via get() and store in a strong handle (simulated by looking up
-  // the object — the object is still alive because we hold the handle).
   uint64_t strong_handle = wr.Get();
   EXPECT_NE(strong_handle, kNullClassHandle);
   auto* strong_obj = f.ctx.GetClassObject(strong_handle);
@@ -79,16 +76,15 @@ TEST(ClassSim, WeakRefGetMultipleCallsConsistent) {
   WeakReference wr;
   wr.referent_handle = handle;
 
-  // Multiple calls to get() return the same value.
   EXPECT_EQ(wr.Get(), wr.Get());
   EXPECT_EQ(wr.Get(), handle);
 }
 
 TEST(ClassSim, WeakRefGetTakesNoArguments) {
   WeakReference wr;
-  // get() is callable with no arguments and returns a handle.
+
   uint64_t result = wr.Get();
   EXPECT_EQ(result, kNullClassHandle);
 }
 
-}  // namespace
+}

@@ -56,4 +56,4 @@ TEST(SequentialBlockSynthesis, EmptySeqBlockInAlwaysCombSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

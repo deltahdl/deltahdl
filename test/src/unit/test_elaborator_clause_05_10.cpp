@@ -88,10 +88,6 @@ TEST(StructLiteralElaboration, NestedBracesArrayOfStructs) {
              "endmodule\n"));
 }
 
-// §5.10: "The C-like alternative '{1, 1.0, 2, 2.0} for the preceding example
-// is not allowed." For an array-of-structs initializer, the structure must
-// appear under its own nested '{...} — a flat element list whose count
-// matches the *flattened* member count is normatively rejected.
 TEST(StructLiteralElaboration, CLikeFlatLiteralForArrayOfStructsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -112,4 +108,4 @@ TEST(StructLiteralElaboration, ReplicationStructLiteral) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

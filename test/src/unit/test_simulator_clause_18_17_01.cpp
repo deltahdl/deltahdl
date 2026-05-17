@@ -31,4 +31,4 @@ TEST(RandsequenceSim, WeightedAlternativesReachable) {
   EXPECT_TRUE(var->value.ToUint64() == 1u || var->value.ToUint64() == 2u);
 }
 
-}  // namespace
+}

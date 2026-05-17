@@ -115,4 +115,4 @@ TEST(AssocTraversal, NextStringKey) {
   EXPECT_EQ(out.ToUint64(), 1u);
 }
 
-}  // namespace
+}

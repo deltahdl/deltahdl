@@ -75,4 +75,4 @@ TEST(ModuleInstantiation, EmptyNamedPortSurvivesPreprocessing) {
   EXPECT_NE(inst->inst_ports[1].second, nullptr);
 }
 
-}  // namespace
+}

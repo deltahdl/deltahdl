@@ -534,8 +534,6 @@ TEST(OperatorAndExpressionParsing, TernaryInIfCondition) {
   EXPECT_EQ(stmt->condition->kind, ExprKind::kTernary);
 }
 
-// --- Moved from test_parser_clause_11_03_02.cpp ---
-
 TEST(Precedence, NestedTernaryRightAssoc) {
   auto r = Parse(
       "module t;\n"
@@ -602,4 +600,4 @@ TEST(OperatorAndExpressionParsing, ChainedCondPredicateTripleAndInTernary) {
   EXPECT_EQ(rhs->condition->lhs->op, TokenKind::kAmpAmpAmp);
 }
 
-}  // namespace
+}

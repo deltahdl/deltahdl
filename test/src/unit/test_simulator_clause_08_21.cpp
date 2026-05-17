@@ -156,4 +156,4 @@ TEST(AbstractClassSimulation, EmptyBodyVirtualMethodIsCallable) {
       "endmodule\n", "result"), 1u);
 }
 
-}  // namespace
+}

@@ -66,4 +66,4 @@ TEST(ContAssignDelaySynth, DelayConstantProducesCorrectValue) {
   EXPECT_EQ(aig->outputs[0], AigGraph::kConstTrue);
 }
 
-}  // namespace
+}

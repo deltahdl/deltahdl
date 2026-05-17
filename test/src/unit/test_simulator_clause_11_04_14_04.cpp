@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Requirement 10: In pack context, `with` behaves as an array slice —
-// only the specified elements are streamed.
 TEST(StreamingDynamicDataSim, PackWithSlicesSelectedElements) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -31,7 +29,6 @@ TEST(StreamingDynamicDataSim, PackWithSlicesSelectedElements) {
   EXPECT_EQ(var->value.ToUint64(), 0xAABBu);
 }
 
-// Requirement 10: Pack with fixed range [1:2] selects elements 1 and 2.
 TEST(StreamingDynamicDataSim, PackWithFixedRangeSelectsSubset) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -56,7 +53,6 @@ TEST(StreamingDynamicDataSim, PackWithFixedRangeSelectsSubset) {
   EXPECT_EQ(var->value.ToUint64(), 0xBBCCu);
 }
 
-// Requirement 10: Pack with simple index selects single element.
 TEST(StreamingDynamicDataSim, PackWithSimpleIndexSelectsSingleElement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -81,8 +77,6 @@ TEST(StreamingDynamicDataSim, PackWithSimpleIndexSelectsSingleElement) {
   EXPECT_EQ(var->value.ToUint64(), 0xCCu);
 }
 
-// Requirement 9: Unpack with range smaller than array — only specified
-// items are unpacked; remainder is unmodified.
 TEST(StreamingDynamicDataSim, UnpackPartialRangeKeepsRemainder) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -107,7 +101,6 @@ TEST(StreamingDynamicDataSim, UnpackPartialRangeKeepsRemainder) {
   EXPECT_EQ(f.ctx.FindVariable("arr[3]")->value.ToUint64(), 0x44u);
 }
 
-// Requirement 9: Unpack with fixed range [1:2] unpacks only those positions.
 TEST(StreamingDynamicDataSim, UnpackFixedRangeModifiesOnlySpecified) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -132,8 +125,6 @@ TEST(StreamingDynamicDataSim, UnpackFixedRangeModifiesOnlySpecified) {
   EXPECT_EQ(f.ctx.FindVariable("arr[3]")->value.ToUint64(), 0x44u);
 }
 
-// Requirement 8: Unpack with range outside fixed-size array extent
-// generates an error.
 TEST(StreamingDynamicDataSim, UnpackOutOfRangeOnFixedArrayErrors) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -151,7 +142,6 @@ TEST(StreamingDynamicDataSim, UnpackOutOfRangeOnFixedArrayErrors) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// Requirement 7: Unpack with variable-size array resizes it to fit range.
 TEST(StreamingDynamicDataSim, UnpackResizesDynamicArray) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -172,8 +162,6 @@ TEST(StreamingDynamicDataSim, UnpackResizesDynamicArray) {
   }
 }
 
-// Requirement 1: Greedy unpacking — first dynamically sized item gets all
-// available data excluding subsequent fixed-size items.
 TEST(StreamingDynamicDataSim, GreedyUnpackFirstDynamicGetsAllData) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -197,8 +185,6 @@ TEST(StreamingDynamicDataSim, GreedyUnpackFirstDynamicGetsAllData) {
   }
 }
 
-// Requirement 1: Greedy unpacking — remaining dynamically sized items
-// are left empty.
 TEST(StreamingDynamicDataSim, GreedyUnpackRemainingDynamicLeftEmpty) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -222,9 +208,6 @@ TEST(StreamingDynamicDataSim, GreedyUnpackRemainingDynamicLeftEmpty) {
   }
 }
 
-// Requirement 6: The `with` expression is evaluated immediately before
-// its corresponding array is streamed and can reference data unpacked
-// earlier by the same operator.
 TEST(StreamingDynamicDataSim, WithExprReferencesEarlierUnpackedData) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -246,8 +229,6 @@ TEST(StreamingDynamicDataSim, WithExprReferencesEarlierUnpackedData) {
   }
 }
 
-// Requirement 10: Pack with left-shift and `with` — slice selected then
-// reordered.
 TEST(StreamingDynamicDataSim, PackLeftShiftWithClause) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -272,8 +253,6 @@ TEST(StreamingDynamicDataSim, PackLeftShiftWithClause) {
   EXPECT_EQ(var->value.ToUint64(), 0xBBAAu);
 }
 
-// Requirement 10: Pack with `with` range larger than array extent — entire
-// array is streamed and remaining items use the default value.
 TEST(StreamingDynamicDataSim, PackWithRangeLargerThanArrayUsesDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -291,8 +270,7 @@ TEST(StreamingDynamicDataSim, PackWithRangeLargerThanArrayUsesDefault) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // arr[0]=0xAA, arr[1]=0xBB, arr[2] and arr[3] are nonexistent (default 'x).
-  // The result should contain the two real elements plus two default elements.
+
 }
 
-}  // namespace
+}

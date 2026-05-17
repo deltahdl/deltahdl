@@ -127,4 +127,4 @@ TEST(DriveStrengthParsing, NetDeclReversedStrengthOrder) {
   EXPECT_EQ(item->drive_strength1, 4u);
 }
 
-}  // namespace
+}

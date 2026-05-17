@@ -261,4 +261,4 @@ TEST(FunctionReturnSim, FunctionNameAssignRespectsReturnWidth) {
   LowerRunAndCheck(f, design, {{"x", 15u}});
 }
 
-}  // namespace
+}

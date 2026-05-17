@@ -2,7 +2,6 @@
 
 namespace {
 
-// A config name and a module name in the same compilation unit collide.
 TEST(ConfigDesignElementNameSpace, ConfigCollidesWithModule) {
   EXPECT_FALSE(
       ElabOk("module foo; endmodule\n"
@@ -11,7 +10,6 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithModule) {
              "endconfig\n"));
 }
 
-// Reverse declaration order — collision is order-independent.
 TEST(ConfigDesignElementNameSpace, ConfigCollidesWithModuleReverseOrder) {
   EXPECT_FALSE(
       ElabOk("config foo;\n"
@@ -20,7 +18,6 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithModuleReverseOrder) {
              "module foo; endmodule\n"));
 }
 
-// Two configs sharing a name in the same compilation unit collide.
 TEST(ConfigDesignElementNameSpace, DuplicateConfigNames) {
   EXPECT_FALSE(
       ElabOk("module m; endmodule\n"
@@ -32,7 +29,6 @@ TEST(ConfigDesignElementNameSpace, DuplicateConfigNames) {
              "endconfig\n"));
 }
 
-// Distinct names — config and module coexist without conflict.
 TEST(ConfigDesignElementNameSpace, DistinctConfigAndModuleOk) {
   EXPECT_TRUE(
       ElabOk("module m; endmodule\n"
@@ -41,7 +37,6 @@ TEST(ConfigDesignElementNameSpace, DistinctConfigAndModuleOk) {
              "endconfig\n"));
 }
 
-// Config name shares the design-element space with interfaces too.
 TEST(ConfigDesignElementNameSpace, ConfigCollidesWithInterface) {
   ElabFixture f;
   ElaborateSrc(
@@ -54,7 +49,6 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithInterface) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// Config name shares the design-element space with programs too.
 TEST(ConfigDesignElementNameSpace, ConfigCollidesWithProgram) {
   ElabFixture f;
   ElaborateSrc(
@@ -67,4 +61,4 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithProgram) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -14,4 +14,4 @@ enum class StmtResult : uint8_t {
   kDisable,
 };
 
-}  // namespace delta
+}

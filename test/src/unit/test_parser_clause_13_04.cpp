@@ -123,6 +123,25 @@ TEST(FunctionDeclParsing, IntegerTypesAsFunctionParams) {
   EXPECT_EQ(item->func_args[1].name, "b");
 }
 
+// §13.4 p.341: "an implicit syntax that indicates only the ranges of the
+// packed dimensions and, optionally, the signedness" — note the plural
+// "packed dimensions". A function return type may carry multiple packed
+// dimensions, as in the LRM example `function [3:0][7:0] myfunc4(...)`.
+TEST(FunctionDeclParsing, FuncReturnTypeImplicitMultiPackedDims) {
+  auto r = Parse(
+      "module m;\n"
+      "  function [3:0][7:0] myfunc4();\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->return_type.packed_dim_left, nullptr);
+  EXPECT_EQ(item->return_type.extra_packed_dims.size(), 1u);
+}
+
 TEST(FunctionDeclParsing, FuncReturnTypeImplicitSigned) {
   auto r = Parse(
       "module m;\n  function signed [7:0] foo();\n"
@@ -196,30 +215,6 @@ TEST(FunctionDeclParsing, FunctionBodyMultipleStatements) {
   EXPECT_EQ(func->func_body_stmts[2]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(FunctionDeclParsing, FuncBodyVarDecl) {
-  auto r = Parse(
-      "module top;\n"
-      "  function int foo();\n"
-      "    int x;\n"
-      "    x = 5;\n"
-      "    return x;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-TEST(FunctionDeclParsing, FuncBodyNewStyleEmptyPorts) {
-  auto r =
-      Parse("module m;\n  function void foo();\n  endfunction\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(item->func_args.empty());
-}
-
 TEST(FunctionDeclParsing, FuncBodyNewStyleStickyDirection) {
   auto r = Parse(
       "module m;\n"
@@ -230,21 +225,6 @@ TEST(FunctionDeclParsing, FuncBodyNewStyleStickyDirection) {
   VerifyFuncArgDirections(
       r.cu->modules[0]->items[0],
       {Direction::kInput, Direction::kInput, Direction::kInput});
-}
-
-TEST(FunctionDeclParsing, FuncBodyWithBlockItemDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int foo(input int x);\n"
-      "    int temp;\n"
-      "    temp = x + 1;\n"
-      "    return temp;\n"
-      "  endfunction\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_GE(item->func_body_stmts.size(), 1u);
 }
 
 TEST(FunctionDeclParsing, FuncBodyWithEndLabel) {
@@ -330,19 +310,6 @@ TEST(FunctionDeclParsing, OldStyleFunction) {
   EXPECT_EQ(fn->func_args[0].direction, Direction::kInput);
 }
 
-TEST(FunctionDeclParsing, FunctionEndLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction : add\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "add");
-  ASSERT_NE(fn, nullptr);
-  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
-}
-
 TEST(FunctionDeclParsing, FunctionEmptyBody) {
   auto r = Parse(
       "module m;\n"
@@ -354,26 +321,6 @@ TEST(FunctionDeclParsing, FunctionEmptyBody) {
   ASSERT_NE(fn, nullptr);
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kVoid);
   EXPECT_TRUE(fn->func_body_stmts.empty());
-}
-
-TEST(FunctionDeclParsing, AutoFuncWithOutputArg) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic void compute(input int a, output int b);\n"
-      "    b = a * 3;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_automatic);
-  EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
-  ASSERT_EQ(item->func_args.size(), 2u);
-  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
-  EXPECT_EQ(item->func_args[0].name, "a");
-  EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
-  EXPECT_EQ(item->func_args[1].name, "b");
 }
 
 TEST(FunctionDeclParsing, FunctionDefaultDirectionInput) {
@@ -405,50 +352,101 @@ TEST(FunctionDeclParsing, FunctionDirectionStickyOutput) {
   EXPECT_EQ(fn->func_args[1].direction, Direction::kOutput);
 }
 
-TEST(FunctionDeclParsing, FunctionMultipleStmtsSequential) {
+TEST(FunctionDeclParsing, FunctionStaticLifetime) {
   auto r = Parse(
       "module m;\n"
-      "  function void f();\n"
-      "    int x;\n"
-      "    x = 1;\n"
-      "    x = x + 1;\n"
+      "  function static int f(int a);\n"
+      "    return a;\n"
       "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* fn = FindFunc(r, "f");
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_TRUE(item->is_static);
+  EXPECT_FALSE(item->is_automatic);
+}
+
+TEST(FunctionDeclParsing, FuncArgImplicitTypeFirstArgIsLogic) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f(a);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].data_type.kind, DataTypeKind::kLogic);
+}
+
+TEST(FunctionDeclParsing, FuncArgImplicitTypeAfterExplicitDirIsLogic) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f(int a, output b);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[0].data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
+  EXPECT_EQ(item->func_args[1].data_type.kind, DataTypeKind::kLogic);
+}
+
+TEST(FunctionDeclParsing, ConstRefStickyToInheritedRefArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic void f(const ref int a, int b);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
+  EXPECT_TRUE(item->func_args[0].is_const);
+  EXPECT_EQ(item->func_args[1].direction, Direction::kRef);
+  EXPECT_TRUE(item->func_args[1].is_const);
+}
+
+TEST(FunctionDeclParsing, RefStaticStickyToInheritedRefArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic void f(ref static int a, int b);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
+  EXPECT_TRUE(item->func_args[0].is_ref_static);
+  EXPECT_EQ(item->func_args[1].direction, Direction::kRef);
+  EXPECT_TRUE(item->func_args[1].is_ref_static);
+}
+
+TEST(FunctionDeclParsing, FunctionDirectionStickyInout) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f(inout int a, int b);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FirstItem(r);
   ASSERT_NE(fn, nullptr);
-  ASSERT_GE(fn->func_body_stmts.size(), 3u);
+  ASSERT_EQ(fn->func_args.size(), 2u);
+  EXPECT_EQ(fn->func_args[0].direction, Direction::kInout);
+  EXPECT_EQ(fn->func_args[1].direction, Direction::kInout);
 }
 
-TEST(FunctionDeclParsing, IntReturnWithArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
-}
-
-TEST(FunctionDeclParsing, AllArgDirections) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function int compute(input int a, output int b,\n"
-              "                       inout int c, ref int d);\n"
-              "    b = a;\n"
-              "    c = c + 1;\n"
-              "    return a + d;\n"
-              "  endfunction\n"
-              "endmodule\n"));
-}
-
-// §13.4: "Each formal argument has a data type that can be explicitly
-// declared or inherited from the previous argument." When the data type is
-// omitted on a non-first argument that does not have an explicit direction,
-// it shall inherit from the previous argument.
 TEST(FunctionDeclParsing, FuncArgDataTypeInheritedFromPrevious) {
   auto r = Parse(
       "module m;\n"
@@ -464,4 +462,4 @@ TEST(FunctionDeclParsing, FuncArgDataTypeInheritedFromPrevious) {
   EXPECT_EQ(item->func_args[1].data_type.kind, DataTypeKind::kInt);
 }
 
-}  // namespace
+}

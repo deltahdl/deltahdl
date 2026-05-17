@@ -299,4 +299,4 @@ TEST(SpecifyPathDelayParsing, ErrorEmptyDelayList) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

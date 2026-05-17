@@ -97,4 +97,4 @@ TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_NotStringIndex) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

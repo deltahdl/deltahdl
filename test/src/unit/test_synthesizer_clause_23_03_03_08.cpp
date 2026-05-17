@@ -4,8 +4,6 @@
 
 namespace {
 
-// --- R1: The sign attribute shall not cross hierarchy ---
-
 TEST(SignedValuesViaPortsSynthesis,
      SignedToUnsignedPortConnectionSynthesizes) {
   SynthFixture f;
@@ -56,4 +54,4 @@ TEST(SignedValuesViaPortsSynthesis,
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

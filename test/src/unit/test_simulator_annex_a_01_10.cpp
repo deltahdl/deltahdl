@@ -10,8 +10,6 @@ using namespace delta;
 
 namespace {
 
-// === constraint_block: empty block ===
-
 TEST(ConstraintSolving, EmptyConstraintBlock) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -30,8 +28,6 @@ TEST(ConstraintSolving, EmptyConstraintBlock) {
   EXPECT_LE(val, 100);
 }
 
-// === constraint_expression: implication (expression -> constraint_set) ===
-
 TEST(ConstraintSolving, ImplicationTrueCondition) {
   ConstraintSolver solver(42);
   RandVariable vx;
@@ -46,7 +42,6 @@ TEST(ConstraintSolving, ImplicationTrueCondition) {
   vy.max_val = 100;
   solver.AddVariable(vy);
 
-  // Force x = 50 so implication fires.
   ConstraintBlock b1;
   b1.name = "fix_x";
   ConstraintExpr eq;
@@ -56,7 +51,6 @@ TEST(ConstraintSolving, ImplicationTrueCondition) {
   b1.constraints.push_back(eq);
   solver.AddConstraintBlock(b1);
 
-  // x > 10 -> y < 20
   ConstraintBlock b2;
   b2.name = "impl";
   ConstraintExpr impl;
@@ -89,7 +83,6 @@ TEST(ConstraintSolving, ImplicationFalseCondition) {
   vy.max_val = 100;
   solver.AddVariable(vy);
 
-  // Force x = 5 so implication does NOT fire.
   ConstraintBlock b1;
   b1.name = "fix_x";
   ConstraintExpr eq;
@@ -99,7 +92,6 @@ TEST(ConstraintSolving, ImplicationFalseCondition) {
   b1.constraints.push_back(eq);
   solver.AddConstraintBlock(b1);
 
-  // x > 10 -> y < 20 (should not apply since x=5)
   ConstraintBlock b2;
   b2.name = "impl";
   ConstraintExpr impl;
@@ -115,11 +107,9 @@ TEST(ConstraintSolving, ImplicationFalseCondition) {
   solver.AddConstraintBlock(b2);
 
   ASSERT_TRUE(solver.Solve());
-  // y is unconstrained — just verify solve succeeds.
+
   EXPECT_GE(solver.GetValue("y"), 0);
 }
-
-// === constraint_expression: uniqueness_constraint ===
 
 TEST(ConstraintSolving, UniquenessThreeVars) {
   ConstraintSolver solver(42);
@@ -147,8 +137,6 @@ TEST(ConstraintSolving, UniquenessThreeVars) {
   EXPECT_NE(a, c);
   EXPECT_NE(b, c);
 }
-
-// === constraint_expression: foreach ===
 
 TEST(ConstraintSolving, ForeachAllPositive) {
   ConstraintSolver solver(42);
@@ -180,8 +168,6 @@ TEST(ConstraintSolving, ForeachAllPositive) {
   }
 }
 
-// === constraint_expression: [soft] expression_or_dist ===
-
 TEST(ConstraintSolving, SoftYieldsToHardConstraint) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -190,7 +176,6 @@ TEST(ConstraintSolving, SoftYieldsToHardConstraint) {
   v.max_val = 100;
   solver.AddVariable(v);
 
-  // soft x == 50
   ConstraintBlock b1;
   b1.name = "soft_c";
   ConstraintExpr soft;
@@ -203,7 +188,6 @@ TEST(ConstraintSolving, SoftYieldsToHardConstraint) {
   b1.constraints.push_back(soft);
   solver.AddConstraintBlock(b1);
 
-  // hard: x == 30
   ConstraintBlock b2;
   b2.name = "hard_c";
   ConstraintExpr hard;
@@ -217,8 +201,6 @@ TEST(ConstraintSolving, SoftYieldsToHardConstraint) {
   EXPECT_EQ(solver.GetValue("x"), 30);
   delete inner;
 }
-
-// === expression_or_dist: distribution constraint ===
 
 TEST(ConstraintSolving, DistConstraintWeightedValues) {
   ConstraintSolver solver(42);
@@ -242,8 +224,6 @@ TEST(ConstraintSolving, DistConstraintWeightedValues) {
   EXPECT_TRUE(val == 10 || val == 20 || val == 30);
 }
 
-// === constraint_expression: set membership (inside) ===
-
 TEST(ConstraintSolving, SetMembershipConstraint) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -265,8 +245,6 @@ TEST(ConstraintSolving, SetMembershipConstraint) {
   int64_t val = solver.GetValue("x");
   EXPECT_TRUE(val == 5 || val == 15 || val == 25 || val == 35);
 }
-
-// === constraint_block: multiple constraint blocks ===
 
 TEST(ConstraintSolving, MultipleNamedConstraintBlocks) {
   ConstraintSolver solver(42);
@@ -300,8 +278,6 @@ TEST(ConstraintSolving, MultipleNamedConstraintBlocks) {
   EXPECT_LE(val, 200);
 }
 
-// === constraint_block: disabled block (constraint_mode) ===
-
 TEST(ConstraintSolving, DisabledConstraintBlockIgnored) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -321,11 +297,9 @@ TEST(ConstraintSolving, DisabledConstraintBlockIgnored) {
 
   solver.SetConstraintMode("tight", false);
   ASSERT_TRUE(solver.Solve());
-  // With constraint disabled, x is free — just verify solve succeeds.
+
   EXPECT_GE(solver.GetValue("x"), 0);
 }
-
-// === constraint_block_item: multiple expressions in one block ===
 
 TEST(ConstraintSolving, MultipleExpressionsInOneBlock) {
   ConstraintSolver solver(42);
@@ -361,4 +335,4 @@ TEST(ConstraintSolving, MultipleExpressionsInOneBlock) {
   EXPECT_LT(solver.GetValue("y"), 30);
 }
 
-}  // namespace
+}

@@ -134,4 +134,4 @@ TEST(OperatorParsing, EquivalenceSameLevelAsImplication) {
   EXPECT_EQ(rhs->rhs->op, TokenKind::kLtDashGt);
 }
 
-}  // namespace
+}

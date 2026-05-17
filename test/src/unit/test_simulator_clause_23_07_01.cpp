@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- Requirement 1: :: prefix resolves downward ---
-
 TEST(ScopeResolutionPrefixSim, PackagePrefixResolvesDownward) {
   EXPECT_EQ(RunAndGet(
       "package pkg;\n"
@@ -27,8 +25,6 @@ TEST(ScopeResolutionPrefixSim, ClassPrefixResolvesDownward) {
       "  initial result = C::val;\n"
       "endmodule\n", "result"), 77u);
 }
-
-// --- Requirement 2: :: prefix never uses upward resolution ---
 
 TEST(ScopeResolutionPrefixSim, PrefixDoesNotResolveToLocalVariable) {
   EXPECT_EQ(RunAndGet(
@@ -53,8 +49,6 @@ TEST(ScopeResolutionPrefixSim, PackagePrefixDoesNotResolveToLocalVariable) {
       "  initial result = pkg::N;\n"
       "endmodule\n", "result"), 5u);
 }
-
-// --- Requirement 3: class vs. package disambiguation ---
 
 TEST(ScopeResolutionPrefixSim, VisibleClassNameDenotesClassScope) {
   EXPECT_EQ(RunAndGet(
@@ -97,4 +91,4 @@ TEST(ScopeResolutionPrefixSim, ClassAndPackagePrefixesResolveIndependently) {
   LowerRunAndCheck(f, design, {{"r1", 11u}, {"r2", 22u}});
 }
 
-}  // namespace
+}

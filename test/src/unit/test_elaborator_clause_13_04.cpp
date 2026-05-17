@@ -6,21 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(FunctionElaboration, FunctionCallInContAssign) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  wire [7:0] y;\n"
-      "  function logic [7:0] compute(input logic [7:0] a);\n"
-      "    return a + 8'd1;\n"
-      "  endfunction\n"
-      "  assign y = compute(8'd5);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(FunctionElaboration, FunctionWithOutputArgsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -202,9 +187,6 @@ TEST(FunctionElaboration, FunctionWithNestedTaskEnableError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4: It shall be illegal to call a function with output, inout, or ref
-// arguments in an expression that is not within a procedural statement
-// (e.g., a continuous assignment).
 TEST(FunctionElaboration, OutputArgCallInContAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -244,7 +226,6 @@ TEST(FunctionElaboration, RefArgCallInContAssignError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4: A const ref function argument shall be legal in this context.
 TEST(FunctionElaboration, ConstRefArgCallInContAssignOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -259,8 +240,6 @@ TEST(FunctionElaboration, ConstRefArgCallInContAssignOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4: It shall be illegal to call a function with output / inout / ref
-// arguments inside an event expression.
 TEST(FunctionElaboration, OutputArgCallInEventExpressionError) {
   ElabFixture f;
   ElaborateSrc(
@@ -274,8 +253,6 @@ TEST(FunctionElaboration, OutputArgCallInEventExpressionError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4: It shall be illegal to call a function with output / inout / ref
-// arguments inside a procedural continuous assignment (assign / force).
 TEST(FunctionElaboration, OutputArgCallInProceduralContAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -291,8 +268,6 @@ TEST(FunctionElaboration, OutputArgCallInProceduralContAssignError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4(a): The expect statement is one of the time-controlling statements
-// listed in §13.4 and shall not appear inside a function body.
 TEST(FunctionElaboration, FunctionWithExpectError) {
   ElabFixture f;
   ElaborateSrc(
@@ -306,8 +281,6 @@ TEST(FunctionElaboration, FunctionWithExpectError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4(a): The cycle-delay statement (##N) is a time-controlling statement
-// and shall not appear inside a function body.
 TEST(FunctionElaboration, FunctionWithCycleDelayError) {
   ElabFixture f;
   ElaborateSrc(
@@ -320,8 +293,127 @@ TEST(FunctionElaboration, FunctionWithCycleDelayError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4: A function call with only input args is legal in any expression
-// context.
+TEST(FunctionElaboration, ImplicitReturnTypeIsLogicScalar) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function foo();\n"
+      "    return 1'b1;\n"
+      "  endfunction\n"
+      "  logic x;\n"
+      "  initial x = foo();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FunctionElaboration, FunctionWithForkJoinError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    fork\n"
+      "      ;\n"
+      "    join\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionElaboration, FunctionWithForkJoinAnyError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    fork\n"
+      "      ;\n"
+      "    join_any\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionElaboration, FunctionMayCallProcessKill) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    process p;\n"
+      "    p = process::self();\n"
+      "    p.kill();\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FunctionElaboration, FunctionMayCallProcessSuspendResume) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function void f(process p);\n"
+      "    p.suspend();\n"
+      "    p.resume();\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FunctionElaboration, DynamicOverrideOnModuleScopeFunctionError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function :initial void f();\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionElaboration, DynamicOverrideFinalOnModuleScopeFunctionError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function :final void f();\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionElaboration, DynamicOverrideExtendsOnModuleScopeFunctionError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function :initial :extends void f();\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionElaboration, NestedForkJoinInFunctionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    if (1) begin\n"
+      "      fork\n"
+      "        ;\n"
+      "      join\n"
+      "    end\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(FunctionElaboration, InputOnlyArgCallInContAssignOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -335,4 +427,4 @@ TEST(FunctionElaboration, InputOnlyArgCallInContAssignOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

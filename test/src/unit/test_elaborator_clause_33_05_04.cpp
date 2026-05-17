@@ -46,11 +46,6 @@ CompilationUnit* ParseSrc(SourceManager& mgr, Arena& arena, DiagEngine& diag,
   return parser.Parse();
 }
 
-// §33.5.4: "in the case where the config includes a design statement,
-// then the specified cell shall be the top-level module."  Driving
-// elaboration through the config picks the cell named in the design
-// statement as the elaborated design's root, even when the call site
-// supplies no explicit top-module name.
 TEST(ConfigCommandLine, DesignStatementSelectsTopModule) {
   SourceManager mgr;
   Arena arena;
@@ -73,10 +68,6 @@ TEST(ConfigCommandLine, DesignStatementSelectsTopModule) {
   EXPECT_EQ(design->top_modules[0]->name, "top");
 }
 
-// §33.5.4: "regardless of the presence of any uninstantiated cells in
-// the rest of the source files."  Other cells in the source must not
-// displace the cell named by the config's design statement, and they
-// must stay out of the elaborated hierarchy.
 TEST(ConfigCommandLine, UninstantiatedCellsDoNotDisplaceDesignTop) {
   SourceManager mgr;
   Arena arena;
@@ -104,8 +95,6 @@ TEST(ConfigCommandLine, UninstantiatedCellsDoNotDisplaceDesignTop) {
   EXPECT_FALSE(design->all_modules.contains("spurious_b"));
 }
 
-// §33.5.4: a design statement can name multiple cells; each of them
-// becomes a top-level module of the elaborated design.
 TEST(ConfigCommandLine, MultipleDesignCellsAllBecomeTopModules) {
   SourceManager mgr;
   Arena arena;
@@ -130,11 +119,6 @@ TEST(ConfigCommandLine, MultipleDesignCellsAllBecomeTopModules) {
   EXPECT_EQ(design->top_modules[1]->name, "b");
 }
 
-// §33.5.4: "in this strategy [the separate compilation tool], the
-// config itself shall also be precompiled."  Saving a config to the
-// precompiled-library archive and reloading it later lets the binding
-// tool pick the config up after the fact, and the loaded config still
-// drives the design statement rule above.
 TEST(ConfigCommandLine, PrecompiledConfigDrivesBinding) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "lib.dpl";
@@ -163,10 +147,6 @@ TEST(ConfigCommandLine, PrecompiledConfigDrivesBinding) {
   EXPECT_EQ(design->top_modules[0]->name, "top");
 }
 
-// §33.5.4: a design cell that does not resolve to a module description
-// in the available source/library is a binding error.  The §33.5.1
-// "no fallback pool" rule still applies when the top-level cell is
-// chosen by a config rather than a command-line name.
 TEST(ConfigCommandLine, DesignCellWithNoModuleFails) {
   SourceManager mgr;
   Arena arena;
@@ -185,4 +165,4 @@ TEST(ConfigCommandLine, DesignCellWithNoModuleFails) {
   EXPECT_TRUE(diag.HasErrors());
 }
 
-}  // namespace
+}

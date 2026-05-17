@@ -22,4 +22,4 @@ TEST(BuiltinMethodSynthesis, ModuleWithMethodCallSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

@@ -1,4 +1,4 @@
-// §28.10
+
 
 #include <gtest/gtest.h>
 
@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// Each pull-source keyword must lex to its own token kind so the parser can
-// distinguish the 1-driving source from the 0-driving source.
 TEST(PullGateLexing, PullupKeyword) {
   auto tokens = Lex("pullup");
   ASSERT_GE(tokens.size(), 1u);
@@ -42,4 +40,4 @@ TEST(PullGateLexing, PulldownTokenSequence) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kSemicolon);
 }
 
-}  // namespace
+}

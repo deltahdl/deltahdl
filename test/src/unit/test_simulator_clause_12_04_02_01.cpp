@@ -424,4 +424,4 @@ TEST(UniqueIfViolationSim, UniqueIfThreeBranchOverlapTakesFirst) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-}  // namespace
+}

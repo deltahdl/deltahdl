@@ -85,4 +85,4 @@ TEST(VectorNetAccessibility, ScalaredWithoutPackedDimIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

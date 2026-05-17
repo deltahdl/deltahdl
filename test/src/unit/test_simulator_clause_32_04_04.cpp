@@ -9,15 +9,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §32.4.4 — SDF annotation of interconnect delays
-// =============================================================================
-
-// §32.4.4 Table 32-3 row "(INTERCONNECT...)": the construct names a source
-// port followed by a load port and a delay list. The parser must decode
-// both ports and surface them on the resulting SdfInterconnect so the
-// downstream annotator can route the entry through the source/load
-// matching rule the same paragraph spells out.
 TEST(SdfInterconnectAnnotation, ParseInterconnectConstructCarriesSourceAndLoad) {
   SdfFile file;
   std::string sdf = R"(
@@ -38,12 +29,6 @@ TEST(SdfInterconnectAnnotation, ParseInterconnectConstructCarriesSourceAndLoad) 
   EXPECT_EQ(ic.fall.typ_val, 9u);
 }
 
-// §32.4.4 Table 32-3 row "(PORT...)": a PORT entry carries only the load
-// port and the delay list — no source port — because the LRM defines its
-// semantics as "the delay from all sources on the net to that port". The
-// parser records this absence by leaving src_port empty and tagging the
-// entry with kPort so a future stage can apply the "from all sources"
-// fan-out rule.
 TEST(SdfInterconnectAnnotation, ParsePortConstructHasEmptySourceAndKindPort) {
   SdfFile file;
   std::string sdf = R"(
@@ -63,11 +48,6 @@ TEST(SdfInterconnectAnnotation, ParsePortConstructHasEmptySourceAndKindPort) {
   EXPECT_EQ(ic.fall.typ_val, 8u);
 }
 
-// §32.4.4 Table 32-3 row "(NETDELAY...)" plus the paragraph naming its
-// load-only shape: NETDELAY also carries no source port. The parser tags
-// it with kNetdelay so a future stage can enforce the LRM's restriction
-// that NETDELAY only land on input/inout module ports or on nets — a
-// constraint the kPort fan-out path does not impose.
 TEST(SdfInterconnectAnnotation,
      ParseNetdelayConstructHasEmptySourceAndKindNetdelay) {
   SdfFile file;
@@ -88,10 +68,6 @@ TEST(SdfInterconnectAnnotation,
   EXPECT_EQ(ic.fall.typ_val, 12u);
 }
 
-// §32.4.4 paragraph naming Table 32-3: the SDF parser must not silently
-// drop INTERCONNECT/PORT/NETDELAY into the §32.3 unannotatable warning
-// channel — they are explicitly mapped to interconnect delays in this
-// clause, so backannotation owns them.
 TEST(SdfInterconnectAnnotation, ConstructsDoNotProduceUnannotatableWarning) {
   SdfFile file;
   std::string sdf = R"(
@@ -115,10 +91,6 @@ TEST(SdfInterconnectAnnotation, ConstructsDoNotProduceUnannotatableWarning) {
   }
 }
 
-// §32.4.4 paragraph naming Table 32-3: the parsed entries must reach the
-// SpecifyManager as InterconnectDelay records, preserving the load port
-// (and source port when supplied) so a runtime that wires up references
-// to the annotated load can find the matching delay.
 TEST(SdfInterconnectAnnotation, ParsedConstructsRouteToInterconnectDelays) {
   SdfFile file;
   std::string sdf = R"(
@@ -144,10 +116,6 @@ TEST(SdfInterconnectAnnotation, ParsedConstructsRouteToInterconnectDelays) {
   EXPECT_EQ(ics[2].dst_port, "d.d");
 }
 
-// §32.4.4: "Interconnect delays have 12 transition delays". The runtime
-// InterconnectDelay record must therefore expose a 12-slot transition
-// table, mirroring the PathDelay shape, so per-transition lookups can
-// resolve to the right delay value.
 TEST(SdfInterconnectAnnotation, InterconnectDelayHas12TransitionSlots) {
   SdfFile file;
   SdfCell cell;
@@ -164,21 +132,15 @@ TEST(SdfInterconnectAnnotation, InterconnectDelayHas12TransitionSlots) {
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
   ASSERT_EQ(mgr.GetInterconnectDelays().size(), 1u);
   const auto& got = mgr.GetInterconnectDelays()[0];
-  // Two-value SDF expansion mirrors Table 32-4: rise covers 0->1/0->z/z->1
-  // and fall covers 1->0/1->z/z->0 across the six non-x transition slots.
-  EXPECT_EQ(got.delays[0], 7u);   // 0->1
-  EXPECT_EQ(got.delays[1], 11u);  // 1->0
-  EXPECT_EQ(got.delays[2], 7u);   // 0->z
-  EXPECT_EQ(got.delays[3], 7u);   // z->1
-  EXPECT_EQ(got.delays[4], 11u);  // 1->z
-  EXPECT_EQ(got.delays[5], 11u);  // z->0
+
+  EXPECT_EQ(got.delays[0], 7u);
+  EXPECT_EQ(got.delays[1], 11u);
+  EXPECT_EQ(got.delays[2], 7u);
+  EXPECT_EQ(got.delays[3], 7u);
+  EXPECT_EQ(got.delays[4], 11u);
+  EXPECT_EQ(got.delays[5], 11u);
 }
 
-// §32.4.4: "unique reject and error pulse limits are associated with each
-// of the 12" transition delays. The annotator must initialise per-slot
-// reject/error limits to the corresponding transition delay so the
-// default inertial-delay behaviour applies until a later mechanism
-// revises them.
 TEST(SdfInterconnectAnnotation, InterconnectPulseLimitsInitFromDelays) {
   SdfFile file;
   SdfCell cell;
@@ -200,10 +162,6 @@ TEST(SdfInterconnectAnnotation, InterconnectPulseLimitsInitFromDelays) {
   }
 }
 
-// §32.4.4: "The same rules for specify path delays for filling in missing
-// delays … also apply for interconnect delays." A single-value SDF entry
-// must therefore broadcast across every transition slot, exactly the
-// fill behaviour Table 32-4 spells out for path delays.
 TEST(SdfInterconnectAnnotation, SingleValueDelayBroadcastsAcrossAllSlots) {
   SdfFile file;
   SdfCell cell;
@@ -211,9 +169,7 @@ TEST(SdfInterconnectAnnotation, SingleValueDelayBroadcastsAcrossAllSlots) {
   ic.kind = SdfInterconnectKind::kInterconnect;
   ic.src_port = "a";
   ic.dst_port = "b";
-  // A "single-value" SDF entry leaves the fall delay at zero — only rise
-  // is supplied. The fill rule should propagate the rise value into every
-  // slot rather than leaving the unsupplied slots at zero.
+
   ic.rise.typ_val = 5;
   cell.interconnects.push_back(ic);
   file.cells.push_back(cell);
@@ -226,4 +182,4 @@ TEST(SdfInterconnectAnnotation, SingleValueDelayBroadcastsAcrossAllSlots) {
   }
 }
 
-}  // namespace
+}

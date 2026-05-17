@@ -51,4 +51,4 @@ TEST(ArrayMethodWithClause, IteratorScopeLimitedToWithClause) {
   EXPECT_EQ(outer_item->value.ToUint64(), 999u);
 }
 
-}  // namespace
+}

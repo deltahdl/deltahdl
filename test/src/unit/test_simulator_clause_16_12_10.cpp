@@ -35,4 +35,4 @@ TEST(SvaEngine, PropertyOr) {
             PropertyResult::kPass);
 }
 
-}  // namespace
+}

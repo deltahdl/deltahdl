@@ -21,8 +21,6 @@ struct CombBuilder {
   }
 };
 
-// A z on an input symbol is observed as x, so a row expecting x on that
-// position matches when the input is z.
 TEST(UdpInputZAsX, CombinationalXRowMatchesZ) {
   CombBuilder b;
   b.AddRow({'x', '0'}, '1').AddRow({'1', '1'}, '0');
@@ -31,8 +29,6 @@ TEST(UdpInputZAsX, CombinationalXRowMatchesZ) {
   EXPECT_EQ(state.Evaluate({'z', '0'}), '1');
 }
 
-// '?' wildcard accepts 0/1/x; a z input should be coerced to x and still
-// satisfy '?'.
 TEST(UdpInputZAsX, CombinationalWildcardAcceptsZ) {
   CombBuilder b;
   b.AddRow({'?', '1'}, '1');
@@ -41,8 +37,6 @@ TEST(UdpInputZAsX, CombinationalWildcardAcceptsZ) {
   EXPECT_EQ(state.Evaluate({'z', '1'}), '1');
 }
 
-// 'b' matches only 0 or 1. Once z is coerced to x, the row should not
-// match and the default x output should be produced.
 TEST(UdpInputZAsX, CombinationalBRowRejectsCoercedZ) {
   CombBuilder b;
   b.AddRow({'b', '1'}, '1');
@@ -51,8 +45,6 @@ TEST(UdpInputZAsX, CombinationalBRowRejectsCoercedZ) {
   EXPECT_EQ(state.Evaluate({'z', '1'}), 'x');
 }
 
-// A posedge symbol 'p' accepts 0→1, 0→x, and x→1. Treating z as x means a
-// 0→z transition (coerced to 0→x) satisfies 'p'.
 TEST(UdpInputZAsX, SequentialEdgeZTreatedAsX) {
   UdpDecl decl;
   decl.is_sequential = true;
@@ -72,8 +64,6 @@ TEST(UdpInputZAsX, SequentialEdgeZTreatedAsX) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-// Previous value of z on the same input position is treated as x for edge
-// detection. A z→0 transition is coerced to x→0, which negedge 'n' accepts.
 TEST(UdpInputZAsX, SequentialPreviousZTreatedAsX) {
   UdpDecl decl;
   decl.is_sequential = true;
@@ -93,8 +83,6 @@ TEST(UdpInputZAsX, SequentialPreviousZTreatedAsX) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-// SetInputs coerces z to x in the stored prev-inputs vector as well, so a
-// subsequent Evaluate observes a stable-x rather than stable-z history.
 TEST(UdpInputZAsX, SetInputsCoercesZ) {
   CombBuilder b;
   b.AddRow({'x', 'x'}, '1');
@@ -104,4 +92,4 @@ TEST(UdpInputZAsX, SetInputsCoercesZ) {
   EXPECT_EQ(state.Evaluate({'z', 'z'}), '1');
 }
 
-}  // namespace
+}

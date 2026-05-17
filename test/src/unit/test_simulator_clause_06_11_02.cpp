@@ -206,11 +206,6 @@ TEST(TwoStateAndFourState, LogicAndRegSimulateIdentically) {
   EXPECT_EQ(va->value.width, vb->value.width);
 }
 
-// §6.11.2 widening rule applies at any width. A 32-bit signed source with the
-// sign bit set, when widened into a 128-bit signed destination, must produce
-// sign-extension across the full upper 96 bits — i.e. the multi-word path of
-// the conversion code must replicate the MSB through every word above the
-// source width.
 TEST(TwoStateAndFourState, MultiWordSignedWideningSignExtends) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -229,15 +224,11 @@ TEST(TwoStateAndFourState, MultiWordSignedWideningSignExtends) {
   ASSERT_NE(dst, nullptr);
   EXPECT_EQ(dst->value.width, 128u);
   ASSERT_EQ(dst->value.nwords, 2u);
-  // Bits 0..31 hold the original 0x80000000; bits 32..63 sign-extend in the
-  // low word; bits 64..127 are entirely sign-extended ones in the high word.
+
   EXPECT_EQ(dst->value.words[0].aval, 0xFFFFFFFF80000000ull);
   EXPECT_EQ(dst->value.words[1].aval, 0xFFFFFFFFFFFFFFFFull);
 }
 
-// §6.11.2 narrowing rule applies at any width. A 128-bit source must
-// truncate to a 32-bit destination by keeping only the low 32 bits — the
-// upper-word contents must not bleed into the result.
 TEST(TwoStateAndFourState, MultiWordNarrowingTruncatesMSBs) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -258,10 +249,6 @@ TEST(TwoStateAndFourState, MultiWordNarrowingTruncatesMSBs) {
   EXPECT_EQ(dst->value.ToUint64(), 0xDDDDDDDDu);
 }
 
-// §6.11.2 4-state→2-state rule applies at any width. A 128-bit 4-state
-// source whose high word holds only x/z bits must coerce those bits to zero
-// when assigned to a 2-state destination, while preserving the known bits
-// from the low word.
 TEST(TwoStateAndFourState, MultiWordFourToTwoStateZeroesXz) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -285,4 +272,4 @@ TEST(TwoStateAndFourState, MultiWordFourToTwoStateZeroesXz) {
   EXPECT_EQ(dst->value.words[1].aval, 0ull);
 }
 
-}  // namespace
+}

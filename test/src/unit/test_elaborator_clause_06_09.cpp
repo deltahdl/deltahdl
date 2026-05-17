@@ -38,7 +38,6 @@ TEST(ScalarAndVectorDeclaration, BitScalarWidth) {
   EXPECT_EQ(mod->variables[0].width, 1u);
 }
 
-// §6.9: A matching user-defined type without a range is a 1-bit scalar.
 TEST(ScalarAndVectorDeclaration, LogicTypedefScalarWidth) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -54,8 +53,6 @@ TEST(ScalarAndVectorDeclaration, LogicTypedefScalarWidth) {
   EXPECT_EQ(mod->variables[0].width, 1u);
 }
 
-// §6.9: An object declared implicitly as logic without a range is a 1-bit
-// scalar.
 TEST(ScalarAndVectorDeclaration, ImplicitLogicScalarWidth) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -70,9 +67,6 @@ TEST(ScalarAndVectorDeclaration, ImplicitLogicScalarWidth) {
   EXPECT_EQ(mod->variables[0].width, 1u);
 }
 
-// §6.9: "A multibit data object of one of these types shall be declared by
-// specifying a range and is known as a vector." A `logic [7:0]` declaration
-// is the canonical §6.9 vector and shall elaborate to an 8-bit variable.
 TEST(ScalarAndVectorDeclaration, MultibitRangeProducesVectorWidth) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic [7:0] v; endmodule\n", f);
@@ -83,8 +77,6 @@ TEST(ScalarAndVectorDeclaration, MultibitRangeProducesVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// §6.9: The multibit-vector rule applies to reg the same way it applies to
-// logic; a packed range on reg produces a vector of the range's width.
 TEST(ScalarAndVectorDeclaration, RegMultibitVectorWidth) {
   ElabFixture f;
   auto* design = Elaborate("module m; reg [3:0] r; endmodule\n", f);
@@ -95,8 +87,6 @@ TEST(ScalarAndVectorDeclaration, RegMultibitVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 4u);
 }
 
-// §6.9: The multibit-vector rule applies to bit; a packed range on bit
-// produces a vector of the range's width.
 TEST(ScalarAndVectorDeclaration, BitMultibitVectorWidth) {
   ElabFixture f;
   auto* design = Elaborate("module m; bit [7:0] b; endmodule\n", f);
@@ -107,9 +97,6 @@ TEST(ScalarAndVectorDeclaration, BitMultibitVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// §6.9: The multibit-vector rule applies to a matching user-defined type
-// of logic; the typedef carries the packed range and the use-site elaborates
-// to the typedef's width.
 TEST(ScalarAndVectorDeclaration, LogicTypedefVectorWidth) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -125,10 +112,6 @@ TEST(ScalarAndVectorDeclaration, LogicTypedefVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// §6.9: The multibit-vector rule applies to an object whose type is
-// implicit logic. A `var [7:0] v;` declaration omits the base type, defaults
-// to logic, and carries a packed range; it shall elaborate to an 8-bit
-// vector.
 TEST(ScalarAndVectorDeclaration, ImplicitLogicVectorWidth) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -143,12 +126,6 @@ TEST(ScalarAndVectorDeclaration, ImplicitLogicVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// §6.9: The scalar rule applies to a matching user-defined type of `bit`
-// (a typedef of bit without a range) just as it applies to a typedef of
-// logic. §6.9 explicitly enumerates "reg, logic, or bit (or as a matching
-// user-defined type ...)", so the user-defined-type extension shall cover
-// all three named integer kinds. The elaborator resolves the typedef and
-// elaborates the variable to 1 bit.
 TEST(ScalarAndVectorDeclaration, BitTypedefScalarWidth) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -164,7 +141,6 @@ TEST(ScalarAndVectorDeclaration, BitTypedefScalarWidth) {
   EXPECT_EQ(mod->variables[0].width, 1u);
 }
 
-// §6.9: The scalar rule applies to a matching user-defined type of `reg`.
 TEST(ScalarAndVectorDeclaration, RegTypedefScalarWidth) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -180,9 +156,6 @@ TEST(ScalarAndVectorDeclaration, RegTypedefScalarWidth) {
   EXPECT_EQ(mod->variables[0].width, 1u);
 }
 
-// §6.9: The vector rule applies to a matching user-defined type of `bit`
-// — a typedef of bit with a packed range produces a vector of that range's
-// width. The §6.9 user-defined-type extension covers bit/reg/logic equally.
 TEST(ScalarAndVectorDeclaration, BitTypedefVectorWidth) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -198,7 +171,6 @@ TEST(ScalarAndVectorDeclaration, BitTypedefVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 4u);
 }
 
-// §6.9: The vector rule applies to a matching user-defined type of `reg`.
 TEST(ScalarAndVectorDeclaration, RegTypedefVectorWidth) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -214,8 +186,6 @@ TEST(ScalarAndVectorDeclaration, RegTypedefVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 4u);
 }
 
-// §6.9: Each variable in a multi-name declaration without a range is its
-// own 1-bit scalar.
 TEST(ScalarAndVectorDeclaration, MultipleScalarsHaveUnitWidth) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -232,8 +202,6 @@ TEST(ScalarAndVectorDeclaration, MultipleScalarsHaveUnitWidth) {
   EXPECT_EQ(mod->variables[2].width, 1u);
 }
 
-// §6.9: The vector rule applies per declarator. Each declarator in a
-// multi-name vector declaration is its own vector of the range's width.
 TEST(ScalarAndVectorDeclaration, MultipleVectorsHaveSpecifiedWidth) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -250,4 +218,4 @@ TEST(ScalarAndVectorDeclaration, MultipleVectorsHaveSpecifiedWidth) {
   EXPECT_EQ(mod->variables[2].width, 4u);
 }
 
-}  // namespace
+}

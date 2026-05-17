@@ -23,4 +23,4 @@ TEST(SysTask, TimeformatDoesNotCrash) {
   EXPECT_EQ(result.width, 1u);
 }
 
-}  // namespace
+}

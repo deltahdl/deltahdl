@@ -55,4 +55,4 @@ TEST(ArrayAddressingElaboration, BitSelectAfterArrayElementElaborates) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

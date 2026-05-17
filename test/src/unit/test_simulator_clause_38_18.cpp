@@ -44,5 +44,5 @@ TEST_F(VpiHandleSim, HandleReturnsNullptrForNoMatch) {
   EXPECT_EQ(result, nullptr);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

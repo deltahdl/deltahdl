@@ -40,5 +40,5 @@ TEST_F(VpiHandleMultiSim, HandleMultiBothNullReturnsNull) {
   EXPECT_EQ(h, nullptr);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

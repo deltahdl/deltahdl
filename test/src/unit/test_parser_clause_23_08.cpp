@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 23-8: upward_name_reference ::= module_identifier . item_name
-
 TEST(UpwardNameReferenceParsing, UpwardReferenceToVariable) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -103,9 +101,6 @@ TEST(UpwardNameReferenceParsing, UpwardReferenceProducesMemberAccessNode) {
   EXPECT_EQ(stmt->rhs->rhs->text, "v");
 }
 
-// scope_name.item_name: scope_name may be subroutine / module-program-
-// interface instance / generate-block name.
-
 TEST(UpwardNameReferenceParsing, ScopeNameSubroutineFormParses) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -142,4 +137,4 @@ TEST(UpwardNameReferenceParsing, MultiComponentUpwardPathParses) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

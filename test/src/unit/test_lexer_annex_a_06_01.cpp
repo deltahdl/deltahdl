@@ -51,4 +51,4 @@ TEST(ContinuousAssignLexing, CommaSeparatedAssignments) {
   EXPECT_GE(comma_count, 1);
 }
 
-}  // namespace
+}

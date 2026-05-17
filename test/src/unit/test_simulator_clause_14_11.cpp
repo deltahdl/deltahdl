@@ -71,12 +71,10 @@ TEST(CycleDelaySim, ZeroCycleDelayNoSuspend) {
   cmgr.Register(block);
   cmgr.SetDefaultClocking("cb");
 
-  // ##0 with 0 cycles should not suspend — await_ready returns true.
-  // This verifies the CycleDelayAwaiter behavior.
   f.ctx.SetClockingManager(&cmgr);
   cmgr.Attach(f.ctx, f.scheduler);
   f.scheduler.Run();
-  // No assertion needed beyond not hanging.
+
 }
 
-}  // namespace
+}

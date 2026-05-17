@@ -380,4 +380,4 @@ TEST(ArrayLiteralSim, DefaultMultidimensionalValues) {
   EXPECT_EQ(e11->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

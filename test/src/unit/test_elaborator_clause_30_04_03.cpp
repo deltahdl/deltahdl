@@ -69,8 +69,6 @@ TEST(SpecifyPathElaboration, EdgeKeywordPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// An edge-sensitive path whose input is a bit-select of a vector must
-// elaborate cleanly; the edge is conceptually on the selected bit.
 TEST(SpecifyPathElaboration, VectorInputBitSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -84,8 +82,6 @@ TEST(SpecifyPathElaboration, VectorInputBitSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Omitting the edge_identifier is legal when the output carries a
-// data_source_expression; the path is active on any transition.
 TEST(SpecifyPathElaboration, NoEdgeIdentifierWithDataSourceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -99,8 +95,6 @@ TEST(SpecifyPathElaboration, NoEdgeIdentifierWithDataSourceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A full edge-sensitive path with a multi-output data_source form must
-// elaborate without error.
 TEST(SpecifyPathElaboration, FullEdgeSensitiveMultipleOutputsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -114,4 +108,4 @@ TEST(SpecifyPathElaboration, FullEdgeSensitiveMultipleOutputsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

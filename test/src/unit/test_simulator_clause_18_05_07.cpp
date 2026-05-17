@@ -46,4 +46,4 @@ TEST(Constraint, ForeachConstraint) {
   }
 }
 
-}  // namespace
+}

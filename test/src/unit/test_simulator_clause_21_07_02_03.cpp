@@ -48,5 +48,5 @@ TEST_F(VcdHeaderAndScopeSim, RegistersSignal) {
   EXPECT_NE(content.find("clk"), std::string::npos);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

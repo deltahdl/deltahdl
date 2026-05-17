@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- let_port_item ---
-
 TEST(LetDeclParsing, LetPortItem_ExplicitType) {
   auto r = Parse(
       "module m;\n"
@@ -115,8 +113,6 @@ TEST(LetDeclParsing, LetPortItem_ImplicitType) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
-// --- let_formal_type ---
-
 TEST(LetDeclParsing, LetFormalType_Logic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -178,8 +174,6 @@ TEST(LetDeclParsing, LetFormalType_Untyped) {
   ASSERT_EQ(item->func_args.size(), 1u);
   EXPECT_EQ(item->func_args[0].name, "a");
 }
-
-// --- let_declaration ---
 
 TEST(LetDeclParsing, LetDecl_NoArgs) {
   auto r = Parse(
@@ -289,8 +283,6 @@ TEST(LetDeclParsing, LetDecl_Multiple) {
   EXPECT_EQ(count, 2);
 }
 
-// --- let_identifier ---
-
 TEST(LetDeclParsing, LetIdentifier_Simple) {
   auto r = Parse(
       "module m;\n"
@@ -302,8 +294,6 @@ TEST(LetDeclParsing, LetIdentifier_Simple) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "foo");
 }
-
-// --- let_port_list ---
 
 TEST(LetDeclParsing, LetPortList_Single) {
   auto r = Parse(
@@ -345,8 +335,6 @@ TEST(LetDeclParsing, LetPortList_MixedTypes) {
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->func_args.size(), 3u);
 }
-
-// --- let_expression ---
 
 TEST(LetDeclParsing, LetExpr_SimpleCall) {
   EXPECT_TRUE(
@@ -426,8 +414,6 @@ TEST(LetDeclParsing, LetExpr_InConditional) {
               "endmodule\n"));
 }
 
-// --- let_list_of_arguments ---
-
 TEST(LetDeclParsing, LetArgs_SinglePositional) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -496,8 +482,6 @@ TEST(LetDeclParsing, LetArgs_ExprInArgs) {
               "endmodule\n"));
 }
 
-// --- let_actual_arg ---
-
 TEST(LetDeclParsing, LetActualArg_Literal) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -565,8 +549,6 @@ TEST(LetDeclParsing, LetActualArg_FunctionCall) {
               "endmodule\n"));
 }
 
-// --- LetDeclParsing (declaration variants) ---
-
 TEST(LetDeclParsing, DeclNoArgsBody) {
   auto r = Parse(
       "module t;\n"
@@ -622,8 +604,6 @@ TEST(LetDeclParsing, DeclTypedArgsNames) {
   EXPECT_EQ(let_item->func_args[1].name, "y");
 }
 
-// --- let_declaration in block items ---
-
 TEST(LetDeclParsing, LetDeclInFunction) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -660,8 +640,6 @@ TEST(LetDeclParsing, LetDeclInForkJoin) {
               "endmodule\n"));
 }
 
-// --- let_declaration in clocking block ---
-
 TEST(LetDeclParsing, LetDeclInClockingBlock) {
   auto r = Parse(
       "module m;\n"
@@ -676,8 +654,6 @@ TEST(LetDeclParsing, LetDeclInClockingBlock) {
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
 }
-
-// --- Error conditions and edge cases ---
 
 TEST(LetDeclParsing, ErrorMissingEquals) {
   auto r = Parse(
@@ -783,8 +759,6 @@ TEST(LetDeclParsing, LetCallInAlwaysBlock) {
               "endmodule\n"));
 }
 
-// --- let as subexpression shortcut (§11.12 Example) ---
-
 TEST(LetDeclParsing, LetAsSubexpressionShortcut) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -795,8 +769,6 @@ TEST(LetDeclParsing, LetAsSubexpressionShortcut) {
               "  end\n"
               "endmodule\n"));
 }
-
-// --- package-scoped let with import ---
 
 TEST(LetDeclParsing, LetDeclImportedFromPackage) {
   EXPECT_TRUE(
@@ -815,8 +787,6 @@ TEST(LetDeclParsing, LetDeclImportedFromPackage) {
               "endmodule\n"));
 }
 
-// --- let in compilation-unit scope ---
-
 TEST(LetDeclParsing, LetDeclInCompilationUnitScope) {
   EXPECT_TRUE(
       ParseOk("let global_add(a, b) = a + b;\n"
@@ -824,16 +794,12 @@ TEST(LetDeclParsing, LetDeclInCompilationUnitScope) {
               "endmodule\n"));
 }
 
-// --- let with body using $bits ---
-
 TEST(LetDeclParsing, LetBodyWithSystemFunction) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let mult(x, y) = ($bits(x) + $bits(y))'(x * y);\n"
               "endmodule\n"));
 }
-
-// --- mixed positional and named arguments ---
 
 TEST(LetDeclParsing, LetArgsMixedPositionalAndNamed) {
   EXPECT_TRUE(
@@ -846,4 +812,4 @@ TEST(LetDeclParsing, LetArgsMixedPositionalAndNamed) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

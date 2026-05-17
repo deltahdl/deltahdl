@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- function_declaration ---
-
 TEST(FunctionDeclElaboration, FunctionDeclAddedToModule) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -28,19 +26,12 @@ TEST(FunctionDeclElaboration, FunctionDeclVoidReturn) {
       "endmodule\n"));
 }
 
-// Lifetime-keyword acceptance on function declarations is a §6.21 rule;
-// the corresponding elaborator tests live in test_elaborator_clause_06_21.cpp.
-
-// --- function_body_declaration: implicit return type ---
-
 TEST(FunctionDeclElaboration, FunctionImplicitReturnType) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
       "  function [7:0] f(); return 8'hFF; endfunction\n"
       "endmodule\n"));
 }
-
-// --- function_body_declaration: old-style ports ---
 
 TEST(FunctionDeclElaboration, FunctionOldStylePorts) {
   EXPECT_TRUE(ElabOk(
@@ -51,8 +42,6 @@ TEST(FunctionDeclElaboration, FunctionOldStylePorts) {
       "  endfunction\n"
       "endmodule\n"));
 }
-
-// --- dpi_import_export ---
 
 TEST(FunctionDeclElaboration, DpiImportPureElaborates) {
   EXPECT_TRUE(ElabOk(
@@ -75,8 +64,6 @@ TEST(FunctionDeclElaboration, DpiImportTaskContextElaborates) {
       "endmodule\n"));
 }
 
-// --- multiple function declarations ---
-
 TEST(FunctionDeclElaboration, MultipleFunctionsElaborate) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -91,4 +78,4 @@ TEST(FunctionDeclElaboration, MultipleFunctionsElaborate) {
   EXPECT_GE(mod->function_decls.size(), 2u);
 }
 
-}  // namespace
+}

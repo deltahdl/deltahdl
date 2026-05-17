@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- Parsing default values on input ports ---
-
 TEST(DefaultPortValueParsing, InputWithDefaultValue) {
   auto r = Parse("module m(input logic x = 1'b0); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -78,9 +76,6 @@ TEST(DefaultPortValueParsing, MultipleInputsAllWithDefaults) {
   EXPECT_NE(r.cu->modules[0]->ports[2].default_value, nullptr);
 }
 
-// --- Parser accepts default values on any direction (semantic check is in
-//     the elaborator) ---
-
 TEST(DefaultPortValueParsing, OutputWithDefaultValue) {
   auto r = Parse("module m(output logic q = 1'b0); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -104,8 +99,6 @@ TEST(DefaultPortValueParsing, RefWithDefaultValue) {
   EXPECT_NE(r.cu->modules[0]->ports[0].default_value, nullptr);
 }
 
-// --- LRM example: bus_conn ---
-
 TEST(DefaultPortValueParsing, LrmExampleBusConn) {
   auto r = Parse(
       "module bus_conn (\n"
@@ -121,4 +114,4 @@ TEST(DefaultPortValueParsing, LrmExampleBusConn) {
   EXPECT_NE(r.cu->modules[0]->ports[1].default_value, nullptr);
 }
 
-}  // namespace
+}

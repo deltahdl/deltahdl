@@ -40,23 +40,15 @@ bool Lexer::AtEnd() const { return pos_ >= source_.size(); }
 
 SourceLoc Lexer::MakeLoc() const { return {file_id_, line_, column_}; }
 
-// ---------------------------------------------------------------------------
-// Whitespace and comments
-// ---------------------------------------------------------------------------
-
 void Lexer::SkipLineComment() {
-  // §A.9.2: one_line_comment ::= // comment_text \n — comment_text is any
-  // ASCII character sequence terminated by the newline. EOF acts as a
-  // terminator too (§A.9.4 lists eof as white_space).
+
   while (!AtEnd() && Current() != '\n') {
     Advance();
   }
 }
 
 void Lexer::SkipBlockComment(SourceLoc start_loc) {
-  // §A.9.2: block_comment ::= /* comment_text */ — caller has already
-  // consumed '/' and '*'. comment_text is any ASCII character sequence
-  // greedily consumed until the first '*/' terminator (no nesting per BNF).
+
   while (!AtEnd()) {
     if (Current() == '*' && PeekChar() == '/') {
       Advance();
@@ -70,9 +62,7 @@ void Lexer::SkipBlockComment(SourceLoc start_loc) {
 
 void Lexer::SkipWhitespaceAndComments() {
   while (!AtEnd()) {
-    // §A.9.4: white_space ::= space | tab | newline | formfeed | eof.
-    // eof is handled by the !AtEnd() loop guard; std::isspace covers the four
-    // listed characters (and tolerates additional ASCII whitespace).
+
     if (std::isspace(static_cast<unsigned char>(Current()))) {
       Advance();
       continue;
@@ -81,15 +71,15 @@ void Lexer::SkipWhitespaceAndComments() {
       ConsumeKeywordMarker();
       continue;
     }
-    // §A.9.2: comment ::= one_line_comment | block_comment.
+
     if (Current() == '/' && PeekChar() == '/') {
       SkipLineComment();
       continue;
     }
     if (Current() == '/' && PeekChar() == '*') {
       auto comment_loc = MakeLoc();
-      Advance();  // skip '/'
-      Advance();  // skip '*'
+      Advance();
+      Advance();
       SkipBlockComment(comment_loc);
       continue;
     }
@@ -98,19 +88,15 @@ void Lexer::SkipWhitespaceAndComments() {
 }
 
 void Lexer::ConsumeKeywordMarker() {
-  Advance();  // skip marker byte
+  Advance();
   if (!AtEnd()) {
     keyword_version_ = static_cast<KeywordVersion>(Current());
-    Advance();  // skip version byte
+    Advance();
   }
   if (!AtEnd() && Current() == '\n') {
-    Advance();  // skip trailing newline
+    Advance();
   }
 }
-
-// ---------------------------------------------------------------------------
-// Token construction
-// ---------------------------------------------------------------------------
 
 Token Lexer::MakeToken(TokenKind kind, SourceLoc loc) const {
   Token tok;
@@ -127,10 +113,6 @@ Token Lexer::MakeOp(TokenKind kind, SourceLoc loc, uint32_t start) {
   return tok;
 }
 
-// ---------------------------------------------------------------------------
-// Top-level dispatch
-// ---------------------------------------------------------------------------
-
 Token Lexer::Next() {
   if (has_peeked_) {
     has_peeked_ = false;
@@ -142,12 +124,7 @@ Token Lexer::Next() {
   }
   char c = Current();
   if (c == '$') {
-    // §A.9.3: system_tf_identifier ::= $[a-zA-Z0-9_$] { [a-zA-Z0-9_$] }.  The
-    // first body-character class admits `$` itself (alongside alphanumerics
-    // and `_`), so `$$x` is a single system_tf_identifier — not a kDollar
-    // followed by `$x`.  A bare `$` (or `$` followed by white_space, EOF, or
-    // any non-body char) falls through to the kDollar token used for queue-
-    // dimension / last-index syntax.
+
     char next = PeekChar();
     if (std::isalnum(static_cast<unsigned char>(next)) || next == '_' ||
         next == '$') {
@@ -208,10 +185,6 @@ Token Lexer::NextFilePathSpec() {
   return tok;
 }
 
-// ---------------------------------------------------------------------------
-// Identifiers
-// ---------------------------------------------------------------------------
-
 Token Lexer::LexIdentifier() {
   auto loc = MakeLoc();
   uint32_t start = pos_;
@@ -231,14 +204,10 @@ Token Lexer::LexIdentifier() {
   return tok;
 }
 
-// ---------------------------------------------------------------------------
-// Numbers
-// ---------------------------------------------------------------------------
-
 Token Lexer::LexUnbasedUnsized(SourceLoc loc, uint32_t start) {
-  Advance();  // skip '
+  Advance();
   if (!AtEnd()) {
-    Advance();  // value character
+    Advance();
   }
   Token tok;
   tok.kind = TokenKind::kUnbasedUnsizedLiteral;
@@ -250,7 +219,7 @@ Token Lexer::LexUnbasedUnsized(SourceLoc loc, uint32_t start) {
 void Lexer::ValidateDecimalXZ(SourceLoc loc, char base_letter,
                               uint32_t digit_start) {
   if (base_letter != 'd' && base_letter != 'D') return;
-  // §5.7.1: In a decimal literal, x/z/? is only valid as the sole digit.
+
   uint32_t digit_count = 0;
   bool has_xz = false;
   for (uint32_t i = digit_start; i < pos_; ++i) {
@@ -299,17 +268,17 @@ void Lexer::ValidateBaseDigits(SourceLoc loc, char base_letter,
 }
 
 Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
-  Advance();  // skip '
-  // Optional signed specifier: 's' or 'S'.
+  Advance();
+
   if (!AtEnd() && (Current() == 's' || Current() == 'S')) {
     Advance();
   }
   char base_letter = '\0';
   if (!AtEnd()) {
     base_letter = Current();
-    Advance();  // base letter (h/d/b/o)
+    Advance();
   }
-  // Skip optional whitespace after base letter (IEEE §5.7.1).
+
   while (!AtEnd() && (Current() == ' ' || Current() == '\t')) {
     Advance();
   }
@@ -348,10 +317,7 @@ void Lexer::LexFractionalPart() {
 void Lexer::LexExponentPart() {
   if (AtEnd()) return;
   if (Current() != 'e' && Current() != 'E') return;
-  // §A.8.7: real_number ::= ... exp [ sign ] unsigned_number, and
-  // unsigned_number ::= decimal_digit { _ | decimal_digit }. The body
-  // following exp [sign] must therefore begin with a decimal_digit;
-  // peek before consuming so a bare 'e' or 'e+' stays out of the number.
+
   uint32_t look = pos_ + 1;
   if (look < source_.size() &&
       (source_[look] == '+' || source_[look] == '-')) {
@@ -384,7 +350,7 @@ bool Lexer::IsWordBoundary(uint32_t p) const {
 bool Lexer::TryLexTimeSuffix() {
   if (AtEnd()) return false;
   uint32_t save = pos_;
-  // Two-character suffixes first: ms, us, ns, ps, fs.
+
   if (pos_ + 1 < source_.size()) {
     char c0 = source_[pos_];
     char c1 = source_[pos_ + 1];
@@ -397,7 +363,7 @@ bool Lexer::TryLexTimeSuffix() {
       return true;
     }
   }
-  // Single character: just 's'.
+
   if (source_[pos_] == 's' && IsWordBoundary(pos_ + 1)) {
     Advance();
     return true;
@@ -414,29 +380,25 @@ Token Lexer::LexNumber() {
     return LexUnbasedUnsized(loc, start);
   }
 
-  // Decimal digits
   while (!AtEnd() && (std::isdigit(static_cast<unsigned char>(Current())) ||
                       Current() == '_')) {
     Advance();
   }
 
-  // Skip optional whitespace before base specifier (IEEE §5.7.1).
   uint32_t before_ws = pos_;
   while (!AtEnd() && (Current() == ' ' || Current() == '\t')) {
     Advance();
   }
-  // Check for base specifier: 'h, 'b, 'o, 'd
+
   if (!AtEnd() && Current() == '\'') {
     return LexBasedNumber(loc, start);
   }
-  pos_ = before_ws;  // no apostrophe — restore past whitespace
+  pos_ = before_ws;
 
-  // Check for real literal (decimal point or exponent)
   uint32_t before_real = pos_;
   LexRealSuffix();
   bool is_real = (pos_ != before_real);
 
-  // Check for time suffix (s, ms, us, ns, ps, fs).
   bool is_time = TryLexTimeSuffix();
 
   Token tok;
@@ -448,25 +410,21 @@ Token Lexer::LexNumber() {
   return tok;
 }
 
-// ---------------------------------------------------------------------------
-// String / system / escaped identifiers
-// ---------------------------------------------------------------------------
-
 Token Lexer::LexStringLiteral() {
   auto loc = MakeLoc();
   uint32_t start = pos_;
-  // Detect triple-quoted string: """...""" (§5.9)
+
   bool triple = PeekChar() == '"' && pos_ + 2 < source_.size() &&
                 source_[pos_ + 2] == '"';
   if (triple) {
     Advance();
     Advance();
-    Advance();  // skip opening """
+    Advance();
     if (!LexTripleQuotedBody()) {
       diag_.Error(loc, "unterminated triple-quoted string");
     }
   } else {
-    Advance();  // skip opening "
+    Advance();
     if (!LexQuotedBody()) {
       diag_.Error(loc, "unterminated string literal");
     }
@@ -481,18 +439,18 @@ Token Lexer::LexStringLiteral() {
 bool Lexer::LexQuotedBody() {
   while (!AtEnd() && Current() != '"') {
     if (Current() == '\n' || Current() == '\r') {
-      // §A.8.8: quoted_string_item excludes newline — unterminated string
+
       return false;
     }
     if (Current() == '\\') {
-      Advance();  // skip backslash; following char (incl. newline) is the
-                  // escape
+      Advance();
+
       if (AtEnd()) return false;
     }
     Advance();
   }
   if (AtEnd()) return false;
-  Advance();  // skip closing "
+  Advance();
   return true;
 }
 
@@ -502,11 +460,11 @@ bool Lexer::LexTripleQuotedBody() {
         source_[pos_ + 2] == '"') {
       Advance();
       Advance();
-      Advance();  // skip closing """
+      Advance();
       return true;
     }
     if (Current() == '\\') {
-      Advance();  // skip escape character
+      Advance();
     }
     Advance();
   }
@@ -516,7 +474,7 @@ bool Lexer::LexTripleQuotedBody() {
 Token Lexer::LexSystemIdentifier() {
   auto loc = MakeLoc();
   uint32_t start = pos_;
-  Advance();  // skip leading $
+  Advance();
   while (!AtEnd()) {
     char ch = Current();
     bool is_word =
@@ -536,14 +494,14 @@ Token Lexer::LexSystemIdentifier() {
 
 Token Lexer::LexEscapedIdentifier() {
   auto loc = MakeLoc();
-  Advance();  // skip backslash
+  Advance();
   uint32_t start = pos_;
   while (!AtEnd()) {
     unsigned char c = static_cast<unsigned char>(Current());
     if (std::isspace(c)) {
       break;
     }
-    // §5.6.1: body may contain only printable ASCII (decimal 33-126).
+
     if (c < 33 || c > 126) {
       diag_.Error(MakeLoc(),
                   "escaped identifier contains non-printable character");
@@ -560,11 +518,6 @@ Token Lexer::LexEscapedIdentifier() {
   return tok;
 }
 
-// ---------------------------------------------------------------------------
-// Apostrophe dispatch (§5.7 unbased unsized, §5.10 assignment pattern, §6.24
-// cast)
-// ---------------------------------------------------------------------------
-
 static bool IsBaseSpecifier(char c) {
   return c == 'h' || c == 'H' || c == 'd' || c == 'D' || c == 'b' || c == 'B' ||
          c == 'o' || c == 'O';
@@ -575,8 +528,8 @@ Token Lexer::LexApostrophe() {
   if (next == '{') {
     auto loc = MakeLoc();
     uint32_t start = pos_;
-    Advance();  // skip '
-    Advance();  // skip {
+    Advance();
+    Advance();
     return MakeOp(TokenKind::kApostropheLBrace, loc, start);
   }
   if (next == '0' || next == '1' || next == 'x' || next == 'X' || next == 'z' ||
@@ -586,25 +539,21 @@ Token Lexer::LexApostrophe() {
   if (next == '(') {
     auto loc = MakeLoc();
     uint32_t start = pos_;
-    Advance();  // skip '
+    Advance();
     return MakeOp(TokenKind::kApostrophe, loc, start);
   }
-  // Unsized based literals: 'h, 'd, 'b, 'o (optionally with 's' for signed).
+
   if (IsBaseSpecifier(next)) {
     return LexBasedNumber(MakeLoc(), pos_);
   }
   if (next == 's' || next == 'S') {
-    // Check for signed base: 'sh, 'sd, etc.
+
     if (pos_ + 2 < source_.size() && IsBaseSpecifier(source_[pos_ + 2])) {
       return LexBasedNumber(MakeLoc(), pos_);
     }
   }
   return LexOperator();
 }
-
-// ---------------------------------------------------------------------------
-// Operator sub-helpers
-// ---------------------------------------------------------------------------
 
 Token Lexer::LexOpTilde(SourceLoc loc, uint32_t start) {
   if (!AtEnd() && Current() == '&') {
@@ -635,17 +584,17 @@ Token Lexer::LexOpPlus(SourceLoc loc, uint32_t start) {
     Advance();
     return MakeOp(TokenKind::kPlusColon, loc, start);
   }
-  // §11.4.13: +/- (absolute tolerance) and +%- (relative tolerance).
+
   if (!AtEnd() && Current() == '/' && pos_ + 1 < source_.size() &&
       source_[pos_ + 1] == '-') {
-    Advance();  // /
-    Advance();  // -
+    Advance();
+    Advance();
     return MakeOp(TokenKind::kPlusSlashMinus, loc, start);
   }
   if (!AtEnd() && Current() == '%' && pos_ + 1 < source_.size() &&
       source_[pos_ + 1] == '-') {
-    Advance();  // %
-    Advance();  // -
+    Advance();
+    Advance();
     return MakeOp(TokenKind::kPlusPercentMinus, loc, start);
   }
   return MakeOp(TokenKind::kPlus, loc, start);
@@ -783,14 +732,14 @@ Token Lexer::LexOpHash(SourceLoc loc, uint32_t start) {
   }
   if (!AtEnd() && Current() == '-' && pos_ + 1 < source_.size() &&
       source_[pos_ + 1] == '#') {
-    Advance();  // -
-    Advance();  // #
+    Advance();
+    Advance();
     return MakeOp(TokenKind::kHashMinusHash, loc, start);
   }
   if (!AtEnd() && Current() == '=' && pos_ + 1 < source_.size() &&
       source_[pos_ + 1] == '#') {
-    Advance();  // =
-    Advance();  // #
+    Advance();
+    Advance();
     return MakeOp(TokenKind::kHashEqHash, loc, start);
   }
   return MakeOp(TokenKind::kHash, loc, start);
@@ -846,14 +795,14 @@ Token Lexer::LexAngleLeft(SourceLoc loc, uint32_t start) {
   }
   if (Current() == '-' && pos_ + 1 < source_.size() &&
       source_[pos_ + 1] == '>') {
-    Advance();  // -
-    Advance();  // >
+    Advance();
+    Advance();
     return MakeOp(TokenKind::kLtDashGt, loc, start);
   }
   if (Current() != '<') {
     return MakeOp(TokenKind::kLt, loc, start);
   }
-  Advance();  // second <
+  Advance();
   if (!AtEnd() && Current() == '<') {
     Advance();
     if (!AtEnd() && Current() == '=') {
@@ -880,7 +829,7 @@ Token Lexer::LexAngleRight(SourceLoc loc, uint32_t start) {
   if (Current() != '>') {
     return MakeOp(TokenKind::kGt, loc, start);
   }
-  Advance();  // second >
+  Advance();
   if (!AtEnd() && Current() == '>') {
     Advance();
     if (!AtEnd() && Current() == '=') {
@@ -896,10 +845,6 @@ Token Lexer::LexAngleRight(SourceLoc loc, uint32_t start) {
   return MakeOp(TokenKind::kGtGt, loc, start);
 }
 
-// ---------------------------------------------------------------------------
-// Main operator dispatch
-// ---------------------------------------------------------------------------
-
 Token Lexer::LexOperator() {
   auto loc = MakeLoc();
   uint32_t start = pos_;
@@ -909,7 +854,7 @@ Token Lexer::LexOperator() {
   switch (c) {
     case '(':
       if (!AtEnd() && Current() == '*' && PeekChar() != ')') {
-        Advance();  // skip *
+        Advance();
         in_attribute_ = true;
         return MakeOp(TokenKind::kAttrStart, loc, start);
       }
@@ -938,7 +883,7 @@ Token Lexer::LexOperator() {
       return LexOpMinus(loc, start);
     case '*':
       if (in_attribute_ && !AtEnd() && Current() == ')') {
-        Advance();  // skip )
+        Advance();
         in_attribute_ = false;
         return MakeOp(TokenKind::kAttrEnd, loc, start);
       }
@@ -981,10 +926,6 @@ Token Lexer::LexOperator() {
   return tok;
 }
 
-// ---------------------------------------------------------------------------
-// Bulk lexing
-// ---------------------------------------------------------------------------
-
 std::vector<Token> Lexer::LexAll() {
   std::vector<Token> tokens;
   while (true) {
@@ -1012,4 +953,4 @@ void Lexer::RestorePos(const SavedPos& saved) {
   keyword_version_ = saved.keyword_version;
 }
 
-}  // namespace delta
+}

@@ -4,8 +4,6 @@
 
 using namespace delta;
 
-// §6.19 Enumerations
-
 TEST(Enumerations, EnumKeywordToken) {
   auto tokens = Lex("enum");
   ASSERT_GE(tokens.size(), 2);

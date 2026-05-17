@@ -9,10 +9,8 @@
 
 namespace delta {
 
-// Forward declarations
 struct RtlirModule;
 
-/// A single port on an inferred memory.
 struct MemoryPort {
   std::string name;
   uint32_t addr_width = 0;
@@ -21,7 +19,6 @@ struct MemoryPort {
   Edge clock_edge = Edge::kNone;
 };
 
-/// An inferred memory block detected from array access patterns.
 struct InferredMemory {
   std::string name;
   uint32_t depth = 0;
@@ -30,8 +27,6 @@ struct InferredMemory {
   std::vector<MemoryPort> write_ports;
 };
 
-/// Analyze always_ff blocks in an RTLIR module for array access patterns
-/// (indexed reads/writes like mem[addr]) and return detected memories.
 std::vector<InferredMemory> InferMemories(const RtlirModule* mod);
 
-}  // namespace delta
+}

@@ -80,4 +80,4 @@ TEST(Elaboration, MultipleEventDeclarationsElaborate) {
   EXPECT_EQ(event_count, 2);
 }
 
-}  // namespace
+}

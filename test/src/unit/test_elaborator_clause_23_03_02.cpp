@@ -150,9 +150,6 @@ TEST(ModuleInstantiationElaboration, PortConnectionsToPortlessModuleWarns) {
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-// §23.3.2: "The parentheses shall be required on all module instantiations,
-// even when the instantiated module does not have ports." Empty parens on a
-// portless module shall elaborate without errors.
 TEST(ModuleInstantiationElaboration,
      EmptyParensOnPortlessModuleElaborates) {
   ElabFixture f;
@@ -168,4 +165,4 @@ TEST(ModuleInstantiationElaboration,
   EXPECT_NE(design->top_modules[0]->children[0].resolved, nullptr);
 }
 
-}  // namespace
+}

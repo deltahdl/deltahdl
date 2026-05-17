@@ -5,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §28.16.1 R1: a gate-instance delay in min:typ:max form must parse — the
-// three colon-separated sub-expressions fill the single rise slot so the
-// gate_delay surfaces an ExprKind::kMinTypMax node to downstream passes.
 TEST(MinTypMaxDelayParsing, GateDelaySingleSlot) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -16,9 +13,6 @@ TEST(MinTypMaxDelayParsing, GateDelaySingleSlot) {
               "endmodule\n"));
 }
 
-// §28.16.1 R1: the three colon-separated sub-expressions of a cont-assign
-// mintypmax must land in the AST's lhs/condition/rhs so later passes can
-// read each branch independently under a DelayMode selection.
 TEST(MinTypMaxDelayParsing, ContAssignTripleFields) {
   auto r = Parse(
       "module m;\n"
@@ -38,8 +32,6 @@ TEST(MinTypMaxDelayParsing, ContAssignTripleFields) {
   EXPECT_EQ(delay->rhs->int_val, 30u);
 }
 
-// §28.16.1 R1: each of the three slots is a full expression, not just an
-// integer literal — the parser must accept arithmetic in any position.
 TEST(MinTypMaxDelayParsing, ArithmeticSubExpressions) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -48,8 +40,6 @@ TEST(MinTypMaxDelayParsing, ArithmeticSubExpressions) {
               "endmodule\n"));
 }
 
-// §28.16.1 R1: in a multi-delay spec (here, delay2) each comma-separated
-// position independently accepts a full mintypmax triple.
 TEST(MinTypMaxDelayParsing, GateDelayTwoSlots) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -58,8 +48,6 @@ TEST(MinTypMaxDelayParsing, GateDelayTwoSlots) {
               "endmodule\n"));
 }
 
-// §28.16.1 R3: a procedural delay control accepts mintypmax — `#(a:b:c)`
-// on a statement must land as an ExprKind::kMinTypMax on the delay slot.
 TEST(MinTypMaxDelayParsing, ProceduralDelayControl) {
   auto r = Parse(
       "module m;\n"
@@ -76,9 +64,6 @@ TEST(MinTypMaxDelayParsing, ProceduralDelayControl) {
   EXPECT_EQ(stmt->delay->kind, ExprKind::kMinTypMax);
 }
 
-// §28.16.1 R1: a net declaration's delay slot accepts mintypmax — the
-// kMinTypMax node must surface on net_delay so the simulator can later
-// pick min/typ/max per DelayMode.
 TEST(MinTypMaxDelayParsing, NetDelaySingleSlot) {
   auto r = Parse(
       "module m;\n"
@@ -91,9 +76,6 @@ TEST(MinTypMaxDelayParsing, NetDelaySingleSlot) {
   EXPECT_EQ(item->net_delay->kind, ExprKind::kMinTypMax);
 }
 
-// §28.16.1 R1: a net declaration's three delay slots each accept an
-// independent mintypmax triple — rise/fall/turn-off must all carry a
-// kMinTypMax node, none silently flattened.
 TEST(MinTypMaxDelayParsing, NetDelayThreeSlotTriples) {
   auto r = Parse(
       "module m;\n"
@@ -110,8 +92,6 @@ TEST(MinTypMaxDelayParsing, NetDelayThreeSlotTriples) {
   EXPECT_EQ(item->net_delay_decay->kind, ExprKind::kMinTypMax);
 }
 
-// §28.16.1 R1: a cont-assign's two delay slots each accept an independent
-// mintypmax triple — both rise and fall must carry a kMinTypMax node.
 TEST(MinTypMaxDelayParsing, ContAssignDelayTwoSlotTriples) {
   auto r = Parse(
       "module m;\n"
@@ -127,9 +107,6 @@ TEST(MinTypMaxDelayParsing, ContAssignDelayTwoSlotTriples) {
   EXPECT_EQ(item->assign_delay_fall->kind, ExprKind::kMinTypMax);
 }
 
-// §28.16.1 R2: min/typ/max have no required ordering — a spec where the
-// literal min value exceeds typ and max must still parse cleanly, i.e.,
-// there is no parse-time validator rejecting non-ascending triples.
 TEST(MinTypMaxDelayParsing, MinExceedsTypAndMaxAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -146,9 +123,6 @@ TEST(MinTypMaxDelayParsing, MinExceedsTypAndMaxAccepted) {
   EXPECT_EQ(delay->rhs->int_val, 3u);
 }
 
-// §28.16.1 R1: mintypmax slots accept identifiers, not just constants —
-// e.g., parameters in each position must parse, since R1 requires
-// "expressions", not numeric literals.
 TEST(MinTypMaxDelayParsing, IdentifierExpressionsInTriple) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -158,4 +132,4 @@ TEST(MinTypMaxDelayParsing, IdentifierExpressionsInTriple) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

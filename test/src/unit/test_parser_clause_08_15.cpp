@@ -187,4 +187,4 @@ TEST(SuperParsing, SuperNewFollowedByStatements) {
               "endclass\n"));
 }
 
-}  // namespace
+}

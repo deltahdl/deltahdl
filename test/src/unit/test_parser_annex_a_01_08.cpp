@@ -849,4 +849,4 @@ TEST(CheckerItemsParsing, CheckerMultipleNullItems) {
   ASSERT_EQ(r.cu->checkers.size(), 1u);
 }
 
-}  // namespace
+}

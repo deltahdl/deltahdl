@@ -16,4 +16,4 @@ TEST(DesignBuildingBlockParsing, ThreeMagnitudes) {
   EXPECT_EQ(DelayToTicks(1, ts100, TimeUnit::kPs), 100000u);
 }
 
-}  // namespace
+}

@@ -177,4 +177,4 @@ TEST(InterconnectElaboration, ContAssignRhsUsingInterconnectIsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

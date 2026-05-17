@@ -90,8 +90,6 @@ TEST(DelayParsing, XorGateSingleValueDelay) {
   EXPECT_EQ(item->gate_delay->int_val, 7u);
 }
 
-// When no `#` appears, all three delay fields remain null — the zero-delay
-// baseline §28.3.3 permits.
 TEST(GateDelayParsing, GateWithoutDelayHasNullDelay) {
   auto r = Parse(
       "module m;\n"
@@ -107,4 +105,4 @@ TEST(GateDelayParsing, GateWithoutDelayHasNullDelay) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-}  // namespace
+}

@@ -22,8 +22,6 @@ TEST(PackageImportSim, WildcardImportParameter) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 99u);
 }
 
-// §26.3: a package parameter referenced via the scope resolution operator
-// `pkg::WIDTH` must deliver the package's value at runtime.
 TEST(PackageScopeReferenceSim, PackageScopeParamResolves) {
   auto val = RunAndGet(
       "package pkg;\n"
@@ -37,9 +35,6 @@ TEST(PackageScopeReferenceSim, PackageScopeParamResolves) {
   EXPECT_EQ(val, 16u);
 }
 
-// §26.3: an explicitly-imported identifier (`import pkg::VAL;`) is directly
-// visible by its unqualified name in the importing scope and must carry the
-// package's value into simulation.
 TEST(PackageImportSim, ExplicitImportParameter) {
   auto val = RunAndGet(
       "package pkg;\n"
@@ -54,4 +49,4 @@ TEST(PackageImportSim, ExplicitImportParameter) {
   EXPECT_EQ(val, 77u);
 }
 
-}  // namespace
+}

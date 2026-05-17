@@ -111,8 +111,6 @@ TEST_F(SpecifyTest, FullPathDelay) {
   EXPECT_EQ(spec->specify_items[0]->path.path_kind, SpecifyPathKind::kFull);
 }
 
-// The parallel_path_description grammar admits exactly one input terminal
-// descriptor, so a comma-separated source list must be rejected.
 TEST(SpecifyPathParsing, ParallelPathRejectsMultipleSources) {
   auto r = Parse(
       "module m;\n"
@@ -123,8 +121,6 @@ TEST(SpecifyPathParsing, ParallelPathRejectsMultipleSources) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Symmetric to the above: parallel_path_description admits exactly one output
-// terminal descriptor.
 TEST(SpecifyPathParsing, ParallelPathRejectsMultipleDestinations) {
   auto r = Parse(
       "module m;\n"
@@ -273,4 +269,4 @@ TEST(SpecifyPathParsing, FullPathPolarityWithMultipleSources) {
   ASSERT_EQ(si->path.src_ports.size(), 2u);
 }
 
-}  // namespace
+}

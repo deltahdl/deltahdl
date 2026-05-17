@@ -187,4 +187,4 @@ TEST(ReadWriteInterfaceExample, TopBindsModportSelectorsAndBareInterface) {
   EXPECT_TRUE(found_bare_binding);
 }
 
-}  // namespace
+}

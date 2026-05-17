@@ -1,4 +1,4 @@
-// §25.7
+
 
 #include "fixture_elaborator.h"
 
@@ -100,4 +100,4 @@ TEST(ModportDeclarationElaboration, ImportPrototypeWithDefaultArgElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

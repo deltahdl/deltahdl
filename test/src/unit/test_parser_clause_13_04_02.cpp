@@ -5,11 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Lifetime-keyword acceptance on function declarations is a §6.21 rule;
-// the corresponding parser tests (FunctionDeclLifetimeAutomatic,
-// FunctionDeclLifetimeStatic, and the default-lifetime case) live in
-// test_parser_clause_06_21.cpp.
-
 TEST(FunctionLifetimeParsing, AutomaticVoidFunction) {
   auto r = Parse(
       "module m;\n"
@@ -126,12 +121,6 @@ TEST(FunctionLifetimeParsing, StaticFunctionWithLocalVar) {
   EXPECT_EQ(fn->name, "count");
 }
 
-// Lifetime-related parser tests for functions — the static-var-in-auto-func,
-// auto-var-in-static-func, and static-var-in-static-func cases — are §6.21
-// lifetime-semantics tests; the corresponding parser tests
-// (StaticVarInAutoFunc, AutoVarInStaticFunc, StaticVarInStaticFunc) live in
-// test_parser_clause_06_21.cpp.
-
 TEST(FunctionLifetimeParsing, AutomaticFunctionWithLocalVars) {
   auto r = Parse(
       "module m;\n"
@@ -233,4 +222,4 @@ TEST(FunctionLifetimeParsing, FunctionInInterface) {
   EXPECT_EQ(item->name, "get_data");
 }
 
-}  // namespace
+}

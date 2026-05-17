@@ -34,4 +34,4 @@ TEST(ThisLexer, ThisDotMemberLexesAsThreeTokens) {
   EXPECT_EQ(tokens[2].text, "x");
 }
 
-}  // namespace
+}

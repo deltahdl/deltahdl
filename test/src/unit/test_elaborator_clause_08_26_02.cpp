@@ -1,4 +1,4 @@
-// §8.26.2
+
 
 #include "fixture_elaborator.h"
 
@@ -209,4 +209,4 @@ TEST(InterfaceClassImplements, InheritedNonVirtualFromBaseDoesNotSatisfy) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

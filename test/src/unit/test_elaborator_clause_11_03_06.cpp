@@ -38,4 +38,4 @@ TEST(AssignmentWithinExpressionElaboration,
       "endmodule\n"));
 }
 
-}  // namespace
+}

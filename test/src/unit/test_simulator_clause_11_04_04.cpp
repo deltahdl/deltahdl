@@ -247,4 +247,4 @@ TEST(RelationalSignedness, UnsignedHighValueNotLessThan) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}  // namespace
+}

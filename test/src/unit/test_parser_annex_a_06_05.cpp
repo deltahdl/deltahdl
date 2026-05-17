@@ -61,9 +61,6 @@ TEST(TimingControlSyntaxParsing, DelayControlMintypmax) {
   EXPECT_EQ(stmt->delay->kind, ExprKind::kMinTypMax);
 }
 
-// posedge / negedge event-control AST encoding is governed by §9.4.2;
-// canonical coverage lives in test_parser_clause_09_04_02.cpp.
-
 TEST(TimingControlSyntaxParsing, EventControlStar) {
   auto r = Parse(
       "module m;\n"
@@ -112,15 +109,6 @@ TEST(TimingControlSyntaxParsing, EventControlAtStarParen) {
   EXPECT_TRUE(stmt->is_star_event);
 }
 
-// `@id` (§15.5.2 named-event wait) and `@(any-signal)` (§9.4.2 any-change)
-// AST encoding are tested in test_parser_clause_15_05_02.cpp and
-// test_parser_clause_09_04_02.cpp respectively.
-
-// posedge / negedge / edge / any-change AST-encoding tests for the
-// event-control form belong to §9.4.2 and live in
-// test_parser_clause_09_04_02.cpp. The multi-edge `or` / `,` combinations
-// belong to §9.4.2.1 and live in test_parser_clause_09_04_02_01.cpp.
-
 TEST(TimingControlSyntaxParsing, WaitOrder) {
   auto r = Parse(
       "module m;\n"
@@ -135,8 +123,6 @@ TEST(TimingControlSyntaxParsing, WaitOrder) {
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
   ASSERT_GE(stmt->wait_order_events.size(), 3u);
 }
-
-// --- Error conditions and edge cases ---
 
 TEST(TimingControlSyntaxParsing, DelayControlMissingRParen) {
   EXPECT_TRUE(Parse(
@@ -246,9 +232,6 @@ TEST(TimingControlSyntaxParsing, IntraAssignCycleDelayNonblocking) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-// `@(posedge top.u1.clk)` moved to test_parser_clause_09_04_02.cpp as
-// EventControlHierarchicalSignal — §9.4.2 owns the posedge rule.
-
 TEST(TimingControlSyntaxParsing, WaitOrderWithActionBlock) {
   auto r = Parse(
       "module m;\n"
@@ -336,11 +319,6 @@ TEST(TimingControlSyntaxParsing, DelayControlRealLiteral) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-// --- delay_or_event_control ::= repeat ( expression ) event_control ---
-//
-// The repeat form attaches to the RHS of an assignment as intra-assignment
-// timing: `lhs = repeat (N) @(event_control) rhs;` (§A.6.5 / §10.4.2).
-
 TEST(TimingControlSyntaxParsing, RepeatEventControlInAssignment) {
   auto r = Parse(
       "module m;\n"
@@ -374,8 +352,6 @@ TEST(TimingControlSyntaxParsing, RepeatEventControlNonblocking) {
   ASSERT_EQ(stmt->events.size(), 1u);
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
 }
-
-// --- jump_statement ::= return [ expression ] ; | break ; | continue ; ---
 
 TEST(JumpStatementSyntaxParsing, BreakStatementBnf) {
   auto r = Parse(
@@ -455,11 +431,6 @@ TEST(JumpStatementSyntaxParsing, ContinueMissingSemicolonBnf) {
       "endmodule\n").has_errors);
 }
 
-// --- wait_statement ::= wait ( expression ) statement_or_null
-//                      | wait fork ;
-//                      | wait_order ( ... ) action_block ---
-// (wait_order tests above; here we cover the bare wait and wait fork forms.)
-
 TEST(WaitStatementSyntaxParsing, WaitExpressionStatement) {
   auto r = Parse(
       "module m;\n"
@@ -522,8 +493,6 @@ TEST(WaitStatementSyntaxParsing, WaitForkMissingSemicolonErrors) {
       "endmodule\n").has_errors);
 }
 
-// --- Parenthesized event_expression (§A.6.5) ---
-
 TEST(TimingControlSyntaxParsing, ParenthesizedEventExprEdges) {
   auto r = Parse(
       "module m;\n"
@@ -557,4 +526,4 @@ TEST(TimingControlSyntaxParsing, ParenthesizedEventExprNested) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-}  // namespace
+}

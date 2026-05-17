@@ -13,19 +13,11 @@ namespace delta {
 class Scheduler;
 class SimContext;
 
-// =============================================================================
-// Assertion result
-// =============================================================================
-
 enum class AssertionResult : uint8_t {
   kPass,
   kFail,
   kVacuousPass,
 };
-
-// =============================================================================
-// SVA property kind (simple sequence-based properties)
-// =============================================================================
 
 enum class SvaPropertyKind : uint8_t {
   kRose,
@@ -36,10 +28,6 @@ enum class SvaPropertyKind : uint8_t {
   kCustom,
 };
 
-// =============================================================================
-// SvaProperty: a simple SVA property definition
-// =============================================================================
-
 struct SvaProperty {
   std::string_view name;
   SvaPropertyKind kind = SvaPropertyKind::kCustom;
@@ -48,10 +36,6 @@ struct SvaProperty {
   std::function<bool(uint64_t current, uint64_t previous)> custom_check;
 };
 
-// =============================================================================
-// AssertionEntry: internal tracking for an active assertion
-// =============================================================================
-
 struct AssertionEntry {
   SvaProperty property;
   uint64_t prev_value = 0;
@@ -59,10 +43,6 @@ struct AssertionEntry {
   uint32_t cycle_count = 0;
   AssertionResult last_result = AssertionResult::kVacuousPass;
 };
-
-// =============================================================================
-// AssertionMonitor: evaluates properties each clock cycle
-// =============================================================================
 
 class AssertionMonitor {
  public:
@@ -85,4 +65,4 @@ class AssertionMonitor {
   uint32_t pass_count_ = 0;
 };
 
-}  // namespace delta
+}

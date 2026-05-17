@@ -14,9 +14,6 @@
 
 namespace delta {
 
-// --- Helpers ---
-
-// Collect all element values from an unpacked array into a vector.
 static std::vector<uint64_t> CollectElements(std::string_view var_name,
                                              const ArrayInfo& info,
                                              SimContext& ctx) {
@@ -39,7 +36,6 @@ static std::vector<uint64_t> CollectElements(std::string_view var_name,
   return vals;
 }
 
-// Write element values back to an unpacked array.
 static void WriteElements(std::string_view var_name, const ArrayInfo& info,
                           const std::vector<uint64_t>& vals, SimContext& ctx,
                           Arena& arena) {
@@ -60,7 +56,6 @@ static void WriteElements(std::string_view var_name, const ArrayInfo& info,
   }
 }
 
-// Collect Logic4Vec values from an unpacked array (preserves full value).
 static std::vector<Logic4Vec> CollectVecElements(std::string_view var_name,
                                                  const ArrayInfo& info,
                                                  SimContext& ctx,
@@ -80,8 +75,6 @@ static std::vector<Logic4Vec> CollectVecElements(std::string_view var_name,
   }
   return vals;
 }
-
-// --- Reduction methods (§7.12.3) ---
 
 static Logic4Vec ArraySum(std::string_view var_name, const ArrayInfo& info,
                           SimContext& ctx, Arena& arena) {
@@ -123,7 +116,6 @@ static Logic4Vec ArrayXor(std::string_view var_name, const ArrayInfo& info,
   return MakeLogic4VecVal(arena, info.elem_width, result);
 }
 
-// Evaluate the with-clause expression for each element, then reduce.
 static Logic4Vec ReduceWithExpr(std::string_view var_name,
                                 const ArrayInfo& info, const Expr* expr,
                                 SimContext& ctx, Arena& arena) {
@@ -140,7 +132,7 @@ static Logic4Vec ReduceWithExpr(std::string_view var_name,
   }
   std::string idx_var_name =
       std::string(iter_name) + "." + std::string(index_name);
-  // Evaluate with-clause for each element to get transformed values.
+
   std::vector<uint64_t> vals;
   vals.reserve(elems.size());
   uint32_t result_width = 0;
@@ -158,7 +150,6 @@ static Logic4Vec ReduceWithExpr(std::string_view var_name,
   }
   if (result_width == 0) result_width = info.elem_width;
 
-  // Extract method name from the call expression.
   std::string_view method = expr->lhs->rhs->text;
 
   uint64_t result = 0;
@@ -178,8 +169,6 @@ static Logic4Vec ReduceWithExpr(std::string_view var_name,
   return MakeLogic4VecVal(arena, result_width, result);
 }
 
-// --- Size method ---
-
 static Logic4Vec ArraySize(std::string_view var_name, const ArrayInfo& info,
                            SimContext& ctx, Arena& arena) {
   if (info.is_dynamic) {
@@ -188,8 +177,6 @@ static Logic4Vec ArraySize(std::string_view var_name, const ArrayInfo& info,
   }
   return MakeLogic4VecVal(arena, 32, info.size);
 }
-
-// --- Locator methods (§7.12.1) ---
 
 static Logic4Vec ArrayMin(std::string_view var_name, const ArrayInfo& info,
                           SimContext& ctx, Arena& arena) {
@@ -207,9 +194,6 @@ static Logic4Vec ArrayMax(std::string_view var_name, const ArrayInfo& info,
   return MakeLogic4VecVal(arena, info.elem_width, result);
 }
 
-// --- Dispatch ---
-
-// Bundles common array method arguments to stay within 5-parameter limit.
 struct ArrayCtx {
   std::string_view var_name;
   const ArrayInfo& info;
@@ -222,7 +206,6 @@ static bool IsReductionMethod(std::string_view method) {
          method == "or" || method == "xor";
 }
 
-// §7.12.3: Reduction method dispatch (property access, no with clause).
 static bool DispatchReduction(std::string_view method, const ArrayCtx& ac,
                               Logic4Vec& out) {
   if (method == "sum") {
@@ -248,7 +231,6 @@ static bool DispatchReduction(std::string_view method, const ArrayCtx& ac,
   return false;
 }
 
-// §7.12.3: Reduction dispatch with full Expr (supports with clause).
 static bool DispatchReductionExpr(std::string_view method, const ArrayCtx& ac,
                                   const Expr* expr, Logic4Vec& out) {
   if (!IsReductionMethod(method)) return false;
@@ -268,7 +250,6 @@ static bool DispatchReductionExpr(std::string_view method, const ArrayCtx& ac,
   return true;
 }
 
-// §7.12.1: Locator and query method dispatch.
 static bool DispatchQuery(std::string_view method, const ArrayCtx& ac,
                           Logic4Vec& out) {
   if (method == "size") {
@@ -295,15 +276,13 @@ bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   ArrayCtx ac{parts.var_name, *info, ctx, arena};
   if (DispatchReductionExpr(parts.method_name, ac, expr, out)) return true;
   if (DispatchQuery(parts.method_name, ac, out)) return true;
-  // Mutating methods return void; set out to 0 on success.
+
   if (TryExecArrayMethodStmt(expr, ctx, arena)) {
     out = MakeLogic4VecVal(arena, 1, 0);
     return true;
   }
   return false;
 }
-
-// --- Mutating methods (§7.12.2) ---
 
 static uint64_t EvalSortKey(const Expr* with_expr, std::string_view iter_name,
                             const std::string& idx_var_name,
@@ -335,7 +314,7 @@ static void ArraySortWithExpr(std::string_view var_name, const ArrayInfo& info,
   }
   std::string idx_var_name =
       std::string(iter_name) + "." + std::string(index_name);
-  // Compute sort keys for each element.
+
   std::vector<std::pair<uint64_t, size_t>> keys(vals.size());
   for (size_t i = 0; i < vals.size(); ++i) {
     keys[i] = {EvalSortKey(expr->with_expr, iter_name, idx_var_name, vals[i], i,
@@ -367,7 +346,6 @@ static void ArrayRsort(std::string_view var_name, const ArrayInfo& info,
   WriteElements(var_name, info, vals, ctx, arena);
 }
 
-// Write Logic4Vec values back to an unpacked array (preserves width).
 static void WriteVecElements(std::string_view var_name, const ArrayInfo& info,
                              const std::vector<Logic4Vec>& vals,
                              SimContext& ctx) {
@@ -397,7 +375,7 @@ static void ArrayReverse(std::string_view var_name, const ArrayInfo& info,
 static void ArrayShuffle(std::string_view var_name, const ArrayInfo& info,
                          SimContext& ctx, Arena& arena) {
   auto vals = CollectElements(var_name, info, ctx);
-  // Use a simple shuffle (std::shuffle requires a URBG).
+
   for (size_t i = vals.size(); i > 1; --i) {
     size_t j = ctx.Urandom32() % i;
     std::swap(vals[i - 1], vals[j]);
@@ -416,12 +394,12 @@ bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto* info = ctx.FindArrayInfo(parts.var_name);
   if (!info) return false;
   if (!IsOrderingMethod(parts.method_name)) return false;
-  // §7.12: Specifying an iterator_argument without a with clause is illegal.
+
   if (!expr->args.empty() && !expr->with_expr) {
     ctx.GetDiag().Error({}, "iterator argument without 'with' clause");
     return false;
   }
-  // §7.12.2: reverse/shuffle with a with clause shall be a compiler error.
+
   if ((parts.method_name == "reverse" || parts.method_name == "shuffle") &&
       expr->with_expr) {
     ctx.GetDiag().Error(
@@ -454,7 +432,6 @@ bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
   return false;
 }
 
-// §7.12: Property access (e.g., arr.sum without parens).
 bool TryEvalArrayProperty(std::string_view var_name, std::string_view prop,
                           SimContext& ctx, Arena& arena, Logic4Vec& out) {
   auto* info = ctx.FindArrayInfo(var_name);
@@ -464,7 +441,6 @@ bool TryEvalArrayProperty(std::string_view var_name, std::string_view prop,
   return DispatchQuery(prop, ac, out);
 }
 
-// §7.12: Mutating property access (arr.sort, arr.reverse).
 bool TryExecArrayPropertyStmt(std::string_view var_name, std::string_view prop,
                               SimContext& ctx, Arena& arena) {
   auto* info = ctx.FindArrayInfo(var_name);
@@ -488,9 +464,6 @@ bool TryExecArrayPropertyStmt(std::string_view var_name, std::string_view prop,
   return false;
 }
 
-// --- §7.10: Queue method dispatch ---
-
-// §7.10.2: Eval-returning queue methods (size, pop_front, pop_back).
 static bool DispatchQueueEval(std::string_view method, QueueObject* q,
                               Arena& arena, Logic4Vec& out) {
   if (method == "size") {
@@ -522,7 +495,6 @@ static bool DispatchQueueEval(std::string_view method, QueueObject* q,
   return false;
 }
 
-// §7.10.2: Queue push/insert methods.
 static bool DispatchQueuePush(std::string_view method, QueueObject* q,
                               const Expr* expr, SimContext& ctx, Arena& arena) {
   if (method == "push_back" && !expr->args.empty()) {
@@ -577,7 +549,6 @@ static bool DispatchQueuePush(std::string_view method, QueueObject* q,
   return false;
 }
 
-// §7.10.2: Queue delete method.
 static bool DispatchQueueDelete(std::string_view method, QueueObject* q,
                                 const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
@@ -603,10 +574,6 @@ static bool DispatchQueueDelete(std::string_view method, QueueObject* q,
   return true;
 }
 
-// §9.4.2: Method calls that change the size of a dynamically sized array or
-// queue shall cause event expressions referencing it to be reevaluated.
-// Surface the mutation as a watcher notification on the owning variable so
-// that compound event-control awaiters (e.g. @(q.size())) re-evaluate.
 static bool IsQueueMutator(std::string_view method) {
   return method == "push_back" || method == "push_front" ||
          method == "pop_back" || method == "pop_front" ||
@@ -628,7 +595,7 @@ bool TryEvalQueueMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
       NotifyOwningVar(ctx, parts.var_name);
     return true;
   }
-  // Mutating methods also return via out (e.g., pop used in expression).
+
   if (DispatchQueuePush(parts.method_name, q, expr, ctx, arena)) {
     out = MakeLogic4VecVal(arena, 1, 0);
     NotifyOwningVar(ctx, parts.var_name);
@@ -662,11 +629,10 @@ bool TryEvalQueueProperty(std::string_view var_name, std::string_view prop,
                           SimContext& ctx, Arena& arena, Logic4Vec& out) {
   auto* q = ctx.FindQueue(var_name);
   if (!q) return false;
-  // Use the same dispatch as method calls for eval-returning methods.
+
   return DispatchQueueEval(prop, q, arena, out);
 }
 
-// §7.10.3: Sort queue elements and IDs together, preserving ID-element pairing.
 static void SortQueueWithIds(QueueObject* q, bool ascending) {
   auto& elems = q->elements;
   auto& ids = q->element_ids;
@@ -687,7 +653,6 @@ static void SortQueueWithIds(QueueObject* q, bool ascending) {
   ++q->generation;
 }
 
-// §7.10.3: Shuffle queue elements and IDs together.
 static void ShuffleQueueWithIds(QueueObject* q, SimContext& ctx) {
   auto& elems = q->elements;
   auto& ids = q->element_ids;
@@ -700,7 +665,7 @@ static void ShuffleQueueWithIds(QueueObject* q, SimContext& ctx) {
 }
 
 bool TryExecQueuePropertyStmt(std::string_view var_name, std::string_view prop,
-                              SimContext& ctx, Arena& /*arena*/) {
+                              SimContext& ctx, Arena& ) {
   auto* q = ctx.FindQueue(var_name);
   if (!q) return false;
   if (prop == "delete") {
@@ -730,11 +695,6 @@ bool TryExecQueuePropertyStmt(std::string_view var_name, std::string_view prop,
   return false;
 }
 
-// ============================================================================
-// §7.8: Associative array method dispatch
-// ============================================================================
-
-// Convert Logic4Vec to a string (for string-keyed assoc array lookups).
 static std::string Vec2Str(const Logic4Vec& vec) {
   uint32_t nbytes = vec.width / 8;
   std::string result;
@@ -749,7 +709,6 @@ static std::string Vec2Str(const Logic4Vec& vec) {
   return result;
 }
 
-// Convert a string to a Logic4Vec (for writing string keys to ref vars).
 static Logic4Vec Str2Vec(const std::string& s, Arena& arena) {
   uint32_t w = static_cast<uint32_t>(s.size()) * 8;
   if (w == 0) w = 8;
@@ -763,7 +722,6 @@ static Logic4Vec Str2Vec(const std::string& s, Arena& arena) {
   return vec;
 }
 
-// Evaluate an assoc array key from an expression.
 static std::string EvalStrKey(const Expr* expr, SimContext& ctx, Arena& arena) {
   return Vec2Str(EvalExpr(expr, ctx, arena));
 }
@@ -777,7 +735,6 @@ static int64_t EvalIntKey(const Expr* expr, SimContext& ctx, Arena& arena,
   return SignExtend(val.ToUint64(), index_width);
 }
 
-// §7.9.3: exists(key).
 static bool AssocExists(AssocArrayObject* aa, const Expr* expr, SimContext& ctx,
                         Arena& arena, Logic4Vec& out) {
   if (expr->args.empty()) return false;
@@ -791,7 +748,6 @@ static bool AssocExists(AssocArrayObject* aa, const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §7.8.6: Traversal on string-keyed assoc arrays.
 static bool AssocStrTraversal(AssocArrayObject* aa, std::string_view method,
                               Variable* ref_var, Arena& arena, Logic4Vec& out) {
   auto& m = aa->str_data;
@@ -834,7 +790,6 @@ static bool AssocStrTraversal(AssocArrayObject* aa, std::string_view method,
   return true;
 }
 
-// §7.9.8: Write a traversal key, returning -1 if truncation is needed.
 static int WriteTraversalKey(Variable* ref, int64_t key, uint32_t idx_width,
                              Arena& arena) {
   uint32_t w = ref->value.width;
@@ -843,7 +798,6 @@ static int WriteTraversalKey(Variable* ref, int64_t key, uint32_t idx_width,
   return (w < idx_width) ? -1 : 1;
 }
 
-// §7.8.6: Traversal on integer-keyed assoc arrays.
 static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
                               Variable* ref_var, Arena& arena, Logic4Vec& out) {
   auto& m = aa->int_data;
@@ -887,7 +841,6 @@ static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
   return true;
 }
 
-// Resolve the ref argument for traversal methods.
 static Variable* ResolveTraversalRef(const Expr* expr, SimContext& ctx) {
   if (expr->args.empty()) return nullptr;
   auto* ref_expr = expr->args[0];
@@ -895,7 +848,6 @@ static Variable* ResolveTraversalRef(const Expr* expr, SimContext& ctx) {
   return ctx.FindVariable(ref_expr->text);
 }
 
-// §7.8.6: first/last/next/prev — dispatch to string or int traversal.
 static bool AssocTraversal(AssocArrayObject* aa, std::string_view method,
                            Variable* ref_var, Arena& arena, Logic4Vec& out) {
   if (aa->is_string_key)
@@ -969,7 +921,7 @@ bool TryEvalAssocProperty(std::string_view var_name, std::string_view prop,
 }
 
 bool TryExecAssocPropertyStmt(std::string_view var_name, std::string_view prop,
-                              SimContext& ctx, Arena& /*arena*/) {
+                              SimContext& ctx, Arena& ) {
   auto* aa = ctx.FindAssocArray(var_name);
   if (!aa) return false;
   if (prop == "delete") {
@@ -980,9 +932,6 @@ bool TryExecAssocPropertyStmt(std::string_view var_name, std::string_view prop,
   return false;
 }
 
-// --- Locator methods (§7.12.1) ---
-
-// Check if any element of an unpacked array is a string variable.
 static bool IsStringArray(std::string_view var_name, const ArrayInfo& info,
                           SimContext& ctx) {
   if (info.is_dynamic) return ctx.IsStringVariable(var_name);
@@ -990,7 +939,6 @@ static bool IsStringArray(std::string_view var_name, const ArrayInfo& info,
   return ctx.IsStringVariable(name);
 }
 
-// §7.12.1/§7.12.5: Check if a method name is a locator or map method.
 static bool IsLocatorMethod(std::string_view name) {
   return name == "find" || name == "find_first" || name == "find_last" ||
          name == "find_index" || name == "find_first_index" ||
@@ -998,7 +946,6 @@ static bool IsLocatorMethod(std::string_view name) {
          name == "unique" || name == "unique_index" || name == "map";
 }
 
-// Bundles common locator method arguments to stay within 5-parameter limit.
 struct LocatorCtx {
   const std::vector<Logic4Vec>& elems;
   bool is_string;
@@ -1009,7 +956,6 @@ struct LocatorCtx {
   std::string idx_var_name = "item.index";
 };
 
-// §7.12: Extract iterator_argument and index_argument names from call args.
 static LocatorCtx MakeLocatorCtx(const std::vector<Logic4Vec>& elems,
                                  bool is_str, const Expr* expr,
                                  SimContext& ctx, Arena& arena) {
@@ -1029,7 +975,6 @@ static LocatorCtx MakeLocatorCtx(const std::vector<Logic4Vec>& elems,
                     std::move(idx_var)};
 }
 
-// Evaluate a with-clause predicate with iterator bound to a value.
 static bool EvalLocatorPredicate(const LocatorCtx& lc,
                                  const Logic4Vec& item_val, size_t item_index) {
   lc.ctx.PushScope();
@@ -1044,7 +989,6 @@ static bool EvalLocatorPredicate(const LocatorCtx& lc,
   return result != 0;
 }
 
-// Evaluate a with-clause expression and return its value (not just bool).
 static Logic4Vec EvalLocatorWithExpr(const LocatorCtx& lc,
                                      const Logic4Vec& item_val,
                                      size_t item_index) {
@@ -1060,7 +1004,6 @@ static Logic4Vec EvalLocatorWithExpr(const LocatorCtx& lc,
   return result;
 }
 
-// §7.12.1: find/find_first/find_last with predicate.
 static void LocatorFind(std::string_view method, const LocatorCtx& lc,
                         std::vector<Logic4Vec>& out) {
   for (size_t i = 0; i < lc.elems.size(); ++i) {
@@ -1070,7 +1013,6 @@ static void LocatorFind(std::string_view method, const LocatorCtx& lc,
   }
 }
 
-// §7.12.1: find/find_last — process in appropriate order.
 static void LocatorFindDispatch(std::string_view method, const LocatorCtx& lc,
                                 std::vector<Logic4Vec>& out) {
   if (method == "find_last") {
@@ -1084,7 +1026,6 @@ static void LocatorFindDispatch(std::string_view method, const LocatorCtx& lc,
   LocatorFind(method, lc, out);
 }
 
-// §7.12.1: find_index/find_first_index/find_last_index with predicate.
 static void LocatorFindIndex(std::string_view method, const LocatorCtx& lc,
                              std::vector<Logic4Vec>& out) {
   if (method == "find_last_index") {
@@ -1103,7 +1044,6 @@ static void LocatorFindIndex(std::string_view method, const LocatorCtx& lc,
   }
 }
 
-// §7.12.5: map — transform each element via with-clause.
 static void LocatorMap(const LocatorCtx& lc, std::vector<Logic4Vec>& out) {
   for (size_t i = 0; i < lc.elems.size(); ++i) {
     lc.ctx.PushScope();
@@ -1117,8 +1057,7 @@ static void LocatorMap(const LocatorCtx& lc, std::vector<Logic4Vec>& out) {
   }
 }
 
-// §7.12.1: unique — return queue of distinct values.
-static void LocatorUnique(const std::vector<Logic4Vec>& elems, Arena& /*arena*/,
+static void LocatorUnique(const std::vector<Logic4Vec>& elems, Arena& ,
                           std::vector<Logic4Vec>& out) {
   std::vector<uint64_t> seen;
   for (const auto& e : elems) {
@@ -1137,7 +1076,6 @@ static void LocatorUnique(const std::vector<Logic4Vec>& elems, Arena& /*arena*/,
   }
 }
 
-// §7.12.1: unique_index — return queue of indices of first occurrences.
 static void LocatorUniqueIndex(const std::vector<Logic4Vec>& elems,
                                Arena& arena, std::vector<Logic4Vec>& out) {
   std::vector<uint64_t> seen;
@@ -1157,7 +1095,6 @@ static void LocatorUniqueIndex(const std::vector<Logic4Vec>& elems,
   }
 }
 
-// §7.12.1: min/max — return element whose with-expression is minimal/maximal.
 static void LocatorMinMax(std::string_view method, const LocatorCtx& lc,
                           std::vector<Logic4Vec>& out) {
   if (lc.elems.empty()) return;
@@ -1178,7 +1115,6 @@ static void LocatorMinMax(std::string_view method, const LocatorCtx& lc,
   out.push_back(lc.elems[best_idx]);
 }
 
-// §7.12.1: unique with with-clause — uniqueness by expression value.
 static void LocatorUniqueWith(const LocatorCtx& lc,
                               std::vector<Logic4Vec>& out) {
   std::vector<uint64_t> seen;
@@ -1198,7 +1134,6 @@ static void LocatorUniqueWith(const LocatorCtx& lc,
   }
 }
 
-// §7.12.1: unique_index with with-clause — uniqueness by expression value.
 static void LocatorUniqueIndexWith(const LocatorCtx& lc,
                                    std::vector<Logic4Vec>& out) {
   std::vector<uint64_t> seen;
@@ -1219,9 +1154,8 @@ static void LocatorUniqueIndexWith(const LocatorCtx& lc,
   }
 }
 
-// Extract var and method names from member access (e.g., s.find, s.unique).
 static bool ExtractLocatorParts(const Expr* expr, MethodCallParts& out) {
-  // Member access pattern: s.find (no parens).
+
   if (expr->kind == ExprKind::kMemberAccess) {
     if (!expr->lhs || expr->lhs->kind != ExprKind::kIdentifier) return false;
     if (!expr->rhs || expr->rhs->kind != ExprKind::kIdentifier) return false;
@@ -1229,7 +1163,7 @@ static bool ExtractLocatorParts(const Expr* expr, MethodCallParts& out) {
     out.method_name = expr->rhs->text;
     return true;
   }
-  // Function call pattern: s.find() (with parens).
+
   return ExtractMethodCallParts(expr, out);
 }
 
@@ -1239,7 +1173,6 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   if (!ExtractLocatorParts(expr, parts)) return false;
   if (!IsLocatorMethod(parts.method_name)) return false;
 
-  // §7.12: Specifying an iterator_argument without a with clause is illegal.
   if (!expr->args.empty() && !expr->with_expr) {
     ctx.GetDiag().Error({}, "iterator argument without 'with' clause");
     return false;
@@ -1251,7 +1184,6 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   auto elems = CollectVecElements(parts.var_name, *info, ctx, arena);
   bool is_str = IsStringArray(parts.var_name, *info, ctx);
 
-  // §7.12.1: unique/unique_index/min/max may omit the with clause.
   if (parts.method_name == "unique") {
     if (expr->with_expr) {
       LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
@@ -1276,7 +1208,6 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
     return true;
   }
 
-  // All other locator methods require a with clause.
   if (!expr->with_expr) return false;
 
   LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
@@ -1292,4 +1223,4 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-}  // namespace delta
+}

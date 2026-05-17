@@ -63,4 +63,4 @@ TEST(DynamicArrayNewParsing, DynamicArrayNewWithInit) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-}  // namespace
+}

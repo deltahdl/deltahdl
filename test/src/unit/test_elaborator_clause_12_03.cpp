@@ -110,4 +110,4 @@ TEST(StatementElaboration, MultipleAttributesOnStatementElaborates) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-}  // namespace
+}

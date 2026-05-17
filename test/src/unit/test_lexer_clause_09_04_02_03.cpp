@@ -60,4 +60,4 @@ TEST(ConditionalEventIffLexing, IffWithEdgeKeyword) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kKwIff);
 }
 
-}  // namespace
+}

@@ -34,4 +34,4 @@ TEST(ArrayOperationParsing, ArrayInequalityExpression) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
-}  // namespace
+}

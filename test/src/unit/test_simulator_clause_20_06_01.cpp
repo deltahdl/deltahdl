@@ -15,4 +15,4 @@ TEST(UtilitySystemTaskTest, Typename) {
   EXPECT_GT(result.width, 0u);
 }
 
-}  // namespace
+}

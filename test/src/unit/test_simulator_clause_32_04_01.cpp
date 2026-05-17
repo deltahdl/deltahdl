@@ -9,16 +9,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §32.4.1 — Mapping of SDF delay constructs to SystemVerilog declarations
-// =============================================================================
-
-// §32.4.1 body sentence 1: "When annotating DELAY constructs that are not
-// interconnect delays..., the SDF annotator looks for specify paths where the
-// names and conditions match." A bare (IOPATH src dst ...) carries no SDF
-// condition, so the parser must record the absence of a condition explicitly
-// rather than leaving the field uninitialised — otherwise the conditional/
-// nonconditional dispatch in the annotator cannot tell the two cases apart.
 TEST(SdfDelayMapping, BareIopathHasNoConditionAndIsNotIfnone) {
   SdfFile file;
   std::string sdf = R"(
@@ -36,10 +26,6 @@ TEST(SdfDelayMapping, BareIopathHasNoConditionAndIsNotIfnone) {
   EXPECT_FALSE(file.cells[0].iopaths[0].is_ifnone);
 }
 
-// §32.4.1 Table 32-1 row "(COND (IOPATH...) → Conditional specify path
-// delays/pulse limits": a (COND <expr> (IOPATH ...)) wrapper carries a
-// condition expression that shall reach the SdfIopath so the annotator can
-// later compare it against the SystemVerilog `if (cond)` text.
 TEST(SdfDelayMapping, CondIopathCarriesConditionText) {
   SdfFile file;
   std::string sdf = R"(
@@ -61,10 +47,6 @@ TEST(SdfDelayMapping, CondIopathCarriesConditionText) {
   EXPECT_EQ(file.cells[0].iopaths[0].fall.typ_val, 20u);
 }
 
-// §32.4.1 Table 32-1 row "(CONDELSE (IOPATH...) → ifnone": the CONDELSE
-// wrapper does not carry an explicit expression — its semantics are
-// "ifnone", i.e. the SystemVerilog else-branch specify path. The parser
-// flags the iopath with is_ifnone so the annotator can route it.
 TEST(SdfDelayMapping, CondelseIopathSetsIfnoneFlag) {
   SdfFile file;
   std::string sdf = R"(
@@ -84,10 +66,6 @@ TEST(SdfDelayMapping, CondelseIopathSetsIfnoneFlag) {
   EXPECT_EQ(file.cells[0].iopaths[0].dst_port, "y");
 }
 
-// §32.4.1 sentence: "A nonconditional IOPATH delay between two ports shall
-// annotate to all SystemVerilog specify paths between those same two ports."
-// The manager pre-loads two specify paths between (a, y) — one guarded by
-// `mode`, one by `!mode` — and then a bare IOPATH must update both.
 TEST(SdfDelayMapping, NonconditionalIopathAnnotatesAllPathsBetweenSamePorts) {
   SpecifyManager mgr;
   PathDelay sv_then;
@@ -121,9 +99,7 @@ TEST(SdfDelayMapping, NonconditionalIopathAnnotatesAllPathsBetweenSamePorts) {
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   ASSERT_EQ(mgr.GetPathDelays().size(), 2u);
-  // Both pre-existing specify paths receive the new rise/fall, while their
-  // own conditional identities survive — the annotator updates payload, not
-  // the matched SV declaration's condition.
+
   for (const auto& pd : mgr.GetPathDelays()) {
     EXPECT_EQ(pd.src_port, "a");
     EXPECT_EQ(pd.dst_port, "y");
@@ -140,10 +116,6 @@ TEST(SdfDelayMapping, NonconditionalIopathAnnotatesAllPathsBetweenSamePorts) {
   EXPECT_TRUE(saw_else);
 }
 
-// §32.4.1 sentence: "A conditional IOPATH delay between two ports shall
-// annotate only to SystemVerilog specify paths between those same two ports
-// with the same condition." The same two pre-loaded specify paths from above
-// must this time receive the SDF update on the `mode` side only.
 TEST(SdfDelayMapping, ConditionalIopathAnnotatesOnlyMatchingConditionPath) {
   SpecifyManager mgr;
   PathDelay sv_then;
@@ -181,8 +153,7 @@ TEST(SdfDelayMapping, ConditionalIopathAnnotatesOnlyMatchingConditionPath) {
       EXPECT_EQ(pd.delays[0], 13u);
       EXPECT_EQ(pd.delays[1], 17u);
     } else if (pd.condition == "!mode") {
-      // Untouched: the SDF condition `mode` does not match `!mode`, so the
-      // pre-annotation value persists per §32.3 sentence 4.
+
       EXPECT_EQ(pd.delays[0], 2u);
     } else {
       ADD_FAILURE() << "unexpected condition: " << pd.condition;
@@ -190,10 +161,6 @@ TEST(SdfDelayMapping, ConditionalIopathAnnotatesOnlyMatchingConditionPath) {
   }
 }
 
-// §32.4.1 Table 32-1 "(CONDELSE (IOPATH...) → ifnone": a CONDELSE-wrapped
-// IOPATH may only annotate to the ifnone specify path between the two named
-// ports. A sibling conditional path between the same two ports keeps its
-// pre-annotation value.
 TEST(SdfDelayMapping, CondelseIopathAnnotatesOnlyIfnonePath) {
   SpecifyManager mgr;
   PathDelay sv_cond;
@@ -238,10 +205,6 @@ TEST(SdfDelayMapping, CondelseIopathAnnotatesOnlyIfnonePath) {
   }
 }
 
-// §32.4.1 closure: once COND/CONDELSE-wrapped IOPATHs are annotated by §32.4.1,
-// they are no longer "data the annotator was unable to annotate" under §32.3
-// sentence 1, so a SDF file consisting only of such constructs produces no
-// warnings.
 TEST(SdfDelayMapping, CondAndCondelseIopathProduceNoUnannotatableWarnings) {
   SdfFile file;
   std::string sdf = R"(
@@ -265,10 +228,6 @@ TEST(SdfDelayMapping, CondAndCondelseIopathProduceNoUnannotatableWarnings) {
   EXPECT_TRUE(result.warnings.empty());
 }
 
-// §32.4.1 Table 32-1 COND IOPATH row, min/typ/max edge: a COND wrapper must
-// not interfere with delay-value extraction underneath it. Pinning the typ
-// column through the wrapper guards against a parser regression where the
-// COND branch silently consumes the rise/fall triplets.
 TEST(SdfDelayMapping, CondIopathPreservesMinTypMaxDelaySelection) {
   SpecifyManager mgr;
   PathDelay sv;
@@ -298,11 +257,6 @@ TEST(SdfDelayMapping, CondIopathPreservesMinTypMaxDelaySelection) {
   EXPECT_EQ(mgr.GetPathDelays()[0].delays[1], 8u);
 }
 
-// §32.4.1 conditional shall rule, multiple-sibling edge: when two SV specify
-// paths between the same two ports carry distinct conditions, two SDF COND
-// IOPATHs must each land on their own sibling. The annotator's condition
-// matching has to be exact — neither SDF entry may bleed onto the other's
-// declaration.
 TEST(SdfDelayMapping, MultipleCondIopathsAnnotateRespectiveSiblings) {
   SpecifyManager mgr;
   PathDelay sv_m1;
@@ -353,11 +307,6 @@ TEST(SdfDelayMapping, MultipleCondIopathsAnnotateRespectiveSiblings) {
   }
 }
 
-// §32.4.1 nonconditional shall rule, ifnone-sibling edge: an ifnone path is
-// still a specify path between the two named ports, so a nonconditional
-// IOPATH must update its delays alongside a conditional sibling. The SV
-// declaration's ifnone identity survives the update — only the payload
-// changes.
 TEST(SdfDelayMapping, NonconditionalIopathUpdatesIfnoneSiblingToo) {
   SpecifyManager mgr;
   PathDelay sv_cond;
@@ -401,12 +350,6 @@ TEST(SdfDelayMapping, NonconditionalIopathUpdatesIfnoneSiblingToo) {
   EXPECT_TRUE(saw_cond_with_payload);
 }
 
-// §32.4.1 body sentence 2: when annotating TIMINGCHECK constructs, the
-// annotator looks for timing checks of the same type where names AND
-// conditions match. Two stored timing checks that share kind/signals/edges
-// but carry different SystemVerilog `&&&` conditions must remain distinct
-// backannotation targets — an incoming entry with one condition value
-// updates only the matching sibling, leaving the other untouched.
 TEST(SdfDelayMapping, TimingCheckMatchingDistinguishesByCondition) {
   SpecifyManager mgr;
   TimingCheckEntry tc_then;
@@ -445,10 +388,6 @@ TEST(SdfDelayMapping, TimingCheckMatchingDistinguishesByCondition) {
   }
 }
 
-// §32.4.1 Table 32-1 PATHPULSE row: an absolute (PATHPULSE src dst reject
-// error) construct annotates the per-transition reject and error limits of
-// every PathDelay between the named ports. The path's propagation delays
-// are not touched — only the §30.7 pulse-filter limits.
 TEST(SdfDelayMapping, PathpulseAnnotatesAbsolutePulseLimits) {
   SpecifyManager mgr;
   PathDelay pd;
@@ -481,10 +420,6 @@ TEST(SdfDelayMapping, PathpulseAnnotatesAbsolutePulseLimits) {
   EXPECT_EQ(mgr.GetPathDelays()[0].error_limit[0], 20u);
 }
 
-// §32.4.1 Table 32-1 PATHPULSE row, single-value form: when only the reject
-// limit is supplied, the X band collapses to zero — error_limit mirrors
-// reject_limit, matching the §30.7.3 single-value rule that this row
-// inherits.
 TEST(SdfDelayMapping, PathpulseSingleValueCollapsesXBand) {
   SpecifyManager mgr;
   PathDelay pd;
@@ -513,10 +448,6 @@ TEST(SdfDelayMapping, PathpulseSingleValueCollapsesXBand) {
   EXPECT_EQ(mgr.GetPathDelays()[0].error_limit[0], 8u);
 }
 
-// §32.4.1 Table 32-1 PATHPULSE row applied across siblings: the table maps
-// PATHPULSE to "conditional and nonconditional specify path pulse limits",
-// so a single SDF entry must fan out across every PathDelay between the
-// two named ports — both conditional siblings and any ifnone sibling.
 TEST(SdfDelayMapping, PathpulseAnnotatesAllPathsBetweenSamePorts) {
   SpecifyManager mgr;
   PathDelay sv_then;
@@ -555,10 +486,6 @@ TEST(SdfDelayMapping, PathpulseAnnotatesAllPathsBetweenSamePorts) {
   }
 }
 
-// §32.4.1 Table 32-1 PATHPULSEPERCENT row: percentages scale each PathDelay's
-// own delay value into the matching reject_limit / error_limit slot. With a
-// 10 ns path delay and a 25%/75% PATHPULSEPERCENT entry, reject becomes
-// 2 ns and error becomes 7 ns.
 TEST(SdfDelayMapping, PathpulsepercentScalesFromPathDelay) {
   SpecifyManager mgr;
   PathDelay pd;
@@ -588,10 +515,6 @@ TEST(SdfDelayMapping, PathpulsepercentScalesFromPathDelay) {
   EXPECT_EQ(mgr.GetPathDelays()[0].error_limit[0], 7u);
 }
 
-// §32.4.1 Table 32-1 RETAIN rows: the table allows the simulator to ignore
-// a (RETAIN ...) qualifier on an IOPATH. "Ignore" must mean syntactic
-// transparency — the surrounding rise/fall delay-value triplets must still
-// land in the correct slots regardless of whether RETAIN is present.
 TEST(SdfDelayMapping, IopathRetainQualifierIsParsedAndIgnored) {
   SdfFile file;
   std::string sdf = R"(
@@ -611,9 +534,6 @@ TEST(SdfDelayMapping, IopathRetainQualifierIsParsedAndIgnored) {
   EXPECT_EQ(file.cells[0].iopaths[0].fall.typ_val, 20u);
 }
 
-// §32.4.1 Table 32-1 RETAIN rows under COND: ignoring RETAIN must compose
-// with the COND wrapper — the condition still reaches the iopath while the
-// retain block is silently consumed.
 TEST(SdfDelayMapping, CondIopathWithRetainIgnoresRetainAndKeepsCondition) {
   SdfFile file;
   std::string sdf = R"(
@@ -636,8 +556,6 @@ TEST(SdfDelayMapping, CondIopathWithRetainIgnoresRetainAndKeepsCondition) {
   EXPECT_EQ(file.cells[0].iopaths[0].fall.typ_val, 20u);
 }
 
-// §32.4.1 Table 32-1 RETAIN rows under CONDELSE: same composition with the
-// ifnone routing — RETAIN drops away cleanly.
 TEST(SdfDelayMapping, CondelseIopathWithRetainIgnoresRetainAndKeepsIfnone) {
   SdfFile file;
   std::string sdf = R"(
@@ -660,12 +578,6 @@ TEST(SdfDelayMapping, CondelseIopathWithRetainIgnoresRetainAndKeepsIfnone) {
   EXPECT_EQ(file.cells[0].iopaths[0].fall.typ_val, 20u);
 }
 
-// §32.4.1 conditional shall rule, ifnone-exclusion edge: a (COND mode
-// (IOPATH a y ...)) names a same-condition match. An ifnone sibling between
-// the same two ports has no condition — its conditional shape is "ifnone",
-// not "mode" — so it must not be touched. The annotator instead leaves the
-// ifnone payload at its prebackannotation value and appends the new
-// conditional entry.
 TEST(SdfDelayMapping, ConditionalIopathDoesNotAnnotateIfnoneSibling) {
   SpecifyManager mgr;
   PathDelay sv_ifnone;
@@ -705,4 +617,4 @@ TEST(SdfDelayMapping, ConditionalIopathDoesNotAnnotateIfnoneSibling) {
   EXPECT_TRUE(saw_new_conditional);
 }
 
-}  // namespace
+}

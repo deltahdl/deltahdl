@@ -104,4 +104,4 @@ TEST(LogicGates, XnorIsInvertedXor) {
   CheckInversion(GateKind::kXor, GateKind::kXnor);
 }
 
-}  // namespace
+}

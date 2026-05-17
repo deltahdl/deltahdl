@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.5: get() call in initial block elaborates.
 TEST(MailboxGetElaborator, GetCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,7 +19,6 @@ TEST(MailboxGetElaborator, GetCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.5: get() after put() elaborates.
 TEST(MailboxGetElaborator, GetAfterPut) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -37,7 +35,6 @@ TEST(MailboxGetElaborator, GetAfterPut) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.5: Multiple get() calls elaborate.
 TEST(MailboxGetElaborator, MultipleGetCalls) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -54,4 +51,4 @@ TEST(MailboxGetElaborator, MultipleGetCalls) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -70,4 +70,4 @@ TEST(DynamicCastParsing, DynamicCastWithExpression) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

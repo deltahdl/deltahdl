@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- Property declarations elaborate without errors ---
-
 TEST(AssertionDeclElaboration, PropertyDeclElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -32,8 +30,6 @@ TEST(AssertionDeclElaboration, PropertyDeclWithPortsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Sequence declarations elaborate without errors ---
-
 TEST(AssertionDeclElaboration, SequenceDeclElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -59,8 +55,6 @@ TEST(AssertionDeclElaboration, SequenceDeclWithPortsElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- Concurrent assertion statements elaborate without errors ---
 
 TEST(AssertionDeclElaboration, AssertPropertyElaborates) {
   ElabFixture f;
@@ -116,8 +110,6 @@ TEST(AssertionDeclElaboration, RestrictPropertyElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- Combined declarations and assertions elaborate ---
 
 TEST(AssertionDeclElaboration, PropertyDeclWithAssertElaborates) {
   ElabFixture f;
@@ -176,8 +168,6 @@ TEST(AssertionDeclElaboration, AllFiveConcurrentAssertionsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Assertion with disable iff elaborates ---
-
 TEST(AssertionDeclElaboration, AssertPropertyWithDisableIffElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -190,8 +180,6 @@ TEST(AssertionDeclElaboration, AssertPropertyWithDisableIffElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Named assertion elaborates ---
-
 TEST(AssertionDeclElaboration, NamedAssertPropertyElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -203,4 +191,4 @@ TEST(AssertionDeclElaboration, NamedAssertPropertyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

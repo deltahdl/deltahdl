@@ -138,4 +138,4 @@ TEST(ParameterizedInterface, MixedOrderedAndNamedOverrideIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

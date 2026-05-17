@@ -115,4 +115,4 @@ TEST(ReplicationParsing, RepeatCountAndMultipleElements) {
   EXPECT_EQ(rhs->repeat_count->kind, ExprKind::kIntegerLiteral);
   EXPECT_EQ(rhs->elements.size(), 2u);
 }
-}  // namespace
+}

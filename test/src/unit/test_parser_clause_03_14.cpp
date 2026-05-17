@@ -69,4 +69,4 @@ TEST(DesignBuildingBlockParsing, SlashPrecisionEqualToUnit) {
   EXPECT_TRUE(ParseOk("module m; timeunit 1ns / 1ns; endmodule\n"));
 }
 
-}  // namespace
+}

@@ -4,10 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §31.9: the elaborator must accept a $setuphold invocation whose
-// setup and hold limits are negative. §31.3.3's elaboration rules
-// say nothing about sign; the allowance lives in §31.9, and blocking
-// it here would make the downstream simulator path unreachable.
 TEST(NegativeTimingChecks, SetupholdNegativeLimitsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -21,9 +17,6 @@ TEST(NegativeTimingChecks, SetupholdNegativeLimitsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.9: the same rule applies to $recrem — the two kinds must behave
-// identically with respect to negative values, so the elaborator must
-// accept either one.
 TEST(NegativeTimingChecks, RecremNegativeLimitsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -37,4 +30,4 @@ TEST(NegativeTimingChecks, RecremNegativeLimitsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -6,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §3.13(b): "The package name space unifies all the package identifiers
-// defined among all compilation units."  A package's parameter, looked up
-// through the package name space at elaboration, must carry into runtime
-// as a distinct value addressable from a module that imports the package.
 TEST(NameSpaceSimulation, PackageNameSpaceValueAtRuntime) {
   auto val = RunAndGet(
       "package pkg;\n"
@@ -24,13 +20,6 @@ TEST(NameSpaceSimulation, PackageNameSpaceValueAtRuntime) {
   EXPECT_EQ(val, 7u);
 }
 
-// §3.13(e): "The module name space ... unifies the definition of modules,
-// interfaces, programs, checkers, functions, tasks, named blocks, instance
-// names, parameters, named events, net declarations, variable
-// declarations, and user-defined types within the enclosing construct."
-// A child-module instance declared in the module name space must be
-// reachable as a hierarchical name during simulation (linking §3.13(e) to
-// §23.6).
 TEST(NameSpaceSimulation, ModuleNameSpaceInstanceAddressableAtRuntime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -56,11 +45,6 @@ TEST(NameSpaceSimulation, ModuleNameSpaceInstanceAddressableAtRuntime) {
   EXPECT_EQ(r->value.ToUint64(), 0x55u);
 }
 
-// §3.13(f): "The block name space ... unifies the definitions of the
-// named blocks, functions, tasks, parameters, named events, variable type
-// of declaration, and user-defined types within the enclosing construct."
-// Two different named blocks defining the same local name must each keep
-// their own value at runtime — distinct block name spaces are observable.
 TEST(NameSpaceSimulation, BlockNameSpaceIsolatesLocalVariables) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -90,4 +74,4 @@ TEST(NameSpaceSimulation, BlockNameSpaceIsolatesLocalVariables) {
   EXPECT_EQ(v2->value.ToUint64(), 2u);
 }
 
-}  // namespace
+}

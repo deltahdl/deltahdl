@@ -16,7 +16,7 @@ Preprocessor::Preprocessor(SourceManager& src_mgr, DiagEngine& diag,
     def.body = value;
     macros_.Define(std::move(def));
   }
-  // IEEE 1800-2023 Table 22-2: predefined coverage macros.
+
   DefinePredefined("SV_COV_START", "0");
   DefinePredefined("SV_COV_STOP", "1");
   DefinePredefined("SV_COV_RESET", "2");
@@ -56,7 +56,6 @@ std::string_view Preprocessor::Trim(std::string_view s) {
   return s;
 }
 
-// §22.5.1: Compiler directive names that cannot be redefined as macros.
 bool IsCompilerDirective(std::string_view name) {
   static constexpr std::string_view kDirectives[] = {
       "define",
@@ -92,8 +91,6 @@ bool IsCompilerDirective(std::string_view name) {
   return false;
 }
 
-// Returns true if the character at position i is a backtick-quote (`") or
-// backtick-escaped-quote (`\`") delimiter, advancing i past the sequence.
 static bool SkipBacktickQuote(std::string_view body, size_t& i) {
   if (body[i] != '`') return false;
   if (i + 1 < body.size() && body[i + 1] == '"') {
@@ -108,8 +105,6 @@ static bool SkipBacktickQuote(std::string_view body, size_t& i) {
   return false;
 }
 
-// Process an unescaped quote character, updating triple-quote and
-// single-string tracking state. Advances i past triple-quote sequences.
 static void ProcessQuoteChar(std::string_view body, size_t& i, bool& in_string,
                              bool& in_triple) {
   if (in_triple) {
@@ -131,8 +126,6 @@ static void ProcessQuoteChar(std::string_view body, size_t& i, bool& in_string,
   in_string = true;
 }
 
-// §22.5.1: Check for unterminated string literals in macro bodies.
-// Handles triple-quoted strings (""") and `" (backtick-quote) delimiters.
 bool HasUnterminatedString(std::string_view body) {
   bool in_string = false;
   bool in_triple = false;
@@ -149,8 +142,6 @@ static bool EndsWithBackslash(std::string_view line) {
   return !line.empty() && line.back() == '\\';
 }
 
-// Count unmatched triple-quote sequences in text, skipping backtick-prefixed
-// `""" sequences which are a distinct operator (§22.5.1).
 static bool HasOpenTripleQuote(std::string_view text) {
   int count = 0;
   for (size_t i = 0; i + 2 < text.size(); ++i) {
@@ -166,7 +157,6 @@ static bool HasOpenTripleQuote(std::string_view text) {
   return count % 2 != 0;
 }
 
-// §22.5.1: Count unmatched backtick-triple-quote (`""") sequences.
 static bool HasOpenBacktickTripleQuote(std::string_view text) {
   int count = 0;
   for (size_t i = 0; i + 3 < text.size(); ++i) {
@@ -179,15 +169,11 @@ static bool HasOpenBacktickTripleQuote(std::string_view text) {
   return count % 2 != 0;
 }
 
-// Returns true if character at i is an unescaped quote (not preceded by
-// backslash or backtick), toggling string state when outside a block comment.
 static bool IsUnescapedQuote(std::string_view text, size_t i) {
   return text[i] == '"' && (i == 0 || text[i - 1] != '\\') &&
          (i == 0 || text[i - 1] != '`');
 }
 
-// Advance past a block-comment delimiter if present. Returns true if a
-// comment-open or comment-close was consumed, updating in_block accordingly.
 static bool TryToggleBlockComment(std::string_view text, size_t& i,
                                   bool& in_block) {
   if (i + 1 >= text.size()) return false;
@@ -204,7 +190,6 @@ static bool TryToggleBlockComment(std::string_view text, size_t& i,
   return false;
 }
 
-// Check for an unclosed block comment in text.
 static bool HasOpenBlockComment(std::string_view text) {
   bool in_string = false;
   bool in_block = false;
@@ -219,22 +204,17 @@ static bool HasOpenBlockComment(std::string_view text) {
   return in_block;
 }
 
-// §22.5.1: Join a `define body that spans multiple lines via backslash,
-// triple-quoted strings, or block comments.
 static std::string JoinDefineBody(std::string_view src, size_t pos, size_t& eol,
                                   uint32_t& line_num) {
   std::string_view first_line = src.substr(pos, eol - pos);
   std::string joined;
 
-  // Start with the first line, stripping trailing backslash if present.
   if (EndsWithBackslash(first_line)) {
     joined.assign(first_line.substr(0, first_line.size() - 1));
   } else {
     joined.assign(first_line);
   }
 
-  // Keep joining while the current text has: trailing backslash (already
-  // stripped), open triple-quote, or open block comment.
   auto needs_continuation = [](std::string_view line_text,
                                const std::string& accumulated) {
     if (EndsWithBackslash(line_text)) return true;
@@ -250,9 +230,8 @@ static std::string JoinDefineBody(std::string_view src, size_t pos, size_t& eol,
     std::string_view next_line = src.substr(next_start, next_eol - next_start);
     ++line_num;
     eol = next_eol;
-    first_line = next_line;  // For next backslash check.
-    // §22.5.1: Inside `""", backslash-newline preserves the newline
-    // (only the backslash is removed).
+    first_line = next_line;
+
     if (HasOpenBacktickTripleQuote(joined)) {
       joined += '\n';
     }
@@ -283,7 +262,6 @@ static std::string_view AfterDirective(std::string_view line,
   return Preprocessor::Trim(rest);
 }
 
-// §22.2: Split a single-token directive argument from the remainder text.
 static std::pair<std::string_view, std::string_view> SplitFirstToken(
     std::string_view s) {
   size_t end = 0;
@@ -293,8 +271,6 @@ static std::pair<std::string_view, std::string_view> SplitFirstToken(
   return {s.substr(0, end), Preprocessor::Trim(s.substr(end))};
 }
 
-// §22.2: Split `timescale argument (unit / precision) from remainder.
-// Expects expanded text (macros already substituted).
 static std::pair<std::string_view, std::string_view> SplitTimescaleArg(
     std::string_view s) {
   auto slash = s.find('/');
@@ -302,15 +278,15 @@ static std::pair<std::string_view, std::string_view> SplitTimescaleArg(
   auto after_slash = s.substr(slash + 1);
   auto prec = Preprocessor::Trim(after_slash);
   size_t end = 0;
-  // Skip digits (magnitude: 1, 10, 100).
+
   while (end < prec.size() &&
          std::isdigit(static_cast<unsigned char>(prec[end])))
     ++end;
-  // Skip whitespace between magnitude and unit.
+
   while (end < prec.size() &&
          std::isspace(static_cast<unsigned char>(prec[end])))
     ++end;
-  // Skip alpha chars (unit: s, ms, us, ns, ps, fs).
+
   while (end < prec.size() &&
          std::isalpha(static_cast<unsigned char>(prec[end])))
     ++end;
@@ -318,7 +294,6 @@ static std::pair<std::string_view, std::string_view> SplitTimescaleArg(
   return {s.substr(0, ts_end), Preprocessor::Trim(s.substr(ts_end))};
 }
 
-// §22.2: Split `begin_keywords quoted argument from remainder.
 static std::pair<std::string_view, std::string_view> SplitQuotedArg(
     std::string_view s) {
   auto first = s.find('"');
@@ -329,8 +304,6 @@ static std::pair<std::string_view, std::string_view> SplitQuotedArg(
   return {s.substr(0, end), Preprocessor::Trim(s.substr(end))};
 }
 
-// Consume characters inside a block comment, replacing content with spaces
-// until the closing */ is found. Returns true if the block comment was closed.
 static bool StripBlockCommentContent(std::string_view line, size_t& i,
                                      std::string& result) {
   if (i + 1 < line.size() && line[i] == '*' && line[i + 1] == '/') {
@@ -343,9 +316,6 @@ static bool StripBlockCommentContent(std::string_view line, size_t& i,
   return false;
 }
 
-// Process a single character outside of strings and comments, detecting
-// line comments (//) and block comment starts (/*). Returns true if a
-// line comment was found (caller should stop processing).
 static bool StripNormalChar(std::string_view line, size_t& i,
                             std::string& result, bool& in_block_comment) {
   if (i + 1 < line.size() && line[i] == '/' && line[i + 1] == '/') {
@@ -367,8 +337,6 @@ static bool StripNormalChar(std::string_view line, size_t& i,
   return false;
 }
 
-// §22.2: Replace comment content with spaces so backticks within comments
-// are not processed by ExpandInlineMacros. Tracks block comment state.
 static std::string StripComments(std::string_view line,
                                  bool& in_block_comment) {
   std::string result;
@@ -395,8 +363,6 @@ static std::string StripComments(std::string_view line,
   return result;
 }
 
-// Expand macros, conditionals, and strip comments for a non-directive line,
-// appending the result to output.
 void Preprocessor::ExpandAndAppendLine(std::string_view line, uint32_t file_id,
                                        uint32_t line_num, std::string& output) {
   auto stripped = StripComments(line, in_block_comment_);
@@ -406,10 +372,6 @@ void Preprocessor::ExpandAndAppendLine(std::string_view line, uint32_t file_id,
   output.append(expanded);
 }
 
-// §22.2: After stripping comments, find the start of a directive that was
-// hidden behind comments or whitespace.  Returns the position in `stripped`
-// where the backtick begins, or npos if the first meaningful character is
-// not a backtick.
 static size_t FindDirectiveInStripped(std::string_view stripped) {
   size_t i = 0;
   while (i < stripped.size()) {
@@ -418,7 +380,7 @@ static size_t FindDirectiveInStripped(std::string_view stripped) {
       ++i;
       continue;
     }
-    // Skip preserved comment shells left by StripComments.
+
     if (i + 1 < stripped.size() && c == '/' && stripped[i + 1] == '*') {
       auto close = stripped.find("*/", i + 2);
       if (close != std::string_view::npos) {
@@ -435,9 +397,6 @@ static size_t FindDirectiveInStripped(std::string_view stripped) {
   return std::string_view::npos;
 }
 
-// Handle a line that falls inside an open block comment. Passes through
-// comment text and processes any remainder after the closing */.
-// Returns true if the line was consumed (caller should advance to next line).
 bool Preprocessor::ProcessBlockCommentLine(std::string_view line,
                                            uint32_t file_id, uint32_t line_num,
                                            int depth, std::string& output) {
@@ -485,8 +444,6 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
       continue;
     }
 
-    // §22.5.1: Join multi-line `define (backslash, triple-quote, block
-    // comment).
     std::string joined;
     if (StartsWithDirective(line, "define")) {
       auto body_start = AfterDirective(line, "define");
@@ -499,9 +456,7 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
 
     bool handled = ProcessDirective(line, file_id, line_num, depth, output);
     if (!handled && IsActive()) {
-      // §22.2: A language element is allowed before a directive on the same
-      // line.  Strip comments and check whether the remaining text begins
-      // with a directive (e.g. after an inline block comment).
+
       auto stripped = StripComments(std::string(line), in_block_comment_);
       size_t dir_pos = FindDirectiveInStripped(stripped);
       if (dir_pos != std::string_view::npos) {
@@ -527,8 +482,6 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   return output;
 }
 
-// §22.2: Process arbitrary text — strip comments, expand macros, track design
-// elements, and append to output.
 void Preprocessor::OutputText(std::string_view text, uint32_t file_id,
                               uint32_t line_num, std::string& output) {
   if (Trim(text).empty()) return;
@@ -538,8 +491,6 @@ void Preprocessor::OutputText(std::string_view text, uint32_t file_id,
   output.append(expanded);
 }
 
-// §22.2: Process pre-expanded text — strip comments and track design elements,
-// but skip macro expansion (already done by caller).
 void Preprocessor::OutputPreExpanded(std::string_view text,
                                      std::string& output) {
   if (Trim(text).empty()) return;
@@ -548,16 +499,12 @@ void Preprocessor::OutputPreExpanded(std::string_view text,
   output.append(stripped);
 }
 
-// §22.2: Output text that follows a directive with a defined end on the
-// same line.  Applies macro expansion and comment stripping.
 void Preprocessor::OutputRemainder(std::string_view line,
                                    std::string_view directive, uint32_t file_id,
                                    uint32_t line_num, std::string& output) {
   OutputText(AfterDirective(line, directive), file_id, line_num, output);
 }
 
-// Returns true (and emits an error) if currently inside a design element,
-// which makes the given directive illegal.
 bool Preprocessor::RejectInsideDesignElement(std::string_view directive_name,
                                              SourceLoc loc) {
   if (design_element_depth_ == 0) return false;
@@ -568,7 +515,6 @@ bool Preprocessor::RejectInsideDesignElement(std::string_view directive_name,
   return true;
 }
 
-// §22.3: Reset all resettable directive state.
 void Preprocessor::ResetDirectiveState() {
   default_net_type_ = NetType::kWire;
   in_celldefine_ = false;
@@ -583,7 +529,6 @@ void Preprocessor::ResetDirectiveState() {
   delay_mode_directive_ = DelayModeDirective::kNone;
 }
 
-// Annex E: Handle delay_mode_* directives.
 bool Preprocessor::ProcessDelayModeDirective(std::string_view line,
                                              SourceLoc loc) {
   if (StartsWithDirective(line, "delay_mode_distributed")) {
@@ -711,7 +656,6 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
   return false;
 }
 
-// Extract the macro name from a `undef argument, handling escaped identifiers.
 static size_t FindUndefNameEnd(std::string_view text) {
   size_t name_end = 0;
   if (!text.empty() && text[0] == '\\') {
@@ -725,7 +669,6 @@ static size_t FindUndefNameEnd(std::string_view text) {
   return name_end;
 }
 
-// Handle the `include directive: expand macros in the argument and delegate.
 void Preprocessor::ProcessIncludeDirective(std::string_view line, SourceLoc loc,
                                            int depth, std::string& output) {
   auto inc_arg = AfterDirective(line, "include");
@@ -735,7 +678,6 @@ void Preprocessor::ProcessIncludeDirective(std::string_view line, SourceLoc loc,
   HandleInclude(expanded_arg, loc, depth, output, angle_bracket);
 }
 
-// Handle `begin_keywords / `end_keywords directives.
 bool Preprocessor::ProcessKeywordsDirective(std::string_view line,
                                             SourceLoc loc, uint32_t file_id,
                                             uint32_t line_num,
@@ -823,17 +765,17 @@ bool Preprocessor::ProcessConditionalDirective(std::string_view line,
   }
   if (StartsWithDirective(line, "else")) {
     HandleElse();
-    // §22.2: text after `else on same line is preserved.
+
     if (IsActive()) OutputRemainder(line, "else", file_id, line_num, output);
     return true;
   }
   if (StartsWithDirective(line, "endif")) {
     HandleEndif();
-    // §22.2: text after `endif on same line is preserved.
+
     if (IsActive()) OutputRemainder(line, "endif", file_id, line_num, output);
     return true;
   }
   return false;
 }
 
-}  // namespace delta
+}

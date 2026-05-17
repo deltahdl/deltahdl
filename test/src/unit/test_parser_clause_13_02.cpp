@@ -1,4 +1,4 @@
-// §13.2
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -21,4 +21,4 @@ TEST(Subroutines, TaskAndFunctionCoexist) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kTaskDecl));
 }
 
-}  // namespace
+}

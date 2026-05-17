@@ -17,7 +17,6 @@ TEST(TaggedUnionSimulation, ChangeTag) {
   EXPECT_EQ(f.ctx.GetVariableTag("u"), "b");
 }
 
-// §7.3.2: Tagged assignment sets tag and value; read back via matching member.
 TEST(TaggedUnionSimulation, TaggedAssignment_SetsTagAndValue) {
   auto v = RunAndGet(
       "module t;\n"
@@ -33,7 +32,6 @@ TEST(TaggedUnionSimulation, TaggedAssignment_SetsTagAndValue) {
   EXPECT_EQ(v, 42u);
 }
 
-// §7.3.2: Reassigning with different tag updates the active member.
 TEST(TaggedUnionSimulation, TaggedAssignment_OverwriteTag) {
   auto v = RunAndGet(
       "module t;\n"
@@ -50,7 +48,6 @@ TEST(TaggedUnionSimulation, TaggedAssignment_OverwriteTag) {
   EXPECT_EQ(v, 20u);
 }
 
-// §7.3.2: Void member tagged assignment (tag only, no value).
 TEST(TaggedUnionSimulation, VoidMemberTaggedAssignment) {
   auto v = RunAndGet(
       "module t;\n"
@@ -67,4 +64,4 @@ TEST(TaggedUnionSimulation, VoidMemberTaggedAssignment) {
   EXPECT_EQ(v, 99u);
 }
 
-}  // namespace
+}

@@ -99,12 +99,6 @@ TEST(ProceduralAssignmentParsing, AllThreeAssignmentTypes) {
   EXPECT_EQ(stmts[2]->kind, StmtKind::kBlockingAssign);
 }
 
-// §10.4 enumerates four legal LHS forms for procedural assignments. At the
-// parser AST level only three distinct shapes appear: singular and aggregate
-// variables share kIdentifier (already covered by the tests above); bit-,
-// part-, and slice-selects of packed arrays and slices/elements of unpacked
-// arrays all share kSelect (covered here); concatenation lvalues use
-// kConcatenation (covered below).
 TEST(ProceduralAssignmentParsing, LhsSelectIsAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -140,4 +134,4 @@ TEST(ProceduralAssignmentParsing, LhsConcatenationIsAccepted) {
   EXPECT_EQ(stmts[0]->lhs->kind, ExprKind::kConcatenation);
 }
 
-}  // namespace
+}

@@ -48,16 +48,14 @@ TEST(MultiBlockExampleSim, TwoBlocksDifferentClocks) {
 
   cmgr.Attach(f.ctx, f.scheduler);
 
-  // Trigger phi1 posedge — only cd1 samples.
   SchedulePosedge(f, phi1, 10);
   f.scheduler.Run();
   EXPECT_EQ(cmgr.GetSampledValue("cd1", "data"), 0x1234u);
-  EXPECT_EQ(cmgr.GetSampledValue("cd2", "cmd"), 0u);  // Not yet triggered.
+  EXPECT_EQ(cmgr.GetSampledValue("cd2", "cmd"), 0u);
 
-  // Trigger phi2 posedge — cd2 samples.
   SchedulePosedge(f, phi2, 20);
   f.scheduler.Run();
   EXPECT_EQ(cmgr.GetSampledValue("cd2", "cmd"), 0x56u);
 }
 
-}  // namespace
+}

@@ -137,7 +137,7 @@ TEST(StringDataType, StringIndexReturnsAscii) {
   MakeStringVar(f, "s", "hello");
   auto* sel = MakeSelectExpr(f.arena, MakeId(f.arena, "s"), MakeInt(f.arena, 0));
   auto result = EvalExpr(sel, f.ctx, f.arena);
-  // §6.16 Table 6-9: s[0] returns ASCII code of first character ('h' = 0x68).
+
   EXPECT_EQ(result.ToUint64(), 0x68u);
 }
 
@@ -161,8 +161,6 @@ TEST(StringDataType, StringAssignFromString) {
   EXPECT_EQ(VecToStr(var_b->value), "test");
 }
 
-// §6.16: "A string literal assigned to a string variable is converted ...
-// All '\0' characters in the string literal are ignored."
 TEST(StringDataType, StringLiteralEmbeddedZeroStrippedInInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -179,8 +177,6 @@ TEST(StringDataType, StringLiteralEmbeddedZeroStrippedInInit) {
   EXPECT_EQ(VecToStr(s1->value), "helloworld");
 }
 
-// §6.16: same rule applied through a procedural assignment, not just an
-// initializer.  The string literal is converted before the value is stored.
 TEST(StringDataType, StringLiteralEmbeddedZeroStrippedInProceduralAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -198,9 +194,6 @@ TEST(StringDataType, StringLiteralEmbeddedZeroStrippedInProceduralAssign) {
   EXPECT_EQ(VecToStr(s->value), "foobar");
 }
 
-// §6.16: "A single character of a string variable may be selected for
-// reading or writing by indexing the variable."  s[1] = "B" overwrites the
-// middle byte of "abc" to yield "aBc".
 TEST(StringDataType, StringIndexedWriteUpdatesByte) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -221,7 +214,6 @@ TEST(StringDataType, StringIndexedWriteUpdatesByte) {
   EXPECT_EQ(VecToStr(s->value), "aBc");
 }
 
-// §6.16: "Assigning the value 0 to a string character shall be ignored."
 TEST(StringDataType, AssignZeroToStringCharIgnored) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -242,7 +234,6 @@ TEST(StringDataType, AssignZeroToStringCharIgnored) {
   EXPECT_EQ(VecToStr(s->value), "abc");
 }
 
-// §6.16 Table 6-9: "If given an index out of range, returns 0."
 TEST(StringDataType, IndexOutOfRangeReturnsZero) {
   SimFixture f;
   MakeStringVar(f, "s", "abc");
@@ -251,8 +242,6 @@ TEST(StringDataType, IndexOutOfRangeReturnsZero) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-// §6.16: "Indexing an empty string variable shall be an out-of-bounds access."
-// Out-of-bounds returns 0 per Table 6-9's Indexing entry.
 TEST(StringDataType, IndexEmptyStringIsOutOfBounds) {
   SimFixture f;
   MakeStringVar(f, "s", "");
@@ -261,15 +250,6 @@ TEST(StringDataType, IndexEmptyStringIsOutOfBounds) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-// §6.16: "Casting an integral value to a string variable proceeds:
-// — If the size (in bits) of the integral value is not a multiple of 8, the
-//   integral value is left extended and filled with zeros until its bit size
-//   is a multiple of 8.  The extended value is then treated the same as a
-//   string literal, where each successive 8 bits represent a character.
-// — The steps described previously for string literal conversion are then
-//   applied to the extended value."  The LRM example assigns
-// `string'(b)` with `b = 12'ha41` and expects the result to hold the two
-// bytes 0x0a, 0x41 — \0 stripping removes the high zero pad.
 TEST(StringDataType, IntegralCastToStringZeroPadsThenStripsZeros) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -288,8 +268,6 @@ TEST(StringDataType, IntegralCastToStringZeroPadsThenStripsZeros) {
   EXPECT_EQ(VecToStr(s2->value), "\nA");
 }
 
-// §6.16 Table 6-9: Concatenation of two operands of `string` type yields a
-// string-typed result holding the byte sequence of the two operands.
 TEST(StringDataType, StringConcatenationProducesStringResult) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -311,9 +289,6 @@ TEST(StringDataType, StringConcatenationProducesStringResult) {
   EXPECT_EQ(VecToStr(c->value), "foobar");
 }
 
-// §6.16 Table 6-9 Replication: `{n{Str}}` replicates a string operand n times.
-// With a string-typed target and a string-literal inner operand, the result is
-// the literal repeated n times.
 TEST(StringDataType, StringReplicationOperator) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -331,11 +306,6 @@ TEST(StringDataType, StringReplicationOperator) {
   EXPECT_EQ(VecToStr(s->value), "ababab");
 }
 
-// §6.16: "If an initial value is not specified, the variable is initialized to
-// "", the empty string."  Combined with "Indexing an empty string variable
-// shall be an out-of-bounds access" (and Table 6-9 Indexing returns 0 out of
-// range), reading byte 0 of a defaulted string variable yields 0.  This
-// exercises the lowerer's default-init path, not a fixture helper.
 TEST(StringDataType, DefaultStringVariableIndexingReturnsZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -354,10 +324,6 @@ TEST(StringDataType, DefaultStringVariableIndexingReturnsZero) {
   EXPECT_EQ(b->value.ToUint64() & 0xFFu, 0u);
 }
 
-// §5.9 / §6.16: "String literals are implicitly converted to the `string` type
-// when assigned to a `string` type or used in an expression involving `string`
-// type operands."  Equality of a `string`-typed variable against a raw string
-// literal must observe lexicographic equality, not bit equality.
 TEST(StringDataType, StringLiteralImplicitlyConvertedInEquality) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -379,4 +345,4 @@ TEST(StringDataType, StringLiteralImplicitlyConvertedInEquality) {
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

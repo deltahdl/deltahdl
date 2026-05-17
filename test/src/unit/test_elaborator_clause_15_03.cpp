@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.3: semaphore declaration elaborates with class_type_name set.
 TEST(SemaphoreElaborator, DeclarationSetsClassTypeName) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,7 +18,6 @@ TEST(SemaphoreElaborator, DeclarationSetsClassTypeName) {
   EXPECT_EQ(mod->variables[0].class_type_name, "semaphore");
 }
 
-// §15.3: multiple semaphore declarations each get correct class_type_name.
 TEST(SemaphoreElaborator, MultipleSemaphoreDeclarations) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -36,7 +34,6 @@ TEST(SemaphoreElaborator, MultipleSemaphoreDeclarations) {
   EXPECT_EQ(mod->variables[1].class_type_name, "semaphore");
 }
 
-// §15.3: semaphore with initializer elaborates without error.
 TEST(SemaphoreElaborator, DeclarationWithInitializer) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -52,7 +49,6 @@ TEST(SemaphoreElaborator, DeclarationWithInitializer) {
   EXPECT_NE(mod->variables[0].init_expr, nullptr);
 }
 
-// §15.3: semaphore used in initial block with method calls elaborates.
 TEST(SemaphoreElaborator, MethodCallsInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -68,7 +64,6 @@ TEST(SemaphoreElaborator, MethodCallsInInitialBlock) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.3: semaphore does not require an explicit class declaration.
 TEST(SemaphoreElaborator, BuiltInTypeWithoutClassDecl) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -76,4 +71,4 @@ TEST(SemaphoreElaborator, BuiltInTypeWithoutClassDecl) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

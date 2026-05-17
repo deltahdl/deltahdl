@@ -98,10 +98,6 @@ TEST(DesignBuildingBlockParsing, CuScopeDataDecl) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "b");
 }
 
-// §3.12.1 declares that the compilation-unit scope can contain any item
-// definable in a package; §3.13(c) explicitly lists named events among the
-// CU-scope name space's contents.  A bare `event e;` at the top level
-// must be parsed as a CU-scope declaration.
 TEST(DesignBuildingBlockParsing, CuScopeNamedEventDeclaration) {
   auto r = Parse(
       "event e;\n"
@@ -156,9 +152,6 @@ TEST(DesignBuildingBlockParsing, MultipleCuScopeItems) {
   EXPECT_EQ(r.cu->cu_items[2]->kind, ModuleItemKind::kFunctionDecl);
 }
 
-// §3.1 General — the compilation unit must accept empty, whitespace-only,
-// and comment-only sources as valid, producing a CU with all building-block
-// vectors empty.
 TEST(CompilationUnitStructure, EmptySourceProducesValidCompilationUnit) {
   auto r = Parse("");
   ASSERT_NE(r.cu, nullptr);
@@ -366,7 +359,6 @@ TEST(CompilationUnitStructure, SourceWithoutModulesIsValid) {
   EXPECT_EQ(r.cu->interfaces.size(), 1u);
 }
 
-// §3.1 — UDPs (primitives) accumulate in the compilation unit.
 TEST(CompilationUnitStructure, MultipleUdpsAccumulate) {
   auto r = Parse(
       "primitive u1(output y, input a, b);\n"
@@ -388,7 +380,6 @@ TEST(CompilationUnitStructure, MultipleUdpsAccumulate) {
   EXPECT_EQ(r.cu->udps[1]->name, "u2");
 }
 
-// §3.1 — Configs accumulate in the compilation unit.
 TEST(CompilationUnitStructure, MultipleConfigsAccumulate) {
   auto r = Parse(
       "module m; endmodule\n"
@@ -405,7 +396,6 @@ TEST(CompilationUnitStructure, MultipleConfigsAccumulate) {
   EXPECT_EQ(r.cu->configs[1]->name, "cfg2");
 }
 
-// §3.1 — CU-scope classes accumulate in the compilation unit.
 TEST(CompilationUnitStructure, CuScopeClassesAccumulate) {
   auto r = Parse(
       "class C1;\n"
@@ -421,7 +411,6 @@ TEST(CompilationUnitStructure, CuScopeClassesAccumulate) {
   EXPECT_EQ(r.cu->classes[1]->name, "C2");
 }
 
-// §3.1 — CU-scope items: multiple functions and tasks accumulate.
 TEST(CompilationUnitStructure, MultipleCuScopeSubroutinesAccumulate) {
   auto r = Parse(
       "function void f1; endfunction\n"
@@ -434,7 +423,6 @@ TEST(CompilationUnitStructure, MultipleCuScopeSubroutinesAccumulate) {
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §3.1 — Design elements with comments interspersed.
 TEST(CompilationUnitStructure, CommentsInterspersedBetweenDesignElements) {
   auto r = Parse(
       "// header comment\n"
@@ -448,7 +436,6 @@ TEST(CompilationUnitStructure, CommentsInterspersedBetweenDesignElements) {
   EXPECT_EQ(r.cu->packages.size(), 1u);
 }
 
-// §3.1 — Design elements and CU-scope items interleaved.
 TEST(CompilationUnitStructure, DesignElementsAndCuItemsInterleaved) {
   auto r = Parse(
       "function void f1; endfunction\n"
@@ -463,7 +450,6 @@ TEST(CompilationUnitStructure, DesignElementsAndCuItemsInterleaved) {
   EXPECT_GE(r.cu->cu_items.size(), 3u);
 }
 
-// §3.1 — Large number of modules accumulate correctly.
 TEST(CompilationUnitStructure, ManyModulesAccumulate) {
   std::string src;
   for (int i = 0; i < 50; ++i) {
@@ -475,9 +461,6 @@ TEST(CompilationUnitStructure, ManyModulesAccumulate) {
   EXPECT_EQ(r.cu->modules.size(), 50u);
 }
 
-// §3.12.1: "Because it has no name, the compilation-unit scope cannot be
-// used with an import declaration."  An `import $unit::*;` (or selective
-// `import $unit::name;`) is rejected at parse time.
 TEST(CompilationUnitParsing, CompilationUnitScopeCannotBeImportedWildcard) {
   EXPECT_FALSE(
       ParseOk("import $unit::*;\n"
@@ -536,10 +519,6 @@ TEST(CompilationUnits, BareStatementAtTopLevelIsError) {
   EXPECT_FALSE(ParseOk("assign x = 1;"));
 }
 
-// §3.12.1: the compilation-unit scope can contain any item that can be
-// defined within a package, plus bind constructs.  Modules, primitives,
-// programs, interfaces, and packages are visible across compilation units;
-// classes, checkers, configs, and bind directives also belong to a CU.
 TEST(CompilationUnitStructure, AllDescriptionTypesCoexist) {
   auto r = Parse(
       "package pkg; endpackage\n"
@@ -583,4 +562,4 @@ TEST(CompilationUnits, DesignElementsInterleaveWithNonDesignElements) {
   EXPECT_EQ(r.cu->packages.size(), 1u);
 }
 
-}  // namespace
+}

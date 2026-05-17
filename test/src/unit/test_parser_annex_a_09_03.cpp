@@ -84,9 +84,6 @@ TEST(IdentifierSyntaxParsing, HierarchicalIdentWithMultipleBitSelects) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §A.9.3: hierarchical_identifier ::= [ $root . ] { identifier
-// constant_bit_select . } identifier — the optional `$root .` prefix
-// reaches the top-level scope regardless of the current instance.
 TEST(IdentifierSyntaxParsing, HierarchicalIdentWithRoot) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -419,7 +416,6 @@ TEST(IdentifierSyntaxParsing, SystemIdentMultipleInBlock) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-
 TEST(IdentifierSyntaxParsing, TypeIdentifier) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -494,12 +490,8 @@ TEST(IdentifierSyntaxParsing, SequenceIdentifier) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// --- package_scope ::= package_identifier :: | $unit :: ---
-
 TEST(IdentifierSyntaxParsing, PackageScopeUnit) {
-  // package_scope ::= ... | $unit ::  — the compilation-unit scope form
-  // (cross-link with A.8.3 expression: a $unit::name reference inside an
-  // initial-block assignment).
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "int cu_var = 0;\n"
@@ -513,7 +505,7 @@ TEST(IdentifierSyntaxParsing, PackageScopeUnit) {
 }
 
 TEST(IdentifierSyntaxParsing, PackageScopeNamed) {
-  // package_scope ::= package_identifier :: — the named-package form.
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "package pkg;\n"
@@ -527,14 +519,6 @@ TEST(IdentifierSyntaxParsing, PackageScopeNamed) {
   ASSERT_NE(cu, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
 }
-
-// --- c_identifier ::= [ a-zA-Z_ ] { [ a-zA-Z0-9_ ] } ---
-//
-// §A.9.3 defines c_identifier with a *narrower* lexical class than
-// simple_identifier: the body alphabet is [a-zA-Z0-9_], so `$` is not
-// permitted.  The DPI import/export rules in §A.2.6 use c_identifier (the
-// `c_identifier =` prefix); the parser must reject a `$`-bearing token in
-// that slot even though the lexer happily forms it as a simple_identifier.
 
 TEST(IdentifierSyntaxParsing, DpiImportCIdentifierWithDollarIsError) {
   ParseFixture f;
@@ -557,11 +541,6 @@ TEST(IdentifierSyntaxParsing, DpiExportCIdentifierWithDollarIsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §A.9.3 simple_identifier ::= [ a-zA-Z_ ] { [ a-zA-Z0-9_$ ] } — the body
-// alphabet permits `$`, so the parser must accept `my$var` as a regular
-// identifier when it appears in a variable declaration (A.2.2.1
-// list_of_variable_decl_assignments) and in the RHS of an assignment
-// (A.8.4 primary).  Stage = parser.
 TEST(IdentifierSyntaxParsing, SimpleIdentifierWithDollarInBody) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -574,10 +553,6 @@ TEST(IdentifierSyntaxParsing, SimpleIdentifierWithDollarInBody) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §A.9.3 ps_type_identifier ::= [local::] | [package_scope|class_scope]
-// type_identifier — the parser must accept a typedef declared inside a
-// package and referenced from a module via the `pkg::` prefix as a valid
-// data_type in a variable declaration.
 TEST(IdentifierSyntaxParsing, PsTypeIdentifierFromPackage) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -592,10 +567,6 @@ TEST(IdentifierSyntaxParsing, PsTypeIdentifierFromPackage) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §A.9.3 ps_or_hierarchical_tf_identifier ::= [package_scope] tf_identifier
-// | hierarchical_tf_identifier — the package_scope alternative: calling a
-// function declared in a package via the `pkg::` prefix must parse as a
-// valid call expression.
 TEST(IdentifierSyntaxParsing, PsOrHierarchicalTfIdentifierPackageScopedCall) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -611,14 +582,8 @@ TEST(IdentifierSyntaxParsing, PsOrHierarchicalTfIdentifierPackageScopedCall) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// --- identifier ::= simple_identifier | escaped_identifier ---
-
 TEST(IdentifierSyntaxParsing, EscapedIdentifierInExpr) {
-  // escaped_identifier ::= \ {any_printable_ASCII_character_except_white_space}
-  //                          white_space
-  // Parser-level test that an escaped identifier survives the lexer and is
-  // treated as an identifier in the AST (cross-link with A.9.4 white_space
-  // terminator and the lexer-stage rule in test_lexer_annex_a_09_03.cpp).
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -630,10 +595,6 @@ TEST(IdentifierSyntaxParsing, EscapedIdentifierInExpr) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §A.9.3 ps_class_identifier ::= [package_scope] class_identifier — the
-// package_scope alternative: a class declared inside a package is referenced
-// from a module via the `pkg::ClassName` form in a variable declaration's
-// data_type slot.
 TEST(IdentifierSyntaxParsing, PsClassIdentifierFromPackage) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -650,13 +611,6 @@ TEST(IdentifierSyntaxParsing, PsClassIdentifierFromPackage) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §A.9.3 ps_parameter_identifier ::= ... |
-//     { generate_block_identifier [ [ constant_expression ] ] . }
-//       parameter_identifier
-// The second alternative reaches a parameter declared inside a generate-for
-// block via the generate-block name and an instance index. The parser must
-// accept `gen_blk[0].LOCAL_P` as the value side of a constant_expression in a
-// packed-dimension width slot.
 TEST(IdentifierSyntaxParsing, PsParameterIdentifierFromGenerateBlock) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -673,4 +627,4 @@ TEST(IdentifierSyntaxParsing, PsParameterIdentifierFromGenerateBlock) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

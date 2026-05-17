@@ -716,4 +716,4 @@ TEST(AlwaysCombLatchWarning, NestedIncompleteIfWarnsLatch) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-}  // namespace
+}

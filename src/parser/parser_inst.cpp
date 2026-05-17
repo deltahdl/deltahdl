@@ -10,7 +10,7 @@ ModuleItem* Parser::ParseModuleInst(const Token& module_tok) {
 
 ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
                                         std::vector<ModuleItem*>* extra_items) {
-  // A.4.1.1: parameter_value_assignment shared by all instances
+
   std::vector<std::pair<std::string_view, Expr*>> params;
   if (Match(TokenKind::kHash)) {
     ParseParamValueAssignment(params);
@@ -23,7 +23,7 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
     item->inst_module = module_tok.text;
     item->inst_params = params;
     item->inst_name = Expect(TokenKind::kIdentifier).text;
-    // §A.4.1.1: name_of_instance ::= instance_identifier { unpacked_dimension }
+
     while (Check(TokenKind::kLBracket)) {
       Consume();
       Expr* left = ParseExpr();
@@ -58,7 +58,7 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
 
   auto* first = parse_one_instance();
   if (extra_items) extra_items->push_back(first);
-  // A.4.1.1: { , hierarchical_instance }
+
   while (Match(TokenKind::kComma)) {
     auto* next = parse_one_instance();
     if (extra_items) extra_items->push_back(next);
@@ -134,7 +134,7 @@ void Parser::ParseParamValueAssignment(
 }
 
 bool Parser::ParsePortConnection(ModuleItem* item) {
-  ParseAttributes();  // §5.12: attribute on port connection
+  ParseAttributes();
   if (Check(TokenKind::kDotStar)) {
     auto loc = CurrentLoc();
     Consume();
@@ -148,7 +148,7 @@ bool Parser::ParsePortConnection(ModuleItem* item) {
   }
   if (Match(TokenKind::kDot)) {
     auto name = Expect(TokenKind::kIdentifier);
-    // A.4.1.1: [ ( [ expression ] ) ] — parentheses are optional
+
     if (Match(TokenKind::kLParen)) {
       Expr* expr = nullptr;
       if (!Check(TokenKind::kRParen)) {
@@ -167,7 +167,7 @@ bool Parser::ParsePortConnection(ModuleItem* item) {
     }
     return true;
   }
-  // Ordered port: blank position (empty expression) or expression
+
   if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
     item->inst_ports.push_back({{}, nullptr});
     item->inst_ports_implicit.push_back(false);
@@ -178,7 +178,6 @@ bool Parser::ParsePortConnection(ModuleItem* item) {
   return false;
 }
 
-// §10.3.4: Check if a token is a strength-0 keyword.
 static bool IsStr0Token(TokenKind k) {
   switch (k) {
     case TokenKind::kKwSupply0:
@@ -192,8 +191,6 @@ static bool IsStr0Token(TokenKind k) {
   }
 }
 
-// §10.3.4: Parse drive strength pair. Called after '(' when first token is
-// a strength keyword. Sets s0 (strength for value 0) and s1 (value 1).
 void Parser::ParseDriveStrength(uint8_t& s0, uint8_t& s1) {
   auto loc = CurrentLoc();
   if (IsStr0Token(CurrentToken().kind)) {
@@ -205,9 +202,7 @@ void Parser::ParseDriveStrength(uint8_t& s0, uint8_t& s1) {
     Expect(TokenKind::kComma);
     s0 = ParseStrength0();
   }
-  // §A.2.2.2: drive_strength's two slots must specify one value-0
-  // strength keyword and one value-1 strength keyword; same-direction
-  // pairs are not in any BNF alternative.
+
   if (s0 == 0 || s1 == 0) {
     diag_.Error(loc,
                 "drive_strength requires one strength0 keyword and "
@@ -215,7 +210,6 @@ void Parser::ParseDriveStrength(uint8_t& s0, uint8_t& s1) {
   }
 }
 
-// §10.3.4: Check if a token is a drive strength keyword.
 static bool IsDriveStrengthToken(TokenKind k) {
   switch (k) {
     case TokenKind::kKwSupply0:
@@ -237,11 +231,11 @@ static bool IsDriveStrengthToken(TokenKind k) {
 void Parser::ParseContinuousAssign(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
   Expect(TokenKind::kKwAssign);
-  // §10.3.4: Optional drive strength: assign (strong0, weak1) ...
+
   uint8_t ds0 = 0, ds1 = 0;
   if (Check(TokenKind::kLParen)) {
     auto saved = lexer_.SavePos();
-    Consume();  // '('
+    Consume();
     if (IsDriveStrengthToken(CurrentToken().kind)) {
       ParseDriveStrength(ds0, ds1);
       Expect(TokenKind::kRParen);
@@ -249,12 +243,12 @@ void Parser::ParseContinuousAssign(std::vector<ModuleItem*>& items) {
       lexer_.RestorePos(saved);
     }
   }
-  // Optional delay3: assign #(rise, fall, decay) or assign #delay (§10.3.3)
+
   Expr* delay = nullptr;
   Expr* delay_fall = nullptr;
   Expr* delay_decay = nullptr;
   ParseGateDelay(delay, delay_fall, delay_decay);
-  // A.6.1: list_of_net_assignments ::= net_assignment { , net_assignment }
+
   do {
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kContAssign;
@@ -304,17 +298,17 @@ ModuleItem* Parser::ParseAlwaysBlock(AlwaysKind kind) {
   item->kind = AlwaysKindToItemKind(kind);
   item->always_kind = kind;
   item->loc = CurrentLoc();
-  Consume();  // always / always_comb / always_ff / always_latch
+  Consume();
 
   if (Check(TokenKind::kAt)) {
     Consume();
     if (Match(TokenKind::kStar)) {
-      // @* — implicit sensitivity (§9.4.2.2)
+
       item->is_star_sensitivity = true;
     } else if (Check(TokenKind::kLParen)) {
       Consume();
       if (Match(TokenKind::kStar)) {
-        // @(*) — implicit sensitivity (§9.4.2.2)
+
         item->is_star_sensitivity = true;
       } else {
         item->sensitivity = ParseEventList();
@@ -331,7 +325,7 @@ ModuleItem* Parser::ParseInitialBlock() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kInitialBlock;
   item->loc = CurrentLoc();
-  Consume();  // initial
+  Consume();
   item->body = ParseStmt();
   return item;
 }
@@ -340,7 +334,7 @@ ModuleItem* Parser::ParseFinalBlock() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kFinalBlock;
   item->loc = CurrentLoc();
-  Consume();  // final
+  Consume();
   item->body = ParseStmt();
   return item;
 }
@@ -370,4 +364,4 @@ bool Parser::CheckIdentifier() {
   return Check(TokenKind::kIdentifier) || Check(TokenKind::kEscapedIdentifier);
 }
 
-}  // namespace delta
+}

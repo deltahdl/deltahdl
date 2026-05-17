@@ -15,8 +15,6 @@ static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
 
 namespace {
 
-// --- Signedness based on base specifier ---
-
 TEST(IntegerLiteralElaboration, UnbasedDecimalIsSigned) {
   SimFixture f;
   auto* lit = MakeSizedLiteral(f.arena, "42", 42);
@@ -65,8 +63,6 @@ TEST(IntegerLiteralElaboration, UnsizedBasedSignedIsSigned) {
   EXPECT_TRUE(result.is_signed);
 }
 
-// --- Negation/division examples from §11.3.3 ---
-
 TEST(IntegerLiteralElaboration, NegatedUnbasedDivThreeEqualsMinusFour) {
   EvalFixture f;
   auto val = ConstEvalInt(ParseExprFrom("-12 / 3", f));
@@ -95,4 +91,4 @@ TEST(IntegerLiteralElaboration, NegatedSizedSignedBasedDivThreeEqualsOne) {
   EXPECT_EQ(val.value_or(0), 1);
 }
 
-}  // namespace
+}

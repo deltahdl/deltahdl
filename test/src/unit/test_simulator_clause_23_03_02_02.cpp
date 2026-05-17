@@ -109,4 +109,4 @@ TEST(NamedPortSimulation, EmptyNamedOutputNotDriven) {
   EXPECT_EQ(var->value.ToUint64(), 0xBBu);
 }
 
-}  // namespace
+}

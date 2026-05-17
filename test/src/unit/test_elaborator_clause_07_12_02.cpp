@@ -52,4 +52,4 @@ TEST(ArrayOrderingElaboration, RsortWithClauseOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -153,7 +153,7 @@ TEST(ImplicitDeclaration, ImplicitNetBelongsToInnermostScope) {
   }
   EXPECT_TRUE(x_in_top) << "implicit net 'x' should be in top";
   EXPECT_TRUE(y_in_top) << "implicit net 'y' should be in top";
-  // Verify child module does not contain these implicit nets.
+
   auto* child = top->children[0].resolved;
   ASSERT_NE(child, nullptr);
   for (const auto& n : child->nets) {
@@ -236,4 +236,4 @@ TEST(ImplicitDeclaration, ImplicitNetOnInstancePortUsesDefaultNettype) {
   }
 }
 
-}  // namespace
+}

@@ -154,9 +154,9 @@ TEST(ConstantClassPropertySim, ConstPropertyInitExprTracked) {
   SimFixture f;
   auto* info = f.arena.Create<ClassTypeInfo>();
   info->name = "Mix";
-  // Global constant (has init_expr placeholder).
+
   info->properties.push_back({"MAX", 32, true, false, false, true});
-  // Instance constant (no init_expr).
+
   ClassTypeInfo::PropertyInfo inst_prop;
   inst_prop.name = "val";
   inst_prop.width = 32;
@@ -171,4 +171,4 @@ TEST(ConstantClassPropertySim, ConstPropertyInitExprTracked) {
   EXPECT_FALSE(info->properties[1].is_static);
 }
 
-}  // namespace
+}

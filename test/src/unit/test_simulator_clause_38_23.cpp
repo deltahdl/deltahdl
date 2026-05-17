@@ -57,5 +57,5 @@ TEST_F(VpiIterateSim, ScanNullIteratorReturnsNull) {
   EXPECT_EQ(vpi_scan(nullptr), nullptr);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

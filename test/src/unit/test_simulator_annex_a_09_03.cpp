@@ -80,12 +80,6 @@ TEST(IdentifierSimulation, HierarchicalIdentSubmodulePort) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-// §A.9.3 identifier ::= simple_identifier | escaped_identifier — the BNF
-// admits the escaped form on equal footing with the simple form, so a
-// variable declared with an escaped identifier name (`\my-sig`, body
-// stripped of leading `\` and terminating white_space per the production)
-// must execute at runtime: assignment reaches the variable, and the
-// simulator's variable lookup finds it under the stripped name.
 TEST(IdentifierSimulation, EscapedIdentifierVariableExecutes) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -103,4 +97,4 @@ TEST(IdentifierSimulation, EscapedIdentifierVariableExecutes) {
   EXPECT_EQ(var->value.ToUint64(), 0x42u);
 }
 
-}  // namespace
+}

@@ -17,4 +17,4 @@ TEST(ParameterizedModules, ParameterizedModuleSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

@@ -15,10 +15,6 @@ Expr* MakeConcat(Arena& arena, std::vector<Expr*> elems) {
   return e;
 }
 
-// ---------------------------------------------------------------------------
-// push_back on a full bounded queue
-// ---------------------------------------------------------------------------
-
 TEST(BoundedQueue, PushBackRespectsMax) {
   SimFixture f;
   auto* q = f.ctx.CreateQueue("q", 32, 3);
@@ -62,10 +58,6 @@ TEST(BoundedQueue, PushBackWarnsOnDiscard) {
   TryExecQueueMethodStmt(call, f.ctx, f.arena);
   EXPECT_GT(f.diag.WarningCount(), before);
 }
-
-// ---------------------------------------------------------------------------
-// push_front on a full bounded queue
-// ---------------------------------------------------------------------------
 
 TEST(BoundedQueue, PushFrontRespectsMax) {
   SimFixture f;
@@ -111,10 +103,6 @@ TEST(BoundedQueue, PushFrontWarnsOnDiscard) {
   EXPECT_GT(f.diag.WarningCount(), before);
 }
 
-// ---------------------------------------------------------------------------
-// insert on a full bounded queue
-// ---------------------------------------------------------------------------
-
 TEST(BoundedQueue, InsertOnFullDiscardsLastElement) {
   SimFixture f;
   auto* q = f.ctx.CreateQueue("q", 32, 3);
@@ -147,10 +135,6 @@ TEST(BoundedQueue, InsertWarnsOnDiscard) {
   TryExecQueueMethodStmt(call, f.ctx, f.arena);
   EXPECT_GT(f.diag.WarningCount(), before);
 }
-
-// ---------------------------------------------------------------------------
-// Indexed write Q[$+1] on a full bounded queue
-// ---------------------------------------------------------------------------
 
 TEST(BoundedQueue, IndexedWriteDollarPlusOneOnFullIsNoop) {
   SimFixture f;
@@ -189,17 +173,13 @@ TEST(BoundedQueue, IndexedWriteWarnsOnDiscard) {
   EXPECT_GT(f.diag.WarningCount(), before);
 }
 
-// ---------------------------------------------------------------------------
-// Queue assignment truncation
-// ---------------------------------------------------------------------------
-
 TEST(BoundedQueue, ConcatAssignTruncates) {
   SimFixture f;
   auto* q = f.ctx.CreateQueue("q", 32, 3);
   q->elements = {MakeLogic4VecVal(f.arena, 32, 10),
                  MakeLogic4VecVal(f.arena, 32, 20)};
   q->AssignFreshIds();
-  // q = {q, 30, 40, 50} — would be 5 elements, bounded to 3.
+
   auto* rhs = MakeConcat(
       f.arena, {MakeId(f.arena, "q"), MakeInt(f.arena, 30),
                 MakeInt(f.arena, 40), MakeInt(f.arena, 50)});
@@ -217,7 +197,7 @@ TEST(BoundedQueue, ConcatAssignWarnsOnTruncate) {
   auto* q = f.ctx.CreateQueue("q", 32, 2);
   q->elements = {MakeLogic4VecVal(f.arena, 32, 10)};
   q->AssignFreshIds();
-  // q = {q, 20, 30} — would be 3 elements, bounded to 2.
+
   auto before = f.diag.WarningCount();
   auto* rhs = MakeConcat(f.arena, {MakeId(f.arena, "q"),
                                    MakeInt(f.arena, 20),
@@ -226,10 +206,6 @@ TEST(BoundedQueue, ConcatAssignWarnsOnTruncate) {
   TryQueueBlockingAssign(stmt, f.ctx, f.arena);
   EXPECT_GT(f.diag.WarningCount(), before);
 }
-
-// ---------------------------------------------------------------------------
-// Edge cases
-// ---------------------------------------------------------------------------
 
 TEST(BoundedQueue, AllowsPushAfterDelete) {
   SimFixture f;
@@ -283,7 +259,7 @@ TEST(BoundedQueue, AssignWithinBoundNoWarning) {
   auto* q = f.ctx.CreateQueue("q", 32, 5);
   q->AssignFreshIds();
   auto before = f.diag.WarningCount();
-  // q = {1, 2, 3} — 3 elements, well within bound of 5.
+
   auto* rhs = MakeConcat(f.arena, {MakeInt(f.arena, 1), MakeInt(f.arena, 2),
                                    MakeInt(f.arena, 3)});
   auto* stmt = MakeAssign(f.arena, "q", rhs);
@@ -306,4 +282,4 @@ TEST(BoundedQueue, PushBackBelowBoundNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), before);
 }
 
-}  // namespace
+}

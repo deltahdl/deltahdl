@@ -9,8 +9,6 @@ using namespace delta;
 
 namespace {
 
-// --- Indexing (Q[i]) ---
-
 TEST(QueueOps, IndexReturnsElement) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
@@ -48,13 +46,11 @@ TEST(QueueOps, IndexLastElement) {
 TEST(QueueOps, NegativeIndexReturnsX) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20});
-  // Use a large unsigned value that sign-extends to negative.
+
   auto result =
       EvalExpr(MakeSelect(f.arena, "q", 0xFFFFFFFFu), f.ctx, f.arena);
   EXPECT_FALSE(result.IsKnown());
 }
-
-// --- Indexed write (Q[i] = val) ---
 
 TEST(QueueOps, IndexedWriteUpdatesElement) {
   SimFixture f;
@@ -76,8 +72,6 @@ TEST(QueueOps, IndexedWriteOutOfBoundsIgnored) {
   EXPECT_EQ(q->elements[0].ToUint64(), 10u);
   EXPECT_EQ(q->elements[1].ToUint64(), 20u);
 }
-
-// --- Queue resize on assignment ---
 
 TEST(QueueOps, AssignGrowsQueue) {
   SimFixture f;
@@ -103,14 +97,11 @@ TEST(QueueOps, AssignShrinksQueue) {
   EXPECT_EQ(q->elements[0].ToUint64(), 5u);
 }
 
-// --- Slice (Q[a:b]) ---
-
 TEST(QueueOps, SliceYieldsCorrectElements) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30, 40, 50});
   MakeQueue(f, "dst", {});
 
-  // dst = q[1:3] — should yield {20, 30, 40}.
   auto* slice = f.arena.Create<Expr>();
   slice->kind = ExprKind::kSelect;
   slice->base = MakeId(f.arena, "q");
@@ -134,7 +125,6 @@ TEST(QueueOps, SliceAGreaterThanBYieldsEmpty) {
   MakeQueue(f, "q", {10, 20, 30});
   MakeQueue(f, "dst", {99});
 
-  // dst = q[2:0] — a > b, should yield empty queue.
   auto* slice = f.arena.Create<Expr>();
   slice->kind = ExprKind::kSelect;
   slice->base = MakeId(f.arena, "q");
@@ -155,7 +145,6 @@ TEST(QueueOps, SliceSingleElementYieldsOneItem) {
   MakeQueue(f, "q", {10, 20, 30});
   MakeQueue(f, "dst", {});
 
-  // dst = q[1:1] — should yield {20}.
   auto* slice = f.arena.Create<Expr>();
   slice->kind = ExprKind::kSelect;
   slice->base = MakeId(f.arena, "q");
@@ -177,7 +166,6 @@ TEST(QueueOps, SliceBBeyondDollarClampsToDollar) {
   MakeQueue(f, "q", {10, 20, 30});
   MakeQueue(f, "dst", {});
 
-  // dst = q[1:100] — b > $, should be same as q[1:$] = {20, 30}.
   auto* slice = f.arena.Create<Expr>();
   slice->kind = ExprKind::kSelect;
   slice->base = MakeId(f.arena, "q");
@@ -195,8 +183,6 @@ TEST(QueueOps, SliceBBeyondDollarClampsToDollar) {
   EXPECT_EQ(dst->elements[1].ToUint64(), 30u);
 }
 
-// --- Bounded queue ([$:N]) ---
-
 TEST(QueueOps, BoundedQueueAssignTruncates) {
   SimFixture f;
   auto* q = f.ctx.CreateQueue("q", 32, 3);
@@ -209,8 +195,6 @@ TEST(QueueOps, BoundedQueueAssignTruncates) {
   TryQueueBlockingAssign(stmt, f.ctx, f.arena);
   EXPECT_EQ(q->elements.size(), 3u);
 }
-
-// --- Empty queue ---
 
 TEST(QueueOps, EmptyQueueReadReturnsX) {
   SimFixture f;
@@ -230,14 +214,11 @@ TEST(QueueOps, EmptyQueueAssignEmptyConcat) {
   EXPECT_EQ(q->elements.size(), 0u);
 }
 
-// --- Slice with full range ---
-
 TEST(QueueOps, SliceFullRangeCopiesAll) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
   MakeQueue(f, "dst", {});
 
-  // dst = q[0:2] — full range, should copy all elements.
   auto* slice = f.arena.Create<Expr>();
   slice->kind = ExprKind::kSelect;
   slice->base = MakeId(f.arena, "q");
@@ -255,4 +236,4 @@ TEST(QueueOps, SliceFullRangeCopiesAll) {
   EXPECT_EQ(dst->elements[2].ToUint64(), 30u);
 }
 
-}  // namespace
+}

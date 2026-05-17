@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §31.4.2 Syntax 31-10 / Table 31-8: the optional notifier slot is captured
-// as a variable identifier alongside the edge-qualified events.
 TEST(TimingCheckCommandParsing, TimeskewWithNotifier) {
   auto r = Parse(
       "module m;\n"
@@ -21,9 +19,6 @@ TEST(TimingCheckCommandParsing, TimeskewWithNotifier) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-// §31.4.2 Syntax 31-10: the three positional fields — edge-qualified
-// reference and data events plus the timing_check_limit — must round-trip
-// through the parser without consuming any trailing extension slots.
 TEST(TimingCheckCommandParsing, TimeskewAllFields) {
   auto r = Parse(
       "module m;\n"
@@ -42,8 +37,6 @@ TEST(TimingCheckCommandParsing, TimeskewAllFields) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
-// §31.4.2 Syntax 31-10 / Table 31-8: $timeskew accepts the two trailing
-// optional slots event_based_flag and remain_active_flag past the notifier.
 TEST(TimingCheckCommandParsing, TimeskewWithFlags) {
   auto r = Parse(
       "module m;\n"
@@ -60,8 +53,6 @@ TEST(TimingCheckCommandParsing, TimeskewWithFlags) {
   ASSERT_NE(tc->remain_active_flag, nullptr);
 }
 
-// §31.4.2 Table 31-8: the limit is a non-negative constant expression, so a
-// specparam reference in the limit slot must parse.
 TEST(TimingCheckCommandParsing, TimeskewLimitIsExpression) {
   auto r = Parse(
       "module m;\n"
@@ -77,9 +68,6 @@ TEST(TimingCheckCommandParsing, TimeskewLimitIsExpression) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
-// §31.4.2: the zero limit is the boundary case the LRM calls out for the
-// simultaneous-transition carve-out and must parse like any non-negative
-// constant.
 TEST(TimingCheckCommandParsing, TimeskewZeroLimit) {
   auto r = Parse(
       "module m;\n"
@@ -94,8 +82,6 @@ TEST(TimingCheckCommandParsing, TimeskewZeroLimit) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
-// §31.4.2 Syntax 31-10 makes the timing_check_limit a mandatory positional
-// argument — a $timeskew call with only the two events is ill-formed.
 TEST(TimingCheckCommandParsing, TimeskewMissingLimitIsError) {
   auto r = Parse(
       "module m;\n"
@@ -106,8 +92,6 @@ TEST(TimingCheckCommandParsing, TimeskewMissingLimitIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §31.4.2 Syntax 31-10 requires three positional arguments; an empty
-// argument list is ill-formed.
 TEST(TimingCheckCommandParsing, TimeskewEmptyArgListIsError) {
   auto r = Parse(
       "module m;\n"
@@ -118,8 +102,6 @@ TEST(TimingCheckCommandParsing, TimeskewEmptyArgListIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §31.4.2 Syntax 31-10: $timeskew is a specify item and must carry the
-// kTimingCheck classification alongside its kTimeskew kind.
 TEST(TimingCheckCommandParsing, TimeskewAsSpecifyItem) {
   auto sp = ParseSpecifySingle(
       "module m(input clk1, clk2);\n"
@@ -139,4 +121,4 @@ TEST(TimingCheckCommandParsing, TimeskewAsSpecifyItem) {
   EXPECT_EQ(si->timing_check.data_terminal.name, "clk2");
 }
 
-}  // namespace
+}

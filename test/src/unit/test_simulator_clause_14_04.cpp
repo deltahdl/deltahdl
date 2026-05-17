@@ -169,7 +169,6 @@ TEST(ClockingSkewSim, PerSignalSkewOverridesDefault) {
   EXPECT_EQ(default_skew.ticks, 5u);
 }
 
-// §14.4: Explicit #0 output skew drives in Re-NBA region.
 TEST(ClockingSkewSim, ZeroOutputSkewDrivesInReNbaRegion) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -186,7 +185,6 @@ TEST(ClockingSkewSim, ZeroOutputSkewDrivesInReNbaRegion) {
                       "data_out",
                       ClockingDir::kOutput});
 
-  // Schedule a drive at the same time as clock edge with #0 skew.
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [&cmgr, &f]() {
     cmgr.ScheduleOutputDrive("cb", "data_out", 0x42, f.ctx, f.scheduler);
@@ -194,20 +192,18 @@ TEST(ClockingSkewSim, ZeroOutputSkewDrivesInReNbaRegion) {
   f.scheduler.ScheduleEvent(SimTime{10}, Region::kActive, ev);
   f.scheduler.Run();
 
-  // Value should be driven (in Re-NBA region, same time step).
   EXPECT_EQ(data_out->value.ToUint64(), 0x42u);
 }
 
-// §14.4: Default input skew is 1step, default output skew is 0.
 TEST(ClockingSkewSim, DefaultSkewValues) {
   ClockingManager cmgr;
   ClockingBlock block;
   block.name = "cb";
   block.clock_signal = "clk";
   block.clock_edge = Edge::kPosedge;
-  // Explicitly set defaults matching §14.4.
-  block.default_input_skew = SimTime{0};   // 1step represented as 0
-  block.default_output_skew = SimTime{0};  // #0
+
+  block.default_input_skew = SimTime{0};
+  block.default_output_skew = SimTime{0};
 
   ClockingSignal sig;
   sig.signal_name = "data";
@@ -219,4 +215,4 @@ TEST(ClockingSkewSim, DefaultSkewValues) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "data").ticks, 0u);
 }
 
-}  // namespace
+}

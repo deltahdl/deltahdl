@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §31.3.2 syntax as a specify item: the reference_event comes first and is
-// an edge-qualified clock; the data_event is the bare data terminal.
 TEST(TimingCheckCommandParsing, HoldAsSpecifyItem) {
   auto sp = ParseSpecifySingle(
       "module m(input d, clk);\n"
@@ -27,7 +25,6 @@ TEST(TimingCheckCommandParsing, HoldAsSpecifyItem) {
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
-// §31.3.2: the bare three-argument form with no notifier.
 TEST(TimingCheckCommandParsing, HoldBasic) {
   auto r = Parse(
       "module m;\n"
@@ -45,8 +42,6 @@ TEST(TimingCheckCommandParsing, HoldBasic) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
-// §31.3.2: the optional notifier argument is captured as a variable
-// identifier on the timing check entry.
 TEST(TimingCheckCommandParsing, HoldWithNotifier) {
   auto r = Parse(
       "module m;\n"
@@ -61,8 +56,6 @@ TEST(TimingCheckCommandParsing, HoldWithNotifier) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-// §31.3.2 Table 31-2: the limit is a constant expression, not just a
-// literal. A specparam reference in the limit position must parse.
 TEST(TimingCheckCommandParsing, HoldLimitIsExpression) {
   auto r = Parse(
       "module m;\n"
@@ -78,4 +71,4 @@ TEST(TimingCheckCommandParsing, HoldLimitIsExpression) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
-}  // namespace
+}

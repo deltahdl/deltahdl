@@ -120,7 +120,7 @@ TEST(AssignmentDelaySim, TwoDelayVectorXToKnownUsesRise) {
   auto* var = f.ctx.FindVariable("y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
-  // X->known on a vector is "all other transitions" -> rise delay (20).
+
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 20u);
 }
 
@@ -144,7 +144,7 @@ TEST(AssignmentDelaySim, VectorNonzeroToNonzeroUsesRise) {
   auto* var = f.ctx.FindVariable("y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x01u);
-  // FF->01 is nonzero->nonzero -> rise delay (20), scheduled at t=50.
+
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 70u);
 }
 
@@ -168,7 +168,7 @@ TEST(AssignmentDelaySim, VectorNonzeroToZeroUsesFall) {
   auto* var = f.ctx.FindVariable("y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
-  // FF->00 is nonzero->zero -> fall delay (5), scheduled at t=50.
+
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 55u);
 }
 
@@ -225,8 +225,7 @@ TEST(AssignmentDelaySim, InertialDelayCancelsPending) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("y");
   ASSERT_NE(var, nullptr);
-  // Inertial: src=1 at t=0 schedules y=1 at t=10, but src=0 at t=5
-  // cancels that and schedules y=0 at t=15.
+
   EXPECT_EQ(var->value.ToUint64(), 0u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 15u);
 }
@@ -253,9 +252,8 @@ TEST(AssignmentDelaySim, InertialDelayNoIntermediateGlitch) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("y");
   ASSERT_NE(var, nullptr);
-  // With inertial delay, y should never transition to 1.
-  // The final value should be 0.
+
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-}  // namespace
+}

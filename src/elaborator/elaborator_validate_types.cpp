@@ -41,8 +41,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateVirtualInterfaceOps(decl);
   ValidateVirtualInterfaceClocking(decl);
   ValidateInterfaceObjectAccess(decl);
-  // §16.4: deferred assertion pass/fail action shall be a single subroutine
-  // call — no begin-end blocks and no other statement kinds.
+
   ValidateDeferredAssertionActions(decl);
   ValidateAggregateComparisons(decl);
   ValidateRealOperatorRestrictions(decl);
@@ -60,7 +59,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateStaticMethodBodies(decl);
   ValidateClassMethodBodies(decl);
   ValidateThisUsage(decl);
-  // §3.14: Precision shall be at least as precise as the time unit.
+
   if (decl->has_timeunit && decl->has_timeprecision) {
     if (static_cast<int>(decl->time_prec) > static_cast<int>(decl->time_unit)) {
       diag_.Error(decl->range.start,
@@ -68,8 +67,6 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
     }
   }
 }
-
-// §6.19 enum validation helpers
 
 static int64_t ParseLiteralWidth(std::string_view txt) {
   auto apos = txt.find('\'');
@@ -101,13 +98,6 @@ static bool ExprContainsXZ(const Expr* e) {
   return ExprContainsXZ(e->repeat_count);
 }
 
-// §6.19: enum named constants "...can include references to parameters, local
-// parameters, genvars, other enum named constants, and constant functions of
-// these. Hierarchical names and const variables are not allowed." A
-// hierarchical reference manifests as kMemberAccess or a non-empty scope
-// prefix on an identifier (the latter being §3.12.1 $unit::/pkg:: form);
-// either shape is rejected here regardless of whether the path would have
-// resolved.
 static bool ExprContainsHierarchicalRef(const Expr* e) {
   if (!e) return false;
   if (e->kind == ExprKind::kMemberAccess) return true;
@@ -130,11 +120,6 @@ static bool ExprContainsHierarchicalRef(const Expr* e) {
   return false;
 }
 
-// §6.19 + §6.20.6: walk an enum initializer expression looking for plain
-// identifier references to const variables declared in the enclosing scope.
-// Returns the offending name, or empty if none are present. Parameters and
-// localparams (§6.20) and other enum named constants (§6.19) are allowed
-// references and are not stored in const_names_.
 static std::string_view FindConstVarRef(
     const Expr* e, const std::unordered_set<std::string_view>& const_names) {
   if (!e) return {};
@@ -183,9 +168,7 @@ bool Elaborator::ValidateEnumLiteral(const EnumMember& member,
 }
 
 void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
-  // §6.19 footnote 19: a type_identifier used as enum_base_type shall denote
-  // an integer_atom_type or an integer_vector_type, and if it denotes an
-  // integer_atom_type, an additional packed dimension is not permitted.
+
   if (!dtype.enum_base_name.empty()) {
     auto it = typedefs_.find(dtype.enum_base_name);
     if (it != typedefs_.end()) {
@@ -215,8 +198,6 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
   bool is_2state = !Is4stateType(dtype, typedefs_);
   bool prev_had_xz = false;
 
-  // §6.19: Compute representable range of the base type for explicit-value
-  // range checks and auto-increment overflow detection.
   uint64_t max_val = dtype.is_signed
                          ? (base_width > 0 ? (1ULL << (base_width - 1)) - 1 : 0)
                          : (base_width < 64 ? (1ULL << base_width) - 1
@@ -230,15 +211,13 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
   int64_t next_val = 0;
 
   for (const auto& member : dtype.enum_members) {
-    // §6.19: Enum member names shall be unique.
+
     if (!member.range_start) {
       if (!seen_names.insert(member.name).second) {
         diag_.Error(loc,
                     std::format("duplicate enum member name '{}'", member.name));
       } else if (enum_member_names_.count(member.name)) {
-        // §6.19: "As in C, there is no overloading of literals" — an enum
-        // member name introduced by a prior enum in the same scope cannot be
-        // reused.
+
         diag_.Error(loc,
                     std::format("enum member name '{}' is already declared "
                                 "in this scope",
@@ -246,8 +225,6 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
       }
     }
 
-    // §6.19: "Hierarchical names and const variables are not allowed" in the
-    // value of an enum named constant.
     if (member.value) {
       if (ExprContainsHierarchicalRef(member.value)) {
         diag_.Error(member.value->range.start,
@@ -276,11 +253,7 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
       if (!prev_had_xz) {
         auto v = ConstEvalInt(member.value);
         if (v) {
-          // §6.19: "Any enumeration encoding value that is outside the
-          // representable range of the enum base type shall be an error." For
-          // an unsigned base, any value with a nonzero bit beyond the base
-          // width fails the cast; for a signed base, any value outside
-          // [-(2^(N-1)), 2^(N-1) - 1] fails.
+
           bool out_of_range;
           if (dtype.is_signed) {
             out_of_range = *v < signed_min ||
@@ -300,7 +273,6 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
       }
     }
 
-    // §6.19.2: Compute how many concrete members this entry expands to.
     int64_t count = 1;
     if (member.range_start) {
       auto n = ConstEvalInt(member.range_start).value_or(0);
@@ -313,7 +285,6 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
       if (count < 1) count = 1;
     }
 
-    // §6.19: Enum member values shall be unique.
     if (!prev_had_xz) {
       for (int64_t i = 0; i < count; ++i) {
         if (!seen_values.insert(next_val + i).second) {
@@ -324,7 +295,6 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
       }
     }
 
-    // §6.19: Auto-increment past max representable value is an error.
     next_val += count;
     if (!prev_had_xz && next_val > 0 &&
         static_cast<uint64_t>(next_val) > max_val &&
@@ -334,8 +304,6 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
     }
   }
 }
-
-// §6.19.3/§6.19.4 enum assignment validation
 
 void Elaborator::TrackEnumVariable(const ModuleItem* item) {
   if (item->data_type.kind == DataTypeKind::kEnum) {
@@ -431,7 +399,7 @@ void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
 
 void Elaborator::ValidateEnumAssignments(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    // §6.19.3: Check module-level enum variable initializers.
+
     if (item->kind == ModuleItemKind::kVarDecl &&
         enum_var_names_.count(item->name) != 0 && item->init_expr &&
         item->init_expr->kind != ExprKind::kIdentifier &&
@@ -446,8 +414,6 @@ void Elaborator::ValidateEnumAssignments(const ModuleDecl* decl) {
     }
   }
 }
-
-// --- §6.20: Constant assignment validation ---
 
 void Elaborator::WalkStmtsForConstAssign(const Stmt* s) {
   if (!s) return;
@@ -479,10 +445,6 @@ void Elaborator::ValidateConstAssignments(const ModuleDecl* decl) {
   }
 }
 
-// --- Type resolution (§6.23, §6.25) ---
-
-// §6.23: Compute self-determined width of an expression inside type(),
-// resolving identifiers from already-elaborated module variables.
 static uint32_t InferTypeRefExprWidth(const Expr* expr,
                                       const RtlirModule* mod) {
   if (!expr) return 0;
@@ -528,7 +490,6 @@ static uint32_t InferTypeRefExprWidth(const Expr* expr,
   }
 }
 
-// §6.23: Compute signedness of a self-determined expression inside type().
 static bool InferTypeRefExprSigned(const Expr* expr, const RtlirModule* mod) {
   if (!expr) return false;
   switch (expr->kind) {
@@ -556,7 +517,7 @@ void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
   if (!item->data_type.type_ref_expr) return;
   auto* ref = item->data_type.type_ref_expr;
   if (ref->kind != ExprKind::kIdentifier) {
-    // §6.23: Self-determined result type of the expression.
+
     uint32_t w = InferTypeRefExprWidth(ref, mod);
     item->data_type.kind = DataTypeKind::kLogic;
     if (w > 1) {
@@ -573,12 +534,12 @@ void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
     item->data_type.type_ref_expr = nullptr;
     return;
   }
-  // Look up the referenced variable's type in the module.
+
   for (const auto& v : mod->variables) {
     if (v.name != ref->text) continue;
     item->data_type.kind = var_types_[ref->text];
     item->data_type.is_signed = v.is_signed;
-    // §6.23: Reconstruct packed dimensions for vector types.
+
     if (v.width > 1 && (item->data_type.kind == DataTypeKind::kLogic ||
                         item->data_type.kind == DataTypeKind::kBit ||
                         item->data_type.kind == DataTypeKind::kReg)) {
@@ -601,7 +562,6 @@ void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
   }
 }
 
-// §6.25: Find a ClassDecl by name in the compilation unit.
 const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit) {
   for (const auto* cls : unit->classes) {
@@ -610,7 +570,6 @@ const ClassDecl* FindClassDecl(std::string_view name,
   return nullptr;
 }
 
-// §6.25: Find a typedef member inside a class declaration.
 static const ModuleItem* FindClassTypedef(const ClassDecl* cls,
                                           std::string_view member_name) {
   for (const auto* m : cls->members) {
@@ -627,13 +586,13 @@ bool Elaborator::ResolveParameterizedType(DataType& dtype) {
   if (!cls) return false;
   const auto* td = FindClassTypedef(cls, dtype.type_name);
   if (!td) return false;
-  // Build substitution map: param_name → provided type.
+
   std::unordered_map<std::string_view, const DataType*> subst;
   for (size_t i = 0; i < cls->params.size() && i < dtype.type_params.size();
        ++i) {
     subst[cls->params[i].first] = &dtype.type_params[i];
   }
-  // The typedef references a type parameter (e.g. typedef T my_type).
+
   auto it = subst.find(td->typedef_type.type_name);
   if (it == subst.end()) return false;
   const DataType& resolved = *it->second;
@@ -648,7 +607,6 @@ bool Elaborator::ResolveParameterizedType(DataType& dtype) {
   return true;
 }
 
-// §7.2.2: Packed struct members shall not have individual default values.
 void Elaborator::ValidatePackedStructDefaults(const DataType& dtype,
                                               SourceLoc loc) {
   if (dtype.kind != DataTypeKind::kStruct || !dtype.is_packed) return;
@@ -662,8 +620,6 @@ void Elaborator::ValidatePackedStructDefaults(const DataType& dtype,
   }
 }
 
-// §7.2.2: Members of unpacked structures containing a union shall not be
-// assigned individual default member values.
 void Elaborator::ValidateUnpackedStructWithUnionDefaults(const DataType& dtype,
                                                          SourceLoc loc) {
   if (dtype.kind != DataTypeKind::kStruct || dtype.is_packed) return;
@@ -682,14 +638,12 @@ void Elaborator::ValidateUnpackedStructWithUnionDefaults(const DataType& dtype,
   }
 }
 
-// §7.2.2: Struct member default values must be constant expressions.
 void Elaborator::ValidateStructMemberDefaultsConstant(const DataType& dtype,
                                                       SourceLoc loc) {
   if (dtype.kind != DataTypeKind::kStruct) return;
-  // Packed struct defaults are rejected entirely by ValidatePackedStructDefaults.
+
   if (dtype.is_packed) return;
-  // Unpacked structs containing a union are rejected entirely by
-  // ValidateUnpackedStructWithUnionDefaults.
+
   for (const auto& m : dtype.struct_members) {
     if (m.type_kind == DataTypeKind::kUnion) return;
   }
@@ -702,7 +656,6 @@ void Elaborator::ValidateStructMemberDefaultsConstant(const DataType& dtype,
   }
 }
 
-// §7.2, footnote 20: void struct_union_member only within tagged unions.
 void Elaborator::ValidateVoidMembers(const DataType& dtype, SourceLoc loc) {
   bool allow_void = (dtype.kind == DataTypeKind::kUnion && dtype.is_tagged);
   for (const auto& m : dtype.struct_members) {
@@ -713,7 +666,6 @@ void Elaborator::ValidateVoidMembers(const DataType& dtype, SourceLoc loc) {
   }
 }
 
-// §7.2, footnote 20: random_qualifier only within unpacked structures.
 void Elaborator::ValidateRandQualifiers(const DataType& dtype, SourceLoc loc) {
   bool allow_rand = (dtype.kind == DataTypeKind::kStruct && !dtype.is_packed);
   for (const auto& m : dtype.struct_members) {
@@ -725,8 +677,6 @@ void Elaborator::ValidateRandQualifiers(const DataType& dtype, SourceLoc loc) {
   }
 }
 
-// §7.2, footnote 17: packed dimension on struct requires packed keyword;
-// on union requires soft and/or packed keyword.
 void Elaborator::ValidatePackedDimRequiresPackedKeyword(const DataType& dtype,
                                                         SourceLoc loc) {
   if (dtype.kind != DataTypeKind::kStruct && dtype.kind != DataTypeKind::kUnion)
@@ -739,8 +689,6 @@ void Elaborator::ValidatePackedDimRequiresPackedKeyword(const DataType& dtype,
                           kw));
 }
 
-// §7.2.1: Only packed data types and integer data types shall be legal in
-// packed structures.
 static bool IsLegalPackedMemberType(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kBit:
@@ -779,7 +727,6 @@ void Elaborator::ValidatePackedStructMemberTypes(const DataType& dtype,
   }
 }
 
-// §7.3: Dynamic types and chandle types can only be used in tagged unions.
 void Elaborator::ValidateChandleInUnion(const DataType& dtype, SourceLoc loc) {
   if (dtype.kind != DataTypeKind::kUnion) return;
   if (dtype.is_tagged) return;
@@ -795,7 +742,6 @@ void Elaborator::ValidateChandleInUnion(const DataType& dtype, SourceLoc loc) {
   }
 }
 
-// §25.9: Virtual interfaces shall not be used as members of unions.
 void Elaborator::ValidateVirtualInterfaceInUnion(const DataType& dtype,
                                                  SourceLoc loc) {
   if (dtype.kind != DataTypeKind::kUnion) return;
@@ -808,14 +754,11 @@ void Elaborator::ValidateVirtualInterfaceInUnion(const DataType& dtype,
   }
 }
 
-// §7.3.1: Validate packed union member constraints.
 void Elaborator::ValidatePackedUnion(const DataType& dtype, SourceLoc loc) {
   if (dtype.kind != DataTypeKind::kUnion) return;
   if (!dtype.is_packed && !dtype.is_soft) return;
   if (dtype.struct_members.empty()) return;
 
-  // Hard packed union: all members must be the same width.
-  // §7.3.2: Tagged packed unions allow different-width members.
   if (!dtype.is_soft && !dtype.is_tagged) {
     uint32_t first_w = EvalStructMemberWidth(dtype.struct_members[0]);
     for (size_t i = 1; i < dtype.struct_members.size(); ++i) {
@@ -831,8 +774,6 @@ void Elaborator::ValidatePackedUnion(const DataType& dtype, SourceLoc loc) {
   }
 }
 
-// §7.4.1: Integer types with predefined widths shall not have packed array
-// dimensions.
 static bool HasPredefinedWidth(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kByte:
@@ -885,4 +826,4 @@ void Elaborator::ValidatePackedDimOnPredefinedType(const DataType& dtype,
               "array dimensions");
 }
 
-}  // namespace delta
+}

@@ -47,4 +47,4 @@ TEST(CompilerDirectiveParsing, Celldefine_InsideModule) {
                               "`endcelldefine\n"));
 }
 
-}  // namespace
+}

@@ -83,4 +83,4 @@ TEST(CastCompatibleParsing, LogicToEnumCastCompatible) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-}  // namespace
+}

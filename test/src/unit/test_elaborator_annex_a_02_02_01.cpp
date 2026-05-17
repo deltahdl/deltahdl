@@ -1,7 +1,4 @@
-// §A.2.2.1: elaborator-stage coverage of Net and variable types. The
-// elaborator must accept each data_type / net_type alternative from the
-// §A.2.2.1 grammar without diagnostics and propagate the parsed kind into the
-// RTLIR.
+
 
 #include "fixture_elaborator.h"
 
@@ -9,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §A.2.2.1 integer_vector_type: every bit/logic/reg signal elaborates.
 TEST(NetAndVariableTypeElaboration, IntegerVectorTypeLogic) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -21,7 +17,6 @@ TEST(NetAndVariableTypeElaboration, IntegerVectorTypeLogic) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.2.2.1 integer_atom_type: int/byte/longint values elaborate.
 TEST(NetAndVariableTypeElaboration, IntegerAtomTypesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -38,7 +33,6 @@ TEST(NetAndVariableTypeElaboration, IntegerAtomTypesElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.2.2.1 non_integer_type: real/shortreal/realtime values elaborate.
 TEST(NetAndVariableTypeElaboration, NonIntegerTypesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -52,7 +46,6 @@ TEST(NetAndVariableTypeElaboration, NonIntegerTypesElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.2.2.1 net_type: wire/tri/wand/wor/uwire nets elaborate into RtlirNet.
 TEST(NetAndVariableTypeElaboration, NetTypesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -70,7 +63,6 @@ TEST(NetAndVariableTypeElaboration, NetTypesElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.2.2.1 signing: explicit signed/unsigned on a data_type elaborates.
 TEST(NetAndVariableTypeElaboration, SigningExplicitElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -83,7 +75,6 @@ TEST(NetAndVariableTypeElaboration, SigningExplicitElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.2.2.1 struct_union: packed struct and tagged union types elaborate.
 TEST(NetAndVariableTypeElaboration, StructUnionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -108,8 +99,6 @@ TEST(NetAndVariableTypeElaboration, UnionTaggedElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.2.2.1 data_type ::= string / chandle / event — each elaborates as a
-// variable.
 TEST(NetAndVariableTypeElaboration, StringChandleEventElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -123,8 +112,6 @@ TEST(NetAndVariableTypeElaboration, StringChandleEventElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.2.2.1 var_data_type ::= var data_type_or_implicit — `var` on a port
-// admits an explicit storage qualifier and elaborates.
 TEST(NetAndVariableTypeElaboration, VarDataTypeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -135,9 +122,6 @@ TEST(NetAndVariableTypeElaboration, VarDataTypeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.2.2.1 ↔ §A.9.1 cross-link: a struct_union_member carries an
-// attribute_instance per §A.9.1. The elaborator must accept the construct
-// (attributes on members do not block type evaluation).
 TEST(NetAndVariableTypeElaboration, StructMemberAttributeInstanceCrossLink) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -153,9 +137,6 @@ TEST(NetAndVariableTypeElaboration, StructMemberAttributeInstanceCrossLink) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.2.2.1 ↔ §A.8.3 cross-link: packed_dimension bounds are §A.8.3
-// constant_expressions. A parameter-driven bound must constant-fold during
-// elaboration.
 TEST(NetAndVariableTypeElaboration,
      PackedDimensionConstantExpressionCrossLink) {
   ElabFixture f;
@@ -169,8 +150,6 @@ TEST(NetAndVariableTypeElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.2.2.1 type_reference ::= type ( expression ) — a type(expr) form is
-// elaborated into a fully resolved data type for the declared variable.
 TEST(NetAndVariableTypeElaboration, TypeReferenceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -183,4 +162,4 @@ TEST(NetAndVariableTypeElaboration, TypeReferenceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

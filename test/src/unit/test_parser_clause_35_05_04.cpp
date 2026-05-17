@@ -407,4 +407,4 @@ TEST(TaskAndFunctionParsing, DpiImportWithCName) {
   EXPECT_EQ(dpi->name, "sv_wrapper");
 }
 
-}  // namespace
+}

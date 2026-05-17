@@ -95,4 +95,4 @@ TEST(IntegerLiteralParsing, IntegerLiteralInExpression) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

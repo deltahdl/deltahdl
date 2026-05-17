@@ -33,9 +33,6 @@ TEST(DynamicArrayValidation, PackedElementDynamicElaborates) {
              "endmodule\n"));
 }
 
-// §7.5: An identifier is a dynamic array only when its leftmost unpacked
-// dimension is dynamic. A fixed leftmost dim ([2]) plus an inner dynamic
-// subarray dim ([]) means the identifier itself is fixed-size.
 TEST(DynamicArrayValidation, LeftmostDimMustBeDynamicToBeDynamicArray) {
   ElabFixture f;
   auto* design = Elaborate("module m; integer mem[2][]; endmodule\n", f);
@@ -45,8 +42,6 @@ TEST(DynamicArrayValidation, LeftmostDimMustBeDynamicToBeDynamicArray) {
   EXPECT_FALSE(mod->variables[0].is_dynamic);
 }
 
-// §7.5: With the leftmost unpacked dim dynamic, the identifier represents a
-// dynamic array even when an inner dim is fixed.
 TEST(DynamicArrayValidation, LeftmostDynamicDimMakesArrayDynamic) {
   ElabFixture f;
   auto* design = Elaborate("module m; integer mem[][2]; endmodule\n", f);
@@ -56,8 +51,6 @@ TEST(DynamicArrayValidation, LeftmostDynamicDimMakesArrayDynamic) {
   EXPECT_TRUE(mod->variables[0].is_dynamic);
 }
 
-// §7.5: "Dynamic arrays support all variable data types as element types,
-// including arrays." Verify a dynamic array of dynamic arrays elaborates.
 TEST(DynamicArrayValidation, DynamicArrayOfArraysElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -65,4 +58,4 @@ TEST(DynamicArrayValidation, DynamicArrayOfArraysElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

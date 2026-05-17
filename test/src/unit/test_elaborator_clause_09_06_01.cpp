@@ -50,4 +50,4 @@ TEST(WaitForkInAlwaysComb, WaitForkInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

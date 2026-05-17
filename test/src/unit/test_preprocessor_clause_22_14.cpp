@@ -393,4 +393,4 @@ TEST(KeywordVersionPreprocessing, SameVersionNested) {
             KeywordVersion::kVer18002023);
 }
 
-}  // namespace
+}

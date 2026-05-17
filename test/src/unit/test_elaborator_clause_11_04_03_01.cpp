@@ -173,4 +173,4 @@ TEST(SignedUnsignedArithmetic, DefaultNetElaboratesAsUnsigned) {
   EXPECT_FALSE(mod->nets[0].is_signed);
 }
 
-}  // namespace
+}

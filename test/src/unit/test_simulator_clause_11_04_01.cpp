@@ -153,12 +153,6 @@ TEST(CompoundAssignOpEval, GtGtEq) {
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
 
-// §11.4.1: "An assignment operator is semantically equivalent to a
-// blocking assignment, with the exception that any left-hand index
-// expression is only evaluated once."  Drive the lvalue index with a
-// function that increments a counter every time it executes; after
-// `arr[idx_fn()] += 5` the counter must hold 1, not 2.  A naive read-
-// modify-write that re-evaluates the lvalue would call idx_fn twice.
 TEST(LvalueSim, CompoundAssignEvaluatesLvalueIndexOnce) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -188,11 +182,6 @@ TEST(LvalueSim, CompoundAssignEvaluatesLvalueIndexOnce) {
   EXPECT_EQ(calls->value.ToUint64(), 1u);
 }
 
-// §11.4.1 edge case: when the lvalue appears on both sides of a compound
-// assign (`a += a`), the RHS must read the current value of `a` and the
-// final value must equal `a + a`.  This pins down the "semantically
-// equivalent to a blocking assignment" claim — the read-modify-write
-// must not double-apply or skip the addition.
 TEST(LvalueSim, CompoundAssignSelfReferenceDoublesValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -213,10 +202,6 @@ TEST(LvalueSim, CompoundAssignSelfReferenceDoublesValue) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §11.4.1: "semantically equivalent to a blocking assignment" must hold
-// for every operator, not just `+=`.  Exercise the arithmetic, bitwise,
-// and shift compounds through the full parse → elaborate → lower →
-// simulate pipeline in a single block.
 TEST(LvalueSim, CompoundAssignArithBitwiseShiftThroughPipeline) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -252,4 +237,4 @@ TEST(LvalueSim, CompoundAssignArithBitwiseShiftThroughPipeline) {
   EXPECT_EQ(f.ctx.FindVariable("shr")->value.ToUint64(), 16u);
 }
 
-}  // namespace
+}

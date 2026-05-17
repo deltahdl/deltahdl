@@ -6,13 +6,10 @@
 
 namespace delta {
 
-// §9.2.2.2.1 / §11.5.3: For select expressions, insert the longest static
-// prefix as the sensitivity signal.  Non-static index sub-expressions are
-// also collected (they are themselves reads).
 static void CollectSelectReads(const Expr* expr,
                                std::unordered_set<std::string>& out) {
   out.insert(LongestStaticPrefix(expr));
-  // Walk the index chain to collect reads from non-static indices.
+
   const Expr* cur = expr;
   while (cur && cur->kind == ExprKind::kSelect) {
     if (cur->index && cur->index->kind != ExprKind::kIntegerLiteral) {
@@ -43,9 +40,6 @@ void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out) {
   for (auto* elem : expr->elements) CollectExprReads(elem, out);
 }
 
-// §9.4.2.2: Collect reads from index sub-expressions on the LHS of an
-// assignment (e.g. y[a] = ... makes 'a' a read), but not the base identifier
-// itself (it is a write target).
 static void CollectLhsIndexReads(const Expr* lhs,
                                  std::unordered_set<std::string>& out) {
   const Expr* cur = lhs;
@@ -88,7 +82,6 @@ std::vector<std::string> CollectReadSignals(const Stmt* body) {
   return {set.begin(), set.end()};
 }
 
-// §9.2.2.2.1(b): Extract the base identifier name from an assignment LHS.
 static void CollectAssignLhsName(const Expr* lhs,
                                  std::unordered_set<std::string>& out) {
   if (!lhs) return;
@@ -98,7 +91,6 @@ static void CollectAssignLhsName(const Expr* lhs,
     out.insert(std::string(e->text));
 }
 
-// §9.2.2.2.1(b): Collect LHS variable names written in the statement tree.
 void CollectWrittenNames(const Stmt* stmt,
                          std::unordered_set<std::string>& out) {
   if (!stmt) return;
@@ -117,7 +109,6 @@ void CollectWrittenNames(const Stmt* stmt,
   for (const auto* s : stmt->fork_stmts) CollectWrittenNames(s, out);
 }
 
-// §9.2.2.2.1(a): Collect names of variables declared within the block.
 static void CollectBlockLocalNames(const Stmt* stmt,
                                    std::unordered_set<std::string>& out) {
   if (!stmt) return;
@@ -243,4 +234,4 @@ std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena,
   return events;
 }
 
-}  // namespace delta
+}

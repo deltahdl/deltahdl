@@ -58,7 +58,6 @@ TEST(ArrayIndexingAndSlicing, ReadSliceConcat) {
   EXPECT_EQ(result.ToUint64(), (30u << 8) | 20u);
 }
 
-// §7.4.5: Write to out-of-bounds index performs no operation.
 TEST(ArrayIndexingAndSlicing, WriteOutOfBoundsIsNoop) {
   SimFixture f;
 
@@ -73,16 +72,13 @@ TEST(ArrayIndexingAndSlicing, WriteOutOfBoundsIsNoop) {
   auto before = EvalExpr(MakeSelect(f.arena, "arr", 1), f.ctx, f.arena);
   EXPECT_EQ(before.ToUint64(), 20u);
 
-  // Out-of-bounds element does not exist — no variable created.
   auto* oob = f.ctx.FindVariable("arr[10]");
   EXPECT_EQ(oob, nullptr);
 
-  // Original element unchanged.
   auto after = EvalExpr(MakeSelect(f.arena, "arr", 1), f.ctx, f.arena);
   EXPECT_EQ(after.ToUint64(), 20u);
 }
 
-// §7.4.5: Part-select on packed array.
 TEST(ArrayIndexingAndSlicing, PartSelectOnPackedArray) {
   auto v = RunAndGet(
       "module t;\n"
@@ -97,7 +93,6 @@ TEST(ArrayIndexingAndSlicing, PartSelectOnPackedArray) {
   EXPECT_EQ(v, 0xBEu);
 }
 
-// §7.4.5: Indexed part-select ascending (+:).
 TEST(ArrayIndexingAndSlicing, IndexedPartSelectPlus) {
   auto v = RunAndGet(
       "module t;\n"
@@ -114,7 +109,6 @@ TEST(ArrayIndexingAndSlicing, IndexedPartSelectPlus) {
   EXPECT_EQ(v, 0xCCu);
 }
 
-// §7.4.5: Indexed part-select descending (-:).
 TEST(ArrayIndexingAndSlicing, IndexedPartSelectMinus) {
   auto v = RunAndGet(
       "module t;\n"
@@ -131,4 +125,4 @@ TEST(ArrayIndexingAndSlicing, IndexedPartSelectMinus) {
   EXPECT_EQ(v, 0xCCu);
 }
 
-}  // namespace
+}

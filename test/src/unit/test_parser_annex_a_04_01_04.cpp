@@ -239,4 +239,4 @@ TEST(CheckerInstantiationGrammar, Error_MissingSemicolon) {
       "module m; my_chk u0() endmodule\n"));
 }
 
-}  // namespace
+}

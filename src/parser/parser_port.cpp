@@ -8,10 +8,6 @@
 
 namespace delta {
 
-// §A.9.3: c_identifier ::= [ a-zA-Z_ ] { [ a-zA-Z0-9_ ] }
-// Narrower than simple_identifier; `$` is not part of the c_identifier
-// alphabet, even though the lexer admits `$` while forming an identifier
-// token under simple_identifier rules.
 static bool IsValidCIdentifier(std::string_view text) {
   if (text.empty()) return false;
   unsigned char first = static_cast<unsigned char>(text.front());
@@ -42,12 +38,7 @@ ModuleItem* Parser::ParseImportItem() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kImportDecl;
   item->loc = CurrentLoc();
-  // §3.12.1: "Because it has no name, the compilation-unit scope cannot be
-  // used with an import declaration."  An attempted `$unit::` source on an
-  // import declaration is rejected with a §3.12.1-specific diagnostic so
-  // the rule is observable, rather than surfacing as a generic
-  // expected-identifier complaint from the kSystemIdentifier vs. kIdentifier
-  // mismatch.
+
   if (CurrentToken().kind == TokenKind::kSystemIdentifier &&
       CurrentToken().text == "$unit") {
     diag_.Error(CurrentLoc(),
@@ -75,7 +66,7 @@ ModuleItem* Parser::ParseImportItem() {
 
 void Parser::ParseImportDecl(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kKwImport);
-  // DPI-C import: import "DPI-C" ...
+
   if (Check(TokenKind::kStringLiteral)) {
     items.push_back(ParseDpiImport());
     return;
@@ -90,7 +81,7 @@ void Parser::ParseImportDecl(std::vector<ModuleItem*>& items) {
 void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
   Expect(TokenKind::kKwExport);
-  // DPI-C export: export "DPI-C" ...
+
   if (Check(TokenKind::kStringLiteral)) {
     items.push_back(ParseDpiExport(loc));
     return;
@@ -99,7 +90,7 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
   item->kind = ModuleItemKind::kExportDecl;
   item->loc = loc;
   if (Match(TokenKind::kStar)) {
-    // export *::*;
+
     item->import_item.package_name = "*";
     Expect(TokenKind::kColonColon);
     Expect(TokenKind::kStar);
@@ -114,7 +105,7 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
     }
   }
   items.push_back(item);
-  // A.2.1.3: export package_import_item { , package_import_item } ;
+
   while (Match(TokenKind::kComma)) {
     auto* next = arena_.Create<ModuleItem>();
     next->kind = ModuleItemKind::kExportDecl;
@@ -135,9 +126,8 @@ ModuleItem* Parser::ParseDpiImport() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kDpiImport;
   item->loc = CurrentLoc();
-  Consume();  // string literal "DPI-C"
+  Consume();
 
-  // Optional: pure or context
   if (Match(TokenKind::kKwPure)) {
     item->dpi_is_pure = true;
   }
@@ -145,7 +135,6 @@ ModuleItem* Parser::ParseDpiImport() {
     item->dpi_is_context = true;
   }
 
-  // Optional: c_identifier = (lookahead for identifier followed by '=')
   if (Check(TokenKind::kIdentifier)) {
     auto saved = lexer_.SavePos();
     auto tok = Consume();
@@ -160,23 +149,19 @@ ModuleItem* Parser::ParseDpiImport() {
     }
   }
 
-  // function or task
   if (Match(TokenKind::kKwTask)) {
     item->dpi_is_task = true;
   } else {
     Expect(TokenKind::kKwFunction);
   }
 
-  // Parse return type (for functions) and name
   if (!item->dpi_is_task) {
     item->return_type = ParseDataType();
   }
   item->name = Expect(TokenKind::kIdentifier).text;
 
-  // Optional argument list — DPI import is a prototype-only context, so
-  // port identifiers may be omitted per §13.3 footnote 28.
   if (Check(TokenKind::kLParen)) {
-    item->func_args = ParseFunctionArgs(/*require_identifiers=*/false);
+    item->func_args = ParseFunctionArgs( false);
   }
   Expect(TokenKind::kSemicolon);
   return item;
@@ -186,9 +171,8 @@ ModuleItem* Parser::ParseDpiExport(SourceLoc loc) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kDpiExport;
   item->loc = loc;
-  Consume();  // string literal "DPI-C"
+  Consume();
 
-  // Optional: c_identifier =
   if (Check(TokenKind::kIdentifier)) {
     auto saved = lexer_.SavePos();
     auto tok = Consume();
@@ -203,7 +187,6 @@ ModuleItem* Parser::ParseDpiExport(SourceLoc loc) {
     }
   }
 
-  // function or task
   if (Match(TokenKind::kKwTask)) {
     item->dpi_is_task = true;
   } else {
@@ -225,20 +208,19 @@ void Parser::ParseParamPortDecl(
   } else if (Match(TokenKind::kKwParameter)) {
     is_localparam_group = false;
   }
-  // Handle type parameter: #(type T = real)  (§6.20.3)
+
   if (Match(TokenKind::kKwType)) {
     auto name = Expect(TokenKind::kIdentifier);
     bool has_default = false;
     if (Match(TokenKind::kEq)) {
       has_default = true;
       if (Check(TokenKind::kKwType)) {
-        ParseExpr();  // type() expression as default
+        ParseExpr();
       } else {
-        ParseDataType();  // consume default type
+        ParseDataType();
       }
     }
-    // §6.20.1 footnote 22: a localparam declaration in a parameter_port_list
-    // may not omit the data_type from a type_assignment.
+
     if (is_localparam_group && !has_default) {
       diag_.Error(name.loc,
                   std::format("localparam type '{}' in parameter port list "
@@ -258,8 +240,7 @@ void Parser::ParseParamPortDecl(
   if (Match(TokenKind::kEq)) {
     default_val = ParseExpr();
   }
-  // §6.20.1 footnote 22: a localparam declaration in a parameter_port_list
-  // may not omit the constant_param_expression from a param_assignment.
+
   if (is_localparam_group && default_val == nullptr) {
     diag_.Error(name.loc,
                 std::format("localparam '{}' in parameter port list must "
@@ -272,7 +253,7 @@ void Parser::ParseParamPortDecl(
 }
 
 void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
-  // Optional package imports in module header (§26.4)
+
   SourceLoc import_loc;
   bool has_header_import = false;
   while (Check(TokenKind::kKwImport)) {
@@ -313,9 +294,6 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
   Expect(TokenKind::kSemicolon);
 }
 
-// §23.2.2.3: Apply default direction, port kind, and data type to a port.
-// If prev is non-null, direction is inherited from the previous port when
-// omitted.  Port kind and data type always follow first-port rules.
 static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev) {
   if (port.is_interface_port) return;
   if (port.data_type.kind == DataTypeKind::kNamed &&
@@ -328,11 +306,9 @@ static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev) {
     return;
   }
 
-  // F1 / S2: direction defaults to inout (first) or inherits (subsequent).
   if (port.direction == Direction::kNone)
     port.direction = prev ? prev->direction : Direction::kInout;
 
-  // F3–F6: port kind (is_net) — must run before F2 to see kImplicit.
   if (!port.has_explicit_var && !port.data_type.is_net) {
     switch (port.direction) {
       case Direction::kInput:
@@ -348,7 +324,6 @@ static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev) {
     }
   }
 
-  // F2: implicit data type defaults to logic.
   if (port.data_type.kind == DataTypeKind::kImplicit)
     port.data_type.kind = DataTypeKind::kLogic;
 }
@@ -359,24 +334,24 @@ void Parser::ParsePortList(ModuleDecl& mod) {
     Consume();
     return;
   }
-  // (.* ) wildcard port form (A.1.2)
+
   if (Check(TokenKind::kDotStar)) {
     Consume();
     mod.has_wildcard_ports = true;
     Expect(TokenKind::kRParen);
     return;
   }
-  // §A.1.3: Non-ANSI port list forms start with . or {.
+
   if (Check(TokenKind::kDot) || Check(TokenKind::kLBrace)) {
     ParseNonAnsiPortList(mod);
     return;
   }
-  // Detect non-ANSI style: first token is an identifier (no direction/type).
+
   if (CheckIdentifier()) {
     if (known_types_.count(CurrentToken().text) != 0) {
-      // Known type → ANSI (interface_port_header or typed port).
+
     } else {
-      // Lookahead to distinguish non-ANSI port name from ANSI interface port.
+
       auto saved = lexer_.SavePos();
       Consume();
       bool is_non_ansi = Check(TokenKind::kRParen) ||
@@ -393,8 +368,7 @@ void Parser::ParsePortList(ModuleDecl& mod) {
   ResolvePortDefaults(mod.ports.back(), nullptr);
   while (Match(TokenKind::kComma)) {
     PortDecl prev = mod.ports.back();
-    // §23.2.2.3 S1: detect all-omitted subsequent port (bare identifier
-    // possibly followed by unpacked dims / default value).
+
     if (CheckIdentifier() && known_types_.count(CurrentToken().text) == 0) {
       auto saved = lexer_.SavePos();
       Consume();
@@ -411,7 +385,7 @@ void Parser::ParsePortList(ModuleDecl& mod) {
           port.direction = prev.direction;
           port.data_type = prev.data_type;
         } else {
-          // E2: after an explicit port, inherit only direction.
+
           ResolvePortDefaults(port, &prev);
         }
         mod.ports.push_back(port);
@@ -426,9 +400,9 @@ void Parser::ParsePortList(ModuleDecl& mod) {
 
 void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
   mod.is_non_ansi_ports = true;
-  // §A.1.3 list_of_ports: port { , port }
+
   do {
-    // §23.2.2.1: Empty port slots are allowed (e.g., module m(a, , b)).
+
     if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
       PortDecl port;
       port.loc = CurrentLoc();
@@ -438,7 +412,7 @@ void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
     PortDecl port;
     port.loc = CurrentLoc();
     if (Match(TokenKind::kDot)) {
-      // §A.1.3 port: . port_identifier ( [ port_expression ] )
+
       port.is_explicit_named = true;
       port.name = ExpectIdentifier().text;
       Expect(TokenKind::kLParen);
@@ -447,10 +421,10 @@ void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
       }
       Expect(TokenKind::kRParen);
     } else if (Check(TokenKind::kLBrace)) {
-      // §A.1.3 port_expression: { port_reference { , port_reference } }
+
       port.port_expr = ParseExpr();
     } else {
-      // §A.1.3 port_reference: port_identifier [ constant_select ]
+
       port.name = ExpectIdentifier().text;
       if (Check(TokenKind::kLBracket)) {
         auto* ref = arena_.Create<Expr>();
@@ -484,7 +458,6 @@ PortDecl Parser::ParsePortDecl() {
     Consume();
   }
 
-  // §A.1.3 ansi_port_declaration: [direction] . port_identifier ( [expression] )
   if (Check(TokenKind::kDot)) {
     port.is_explicit_named = true;
     Consume();
@@ -497,7 +470,6 @@ PortDecl Parser::ParsePortDecl() {
     return port;
   }
 
-  // §A.1.3 interface_port_header: interface [ . modport_identifier ] port_name
   if (Check(TokenKind::kKwInterface)) {
     Consume();
     port.is_interface_port = true;
@@ -512,8 +484,6 @@ PortDecl Parser::ParsePortDecl() {
     return port;
   }
 
-  // §A.1.3 interface_port_header: ident . modport_ident port_name
-  // Lookahead for unknown interface identifier followed by .modport pattern.
   if (dir == Direction::kNone && CheckIdentifier() &&
       known_types_.count(CurrentToken().text) == 0) {
     auto saved = lexer_.SavePos();
@@ -538,8 +508,6 @@ PortDecl Parser::ParsePortDecl() {
     lexer_.RestorePos(saved);
   }
 
-  // A.2.1.2: variable_port_type ::= var_data_type
-  // var_data_type ::= data_type | var data_type_or_implicit
   if (Match(TokenKind::kKwVar)) {
     port.has_explicit_var = true;
     port.data_type = ParseDataType();
@@ -551,7 +519,7 @@ PortDecl Parser::ParsePortDecl() {
     port.data_type = ParseStructOrUnionType();
     ParsePackedDims(port.data_type);
   } else if (Match(TokenKind::kKwInterconnect)) {
-    // A.2.2.1: net_port_type ::= ... | interconnect implicit_data_type
+
     port.data_type.kind = DataTypeKind::kWire;
     port.data_type.is_net = true;
     port.data_type.is_interconnect = true;
@@ -565,13 +533,11 @@ PortDecl Parser::ParsePortDecl() {
     port.data_type = ParseDataType();
   }
 
-  // §A.1.3 interface_port_header: known_type . modport_identifier
   if (port.data_type.kind == DataTypeKind::kNamed && Check(TokenKind::kDot)) {
     Consume();
     port.data_type.modport_name = ExpectIdentifier().text;
   }
 
-  // Handle implicit type with bare packed dims: input [3:0] a (§6.10)
   if (port.data_type.kind == DataTypeKind::kImplicit &&
       !port.data_type.packed_dim_left && Check(TokenKind::kLBracket)) {
     Consume();
@@ -584,8 +550,6 @@ PortDecl Parser::ParsePortDecl() {
   auto name_tok = ExpectIdentifier();
   port.name = name_tok.text;
 
-  // A.2.1.2: unpacked dimensions (list_of_port_identifiers,
-  // list_of_variable_identifiers, list_of_variable_port_identifiers)
   ParseUnpackedDims(port.unpacked_dims);
 
   if (Match(TokenKind::kEq)) {
@@ -598,7 +562,7 @@ static bool HasNonAnsiPorts(const ModuleDecl& mod) {
   if (mod.ports.empty()) return false;
   auto& first = mod.ports[0];
   if (first.direction != Direction::kNone) return false;
-  // ANSI ports with interface_port_header or named type have kNone direction.
+
   if (first.is_interface_port) return false;
   if (first.data_type.kind != DataTypeKind::kImplicit) return false;
   return true;
@@ -608,7 +572,7 @@ void Parser::ParseModuleBody(ModuleDecl& mod) {
   auto* prev_module = current_module_;
   current_module_ = &mod;
   bool non_ansi = HasNonAnsiPorts(mod);
-  // [ timeunits_declaration ] — header area per module_declaration grammar
+
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
     bool first_is_unit = Check(TokenKind::kKwTimeunit);
     ParseTimeunitDecl(&mod);
@@ -621,7 +585,7 @@ void Parser::ParseModuleBody(ModuleDecl& mod) {
     }
   }
   while (!Check(TokenKind::kKwEndmodule) && !AtEnd()) {
-    if (Match(TokenKind::kSemicolon)) continue;  // null module item
+    if (Match(TokenKind::kSemicolon)) continue;
     if (non_ansi && IsPortDirection(CurrentToken().kind)) {
       ParseNonAnsiPortDecls(mod);
       continue;
@@ -638,11 +602,10 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
   if (tk == TokenKind::kKwOutput) dir = Direction::kOutput;
   if (tk == TokenKind::kKwInout) dir = Direction::kInout;
   if (tk == TokenKind::kKwRef) dir = Direction::kRef;
-  Consume();  // direction keyword
+  Consume();
 
   auto dtype = ParseDataType();
 
-  // Handle implicit type with packed dims: input [7:0] a;
   if (dtype.kind == DataTypeKind::kImplicit && Check(TokenKind::kLBracket)) {
     Consume();
     dtype.packed_dim_left = ParseExpr();
@@ -651,8 +614,6 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
     Expect(TokenKind::kRBracket);
   }
 
-  // Parse comma-separated names with optional unpacked dims: input [7:0] a, b;
-  // A.2.1.2: list_of_port_identifiers / list_of_variable_port_identifiers
   do {
     auto loc = CurrentLoc();
     auto name = Expect(TokenKind::kIdentifier).text;
@@ -661,8 +622,7 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
     bool found = false;
     for (auto& port : mod.ports) {
       if (port.name != name) continue;
-      // §23.2.2.1 R13: A port shall not be declared in more than one
-      // port declaration.
+
       if (!found && port.direction != Direction::kNone) {
         diag_.Error(loc,
                     std::format("duplicate port declaration for '{}'", name));
@@ -676,4 +636,4 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
   Expect(TokenKind::kSemicolon);
 }
 
-}  // namespace delta
+}

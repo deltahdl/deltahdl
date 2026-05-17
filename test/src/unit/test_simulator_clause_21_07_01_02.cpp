@@ -38,5 +38,5 @@ TEST_F(VcdValueChangeSim, VectorValueChange) {
   EXPECT_NE(content.find("b10100101 !"), std::string::npos);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

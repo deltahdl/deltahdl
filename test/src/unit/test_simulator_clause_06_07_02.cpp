@@ -86,4 +86,4 @@ TEST(NettypeSimulation, NettypeNetIsTaggedInSimulator) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

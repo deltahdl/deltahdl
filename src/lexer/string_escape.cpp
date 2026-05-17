@@ -16,7 +16,6 @@ int HexVal(char c) {
   return c - 'A' + 10;
 }
 
-// Parse 1-3 octal digits starting at pos. Returns (value, chars_consumed).
 std::pair<char, size_t> ParseOctal(std::string_view s, size_t pos) {
   int val = 0;
   size_t count = 0;
@@ -27,7 +26,6 @@ std::pair<char, size_t> ParseOctal(std::string_view s, size_t pos) {
   return {static_cast<char>(val), count};
 }
 
-// Parse 1-2 hex digits starting at pos. Returns (value, chars_consumed).
 std::pair<char, size_t> ParseHex(std::string_view s, size_t pos) {
   int val = 0;
   size_t count = 0;
@@ -38,7 +36,6 @@ std::pair<char, size_t> ParseHex(std::string_view s, size_t pos) {
   return {static_cast<char>(val), count};
 }
 
-// Map a named escape character to its value. Returns 0 if not a named escape.
 char NamedEscape(char c) {
   switch (c) {
     case 'n':
@@ -60,8 +57,6 @@ char NamedEscape(char c) {
   }
 }
 
-// Process one escape sequence starting after the backslash.
-// Appends the result to 'out' and returns the number of extra chars consumed.
 size_t ProcessEscape(std::string_view raw, size_t i, std::string& out) {
   char c = raw[i];
   char named = NamedEscape(c);
@@ -69,10 +64,10 @@ size_t ProcessEscape(std::string_view raw, size_t i, std::string& out) {
     out += named;
     return 0;
   }
-  if (c == '\n') return 0;  // §5.9 line continuation: both chars ignored
+  if (c == '\n') return 0;
   if (c == '\r') {
-    if (i + 1 < raw.size() && raw[i + 1] == '\n') return 1;  // skip \r\n
-    return 0;  // bare \r continuation
+    if (i + 1 < raw.size() && raw[i + 1] == '\n') return 1;
+    return 0;
   }
   if (c == 'x') {
     auto [val, count] = ParseHex(raw, i + 1);
@@ -86,13 +81,13 @@ size_t ProcessEscape(std::string_view raw, size_t i, std::string& out) {
   if (IsOctalDigit(c)) {
     auto [val, count] = ParseOctal(raw, i);
     out += val;
-    return count - 1;  // -1 because caller already consumed first char
+    return count - 1;
   }
-  out += c;  // Unknown escape: drop backslash (§5.9.1)
+  out += c;
   return 0;
 }
 
-}  // namespace
+}
 
 std::string InterpretStringEscapes(std::string_view raw) {
   std::string result;
@@ -102,11 +97,11 @@ std::string InterpretStringEscapes(std::string_view raw) {
       result += raw[i];
       continue;
     }
-    ++i;  // skip backslash
+    ++i;
     if (i >= raw.size()) break;
     i += ProcessEscape(raw, i, result);
   }
   return result;
 }
 
-}  // namespace delta
+}

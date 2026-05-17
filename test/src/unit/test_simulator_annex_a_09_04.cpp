@@ -5,10 +5,6 @@
 
 using namespace delta;
 
-// §A.9.4: white_space ::= space | tab | newline | formfeed | eof — observed at
-// the simulator stage: each non-EOF alternative must successfully separate
-// tokens in a source that simulates to the expected result.
-
 TEST(WhiteSpaceSim, WhitespaceSameResultWithSpaces) {
   auto result = RunAndGet(
       "module t;\n"
@@ -66,9 +62,6 @@ TEST(WhiteSpaceSim, WhitespaceFormfeedInSource) {
   EXPECT_EQ(result, 99u);
 }
 
-// §A.9.4 eof alternative: source ending immediately at EOF — no trailing
-// newline or other whitespace after `endmodule` — must still simulate to the
-// expected value.
 TEST(WhiteSpaceSim, EndOfFileTerminatesSimulation) {
   auto result = RunAndGet(
       "module t;\n"

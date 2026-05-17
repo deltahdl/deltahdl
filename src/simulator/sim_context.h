@@ -27,19 +27,16 @@ class VcdWriter;
 struct ModuleItem;
 struct Process;
 
-// §6.19: Enum member information for built-in enum methods.
 struct EnumMemberInfo {
   std::string_view name;
   uint64_t value = 0;
 };
 
-// §6.19: Enum type descriptor for method dispatch.
 struct EnumTypeInfo {
   std::string_view type_name;
   std::vector<EnumMemberInfo> members;
 };
 
-// §7.2: Struct field descriptor for packed struct layout.
 struct StructFieldInfo {
   std::string_view name;
   uint32_t bit_offset = 0;
@@ -47,68 +44,60 @@ struct StructFieldInfo {
   DataTypeKind type_kind = DataTypeKind::kLogic;
 };
 
-// §7.2: Struct type descriptor for field-level access.
 struct StructTypeInfo {
   std::string_view type_name;
   std::vector<StructFieldInfo> fields;
   uint32_t total_width = 0;
   bool is_packed = false;
-  bool is_union = false;  // §7.3: true for union types.
-  bool is_soft = false;   // §7.3.1: soft packed union.
+  bool is_union = false;
+  bool is_soft = false;
 };
 
-// §7.10: Queue runtime storage.
 struct QueueObject {
   std::vector<Logic4Vec> elements;
-  std::vector<uint64_t> element_ids;  // §7.10.3: per-element identity tracking.
+  std::vector<uint64_t> element_ids;
   uint32_t elem_width = 32;
-  int32_t max_size = -1;    // -1 = unbounded.
-  uint32_t generation = 0;  // §7.10.3: mutation counter for ref persistence.
+  int32_t max_size = -1;
+  uint32_t generation = 0;
 
-  // §7.10.3: Allocate a unique monotonic element ID.
   uint64_t AllocateId() { return ++next_elem_id_; }
 
-  // §7.10.3: Assign fresh IDs to all current elements (e.g. after bulk load).
   void AssignFreshIds();
 
  private:
   uint64_t next_elem_id_ = 0;
 };
 
-// §7.10.3/§13.5.2: Tracks a ref binding to a queue element for writeback.
 struct QueueRefBinding {
   QueueObject* queue = nullptr;
-  uint64_t element_id = 0;        // Captured ID at bind time.
-  Variable* local_var = nullptr;  // Function-local variable holding the value.
+  uint64_t element_id = 0;
+  Variable* local_var = nullptr;
 };
 
-// §7.8: Associative array runtime storage.
 struct AssocArrayObject {
   std::map<int64_t, Logic4Vec> int_data;
   std::map<std::string, Logic4Vec> str_data;
   uint32_t elem_width = 32;
-  uint32_t index_width = 32;  // §7.9.8: width of index type for validation.
+  uint32_t index_width = 32;
   bool is_string_key = false;
-  bool is_wildcard = false;  // §7.8.1: true if declared with [*].
+  bool is_wildcard = false;
   bool is_4state = false;
   bool has_default = false;
   Logic4Vec default_value;
   uint32_t Size() const;
 };
 
-// §7.4/§7.5/§7.10: Array metadata for method dispatch.
 struct ArrayInfo {
-  uint32_t lo = 0;             // Low index of unpacked dimension.
-  uint32_t size = 0;           // Number of elements.
-  uint32_t elem_width = 32;    // Width of each element in bits.
-  bool is_descending = false;  // §7.4: true for [hi:lo] range.
-  bool is_dynamic = false;     // §7.5: dynamic array (new/delete).
-  bool is_queue = false;       // §7.10: queue ($).
-  bool is_4state = true;       // §7.4.5 Table 7-1: 4-state vs 2-state default.
-  DataTypeKind elem_type_kind = DataTypeKind::kImplicit;  // §10.9.1: element type for type-key matching.
+  uint32_t lo = 0;
+  uint32_t size = 0;
+  uint32_t elem_width = 32;
+  bool is_descending = false;
+  bool is_dynamic = false;
+  bool is_queue = false;
+  bool is_4state = true;
+  DataTypeKind elem_type_kind = DataTypeKind::kImplicit;
 };
 
-// §11.11: Delay mode for min:typ:max expression evaluation.
 enum class DelayMode : uint8_t { kMin, kTyp, kMax };
 
 class SimContext {
@@ -118,11 +107,9 @@ class SimContext {
 
   Variable* FindVariable(std::string_view name);
   Variable* CreateVariable(std::string_view name, uint32_t width);
-  // §10.11: Register an alias so that `alias_name` resolves to the same
-  // Variable as `target_name`.
+
   void AliasVariable(std::string_view alias_name, std::string_view target_name);
-  // §15.5.5.2: Break the event association by replacing with an isolated null
-  // event variable.
+
   void NullifyEventVariable(std::string_view name);
 
   Net* FindNet(std::string_view name);
@@ -139,13 +126,9 @@ class SimContext {
   void RequestStop() { stop_requested_ = true; }
   bool StopRequested() const { return stop_requested_; }
 
-  // §24.3: Program initial tracking for implicit $finish and descendant
-  // termination.
   void RegisterProgramInitial(uint32_t program_block_id, Process* proc);
   void OnProgramInitialComplete(Process* proc);
 
-  // §24.7: Terminate all initials (and their descendants) belonging to the
-  // given program block. A block id of 0 indicates a non-program context.
   void ExitProgramBlock(uint32_t program_block_id);
 
   void SetDelayMode(DelayMode mode) { delay_mode_ = mode; }
@@ -161,17 +144,15 @@ class SimContext {
   void RegisterFunction(std::string_view name, ModuleItem* item);
   ModuleItem* FindFunction(std::string_view name);
 
-  // §11.12: Let declaration registration and lookup.
   void RegisterLetDecl(std::string_view name, ModuleItem* item);
   ModuleItem* FindLetDecl(std::string_view name);
 
-  // §9.4.2.4: Sequence declaration registration and lookup.
   void RegisterSequenceDecl(std::string_view name, ModuleItem* item);
   ModuleItem* FindSequenceDecl(std::string_view name);
 
   void PushScope();
   void PopScope();
-  // §11.12: Save and replace the scope stack for declarative context binding.
+
   std::vector<std::unordered_map<std::string_view, Variable*>> SwapScopeStack(
       std::vector<std::unordered_map<std::string_view, Variable*>> new_stack);
   void PushStaticScope(std::string_view func_name);
@@ -179,26 +160,23 @@ class SimContext {
   bool HasLocalScope() const { return !scope_stack_.empty(); }
   Variable* FindLocalVariable(std::string_view name);
   Variable* CreateLocalVariable(std::string_view name, uint32_t width);
-  // §13.4.2: Find a static variable in a function's persistent frame.
+
   Variable* FindStaticFuncVar(std::string_view func_name,
                               std::string_view var_name);
-  // §13.4.2: Save a variable into a function's persistent frame.
+
   void SaveStaticFuncVar(std::string_view func_name, std::string_view var_name,
                          Variable* var);
-  // §13.5.2: Alias an existing variable into the current scope (pass by ref).
+
   void AliasLocalVariable(std::string_view name, Variable* var);
-  // §13.3.1: Track enclosing task name for per-variable lifetime qualifiers.
+
   void PushFuncName(std::string_view name);
   void PopFuncName();
   std::string_view CurrentFuncName() const;
 
-  // §9.7: Track whether execution is currently inside a function body, so
-  // suspend() can enforce "a function cannot suspend its own execution".
   void EnterFunction() { ++function_depth_; }
   void ExitFunction() { if (function_depth_ > 0) --function_depth_; }
   bool InFunction() const { return function_depth_ > 0; }
 
-  // §7.10.3: Queue ref frame management for function calls.
   void PushQueueRefFrame();
   void RecordQueueRef(const QueueRefBinding& binding);
   std::vector<QueueRefBinding> PopQueueRefFrame();
@@ -213,19 +191,15 @@ class SimContext {
   Process* CurrentProcess() const { return current_process_; }
   bool IsReactiveContext() const;
 
-  // §9.6.2: Disable target tracking for same-process propagation.
   void SetDisableTarget(std::string_view name) { disable_target_ = name; }
   std::string_view GetDisableTarget() const { return disable_target_; }
   void ClearDisableTarget() { disable_target_ = {}; }
 
-  // §9.6.2: Named-block/task → Process registry for cross-process disable.
   void RegisterNamedScope(std::string_view name, Process* proc);
   void UnregisterNamedScope(std::string_view name, Process* proc);
   const std::vector<Process*>& FindNamedScopeProcesses(
       std::string_view name) const;
 
-  // §9.6.2: Active named scope stack for registering fork children
-  // under enclosing named blocks (R3: nested activities are terminated).
   void PushActiveNamedScope(std::string_view name) {
     active_scope_stack_.push_back(name);
   }
@@ -234,7 +208,6 @@ class SimContext {
     return active_scope_stack_;
   }
 
-  // §12.4.2.1: Deferred violation reports.
   void AddPendingViolation(std::string msg);
   void FlushPendingViolations();
   void MaturePendingViolations();
@@ -247,43 +220,35 @@ class SimContext {
   uint32_t Urandom32();
   uint32_t UrandomRange(uint32_t min_val, uint32_t max_val);
 
-  // §6.12: Real variable registration and lookup.
   void RegisterRealVariable(std::string_view name);
   bool IsRealVariable(std::string_view name) const;
 
-  // §6.16: String variable registration and lookup.
   void RegisterStringVariable(std::string_view name);
   bool IsStringVariable(std::string_view name) const;
 
-  // §6.20.7: Unbounded parameter ($) tracking.
   void RegisterUnboundedParam(std::string_view name);
   bool IsUnboundedParam(std::string_view name) const;
 
-  // §6.19: Enum type registration and lookup.
   void RegisterEnumType(std::string_view name, const EnumTypeInfo& info);
   const EnumTypeInfo* FindEnumType(std::string_view name) const;
   void SetVariableEnumType(std::string_view var_name,
                            std::string_view type_name);
   const EnumTypeInfo* GetVariableEnumType(std::string_view var_name) const;
 
-  // §7.2: Struct type registration and lookup.
   void RegisterStructType(std::string_view name, const StructTypeInfo& info);
   const StructTypeInfo* FindStructType(std::string_view name) const;
   void SetVariableStructType(std::string_view var_name,
                              std::string_view type_name);
   const StructTypeInfo* GetVariableStructType(std::string_view var_name) const;
 
-  // §7.4/§7.5/§7.10: Array metadata registration and lookup.
   void RegisterArray(std::string_view name, const ArrayInfo& info);
   ArrayInfo* FindArrayInfo(std::string_view name);
   const ArrayInfo* FindArrayInfo(std::string_view name) const;
 
-  // §7.10: Queue management.
   QueueObject* CreateQueue(std::string_view name, uint32_t elem_width,
                            int32_t max_size = -1);
   QueueObject* FindQueue(std::string_view name);
 
-  // §7.8: Associative array management.
   AssocArrayObject* CreateAssocArray(std::string_view name, uint32_t elem_width,
                                      bool is_string_key,
                                      uint32_t index_width = 32,
@@ -291,42 +256,31 @@ class SimContext {
                                      bool is_4state = false);
   AssocArrayObject* FindAssocArray(std::string_view name);
 
-  // §7.3.2: Tagged union tag management.
   void SetVariableTag(std::string_view var_name, std::string_view tag);
   std::string_view GetVariableTag(std::string_view var_name) const;
 
-  // §20.6.2: Type name to bit width, for $bits(type).
   void RegisterTypeWidth(std::string_view name, uint32_t width);
   uint32_t FindTypeWidth(std::string_view name) const;
 
-  // §23.8: Record the module type at a given instance-path prefix. The prefix
-  // is the fully-qualified instance path without a trailing dot; the root is
-  // the empty string.
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
 
-  // Plus-args (§20.11)
   void AddPlusArg(std::string arg);
   const std::vector<std::string>& GetPlusArgs() const { return plus_args_; }
 
-  // File descriptor management (§21.3)
   int OpenFile(std::string_view filename, std::string_view mode);
   void CloseFile(int fd);
   FILE* GetFileHandle(int fd);
 
-  // §15.3: Semaphore object management.
   SemaphoreObject* CreateSemaphore(std::string_view name, int32_t keys);
   SemaphoreObject* FindSemaphore(std::string_view name);
 
-  // §15.4: Mailbox object management.
   MailboxObject* CreateMailbox(std::string_view name, int32_t bound);
   MailboxObject* FindMailbox(std::string_view name);
 
-  // §15.5.3: Event triggered state management.
   void SetEventTriggered(std::string_view name);
   bool IsEventTriggered(std::string_view name) const;
 
-  // §8: Class type registry and object management.
   void RegisterClassType(std::string_view name, ClassTypeInfo* info);
   ClassTypeInfo* FindClassType(std::string_view name);
   void SetVariableClassType(std::string_view var, std::string_view type);
@@ -336,50 +290,38 @@ class SimContext {
   const std::vector<Expr*>& GetVariableClassParamExprs(
       std::string_view var) const;
 
-  // Allocate a new class object, returning its handle ID (>0).
   uint64_t AllocateClassObject(ClassObject* obj);
   ClassObject* GetClassObject(uint64_t handle) const;
   void DeallocateClassObject(uint64_t handle);
 
-  // §8.29: Memory management — reference counting.
   void RetainObject(uint64_t handle);
   void ReleaseObject(uint64_t handle);
 
-  // §8.29: Query reachability of an object.
   Reachability GetReachability(uint64_t handle) const;
 
-  // §8.29: Garbage collection — reclaim unreachable objects.
   void CollectGarbage();
 
-  // §8.30.1: Register/unregister a weak reference for GC clearing.
   void RegisterWeakReference(WeakReference* wr);
   void UnregisterWeakReference(WeakReference* wr);
 
-  // §8.30.2: Allocate a weak reference object, returning its handle.
   uint64_t AllocateWeakReference(uint64_t referent_handle, Arena& arena);
   WeakReference* FindWeakReferenceByHandle(uint64_t handle) const;
 
-  // §9.7: Process handle registry for fine-grain process control.
   uint64_t RegisterProcessHandle(Process* proc);
   Process* FindProcessByHandle(uint64_t handle) const;
 
-  // §8.11: `this` pointer management for method calls.
   void PushThis(ClassObject* obj);
   void PopThis();
   ClassObject* CurrentThis() const;
 
-  // §16.3: Immediate assertion failure tracking.
   void IncrementAssertionFailCount() { ++assertion_fail_count_; }
   int AssertionFailCount() const { return assertion_fail_count_; }
 
-  // §16.3: immediate cover coverage counters (per "Number of times evaluated"
-  // and "Number of times succeeded").
   void IncrementCoverEvalCount() { ++cover_eval_count_; }
   void IncrementCoverSuccessCount() { ++cover_success_count_; }
   int CoverEvalCount() const { return cover_eval_count_; }
   int CoverSuccessCount() const { return cover_success_count_; }
 
-  // §20.10: severity-task output captured for testing (latest call).
   void SetLastSeverity(std::string_view sev, std::string_view msg, SimTime t) {
     last_severity_ = std::string(sev);
     last_severity_msg_ = std::string(msg);
@@ -389,23 +331,12 @@ class SimContext {
   std::string_view LastSeverityMsg() const { return last_severity_msg_; }
   SimTime LastSeverityTime() const { return last_severity_time_; }
 
-  // §14: Clocking manager access.
   void SetClockingManager(class ClockingManager* mgr) { clocking_mgr_ = mgr; }
   class ClockingManager* GetClockingManager() { return clocking_mgr_; }
 
-  // §19: Coverage database access.
   void SetCoverageDB(class CoverageDB* db) { coverage_db_ = db; }
   class CoverageDB* GetCoverageDB() { return coverage_db_; }
 
-  // §16.4 P11: "Actual argument expressions that are passed by value,
-  // including function calls, shall be fully evaluated at the instant
-  // the deferred assertion expression is evaluated." The deferred-action
-  // scheduler walks the call's actuals, evaluates each at expression-eval
-  // time, and stores the resulting Logic4Vec keyed by the actual's AST
-  // node. When the action later runs, EvalExpr consults this map first
-  // and returns the snapshotted value instead of re-evaluating the
-  // expression — so the action sees the schedule-time view of every
-  // pass-by-value actual.
   void SetDeferredArgSnapshot(const Expr* arg, const Logic4Vec& val) {
     deferred_arg_snapshots_[arg] = val;
   }
@@ -429,11 +360,11 @@ class SimContext {
   std::unordered_map<std::string_view, ModuleItem*> let_decls_;
   std::unordered_map<std::string_view, ModuleItem*> sequence_decls_;
   std::vector<std::unordered_map<std::string_view, Variable*>> scope_stack_;
-  // §13.3.1: Static function frames persist between calls.
+
   std::unordered_map<std::string_view,
                      std::unordered_map<std::string_view, Variable*>>
       static_frames_;
-  // §13.3.1: Enclosing task name stack for per-variable lifetime qualifiers.
+
   std::vector<std::string_view> func_name_stack_;
   std::vector<Process*> final_processes_;
   std::unordered_map<std::string, std::vector<Process*>> sensitivity_map_;
@@ -442,88 +373,86 @@ class SimContext {
   DpiContext* dpi_context_ = nullptr;
   Process* current_process_ = nullptr;
   bool stop_requested_ = false;
-  // §16.4 P11: per-actual snapshot map populated at deferred-assertion
-  // schedule time and consulted by EvalExpr at action time. Keys are AST
-  // nodes; entries are cleared once the action runs.
+
   std::unordered_map<const Expr*, Logic4Vec> deferred_arg_snapshots_;
-  uint32_t pending_program_initials_ = 0;  // §24.3
-  // §24.7: Per-program-block list of active initials for targeted termination.
+  uint32_t pending_program_initials_ = 0;
+
   std::unordered_map<uint32_t, std::vector<Process*>> program_initials_by_block_;
   DelayMode delay_mode_ = DelayMode::kTyp;
   std::vector<std::string> plus_args_;
   std::unordered_map<int, FILE*> file_descriptors_;
-  int next_fd_ = 3;  // Start after stdin/stdout/stderr.
-  // §6.12: Real variable tracking.
+  int next_fd_ = 3;
+
   std::unordered_set<std::string_view> real_vars_;
-  // §6.16: String variable tracking.
+
   std::unordered_set<std::string_view> string_vars_;
-  // §6.20.7: Unbounded parameter tracking.
+
   std::unordered_set<std::string_view> unbounded_params_;
-  // §6.19: Enum type info and variable-to-enum-type mapping.
+
   std::unordered_map<std::string_view, EnumTypeInfo> enum_types_;
   std::unordered_map<std::string_view, std::string_view> var_enum_types_;
-  // §7.2: Struct type info and variable-to-struct-type mapping.
+
   std::unordered_map<std::string_view, StructTypeInfo> struct_types_;
   std::unordered_map<std::string_view, std::string_view> var_struct_types_;
-  // §7.4/§7.5/§7.10: Array metadata.
+
   std::unordered_map<std::string_view, ArrayInfo> array_infos_;
-  // §7.10: Queue runtime objects.
+
   std::unordered_map<std::string_view, QueueObject*> queues_;
-  // §7.8: Associative array runtime objects.
+
   std::unordered_map<std::string_view, AssocArrayObject*> assoc_arrays_;
-  // §7.3.2: Tagged union tag tracking (variable name → active tag).
+
   std::unordered_map<std::string_view, std::string> var_tags_;
-  // §15.3: Semaphore objects.
+
   std::unordered_map<std::string_view, SemaphoreObject*> semaphores_;
-  // §15.4: Mailbox objects.
+
   std::unordered_map<std::string_view, MailboxObject*> mailboxes_;
-  // §15.5.3: Event triggered timestamps (ticks when last triggered).
+
   std::unordered_map<std::string_view, uint64_t> event_triggered_;
-  // §8: Class type registry and variable→class type mapping.
+
   std::unordered_map<std::string_view, ClassTypeInfo*> class_types_;
   std::unordered_map<std::string_view, std::string_view> var_class_types_;
   std::unordered_map<std::string_view, std::vector<Expr*>>
       var_class_param_exprs_;
-  // §8: Object heap — maps handle ID to ClassObject.
+
   std::unordered_map<uint64_t, ClassObject*> class_objects_;
   uint64_t next_handle_id_ = 1;
-  // §8.30.1: Registered weak references for GC clearing.
+
   std::unordered_set<WeakReference*> weak_references_;
-  // §8.30.2: Maps handle ID to WeakReference object.
+
   std::unordered_map<uint64_t, WeakReference*> weak_ref_by_handle_;
-  // §9.7: Process handle registry (SV handle ID → Process*).
+
   std::unordered_map<uint64_t, Process*> process_handles_;
   uint64_t next_process_handle_id_ = 1;
-  // §9.7: Depth counter for nested function-body execution.
+
   int function_depth_ = 0;
-  // §8.11: Stack of `this` pointers for nested method calls.
+
   std::vector<ClassObject*> this_stack_;
-  // §7.10.3: Stack of queue ref binding frames for nested function calls.
+
   std::vector<std::vector<QueueRefBinding>> queue_ref_stack_;
-  // §20.6.2: Type name → bit width for $bits(type).
+
   std::unordered_map<std::string_view, uint32_t> type_widths_;
-  // §23.8: Instance-path prefix → module type name, for upward name lookup.
+
   std::unordered_map<std::string, std::string> instance_types_;
-  // §16.3: Immediate assertion failure counter.
+
   int assertion_fail_count_ = 0;
-  // §16.3: immediate cover eval/success counters.
+
   int cover_eval_count_ = 0;
   int cover_success_count_ = 0;
-  // §20.10: latest severity-task observation.
+
   std::string last_severity_;
   std::string last_severity_msg_;
   SimTime last_severity_time_{};
-  // §14: Clocking manager.
+
   class ClockingManager* clocking_mgr_ = nullptr;
-  // §19: Coverage database.
+
   class CoverageDB* coverage_db_ = nullptr;
-  // §9.6.2: Current disable target for same-process propagation.
+
   std::string_view disable_target_;
-  // §9.6.2: Named-scope → process list for cross-process disable.
+
   std::unordered_map<std::string, std::vector<Process*>> named_scope_map_;
   static const std::vector<Process*> kEmptyNamedScopeList;
-  // §9.6.2: Active named scope stack for fork child registration.
+
   std::vector<std::string_view> active_scope_stack_;
 };
 
-}  // namespace delta
+}

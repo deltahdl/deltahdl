@@ -19,4 +19,4 @@ TEST(Coverage, CrossCoverageComputation) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetCrossCoverage(&g->crosses[0]), 50.0);
 }
 
-}  // namespace
+}

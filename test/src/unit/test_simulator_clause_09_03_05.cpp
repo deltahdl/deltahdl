@@ -152,4 +152,4 @@ TEST(StatementLabelSimulation, LabeledBeginBlockWithLocalVar) {
   EXPECT_EQ(val, 21u);
 }
 
-}  // namespace
+}

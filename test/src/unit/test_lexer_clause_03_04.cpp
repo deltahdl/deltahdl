@@ -1,5 +1,4 @@
-// §3.4: A program block is enclosed between the program ... endprogram
-// keywords. The lexer must recognise both as distinct keyword tokens.
+
 
 #include "fixture_lexer.h"
 
@@ -27,4 +26,4 @@ TEST(ProgramBlockLexing, ProgramEnclosureTokenStream) {
   EXPECT_EQ(tokens[3].kind, TokenKind::kKwEndprogram);
 }
 
-}  // namespace
+}

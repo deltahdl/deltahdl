@@ -34,4 +34,4 @@ TEST(WildcardPortConnectionSynthesis, WildcardWithNamedOverrideSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

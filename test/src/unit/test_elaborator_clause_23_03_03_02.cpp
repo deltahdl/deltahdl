@@ -5,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1: input port can be connected to any expression of a compatible data
-//     type; if left unconnected, default initial value is used ---
-
 TEST(PortConnectionRulesForVariablesElaboration,
      InputPortConnectsToExpression) {
   EXPECT_TRUE(
@@ -28,9 +25,6 @@ TEST(PortConnectionRulesForVariablesElaboration,
              "  child u();\n"
              "endmodule\n"));
 }
-
-// --- R2: output port can be connected to a variable; procedural or continuous
-//     assignments to that variable shall be illegal ---
 
 TEST(PortConnectionRulesForVariablesElaboration,
      OutputPortConnectsToVariable) {
@@ -86,9 +80,6 @@ TEST(PortConnectionRulesForVariablesElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-// --- R3: output port can be connected to a net; multiple drivers shall be
-//     permitted on the net ---
-
 TEST(PortConnectionRulesForVariablesElaboration,
      NetOutputPortAndContAssignAllowed) {
   ElabFixture f;
@@ -105,8 +96,6 @@ TEST(PortConnectionRulesForVariablesElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- R4: variable data type not permitted on either side of inout port ---
-
 TEST(PortConnectionRulesForVariablesElaboration,
      InoutPortWithVarKeywordErrors) {
   ElabFixture f;
@@ -120,10 +109,6 @@ TEST(PortConnectionRulesForVariablesElaboration,
       f);
   EXPECT_TRUE(f.has_errors);
 }
-
-// --- R5: ref port shall be connected to an equivalent variable data type;
-//     references treated as hierarchical references; cannot be left
-//     unconnected ---
 
 TEST(PortConnectionRulesForVariablesElaboration, RefPortBindingHasRefDirection) {
   ElabFixture f;
@@ -170,9 +155,6 @@ TEST(PortConnectionRulesForVariablesElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-// --- R6: illegal to connect a port variable to an interconnect port or
-//     interconnect net ---
-
 TEST(PortConnectionRulesForVariablesElaboration,
      PortVariableToInterconnectNetErrors) {
   ElabFixture f;
@@ -202,4 +184,4 @@ TEST(PortConnectionRulesForVariablesElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -137,8 +137,6 @@ TEST(MatchingTypesParsing, TypesMatchChandleToHandle) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-// --- Rule (a): built-in types ---
-
 TEST(MatchingTypesParsing, TypesMatchRealToReal) {
   DataType a;
   a.kind = DataTypeKind::kReal;
@@ -171,8 +169,6 @@ TEST(MatchingTypesParsing, BuiltinLogicDoesNotMatchBit) {
   EXPECT_FALSE(TypesMatch(a, b));
 }
 
-// --- Rule (c): anonymous enum/union same declaration ---
-
 TEST(MatchingTypesParsing, AnonymousEnumSameDeclParses) {
   auto r = Parse(
       "module m;\n"
@@ -201,8 +197,6 @@ TEST(MatchingTypesParsing, TwoAnonymousStructDifferentDeclsParses) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
-// --- Rule (d): typedef enum/union ---
-
 TEST(MatchingTypesParsing, TypedefEnumDeclParses) {
   auto r = Parse(
       "module m;\n"
@@ -224,8 +218,6 @@ TEST(MatchingTypesParsing, TypedefUnionDeclParses) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
-
-// --- Rule (g): explicit signing matching default ---
 
 TEST(MatchingTypesParsing, ByteExplicitSignedMatchesDefault) {
   auto r = Parse(
@@ -264,8 +256,6 @@ TEST(MatchingTypesParsing, LogicExplicitUnsignedMatchesDefault) {
   EXPECT_EQ(items[0]->data_type.is_signed, items[1]->data_type.is_signed);
 }
 
-// --- Rule (h): package typedef matching ---
-
 TEST(MatchingTypesParsing, PackageTypedefImportParses) {
   auto r = Parse(
       "package pkg;\n"
@@ -280,4 +270,4 @@ TEST(MatchingTypesParsing, PackageTypedefImportParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -17,8 +17,6 @@ TEST(OperatorElaboration, ModulePathOperatorsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A conditional expression mixing the allowed operand classes (input port,
-// locally defined net, and specify parameter) must elaborate cleanly.
 TEST(OperatorElaboration, ModulePathOperandClassesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -34,4 +32,4 @@ TEST(OperatorElaboration, ModulePathOperandClassesElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

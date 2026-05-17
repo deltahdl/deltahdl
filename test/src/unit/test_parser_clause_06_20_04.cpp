@@ -175,4 +175,4 @@ TEST(LocalparamParsing, LocalparamSignedType) {
   EXPECT_TRUE(item->is_localparam);
 }
 
-}  // namespace
+}

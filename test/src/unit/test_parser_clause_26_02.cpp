@@ -116,4 +116,4 @@ TEST(PackageDeclaration, PackageNotAllowedInsideProgram) {
       "endprogram\n"));
 }
 
-}  // namespace
+}

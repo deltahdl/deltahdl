@@ -111,4 +111,4 @@ TEST(Elaboration, AssocArgIntIndexOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

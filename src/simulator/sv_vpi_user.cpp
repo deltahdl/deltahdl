@@ -1,4 +1,4 @@
-// IEEE 1800-2023 Annex M — sv_vpi_user.h implementation.
+
 
 #include "simulator/sv_vpi_user.h"
 

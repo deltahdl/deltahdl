@@ -17,9 +17,6 @@ TEST(MultiplePathDeclarationElaboration, MixedTerminalFormsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.6: a multi-path full-connection declaration may mix scalars and
-// vectors of different widths on both sides; parallel-connection width
-// rules from §30.4.5 do not apply.
 TEST(MultiplePathDeclarationElaboration, MixedWidthsInBothLists) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -34,4 +31,4 @@ TEST(MultiplePathDeclarationElaboration, MixedWidthsInBothLists) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

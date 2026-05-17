@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- delay_value: identifier elaboration ---
-
 TEST(DelayElaboration, DelayValueParameterIdentifier) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -23,8 +21,6 @@ TEST(DelayElaboration, DelayValueParameterIdentifier) {
   EXPECT_EQ(mod->assigns[0].delay->kind, ExprKind::kIdentifier);
 }
 
-// --- delay_value: real number ---
-
 TEST(DelayElaboration, DelayValueRealElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -41,8 +37,6 @@ TEST(DelayElaboration, DelayValueRealElaborates) {
   EXPECT_EQ(mod->assigns[0].delay->kind, ExprKind::kRealLiteral);
 }
 
-// --- delay_value: time_literal elaboration ---
-
 TEST(DelayElaboration, ContAssignTimeLiteralDelay) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -58,8 +52,6 @@ TEST(DelayElaboration, ContAssignTimeLiteralDelay) {
   ASSERT_NE(mod->assigns[0].delay, nullptr);
   EXPECT_EQ(mod->assigns[0].delay->kind, ExprKind::kTimeLiteral);
 }
-
-// --- delay_value: unsigned_number elaboration ---
 
 TEST(DelayElaboration, DelayValueUnsignedNumberElaborates) {
   ElabFixture f;
@@ -78,8 +70,6 @@ TEST(DelayElaboration, DelayValueUnsignedNumberElaborates) {
   EXPECT_EQ(mod->assigns[0].delay->int_val, 5u);
 }
 
-// --- delay_value: 1step elaboration ---
-
 TEST(DelayElaboration, DelayValueOneStepElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -96,4 +86,4 @@ TEST(DelayElaboration, DelayValueOneStepElaborates) {
   EXPECT_EQ(mod->assigns[0].delay->text, "1step");
 }
 
-}  // namespace
+}

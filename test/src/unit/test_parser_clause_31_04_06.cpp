@@ -5,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §31.4.6 Syntax 31-14: the five-argument form with reference_event,
-// data_event, start_edge_offset, and end_edge_offset parses and is
-// classified as a $nochange timing check.
 TEST(TimingCheckCommandParsing, NochangeBasic) {
   auto r = Parse(
       "module m;\n"
@@ -25,8 +22,6 @@ TEST(TimingCheckCommandParsing, NochangeBasic) {
   ASSERT_EQ(tc->limits.size(), 2u);
 }
 
-// §31.4.6: "The reference event can be specified with the posedge or
-// negedge keyword" — negedge is one of the two allowed keyword forms.
 TEST(TimingCheckCommandParsing, NochangeNegedgeReference) {
   auto r = Parse(
       "module m;\n"
@@ -40,9 +35,6 @@ TEST(TimingCheckCommandParsing, NochangeNegedgeReference) {
   EXPECT_EQ(tc->ref_edge, SpecifyEdge::kNegedge);
 }
 
-// §31.4.6 Syntax 31-14: start_edge_offset and end_edge_offset are
-// mintypmax expressions; both must reach the AST as distinct limit
-// entries.
 TEST(TimingCheckCommandParsing, NochangeStartAndEndOffsets) {
   auto r = Parse(
       "module m;\n"
@@ -58,11 +50,6 @@ TEST(TimingCheckCommandParsing, NochangeStartAndEndOffsets) {
   EXPECT_NE(tc->limits[1], nullptr);
 }
 
-// §31.4.6: "a negative offset for start edge shrinks the region by
-// starting the region later" and "a negative offset for the end edge
-// shrinks the region by ending it earlier." Both offset positions must
-// therefore accept a unary-minus expression through the mintypmax
-// production.
 TEST(TimingCheckCommandParsing, NochangeNegativeOffsets) {
   auto r = Parse(
       "module m;\n"
@@ -78,9 +65,6 @@ TEST(TimingCheckCommandParsing, NochangeNegativeOffsets) {
   EXPECT_NE(tc->limits[1], nullptr);
 }
 
-// §31.4.6 Syntax 31-14: start_edge_offset and end_edge_offset are
-// mintypmax_expression productions, so a min:typ:max triple must be
-// accepted in each offset position.
 TEST(TimingCheckCommandParsing, NochangeStartEndEdgeOffsetMinTypMax) {
   auto r = Parse(
       "module m;\n"
@@ -96,8 +80,6 @@ TEST(TimingCheckCommandParsing, NochangeStartEndEdgeOffsetMinTypMax) {
   EXPECT_EQ(tc->limits[1]->kind, ExprKind::kMinTypMax);
 }
 
-// §31.4.6 Syntax 31-14: the optional notifier follows the two offsets
-// and is captured by the parser as the timing check's notifier name.
 TEST(TimingCheckCommandParsing, NochangeWithNotifier) {
   auto r = Parse(
       "module m;\n"
@@ -111,9 +93,6 @@ TEST(TimingCheckCommandParsing, NochangeWithNotifier) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-// §31.4.6 Syntax 31-14: the trailing `[ , [ notifier ] ]` permits a
-// comma with an empty notifier slot — the form must parse with the
-// notifier name left unset.
 TEST(TimingCheckCommandParsing, NochangeEmptyNotifierSlot) {
   auto r = Parse(
       "module m;\n"
@@ -127,9 +106,6 @@ TEST(TimingCheckCommandParsing, NochangeEmptyNotifierSlot) {
   EXPECT_TRUE(tc->notifier.empty());
 }
 
-// §31.4.6 Table 31-12: reference_event is an "Edge triggered timestamp
-// and/or timecheck event" — a bare terminal without posedge/negedge is
-// ill-formed.
 TEST(TimingCheckCommandParsing, ErrorNochangeReferenceMissingEdge) {
   auto r = Parse(
       "module m;\n"
@@ -140,9 +116,6 @@ TEST(TimingCheckCommandParsing, ErrorNochangeReferenceMissingEdge) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §31.4.6: "the edge-control specifiers (see 31.5) cannot be used."
-// The `edge` keyword (with or without a descriptor list) is an
-// edge-control specifier and must be rejected on the reference event.
 TEST(TimingCheckCommandParsing, ErrorNochangeEdgeControlSpecifier) {
   auto r = Parse(
       "module m;\n"
@@ -153,9 +126,6 @@ TEST(TimingCheckCommandParsing, ErrorNochangeEdgeControlSpecifier) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §31.4.6 Syntax 31-14: both start_edge_offset and end_edge_offset are
-// mandatory positional arguments — a call with only one offset is
-// ill-formed.
 TEST(TimingCheckCommandParsing, ErrorNochangeMissingEndOffset) {
   auto r = Parse(
       "module m;\n"
@@ -166,4 +136,4 @@ TEST(TimingCheckCommandParsing, ErrorNochangeMissingEndOffset) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -34,4 +34,4 @@ TEST(Assertion, CustomCheckFunction) {
   EXPECT_EQ(r2, AssertionResult::kFail);
 }
 
-}  // namespace
+}

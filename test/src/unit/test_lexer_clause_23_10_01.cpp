@@ -4,9 +4,6 @@
 
 using namespace delta;
 
-// §23.10.1 defparam statement: a defparam statement begins with the keyword
-// `defparam`. The keyword shall lex to TokenKind::kKwDefparam.
-
 namespace {
 
 TEST(DefparamLexer, DefparamKeywordToken) {
@@ -15,10 +12,6 @@ TEST(DefparamLexer, DefparamKeywordToken) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwDefparam);
 }
 
-// §23.10.1: the canonical `defparam u.X = 99;` sequence shall lex as the
-// defparam keyword followed by a hierarchical identifier path, an equals
-// sign, a literal, and a semicolon — the token sequence the parser relies on
-// to build a defparam statement.
 TEST(DefparamLexer, DefparamStatementTokenSequence) {
   auto tokens = Lex("defparam u.X = 99;");
   ASSERT_GE(tokens.size(), 7u);
@@ -33,8 +26,6 @@ TEST(DefparamLexer, DefparamStatementTokenSequence) {
   EXPECT_EQ(tokens[6].kind, TokenKind::kSemicolon);
 }
 
-// §23.10.1: the comma-separated `list_of_defparam_assignments` BNF expects
-// the comma to lex as its own token between two assignments.
 TEST(DefparamLexer, MultipleAssignmentsCommaToken) {
   auto tokens = Lex("defparam u.A = 1, u.B = 2;");
   bool saw_comma = false;
@@ -47,4 +38,4 @@ TEST(DefparamLexer, MultipleAssignmentsCommaToken) {
   EXPECT_TRUE(saw_comma);
 }
 
-}  // namespace
+}

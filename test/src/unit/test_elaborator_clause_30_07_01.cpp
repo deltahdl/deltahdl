@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §30.7.1 R3: a bare PATHPULSE$ sets module-wide pulse limits and must
-// elaborate cleanly in the presence of a specify-block module path.
 TEST(PulseControlSpecparamElab, ModuleWidePathpulseElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,8 +18,6 @@ TEST(PulseControlSpecparamElab, ModuleWidePathpulseElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.7.1 R4: a path-specific PATHPULSE$input$output override may coexist
-// with the module-wide default without conflict.
 TEST(PulseControlSpecparamElab, PathSpecificCoexistsWithModuleWide) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -37,8 +33,6 @@ TEST(PulseControlSpecparamElab, PathSpecificCoexistsWithModuleWide) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.7.1 R5: the input terminal of a PATHPULSE$ must be an entire port —
-// a bit-select is not legal.
 TEST(PulseControlSpecparamElab, BitSelectInputTerminalRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -52,8 +46,6 @@ TEST(PulseControlSpecparamElab, BitSelectInputTerminalRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §30.7.1 R5: the output terminal of a PATHPULSE$ must be an entire port —
-// a bit-select is not legal.
 TEST(PulseControlSpecparamElab, BitSelectOutputTerminalRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -67,7 +59,6 @@ TEST(PulseControlSpecparamElab, BitSelectOutputTerminalRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §30.7.1 R5: part-selects on PATHPULSE$ terminals are likewise illegal.
 TEST(PulseControlSpecparamElab, PartSelectTerminalRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -81,4 +72,4 @@ TEST(PulseControlSpecparamElab, PartSelectTerminalRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

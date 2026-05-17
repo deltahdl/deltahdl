@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- Interconnect net on built-in primitive gate input terminal ---
-
 TEST(InterconnectPrimitiveTerminalElaboration,
      InterconnectOnAndGateInputNoError) {
   ElabFixture f;
@@ -119,8 +117,6 @@ TEST(InterconnectPrimitiveTerminalElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Interconnect net on built-in primitive gate output terminal ---
-
 TEST(InterconnectPrimitiveTerminalElaboration,
      InterconnectOnAndGateOutputNoError) {
   ElabFixture f;
@@ -175,8 +171,6 @@ TEST(InterconnectPrimitiveTerminalElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- All gate terminals as interconnect ---
-
 TEST(InterconnectPrimitiveTerminalElaboration,
      AllTerminalsInterconnectOnAndGateNoError) {
   ElabFixture f;
@@ -189,8 +183,6 @@ TEST(InterconnectPrimitiveTerminalElaboration,
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- Mixed interconnect and wire terminals ---
 
 TEST(InterconnectPrimitiveTerminalElaboration,
      InterconnectMixedWithWireOnGateNoError) {
@@ -206,8 +198,6 @@ TEST(InterconnectPrimitiveTerminalElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Named gate instance with interconnect terminal ---
-
 TEST(InterconnectPrimitiveTerminalElaboration,
      NamedGateInstanceWithInterconnectNoError) {
   ElabFixture f;
@@ -221,8 +211,6 @@ TEST(InterconnectPrimitiveTerminalElaboration,
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- Interconnect net on UDP input terminal ---
 
 TEST(InterconnectPrimitiveTerminalElaboration,
      InterconnectOnUdpInputNoError) {
@@ -246,8 +234,6 @@ TEST(InterconnectPrimitiveTerminalElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Interconnect net on UDP output terminal ---
-
 TEST(InterconnectPrimitiveTerminalElaboration,
      InterconnectOnUdpOutputNoError) {
   ElabFixture f;
@@ -270,8 +256,6 @@ TEST(InterconnectPrimitiveTerminalElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- All UDP terminals as interconnect ---
-
 TEST(InterconnectPrimitiveTerminalElaboration,
      AllTerminalsInterconnectOnUdpNoError) {
   ElabFixture f;
@@ -293,4 +277,4 @@ TEST(InterconnectPrimitiveTerminalElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

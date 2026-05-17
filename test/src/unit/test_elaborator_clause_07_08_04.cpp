@@ -91,4 +91,4 @@ TEST(IntegralIndexAssocArrayElaboration, NotStringIndex) {
   EXPECT_FALSE(v.is_wildcard_index);
 }
 
-}  // namespace
+}

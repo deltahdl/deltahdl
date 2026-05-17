@@ -65,7 +65,6 @@ TEST(LevelSensitiveEventParsing, WaitComparisonCondition) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-
 TEST(LevelSensitiveEventParsing, WaitWithAssignment) {
   auto r = Parse(
       "module t;\n"
@@ -111,4 +110,4 @@ TEST(LevelSensitiveEventParsing, WaitMissingRParen) {
       "endmodule\n").has_errors);
 }
 
-}  // namespace
+}

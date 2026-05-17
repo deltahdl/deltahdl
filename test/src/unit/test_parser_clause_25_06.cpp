@@ -150,4 +150,4 @@ TEST(SpecifyTerminalParsing, InoutPortAsOutputTerminal) {
   EXPECT_EQ(si->path.dst_ports[0].name, "io");
 }
 
-}  // namespace
+}

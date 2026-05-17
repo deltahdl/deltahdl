@@ -10,10 +10,6 @@
 namespace delta {
 namespace {
 
-// =============================================================================
-// Token types
-// =============================================================================
-
 enum class TokKind : uint8_t {
   kIdent,
   kString,
@@ -31,10 +27,6 @@ struct Token {
   TokKind kind = TokKind::kEof;
   std::string text;
 };
-
-// =============================================================================
-// Tokenizer
-// =============================================================================
 
 class Tokenizer {
  public:
@@ -72,7 +64,7 @@ class Tokenizer {
   }
 
   void SkipBlockComment() {
-    pos_ += 2;  // skip /*
+    pos_ += 2;
     while (pos_ + 1 < src_.size()) {
       if (src_[pos_] == '*' && src_[pos_ + 1] == '/') {
         pos_ += 2;
@@ -90,12 +82,12 @@ class Tokenizer {
   }
 
   Token ReadString() {
-    ++pos_;  // skip opening quote
+    ++pos_;
     std::string text;
     while (pos_ < src_.size() && src_[pos_] != '"') {
       text += src_[pos_++];
     }
-    if (pos_ < src_.size()) ++pos_;  // skip closing quote
+    if (pos_ < src_.size()) ++pos_;
     return {TokKind::kString, std::move(text)};
   }
 
@@ -105,7 +97,7 @@ class Tokenizer {
     while (pos_ < src_.size() &&
            (std::isdigit(src_[pos_]) || src_[pos_] == '.'))
       ++pos_;
-    // Handle exponent notation (e.g., 1.5e-3).
+
     if (pos_ < src_.size() && (src_[pos_] == 'e' || src_[pos_] == 'E')) {
       ++pos_;
       if (pos_ < src_.size() && (src_[pos_] == '+' || src_[pos_] == '-'))
@@ -126,10 +118,6 @@ class Tokenizer {
   std::string_view src_;
   size_t pos_ = 0;
 };
-
-// =============================================================================
-// Parser
-// =============================================================================
 
 class LibertyParser {
  public:
@@ -246,9 +234,8 @@ class LibertyParser {
     }
   }
 
-  // Parse "key : value ;" where value is an unquoted identifier.
   std::string ParseStringAttribute() {
-    Advance();  // skip attribute name
+    Advance();
     Expect(TokKind::kColon);
     std::string val = cur_.text;
     Advance();
@@ -256,9 +243,8 @@ class LibertyParser {
     return val;
   }
 
-  // Parse "key : \"value\" ;" where value is a quoted string.
   std::string ParseQuotedAttribute() {
-    Advance();  // skip attribute name
+    Advance();
     Expect(TokKind::kColon);
     std::string val = cur_.text;
     Advance();
@@ -266,9 +252,8 @@ class LibertyParser {
     return val;
   }
 
-  // Parse "key : number ;" and return float value.
   float ParseFloatAttribute() {
-    Advance();  // skip attribute name
+    Advance();
     Expect(TokKind::kColon);
     float val = std::strtof(cur_.text.c_str(), nullptr);
     Advance();
@@ -276,18 +261,17 @@ class LibertyParser {
     return val;
   }
 
-  // Skip an unrecognized attribute or group.
   void SkipAttribute() {
-    Advance();  // skip name
-    // Group with parenthesized header.
+    Advance();
+
     if (cur_.kind == TokKind::kLParen) {
       SkipParenthesized();
       if (cur_.kind == TokKind::kLBrace) SkipBraced();
       return;
     }
-    // Simple attribute: skip to semicolon or next block.
+
     if (cur_.kind == TokKind::kColon) {
-      Advance();  // skip colon
+      Advance();
       SkipToSemicolon();
       return;
     }
@@ -327,15 +311,11 @@ class LibertyParser {
   Token cur_;
 };
 
-}  // namespace
-
-// =============================================================================
-// Public API
-// =============================================================================
+}
 
 Liberty ParseLiberty(std::string_view source) {
   LibertyParser parser(source);
   return parser.Parse();
 }
 
-}  // namespace delta
+}

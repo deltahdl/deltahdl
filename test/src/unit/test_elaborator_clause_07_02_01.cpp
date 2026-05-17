@@ -153,8 +153,6 @@ TEST(PackedStructValidation, NestedPackedStruct_Allowed) {
              "endmodule\n"));
 }
 
-// §7.2.1: "If all data types within a packed structure are 2-state, the
-// structure as a whole is treated as a 2-state vector."
 TEST(PackedStructTyping, AllTwoStateMembers_StructIsTwoState) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -170,9 +168,6 @@ TEST(PackedStructTyping, AllTwoStateMembers_StructIsTwoState) {
   EXPECT_FALSE(mod->variables[0].is_4state);
 }
 
-// §7.2.1: "A packed structure consists of bit fields, which are packed
-// together in memory without gaps." Total width equals the sum of member
-// widths regardless of the individual member types.
 TEST(PackedStructTyping, NoGaps_TotalWidthEqualsSumOfMemberWidths) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -185,11 +180,9 @@ TEST(PackedStructTyping, NoGaps_TotalWidthEqualsSumOfMemberWidths) {
   ASSERT_FALSE(design->top_modules.empty());
   auto* mod = design->top_modules[0];
   ASSERT_FALSE(mod->variables.empty());
-  EXPECT_EQ(mod->variables[0].width, 28u);  // 8 + 16 + 4
+  EXPECT_EQ(mod->variables[0].width, 28u);
 }
 
-// §7.2.1: "If any data type within a packed structure is 4-state, the
-// structure as a whole is treated as a 4-state vector."
 TEST(PackedStructTyping, AnyFourStateMember_StructIsFourState) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -205,4 +198,4 @@ TEST(PackedStructTyping, AnyFourStateMember_StructIsFourState) {
   EXPECT_TRUE(mod->variables[0].is_4state);
 }
 
-}  // namespace
+}

@@ -4,9 +4,6 @@
 
 namespace {
 
-// --- R1/R4: Port connections with assignment-compatible types shall be
-//     accepted ---
-
 TEST(PortConnectionRulesSynthesis, DifferentWidthPortConnectionSynthesizes) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -22,4 +19,4 @@ TEST(PortConnectionRulesSynthesis, DifferentWidthPortConnectionSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

@@ -53,4 +53,4 @@ TEST(QualifiedIfElaboration, QualifiedIfInInitialElaborates) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

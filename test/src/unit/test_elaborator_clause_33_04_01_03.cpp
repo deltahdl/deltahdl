@@ -2,9 +2,6 @@
 
 namespace {
 
-// §33.4.1.3 item 2: an instance clause's hierarchical name shall start
-// at a top-level module of the config — i.e., its leading identifier
-// must match a cell named in the config's design statement.
 TEST(ConfigInstanceClause, InstancePathStartingOutsideDesignIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -17,8 +14,6 @@ TEST(ConfigInstanceClause, InstancePathStartingOutsideDesignIsRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// Positive control: an instance clause anchored at the design cell is
-// accepted.
 TEST(ConfigInstanceClause, InstancePathStartingAtDesignCellAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -31,9 +26,6 @@ TEST(ConfigInstanceClause, InstancePathStartingAtDesignCellAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A bare top-level module name (no nested instance) is also a valid
-// instance path because §33.4.1.3 says the path "starts at" the
-// top-level module — the module itself qualifies as the path.
 TEST(ConfigInstanceClause, BareTopLevelInstancePathAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -46,8 +38,6 @@ TEST(ConfigInstanceClause, BareTopLevelInstancePathAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Multiple top-level cells in the design statement — any of them can
-// anchor an instance path.
 TEST(ConfigInstanceClause, InstancePathPicksAmongMultipleDesignCells) {
   ElabFixture f;
   ElaborateSrc(
@@ -61,4 +51,4 @@ TEST(ConfigInstanceClause, InstancePathPicksAmongMultipleDesignCells) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

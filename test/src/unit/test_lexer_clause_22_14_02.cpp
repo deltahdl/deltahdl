@@ -53,7 +53,7 @@ TEST(Lexer, KeywordVersion_1364_1995_AllKeywordsRecognized) {
 }
 
 TEST(Lexer, KeywordVersion_1364_1995_LaterKeywordsNotRecognized) {
-  // 1364-2001 additions
+
   EXPECT_FALSE(
       LookupKeyword("automatic", KeywordVersion::kVer13641995).has_value());
   EXPECT_FALSE(
@@ -70,10 +70,10 @@ TEST(Lexer, KeywordVersion_1364_1995_LaterKeywordsNotRecognized) {
       LookupKeyword("signed", KeywordVersion::kVer13641995).has_value());
   EXPECT_FALSE(
       LookupKeyword("unsigned", KeywordVersion::kVer13641995).has_value());
-  // 1364-2005 addition
+
   EXPECT_FALSE(
       LookupKeyword("uwire", KeywordVersion::kVer13641995).has_value());
-  // 1800-2005 additions
+
   EXPECT_FALSE(
       LookupKeyword("logic", KeywordVersion::kVer13641995).has_value());
   EXPECT_FALSE(
@@ -82,7 +82,7 @@ TEST(Lexer, KeywordVersion_1364_1995_LaterKeywordsNotRecognized) {
       LookupKeyword("interface", KeywordVersion::kVer13641995).has_value());
   EXPECT_FALSE(
       LookupKeyword("class", KeywordVersion::kVer13641995).has_value());
-  // 1800-2009 addition
+
   EXPECT_FALSE(
       LookupKeyword("checker", KeywordVersion::kVer13641995).has_value());
 }
@@ -92,4 +92,4 @@ TEST(Lexer, KeywordVersion_1364_1995_NonKeywordIdentifier) {
   EXPECT_FALSE(kw.has_value());
 }
 
-}  // namespace
+}

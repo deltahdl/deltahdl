@@ -143,13 +143,6 @@ TEST(DeclarationListParsing, ListOfParamAssignmentsSingle) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// The §6.8 "set of variables sharing the same characteristics, declared in
-// the same declaration statement" rule and the "variable can be declared
-// with an initializer" rule are tested in test_parser_clause_06_08.cpp
-// (ListOfVariableDeclAssignmentsMultiple, ListOfVariableDeclAssignmentsWithDims,
-// MultipleLogicDecls). The corresponding tests previously duplicated in this
-// file have been removed.
-
 TEST(DeclarationListParsing, ListOfPortIdentifiersMultiple) {
   auto r = Parse("module m(input logic a, input logic b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -169,4 +162,4 @@ TEST(DeclarationListParsing, ListOfVariablePortIdentifiersMultiple) {
   EXPECT_NE(r.cu->modules[0]->ports[1].default_value, nullptr);
 }
 
-}  // namespace
+}

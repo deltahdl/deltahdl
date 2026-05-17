@@ -2,12 +2,6 @@
 
 namespace delta {
 
-// =============================================================================
-// §16.3 Immediate assertions
-// =============================================================================
-
-// §16.3 grammar: `deferred_immediate_*_statement ::= keyword #0 (...) ... |
-// keyword final (...) ...`. Only the integer literal 0 is allowed after #.
 static void ExpectDeferredHashZero(DiagEngine& diag, const Token& tok) {
   if (tok.text != "0") {
     diag.Error(tok.loc,
@@ -16,8 +10,6 @@ static void ExpectDeferredHashZero(DiagEngine& diag, const Token& tok) {
   }
 }
 
-// §16.14.6: skip a balanced parenthesised property_spec embedded in a
-// procedural concurrent assertion.  Mirrors the module-level skip.
 static void SkipBalancedPropertySpec(Lexer& lexer) {
   int depth = 1;
   while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
@@ -31,17 +23,11 @@ static void SkipBalancedPropertySpec(Lexer& lexer) {
   }
 }
 
-// §16.14.6 P1: "A concurrent assertion statement can also be embedded in a
-// procedural block."  When the immediate-assertion path sees the `property`
-// keyword right after assert/assume/cover, dispatch to a procedural
-// concurrent assertion parser instead of the §16.3 immediate form.
 Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = kind;
   stmt->range.start = CurrentLoc();
-  // §16.14.6 P2: this is a "procedural concurrent assertion".  The AST
-  // node records that distinction via the is_procedural_concurrent flag so
-  // downstream stages can tell it apart from an immediate assertion.
+
   stmt->is_procedural_concurrent = true;
   Expect(TokenKind::kKwProperty);
   Expect(TokenKind::kLParen);
@@ -61,28 +47,22 @@ Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
   return stmt;
 }
 
-// Shared logic for immediate assert/assume (§16.3).
 Stmt* Parser::ParseImmediateAssertLike(StmtKind kind, TokenKind keyword) {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = kind;
   stmt->range.start = CurrentLoc();
   Expect(keyword);
 
-  // §16.14.6 P1: `assert property (...)` / `assume property (...)` inside
-  // procedural code is a procedural concurrent assertion, not an
-  // immediate assertion.  Dispatch to the dedicated path so the §16.3
-  // immediate-assertion grammar isn't applied to a concurrent form.
   if (Check(TokenKind::kKwProperty)) {
     return ParseProceduralConcurrentAssertLike(kind);
   }
 
-  // §A.6.10: deferred_immediate — assert #0 (...) or assert final (...)
   if (Match(TokenKind::kHash)) {
     auto tok = Expect(TokenKind::kIntLiteral);
     ExpectDeferredHashZero(diag_, tok);
     stmt->is_deferred = true;
   } else if (Match(TokenKind::kKwFinal)) {
-    // §16.4 P14: final deferred assertion — schedules action in Postponed.
+
     stmt->is_deferred = true;
     stmt->is_final_deferred = true;
   }
@@ -114,28 +94,22 @@ Stmt* Parser::ParseImmediateAssume() {
                                   TokenKind::kKwAssume);
 }
 
-// Parse: cover [#0 | final] (expr) [pass_stmt] ;
-// Note: cover has no else branch per the LRM.
 Stmt* Parser::ParseImmediateCover() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kCoverImmediate;
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwCover);
 
-  // §16.14.6 P1: `cover property (...)` in procedural code is a procedural
-  // concurrent assertion.  `cover sequence (...)` (§16.5 grammar) is also
-  // allowed in procedural context per §16.14.6.
   if (Check(TokenKind::kKwProperty)) {
     return ParseProceduralConcurrentAssertLike(StmtKind::kCoverImmediate);
   }
 
-  // §A.6.10: deferred_immediate — cover #0 (...) or cover final (...)
   if (Match(TokenKind::kHash)) {
     auto tok = Expect(TokenKind::kIntLiteral);
     ExpectDeferredHashZero(diag_, tok);
     stmt->is_deferred = true;
   } else if (Match(TokenKind::kKwFinal)) {
-    // §16.4 P14: final deferred cover — schedules action in Postponed.
+
     stmt->is_deferred = true;
     stmt->is_final_deferred = true;
   }
@@ -153,14 +127,6 @@ Stmt* Parser::ParseImmediateCover() {
   return stmt;
 }
 
-// =============================================================================
-// §16.5 Concurrent assertions — module-level items
-// =============================================================================
-
-// Skip a balanced parenthesised property_spec body. SVA property_spec may
-// contain timing controls (@), implication operators (|->, |=>), cycle
-// delays (##), and constructs outside the regular expression grammar.
-// Returns a placeholder identifier so the AST node is non-null.
 static Expr* SkipPropertySpec(Arena& arena, Lexer& lexer, SourceLoc loc) {
   int depth = 1;
   while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
@@ -179,16 +145,12 @@ static Expr* SkipPropertySpec(Arena& arena, Lexer& lexer, SourceLoc loc) {
   return expr;
 }
 
-// Check whether the next tokens indicate a deferred immediate assertion
-// (§16.4): assert #0 (...) or assert final (...) at module level.
 static bool IsDeferredImmediate(Lexer& lexer) {
   if (lexer.Peek().Is(TokenKind::kHash)) return true;
   if (lexer.Peek().Is(TokenKind::kKwFinal)) return true;
   return false;
 }
 
-// Parse a deferred immediate assertion as a module-level item (§16.4).
-// Wraps the procedural immediate-assertion parser result.
 static ModuleItem* WrapStmtAsItem(Arena& arena, Stmt* stmt, SourceLoc loc) {
   auto* item = arena.Create<ModuleItem>();
   item->kind = ModuleItemKind::kAssertProperty;
@@ -197,7 +159,6 @@ static ModuleItem* WrapStmtAsItem(Arena& arena, Stmt* stmt, SourceLoc loc) {
   return item;
 }
 
-// Parse a §16.4 deferred immediate assertion at module level.
 ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = kind;
@@ -205,11 +166,10 @@ ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
   stmt->is_deferred = true;
   if (Match(TokenKind::kHash)) {
     auto tok = Expect(TokenKind::kIntLiteral);
-    // §16.4 Syntax 16-2: the only legal hash value after the verification
-    // directive is 0; reject other integer literals at module level too.
+
     ExpectDeferredHashZero(diag_, tok);
   } else if (Match(TokenKind::kKwFinal)) {
-    // §16.4 P14: final deferred at module level — Postponed-region action.
+
     stmt->is_final_deferred = true;
   }
   Expect(TokenKind::kLParen);
@@ -225,7 +185,6 @@ ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
   return WrapStmtAsItem(arena_, stmt, loc);
 }
 
-// Shared logic for assert/assume property (§16.5).
 ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
                                             TokenKind keyword) {
   auto* item = arena_.Create<ModuleItem>();
@@ -233,7 +192,6 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
   item->loc = CurrentLoc();
   Expect(keyword);
 
-  // §16.4: deferred immediate assertions at module level
   if (IsDeferredImmediate(lexer_)) {
     StmtKind sk = (kind == ModuleItemKind::kAssertProperty)
                       ? StmtKind::kAssertImmediate
@@ -268,17 +226,12 @@ ModuleItem* Parser::ParseAssumeProperty() {
                                  TokenKind::kKwAssume);
 }
 
-// Parse: cover property ( property_spec ) [pass_stmt] ;
-//        cover sequence ( [clocking_event] [disable iff (...)] seq )
-//        stmt_or_null
-// Or: cover #0 ( expr ) [pass_stmt] ; / cover final ( expr ) [pass_stmt] ;
 ModuleItem* Parser::ParseCoverProperty() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kCoverProperty;
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwCover);
 
-  // §16.4: deferred immediate cover at module level
   if (IsDeferredImmediate(lexer_)) {
     auto* stmt = arena_.Create<Stmt>();
     stmt->kind = StmtKind::kCoverImmediate;
@@ -286,10 +239,10 @@ ModuleItem* Parser::ParseCoverProperty() {
     stmt->is_deferred = true;
     if (Match(TokenKind::kHash)) {
       auto tok = Expect(TokenKind::kIntLiteral);
-      // §16.4 Syntax 16-2: cover #0 is the only legal hash form.
+
       ExpectDeferredHashZero(diag_, tok);
     } else if (Match(TokenKind::kKwFinal)) {
-      // §16.4 P14: module-level final deferred cover.
+
       stmt->is_final_deferred = true;
     }
     Expect(TokenKind::kLParen);
@@ -303,7 +256,6 @@ ModuleItem* Parser::ParseCoverProperty() {
     return WrapStmtAsItem(arena_, stmt, item->loc);
   }
 
-  // Distinguish cover property vs cover sequence.
   if (Check(TokenKind::kKwSequence)) {
     item->kind = ModuleItemKind::kCoverSequence;
     Expect(TokenKind::kKwSequence);
@@ -323,7 +275,6 @@ ModuleItem* Parser::ParseCoverProperty() {
   return item;
 }
 
-// Parse: restrict property ( property_spec ) ;
 ModuleItem* Parser::ParseRestrictProperty() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kRestrictProperty;
@@ -337,11 +288,6 @@ ModuleItem* Parser::ParseRestrictProperty() {
   return item;
 }
 
-// =============================================================================
-// §16.12 Property declarations
-// =============================================================================
-
-// Parse: property name [( port_list )]; ... endproperty [: name]
 ModuleItem* Parser::ParsePropertyDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kPropertyDecl;
@@ -349,7 +295,6 @@ ModuleItem* Parser::ParsePropertyDecl() {
   Expect(TokenKind::kKwProperty);
   item->name = Expect(TokenKind::kIdentifier).text;
 
-  // Optional formal port list.
   if (Match(TokenKind::kLParen)) {
     int depth = 1;
     while (depth > 0 && !AtEnd()) {
@@ -365,7 +310,6 @@ ModuleItem* Parser::ParsePropertyDecl() {
 
   Expect(TokenKind::kSemicolon);
 
-  // Skip property body until endproperty.
   while (!Check(TokenKind::kKwEndproperty) && !AtEnd()) {
     Consume();
   }
@@ -374,11 +318,6 @@ ModuleItem* Parser::ParsePropertyDecl() {
   return item;
 }
 
-// =============================================================================
-// §16.8 Sequence declarations
-// =============================================================================
-
-// Parse: sequence name [( port_list )]; ... endsequence [: name]
 ModuleItem* Parser::ParseSequenceDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kSequenceDecl;
@@ -386,7 +325,6 @@ ModuleItem* Parser::ParseSequenceDecl() {
   Expect(TokenKind::kKwSequence);
   item->name = Expect(TokenKind::kIdentifier).text;
 
-  // Optional formal port list.
   if (Match(TokenKind::kLParen)) {
     int depth = 1;
     while (depth > 0 && !AtEnd()) {
@@ -402,7 +340,6 @@ ModuleItem* Parser::ParseSequenceDecl() {
 
   Expect(TokenKind::kSemicolon);
 
-  // Skip sequence body until endsequence.
   while (!Check(TokenKind::kKwEndsequence) && !AtEnd()) {
     Consume();
   }
@@ -411,20 +348,14 @@ ModuleItem* Parser::ParseSequenceDecl() {
   return item;
 }
 
-// =============================================================================
-// §16.17 Expect statement
-// =============================================================================
-
 Stmt* Parser::ParseExpectStmt() {
   auto* stmt = arena_.Create<Stmt>();
-  // §13.4: expect is one of the time-controlling statements forbidden
-  // inside a function body, so it carries its own kind distinct from the
-  // immediate-assert family.
+
   stmt->kind = StmtKind::kExpect;
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwExpect);
   Expect(TokenKind::kLParen);
-  // Skip property_spec — same balanced-paren approach.
+
   int depth = 1;
   while (depth > 0 && !AtEnd()) {
     if (Match(TokenKind::kLParen)) {
@@ -435,7 +366,7 @@ Stmt* Parser::ParseExpectStmt() {
       Consume();
     }
   }
-  // Optional action block
+
   if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwElse)) {
     stmt->assert_pass_stmt = ParseStmt();
   }
@@ -447,4 +378,4 @@ Stmt* Parser::ParseExpectStmt() {
   return stmt;
 }
 
-}  // namespace delta
+}

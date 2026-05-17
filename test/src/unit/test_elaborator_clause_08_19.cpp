@@ -77,8 +77,7 @@ TEST(ConstantClassPropertyElaboration, MultipleInstanceConstantsOk) {
 }
 
 TEST(ConstantClassPropertyElaboration, InstanceConstStaticErrorWithInit) {
-  // static + no init_expr = instance constant + static → error.
-  // Having an init_expr makes it a global constant, so static is fine.
+
   EXPECT_TRUE(
       ElabOk("class C;\n"
              "  static const int X = 42;\n"
@@ -184,4 +183,4 @@ TEST(ConstantClassPropertyElaboration, InstanceConstAssignInTaskError) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

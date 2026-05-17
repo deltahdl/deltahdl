@@ -22,4 +22,4 @@ TEST(QueueAccess, DefaultInitializationIsEmpty) {
   EXPECT_EQ(q->elements.size(), 0u);
 }
 
-}  // namespace
+}

@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1: .* implicitly connects all ports where name and type match ---
-
 TEST(WildcardPortConnectionParsing, WildcardOnly) {
   auto r = Parse(
       "module top;\n"
@@ -46,9 +44,6 @@ TEST(WildcardPortConnectionParsing, WildcardMultipleChildPorts) {
   EXPECT_TRUE(inst->inst_wildcard);
   EXPECT_TRUE(inst->inst_ports.empty());
 }
-
-// --- R2: Named connections can mix with .* to override or leave ports
-//         unconnected ---
 
 TEST(WildcardPortConnectionParsing, WildcardWithNamedPorts) {
   auto r = Parse("module m; sub u0(.clk(clk), .*); endmodule\n");
@@ -113,8 +108,6 @@ TEST(WildcardPortConnectionParsing, WildcardWithMultipleEmptyPorts) {
   EXPECT_EQ(item->inst_ports[1].second, nullptr);
 }
 
-// --- R5: .* may appear anywhere in the port list ---
-
 TEST(WildcardPortConnectionParsing, WildcardBeforeNamed) {
   auto r = Parse(
       "module top;\n"
@@ -152,8 +145,6 @@ TEST(WildcardPortConnectionParsing, WildcardBetweenNamed) {
   EXPECT_EQ(item->inst_ports[1].first, "b");
 }
 
-// --- R5 (attribute interaction) ---
-
 TEST(WildcardPortConnectionParsing, AttributeOnWildcardPort) {
   auto r = Parse(
       "module m;\n"
@@ -165,8 +156,6 @@ TEST(WildcardPortConnectionParsing, AttributeOnWildcardPort) {
   EXPECT_TRUE(item->inst_wildcard);
   EXPECT_EQ(item->inst_ports.size(), 1u);
 }
-
-// --- R5 (with parameter and instance array) ---
 
 TEST(WildcardPortConnectionParsing, ParametersArrayAndWildcardCombined) {
   auto r = Parse(
@@ -186,8 +175,6 @@ TEST(WildcardPortConnectionParsing, ParametersArrayAndWildcardCombined) {
   EXPECT_TRUE(item->inst_wildcard);
 }
 
-// --- R6: .* shall appear at most once (error condition) ---
-
 TEST(WildcardPortConnectionParsing, WildcardCannotMixWithPositional) {
   auto r = Parse(
       "module top;\n"
@@ -195,8 +182,6 @@ TEST(WildcardPortConnectionParsing, WildcardCannotMixWithPositional) {
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
-
-// --- R7: Different instances in same parent can mix connection styles ---
 
 TEST(WildcardPortConnectionParsing, MixedStylesInSameParent) {
   auto r = Parse(
@@ -218,4 +203,4 @@ TEST(WildcardPortConnectionParsing, MixedStylesInSameParent) {
   EXPECT_TRUE(items[3]->inst_wildcard);
 }
 
-}  // namespace
+}

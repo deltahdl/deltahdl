@@ -198,4 +198,4 @@ TEST(Preprocessor, Pragma_UnrecognizedNameNoEffect_CodePreserved) {
   EXPECT_NE(out.find("wire w;"), std::string::npos);
 }
 
-}  // namespace
+}

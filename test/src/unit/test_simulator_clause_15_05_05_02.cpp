@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §15.5.5.2: Event initialized to null has is_null_event flag set.
 TEST(IpcSync, NullEventInitialization) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -24,7 +23,6 @@ TEST(IpcSync, NullEventInitialization) {
   EXPECT_TRUE(var->is_null_event);
 }
 
-// §15.5.5.2: Triggering a null event has no effect.
 TEST(IpcSync, TriggerNullEventHasNoEffect) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -50,7 +48,6 @@ TEST(IpcSync, TriggerNullEventHasNoEffect) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §15.5.5.2: .triggered on a null event returns false.
 TEST(IpcSync, NullEventTriggeredReturnsFalse) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -75,7 +72,6 @@ TEST(IpcSync, NullEventTriggeredReturnsFalse) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §15.5.5.2: Imperative ev = null breaks the synchronization association.
 TEST(IpcSync, ImperativeNullAssignmentBreaksAssociation) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -98,7 +94,6 @@ TEST(IpcSync, ImperativeNullAssignmentBreaksAssociation) {
   EXPECT_TRUE(var->is_null_event);
 }
 
-// §15.5.5.2: Trigger after imperative null assignment has no effect.
 TEST(IpcSync, TriggerAfterImperativeNullHasNoEffect) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -125,7 +120,6 @@ TEST(IpcSync, TriggerAfterImperativeNullHasNoEffect) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §15.5.5.2: Nullifying one alias does not affect the other.
 TEST(IpcSync, NullAssignmentDoesNotAffectOtherAliases) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -154,4 +148,4 @@ TEST(IpcSync, NullAssignmentDoesNotAffectOtherAliases) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-}  // namespace
+}

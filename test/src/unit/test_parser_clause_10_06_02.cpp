@@ -59,7 +59,6 @@ TEST(ForceReleaseParsing, ReleaseNet) {
   ASSERT_NE(stmt->lhs, nullptr);
 }
 
-
 TEST(ForceReleaseParsing, ForceVariableParses) {
   auto r = Parse(
       "module m;\n"
@@ -165,4 +164,4 @@ TEST(ForceReleaseParsing, ReleaseConstPartSelectNet) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
-}  // namespace
+}

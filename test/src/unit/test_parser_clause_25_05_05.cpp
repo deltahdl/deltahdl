@@ -94,4 +94,4 @@ TEST(ClockingModportParsing, MultipleClockingPorts) {
   EXPECT_EQ(mp->ports[1].name, "cb2");
 }
 
-}  // namespace
+}

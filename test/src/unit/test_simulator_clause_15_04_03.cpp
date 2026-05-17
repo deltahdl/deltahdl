@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.3: Put on unbounded mailbox always succeeds.
 TEST(IpcSync, MailboxPutUnboundedAlwaysPlaced) {
   MailboxObject mb;
   EXPECT_EQ(mb.Put(10), MbxPutStatus::kPlaced);
@@ -17,7 +16,6 @@ TEST(IpcSync, MailboxPutUnboundedAlwaysPlaced) {
   EXPECT_EQ(mb.Num(), 3);
 }
 
-// §15.4.3: Put stores messages in FIFO order.
 TEST(IpcSync, MailboxPutFifoOrder) {
   MailboxObject mb;
   mb.Put(100);
@@ -32,7 +30,6 @@ TEST(IpcSync, MailboxPutFifoOrder) {
   EXPECT_EQ(msg, 300u);
 }
 
-// §15.4.3: Put on bounded mailbox returns kBlock when full.
 TEST(IpcSync, MailboxPutBoundedBlocksWhenFull) {
   MailboxObject mb(2);
   EXPECT_EQ(mb.Put(1), MbxPutStatus::kPlaced);
@@ -41,7 +38,6 @@ TEST(IpcSync, MailboxPutBoundedBlocksWhenFull) {
   EXPECT_EQ(mb.Num(), 2);
 }
 
-// §15.4.3: Put succeeds after space is freed by get.
 TEST(IpcSync, MailboxPutSucceedsAfterGet) {
   MailboxObject mb(1);
   EXPECT_EQ(mb.Put(42), MbxPutStatus::kPlaced);
@@ -52,7 +48,6 @@ TEST(IpcSync, MailboxPutSucceedsAfterGet) {
   EXPECT_EQ(mb.Num(), 1);
 }
 
-// §15.4.3: Many puts on unbounded mailbox all succeed.
 TEST(IpcSync, MailboxPutUnboundedManyMessages) {
   MailboxObject mb;
   for (uint64_t i = 0; i < 100; ++i) {
@@ -61,4 +56,4 @@ TEST(IpcSync, MailboxPutUnboundedManyMessages) {
   EXPECT_EQ(mb.Num(), 100);
 }
 
-}  // namespace
+}

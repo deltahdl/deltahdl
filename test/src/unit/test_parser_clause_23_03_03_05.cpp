@@ -6,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1: For an unpacked array port, the port and the array connected to the
-//     port shall have the same number of unpacked dimensions, and each
-//     dimension of the port shall have the same size as the corresponding
-//     dimension of the array being connected ---
-
 TEST(UnpackedArrayPortsAndArraysOfInstancesParser,
      InstanceArraySingleRangeDimensionParsed) {
   auto r = Parse("module m; child c[3:0](a, b); endmodule\n");
@@ -39,8 +34,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesParser,
   EXPECT_NE(item->inst_range_left, nullptr);
   EXPECT_EQ(item->inst_range_right, nullptr);
 }
-
-// --- R2/R3: Arrays of instances with port connections ---
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesParser,
      MultipleDimensionInstanceArrayParsed) {
@@ -97,4 +90,4 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesParser,
   EXPECT_EQ(item->inst_range_right, nullptr);
 }
 
-}  // namespace
+}

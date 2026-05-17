@@ -159,4 +159,4 @@ TEST(TypedConstructorCallSim, ParameterizedTypedConstructorWithArgs) {
       "endmodule\n", "result"), 10u);
 }
 
-}  // namespace
+}

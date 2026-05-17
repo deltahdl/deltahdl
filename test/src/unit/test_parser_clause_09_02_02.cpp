@@ -49,4 +49,4 @@ TEST(AlwaysProcedureParsing, AlwaysFormsHaveBodies) {
   }
 }
 
-}  // namespace
+}

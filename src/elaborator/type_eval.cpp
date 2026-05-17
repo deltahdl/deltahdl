@@ -9,9 +9,8 @@
 
 namespace delta {
 
-// Compute the bit-width of a single struct/union member.
 uint32_t EvalStructMemberWidth(const StructMember& m) {
-  // If the member has explicit packed dimensions, use them.
+
   if (m.packed_dim_left && m.packed_dim_right) {
     auto left = ConstEvalInt(m.packed_dim_left);
     auto right = ConstEvalInt(m.packed_dim_right);
@@ -20,7 +19,7 @@ uint32_t EvalStructMemberWidth(const StructMember& m) {
       return static_cast<uint32_t>(w);
     }
   }
-  // Default widths for common types.
+
   switch (m.type_kind) {
     case DataTypeKind::kByte:
       return 8;
@@ -32,18 +31,16 @@ uint32_t EvalStructMemberWidth(const StructMember& m) {
     case DataTypeKind::kLongint:
       return 64;
     default:
-      return 1;  // bit, logic, reg default to 1.
+      return 1;
   }
 }
 
-// §7.3.2: Compute ⌈log₂(n)⌉ tag bits for a tagged packed union.
 static uint32_t TagBitWidth(uint32_t num_members) {
   uint32_t bits = 0;
   while ((1u << bits) < num_members) ++bits;
   return bits;
 }
 
-// §7.2/§7.3: Compute total width of a packed struct or union from members.
 static uint32_t EvalStructOrUnionWidth(const DataType& dtype) {
   if (dtype.struct_members.empty()) return 0;
   if (dtype.kind == DataTypeKind::kUnion) {
@@ -51,7 +48,7 @@ static uint32_t EvalStructOrUnionWidth(const DataType& dtype) {
     for (const auto& m : dtype.struct_members) {
       max_w = std::max(max_w, EvalStructMemberWidth(m));
     }
-    // §7.3.2: Tagged packed unions include tag bits.
+
     if (dtype.is_tagged && dtype.is_packed)
       max_w += TagBitWidth(static_cast<uint32_t>(dtype.struct_members.size()));
     return max_w;
@@ -63,7 +60,6 @@ static uint32_t EvalStructOrUnionWidth(const DataType& dtype) {
   return total;
 }
 
-// Compute width from explicit [left:right] packed dimension range.
 static uint32_t EvalRangeWidth(const Expr* left_expr, const Expr* right_expr) {
   auto left = ConstEvalInt(left_expr);
   auto right = ConstEvalInt(right_expr);
@@ -80,17 +76,16 @@ static uint32_t EvalRangeWidth(const Expr* left_expr, const Expr* right_expr,
 }
 
 uint32_t EvalTypeWidth(const DataType& dtype) {
-  // If explicit packed dimensions are present, compute from range.
+
   if (dtype.packed_dim_left && dtype.packed_dim_right) {
     uint32_t w = EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right);
-    // §7.4.1: Multiply by extra packed dimensions (e.g., [3:0][7:0]).
+
     for (const auto& [left, right] : dtype.extra_packed_dims) {
       w *= EvalRangeWidth(left, right);
     }
     if (w > 0) return w;
   }
 
-  // Built-in type widths per IEEE 1800-2023.
   switch (dtype.kind) {
     case DataTypeKind::kImplicit:
     case DataTypeKind::kLogic:
@@ -111,7 +106,7 @@ uint32_t EvalTypeWidth(const DataType& dtype) {
     case DataTypeKind::kRealtime:
       return 64;
     case DataTypeKind::kEnum:
-      return 32;  // default enum base type is int (32-bit)
+      return 32;
     case DataTypeKind::kStruct:
     case DataTypeKind::kUnion:
       return EvalStructOrUnionWidth(dtype);
@@ -121,7 +116,7 @@ uint32_t EvalTypeWidth(const DataType& dtype) {
     case DataTypeKind::kEvent:
       return 0;
     case DataTypeKind::kChandle:
-      return 64;  // §6.14: Platform-dependent, at least pointer-sized.
+      return 64;
     case DataTypeKind::kWire:
     case DataTypeKind::kTri:
     case DataTypeKind::kWand:
@@ -134,7 +129,7 @@ uint32_t EvalTypeWidth(const DataType& dtype) {
     case DataTypeKind::kSupply0:
     case DataTypeKind::kSupply1:
     case DataTypeKind::kUwire:
-      return 1;  // Scalar net default width.
+      return 1;
     case DataTypeKind::kVirtualInterface:
       return 0;
   }
@@ -197,10 +192,7 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
 bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
   const auto* resolved = ResolveNamed(dtype, typedefs);
   if (resolved) return Is4stateType(*resolved, typedefs);
-  // §6.19: An enum's 4-state-ness follows its base type. A type_identifier
-  // base resolves through the typedef map; a built-in base is preserved in
-  // enum_base_kind by the parser. Absent any base, the default is `int`,
-  // which is 2-state.
+
   if (dtype.kind == DataTypeKind::kEnum) {
     if (!dtype.enum_base_name.empty()) {
       auto it = typedefs.find(dtype.enum_base_name);
@@ -212,8 +204,7 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
     return false;
   }
   if (Is4stateType(dtype.kind)) return true;
-  // §7.2.1: If any member of a packed struct/union is 4-state, the whole is.
-  // §7.3.1: soft implies packed.
+
   if ((dtype.kind == DataTypeKind::kStruct ||
        dtype.kind == DataTypeKind::kUnion) &&
       (dtype.is_packed || dtype.is_soft)) {
@@ -221,7 +212,7 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
       if (Is4stateType(m.type_kind)) return true;
     }
   }
-  // §7.3: Unpacked union defaults to first member's type.
+
   if (dtype.kind == DataTypeKind::kUnion && !dtype.is_packed &&
       !dtype.is_soft && !dtype.struct_members.empty()) {
     return Is4stateType(dtype.struct_members[0].type_kind);
@@ -235,12 +226,6 @@ bool IsSignedType(const DataType& dtype, const TypedefMap& typedefs) {
                   : (dtype.is_signed || IsImplicitlySigned(dtype.kind));
 }
 
-// --- §6.9: Vector predicate ---
-
-// §6.9 normatively defines a vector as a multibit reg/logic/bit (or
-// implicitly logic) declared with a range, and states that "Vectors are
-// packed arrays of scalars". The predicate therefore requires exactly one
-// packed dimension over a single-bit element kind.
 bool IsVector(const DataType& dtype) {
   if (!dtype.packed_dim_left || !dtype.packed_dim_right) return false;
   if (!dtype.extra_packed_dims.empty()) return false;
@@ -255,16 +240,10 @@ bool IsVector(const DataType& dtype) {
   }
 }
 
-// §6.9 enumerates "reg, logic, or bit (or as a matching user-defined type
-// or implicitly as logic)" as the types that participate in the scalar /
-// vector distinction. Resolve named types through the typedef map so a
-// `typedef logic [7:0] byte_t` is recognised as a §6.9 vector when used.
 bool IsVector(const DataType& dtype, const TypedefMap& typedefs) {
   const auto* resolved = ResolveNamed(dtype, typedefs);
   return resolved ? IsVector(*resolved, typedefs) : IsVector(dtype);
 }
-
-// --- §6.4: Singular and aggregate types ---
 
 bool IsAggregateType(const DataType& dtype) {
   if (dtype.kind == DataTypeKind::kStruct || dtype.kind == DataTypeKind::kUnion)
@@ -274,9 +253,6 @@ bool IsAggregateType(const DataType& dtype) {
 
 bool IsSingularType(const DataType& dtype) { return !IsAggregateType(dtype); }
 
-// --- Type compatibility (IEEE §6.22) ---
-
-// §6.11.1: Return true if the type kind is an integral type.
 bool IsIntegralType(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kBit:
@@ -297,8 +273,7 @@ bool IsIntegralType(DataTypeKind kind) {
 }
 
 bool IsSimpleBitVectorType(DataTypeKind kind) {
-  // §6.11.1: The Table 6-8 integer types are simple bit vector types — those
-  // with predefined widths plus the unsized bit/logic/reg.
+
   switch (kind) {
     case DataTypeKind::kBit:
     case DataTypeKind::kLogic:
@@ -316,19 +291,16 @@ bool IsSimpleBitVectorType(DataTypeKind kind) {
 }
 
 bool IsSimpleBitVectorType(const DataType& dtype) {
-  // §6.11.1: Packed structures (§7.2.1) and packed unions (§7.2.2) are
-  // equivalent to a simple bit vector type but are not themselves one.
+
   if ((dtype.kind == DataTypeKind::kStruct ||
        dtype.kind == DataTypeKind::kUnion) &&
       (dtype.is_packed || dtype.is_soft))
     return false;
-  // §6.11.1: Multidimensional packed array types (§7.4) are not simple bit
-  // vector types — only a one-dimensional packed array of bits qualifies.
+
   if (!dtype.extra_packed_dims.empty()) return false;
   return IsSimpleBitVectorType(dtype.kind);
 }
 
-// §6.22.1(e): Types with a predefined width.
 static bool HasPredefinedWidth(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kByte:
@@ -343,14 +315,11 @@ static bool HasPredefinedWidth(DataTypeKind kind) {
   }
 }
 
-// §6.22.1(e): Simple bit vector types without a predefined width.
 static bool IsSimpleBitVector(DataTypeKind kind) {
   return kind == DataTypeKind::kBit || kind == DataTypeKind::kLogic ||
          kind == DataTypeKind::kReg;
 }
 
-// §6.11.2: logic and reg denote the same type, so collapse reg onto logic
-// for kind comparisons.
 static DataTypeKind CanonKind(DataTypeKind k) {
   return k == DataTypeKind::kReg ? DataTypeKind::kLogic : k;
 }
@@ -363,8 +332,6 @@ bool TypesMatch(const DataType& a, const DataType& b) {
     return true;
   }
 
-  // §6.22.1(e): A simple bit vector with range [width-1:0] matches a
-  // predefined-width type if both have the same state and width.
   const DataType* vec = nullptr;
   const DataType* predef = nullptr;
   if (IsSimpleBitVector(a.kind) && HasPredefinedWidth(b.kind)) {
@@ -388,7 +355,6 @@ bool TypesMatch(const DataType& a, const DataType& b) {
   return false;
 }
 
-// §6.22.2(c): Only packed/integral types participate in equivalence.
 static bool IsPackedOrIntegral(const DataType& dtype) {
   if (IsIntegralType(dtype.kind)) return true;
   if ((dtype.kind == DataTypeKind::kStruct ||
@@ -398,7 +364,6 @@ static bool IsPackedOrIntegral(const DataType& dtype) {
   return false;
 }
 
-// §6.22.2(c): 4-state with contagion for packed structs/unions.
 static bool Is4stateForEquivalence(const DataType& dtype) {
   if (Is4stateType(dtype.kind)) return true;
   if ((dtype.kind == DataTypeKind::kStruct ||
@@ -413,7 +378,7 @@ static bool Is4stateForEquivalence(const DataType& dtype) {
 
 bool TypesEquivalent(const DataType& a, const DataType& b) {
   if (TypesMatch(a, b)) return true;
-  // §6.22.2(c): Only applies to packed/integral types.
+
   if (!IsPackedOrIntegral(a) || !IsPackedOrIntegral(b)) return false;
   uint32_t wa = EvalTypeWidth(a);
   uint32_t wb = EvalTypeWidth(b);
@@ -424,14 +389,12 @@ bool TypesEquivalent(const DataType& a, const DataType& b) {
 bool ElementTypesEquivalent(DataTypeKind a_kind, uint32_t a_width,
                             bool a_signed, bool a_4state, DataTypeKind b_kind,
                             uint32_t b_width, bool b_signed, bool b_4state) {
-  // §6.22.2(a): Matching types are equivalent. For element kinds we treat
-  // logic/reg as the same canonical kind, mirroring TypesMatch.
+
   if (CanonKind(a_kind) == CanonKind(b_kind) && a_signed == b_signed &&
       a_width == b_width && a_4state == b_4state) {
     return true;
   }
-  // §6.22.2(c): Built-in integral types are equivalent if they have the same
-  // total bit width, same signedness, and same 2-state/4-state class.
+
   if (IsIntegralType(a_kind) && IsIntegralType(b_kind)) {
     return a_width == b_width && a_width > 0 && a_signed == b_signed &&
            a_4state == b_4state;
@@ -441,11 +404,11 @@ bool ElementTypesEquivalent(DataTypeKind a_kind, uint32_t a_width,
 
 bool IsAssignmentCompatible(const DataType& a, const DataType& b) {
   if (TypesEquivalent(a, b)) return true;
-  // §6.22.3: All integral types are assignment compatible with each other.
+
   if (IsIntegralType(a.kind) && IsIntegralType(b.kind)) return true;
-  // §6.22.3: enum → integral is assignment compatible (not the reverse).
+
   if (a.kind == DataTypeKind::kEnum && IsIntegralType(b.kind)) return true;
-  // Real types are assignment compatible with integral types.
+
   bool a_real =
       (a.kind == DataTypeKind::kReal || a.kind == DataTypeKind::kShortreal ||
        a.kind == DataTypeKind::kRealtime);
@@ -461,13 +424,11 @@ bool IsAssignmentCompatible(const DataType& a, const DataType& b) {
 
 bool IsCastCompatible(const DataType& a, const DataType& b) {
   if (IsAssignmentCompatible(a, b)) return true;
-  // §6.22.4: integral → enum requires explicit cast but is cast compatible.
+
   if (IsIntegralType(a.kind) && b.kind == DataTypeKind::kEnum) return true;
   if (IsIntegralType(b.kind) && a.kind == DataTypeKind::kEnum) return true;
   return false;
 }
-
-// --- Width inference (IEEE §11.6) ---
 
 static bool IsOneBitResultOp(TokenKind op) {
   return op == TokenKind::kEqEq || op == TokenKind::kBangEq ||
@@ -519,7 +480,7 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
   if (!expr) return 0;
   switch (expr->kind) {
     case ExprKind::kIntegerLiteral: {
-      // §5.7.1: Sized literals use their declared width; unsized default to 32.
+
       auto tick = expr->text.find('\'');
       if (tick != std::string_view::npos && tick > 0) {
         uint32_t w = 0;
@@ -539,7 +500,7 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
     case ExprKind::kUnbasedUnsizedLiteral:
       return 1;
     case ExprKind::kIdentifier:
-      return 0;  // Need variable lookup; return 0 for unknown.
+      return 0;
     case ExprKind::kSystemCall:
       return 32;
     case ExprKind::kUnary:
@@ -606,4 +567,4 @@ uint32_t ContextWidth(const Expr* expr, uint32_t ctx_width,
   return std::max(self_width, ctx_width);
 }
 
-}  // namespace delta
+}

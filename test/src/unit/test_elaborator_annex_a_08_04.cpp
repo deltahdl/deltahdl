@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §A.8.4: primary_literal — integer literal elaborates
 TEST(PrimaryElaboration, IntegerLiteralElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -17,7 +16,6 @@ TEST(PrimaryElaboration, IntegerLiteralElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.4: constant_primary — parameter identifier in constant context
 TEST(PrimaryElaboration, ConstantPrimaryParameterElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -30,7 +28,6 @@ TEST(PrimaryElaboration, ConstantPrimaryParameterElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.4: hierarchical_identifier with select elaborates
 TEST(PrimaryElaboration, HierarchicalIdentifierSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -44,7 +41,6 @@ TEST(PrimaryElaboration, HierarchicalIdentifierSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.4: concatenation with range_expression elaborates
 TEST(PrimaryElaboration, ConcatenationWithRangeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -58,10 +54,6 @@ TEST(PrimaryElaboration, ConcatenationWithRangeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.4 constant_primary ::= [ package_scope | class_scope ] enum_identifier
-// — the elaborator must resolve a package-scoped enum member to its constant
-// value.  Combines A.8.4 (primary slot), A.9.3 (package_scope, enum_identifier)
-// and A.2.2.1 (enum data_type).
 TEST(PrimaryElaboration, PackageScopedEnumIdentifierElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -78,7 +70,6 @@ TEST(PrimaryElaboration, PackageScopedEnumIdentifierElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.4: null primary elaborates
 TEST(PrimaryElaboration, NullPrimaryElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -94,4 +85,4 @@ TEST(PrimaryElaboration, NullPrimaryElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

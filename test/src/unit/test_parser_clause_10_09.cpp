@@ -168,8 +168,6 @@ TEST(AssignmentPatternParsing, TypeReferencePatternExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- LHS assignment patterns ---
-
 TEST(AssignmentPatternParsing, NetLvalueAssignmentPattern) {
   auto r = Parse(
       "module m;\n"
@@ -201,8 +199,6 @@ TEST(AssignmentPatternParsing, VarLvalueAssignmentPatternWithIndex) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-// --- Error conditions ---
 
 TEST(AssignmentPatternParsing, ErrorAssignmentPatternMissingCloseBrace) {
   auto r = Parse(
@@ -238,8 +234,6 @@ TEST(AssignmentPatternParsing, ErrorReplicationMissingCloseBrace) {
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
-
-// --- Integer atom type prefixes (assignment_pattern_expression_type) ---
 
 TEST(AssignmentPatternParsing, ByteTypePrefix) {
   EXPECT_TRUE(
@@ -281,8 +275,6 @@ TEST(AssignmentPatternParsing, TimeTypePrefix) {
               "endmodule\n"));
 }
 
-// --- Assignment pattern expression with type_reference ---
-
 TEST(AssignmentPatternParsing, TypeReferenceWithMultipleElements) {
   auto r = Parse(
       "module m;\n"
@@ -295,8 +287,6 @@ TEST(AssignmentPatternParsing, TypeReferenceWithMultipleElements) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
-
-// --- Single-element replication ---
 
 TEST(AssignmentPatternParsing, SingleElementReplication) {
   auto r = Parse(
@@ -312,4 +302,4 @@ TEST(AssignmentPatternParsing, SingleElementReplication) {
   EXPECT_EQ(rhs->elements[0]->kind, ExprKind::kReplicate);
 }
 
-}  // namespace
+}

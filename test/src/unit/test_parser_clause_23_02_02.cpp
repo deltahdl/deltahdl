@@ -48,4 +48,4 @@ TEST(PortDeclaration, TypedefStructWithUnionAsPortType) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

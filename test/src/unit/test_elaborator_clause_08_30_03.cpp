@@ -50,4 +50,4 @@ TEST(ClassConstraintElaboration, WeakRefGetInWaitOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

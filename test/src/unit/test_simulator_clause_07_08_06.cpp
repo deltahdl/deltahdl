@@ -50,7 +50,6 @@ TEST(AssocArray, XzIndexWriteWarns) {
   SimFixture f;
   f.ctx.CreateAssocArray("aa", 32, false, 32);
 
-  // Create a variable with x bits to use as index.
   auto* var = f.ctx.CreateLocalVariable("__xkey", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 5);
   var->value.words[0].bval = 0x1;
@@ -80,7 +79,6 @@ TEST(AssocArray, XzIndexReadWarns) {
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 32);
   aa->int_data[5] = MakeLogic4VecVal(f.arena, 32, 42);
 
-  // Create a variable with x bits to use as index.
   auto* var = f.ctx.CreateLocalVariable("__xkey", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 5);
   var->value.words[0].bval = 0x1;
@@ -188,4 +186,4 @@ TEST(AssocArray, XzIndexWriteDoesNotClobberExistingEntries) {
   EXPECT_EQ(aa->int_data[5].ToUint64(), 42u);
 }
 
-}  // namespace
+}

@@ -21,14 +21,12 @@ TEST(ClockingScopeSim, BlockPersistsAcrossClockEdges) {
       f, cmgr,
       {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput});
 
-  // First edge: sample 0x10.
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
   EXPECT_EQ(cmgr.GetSampledValue("cb", "data"), 0x10u);
 
-  // Change data and trigger second edge: block still alive.
   data->value = MakeLogic4VecVal(f.arena, 8, 0x20);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);  // Reset for negedge->posedge.
+  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
   SchedulePosedge(f, clk, 20);
   f.scheduler.Run();
   EXPECT_EQ(cmgr.GetSampledValue("cb", "data"), 0x20u);
@@ -49,8 +47,7 @@ TEST(ClockingScopeSim, DotAccessRetrievesSampledValue) {
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
 
-  // Simulates dom.sig access.
   EXPECT_EQ(cmgr.GetSampledValue("dom", "sig"), 0xBBu);
 }
 
-}  // namespace
+}

@@ -408,4 +408,4 @@ TEST(LvalueParsing, VarLvalueConcatWithMemberAccess) {
   EXPECT_EQ(stmt->lhs->elements[0]->kind, ExprKind::kMemberAccess);
 }
 
-}  // namespace
+}

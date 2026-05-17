@@ -5,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §28.15.2 R4: if the user omits the charge strength on a trireg declaration,
-// the net's charge strength must default to medium. Verifies the AST→Net
-// plumbing picks up the default when no `(small|medium|large)` is given.
 TEST(TriregElaboration, DefaultChargeStrengthIsMedium) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -23,8 +20,6 @@ TEST(TriregElaboration, DefaultChargeStrengthIsMedium) {
   EXPECT_EQ(mod->nets[0].charge_strength, Strength::kMedium);
 }
 
-// §28.15.2 R3 (small): a user-declared `(small)` strength must reach the
-// simulator net unchanged.
 TEST(TriregElaboration, ChargeStrengthSmall) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -40,8 +35,6 @@ TEST(TriregElaboration, ChargeStrengthSmall) {
   EXPECT_EQ(mod->nets[0].charge_strength, Strength::kSmall);
 }
 
-// §28.15.2 R3 (medium): explicit `(medium)` must also reach the net — the
-// default-medium rule must not mask an explicit specification.
 TEST(TriregElaboration, ChargeStrengthMedium) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -57,8 +50,6 @@ TEST(TriregElaboration, ChargeStrengthMedium) {
   EXPECT_EQ(mod->nets[0].charge_strength, Strength::kMedium);
 }
 
-// §28.15.2 R3 (large): `(large)` must reach the net. Together with the small
-// and medium cases this covers the complete set of permitted values.
 TEST(TriregElaboration, ChargeStrengthLarge) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -74,4 +65,4 @@ TEST(TriregElaboration, ChargeStrengthLarge) {
   EXPECT_EQ(mod->nets[0].charge_strength, Strength::kLarge);
 }
 
-}  // namespace
+}

@@ -25,4 +25,4 @@ TEST(SpecifyBlockDeclParsing, PulsestyleAndShowcancelledTogether) {
   EXPECT_FALSE(spec->specify_items[1]->is_noshowcancelled);
 }
 
-}  // namespace
+}

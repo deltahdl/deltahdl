@@ -18,7 +18,7 @@ TEST(PackageExportParsing, ExportFollowingMatchingImport) {
 }
 
 TEST(PackageExportParsing, ExportPrecedingMatchingImport) {
-  // §26.6 allows a package export to appear before its matching import.
+
   auto r = Parse(
       "package p;\n"
       "  export other_pkg::foo;\n"
@@ -55,4 +55,4 @@ TEST(PackageExportParsing, PackageContainingOnlyExports) {
   EXPECT_EQ(r.cu->packages[0]->items.size(), 2u);
 }
 
-}  // namespace
+}

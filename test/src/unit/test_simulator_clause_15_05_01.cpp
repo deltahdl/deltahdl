@@ -9,7 +9,6 @@
 
 namespace {
 
-// §15.5.1: Blocking trigger unblocks a process waiting via @(ev).
 TEST(IpcSync, BlockingTriggerUnblocksWaiter) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -37,7 +36,6 @@ TEST(IpcSync, BlockingTriggerUnblocksWaiter) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §15.5.1: Trigger sets value after wait unblocks.
 TEST(IpcSync, TriggerSetsValueAfterWait) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -61,7 +59,6 @@ TEST(IpcSync, TriggerSetsValueAfterWait) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-// §15.5.1: Nonblocking trigger (->> ev) unblocks a waiting process.
 TEST(IpcSync, NonblockingTriggerUnblocksWaiter) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -89,7 +86,6 @@ TEST(IpcSync, NonblockingTriggerUnblocksWaiter) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §15.5.1: Nonblocking trigger with delay unblocks waiter at delayed time.
 TEST(IpcSync, NonblockingTriggerWithDelay) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -117,7 +113,6 @@ TEST(IpcSync, NonblockingTriggerWithDelay) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-// §15.5.1: Blocking trigger unblocks multiple waiting processes.
 TEST(IpcSync, TriggerUnblocksMultipleWaiters) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -152,5 +147,4 @@ TEST(IpcSync, TriggerUnblocksMultipleWaiters) {
   EXPECT_EQ(vb->value.ToUint64(), 22u);
 }
 
-
-}  // namespace
+}

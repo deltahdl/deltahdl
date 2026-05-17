@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// === Existing tests ===
-
 TEST(ConstraintItemsParsing, BasicConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -165,8 +163,6 @@ TEST(ConstraintItemsParsing, InsideConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Moved from test_parser_clause_18_05.cpp ---
-
 TEST(ConstraintItemsParsing, ClassWithTwoExprConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -259,8 +255,6 @@ TEST(ConstraintItemsParsing, ClassWithConstraintVerifiesName) {
   EXPECT_TRUE(found);
 }
 
-// --- Moved from test_parser_clause_18_05_01.cpp ---
-
 TEST(ConstraintItemsParsing, PackageItemExternConstraint) {
   auto r = Parse(
       "package pkg;\n"
@@ -343,8 +337,6 @@ TEST(ConstraintItemsParsing, ExternConstraintPrototypeVerifiesAst) {
   EXPECT_TRUE(found);
 }
 
-// --- Moved from test_parser_clause_18_05_02.cpp ---
-
 TEST(ConstraintItemsParsing, ConstraintDeclDynamicOverride) {
   auto r = Parse(
       "class C;\n"
@@ -389,8 +381,6 @@ TEST(ConstraintItemsParsing, ExternConstraintDeclDynOverrideTopLevel) {
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
-
-// --- Moved from test_parser_clause_18_05_03.cpp ---
 
 TEST(ConstraintItemsParsing, DistConstraintEqualWeight) {
   auto r = Parse(
@@ -538,8 +528,6 @@ TEST(ConstraintItemsParsing, ConstraintExpressionOrDist) {
   EXPECT_EQ(r.cu->classes[0]->members[1]->name, "dist_c");
 }
 
-// --- Moved from test_parser_clause_18_05_04.cpp ---
-
 TEST(ConstraintItemsParsing, UniquenessConstraintVerifiesName) {
   auto r = Parse(
       "class C;\n"
@@ -552,8 +540,6 @@ TEST(ConstraintItemsParsing, UniquenessConstraintVerifiesName) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->members[3]->name, "uc");
 }
-
-// --- Moved from test_parser_clause_18_05_06.cpp ---
 
 TEST(ConstraintItemsParsing, DistInsideIfConstraint) {
   auto r = Parse(
@@ -588,8 +574,6 @@ TEST(ConstraintItemsParsing, ConstraintSet) {
   EXPECT_EQ(r.cu->classes[0]->members[2]->name, "cs");
 }
 
-// --- Moved from test_parser_clause_18_05_07_01.cpp ---
-
 TEST(ConstraintItemsParsing, ConstraintForeachBraced) {
   auto r = Parse(
       "class C;\n"
@@ -615,8 +599,6 @@ TEST(ConstraintItemsParsing, ForeachConstraintSingleLine) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
-
-// --- Moved from test_parser_clause_18_05_10.cpp ---
 
 TEST(ConstraintItemsParsing, PackageItemStaticExternConstraint) {
   auto r = Parse(
@@ -649,8 +631,6 @@ TEST(ConstraintItemsParsing, StaticConstraintWithDynamicOverride) {
   ASSERT_FALSE(r.has_errors);
 }
 
-// --- Moved from test_parser_clause_18_05_13_02.cpp ---
-
 TEST(ConstraintItemsParsing, ImplicationAndDisableSoft) {
   auto r = Parse(
       "class C;\n"
@@ -665,8 +645,6 @@ TEST(ConstraintItemsParsing, ImplicationAndDisableSoft) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->members[2]->name, "ic");
 }
-
-// === Step 9: Missing tests ===
 
 TEST(ConstraintItemsParsing, PureConstraintPrototype) {
   auto r = Parse(
@@ -761,8 +739,6 @@ TEST(ConstraintItemsParsing, SoftDistConstraint) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// === Error conditions ===
-
 TEST(ConstraintItemsParsing, ErrorConstraintMissingName) {
   auto r = Parse(
       "class C;\n"
@@ -802,8 +778,6 @@ TEST(ConstraintItemsParsing, ErrorExternConstraintMissingIdentifier) {
       "constraint C:: { x > 0; }\n");
   EXPECT_TRUE(r.has_errors);
 }
-
-// === Edge cases ===
 
 TEST(ConstraintItemsParsing, ConstraintOnlyFinalOverride) {
   auto r = Parse(
@@ -889,4 +863,4 @@ TEST(ConstraintItemsParsing, NestedBracesInConstraintBlock) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}  // namespace
+}

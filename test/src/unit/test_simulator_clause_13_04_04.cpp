@@ -33,4 +33,4 @@ TEST(FunctionBackgroundProcessSim, NonblockingAssignFromFunction) {
             99u);
 }
 
-}  // namespace
+}

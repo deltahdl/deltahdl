@@ -87,4 +87,4 @@ TEST(AssignmentParsing, BlockLocalWithExprInit) {
   EXPECT_NE(blk->stmts[0]->var_init, nullptr);
 }
 
-}  // namespace
+}

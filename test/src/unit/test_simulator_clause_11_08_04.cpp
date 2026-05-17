@@ -63,15 +63,12 @@ TEST(SignedXZ, KnownSignedNormalExtension) {
   EXPECT_EQ(result.words[0].bval, 0u);
 }
 
-// --- Req 1/2: sign extension fill via ternary (avoids arithmetic all-x path) ---
-
 TEST(SignedXZ, TernarySignExtXFillsWithX) {
   SimFixture f;
 
-  // 4-bit signed, sign bit = x (aval=1, bval=1 at bit 3).
   auto* var = MakeVar4(f, "tx", 4, 0b1001, 0b1000);
   var->is_signed = true;
-  // 8-bit signed false branch forces extension to 8 bits.
+
   MakeSignedVarAdv(f, "fv", 8, 0);
   auto* tern = f.arena.Create<Expr>();
   tern->kind = ExprKind::kTernary;
@@ -80,7 +77,6 @@ TEST(SignedXZ, TernarySignExtXFillsWithX) {
   tern->false_expr = MakeId(f.arena, "fv");
   auto result = EvalExpr(tern, f.ctx, f.arena);
 
-  // Upper 4 bits must be x: aval=1, bval=1 per bit.
   EXPECT_EQ(result.words[0].aval & 0xF0u, 0xF0u);
   EXPECT_EQ(result.words[0].bval & 0xF0u, 0xF0u);
 }
@@ -88,7 +84,6 @@ TEST(SignedXZ, TernarySignExtXFillsWithX) {
 TEST(SignedXZ, TernarySignExtZFillsWithZ) {
   SimFixture f;
 
-  // 4-bit signed, sign bit = z (aval=0, bval=1 at bit 3).
   auto* var = MakeVar4(f, "tz", 4, 0b0001, 0b1000);
   var->is_signed = true;
   MakeSignedVarAdv(f, "fv2", 8, 0);
@@ -99,12 +94,9 @@ TEST(SignedXZ, TernarySignExtZFillsWithZ) {
   tern->false_expr = MakeId(f.arena, "fv2");
   auto result = EvalExpr(tern, f.ctx, f.arena);
 
-  // Upper 4 bits must be z: aval=0, bval=1 per bit.
   EXPECT_EQ(result.words[0].aval & 0xF0u, 0x00u);
   EXPECT_EQ(result.words[0].bval & 0xF0u, 0xF0u);
 }
-
-// --- Req 3: nonlogical operations on signed x/z → entire result is x ---
 
 TEST(SignedXZ, ArithmeticResultIsEntirelyX) {
   SimFixture f;
@@ -208,8 +200,6 @@ TEST(SignedXZ, RelationalWithSignedXZYieldsX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-// --- Req 3: result type consistent with expression type ---
-
 TEST(SignedXZ, NonlogicalOpResultPreservesSignedType) {
   SimFixture f;
 
@@ -223,12 +213,9 @@ TEST(SignedXZ, NonlogicalOpResultPreservesSignedType) {
   EXPECT_TRUE(result.is_signed);
 }
 
-// --- Req 3 edge case: x/z in non-sign-bit position still triggers all-x ---
-
 TEST(SignedXZ, XInLowBitStillYieldsAllX) {
   SimFixture f;
 
-  // Bit 0 = x (aval=1, bval=1), sign bit (bit 3) is 0 (known).
   auto* var = MakeVar4(f, "lx", 4, 0b0001, 0b0001);
   var->is_signed = true;
   MakeSignedVarAdv(f, "l1", 4, 1);
@@ -244,7 +231,6 @@ TEST(SignedXZ, XInLowBitStillYieldsAllX) {
 TEST(SignedXZ, ZInLowBitStillYieldsAllX) {
   SimFixture f;
 
-  // Bit 0 = z (aval=0, bval=1), sign bit (bit 3) is 0 (known).
   auto* var = MakeVar4(f, "lz", 4, 0b0000, 0b0001);
   var->is_signed = true;
   MakeSignedVarAdv(f, "lz1", 4, 1);
@@ -257,4 +243,4 @@ TEST(SignedXZ, ZInLowBitStillYieldsAllX) {
   EXPECT_EQ(result.words[0].bval & mask, mask);
 }
 
-}  // namespace
+}

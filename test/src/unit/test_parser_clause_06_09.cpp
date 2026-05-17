@@ -92,8 +92,6 @@ TEST(ScalarAndVectorDeclaration, BitRangeProducesDimensions) {
   EXPECT_NE(item->data_type.packed_dim_right, nullptr);
 }
 
-// §6.9: An object declared implicitly as logic without a range is a scalar.
-// The parser shall leave the packed-dimension fields null for `var v;`.
 TEST(ScalarAndVectorDeclaration, ImplicitLogicScalarHasNoPackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -107,8 +105,6 @@ TEST(ScalarAndVectorDeclaration, ImplicitLogicScalarHasNoPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right, nullptr);
 }
 
-// §6.9: The multibit-vector rule applies to implicit logic; a `var [7:0] v;`
-// declaration shall carry a packed range and parse as a vector.
 TEST(ScalarAndVectorDeclaration, ImplicitLogicVectorHasPackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -122,9 +118,6 @@ TEST(ScalarAndVectorDeclaration, ImplicitLogicVectorHasPackedDims) {
   EXPECT_NE(item->data_type.packed_dim_right, nullptr);
 }
 
-// §6.9: "Vectors are packed arrays of scalars (see 7.4)." A `logic [7:0] v;`
-// is the §6.9 vector and shall be recognised as such by the shared
-// IsVector predicate.
 TEST(ScalarAndVectorDeclaration, VectorIsRecognisedByIsVector) {
   auto r = Parse("module t; logic [7:0] v; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -134,8 +127,6 @@ TEST(ScalarAndVectorDeclaration, VectorIsRecognisedByIsVector) {
   EXPECT_TRUE(IsVector(item->data_type));
 }
 
-// §6.9: A scalar reg/logic/bit (no range) is not a vector. The shared
-// IsVector predicate distinguishes scalar from vector at the parser stage.
 TEST(ScalarAndVectorDeclaration, ScalarIsNotRecognisedByIsVector) {
   auto r = Parse("module t; logic v; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -145,8 +136,6 @@ TEST(ScalarAndVectorDeclaration, ScalarIsNotRecognisedByIsVector) {
   EXPECT_FALSE(IsVector(item->data_type));
 }
 
-// §6.9: The "vector = packed-array-of-scalars" equivalence applies to reg
-// just as to logic — a `reg [3:0] r;` is a §6.9 vector.
 TEST(ScalarAndVectorDeclaration, RegVectorIsRecognisedByIsVector) {
   auto r = Parse("module t; reg [3:0] r; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -156,8 +145,6 @@ TEST(ScalarAndVectorDeclaration, RegVectorIsRecognisedByIsVector) {
   EXPECT_TRUE(IsVector(item->data_type));
 }
 
-// §6.9: The "vector = packed-array-of-scalars" equivalence applies to bit
-// — a `bit [3:0] b;` is a §6.9 vector.
 TEST(ScalarAndVectorDeclaration, BitVectorIsRecognisedByIsVector) {
   auto r = Parse("module t; bit [3:0] b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -167,8 +154,6 @@ TEST(ScalarAndVectorDeclaration, BitVectorIsRecognisedByIsVector) {
   EXPECT_TRUE(IsVector(item->data_type));
 }
 
-// §6.9: A `var [N:M] v;` is a multibit object whose implicit element type
-// is logic. The equivalence applies, so IsVector recognises it as a vector.
 TEST(ScalarAndVectorDeclaration, ImplicitLogicVectorIsRecognisedByIsVector) {
   auto r = Parse("module t; var [7:0] v; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -178,9 +163,6 @@ TEST(ScalarAndVectorDeclaration, ImplicitLogicVectorIsRecognisedByIsVector) {
   EXPECT_TRUE(IsVector(item->data_type));
 }
 
-// §6.9: A "matching user-defined type" of a packed reg/logic/bit is itself
-// a §6.9 vector. The typedef-aware IsVector overload resolves the named
-// type through a typedef map and recognises the resulting vector.
 TEST(ScalarAndVectorDeclaration, MatchingUserDefinedTypeVectorIsVector) {
   auto r = Parse(
       "module t;\n"
@@ -205,9 +187,6 @@ TEST(ScalarAndVectorDeclaration, MatchingUserDefinedTypeVectorIsVector) {
   EXPECT_TRUE(IsVector(var->data_type, typedefs));
 }
 
-// §6.9: The "matching user-defined type" enumeration in §6.9 applies to
-// typedefs of `bit` as much as to typedefs of logic — a `typedef bit [N:M]`
-// is a §6.9 vector when resolved through the typedef map.
 TEST(ScalarAndVectorDeclaration, BitTypedefVectorIsVector) {
   auto r = Parse(
       "module t;\n"
@@ -230,8 +209,6 @@ TEST(ScalarAndVectorDeclaration, BitTypedefVectorIsVector) {
   EXPECT_TRUE(IsVector(var->data_type, typedefs));
 }
 
-// §6.9: The "matching user-defined type" enumeration also applies to
-// typedefs of `reg` — a `typedef reg [N:M]` is a §6.9 vector.
 TEST(ScalarAndVectorDeclaration, RegTypedefVectorIsVector) {
   auto r = Parse(
       "module t;\n"
@@ -254,9 +231,6 @@ TEST(ScalarAndVectorDeclaration, RegTypedefVectorIsVector) {
   EXPECT_TRUE(IsVector(var->data_type, typedefs));
 }
 
-// §6.9: A typedef of a scalar reg/logic/bit is NOT a vector — even when
-// resolved through the typedef map, it has no packed dimension and so
-// fails the §6.9 vector definition.
 TEST(ScalarAndVectorDeclaration, MatchingUserDefinedTypeScalarIsNotVector) {
   auto r = Parse(
       "module t;\n"
@@ -279,10 +253,6 @@ TEST(ScalarAndVectorDeclaration, MatchingUserDefinedTypeScalarIsNotVector) {
   EXPECT_FALSE(IsVector(var->data_type, typedefs));
 }
 
-// §6.9: The "vector" of §6.9 is multibit "by specifying a range" — a single
-// range. A packed object with more than one range (a multidimensional
-// packed array) is outside §6.9's vector definition. IsVector returns
-// false even though packed dimensions are present.
 TEST(ScalarAndVectorDeclaration, MultidimensionalPackedArrayIsNotAVector) {
   auto r = Parse("module t; logic [3:0][7:0] m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -294,4 +264,4 @@ TEST(ScalarAndVectorDeclaration, MultidimensionalPackedArrayIsNotAVector) {
   EXPECT_FALSE(IsVector(item->data_type));
 }
 
-}  // namespace
+}

@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// The z state is not a permitted symbol anywhere in a UDP state table; placing
-// it in an input field is rejected.
 TEST(UdpZValues, ZSymbolInInputFieldRejected) {
   auto r = Parse(
       "primitive p(output y, input a, input b);\n"
@@ -17,7 +15,6 @@ TEST(UdpZValues, ZSymbolInInputFieldRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// The z state is not permitted in the output field.
 TEST(UdpZValues, ZSymbolInOutputFieldRejected) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -29,7 +26,6 @@ TEST(UdpZValues, ZSymbolInOutputFieldRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// The z state is not permitted in the current-state field of a sequential UDP.
 TEST(UdpZValues, ZSymbolInCurrentStateFieldRejected) {
   auto r = Parse(
       "primitive p(output reg q, input d, input en);\n"
@@ -40,8 +36,6 @@ TEST(UdpZValues, ZSymbolInCurrentStateFieldRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// The uppercase Z spelling is treated the same as the lowercase z form and
-// is likewise illegal in a table entry.
 TEST(UdpZValues, UppercaseZSymbolInInputFieldRejected) {
   auto r = Parse(
       "primitive p(output y, input a, input b);\n"
@@ -52,8 +46,6 @@ TEST(UdpZValues, UppercaseZSymbolInInputFieldRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// A z appearing inside a parenthesized edge indicator is part of the table
-// entry and is illegal just like a bare-level z.
 TEST(UdpZValues, ZSymbolInParenthesizedEdgeRejected) {
   auto r = Parse(
       "primitive p(output reg q, input a, input b);\n"
@@ -64,4 +56,4 @@ TEST(UdpZValues, ZSymbolInParenthesizedEdgeRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

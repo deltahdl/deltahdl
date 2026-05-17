@@ -15,7 +15,6 @@ TEST(DeclarationRangeParsing, AssocDimElaboratesWildcard) {
   EXPECT_TRUE(mod->variables[0].is_assoc);
 }
 
-// §7.8.1: Wildcard array index width defaults to 32.
 TEST(DeclarationRangeParsing, WildcardIndexWidth32) {
   ElabFixture f;
   auto* design = Elaborate("module m; int aa [*]; endmodule\n", f);
@@ -24,7 +23,6 @@ TEST(DeclarationRangeParsing, WildcardIndexWidth32) {
   EXPECT_EQ(v.assoc_index_width, 32u);
 }
 
-// §7.8.1: Wildcard array is not string-indexed.
 TEST(DeclarationRangeParsing, WildcardNotStringIndex) {
   ElabFixture f;
   auto* design = Elaborate("module m; int aa [*]; endmodule\n", f);
@@ -33,4 +31,4 @@ TEST(DeclarationRangeParsing, WildcardNotStringIndex) {
   EXPECT_FALSE(v.is_string_index);
 }
 
-}  // namespace
+}

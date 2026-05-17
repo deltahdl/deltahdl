@@ -118,4 +118,4 @@ TEST(DesignBuildingBlockParsing, ConsidersTimeunitPrecArg) {
   EXPECT_EQ(gp, TimeUnit::kFs);
 }
 
-}  // namespace
+}

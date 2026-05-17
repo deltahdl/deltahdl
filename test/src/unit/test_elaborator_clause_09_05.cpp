@@ -256,4 +256,4 @@ TEST(ProcessExecutionThreadElaboration, EachContAssignCreatesOwnThread) {
   EXPECT_GE(mod->assigns.size(), 3u);
 }
 
-}  // namespace
+}

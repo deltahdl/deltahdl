@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.3.3: get() with explicit keyCount parses.
 TEST(SemaphoreGetParser, GetWithExplicitKeyCount) {
   auto r = Parse(
       "module m;\n"
@@ -16,7 +15,6 @@ TEST(SemaphoreGetParser, GetWithExplicitKeyCount) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3.3: get() with no arguments (default keyCount = 1).
 TEST(SemaphoreGetParser, GetWithDefaultKeyCount) {
   auto r = Parse(
       "module m;\n"
@@ -28,7 +26,6 @@ TEST(SemaphoreGetParser, GetWithDefaultKeyCount) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3.3: get() on a declared semaphore variable.
 TEST(SemaphoreGetParser, GetOnDeclaredSemaphore) {
   auto r = Parse(
       "module m;\n"
@@ -41,7 +38,6 @@ TEST(SemaphoreGetParser, GetOnDeclaredSemaphore) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3.3: get() is a task — used as a statement, not an expression.
 TEST(SemaphoreGetParser, GetUsedAsStatement) {
   auto r = Parse(
       "module m;\n"
@@ -55,4 +51,4 @@ TEST(SemaphoreGetParser, GetUsedAsStatement) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

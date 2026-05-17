@@ -15,12 +15,6 @@
 
 using namespace delta;
 
-// §4.3 ¶1: "The SystemVerilog language is defined in terms of a discrete event
-// execution model." A discrete event model advances simulation time only when
-// scheduled events fire — between events, time is stationary. The Scheduler's
-// Run() loop drains the event_calendar_ in time-key order, so an empty calendar
-// leaves CurrentTime unchanged and an event scheduled at a future time fires at
-// exactly that time.
 TEST(EventSimulationSim, DiscreteEventModelTimeAdvancesOnlyOnScheduledEvents) {
   Arena arena;
   Scheduler sched(arena);
@@ -39,11 +33,6 @@ TEST(EventSimulationSim, DiscreteEventModelTimeAdvancesOnlyOnScheduledEvents) {
   EXPECT_EQ(sched.CurrentTime().ticks, 42u);
 }
 
-// §4.3 ¶2: "Examples of processes include, but are not limited to, primitives;
-// initial, always, always_comb, always_latch, and always_ff procedures;
-// continuous assignments; ...". Each procedural process kind enumerated in the
-// LRM has a corresponding ProcessKind value, and the kind is preserved on the
-// Process objects the simulator schedules.
 TEST(EventSimulationSim, ProcessKindCoversLrmEnumeratedExamples) {
   EXPECT_NE(static_cast<int>(ProcessKind::kInitial),
             static_cast<int>(ProcessKind::kAlways));
@@ -57,10 +46,6 @@ TEST(EventSimulationSim, ProcessKindCoversLrmEnumeratedExamples) {
             static_cast<int>(ProcessKind::kContAssign));
 }
 
-// §4.3 ¶2: "Processes are objects that can be evaluated, that can have state,
-// and that can respond to changes on their inputs to produce outputs." An
-// initial procedure is an object with state (the variable it writes) that
-// produces an output when evaluated.
 TEST(EventSimulationSim, InitialProcedureIsAnEvaluatedProcess) {
   auto result = RunAndGet(
       "module t;\n"
@@ -71,11 +56,6 @@ TEST(EventSimulationSim, InitialProcedureIsAnEvaluatedProcess) {
   EXPECT_EQ(result, 42u);
 }
 
-// §4.3 ¶3: "Every change in state of a net or variable in the system
-// description being simulated is considered an *update event*."
-// `ScheduleNonblockingAssign` labels its scheduled event with
-// EventKind::kUpdate. The Scheduler tallies update-labelled events at schedule
-// time, so a successful NBA path must produce a non-zero update-event tally.
 TEST(EventSimulationSim, NbaAssignmentSchedulesAnUpdateEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -93,14 +73,6 @@ TEST(EventSimulationSim, NbaAssignmentSchedulesAnUpdateEvent) {
   EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 9u);
 }
 
-// §4.3 ¶3, net case: "Every change in state of a net or variable in the
-// system description being simulated is considered an *update event*." The
-// NBA test above covers the `variable` half via `ScheduleNonblockingAssign`;
-// the `net` half is observed here through trireg charge decay, the only
-// scheduled net-state-change path. `ScheduleDecay` (net.cpp) acquires an
-// Event and labels it `EventKind::kUpdate` before placing it on the
-// scheduler — when all drivers go to Z on a trireg with `decay_ticks > 0`,
-// `Net::Resolve` triggers `ScheduleDecay`, and the kUpdate tally rises.
 TEST(EventSimulationSim, NetChargeDecaySchedulesAnUpdateEvent) {
   Arena arena;
   Scheduler sched(arena);
@@ -121,9 +93,6 @@ TEST(EventSimulationSim, NetChargeDecaySchedulesAnUpdateEvent) {
   EXPECT_GE(sched.UpdateEventScheduledCount(), 1u);
 }
 
-// §4.3 ¶3 corollary: a design that performs no state changes must produce no
-// update events. An empty module with no nets, variables, or procedures
-// schedules no events at all, let alone update-labelled ones.
 TEST(EventSimulationSim, NoStateChangeMeansNoUpdateEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -137,11 +106,6 @@ TEST(EventSimulationSim, NoStateChangeMeansNoUpdateEvent) {
   EXPECT_EQ(f.scheduler.UpdateEventScheduledCount(), 0u);
 }
 
-// §4.3 ¶4 sentence 1: "Processes are sensitive to update events. When an
-// update event is executed, all the processes that are sensitive to that event
-// are considered for evaluation in an arbitrary order." Two `always_comb`
-// procedures sensitive to the same source must both re-evaluate when the
-// source changes, regardless of the order the simulator picks.
 TEST(EventSimulationSim, AllSensitiveProcessesEvaluateOnUpdateEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -160,10 +124,6 @@ TEST(EventSimulationSim, AllSensitiveProcessesEvaluateOnUpdateEvent) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 7u);
 }
 
-// §4.3 ¶4 sentence 2: "The evaluation of a process is also an event, known as
-// an *evaluation event*." `ScheduleProcess` (lowerer.cpp) labels each process
-// scheduling with EventKind::kEvaluation, so lowering a design that contains
-// procedural processes must register evaluation events with the scheduler.
 TEST(EventSimulationSim, ProcessEvaluationSchedulesAnEvaluationEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -178,9 +138,6 @@ TEST(EventSimulationSim, ProcessEvaluationSchedulesAnEvaluationEvent) {
   EXPECT_GE(f.scheduler.EvaluationEventScheduledCount(), 1u);
 }
 
-// §4.3 ¶4: update and evaluation events are distinct kinds. The two counters
-// the Scheduler exposes count disjoint sets of events — an event is one or the
-// other at schedule time, never both.
 TEST(EventSimulationSim, UpdateAndEvaluationEventsAreDistinctKinds) {
   Arena arena;
   Scheduler sched(arena);
@@ -199,14 +156,6 @@ TEST(EventSimulationSim, UpdateAndEvaluationEventsAreDistinctKinds) {
   EXPECT_EQ(sched.EvaluationEventScheduledCount(), 1u);
 }
 
-// §4.3 ¶5: "Evaluation events also include PLI callbacks, which are points in
-// the execution model where PLI application routines can be called from the
-// simulation kernel." `RegionForPliCallback` returns the assigned region for
-// each one-shot PLI callback in §4.10 Table 4-1; that mapping is the
-// production-side hook that places PLI callbacks into the same event regions
-// the simulator drains. cbReadOnlySynch landing in Postponed and cbAfterDelay
-// landing in Pre-Active demonstrates that PLI callbacks are scheduled as
-// regular regional events alongside other evaluation events.
 TEST(EventSimulationSim, PliCallbacksAreScheduledAsRegionalEvaluationEvents) {
   EXPECT_TRUE(IsOneShotPliCallback(kCbAfterDelay));
   EXPECT_NE(RegionForPliCallback(kCbAfterDelay), Region::kCOUNT);
@@ -214,11 +163,6 @@ TEST(EventSimulationSim, PliCallbacksAreScheduledAsRegionalEvaluationEvents) {
   EXPECT_NE(RegionForPliCallback(kCbAtEndOfSimTime), Region::kCOUNT);
 }
 
-// §4.3 ¶5 cross-check: the default kind of a freshly acquired Event is
-// kEvaluation, matching the LRM classification of PLI callbacks (and any other
-// non-update scheduled event) as evaluation events. EventPool::Release also
-// resets the kind to kEvaluation, so recycled events default to the evaluation
-// classification.
 TEST(EventSimulationSim, FreshlyAcquiredEventDefaultsToEvaluationKind) {
   Arena arena;
   EventPool pool(arena);
@@ -230,12 +174,6 @@ TEST(EventSimulationSim, FreshlyAcquiredEventDefaultsToEvaluationKind) {
   EXPECT_EQ(recycled->kind, EventKind::kEvaluation);
 }
 
-// §4.3 ¶6: "The term *simulation time* is used to refer to the time value
-// maintained by the simulator to model the actual time it would take for the
-// system description being simulated. The term *time* is used interchangeably
-// with simulation time in this clause." The Scheduler's CurrentTime() exposes
-// that maintained time value; it advances exactly to the time of the next
-// firing event.
 TEST(EventSimulationSim, SchedulerMaintainsSimulationTime) {
   Arena arena;
   Scheduler sched(arena);
@@ -255,11 +193,6 @@ TEST(EventSimulationSim, SchedulerMaintainsSimulationTime) {
   EXPECT_EQ(observed_times[2], 17u);
 }
 
-// §4.3 ¶7: "To fully support clear and predictable interactions, a single time
-// slot is divided into multiple regions where events can be scheduled that
-// provide for an ordering of particular types of execution." The `Region` enum
-// declares the multi-region division; events scheduled in earlier regions of a
-// time slot run before events scheduled in later regions of the same slot.
 TEST(EventSimulationSim, SingleTimeSlotIsDividedIntoOrderedRegions) {
   EXPECT_GT(kRegionCount, 1u);
 

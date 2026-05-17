@@ -9,15 +9,10 @@
 namespace delta {
 namespace {
 
-// ---------------------------------------------------------------------------
-// Common helpers
-// ---------------------------------------------------------------------------
-
 std::unordered_set<uint32_t> BuildInputSet(const AigGraph& aig) {
   return {aig.inputs.begin(), aig.inputs.end()};
 }
 
-/// Map a node id to its signal name: inputs -> i<idx>, AND nodes -> n<id>.
 std::string NodeName(uint32_t node_id, const std::vector<uint32_t>& inputs) {
   if (node_id == 0) {
     return "const0";
@@ -30,7 +25,6 @@ std::string NodeName(uint32_t node_id, const std::vector<uint32_t>& inputs) {
   return "n" + std::to_string(node_id);
 }
 
-/// Collect AND node IDs transitively referenced by outputs.
 std::vector<uint32_t> ReferencedAnds(
     const AigGraph& aig, const std::unordered_set<uint32_t>& input_set) {
   std::unordered_set<uint32_t> visited;
@@ -64,7 +58,6 @@ std::vector<uint32_t> ReferencedAnds(
   return result;
 }
 
-/// Collect all complemented literals used by AND nodes and outputs.
 std::unordered_set<uint32_t> CollectComplements(
     const AigGraph& aig, const std::vector<uint32_t>& ands) {
   std::unordered_set<uint32_t> compl_lits;
@@ -85,7 +78,6 @@ std::unordered_set<uint32_t> CollectComplements(
   return compl_lits;
 }
 
-/// BLIF name for a literal: base name or base_inv for complemented.
 std::string BlifLitName(uint32_t lit, const std::vector<uint32_t>& inputs) {
   uint32_t var = AigVar(lit);
   std::string base = NodeName(var, inputs);
@@ -95,7 +87,6 @@ std::string BlifLitName(uint32_t lit, const std::vector<uint32_t>& inputs) {
   return base;
 }
 
-/// Verilog expression for a literal.
 std::string VerilogLitExpr(uint32_t lit, const std::vector<uint32_t>& inputs) {
   if (lit == AigGraph::kConstFalse) {
     return "1'b0";
@@ -111,15 +102,10 @@ std::string VerilogLitExpr(uint32_t lit, const std::vector<uint32_t>& inputs) {
   return base;
 }
 
-// ---------------------------------------------------------------------------
-// BLIF sub-routines
-// ---------------------------------------------------------------------------
-
-/// Emit BLIF inverter .names blocks for every complemented literal.
 void EmitBlifInverters(std::string& out, const AigGraph& aig,
                        const std::vector<uint32_t>& ands) {
   auto compl_lits = CollectComplements(aig, ands);
-  // Sort for deterministic output.
+
   std::vector<uint32_t> sorted(compl_lits.begin(), compl_lits.end());
   std::sort(sorted.begin(), sorted.end());
   for (uint32_t lit : sorted) {
@@ -134,7 +120,6 @@ void EmitBlifInverters(std::string& out, const AigGraph& aig,
   }
 }
 
-/// Emit BLIF output connection .names blocks.
 void EmitBlifOutputs(std::string& out, const AigGraph& aig) {
   for (size_t i = 0; i < aig.outputs.size(); ++i) {
     uint32_t lit = aig.outputs[i];
@@ -157,10 +142,6 @@ void EmitBlifOutputs(std::string& out, const AigGraph& aig) {
     out += "1 1\n";
   }
 }
-
-// ---------------------------------------------------------------------------
-// Verilog sub-routines
-// ---------------------------------------------------------------------------
 
 void AppendVerilogPortList(std::string& out, const AigGraph& aig) {
   bool first = true;
@@ -203,10 +184,6 @@ void AppendVerilogOutputDecls(std::string& out, const AigGraph& aig) {
   }
   out += ";\n";
 }
-
-// ---------------------------------------------------------------------------
-// JSON sub-routines
-// ---------------------------------------------------------------------------
 
 void AppendJsonPorts(std::string& out, const AigGraph& aig) {
   size_t total = aig.inputs.size() + aig.outputs.size();
@@ -259,11 +236,7 @@ void AppendJsonNetnames(std::string& out, const AigGraph& aig,
   }
 }
 
-}  // namespace
-
-// ---------------------------------------------------------------------------
-// NetlistWriter public methods
-// ---------------------------------------------------------------------------
+}
 
 std::string NetlistWriter::WriteBlif(const AigGraph& aig,
                                      std::string_view module_name) {
@@ -275,24 +248,20 @@ std::string NetlistWriter::WriteBlif(const AigGraph& aig,
   out += module_name;
   out += "\n";
 
-  // Inputs line.
   out += ".inputs";
   for (size_t i = 0; i < aig.inputs.size(); ++i) {
     out += " i" + std::to_string(i);
   }
   out += "\n";
 
-  // Outputs line.
   out += ".outputs";
   for (size_t i = 0; i < aig.outputs.size(); ++i) {
     out += " o" + std::to_string(i);
   }
   out += "\n";
 
-  // Inverter definitions.
   EmitBlifInverters(out, aig, ands);
 
-  // AND gate definitions.
   for (uint32_t nid : ands) {
     const AigNode& node = aig.nodes[nid];
     std::string name = NodeName(nid, aig.inputs);
@@ -308,7 +277,6 @@ std::string NetlistWriter::WriteBlif(const AigGraph& aig,
     out += "11 1\n";
   }
 
-  // Output connections.
   EmitBlifOutputs(out, aig);
 
   out += ".end\n";
@@ -330,13 +298,11 @@ std::string NetlistWriter::WriteVerilog(const AigGraph& aig,
   AppendVerilogInputDecls(out, aig);
   AppendVerilogOutputDecls(out, aig);
 
-  // Wire declarations for internal AND nodes.
   for (uint32_t nid : ands) {
     std::string name = NodeName(nid, aig.inputs);
     out += "  wire " + name + ";\n";
   }
 
-  // AND gate assignments.
   for (uint32_t nid : ands) {
     const AigNode& node = aig.nodes[nid];
     std::string name = NodeName(nid, aig.inputs);
@@ -351,7 +317,6 @@ std::string NetlistWriter::WriteVerilog(const AigGraph& aig,
     out += ";\n";
   }
 
-  // Output assignments.
   for (size_t i = 0; i < aig.outputs.size(); ++i) {
     std::string oname = "o" + std::to_string(i);
     std::string expr = VerilogLitExpr(aig.outputs[i], aig.inputs);
@@ -410,7 +375,6 @@ std::string NetlistWriter::WriteEdif(const AigGraph& aig,
   out += "    (cell " + mod + "\n";
   out += "      (cellType GENERIC)\n";
 
-  // Interface: ports.
   out += "      (interface\n";
   for (size_t i = 0; i < aig.inputs.size(); ++i) {
     out += "        (port i" + std::to_string(i) + " (direction INPUT))\n";
@@ -420,7 +384,6 @@ std::string NetlistWriter::WriteEdif(const AigGraph& aig,
   }
   out += "      )\n";
 
-  // Contents: instances.
   out += "      (contents\n";
   for (uint32_t nid : ands) {
     std::string name = NodeName(nid, aig.inputs);
@@ -450,4 +413,4 @@ std::string NetlistWriter::Write(const AigGraph& aig,
   return "";
 }
 
-}  // namespace delta
+}

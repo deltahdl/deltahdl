@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- Scope resolution prefix produces correct AST structure ---
-
 TEST(ScopeResolutionPrefixParsing, ExpressionPrefixTreeStructure) {
   auto r = Parse(
       "module t;\n"
@@ -54,16 +52,12 @@ TEST(ScopeResolutionPrefixParsing, ChainedPrefixNestsCorrectly) {
   EXPECT_EQ(rhs->rhs->text, "c");
 }
 
-// --- Scope resolution prefix on assignment LHS ---
-
 TEST(ScopeResolutionPrefixParsing, PrefixOnAssignmentLhs) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial C::count = 5;\n"
               "endmodule\n"));
 }
-
-// --- Scope resolution prefix in subexpression ---
 
 TEST(ScopeResolutionPrefixParsing, PrefixInBinaryExpression) {
   EXPECT_TRUE(
@@ -72,4 +66,4 @@ TEST(ScopeResolutionPrefixParsing, PrefixInBinaryExpression) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

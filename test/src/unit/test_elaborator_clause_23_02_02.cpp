@@ -45,4 +45,4 @@ TEST(PortDeclaration, EventPortElaborates) {
   EXPECT_EQ(design->top_modules[0]->ports[0].type_kind, DataTypeKind::kEvent);
 }
 
-}  // namespace
+}

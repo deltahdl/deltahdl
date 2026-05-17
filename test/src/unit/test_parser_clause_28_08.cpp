@@ -1,4 +1,4 @@
-// §28.8
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -138,7 +138,6 @@ TEST(PassEnableSwitches, Rtranif1RejectsThreeValueDelay) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// tran takes exactly two signal terminals; a third must be rejected.
 TEST(PassSwitches, TranRejectsThreeTerminals) {
   auto r = Parse(
       "module m;\n"
@@ -147,7 +146,6 @@ TEST(PassSwitches, TranRejectsThreeTerminals) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// rtran shares tran's two-terminal rule.
 TEST(PassSwitches, RtranAcceptsTwoTerminals) {
   auto r = Parse(
       "module m;\n"
@@ -218,7 +216,6 @@ TEST(PassEnableSwitches, Rtranif1RejectsFourTerminals) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Positive counterpart to RtranAcceptsTwoTerminals.
 TEST(PassSwitches, TranAcceptsTwoTerminals) {
   auto r = Parse(
       "module m;\n"
@@ -231,8 +228,6 @@ TEST(PassSwitches, TranAcceptsTwoTerminals) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-// Mirrors Tranif0AcceptsSingleValueDelay so both enable variants are
-// exercised for the single-delay form.
 TEST(PassEnableSwitches, Tranif1AcceptsSingleValueDelay) {
   auto r = Parse(
       "module m;\n"
@@ -246,8 +241,6 @@ TEST(PassEnableSwitches, Tranif1AcceptsSingleValueDelay) {
   EXPECT_EQ(g->gate_delay_fall, nullptr);
 }
 
-// When the source omits the delay spec entirely all delay slots stay null,
-// matching the no-turn-on / no-turn-off rule for bidirectional pass switches.
 TEST(PassEnableSwitches, Tranif0WithoutDelayLeavesGateDelayNull) {
   auto r = Parse(
       "module m;\n"
@@ -261,8 +254,6 @@ TEST(PassEnableSwitches, Tranif0WithoutDelayLeavesGateDelayNull) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-// All six bidirectional pass switch keywords parse to distinct GateKind values
-// so later stages can dispatch on them.
 TEST(PassSwitches, AllSixKindsParseToDistinctGateKinds) {
   auto r = Parse(
       "module m;\n"
@@ -288,4 +279,4 @@ TEST(PassSwitches, AllSixKindsParseToDistinctGateKinds) {
             nullptr);
 }
 
-}  // namespace
+}

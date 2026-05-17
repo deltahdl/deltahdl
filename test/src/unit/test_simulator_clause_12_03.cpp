@@ -64,4 +64,4 @@ TEST(StatementSimSyntax, MultipleAttributesDoNotAffectExecution) {
   LowerRunAndCheck(f, design, {{"x", 42u}});
 }
 
-}  // namespace
+}

@@ -63,4 +63,4 @@ TEST(FormatArg, DecimalUnsigned) {
   EXPECT_EQ(FormatArg(val, 'd'), "42");
 }
 
-}  // namespace
+}

@@ -42,4 +42,4 @@ TEST(FileAndLineMacroParsing, LineDirectiveInDisplay) {
                               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.4: try_put() call on a mailbox parses.
 TEST(MailboxTryPutParser, TryPutCallParses) {
   auto r = Parse(
       "module m;\n"
@@ -17,7 +16,6 @@ TEST(MailboxTryPutParser, TryPutCallParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.4: try_put() result assigned to variable parses (returns int).
 TEST(MailboxTryPutParser, TryPutResultAssigned) {
   auto r = Parse(
       "module m;\n"
@@ -31,7 +29,6 @@ TEST(MailboxTryPutParser, TryPutResultAssigned) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.4: try_put() used in conditional parses.
 TEST(MailboxTryPutParser, TryPutInConditional) {
   auto r = Parse(
       "module m;\n"
@@ -46,7 +43,6 @@ TEST(MailboxTryPutParser, TryPutInConditional) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.4: try_put() with variable expression parses.
 TEST(MailboxTryPutParser, TryPutWithVariableExpression) {
   auto r = Parse(
       "module m;\n"
@@ -60,4 +56,4 @@ TEST(MailboxTryPutParser, TryPutWithVariableExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

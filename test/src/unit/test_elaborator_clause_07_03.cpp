@@ -67,7 +67,6 @@ TEST(UnionDeclarationValidation, VoidMemberInPackedUnion_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// Footnote 20: random_qualifier only in unpacked structures (not unions).
 TEST(UnionDeclarationValidation, RandInUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -88,7 +87,6 @@ TEST(UnionDeclarationValidation, RandcInUnion_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.3: String (dynamic type) in untagged union shall be rejected.
 TEST(UnionDeclarationValidation, StringInUntaggedUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -99,7 +97,6 @@ TEST(UnionDeclarationValidation, StringInUntaggedUnion_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// Footnote 20: random_qualifier rejected in tagged unions too (only unpacked structs).
 TEST(UnionDeclarationValidation, RandInTaggedUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -110,8 +107,6 @@ TEST(UnionDeclarationValidation, RandInTaggedUnion_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.3.1: a soft union accepts a packed dimension; this is the soft-union
-// relaxation of the §6.8 footnote-17 packed-keyword requirement.
 TEST(UnionDeclarationValidation, PackedDimOnSoftUnion_Allowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -122,4 +117,4 @@ TEST(UnionDeclarationValidation, PackedDimOnSoftUnion_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

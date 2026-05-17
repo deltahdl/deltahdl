@@ -84,4 +84,4 @@ TEST(ProgramItemsParsing, DataAndClassDeclarations) {
               "program p2; logic b; endprogram\n"));
 }
 
-}  // namespace
+}

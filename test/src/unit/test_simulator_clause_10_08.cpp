@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Item 1: Continuous or procedural assignment ---
-
 TEST(AssignmentLikeContextSim, ProceduralAssignExtendsInAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -65,8 +63,6 @@ TEST(AssignmentLikeContextSim, ContAssignTruncatesInAssignLikeContext) {
       "result"), 0xEu);
 }
 
-// --- Item 2: Parameter with explicit type declaration ---
-
 TEST(AssignmentLikeContextSim, ParameterExplicitTypeTruncatesValue) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -98,8 +94,6 @@ TEST(AssignmentLikeContextSim, ParameterOverrideInInstanceTruncates) {
       "endmodule\n",
       "result"), 0xFEu);
 }
-
-// --- Item 3: Port connection to input or output port ---
 
 TEST(AssignmentLikeContextSim, OutputPortAssignLikeContext) {
   SimFixture f;
@@ -135,8 +129,6 @@ TEST(AssignmentLikeContextSim, InputPortConnectionTruncates) {
       "endmodule\n",
       "result"), 0xBu);
 }
-
-// --- Item 4: Passing a value to a subroutine input, output, or inout argument ---
 
 TEST(AssignmentLikeContextSim, SubroutineArgAssignLikeContext) {
   SimFixture f;
@@ -186,8 +178,6 @@ TEST(AssignmentLikeContextSim, InoutArgTruncatesInAssignLikeContext) {
       "result"), 0xFEu);
 }
 
-// --- Item 5: Return statement in a function ---
-
 TEST(AssignmentLikeContextSim, ReturnStatementAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -208,8 +198,6 @@ TEST(AssignmentLikeContextSim, ReturnStatementAssignLikeContext) {
   EXPECT_EQ(result->value.ToUint64(), 0xCDu);
 }
 
-// --- Item 6: Tagged union expression ---
-
 TEST(AssignmentLikeContextSim, TaggedUnionExprTruncatesInAssignLikeContext) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -223,8 +211,6 @@ TEST(AssignmentLikeContextSim, TaggedUnionExprTruncatesInAssignLikeContext) {
       "endmodule\n",
       "result"), 0xFEu);
 }
-
-// --- Item 7: Recursive propagation for RHS in assignment-like context ---
 
 TEST(AssignmentLikeContextSim, ParenExprInAssignLikeContext) {
   SimFixture f;
@@ -281,12 +267,6 @@ TEST(AssignmentLikeContextSim, NestedParenInConditionalPropagatesContext) {
       "result"), 0xFEu);
 }
 
-// --- Item 8: Nondefault correspondence in an assignment pattern ---
-
-// §10.8: "A nondefault correspondence between an expression in an assignment
-// pattern and a field or element in a data object or data value" is an
-// assignment-like context. The named-member correspondence `a: 16'hCAFE`
-// against an 8-bit field truncates the RHS to the field width.
 TEST(AssignmentLikeContextSim, NondefaultCorrespondenceTruncatesToFieldWidth) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -300,8 +280,6 @@ TEST(AssignmentLikeContextSim, NondefaultCorrespondenceTruncatesToFieldWidth) {
       "endmodule\n",
       "result"), 0xFEu);
 }
-
-// --- Item 9: Static cast of an expression ---
 
 TEST(AssignmentLikeContextSim, StaticCastTruncatesInAssignLikeContext) {
   EXPECT_EQ(RunAndGet(
@@ -321,4 +299,4 @@ TEST(AssignmentLikeContextSim, StaticCastExtendsInAssignLikeContext) {
       "result"), 0x000Au);
 }
 
-}  // namespace
+}

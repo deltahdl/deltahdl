@@ -79,4 +79,4 @@ TEST(BuiltinMethodElaboration, MethodNoParensInExpressionOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

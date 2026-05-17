@@ -33,5 +33,4 @@ TEST(EventTriggeredElaborator, ForkTriggerAndWaitTriggeredElaborates) {
       "endmodule\n"));
 }
 
-
-}  // namespace
+}

@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Req 1: Assign object handle to interface class variable.
-
 TEST(InterfaceClassCastingAndRefAssignment, InterfaceClassIsACheck) {
   SimFixture f;
 
@@ -94,8 +92,6 @@ TEST(InterfaceClassCastingAndRefAssignment, E2eAssignImplToInterfaceVar) {
       "endmodule\n", "result"), 1u);
 }
 
-// Req 2: $cast between interface class variables.
-
 TEST(InterfaceClassCastingAndRefAssignment, AreCastCompatibleBothInterfaces) {
   SimFixture f;
 
@@ -104,7 +100,6 @@ TEST(InterfaceClassCastingAndRefAssignment, AreCastCompatibleBothInterfaces) {
   auto* iface_b = MakeClassType(f, "IB", {});
   iface_b->is_interface = true;
 
-  // Unrelated interfaces are cast-compatible because both are interface types.
   EXPECT_TRUE(iface_a->is_interface || iface_b->is_interface);
 }
 
@@ -134,8 +129,6 @@ TEST(InterfaceClassCastingAndRefAssignment, E2eCastBetweenInterfaceVarsSucceeds)
       "  end\n"
       "endmodule\n", "result"), 1u);
 }
-
-// Req 3: Cast from object handle to interface class type handle.
 
 TEST(InterfaceClassCastingAndRefAssignment, E2eCastObjectToInterfaceSucceeds) {
   EXPECT_EQ(RunAndGet(
@@ -178,8 +171,6 @@ TEST(InterfaceClassCastingAndRefAssignment, E2eCastInterfaceBackToImplSucceeds) 
       "endmodule\n", "result"), 1u);
 }
 
-// Req 4: Interface class objects shall not be constructed.
-
 TEST(InterfaceClassCastingAndRefAssignment, InterfaceClassNewReportsError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -194,15 +185,13 @@ TEST(InterfaceClassCastingAndRefAssignment, InterfaceClassNewReportsError) {
       "endmodule\n",
       f);
   if (!design) {
-    // Elaboration-time rejection is acceptable.
+
     EXPECT_TRUE(f.has_errors);
     return;
   }
   LowerAndRun(design, f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// Req 5: Null interface handle casting follows §8.16.
 
 TEST(InterfaceClassCastingAndRefAssignment, E2eCastNullInterfaceHandleSucceeds) {
   EXPECT_EQ(RunAndGet(
@@ -262,4 +251,4 @@ TEST(InterfaceClassCastingAndRefAssignment, E2eCastNullLiteralToInterfaceSucceed
       "endmodule\n", "result"), 1u);
 }
 
-}  // namespace
+}

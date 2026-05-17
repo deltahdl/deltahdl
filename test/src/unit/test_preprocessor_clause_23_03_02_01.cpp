@@ -77,4 +77,4 @@ TEST(OrderedPortPreprocessor, MacroExpandedInOrderedPortExpression) {
   EXPECT_NE(inst->inst_ports[0].second, nullptr);
 }
 
-}  // namespace
+}

@@ -328,7 +328,6 @@ TEST(ImplicitDataType, ImplicitDataTypeSigned) {
   EXPECT_TRUE(port.data_type.is_signed);
 }
 
-// §6.8: var with no explicit type is valid (implicit logic).
 TEST(VariableDeclarations, VarBareNoTypeIsValid) {
   auto r = Parse(
       "module m;\n"
@@ -341,10 +340,6 @@ TEST(VariableDeclarations, VarBareNoTypeIsValid) {
   EXPECT_EQ(item->name, "v");
 }
 
-// §6.8 footnote 14: a data_declaration that omits the explicit data_type
-// requires the `var` keyword. A procedural decl that begins with a lifetime
-// keyword (here `automatic`) followed directly by an identifier and an
-// initializer must be diagnosed.
 TEST(VariableDeclarations, AutomaticWithoutDataTypeOrVarIsError) {
   auto r = Parse(
       "module m;\n"
@@ -355,8 +350,6 @@ TEST(VariableDeclarations, AutomaticWithoutDataTypeOrVarIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §6.8 footnote 14: same rule for explicit static lifetime — without a data
-// type, the `var` keyword is required.
 TEST(VariableDeclarations, StaticWithoutDataTypeOrVarIsError) {
   auto r = Parse(
       "module m;\n"
@@ -367,10 +360,6 @@ TEST(VariableDeclarations, StaticWithoutDataTypeOrVarIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §6.8 footnote 14b: the rule applies to every data_declaration, not only
-// procedural-block ones. At module-item scope a lifetime keyword forces a
-// data_declaration interpretation, so omitting both the data_type and `var`
-// must still be rejected.
 TEST(VariableDeclarations, StaticAtModuleScopeWithoutDataTypeOrVarIsError) {
   auto r = Parse(
       "module m;\n"
@@ -379,10 +368,6 @@ TEST(VariableDeclarations, StaticAtModuleScopeWithoutDataTypeOrVarIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §6.8 footnote 14b: same rule for the automatic lifetime at module-item
-// scope. Footnote 14a separately forbids automatic outside procedural
-// contexts; this test pins the parser-stage requirement that the surface
-// form is rejected before the elaborator gets a chance to apply 14a.
 TEST(VariableDeclarations, AutomaticAtModuleScopeWithoutDataTypeOrVarIsError) {
   auto r = Parse(
       "module m;\n"
@@ -391,9 +376,6 @@ TEST(VariableDeclarations, AutomaticAtModuleScopeWithoutDataTypeOrVarIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §6.8 footnote 14: when `var` is present the data type may be omitted —
-// the implicit data type defaults to logic. Verify the same surface form
-// that triggered the error above is accepted once `var` is added.
 TEST(VariableDeclarations, AutomaticVarWithoutDataTypeOk) {
   auto r = Parse(
       "module m;\n"
@@ -405,7 +387,6 @@ TEST(VariableDeclarations, AutomaticVarWithoutDataTypeOk) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §6.8: Variable with unpacked array dimension.
 TEST(VariableDeclarations, VarWithUnpackedArrayDim) {
   auto r = Parse(
       "module m;\n"
@@ -419,9 +400,6 @@ TEST(VariableDeclarations, VarWithUnpackedArrayDim) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-// §6.8 footnote 18: when a type_reference is used in a variable declaration,
-// it shall be preceded by the var keyword. The bare form `type(x) y;` at
-// module-item position is therefore illegal.
 TEST(VariableDeclarations, TypeRefInVarDeclWithoutVarIsError) {
   auto r = Parse(
       "module m;\n"
@@ -431,9 +409,6 @@ TEST(VariableDeclarations, TypeRefInVarDeclWithoutVarIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §6.8 footnote 18: the same surface form parses cleanly once the required
-// `var` prefix is present, confirming the rule fires only on the missing
-// keyword and not on the type_reference itself.
 TEST(VariableDeclarations, TypeRefInVarDeclWithVarOk) {
   auto r = Parse(
       "module m;\n"
@@ -449,10 +424,6 @@ TEST(VariableDeclarations, TypeRefInVarDeclWithVarOk) {
   EXPECT_EQ(item->name, "b");
 }
 
-// §6.8 footnote 18: the net-side counterpart — when type_reference is used
-// in a net declaration it shall be preceded by a net type keyword. Verify
-// that `wire type(x) y;` is accepted, completing parser-level coverage of
-// both halves of the footnote.
 TEST(VariableDeclarations, TypeRefInNetDeclWithWireOk) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -461,9 +432,6 @@ TEST(VariableDeclarations, TypeRefInNetDeclWithWireOk) {
               "endmodule\n"));
 }
 
-// §6.8 BNF `signing ::= signed | unsigned`. The parser must accept the
-// `unsigned` half of the production on an implicit_data_type — pairs with
-// the existing ImplicitDataTypeSigned test that covers the `signed` half.
 TEST(ImplicitDataType, ImplicitDataTypeUnsigned) {
   auto r = Parse("module m(input unsigned [7:0] d); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -472,9 +440,6 @@ TEST(ImplicitDataType, ImplicitDataTypeUnsigned) {
   EXPECT_FALSE(port.data_type.is_signed);
 }
 
-// §6.8 BNF `signing ::= signed | unsigned`. The `unsigned` keyword must
-// also be accepted on an explicit integer_vector_type, attaching to the
-// data_type rather than only to implicit forms.
 TEST(DataTypeParsing, UnsignedOnLogicVectorOk) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -482,10 +447,6 @@ TEST(DataTypeParsing, UnsignedOnLogicVectorOk) {
               "endmodule\n"));
 }
 
-// §6.8 BNF `variable_decl_assignment ::= ... | dynamic_array_variable_
-// identifier unsized_dimension { variable_dimension } [ = dynamic_array_new ]`.
-// The dynamic-array form of the production must be accepted by the parser —
-// the unsized `[]` dimension plus a `new[N]` initializer.
 TEST(VariableDeclaration, DynamicArrayVarDeclNew) {
   auto r = Parse(
       "module m;\n"
@@ -495,11 +456,6 @@ TEST(VariableDeclaration, DynamicArrayVarDeclNew) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §6.8 footnote 18: the rule has two halves — type_reference in a net decl
-// requires a net type keyword; type_reference in a variable decl requires
-// `var`. A bare `type(x) y;` matches neither half: it has no net type
-// keyword (failing the net-side rule) and no `var` (failing the variable-
-// side rule), so it must be diagnosed at every module-item position.
 TEST(VariableDeclarations, TypeRefBareWithoutNetTypeOrVarIsError) {
   auto r = Parse(
       "module m;\n"
@@ -509,9 +465,6 @@ TEST(VariableDeclarations, TypeRefBareWithoutNetTypeOrVarIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §6.8 BNF `data_type ::= ... | class_type`. A variable whose data_type
-// is a previously-declared class must parse — the parser must look up the
-// class name as a known type and bind it to the variable.
 TEST(DataTypeParsing, ClassTypeVarDecl) {
   auto r = Parse(
       "class C;\n"
@@ -527,9 +480,6 @@ TEST(DataTypeParsing, ClassTypeVarDecl) {
   EXPECT_EQ(item->name, "handle");
 }
 
-// §6.8 BNF `data_type ::= ... | virtual [interface] interface_identifier ...`.
-// A `virtual <iface>` variable declaration must parse — the parser routes
-// through ParseVirtualInterfaceType after consuming the `virtual` keyword.
 TEST(DataTypeParsing, VirtualInterfaceVarDecl) {
   auto r = Parse(
       "interface bus_if;\n"
@@ -545,9 +495,6 @@ TEST(DataTypeParsing, VirtualInterfaceVarDecl) {
   EXPECT_EQ(item->name, "vi");
 }
 
-// §6.8 BNF `data_type ::= ... | virtual [interface] interface_identifier ...`.
-// The explicit `interface` keyword between `virtual` and the identifier is
-// optional per the BNF. Confirm the explicit form parses too.
 TEST(DataTypeParsing, VirtualInterfaceWithKeywordVarDecl) {
   auto r = Parse(
       "interface bus_if;\n"
@@ -559,10 +506,6 @@ TEST(DataTypeParsing, VirtualInterfaceWithKeywordVarDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §6.8 BNF `variable_decl_assignment ::= ... | class_variable_identifier
-// [ = class_new ]`. The class_new initializer form must parse on a class
-// handle — paired with the existing DynamicArrayVarDeclNew test which
-// covers the dynamic_array_new alternative.
 TEST(VariableDeclaration, ClassHandleVarDeclWithNew) {
   auto r = Parse(
       "class C;\n"
@@ -579,4 +522,4 @@ TEST(VariableDeclaration, ClassHandleVarDeclWithNew) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-}  // namespace
+}

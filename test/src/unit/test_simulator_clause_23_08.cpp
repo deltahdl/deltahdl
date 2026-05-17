@@ -6,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Read via upward reference: a lower module reads a variable in its enclosing
-// module using the enclosing module's name.
-
 TEST(UpwardNameReferenceSimulation, UpwardReadReturnsEnclosingValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -34,9 +31,6 @@ TEST(UpwardNameReferenceSimulation, UpwardReadReturnsEnclosingValue) {
   EXPECT_EQ(v->value.ToUint64(), 42u);
 }
 
-// Write via upward reference: a lower module writes a variable in its
-// enclosing module.
-
 TEST(UpwardNameReferenceSimulation, UpwardWriteUpdatesEnclosingVariable) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -56,9 +50,6 @@ TEST(UpwardNameReferenceSimulation, UpwardWriteUpdatesEnclosingVariable) {
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 99u);
 }
-
-// LRM canonical example: module c writes b.i (upward) — both parent-b copies
-// receive the write, while local "i = 1" only writes c's own i.
 
 TEST(UpwardNameReferenceSimulation, CanonicalExampleUpwardWriteHitsEnclosing) {
   SimFixture f;
@@ -91,8 +82,6 @@ TEST(UpwardNameReferenceSimulation, CanonicalExampleUpwardWriteHitsEnclosing) {
   EXPECT_EQ(c_i->value.ToUint64(), 1u);
 }
 
-// Upward reference into the design-element scope (top-level module) resolves.
-
 TEST(UpwardNameReferenceSimulation, UpwardReferenceAcrossTwoLevels) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -121,4 +110,4 @@ TEST(UpwardNameReferenceSimulation, UpwardReferenceAcrossTwoLevels) {
   EXPECT_EQ(v->value.ToUint64(), 55u);
 }
 
-}  // namespace
+}

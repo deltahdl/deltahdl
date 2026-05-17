@@ -31,4 +31,4 @@ TEST(AssertionSemanticsParsing, NonoverlapImplication) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-}  // namespace
+}

@@ -1,4 +1,4 @@
-// §25.4
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -56,4 +56,4 @@ TEST(InterfaceDeclaration, WithMixedDirectionPorts) {
   EXPECT_EQ(r.cu->interfaces[0]->ports[2].name, "c");
 }
 
-}  // namespace
+}

@@ -121,4 +121,4 @@ TEST(AssignmentOverviewSim, ProceduralAssignIndexedPartSelect) {
   EXPECT_EQ(result, 0xF0u);
 }
 
-}  // namespace
+}

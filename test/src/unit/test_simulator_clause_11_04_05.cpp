@@ -424,4 +424,4 @@ TEST(EqualityOperatorEval, AllEqualityOperatorsReturnOneBit) {
   EXPECT_EQ(EvalExpr(cneq, f.ctx, f.arena).width, 1u);
 }
 
-}  // namespace
+}

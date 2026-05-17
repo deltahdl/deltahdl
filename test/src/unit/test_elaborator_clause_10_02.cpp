@@ -433,4 +433,4 @@ TEST(AssignmentOverviewElaboration, ProceduralAssignConstPartSelect_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

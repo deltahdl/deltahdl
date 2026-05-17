@@ -197,4 +197,4 @@ TEST(AssignmentSchedulingElaboration, MultipleAssignStatementsInInitialBlock) {
   EXPECT_EQ(mod->assigns.size(), 0u);
 }
 
-}  // namespace
+}

@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Unit tests: ClassObject memory management API
-// ---------------------------------------------------------------------------
-
 TEST(ClassSim, MemMgmtPropertiesPersist) {
   SimFixture f;
   auto* type = MakeClassType(f, "Persistent", {"data"});
@@ -244,10 +240,6 @@ TEST(ClassSim, CollectGarbagePreservesObjectWithPendingNba) {
   EXPECT_NE(f.ctx.GetClassObject(handle), nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// End-to-end tests: full pipeline (parse -> elaborate -> lower -> run)
-// ---------------------------------------------------------------------------
-
 TEST(ClassSim, E2eNullAssignmentReleasesReference) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -346,4 +338,4 @@ TEST(ClassSim, E2eReassignToNewObjectOldHandleLost) {
   LowerRunAndCheck(f, design, {{"result", 0u}});
 }
 
-}  // namespace
+}

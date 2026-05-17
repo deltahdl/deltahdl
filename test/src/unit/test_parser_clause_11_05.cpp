@@ -152,4 +152,4 @@ TEST(OperatorAndExpressionParsing, ConcatenationWithMixedOperandTypes) {
   EXPECT_EQ(rhs->elements[2]->kind, ExprKind::kSelect);
 }
 
-}  // namespace
+}

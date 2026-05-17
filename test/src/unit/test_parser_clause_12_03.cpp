@@ -439,4 +439,4 @@ TEST(StatementSyntaxParsing, FunctionMultipleNullStatements) {
   EXPECT_EQ(func->func_body_stmts[2]->kind, StmtKind::kNull);
 }
 
-}  // namespace
+}

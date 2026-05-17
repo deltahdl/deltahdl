@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- Edge identifiers ---
-
 TEST(SpecifyPathParsing, EdgeIdentifierEdge) {
   auto r = Parse(
       "module m;\n"
@@ -58,8 +56,6 @@ TEST(SpecifyPathParsing, NegedgeSensitivePath) {
   ASSERT_EQ(si->path.src_ports.size(), 1u);
   EXPECT_EQ(si->path.src_ports[0].name, "clk");
 }
-
-// --- Edge-sensitive path declarations (parallel and full forms) ---
 
 TEST(SpecifyPathParsing, PathDeclEdgeSensitiveFull) {
   auto r = Parse(
@@ -205,8 +201,6 @@ TEST(SpecifyPathParsing, EdgeKeywordWithPolarityParallel) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// --- Data source expressions (output form with optional polarity) ---
-
 TEST(SpecifyPathParsing, DataSourceWithOutputPolarity) {
   auto r = Parse(
       "module m;\n"
@@ -286,11 +280,6 @@ TEST(SpecifyPathParsing, EdgeSensitiveFullWithOutputPolarity) {
   EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kPositive);
 }
 
-// --- Optional edge_identifier (omitted => active on any transition) ---
-
-// When the edge_identifier is omitted, the output-form parentheses with a
-// colon-separated data_source_expression still identify an edge-sensitive
-// path declaration, just one active on any transition of the input.
 TEST(SpecifyPathParsing, NoEdgeIdentifierWithDataSource) {
   auto r = Parse(
       "module m;\n"
@@ -306,10 +295,6 @@ TEST(SpecifyPathParsing, NoEdgeIdentifierWithDataSource) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// --- Vector input (edge is detected on LSB) ---
-
-// The grammar permits a bit-select on the input terminal descriptor; selecting
-// the LSB is the typical way users pin the edge to a known bit of a vector.
 TEST(SpecifyPathParsing, VectorInputBitSelectOnLsb) {
   auto r = Parse(
       "module m;\n"
@@ -326,8 +311,6 @@ TEST(SpecifyPathParsing, VectorInputBitSelectOnLsb) {
   EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
 }
 
-// A whole-vector input is accepted; per §30.4.3 the edge is interpreted on the
-// vector's LSB at simulation time.
 TEST(SpecifyPathParsing, VectorInputWholeVector) {
   auto r = Parse(
       "module m;\n"
@@ -342,10 +325,6 @@ TEST(SpecifyPathParsing, VectorInputWholeVector) {
   EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
 }
 
-// --- Data source expression variations ---
-
-// The data_source_expression inside the output parentheses is a general
-// expression, not just an identifier.
 TEST(SpecifyPathParsing, DataSourceCompoundExpression) {
   auto r = Parse(
       "module m;\n"
@@ -360,8 +339,6 @@ TEST(SpecifyPathParsing, DataSourceCompoundExpression) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// A full edge-sensitive path may carry multiple output terminals inside the
-// parenthesized output-with-data_source form.
 TEST(SpecifyPathParsing, FullEdgeSensitiveMultipleOutputsWithDataSource) {
   auto r = Parse(
       "module m;\n"
@@ -379,8 +356,6 @@ TEST(SpecifyPathParsing, FullEdgeSensitiveMultipleOutputsWithDataSource) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// --- Error conditions specific to data_source_expression form ---
-
 TEST(SpecifyPathParsing, ErrorDataSourceMissingColon) {
   auto r = Parse(
       "module m;\n"
@@ -391,8 +366,6 @@ TEST(SpecifyPathParsing, ErrorDataSourceMissingColon) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// The data_source_expression is mandatory once the output uses the
-// parenthesized form; an empty body must be rejected.
 TEST(SpecifyPathParsing, ErrorDataSourceMissingExpression) {
   auto r = Parse(
       "module m;\n"
@@ -403,4 +376,4 @@ TEST(SpecifyPathParsing, ErrorDataSourceMissingExpression) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -9,7 +9,6 @@
 
 namespace delta {
 
-// Groups the argument-side state for format processing.
 struct FormatArgs {
   const std::vector<Logic4Vec>& vals;
   size_t vi = 0;
@@ -81,7 +80,7 @@ std::string FormatArg(const Logic4Vec& val, char spec) {
       return FormatDecimal(val);
     case 'h':
     case 'x': {
-      // §21.2.1.2: %h prints ceil(width/4) hex digits with leading zeros.
+
       uint32_t ndigits = (val.width + 3) / 4;
       if (ndigits == 0) ndigits = 1;
       std::snprintf(buf, sizeof(buf), "%0*llx", static_cast<int>(ndigits),
@@ -89,7 +88,7 @@ std::string FormatArg(const Logic4Vec& val, char spec) {
       return buf;
     }
     case 'o': {
-      // §21.2.1.2: %o prints ceil(width/3) octal digits with leading zeros.
+
       uint32_t ndigits = (val.width + 2) / 3;
       if (ndigits == 0) ndigits = 1;
       std::snprintf(buf, sizeof(buf), "%0*llo", static_cast<int>(ndigits),
@@ -113,7 +112,6 @@ std::string FormatArg(const Logic4Vec& val, char spec) {
   }
 }
 
-// Append a literal (non-format) character, handling backslash escapes.
 static void AppendLiteralChar(const std::string& fmt, size_t& i,
                               std::string& out) {
   if (fmt[i] == '\\' && i + 1 < fmt.size()) {
@@ -124,34 +122,31 @@ static void AppendLiteralChar(const std::string& fmt, size_t& i,
   }
 }
 
-// Process a single format specifier starting at '%'.
-// Advances i past the specifier and returns true if an arg was consumed.
 static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
                               FormatArgs& args, std::string& out) {
-  // Handle %m (hierarchical name -- no arg consumed).
+
   if (fmt[i + 1] == 'm') {
     out += "<module>";
     ++i;
     return false;
   }
-  // §33.7: %l/%L prints library.cell binding info for the containing module.
-  // No format argument is consumed, mirroring %m.
+
   if (fmt[i + 1] == 'l' || fmt[i + 1] == 'L') {
     out += "<library.cell>";
     ++i;
     return false;
   }
-  // Handle %% (literal percent).
+
   if (fmt[i + 1] == '%') {
     out += '%';
     ++i;
     return false;
   }
-  // Skip optional '0' width modifier (e.g. %0d).
+
   size_t j = i + 1;
   while (j < fmt.size() && (fmt[j] >= '0' && fmt[j] <= '9')) ++j;
   char spec = (j < fmt.size()) ? fmt[j] : 'd';
-  // §21.2.1.6: %p uses pre-computed assignment pattern format.
+
   if (spec == 'p' && args.vi < args.p_fmts.size() &&
       !args.p_fmts[args.vi].empty()) {
     out += args.p_fmts[args.vi];
@@ -189,4 +184,4 @@ std::string ExtractFormatString(const Expr* first_arg) {
   return std::string(text);
 }
 
-}  // namespace delta
+}

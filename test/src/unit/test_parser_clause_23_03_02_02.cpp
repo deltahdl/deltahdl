@@ -173,4 +173,4 @@ TEST(ModuleInstantiationGrammar, SingleNamedPortEmpty) {
   EXPECT_EQ(item->inst_ports[0].second, nullptr);
 }
 
-}  // namespace
+}

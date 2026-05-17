@@ -130,4 +130,4 @@ TEST(PackageImport, ExplicitImportAfterWildcardReferenceIsIllegal) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

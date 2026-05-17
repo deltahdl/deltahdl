@@ -29,4 +29,4 @@ TEST(OptionalSystemTaskExtendedParsing, ScaleRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
-}  // namespace
+}

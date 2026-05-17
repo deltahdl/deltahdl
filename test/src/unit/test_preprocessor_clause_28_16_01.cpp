@@ -17,4 +17,4 @@ TEST(MinTypMaxDelayParsing, BufifThreeSlotTriples) {
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
-}  // namespace
+}

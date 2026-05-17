@@ -134,9 +134,6 @@ TEST(UserDefinedTypeElaboration, TypedefChain2State) {
   }
 }
 
-// §6.18: "It shall be legal to have multiple forward type declarations for
-// the same type identifier in the same scope." The forward declarations are
-// resolved by the matching class declaration that follows.
 TEST(UserDefinedTypeElaboration, MultipleForwardTypedefsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -151,9 +148,6 @@ TEST(UserDefinedTypeElaboration, MultipleForwardTypedefsElaborate) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.18: "It shall be an error if a basic data type was specified by the
-// forward type declaration and the actual type definition does not conform
-// to the specified basic data type."
 TEST(UserDefinedTypeElaboration, ForwardEnumWithStructDefinition_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -190,10 +184,6 @@ TEST(UserDefinedTypeElaboration, ForwardUnionWithEnumDefinition_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.18: "It shall be legal to have multiple forward type declarations for
-// the same type identifier in the same scope." This case exercises the
-// kind-keyword form (`typedef enum NAME;`) with multiple forwards, all
-// resolved by a single final enum definition.
 TEST(UserDefinedTypeElaboration, MultipleForwardEnumDeclarations) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -208,10 +198,6 @@ TEST(UserDefinedTypeElaboration, MultipleForwardEnumDeclarations) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.18: "It shall be legal to have a forward type declaration in the same
-// scope, either before or after the final type definition." The forward
-// declaration appearing after the real definition must not corrupt the
-// existing type so that subsequent variable declarations still resolve.
 TEST(UserDefinedTypeElaboration, ForwardTypedefAfterFinalDefinition) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -234,9 +220,6 @@ TEST(UserDefinedTypeElaboration, ForwardTypedefAfterFinalDefinition) {
   EXPECT_TRUE(found);
 }
 
-// §6.18: "It shall be an error if the type_identifier does not resolve to a
-// data type." A forward enum/struct/union declaration with no matching real
-// definition in the same scope is unresolved.
 TEST(UserDefinedTypeElaboration, UnresolvedForwardTypedefInModule_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -248,8 +231,6 @@ TEST(UserDefinedTypeElaboration, UnresolvedForwardTypedefInModule_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.18: A bare forward typedef (`typedef NAME;`) with no matching real
-// definition in the same scope is similarly unresolved.
 TEST(UserDefinedTypeElaboration, UnresolvedBareForwardTypedefInModule_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -261,9 +242,6 @@ TEST(UserDefinedTypeElaboration, UnresolvedBareForwardTypedefInModule_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.18: "It shall be an error if the prefix does not resolve to a class."
-// `T_fwd` is forward-declared and then resolved as `int`, so using it as a
-// class scope-resolution prefix in `T_fwd::Inner` is an error.
 TEST(UserDefinedTypeElaboration, ForwardTypedefScopePrefixNotClass_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -276,9 +254,6 @@ TEST(UserDefinedTypeElaboration, ForwardTypedefScopePrefixNotClass_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.18 positive companion to the above: when the forward-declared prefix
-// resolves to a class, using it as a scope-resolution prefix in a typedef
-// declaration is legal.
 TEST(UserDefinedTypeElaboration, ForwardTypedefScopePrefixClass_Legal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -294,4 +269,4 @@ TEST(UserDefinedTypeElaboration, ForwardTypedefScopePrefixClass_Legal) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

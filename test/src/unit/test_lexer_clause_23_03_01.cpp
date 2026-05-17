@@ -1,4 +1,4 @@
-// §23.3.1
+
 
 #include "fixture_lexer.h"
 
@@ -33,4 +33,4 @@ TEST(TopLevelModules, DollarRootAloneLexesSingleToken) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
 }
 
-}  // namespace
+}

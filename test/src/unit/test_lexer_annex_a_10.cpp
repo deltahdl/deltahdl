@@ -84,8 +84,6 @@ TEST(BnfClarificationLexing, EmptyInputHasEof) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-// Item 53: apostrophe in unbased_unsized_literal not followed by white_space
-
 TEST(BnfClarificationLexing, UnbasedUnsizedZeroNoSpace) {
   auto tokens = Lex("'0");
   ASSERT_GE(tokens.size(), 2u);
@@ -110,8 +108,6 @@ TEST(BnfClarificationLexing, UnbasedUnsizedZNoSpace) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
-// Item 38: embedded spaces — space breaks based number
-
 TEST(BnfClarificationLexing, SpaceBreaksBasedNumber) {
   auto tokens = Lex("4 'b1010");
   ASSERT_GE(tokens.size(), 2u);
@@ -125,8 +121,6 @@ TEST(BnfClarificationLexing, NoSpaceInBasedNumber) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
 }
 
-// Item 49: space after number breaks time literal
-
 TEST(BnfClarificationLexing, SpaceBreaksTimeLiteral) {
   auto tokens = Lex("10 ns");
   ASSERT_GE(tokens.size(), 3u);
@@ -135,4 +129,4 @@ TEST(BnfClarificationLexing, SpaceBreaksTimeLiteral) {
   EXPECT_EQ(tokens[1].text, "ns");
 }
 
-}  // namespace
+}

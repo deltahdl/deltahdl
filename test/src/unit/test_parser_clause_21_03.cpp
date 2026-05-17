@@ -19,4 +19,4 @@ TEST(IoSystemTaskParsing, FileIOSequence) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

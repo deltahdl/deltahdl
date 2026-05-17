@@ -4,8 +4,6 @@
 
 namespace {
 
-// --- R2: output port can be connected to a variable ---
-
 TEST(PortConnectionRulesForVariablesSynthesis,
      OutputPortDrivingVariableSynthesizes) {
   SynthFixture f;
@@ -21,8 +19,6 @@ TEST(PortConnectionRulesForVariablesSynthesis,
   auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
 }
-
-// --- R3: output port can be connected to a net; multiple drivers permitted ---
 
 TEST(PortConnectionRulesForVariablesSynthesis,
      OutputPortDrivingNetSynthesizes) {
@@ -40,4 +36,4 @@ TEST(PortConnectionRulesForVariablesSynthesis,
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

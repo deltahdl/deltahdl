@@ -89,4 +89,4 @@ TEST(ParameterizedScopeResolutionSim, TwoSpecializationsReturnDifferentValues) {
   LowerRunAndCheck(f, design, {{"a", 3u}, {"b", 7u}});
 }
 
-}  // namespace
+}

@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.2: num() call on a mailbox parses.
 TEST(MailboxNumParser, NumCallParses) {
   auto r = Parse(
       "module m;\n"
@@ -17,7 +16,6 @@ TEST(MailboxNumParser, NumCallParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.2: num() result assigned to int variable parses.
 TEST(MailboxNumParser, NumResultAssigned) {
   auto r = Parse(
       "module m;\n"
@@ -31,7 +29,6 @@ TEST(MailboxNumParser, NumResultAssigned) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.2: num() used in a conditional expression parses.
 TEST(MailboxNumParser, NumInConditional) {
   auto r = Parse(
       "module m;\n"
@@ -46,4 +43,4 @@ TEST(MailboxNumParser, NumInConditional) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -65,4 +65,4 @@ TEST(ImplicitEventLexing, AtParenStarSpaceParenTokens) {
   EXPECT_EQ(tokens[3].kind, TokenKind::kRParen);
 }
 
-}  // namespace
+}

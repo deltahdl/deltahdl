@@ -5,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1: If the net on either side of a port has the net type uwire, a warning
-//     shall be issued if the nets are not merged into a single net ---
-
 TEST(SingleSourceNetsElaboration,
      InternalUwireInputPortConnectedToExternalVariableWarns) {
   ElabFixture f;
@@ -106,8 +103,6 @@ TEST(SingleSourceNetsElaboration,
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-// --- No warning: both sides are nets, so they can be merged ---
-
 TEST(SingleSourceNetsElaboration,
      InternalUwirePortConnectedToExternalWireNoWarning) {
   ElabFixture f;
@@ -173,8 +168,6 @@ TEST(SingleSourceNetsElaboration,
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// --- Edge cases ---
-
 TEST(SingleSourceNetsElaboration,
      UwirePortLeftUnconnectedNoWarning) {
   ElabFixture f;
@@ -239,4 +232,4 @@ TEST(SingleSourceNetsElaboration,
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-}  // namespace
+}

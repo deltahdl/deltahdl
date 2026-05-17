@@ -30,8 +30,6 @@ TEST(SimpleStateDependentPathSim, ParallelPathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// Several coexisting simple state-dependent paths (the XOR/ALU pattern the
-// subclause sketches) must not disrupt unrelated behavioral execution.
 TEST(SimpleStateDependentPathSim, MultipleCoexistingPathsSimulate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -54,4 +52,4 @@ TEST(SimpleStateDependentPathSim, MultipleCoexistingPathsSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
-}  // namespace
+}

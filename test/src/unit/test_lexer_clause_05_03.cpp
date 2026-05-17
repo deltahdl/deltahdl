@@ -128,9 +128,6 @@ TEST(LexicalConventionLexing, VerticalTabSeparatesKeywords) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
 }
 
-// §5.3: end-of-file must terminate every lexical-token category, not just
-// simple identifiers — exercise representative members from §5.2's seven
-// categories sitting flush against EOF (no trailing whitespace).
 TEST(LexicalConventionLexing, EndOfFileTerminatesEachTokenCategory) {
   auto kw = Lex("module");
   ASSERT_EQ(kw.size(), 2u);
@@ -153,4 +150,4 @@ TEST(LexicalConventionLexing, EndOfFileTerminatesEachTokenCategory) {
   EXPECT_EQ(str[1].kind, TokenKind::kEof);
 }
 
-}  // namespace
+}

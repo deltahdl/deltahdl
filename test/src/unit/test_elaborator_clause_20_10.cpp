@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §20.10 BNF "finish_number ::= 0 | 1 | 2". The first argument to $fatal at
-// module level must be in {0,1,2}; values outside that range are rejected.
 TEST(SeveritySystemTaskElab, FatalFinishNumberInRangeAccepted) {
   for (int fn = 0; fn <= 2; ++fn) {
     ElabFixture ef;
@@ -28,4 +26,4 @@ TEST(SeveritySystemTaskElab, FatalFinishNumberOutOfRangeRejected) {
   EXPECT_TRUE(ef.has_errors);
 }
 
-}  // namespace
+}

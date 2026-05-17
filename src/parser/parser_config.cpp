@@ -4,7 +4,6 @@
 
 namespace delta {
 
-// Parse: design { [lib.] cell } ;
 void Parser::ParseDesignStatement(ConfigDecl* decl) {
   Expect(TokenKind::kKwDesign);
   while (!Check(TokenKind::kSemicolon) && !AtEnd()) {
@@ -20,7 +19,6 @@ void Parser::ParseDesignStatement(ConfigDecl* decl) {
   Expect(TokenKind::kSemicolon);
 }
 
-// Parse: liblist { library_identifier }
 void Parser::ParseLiblistClause(ConfigRule* rule) {
   Expect(TokenKind::kKwLiblist);
   while (CheckIdentifier() && !Check(TokenKind::kSemicolon) && !AtEnd()) {
@@ -28,8 +26,6 @@ void Parser::ParseLiblistClause(ConfigRule* rule) {
   }
 }
 
-// Parse: use [lib.] cell [:config] | use named_params [:config]
-//        | use [lib.] cell named_params [:config]
 void Parser::ParseUseClause(ConfigRule* rule) {
   Expect(TokenKind::kKwUse);
   if (CheckIdentifier()) {
@@ -41,7 +37,7 @@ void Parser::ParseUseClause(ConfigRule* rule) {
       rule->use_cell = first;
     }
   }
-  // Optional named parameter assignments: #(.NAME(value), ...)
+
   if (Match(TokenKind::kHash)) {
     Expect(TokenKind::kLParen);
     do {
@@ -54,7 +50,7 @@ void Parser::ParseUseClause(ConfigRule* rule) {
     } while (Match(TokenKind::kComma));
     Expect(TokenKind::kRParen);
   }
-  // Optional :config suffix (always last per BNF)
+
   if (Match(TokenKind::kColon)) {
     if (Check(TokenKind::kKwConfig)) {
       Consume();
@@ -63,7 +59,6 @@ void Parser::ParseUseClause(ConfigRule* rule) {
   }
 }
 
-// Parse a single config rule statement.
 ConfigRule* Parser::ParseConfigRule() {
   auto* rule = arena_.Create<ConfigRule>();
   if (Check(TokenKind::kKwDefault)) {
@@ -99,7 +94,6 @@ ConfigRule* Parser::ParseConfigRule() {
   return rule;
 }
 
-// Parse: config name; ... endconfig [: name]
 ConfigDecl* Parser::ParseConfigDecl() {
   auto* decl = arena_.Create<ConfigDecl>();
   decl->range.start = CurrentLoc();
@@ -107,7 +101,6 @@ ConfigDecl* Parser::ParseConfigDecl() {
   decl->name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kSemicolon);
 
-  // Optional localparam declarations.
   while (Check(TokenKind::kKwLocalparam) && !AtEnd()) {
     Consume();
     auto pname = ExpectIdentifier().text;
@@ -117,8 +110,6 @@ ConfigDecl* Parser::ParseConfigDecl() {
     Expect(TokenKind::kSemicolon);
   }
 
-  // §33.4.1.1: a config has one and only one design statement, and it
-  // shall appear before any config rule statements.
   bool has_design = false;
   if (Check(TokenKind::kKwDesign)) {
     ParseDesignStatement(decl);
@@ -127,13 +118,12 @@ ConfigDecl* Parser::ParseConfigDecl() {
     diag_.Error(CurrentLoc(), "expected 'design' statement in config");
   }
 
-  // Config rule statements.
   while (!Check(TokenKind::kKwEndconfig) && !AtEnd()) {
     if (Check(TokenKind::kKwDesign)) {
       diag_.Error(CurrentLoc(),
                   std::format("duplicate 'design' statement in config '{}'",
                               decl->name));
-      // Skip past the offending design statement so parsing can recover.
+
       Consume();
       while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEndconfig)
              && !AtEnd()) {
@@ -157,4 +147,4 @@ ConfigDecl* Parser::ParseConfigDecl() {
   return decl;
 }
 
-}  // namespace delta
+}

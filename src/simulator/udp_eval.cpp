@@ -14,8 +14,6 @@ static bool IsEdgeSymbol(char symbol) {
          symbol == '*' || symbol == '\x01';
 }
 
-// §29.2: a z on a UDP input is observed as x for table matching and edge
-// detection.
 static char CoerceUdpInput(char value) { return value == 'z' ? 'x' : value; }
 
 static std::vector<char> CoerceUdpInputs(const std::vector<char>& inputs) {
@@ -51,7 +49,6 @@ void UdpEvalState::SetInputs(const std::vector<char>& inputs) {
   prev_inputs_ = CoerceUdpInputs(inputs);
 }
 
-// Check if all level symbols in a row match the given input values.
 static bool MatchAllLevels(const UdpTableRow& row,
                            const std::vector<char>& inputs) {
   if (row.inputs.size() != inputs.size()) return false;
@@ -61,7 +58,6 @@ static bool MatchAllLevels(const UdpTableRow& row,
   return true;
 }
 
-// Check if a row's current_state field matches the given output.
 static bool MatchState(const UdpDecl& decl, const UdpTableRow& row,
                        char output) {
   if (!decl.is_sequential) return true;
@@ -69,12 +65,10 @@ static bool MatchState(const UdpDecl& decl, const UdpTableRow& row,
   return MatchLevel(row.current_state, output);
 }
 
-// Resolve a row output: '-' means no change (keep current output).
 static char ResolveOutput(char row_output, char current_output) {
   return (row_output == '-') ? current_output : row_output;
 }
 
-// §29.4: Combinational evaluation — pure level lookup.
 char UdpEvalState::Evaluate(const std::vector<char>& inputs) {
   auto coerced = CoerceUdpInputs(inputs);
   for (const auto& row : decl_.table) {
@@ -119,7 +113,6 @@ static bool MatchRowWithEdge(const UdpTableRow& row,
   return true;
 }
 
-// §29.9/§29.10: Evaluate with edge detection and level-sensitive dominance.
 char UdpEvalState::EvaluateWithEdge(const std::vector<char>& new_inputs,
                                     uint32_t changed_idx, char prev_value) {
   auto coerced_new = CoerceUdpInputs(new_inputs);
@@ -138,7 +131,6 @@ char UdpEvalState::EvaluateWithEdge(const std::vector<char>& new_inputs,
     if (!has_edge && level_result == 0) level_result = result;
   }
 
-  // §29.10: Level-sensitive dominates if both match.
   if (level_result != 0) {
     output_ = level_result;
   } else if (edge_result != 0) {
@@ -151,4 +143,4 @@ char UdpEvalState::EvaluateWithEdge(const std::vector<char>& new_inputs,
   return output_;
 }
 
-}  // namespace delta
+}

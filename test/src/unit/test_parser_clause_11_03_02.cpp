@@ -118,4 +118,4 @@ TEST(Precedence, CompareAndLogicalWithParentheses) {
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
 
-}  // namespace
+}

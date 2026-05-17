@@ -32,4 +32,4 @@ TEST_F(ProtectedTest, DecryptLicensePragma) {
   EXPECT_EQ(result.find("decrypt_license"), std::string::npos);
 }
 
-}  // namespace
+}

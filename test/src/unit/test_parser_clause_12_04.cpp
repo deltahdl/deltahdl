@@ -468,4 +468,4 @@ TEST(ConditionalSyntaxParsing, IfElseInAlwaysFf) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

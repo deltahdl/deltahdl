@@ -13,10 +13,6 @@ namespace delta {
 class Arena;
 class SimContext;
 
-// =============================================================================
-// SvCallable: represents a SystemVerilog task or function declaration
-// =============================================================================
-
 struct CallableParam {
   std::string_view name;
   Direction direction = Direction::kInput;
@@ -40,20 +36,12 @@ class SvCallable {
   Stmt* body_;
 };
 
-// =============================================================================
-// CallFrame: local state for a single task/function invocation
-// =============================================================================
-
 struct CallFrame {
   std::string_view callable_name;
   std::vector<Logic4Vec> locals;
   Logic4Vec return_value{};
   uint32_t caller_id = 0;
 };
-
-// =============================================================================
-// SvCallableContext: manages a call stack of active invocations
-// =============================================================================
 
 class SvCallableContext {
  public:
@@ -68,4 +56,4 @@ class SvCallableContext {
   std::vector<CallFrame> stack_;
 };
 
-}  // namespace delta
+}

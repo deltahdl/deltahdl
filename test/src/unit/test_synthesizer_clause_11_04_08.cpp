@@ -94,4 +94,4 @@ TEST(BitwiseOperators, NotGate) {
   EXPECT_EQ(aig->outputs.size(), 1);
 }
 
-}  // namespace
+}

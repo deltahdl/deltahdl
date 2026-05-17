@@ -75,7 +75,7 @@ TEST(AssignmentWithinExpression, ChainedAssignUpdatesAllVariables) {
   SimFixture f;
   MakeVar(f, "a", 32, 0);
   MakeVar(f, "b", 32, 0);
-  // a = (b = 5): inner assigns 5 to b, returns 5; outer assigns 5 to a.
+
   auto* inner = MakeBinary(f.arena, TokenKind::kEq, MakeId(f.arena, "b"),
                            MakeInt(f.arena, 5));
   auto* outer = MakeBinary(f.arena, TokenKind::kEq, MakeId(f.arena, "a"),
@@ -88,7 +88,7 @@ TEST(AssignmentWithinExpression, ChainedAssignUpdatesAllVariables) {
 
 TEST(AssignmentWithinExpression, ReturnValueMatchesLhsWidth) {
   SimFixture f;
-  // LHS is 4-bit; assigning 0xFF should return a 4-bit value (0xF).
+
   MakeVar(f, "narrow", 4, 0);
   auto* expr = MakeBinary(f.arena, TokenKind::kEq, MakeId(f.arena, "narrow"),
                           MakeInt(f.arena, 0xFF));
@@ -100,7 +100,7 @@ TEST(AssignmentWithinExpression, ReturnValueMatchesLhsWidth) {
 TEST(AssignmentWithinExpression, AssignInExprReturnUsedByOuterExpr) {
   SimFixture f;
   MakeVar(f, "a", 32, 0);
-  // (a = 10) + 20 should return 30 and set a to 10.
+
   auto* assign = MakeBinary(f.arena, TokenKind::kEq, MakeId(f.arena, "a"),
                             MakeInt(f.arena, 10));
   auto* add = MakeBinary(f.arena, TokenKind::kPlus, assign,
@@ -110,4 +110,4 @@ TEST(AssignmentWithinExpression, AssignInExprReturnUsedByOuterExpr) {
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

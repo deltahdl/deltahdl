@@ -6,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §23.10.1: "Using the defparam statement, parameter values can be changed
-// in any module, interface, or program instance throughout the design using
-// the hierarchical name of the parameter." The override applied at
-// elaboration time shall be the value read at simulation time.
 TEST(DefparamSimulation, OverriddenParameterVisibleAtRuntime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -31,10 +27,6 @@ TEST(DefparamSimulation, OverriddenParameterVisibleAtRuntime) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §23.10.1: "In the case of multiple defparams for a single parameter, the
-// parameter takes the value of the last defparam statement encountered in
-// the source text." The last-wins value shall be the one observed at
-// simulation time.
 TEST(DefparamSimulation, LastDefparamVisibleAtRuntime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -57,4 +49,4 @@ TEST(DefparamSimulation, LastDefparamVisibleAtRuntime) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-}  // namespace
+}

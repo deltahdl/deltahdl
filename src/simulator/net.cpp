@@ -6,8 +6,6 @@
 
 namespace delta {
 
-// --- NetStrength combination (§28.12.2 R2) ---
-
 NetStrength CombineAmbiguousStrength(NetStrength a, NetStrength b) {
   auto hi = [](Strength x, Strength y) {
     return static_cast<uint8_t>(x) > static_cast<uint8_t>(y) ? x : y;
@@ -23,11 +21,8 @@ NetStrength CombineAmbiguousStrength(NetStrength a, NetStrength b) {
   return r;
 }
 
-// --- Per-word resolution helpers ---
-
 Logic4Word ResolveWireWord(Logic4Word a, Logic4Word b) {
-  // IEEE §28.7 wire/tri resolution table:
-  //   z resolves to the other driver; conflicting known bits produce x.
+
   uint64_t a_z = a.aval & a.bval;
   uint64_t b_z = b.aval & b.bval;
   uint64_t both_z = a_z & b_z;
@@ -48,7 +43,7 @@ Logic4Word ResolveWireWord(Logic4Word a, Logic4Word b) {
 }
 
 Logic4Word ResolveWandWord(Logic4Word a, Logic4Word b) {
-  // Wand/triand: AND semantics. 0 dominates, z defers to other driver.
+
   uint64_t a_z = a.aval & a.bval;
   uint64_t b_z = b.aval & b.bval;
   uint64_t both_z = a_z & b_z;
@@ -72,7 +67,7 @@ Logic4Word ResolveWandWord(Logic4Word a, Logic4Word b) {
 }
 
 Logic4Word ResolveWorWord(Logic4Word a, Logic4Word b) {
-  // Wor/trior: OR semantics. 1 dominates, z defers to other driver.
+
   uint64_t a_z = a.aval & a.bval;
   uint64_t b_z = b.aval & b.bval;
   uint64_t both_z = a_z & b_z;
@@ -94,8 +89,6 @@ Logic4Word ResolveWorWord(Logic4Word a, Logic4Word b) {
   return {res_aval, res_bval};
 }
 
-// --- Per-word resolution dispatch ---
-
 static Logic4Word ResolveWord(Logic4Word a, Logic4Word b, NetType type) {
   switch (type) {
     case NetType::kWand:
@@ -109,37 +102,34 @@ static Logic4Word ResolveWord(Logic4Word a, Logic4Word b, NetType type) {
   }
 }
 
-// Fix up z bits for tri0/tri1: replace z with 0 or 1.
 static void FixupTriPull(Logic4Vec& result, NetType type) {
   if (type != NetType::kTri0 && type != NetType::kTri1) return;
   for (uint32_t w = 0; w < result.nwords; ++w) {
     uint64_t z_bits = result.words[w].aval & result.words[w].bval;
     if (z_bits == 0) continue;
-    result.words[w].bval &= ~z_bits;  // Clear bval → known.
+    result.words[w].bval &= ~z_bits;
     if (type == NetType::kTri1) {
-      result.words[w].aval |= z_bits;  // Set aval → 1.
+      result.words[w].aval |= z_bits;
     } else {
-      result.words[w].aval &= ~z_bits;  // Clear aval → 0.
+      result.words[w].aval &= ~z_bits;
     }
   }
 }
 
-// --- Strength-aware per-bit resolution (IEEE §28.12.1) ---
-
 struct BitVal {
-  uint8_t val;  // 0, 1, 2=x, 3=z
+  uint8_t val;
 };
 
 static BitVal GetBitVal(const Logic4Vec& vec, uint32_t bit) {
   uint32_t word = bit / 64;
   uint64_t mask = uint64_t{1} << (bit % 64);
-  if (word >= vec.nwords) return {3};  // z
+  if (word >= vec.nwords) return {3};
   bool a = (vec.words[word].aval & mask) != 0;
   bool b = (vec.words[word].bval & mask) != 0;
   if (!b && !a) return {0};
   if (!b && a) return {1};
-  if (b && !a) return {2};  // x
-  return {3};               // z
+  if (b && !a) return {2};
+  return {3};
 }
 
 static void SetBit(Logic4Vec& vec, uint32_t bit, uint8_t val) {
@@ -152,10 +142,10 @@ static void SetBit(Logic4Vec& vec, uint32_t bit, uint8_t val) {
   } else if (val == 1) {
     vec.words[word].aval |= mask;
     vec.words[word].bval &= ~mask;
-  } else if (val == 2) {  // x
+  } else if (val == 2) {
     vec.words[word].aval &= ~mask;
     vec.words[word].bval |= mask;
-  } else {  // z
+  } else {
     vec.words[word].aval |= mask;
     vec.words[word].bval |= mask;
   }
@@ -166,12 +156,10 @@ static uint8_t EffectiveStrength(uint8_t val, DriverStrength ds) {
   auto s1 = static_cast<uint8_t>(ds.s1);
   if (val == 0) return s0;
   if (val == 1) return s1;
-  if (val == 2) return (s0 > s1) ? s0 : s1;  // x: max
-  return 0;                                  // z: no strength
+  if (val == 2) return (s0 > s1) ? s0 : s1;
+  return 0;
 }
 
-// §28.12.4: 4-valued AND/OR used by wand/triand/wor/trior to resolve
-// same-strength conflicts instead of falling back to x.
 static uint8_t WiredAnd(uint8_t a, uint8_t b) {
   if (a == 0 || b == 0) return 0;
   if (a == 1 && b == 1) return 1;
@@ -184,9 +172,6 @@ static uint8_t WiredOr(uint8_t a, uint8_t b) {
   return 2;
 }
 
-// §28.12.3 rule a/b applied to one side of the strength scale: keep ambig
-// levels strictly above Su; lift the per-side lo to max(orig_lo, Su+1) where
-// the side survives; otherwise leave the side empty.
 static void TrimAmbigSide(Strength a_lo, Strength a_hi, uint8_t su,
                           Strength& r_lo, Strength& r_hi) {
   if (static_cast<uint8_t>(a_hi) <= su) return;
@@ -196,18 +181,12 @@ static void TrimAmbigSide(Strength a_lo, Strength a_hi, uint8_t su,
   r_hi = a_hi;
 }
 
-// §28.12.3 rule c: if the !Vu side has a surviving range with lo > Su+1, the
-// gap left between the unambig (at Su on the Vu side) and the surviving
-// ambig portion is filled by lowering the !Vu lo to Su+1.
 static void FillRuleCGap(Strength& r_lo, Strength r_hi, uint8_t su) {
   if (r_hi == Strength::kHighz) return;
   if (static_cast<uint8_t>(r_lo) <= su + 1) return;
   r_lo = static_cast<Strength>(su + 1);
 }
 
-// §28.12.3: combine an ambiguous-strength signal with one component of value
-// Vu and single strength level Su. Rules a/b/c are applied to each side of
-// the strength scale.
 static NetStrength CombineAmbigWithUnambig(NetStrength ambig, uint8_t vu,
                                            uint8_t su) {
   NetStrength r;
@@ -226,8 +205,6 @@ static NetStrength CombineAmbigWithUnambig(NetStrength ambig, uint8_t vu,
   return r;
 }
 
-// Decode a driver bit into the 0/1/2=x/3=z slot for bit 0. Pulled out of
-// the iteration loops to shrink their cognitive complexity.
 static uint8_t DriverBit0Val(const Logic4Vec& drv) {
   uint64_t mask = 1;
   bool a = (drv.words[0].aval & mask) != 0;
@@ -238,9 +215,6 @@ static uint8_t DriverBit0Val(const Logic4Vec& drv) {
   return 3;
 }
 
-// §28.12.3: locate the strongest unambig driver (value 0 or 1) whose
-// strength sits strictly below the conflict strength. Returns true and sets
-// vu/su when one exists; returns false otherwise.
 static bool FindWeakerUnambig(const std::vector<Logic4Vec>& drivers,
                               const std::vector<DriverStrength>& strengths,
                               uint8_t max_str, uint8_t& vu, uint8_t& su) {
@@ -264,8 +238,6 @@ struct MaxTracker {
   bool conflict = false;
 };
 
-// Update the running tracker for one driver's (val, str) contribution,
-// applying §28.12.4 wand/wor when applicable.
 static void FoldDriverIntoMax(uint8_t val, uint8_t str, NetType net_type,
                               MaxTracker& m) {
   if (str > m.str) {
@@ -284,15 +256,6 @@ static void FoldDriverIntoMax(uint8_t val, uint8_t str, NetType net_type,
   }
 }
 
-// §28.12 R1 at bit 0: pick the dominant (value, strength) across drivers and
-// populate the net's resolved_strength. The unambiguous branch records a
-// single level on the value's side. The ambiguous branch — §28.12.2 R1 —
-// fires when two drivers tie at the max strength with opposite values: the
-// value collapses to x and the result must carry the shared strength level
-// on both sides of the scale together with every smaller level. Wand/wor
-// resolve same-strength disagreements through §28.12.4's AND/OR and stay
-// unambiguous. After §28.12.2 produces the ambig signal, §28.12.3 folds in
-// the strongest unambig driver below the conflict strength.
 static void ComputeSingleBitStrength(
     const std::vector<Logic4Vec>& drivers,
     const std::vector<DriverStrength>& strengths, NetStrength& out,
@@ -325,9 +288,7 @@ static void ComputeSingleBitStrength(
                             net_type == NetType::kTriand ||
                             net_type == NetType::kWor ||
                             net_type == NetType::kTrior)) {
-    // §28.12.4: when wired AND/OR produces an x (e.g., wand of 1 and x), the
-    // result carries the strength of the combined signals. x lives on both
-    // sides of the strength scale, so record the same single level on each.
+
     out.s0_hi = out.s0_lo = s;
     out.s1_hi = out.s1_lo = s;
   }
@@ -338,20 +299,18 @@ static void ResolveStrengthBit(const std::vector<Logic4Vec>& drivers,
                                Logic4Vec& result, uint32_t bit,
                                NetType net_type) {
   uint8_t max_str = 0;
-  uint8_t max_val = 3;  // z
+  uint8_t max_val = 3;
   bool conflict = false;
   for (size_t d = 0; d < drivers.size(); ++d) {
     auto bv = GetBitVal(drivers[d], bit);
-    if (bv.val == 3) continue;  // z: no contribution
+    if (bv.val == 3) continue;
     uint8_t str = EffectiveStrength(bv.val, strengths[d]);
     if (str > max_str) {
       max_str = str;
       max_val = bv.val;
       conflict = false;
     } else if (str == max_str && bv.val != max_val) {
-      // §28.12.4: wired-logic net types resolve same-strength value
-      // disagreements by applying AND/OR over the driver values rather than
-      // producing x. For plain wire/tri/trireg the conflict propagates as x.
+
       if (net_type == NetType::kWand || net_type == NetType::kTriand) {
         max_val = WiredAnd(max_val, bv.val);
       } else if (net_type == NetType::kWor || net_type == NetType::kTrior) {
@@ -363,8 +322,6 @@ static void ResolveStrengthBit(const std::vector<Logic4Vec>& drivers,
   }
   SetBit(result, bit, conflict ? 2 : max_val);
 }
-
-// --- Helpers ---
 
 static bool AllDriversZ(const std::vector<Logic4Vec>& drivers) {
   for (const auto& drv : drivers) {
@@ -384,11 +341,6 @@ static void SetAllX(Logic4Vec& val) {
   }
 }
 
-// §28.16.2.1: charge decay is "the cause of transition of a 1 or 0 that is
-// stored in a trireg net to an unknown value (x)". Bits already at x stay x;
-// bits at z (per §28.16.2 R8, only reachable via initial state or force) are
-// preserved — decay shall not manufacture x out of a z that the LRM allows
-// the trireg to hold.
 static void DecayKnownBitsToX(Logic4Vec& val) {
   for (uint32_t w = 0; w < val.nwords; ++w) {
     uint64_t known = ~val.words[w].bval;
@@ -397,12 +349,10 @@ static void DecayKnownBitsToX(Logic4Vec& val) {
   }
 }
 
-// §6.6.4.2: Schedule charge decay event with generation counter.
 static void ScheduleDecay(Net& net, Scheduler* sched) {
   uint64_t gen = ++net.decay_generation;
   auto* event = sched->GetEventPool().Acquire();
-  // §4.3 ¶3: charge decay rewrites the net's resolved value, which is a
-  // change in state of the net, so the scheduled callback is an update event.
+
   event->kind = EventKind::kUpdate;
   event->callback = [&net, gen]() {
     if (net.decay_generation != gen) return;
@@ -414,9 +364,6 @@ static void ScheduleDecay(Net& net, Scheduler* sched) {
   sched->ScheduleEvent(time, Region::kActive, event);
 }
 
-// §28.15.1: With no overriding source, a tri0 net pulls to 0 at pull strength
-// and a tri1 net pulls to 1 at pull strength. "No overriding source" covers
-// both an empty driver list and drivers contributing only z.
 static bool ResolveTriPullDefault(Net& net, Arena& arena) {
   if (net.type != NetType::kTri0 && net.type != NetType::kTri1) return false;
   if (!net.drivers.empty() && !AllDriversZ(net.drivers)) return false;
@@ -439,9 +386,6 @@ static bool ResolveTriPullDefault(Net& net, Arena& arena) {
   return true;
 }
 
-// §6.6.6/§6.6.4/§28.15.1: Handle supply nets, trireg charge retention, and
-// tri0/tri1 pull defaults. Returns true if the net type was handled
-// (caller should return early).
 static bool ResolveSpecialNet(Net& net, Arena& arena, Scheduler* sched) {
   if (net.type == NetType::kSupply0) {
     net.resolved->value = MakeLogic4VecVal(arena, net.resolved->value.width, 0);
@@ -468,34 +412,25 @@ static bool ResolveSpecialNet(Net& net, Arena& arena, Scheduler* sched) {
   return false;
 }
 
-// --- Net::Resolve ---
-
 bool Net::InCapacitiveState() const {
   return type == NetType::kTrireg && AllDriversZ(drivers);
 }
 
 void Net::Resolve(Arena& arena, Scheduler* sched) {
   if (!resolved) return;
-  // §10.6.2: A force procedural statement on a net shall override all drivers
-  // until a release procedural statement is executed; preserve the forced
-  // value while the net is forced.
+
   if (resolved->is_forced) return;
-  // §6.7.3 / §28.15.1: User-defined nettypes and tri0/tri1 must resolve
-  // even with no drivers — the latter pull to their default value/strength.
+
   bool needs_resolution_when_undriven =
       is_user_nettype || type == NetType::kTri0 || type == NetType::kTri1;
   if (drivers.empty() && !needs_resolution_when_undriven) return;
 
-  // Cancel pending decay when trireg exits capacitive state.
   if (type == NetType::kTrireg && !AllDriversZ(drivers)) {
     ++decay_generation;
   }
 
   if (ResolveSpecialNet(*this, arena, sched)) return;
 
-  // §28.12: user-defined nettypes shall not carry strength levels, so any
-  // per-driver strength on such a net is ignored — skip the strength-aware
-  // path and fall through to value-only resolution.
   if (!is_user_nettype && !driver_strengths.empty()) {
     auto result = MakeLogic4Vec(arena, resolved->value.width);
     for (uint32_t b = 0; b < result.width; ++b) {
@@ -516,7 +451,6 @@ void Net::Resolve(Arena& arena, Scheduler* sched) {
     return;
   }
 
-  // Fold drivers pairwise using the appropriate resolution function.
   Logic4Vec result = drivers[0];
   for (size_t i = 1; i < drivers.size(); ++i) {
     auto combined = MakeLogic4Vec(arena, result.width);
@@ -530,8 +464,6 @@ void Net::Resolve(Arena& arena, Scheduler* sched) {
   resolved->value = result;
   resolved->NotifyWatchers();
 }
-
-// --- §6.6.4.1: Capacitive network charge propagation ---
 
 static bool ValuesEqual(const Logic4Vec& a, const Logic4Vec& b) {
   uint32_t n = (a.nwords < b.nwords) ? a.nwords : b.nwords;
@@ -548,11 +480,11 @@ void PropagateCharge(Net& a, Net& b) {
   auto sb = static_cast<uint8_t>(b.charge_strength);
   if (sa > sb) {
     b.resolved->value = a.resolved->value;
-    b.charge_strength = a.charge_strength;  // §6.6.4.1: Share charge strength.
+    b.charge_strength = a.charge_strength;
     b.resolved->NotifyWatchers();
   } else if (sb > sa) {
     a.resolved->value = b.resolved->value;
-    a.charge_strength = b.charge_strength;  // §6.6.4.1: Share charge strength.
+    a.charge_strength = b.charge_strength;
     a.resolved->NotifyWatchers();
   } else if (!ValuesEqual(a.resolved->value, b.resolved->value)) {
     SetAllX(a.resolved->value);
@@ -566,4 +498,4 @@ void DisconnectCharge(Net& net) {
   net.charge_strength = net.base_charge_strength;
 }
 
-}  // namespace delta
+}

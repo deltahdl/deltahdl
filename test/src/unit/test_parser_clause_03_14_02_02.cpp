@@ -377,4 +377,4 @@ TEST(CompilationUnitTimeDeclarations, TimeunitAndTimeprecisionBothSet) {
   EXPECT_TRUE(r.cu->has_cu_timeprecision);
 }
 
-}  // namespace
+}

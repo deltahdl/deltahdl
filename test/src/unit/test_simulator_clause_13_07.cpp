@@ -72,4 +72,4 @@ TEST(TaskFunctionNameSim, MutuallyRecursiveFunctionsSimulate) {
   LowerRunAndCheck(f, design, {{"x", 1u}});
 }
 
-}  // namespace
+}

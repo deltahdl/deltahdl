@@ -218,4 +218,4 @@ TEST(OutOfBlockDeclElaboration, MismatchedArgDirectionError) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

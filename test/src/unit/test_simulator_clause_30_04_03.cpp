@@ -89,8 +89,6 @@ TEST(SpecifyPathSim, EdgeKeywordPathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-// A full edge-sensitive path declaration must not disturb the surrounding
-// behavioral execution; the initial assignment remains observable.
 TEST(SpecifyPathSim, FullEdgeSensitivePathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -111,8 +109,6 @@ TEST(SpecifyPathSim, FullEdgeSensitivePathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 22u);
 }
 
-// With edge_identifier omitted, the path is active on any transition of the
-// input; the behavioral initial still drives x as expected.
 TEST(SpecifyPathSim, NoEdgeIdentifierWithDataSourceSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -133,4 +129,4 @@ TEST(SpecifyPathSim, NoEdgeIdentifierWithDataSourceSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-}  // namespace
+}

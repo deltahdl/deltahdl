@@ -185,4 +185,4 @@ TEST(NettypeElaboration, MultipleNettypeNetsElaborate) {
   EXPECT_EQ(count, 3);
 }
 
-}  // namespace
+}

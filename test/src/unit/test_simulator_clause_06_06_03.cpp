@@ -9,8 +9,6 @@ using namespace delta;
 
 namespace {
 
-// --- Table 6-3: wand/triand truth table ---
-
 TEST(WiredNetResolution, Wand_0_0) {
   auto r = ResolveWandWord({0, 0}, {0, 0});
   EXPECT_EQ(r.aval, 0u);
@@ -106,8 +104,6 @@ TEST(WiredNetResolution, Wand_z_z) {
   EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
-
-// --- Table 6-4: wor/trior truth table ---
 
 TEST(WiredNetResolution, Wor_0_0) {
   auto r = ResolveWorWord({0, 0}, {0, 0});
@@ -205,8 +201,6 @@ TEST(WiredNetResolution, Wor_z_z) {
   EXPECT_EQ(r.bval, 1u);
 }
 
-// --- Net::Resolve() integration tests ---
-
 TEST(WiredNetResolution, ResolveWandNet) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -267,4 +261,4 @@ TEST(WiredNetResolution, TriorUsesWorResolution) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-}  // namespace
+}

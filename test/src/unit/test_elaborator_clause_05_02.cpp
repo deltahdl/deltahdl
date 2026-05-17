@@ -65,4 +65,4 @@ TEST(LexicalConventionElaboration, CommentsDoNotAffectElaborationResult) {
   EXPECT_FALSE(f2.has_errors);
 }
 
-}  // namespace
+}

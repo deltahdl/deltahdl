@@ -1,4 +1,4 @@
-// §8.26.6.1
+
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -6,10 +6,6 @@
 using namespace delta;
 
 namespace {
-
-// Req: A method name conflict shall be resolved with a single method prototype
-// or implementation that simultaneously provides an implementation for all pure
-// virtual methods of the same name of any implemented interface class.
 
 TEST(InterfaceClassMethodConflict, SingleImplCalledViaObject) {
   EXPECT_EQ(RunAndGet(
@@ -32,9 +28,6 @@ TEST(InterfaceClassMethodConflict, SingleImplCalledViaObject) {
       "  end\n"
       "endmodule\n", "result"), 42u);
 }
-
-// Req: That method shall also be a valid virtual method override for any
-// inherited method of the same name.
 
 TEST(InterfaceClassMethodConflict, ExtendsAndImplementsCallsResolvedMethod) {
   EXPECT_EQ(RunAndGet(
@@ -61,9 +54,6 @@ TEST(InterfaceClassMethodConflict, ExtendsAndImplementsCallsResolvedMethod) {
       "endmodule\n", "result"), 99u);
 }
 
-// Req: An interface class may inherit multiple methods with the same name; the
-// implementing class resolves the conflict with a single method.
-
 TEST(InterfaceClassMethodConflict, InterfaceExtendsConflictResolvesAtRuntime) {
   EXPECT_EQ(RunAndGet(
       "interface class IA;\n"
@@ -88,4 +78,4 @@ TEST(InterfaceClassMethodConflict, InterfaceExtendsConflictResolvesAtRuntime) {
       "endmodule\n", "result"), 7u);
 }
 
-}  // namespace
+}

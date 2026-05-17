@@ -231,8 +231,6 @@ TEST(StatementLabelParsing, StatementWithLabelAndAttribute) {
   EXPECT_EQ(stmt->attrs[0].name, "mark");
 }
 
-// --- R1: label on additional statement types ---
-
 TEST(StatementLabelParsing, StatementLabelOnDoWhile) {
   auto r = Parse(
       "module m;\n"
@@ -323,8 +321,6 @@ TEST(StatementLabelParsing, StatementLabelOnForLoopStoresLabel) {
   EXPECT_EQ(stmt->label, "loop");
 }
 
-// --- R2: label before fork with join_any end-label ---
-
 TEST(StatementLabelParsing, StatementLabelOnForkWithJoinAny) {
   auto r = Parse(
       "module m;\n"
@@ -343,8 +339,6 @@ TEST(StatementLabelParsing, StatementLabelOnForkWithJoinAny) {
   EXPECT_EQ(stmt->label, "race");
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
 }
-
-// --- R2: mismatched end-label on labeled block is error ---
 
 TEST(StatementLabelParsing, MismatchedEndLabelOnLabeledBeginIsError) {
   auto r = Parse(
@@ -369,8 +363,6 @@ TEST(StatementLabelParsing, MismatchedEndLabelOnLabeledForkIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// --- R3: both label and block name on fork is error ---
-
 TEST(StatementLabelParsing, LabelAndBlockNameOnForkIsError) {
   auto r = Parse(
       "module m;\n"
@@ -382,8 +374,6 @@ TEST(StatementLabelParsing, LabelAndBlockNameOnForkIsError) {
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
-
-// --- R1 edge case: multiple labeled statements in sequence ---
 
 TEST(StatementLabelParsing, MultipleLabelsInSequence) {
   auto r = Parse(
@@ -404,4 +394,4 @@ TEST(StatementLabelParsing, MultipleLabelsInSequence) {
   EXPECT_EQ(body->stmts[2]->label, "step3");
 }
 
-}  // namespace
+}

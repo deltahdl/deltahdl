@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §26.3 example: `ComplexPkg::Complex cout = ComplexPkg::mul(a, b);` — the
-// scope resolution operator must bring a package parameter into the design
-// in a form the synthesizer can lower.
 TEST(PackageScopeReferenceSynthesis, PackageScopedParameterLowers) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
@@ -28,9 +25,6 @@ TEST(PackageScopeReferenceSynthesis, PackageScopedParameterLowers) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §26.3: an explicit `import pkg::WIDTH;` makes the imported identifier
-// directly visible in the importing scope.  Synthesis must accept the
-// imported name in dimensions just as it does a local parameter.
 TEST(PackageImportSynthesis, ExplicitImportLowers) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
@@ -50,9 +44,6 @@ TEST(PackageImportSynthesis, ExplicitImportLowers) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §26.3: a wildcard import `import pkg::*;` brings package types into the
-// importing scope; synthesis must lower a design that names a
-// package-declared type by its unqualified name post-wildcard.
 TEST(PackageImportSynthesis, WildcardImportTypeLowers) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
@@ -72,4 +63,4 @@ TEST(PackageImportSynthesis, WildcardImportTypeLowers) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

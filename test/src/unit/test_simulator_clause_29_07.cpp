@@ -54,4 +54,4 @@ TEST(UdpInitialStatement, OutputIsXAtSimulationStart) {
   EXPECT_EQ(state.GetOutput(), 'x');
 }
 
-}  // namespace
+}

@@ -64,4 +64,4 @@ TEST(ConcatDisambiguationSim, QueueTargetYieldsElementValues) {
   EXPECT_EQ(q->elements[1].ToUint64(), 4u);
 }
 
-}  // namespace
+}

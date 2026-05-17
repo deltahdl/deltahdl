@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- task_declaration ---
-
 TEST(TaskDeclElaboration, TaskDeclAddedToModule) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -21,11 +19,6 @@ TEST(TaskDeclElaboration, TaskDeclAddedToModule) {
   EXPECT_GE(mod->function_decls.size(), 1u);
   EXPECT_EQ(mod->function_decls[0]->kind, ModuleItemKind::kTaskDecl);
 }
-
-// Lifetime-keyword acceptance on task declarations is a §6.21 rule;
-// the corresponding elaborator tests live in test_elaborator_clause_06_21.cpp.
-
-// --- task_body_declaration ---
 
 TEST(TaskDeclElaboration, TaskOldStylePortsElaborate) {
   EXPECT_TRUE(ElabOk(
@@ -54,8 +47,6 @@ TEST(TaskDeclElaboration, TaskEmptyBodyElaborates) {
       "endmodule\n"));
 }
 
-// --- tf_port_list / tf_port_item ---
-
 TEST(TaskDeclElaboration, TaskMultiplePortsElaborate) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -79,8 +70,6 @@ TEST(TaskDeclElaboration, TaskPortDefaultValueElaborates) {
       "endmodule\n"));
 }
 
-// --- tf_port_direction ---
-
 TEST(TaskDeclElaboration, TaskConstRefPortElaborates) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -89,16 +78,12 @@ TEST(TaskDeclElaboration, TaskConstRefPortElaborates) {
       "endmodule\n"));
 }
 
-// --- task_prototype ---
-
 TEST(TaskDeclElaboration, TaskPrototypeExternElaborates) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
       "  extern task my_task(input int x);\n"
       "endmodule\n"));
 }
-
-// --- multiple tasks ---
 
 TEST(TaskDeclElaboration, MultipleTasksElaborate) {
   ElabFixture f;
@@ -115,4 +100,4 @@ TEST(TaskDeclElaboration, MultipleTasksElaborate) {
   EXPECT_GE(mod->function_decls.size(), 3u);
 }
 
-}  // namespace
+}

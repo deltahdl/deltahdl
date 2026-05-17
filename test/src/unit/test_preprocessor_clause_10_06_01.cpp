@@ -146,4 +146,4 @@ TEST(ProceduralAssignDeassignParsing, DFlipFlopClearPresetPattern) {
           "endmodule\n"));
 }
 
-}  // namespace
+}

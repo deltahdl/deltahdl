@@ -35,7 +35,7 @@ void VcdWriter::RegisterSignal(std::string_view name, uint32_t width,
   sig.width = width;
   sig.var = var;
   sig.ident = next_ident_++;
-  // Wrap around VCD printable identifier range.
+
   if (next_ident_ > '~') next_ident_ = '!';
   signals_.push_back(sig);
   if (ofs_.is_open()) {
@@ -126,7 +126,7 @@ void VcdWriter::DumpAllValues() {
   ofs_ << "$end\n";
 }
 
-void VcdWriter::DumpChangedValues(uint64_t /*prev_time*/) {
+void VcdWriter::DumpChangedValues(uint64_t ) {
   if (!ofs_.is_open() || !enabled_) return;
   for (const auto& sig : signals_) {
     if (!sig.var) continue;
@@ -135,4 +135,4 @@ void VcdWriter::DumpChangedValues(uint64_t /*prev_time*/) {
   }
 }
 
-}  // namespace delta
+}

@@ -137,4 +137,4 @@ TEST(NonAnsiStylePortDeclarations, PartialPortDeclMismatchedRangesIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

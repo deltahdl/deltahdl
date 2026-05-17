@@ -85,4 +85,4 @@ TEST(AggregateTypeParsing, PackedIndexedPartSelectMinus) {
   EXPECT_TRUE(stmt->rhs->is_part_select_minus);
 }
 
-}  // namespace
+}

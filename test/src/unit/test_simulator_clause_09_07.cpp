@@ -187,8 +187,6 @@ TEST(FineGrainProcessControlSimulation, ResumeNoEffectOnNonSuspended) {
   LowerRunAndCheck(f, design, {{"x", 42u}});
 }
 
-// §9.7: srandom() is a member of the process class (described in §18.13.3).
-// Calling p.srandom(seed) on a process handle seeds that process's RNG.
 TEST(FineGrainProcessControlSimulation, SrandomMethodOnProcessHandle) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -203,7 +201,7 @@ TEST(FineGrainProcessControlSimulation, SrandomMethodOnProcessHandle) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // First call to process::self() registers the current process with handle 1.
+
   auto* proc = f.ctx.FindProcessByHandle(1);
   ASSERT_NE(proc, nullptr);
   EXPECT_EQ(proc->rng_seed, 99u);
@@ -228,8 +226,6 @@ TEST(FineGrainProcessControlSimulation, SuspendNoEffectOnFinished) {
       "x"), 1u);
 }
 
-// §9.7: "It shall be an error to call this task [await] on the current
-// process, i.e., a process cannot wait for its own termination."
 TEST(FineGrainProcessControlSimulation, AwaitOnCurrentProcessIsError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -247,8 +243,6 @@ TEST(FineGrainProcessControlSimulation, AwaitOnCurrentProcessIsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §9.7: "It shall be an error for a function to call suspend() on the
-// current process, i.e., a function cannot suspend its own execution."
 TEST(FineGrainProcessControlSimulation, FunctionCannotSuspendItself) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -269,9 +263,6 @@ TEST(FineGrainProcessControlSimulation, FunctionCannotSuspendItself) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §9.7: A task is NOT a function, so calling suspend() on the current process
-// from within a task is permitted (only the function restriction in §9.7
-// applies to suspend-on-self).
 TEST(FineGrainProcessControlSimulation, TaskCanSuspendItself) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -299,10 +290,6 @@ TEST(FineGrainProcessControlSimulation, TaskCanSuspendItself) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §9.7: "Suspending a process in the WAITING state shall cause the process
-// to be desensitized to the event expression, wait condition, or delay
-// expiration on which it is blocked." Observed via the suspended process
-// failing to execute after its delay expires.
 TEST(FineGrainProcessControlSimulation, SuspendDesensitizesWaitingProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -326,8 +313,6 @@ TEST(FineGrainProcessControlSimulation, SuspendDesensitizesWaitingProcess) {
   LowerRunAndCheck(f, design, {{"x", 0u}});
 }
 
-// §9.7: "Suspending a process in either the SUSPENDED, FINISHED, or KILLED
-// state shall have no effect." This test verifies the SUSPENDED case.
 TEST(FineGrainProcessControlSimulation, SuspendNoEffectOnAlreadySuspended) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -349,8 +334,6 @@ TEST(FineGrainProcessControlSimulation, SuspendNoEffectOnAlreadySuspended) {
       "x"), 1u);
 }
 
-// §9.7: "Suspending a process in either the SUSPENDED, FINISHED, or KILLED
-// state shall have no effect." This test verifies the KILLED case.
 TEST(FineGrainProcessControlSimulation, SuspendNoEffectOnKilled) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -372,10 +355,6 @@ TEST(FineGrainProcessControlSimulation, SuspendNoEffectOnKilled) {
       "x"), 1u);
 }
 
-// §9.7: "The methods kill(), await(), suspend(), and resume() shall be
-// restricted to a process created by an initial procedure, always procedure,
-// or fork block from one of those procedures." This test exercises a final
-// block, which is excluded by the restriction.
 TEST(FineGrainProcessControlSimulation, KillOnFinalProcessIsError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -433,4 +412,4 @@ TEST(FineGrainProcessControlSimulation, ResumeOnFinalProcessIsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

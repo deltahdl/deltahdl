@@ -17,4 +17,4 @@ TEST(DeclarationAssignmentParsing, DefparamAssignmentMinTypMax) {
   ASSERT_EQ(item->defparam_assigns.size(), 1u);
 }
 
-}  // namespace
+}

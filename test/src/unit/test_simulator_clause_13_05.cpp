@@ -310,4 +310,4 @@ TEST(SubroutineCallExprSim, FunctionCallInTernary) {
   LowerRunAndCheck(f, design, {{"x", 10u}});
 }
 
-}  // namespace
+}

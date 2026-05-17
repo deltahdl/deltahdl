@@ -2,8 +2,6 @@
 
 namespace {
 
-// --- Req 1: Extern declaration coexists with actual definition ---
-
 TEST(ExternModuleElaboration, ExternDeclarationSkippedForInstantiation) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -38,8 +36,6 @@ TEST(ExternModuleElaboration, ExternDeclarationDoesNotDuplicatePorts) {
   EXPECT_EQ(top->ports.size(), 2u);
   EXPECT_FALSE(top->assigns.empty());
 }
-
-// --- Req 2: .* port resolution from extern declaration ---
 
 TEST(ExternModuleElaboration, WildcardPortsResolvedFromExtern) {
   ElabFixture f;
@@ -109,8 +105,6 @@ TEST(ExternModuleElaboration, WildcardModuleInstantiatedFromParent) {
   EXPECT_EQ(child->ports.size(), 2u);
 }
 
-// --- Req 4: Extern shall match actual definition ---
-
 TEST(ExternModuleElaboration, MatchingPortsNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -156,4 +150,4 @@ TEST(ExternModuleElaboration, ParamCountMismatchErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

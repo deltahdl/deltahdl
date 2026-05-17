@@ -234,4 +234,4 @@ TEST(BindDirective, BindUnderAnotherBindInstantiationIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

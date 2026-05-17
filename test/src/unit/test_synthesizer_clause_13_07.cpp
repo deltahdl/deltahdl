@@ -26,4 +26,4 @@ TEST(TaskFunctionNameSynth, ForwardFunctionReferenceInContinuousAssign) {
   EXPECT_EQ(aig->outputs.size(), 8);
 }
 
-}  // namespace
+}

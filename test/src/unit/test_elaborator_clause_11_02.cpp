@@ -4,10 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2: Each operand kind from the operand list is a valid expression.
-// These tests verify that complex operand kinds elaborate without errors
-// when used as standalone expressions (no operator).
-
 TEST(OperandElaboration, PackedStructAsExpression) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -90,4 +86,4 @@ TEST(OperandElaboration, PackedUnionBitSelectAsExpression) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

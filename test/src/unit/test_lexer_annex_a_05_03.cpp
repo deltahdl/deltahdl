@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- table / endtable keywords ---
-
 TEST(UdpBodyLexing, TableKeyword) {
   auto r = LexOne("table");
   EXPECT_EQ(r.token.kind, TokenKind::kKwTable);
@@ -31,8 +29,6 @@ TEST(UdpBodyLexing, TableSubstringsAreIdentifiers) {
   auto r4 = LexOne("endtables");
   EXPECT_EQ(r4.token.kind, TokenKind::kIdentifier);
 }
-
-// --- token sequences for UDP body constructs ---
 
 TEST(UdpBodyLexing, CombinationalEntryTokenSequence) {
   auto tokens = Lex("0 1 : 0 ;");
@@ -122,4 +118,4 @@ TEST(UdpBodyLexing, EdgeSymbolTokenKinds) {
   EXPECT_EQ(ts.token.kind, TokenKind::kStar);
 }
 
-}  // namespace
+}

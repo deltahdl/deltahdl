@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.4.3: Bit-type memory word access.
 TEST(MemorySimulation, BitMemoryWordAccess) {
   auto v = RunAndGet(
       "module t;\n"
@@ -20,4 +19,4 @@ TEST(MemorySimulation, BitMemoryWordAccess) {
   EXPECT_EQ(v, 0x42u);
 }
 
-}  // namespace
+}

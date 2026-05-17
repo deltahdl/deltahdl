@@ -4,9 +4,6 @@ using namespace delta;
 
 namespace {
 
-// Footnote 8: It shall be illegal to use the final_specifier when declaring a
-// pure virtual method or pure constraint.
-
 TEST(ClassSyntaxElaboration, FinalOnPureConstraintError) {
   EXPECT_FALSE(
       ElabOk("virtual class Base;\n"
@@ -15,9 +12,6 @@ TEST(ClassSyntaxElaboration, FinalOnPureConstraintError) {
              "module m;\n"
              "endmodule\n"));
 }
-
-// Footnote 25: The dynamic_override_specifiers shall only be legal on method
-// declarations inside a non-interface class scope.
 
 TEST(ClassSyntaxElaboration, DynamicOverrideInInterfaceClassError) {
   EXPECT_FALSE(
@@ -52,4 +46,4 @@ TEST(ClassSyntaxElaboration, DynamicOverrideInNonInterfaceClassOk) {
              "module m; endmodule\n"));
 }
 
-}  // namespace
+}

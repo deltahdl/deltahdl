@@ -97,11 +97,8 @@ TEST(WaitForkSimulation, WaitForkOnlyWaitsForImmediateChildren) {
       "  end\n"
       "endmodule\n",
       f);
-  // Correct behavior: wait fork returns at time 0 (immediate child finished),
-  // marker=1 at time 0, then grandchild sets marker=99 at time 10.
-  // If wait fork incorrectly waited for the grandchild, marker=99 would be set
-  // first at time 10, then marker=1 after wait fork returns, yielding 1.
+
   LowerRunAndCheck(f, design, {{"marker", 99u}});
 }
 
-}  // namespace
+}

@@ -51,4 +51,4 @@ TEST(EscapedIdentifierPreprocessor, EscapedIdentifierInMacroContext) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

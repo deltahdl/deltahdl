@@ -131,4 +131,4 @@ TEST(ClockingHierExprParse, PartSelectExpression) {
   EXPECT_NE(item->clocking_signals[0].hier_expr, nullptr);
 }
 
-}  // namespace
+}

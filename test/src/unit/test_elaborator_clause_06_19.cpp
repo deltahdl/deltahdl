@@ -98,7 +98,6 @@ TEST(EnumerationElaboration, EnumAutoIncrementOverflow_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.19: "Hierarchical names and const variables are not allowed."
 TEST(EnumerationElaboration, EnumHierarchicalNameInitializer_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -121,9 +120,6 @@ TEST(EnumerationElaboration, EnumConstVariableInitializer_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.19: "If the first name is not assigned a value, it is given the initial
-// value of 0." + "A name without a value is automatically assigned an
-// increment of the value of the previous name."
 TEST(EnumerationElaboration, EnumAutoIncrementValues) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -146,9 +142,6 @@ TEST(EnumerationElaboration, EnumAutoIncrementValues) {
   EXPECT_EQ(it->second[2].value, 6);
 }
 
-// §6.19 + §6.20: "...can include references to parameters, local parameters,
-// genvars, other enum named constants, and constant functions of these."
-// Sanity that a parameter reference is still accepted as the spec intends.
 TEST(EnumerationElaboration, EnumParameterInitializer_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -161,10 +154,6 @@ TEST(EnumerationElaboration, EnumParameterInitializer_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19 footnote 19: "A type_identifier shall be legal as an
-// enum_base_type if it denotes an integer_atom_type ... or an
-// integer_vector_type." A typedef of a struct (a non-integer type) used as
-// the enum base shall be rejected by the elaborator.
 TEST(EnumerationElaboration, EnumStructTypedefBaseTypeIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -176,8 +165,6 @@ TEST(EnumerationElaboration, EnumStructTypedefBaseTypeIsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.19: "An enum declaration of a 4-state type, such as integer, that
-// includes one or more names with x or z assignments shall be permitted."
 TEST(EnumerationElaboration, EnumIntegerWithXAssignmentPermitted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -189,10 +176,6 @@ TEST(EnumerationElaboration, EnumIntegerWithXAssignmentPermitted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19: "As in C, there is no overloading of literals; therefore, medal2
-// and medal3 cannot be defined in the same scope because they contain the
-// same names." Two inline enums in the same scope with overlapping member
-// names shall be rejected.
 TEST(EnumerationElaboration, EnumMemberNameReusedInSameScope_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -204,11 +187,6 @@ TEST(EnumerationElaboration, EnumMemberNameReusedInSameScope_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.19 footnote 19: "A type_identifier shall be legal as an enum_base_type
-// if it denotes an integer_atom_type, with which an additional packed
-// dimension is not permitted, or an integer_vector_type." A typedef
-// renaming an integer_atom_type used as enum base with a packed dimension
-// shall be rejected.
 TEST(EnumerationElaboration, EnumAtomTypeBaseWithPackedDim_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -220,11 +198,6 @@ TEST(EnumerationElaboration, EnumAtomTypeBaseWithPackedDim_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.19: "Any enumeration encoding value that is outside the representable
-// range of the enum base type shall be an error. For an unsigned base type,
-// this occurs if the cast truncates the value and any of the discarded bits
-// are nonzero." An unsized 'h10 = 16 is outside the 4-bit unsigned range
-// [0,15] even though no sized-literal width mismatch is present.
 TEST(EnumerationElaboration, EnumUnsignedValueOutsideRange_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -235,9 +208,6 @@ TEST(EnumerationElaboration, EnumUnsignedValueOutsideRange_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.19: "For a signed base type, this occurs if the cast truncates the
-// value and any of the discarded bits are not equal to the sign bit of the
-// result." A value above the signed-base maximum is out of range.
 TEST(EnumerationElaboration, EnumSignedValueOutsideRange_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -248,9 +218,6 @@ TEST(EnumerationElaboration, EnumSignedValueOutsideRange_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.19: The same representable-range rule applies symmetrically below the
-// signed minimum. For 4-bit signed, the range is [-8, 7]; -100 lies below
-// the minimum and shall be rejected.
 TEST(EnumerationElaboration, EnumSignedValueBelowMin_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -261,8 +228,6 @@ TEST(EnumerationElaboration, EnumSignedValueBelowMin_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.19: For an unsigned base type the representable range starts at 0;
-// any negative encoding value is outside the range.
 TEST(EnumerationElaboration, EnumUnsignedNegativeValue_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -273,11 +238,6 @@ TEST(EnumerationElaboration, EnumUnsignedNegativeValue_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.19 footnote 19: "A type_identifier shall be legal as an enum_base_type
-// if it denotes an integer_atom_type, with which an additional packed
-// dimension is not permitted, or an integer_vector_type." The vector-typed
-// alternative explicitly permits an additional packed dimension and shall
-// elaborate without error.
 TEST(EnumerationElaboration, EnumVectorTypedefBaseWithPackedDimAllowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -290,4 +250,4 @@ TEST(EnumerationElaboration, EnumVectorTypedefBaseWithPackedDimAllowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

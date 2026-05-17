@@ -120,7 +120,6 @@ TEST(EvalOpXZ, UnaryPlusWithXPropagatesX) {
 TEST(EvalOpXZ, AddWithZPropagatesX) {
   SimFixture f;
 
-  // Z bit at position 2: aval=1, bval=1 in that position.
   MakeVar4(f, "az", 4, 0b0100, 0b0100);
   auto* b = f.ctx.CreateVariable("z1", 4);
   b->value = MakeLogic4VecVal(f.arena, 4, 1);
@@ -401,9 +400,9 @@ TEST(EvalOp, RealOperandPowerYieldsRealResult) {
 
 TEST(EvalOp, NegativeBaseZeroExponentReturnsOne) {
   SimFixture f;
-  // Table 11-4: op1 < -1 paired with op2 == 0 yields 1.
+
   auto* nb = f.ctx.CreateVariable("nb", 8);
-  nb->value = MakeLogic4VecVal(f.arena, 8, 0xFD);  // -3 as signed 8-bit
+  nb->value = MakeLogic4VecVal(f.arena, 8, 0xFD);
   nb->value.is_signed = true;
   nb->is_signed = true;
   auto* ze = f.ctx.CreateVariable("ze", 8);
@@ -416,4 +415,4 @@ TEST(EvalOp, NegativeBaseZeroExponentReturnsOne) {
   EXPECT_EQ(result.ToUint64() & 0xFF, 1u);
 }
 
-}  // namespace
+}

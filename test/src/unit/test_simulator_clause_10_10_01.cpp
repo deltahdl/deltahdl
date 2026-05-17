@@ -110,4 +110,4 @@ TEST(UnpackedArrayConcatSim, SameArrayUsedMultipleTimes) {
   }
 }
 
-}  // namespace
+}

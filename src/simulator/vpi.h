@@ -15,16 +15,12 @@ class Scheduler;
 struct Net;
 struct Variable;
 
-// --- VPI object type constants (IEEE 1800-2023 Section 36.12) ---
-
 constexpr int kVpiModule = 32;
 constexpr int kVpiNet = 36;
 constexpr int kVpiReg = 48;
 constexpr int kVpiPort = 44;
 constexpr int kVpiParameter = 41;
 constexpr int kVpiCallback = 107;
-
-// --- VPI value format constants (IEEE 1800-2023 Section 36.18) ---
 
 constexpr int kVpiBinStrVal = 1;
 constexpr int kVpiOctStrVal = 2;
@@ -36,12 +32,8 @@ constexpr int kVpiStringVal = 7;
 constexpr int kVpiTimeVal = 8;
 constexpr int kVpiVectorVal = 9;
 
-// --- VPI time type constants (IEEE 1800-2023 Section 36.17) ---
-
 constexpr int kVpiSimTime = 1;
 constexpr int kVpiScaledRealTime = 2;
-
-// --- VPI callback reason constants (IEEE 1800-2023 Section 36.20) ---
 
 constexpr int kCbValueChange = 1;
 constexpr int kCbReadWriteSynch = 2;
@@ -49,14 +41,11 @@ constexpr int kCbEndOfSimulation = 3;
 constexpr int kCbStmt = 4;
 constexpr int kCbAtStartOfSimTime = 5;
 constexpr int kCbReadOnlySynch = 6;
-// §4.10 Table 4-1: the remaining one-shot evaluation callbacks. Numeric
-// values follow the order in which they appear in this header.
+
 constexpr int kCbAfterDelay = 7;
 constexpr int kCbNextSimTime = 8;
 constexpr int kCbNBASynch = 9;
 constexpr int kCbAtEndOfSimTime = 10;
-
-// --- VPI property constants (IEEE 1800-2023 Section 36.13) ---
 
 constexpr int kVpiType = 1;
 constexpr int kVpiName = 2;
@@ -64,44 +53,32 @@ constexpr int kVpiFullName = 3;
 constexpr int kVpiSize = 4;
 constexpr int kVpiDirection = 5;
 constexpr int kVpiDefName = 6;
-// §33.7: library binding info on objects of type vpiModule.
+
 constexpr int kVpiLibrary = 67;
 constexpr int kVpiConfig = 70;
 constexpr int kVpiCell = 71;
 
-// --- VPI direction constants (IEEE 1800-2023 Section 36.13) ---
-
 constexpr int kVpiInput = 1;
 constexpr int kVpiOutput = 2;
 constexpr int kVpiInout = 3;
-
-// --- VPI put_value delay mode constants (IEEE 1800-2023 Section 36.19) ---
 
 constexpr int kVpiNoDelay = 1;
 constexpr int kVpiInertialDelay = 2;
 constexpr int kVpiTransportDelay = 3;
 constexpr int kVpiPureTransportDelay = 4;
 
-// --- VPI control constants (IEEE 1800-2023 Section 36.34) ---
-
 constexpr int kVpiFinish = 66;
 constexpr int kVpiStop = 67;
-
-// --- VPI scalar value constants (IEEE 1800-2023 Section 36.18) ---
 
 constexpr int kVpi0 = 0;
 constexpr int kVpi1 = 1;
 constexpr int kVpiX = 2;
 constexpr int kVpiZ = 3;
 
-// --- VPI error severity (IEEE 1800-2023 Section 36.33) ---
-
 constexpr int kVpiNotice = 1;
 constexpr int kVpiWarning = 2;
 constexpr int kVpiError = 3;
 constexpr int kVpiInternal = 4;
-
-// --- VPI object definition ---
 
 struct VpiObject {
   int type = 0;
@@ -113,19 +90,16 @@ struct VpiObject {
   int direction = 0;
   int size = 0;
   int index = 0;
-  // §33.7: library/cell/config binding info exposed via vpi_get_str on
-  // vpiModule objects. cell_name defaults to the module name post-binding.
+
   std::string library_name;
   std::string cell_name;
   std::string config_name;
-  // Iterator state.
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 };
 
 using VpiHandle = VpiObject*;
-
-// --- VPI value struct (IEEE 1800-2023 Section 36.18) ---
 
 struct VpiVectorVal {
   uint32_t aval;
@@ -143,16 +117,12 @@ struct VpiValue {
   } value = {};
 };
 
-// --- VPI time struct (IEEE 1800-2023 Section 36.17) ---
-
 struct VpiTime {
   int type = 0;
   uint32_t high = 0;
   uint32_t low = 0;
   double real = 0.0;
 };
-
-// --- VPI callback data (IEEE 1800-2023 Section 36.20) ---
 
 struct VpiCbData {
   int reason = 0;
@@ -162,8 +132,6 @@ struct VpiCbData {
   int index = 0;
   void* user_data = nullptr;
 };
-
-// --- VPI error info (IEEE 1800-2023 Section 36.33) ---
 
 struct VpiErrorInfo {
   int state = 0;
@@ -175,16 +143,12 @@ struct VpiErrorInfo {
   int line = 0;
 };
 
-// --- VPI vlog info (IEEE 1800-2023 Section 36.32) ---
-
 struct VpiVlogInfo {
   int argc = 0;
   const char** argv = nullptr;
   const char* product = nullptr;
   const char* version = nullptr;
 };
-
-// --- VPI system task/function data (IEEE 1800-2023 Section 36.7) ---
 
 constexpr int kVpiSysTask = 1;
 constexpr int kVpiSysFunc = 2;
@@ -199,8 +163,6 @@ struct VpiSystfData {
   void* user_data = nullptr;
 };
 
-// --- VPI context ---
-
 class VpiContext {
  public:
   VpiContext() = default;
@@ -208,8 +170,6 @@ class VpiContext {
 
   void Attach(SimContext& sim_ctx);
 
-  // §4.4.3.1: Wire the scheduler so PutValue can detect writes that occur
-  // while the simulator is in the Preponed region.
   void SetScheduler(Scheduler* sched) { scheduler_ = sched; }
 
   VpiHandle RegisterSystf(VpiSystfData* data);
@@ -231,16 +191,12 @@ class VpiContext {
   void GetVlogInfo(VpiVlogInfo* info);
   VpiHandle HandleMulti(int type, VpiHandle ref1, VpiHandle ref2);
 
-  // Create a module-type VPI object (used during elaboration).
   VpiHandle CreateModule(std::string_view name, std::string full_name);
 
-  // Create a port-type VPI object under a parent module.
   VpiHandle CreatePort(std::string_view name, int direction, VpiHandle parent);
 
-  // Create a parameter-type VPI object.
   VpiHandle CreateParameter(std::string_view name, int int_value);
 
-  // Create a net-type VPI object.
   VpiHandle CreateNetObj(std::string_view name, Net* net_ptr, int width);
 
   const std::vector<VpiSystfData>& RegisteredSystfs() const { return systfs_; }
@@ -268,42 +224,19 @@ class VpiContext {
   VpiErrorInfo last_error_ = {};
   std::string product_ = "DeltaHDL";
   std::string version_ = "0.1.0";
-  // Storage for string values returned by GetStr / GetValue.
+
   std::vector<std::string> str_pool_;
 };
 
-// --- §4.10: PLI callback control points ---
-
-/// §4.10 Table 4-1: returns the event region a one-shot PLI callback is
-/// scheduled into based on its registration reason. Reasons not listed in
-/// Table 4-1 (including immediately-fired callbacks like cbValueChange)
-/// return Region::kCOUNT to signal "no assigned region".
 Region RegionForPliCallback(int reason);
 
-/// §4.10 first paragraph: returns true iff the callback reason names one of
-/// the seven Table 4-1 callbacks, which are the kind "explicitly registered
-/// as a one-shot evaluation event". Returns false for the immediate-fire
-/// kind (e.g. cbValueChange).
 bool IsOneShotPliCallback(int reason);
-
-// --- Global VPI context access ---
 
 VpiContext& GetGlobalVpiContext();
 void SetGlobalVpiContext(VpiContext* ctx);
 
-}  // namespace delta
+}
 
-// =============================================================================
-// C API (IEEE 1800-2023 Sections 36-39)
-//
-// The VPI C API names below are MANDATED by IEEE Std 1800-2023. They use
-// snake_case functions, s_-prefixed structs, and camelCase constants as
-// defined in the standard. These names cannot be changed. Exceptions for
-// these names are configured in .clang-tidy (FunctionIgnoredRegexp,
-// TypeAliasIgnoredRegexp).
-// =============================================================================
-
-// Type aliases [IEEE 1800-2023 §36.6].
 using vpiHandle = delta::VpiHandle;
 using s_vpi_value = delta::VpiValue;
 using s_vpi_time = delta::VpiTime;
@@ -313,8 +246,6 @@ using s_vpi_vecval = delta::VpiVectorVal;
 using SVpiErrorInfo = delta::VpiErrorInfo;
 using SVpiVlogInfo = delta::VpiVlogInfo;
 
-// VPI constants [IEEE 1800-2023 §36.12, §36.17, §36.18, §36.20].
-// Defined as macros per IEEE convention (vpi_user.h uses #define).
 #define vpiModule 32
 #define vpiNet 36
 #define vpiReg 48
@@ -381,7 +312,6 @@ using SVpiVlogInfo = delta::VpiVlogInfo;
 #define vpiSysTask 1
 #define vpiSysFunc 2
 
-// VPI C API function declarations [IEEE 1800-2023 §36.7-§36.34].
 vpiHandle vpi_register_systf(s_vpi_systf_data* data);
 vpiHandle VpiHandleC(int type, vpiHandle ref);
 vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope);

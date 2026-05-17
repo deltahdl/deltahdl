@@ -28,4 +28,4 @@ TEST(DataReadApiParsing, CoverageControlInAlwaysBlock) {
   )"));
 }
 
-}  // namespace
+}

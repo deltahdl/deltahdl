@@ -34,5 +34,5 @@ TEST_F(VcdWriterControlSim, ReEnableAfterDisable) {
   EXPECT_NE(content.find("#200"), std::string::npos);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

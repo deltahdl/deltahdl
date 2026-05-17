@@ -25,4 +25,4 @@ TEST(MultiplePathDeclarationSim, MixedTerminalFormsDoNotInterfere) {
   LowerRunAndCheck(f, design, {{"a", 11u}, {"b", 22u}});
 }
 
-}  // namespace
+}

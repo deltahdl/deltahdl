@@ -78,4 +78,4 @@ TEST(RealLiteralElaboration, RealLiteralElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

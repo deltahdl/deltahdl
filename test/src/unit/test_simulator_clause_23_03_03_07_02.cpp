@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Interconnect on gate input propagates value as scalar wire ---
-
 TEST(InterconnectPrimitiveTerminalSimulation,
      InterconnectOnAndGateInputPropagatesValue) {
   SimFixture f;
@@ -72,8 +70,6 @@ TEST(InterconnectPrimitiveTerminalSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// --- Interconnect on gate output receives value as scalar wire ---
-
 TEST(InterconnectPrimitiveTerminalSimulation,
      InterconnectOnAndGateOutputReceivesValue) {
   SimFixture f;
@@ -125,4 +121,4 @@ TEST(InterconnectPrimitiveTerminalSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-}  // namespace
+}

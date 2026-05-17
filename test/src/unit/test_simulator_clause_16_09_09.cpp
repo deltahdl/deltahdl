@@ -41,4 +41,4 @@ TEST(SvaEngine, SequenceThroughoutEmpty) {
   EXPECT_TRUE(EvalThroughout(check, values));
 }
 
-}  // namespace
+}

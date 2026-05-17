@@ -165,4 +165,4 @@ TEST(UnpackedArrayParsing, StringUnpackedDim) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-}  // namespace
+}

@@ -30,4 +30,4 @@ TEST(StringMethods, HextoaOverwritesExisting) {
   EXPECT_EQ(VecToString(var->value), "10");
 }
 
-}  // namespace
+}

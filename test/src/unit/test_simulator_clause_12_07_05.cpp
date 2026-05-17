@@ -142,4 +142,4 @@ TEST(LoopStatementSim, DoWhileXConditionOneIteration) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

@@ -1,4 +1,4 @@
-// §25.3.2
+
 
 #include "fixture_elaborator.h"
 
@@ -104,4 +104,4 @@ TEST(InterfaceNamedBundle, TopBindsInterfaceToModuleImplicitly) {
   EXPECT_NE(top->children[1].resolved, nullptr);
 }
 
-}  // namespace
+}

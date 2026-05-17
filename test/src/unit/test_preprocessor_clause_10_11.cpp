@@ -106,4 +106,4 @@ TEST(NetAliasingPreprocessor, ConditionalCompilationExcludesAlias) {
   EXPECT_FALSE(found);
 }
 
-}  // namespace
+}

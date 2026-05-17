@@ -32,4 +32,4 @@ TEST(CanonicalSimulationSemantics, CanonicalSimulationSemantics) {
   EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 18u);
 }
 
-}  // namespace
+}

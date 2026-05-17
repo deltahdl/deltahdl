@@ -655,4 +655,4 @@ TEST(ParameterizedSubroutineSim, ParamControlsVariableWidth) {
   EXPECT_EQ(r8->value.ToUint64(), 255u);
 }
 
-}  // namespace
+}

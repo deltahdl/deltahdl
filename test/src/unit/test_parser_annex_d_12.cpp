@@ -17,4 +17,4 @@ TEST(OptionalSystemTaskExtendedParsing, ShowscopesArg) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-}  // namespace
+}

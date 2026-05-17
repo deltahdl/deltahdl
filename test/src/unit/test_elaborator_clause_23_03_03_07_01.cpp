@@ -5,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1+R3: Any port connection with an interconnect net shall merge the
-//     dominating and dominated nets into a single net. If only one net is an
-//     interconnect net, the merged net shall be the type of the other net. ---
-
 TEST(InterconnectPortConnectionElaboration,
      ExternalInterconnectInternalWireNoError) {
   ElabFixture f;
@@ -144,8 +140,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// R3 reverse direction: internal interconnect port, external built-in net
-
 TEST(InterconnectPortConnectionElaboration,
      InternalInterconnectExternalWireNoError) {
   ElabFixture f;
@@ -176,10 +170,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- R2+R4: If both nets are interconnect, the merged net shall be
-//     interconnect. It shall be illegal for the type of a simulated net at the
-//     end of elaboration to be an interconnect net. ---
-
 TEST(InterconnectPortConnectionElaboration,
      BothInterconnectIllegalAtEndOfElaboration) {
   ElabFixture f;
@@ -193,9 +183,6 @@ TEST(InterconnectPortConnectionElaboration,
       f);
   EXPECT_TRUE(f.has_errors);
 }
-
-// --- R1: Port connection with interconnect merges nets regardless of
-//     connection style ---
 
 TEST(InterconnectPortConnectionElaboration,
      PositionalConnectionWithExternalInterconnectNoError) {
@@ -243,8 +230,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// R1+R3: Interconnect connected to multiple child ports of different net types
-
 TEST(InterconnectPortConnectionElaboration,
      InterconnectConnectedToMultipleDissimilarChildPorts) {
   ElabFixture f;
@@ -265,4 +250,4 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

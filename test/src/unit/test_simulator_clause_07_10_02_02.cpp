@@ -69,7 +69,7 @@ TEST(QueueMethods, InsertWithXzIndexIsNoop) {
   auto* idx_var = f.ctx.CreateVariable("idx", 32);
   idx_var->value = MakeLogic4Vec(f.arena, 32);
   idx_var->value.words[0].aval = 0;
-  idx_var->value.words[0].bval = 1;  // x value
+  idx_var->value.words[0].bval = 1;
   auto* call = MakeMethodCall(f.arena, "q", "insert",
                               {MakeId(f.arena, "idx"), MakeInt(f.arena, 99)});
   TryExecQueueMethodStmt(call, f.ctx, f.arena);
@@ -83,7 +83,7 @@ TEST(QueueMethods, InsertWithNegativeIndexIsNoop) {
   auto* q = MakeQueue(f, "q", {10, 20});
   auto* idx_var = f.ctx.CreateVariable("idx", 32);
   idx_var->value = MakeLogic4Vec(f.arena, 32);
-  idx_var->value.words[0].aval = static_cast<uint64_t>(-1);  // -1 as signed
+  idx_var->value.words[0].aval = static_cast<uint64_t>(-1);
   idx_var->value.words[0].bval = 0;
   idx_var->value.is_signed = true;
   auto* call = MakeMethodCall(f.arena, "q", "insert",
@@ -94,4 +94,4 @@ TEST(QueueMethods, InsertWithNegativeIndexIsNoop) {
   EXPECT_EQ(q->elements[1].ToUint64(), 20u);
 }
 
-}  // namespace
+}

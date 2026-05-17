@@ -18,4 +18,4 @@ TEST(IoSystemTaskParsing, DumpfileDefaultName) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

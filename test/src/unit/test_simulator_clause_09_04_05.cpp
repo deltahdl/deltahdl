@@ -37,4 +37,4 @@ TEST(IntraAssignRepeatCountEvaluation, RepeatCountNegativeUnsignedExecutes) {
   EXPECT_GT(result, 0u);
 }
 
-}  // namespace
+}

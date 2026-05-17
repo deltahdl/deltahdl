@@ -34,4 +34,4 @@ TEST(OperatorAndExpressionParsing, MinTypMaxInSpecparam) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

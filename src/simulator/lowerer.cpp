@@ -24,18 +24,14 @@
 
 namespace delta {
 
-Lowerer::Lowerer(SimContext& ctx, Arena& arena, DiagEngine& /*diag*/)
+Lowerer::Lowerer(SimContext& ctx, Arena& arena, DiagEngine& )
     : ctx_(ctx), arena_(arena) {}
-
-// --- Coroutine factories ---
 
 static SimCoroutine MakeInitialCoroutine(const Stmt* body, SimContext& ctx,
                                          Arena& arena) {
   co_await ExecStmt(body, ctx, arena);
 }
 
-// §24.3: Program initials track completion so the simulator can terminate
-// spawned descendants and implicitly request $finish once all complete.
 static SimCoroutine MakeProgramInitialCoroutine(const Stmt* body,
                                                 SimContext& ctx, Arena& arena) {
   co_await ExecStmt(body, ctx, arena);
@@ -55,7 +51,7 @@ static SimCoroutine MakeAlwaysSensCoroutine(const Stmt* body,
                                             SimContext& ctx, Arena& arena) {
   while (!ctx.StopRequested()) {
     co_await EventAwaiter{ctx, sens, arena};
-    // §12.4.2.1: Flush pending violation reports on process re-trigger.
+
     ctx.FlushPendingViolations();
     auto result = co_await ExecStmt(body, ctx, arena);
     if (result != StmtResult::kDone) break;
@@ -70,12 +66,11 @@ static SimCoroutine MakeAlwaysCombCoroutine(const Stmt* body, SimContext& ctx,
     co_await ExecStmt(body, ctx, arena);
     if (read_vars.empty()) break;
     co_await AnyChangeAwaiter{ctx, read_vars};
-    // §12.4.2.1: Flush pending violation reports on process re-trigger.
+
     ctx.FlushPendingViolations();
   }
 }
 
-// §10.3.4: Convert parser strength encoding to Strength enum.
 static Strength ParserStrToStrength(uint8_t s) {
   switch (s) {
     case 1:
@@ -93,7 +88,6 @@ static Strength ParserStrToStrength(uint8_t s) {
   }
 }
 
-// §10.3.3: Bit-exact comparison of two Logic4Vec values.
 static bool Logic4VecEqual(const Logic4Vec& a, const Logic4Vec& b) {
   if (a.nwords != b.nwords) return false;
   for (uint32_t i = 0; i < a.nwords; ++i) {
@@ -104,7 +98,6 @@ static bool Logic4VecEqual(const Logic4Vec& a, const Logic4Vec& b) {
   return true;
 }
 
-// §10.3.3: Check if all bits are high-Z (aval=0, bval=1 for each word).
 static bool IsAllHighZ(const Logic4Vec& v) {
   for (uint32_t i = 0; i < v.nwords; ++i) {
     if (v.words[i].aval != 0 || v.words[i].bval == 0) return false;
@@ -112,7 +105,6 @@ static bool IsAllHighZ(const Logic4Vec& v) {
   return v.nwords > 0;
 }
 
-// §10.3.3: Evaluated delay values for a continuous assignment.
 struct ContAssignDelays {
   uint64_t rise = 0;
   uint64_t fall = 0;
@@ -121,38 +113,30 @@ struct ContAssignDelays {
   bool has_decay = false;
 };
 
-// §10.3.3: Delay expression AST nodes for a continuous assignment.
 struct ContAssignDelayExprs {
   const Expr* rise = nullptr;
   const Expr* fall = nullptr;
   const Expr* decay = nullptr;
 };
 
-// §10.3.3: Grouped parameters for a continuous assignment coroutine.
 struct ContAssignParams {
   const Expr* lhs;
   const Expr* rhs;
   DriverStrength ds;
   ContAssignDelayExprs delays;
   uint32_t width = 0;
-  // §28.13: when set, the cont-assign represents an nmos/pmos/cmos switch and
-  // the output's per-side strength is derived per-evaluation from data_input's
-  // resolved net strength rather than the static `ds` above.
+
   bool nonresistive_switch = false;
-  // §28.14: when set, the cont-assign represents an rnmos/rpmos/rcmos switch
-  // and the output's per-side strength is derived per-evaluation from
-  // data_input's resolved net strength reduced one tier per Table 28-8.
+
   bool resistive_switch = false;
   const Expr* data_input = nullptr;
 };
 
-// §10.3.3: Select the appropriate delay for a continuous assignment based on
-// the transition from old_val to new_val.
 static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
                                       const Logic4Vec& new_val,
                                       const ContAssignDelays& d,
                                       uint32_t width) {
-  if (!d.has_fall) return d.rise;  // Single delay for all transitions.
+  if (!d.has_fall) return d.rise;
 
   bool new_is_z = IsAllHighZ(new_val);
   if (new_is_z) {
@@ -161,7 +145,7 @@ static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
   }
 
   if (width <= 1) {
-    // Scalar net: gate delay rules (§28.16).
+
     bool new_has_x = HasUnknownBits(new_val);
     if (new_has_x) {
       uint64_t m = std::min(d.rise, d.fall);
@@ -178,8 +162,6 @@ static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
     return d.rise;
   }
 
-  // Vector net: §10.3.3 rules.
-  // Nonzero-to-zero uses fall; all other transitions use rise.
   if (!HasUnknownBits(new_val) && new_val.ToUint64() == 0 &&
       !HasUnknownBits(old_val) && !IsAllHighZ(old_val) &&
       old_val.ToUint64() != 0) {
@@ -192,12 +174,10 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
                                             SimContext& ctx, Arena& arena) {
   if (!params.lhs || params.lhs->kind != ExprKind::kIdentifier) co_return;
 
-  // §10.3: Collect RHS read signals for re-evaluation sensitivity.
   std::unordered_set<std::string> read_strs;
   CollectExprReads(params.rhs, read_strs);
   std::vector<std::string_view> read_vars(read_strs.begin(), read_strs.end());
 
-  // Track the net driver index so updates replace rather than append.
   auto* net = ctx.FindNet(params.lhs->text);
   size_t driver_idx = net ? net->drivers.size() : 0;
   bool first = true;
@@ -205,7 +185,6 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   while (!ctx.StopRequested()) {
     auto val = EvalExpr(params.rhs, ctx, arena, params.width);
 
-    // §10.3.3: Apply continuous assignment delay with inertial semantics.
     if (params.delays.rise) {
       ContAssignDelays d;
       d.rise = EvalExpr(params.delays.rise, ctx, arena).ToUint64();
@@ -227,8 +206,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
 
       uint64_t ticks = SelectContAssignDelay(old_val, val, d, params.width);
       if (ticks > 0 && !read_vars.empty()) {
-        // §10.3.3: Inertial delay — if the RHS changes before the delay
-        // expires, cancel the pending assignment and reschedule.
+
         SimTime target = ctx.CurrentTime() + SimTime{ticks};
         while (true) {
           uint64_t remaining = (target.ticks > ctx.CurrentTime().ticks)
@@ -250,14 +228,6 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
       }
     }
 
-    // §28.13/§28.14: an nmos/pmos/cmos or rnmos/rpmos/rcmos output reproduces
-    // the data input's per-side resolved strength, with the appropriate
-    // reduction applied — supply→strong for nonresistive switches, the full
-    // Table 28-8 single-tier drop for resistive switches. When the data
-    // terminal is an identifier bound to a net, propagate that net's resolved
-    // strength; otherwise (constant operand, variable terminal, no net) keep
-    // the cont-assign's static drive strength as a fallback so the switch
-    // still drives a meaningful level.
     DriverStrength effective_ds = params.ds;
     if ((params.nonresistive_switch || params.resistive_switch) &&
         params.data_input &&
@@ -272,7 +242,6 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
       }
     }
 
-    // §10.3.4: If target is a net, add/update as a strength-aware driver.
     if (net) {
       if (first) {
         net->drivers.push_back(val);
@@ -285,8 +254,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
     } else {
       auto* var = ctx.FindVariable(params.lhs->text);
       if (var && !var->is_forced) {
-        // §10.6.2: A force on a variable overrides the continuous assignment
-        // until release; skip the cont-assign write while forced.
+
         var->value = ResizeToWidth(val, var->value.width, arena);
         var->NotifyWatchers();
       }
@@ -294,19 +262,15 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
 
     first = false;
 
-    // §10.3: Re-evaluate whenever the RHS changes.
     if (read_vars.empty()) break;
     co_await AnyChangeAwaiter{ctx, read_vars};
   }
 }
 
-// --- Schedule helper ---
-
 static void ScheduleProcess(Process* proc, SimContext& ctx) {
   auto& sched = ctx.GetScheduler();
   auto* event = sched.GetEventPool().Acquire();
-  // §4.3 ¶4: "The evaluation of a process is also an event, known as an
-  // evaluation event."
+
   event->kind = EventKind::kEvaluation;
   event->callback = [proc, &ctx]() {
     ctx.SetCurrentProcess(proc);
@@ -315,9 +279,6 @@ static void ScheduleProcess(Process* proc, SimContext& ctx) {
   sched.ScheduleEvent(SimTime{0}, proc->home_region, event);
 }
 
-// --- Module lowering ---
-
-// Register struct type metadata for field-level access at runtime.
 static void RegisterStructInfo(const RtlirVariable& var, SimContext& ctx) {
   if (!var.dtype || var.dtype->struct_members.empty()) return;
   StructTypeInfo info;
@@ -326,7 +287,7 @@ static void RegisterStructInfo(const RtlirVariable& var, SimContext& ctx) {
   info.is_union = (var.dtype->kind == DataTypeKind::kUnion);
   info.is_soft = var.dtype->is_soft;
   info.total_width = var.width;
-  // §7.2.1: First struct member is MSB. Union members all at offset 0.
+
   uint32_t offset = var.width;
   for (const auto& m : var.dtype->struct_members) {
     uint32_t fw = EvalStructMemberWidth(m);
@@ -341,8 +302,6 @@ static void RegisterStructInfo(const RtlirVariable& var, SimContext& ctx) {
   ctx.SetVariableStructType(var.name, var.name);
 }
 
-// §5.9: Read the i-th source byte (counted from the left) of a string-literal
-// value evaluated as a packed array, returning 0 once the source is exhausted.
 static uint8_t StringLiteralByteAt(const Logic4Vec& packed, uint32_t i) {
   uint32_t nbytes = packed.width / 8;
   if (i >= nbytes) return 0;
@@ -353,16 +312,13 @@ static uint8_t StringLiteralByteAt(const Logic4Vec& packed, uint32_t i) {
   return static_cast<uint8_t>((packed.words[word].aval >> bit) & 0xFF);
 }
 
-// §7.4: Initialize an individual array element, optionally from init pattern.
 static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
                              Variable* elem, SimContext& ctx, Arena& arena) {
   if (!var.init_expr) {
     elem->value = MakeLogic4VecVal(arena, var.width, 0);
     return;
   }
-  // §5.9: "A string literal can be assigned to an unpacked array of bytes.
-  // If the size differs, it is left justified."  Place byte i of the literal
-  // into element i and zero-fill any trailing slots beyond the source length.
+
   if (var.init_expr->kind == ExprKind::kStringLiteral) {
     auto packed = EvalExpr(var.init_expr, ctx, arena);
     auto b = StringLiteralByteAt(packed, elem_idx);
@@ -377,7 +333,6 @@ static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
   elem->value = MakeLogic4VecVal(arena, var.width, 0);
 }
 
-// §5.11: Initialize array element from '{count{val}} replication pattern.
 static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
                                    Variable* elem, SimContext& ctx,
                                    Arena& arena) {
@@ -390,7 +345,6 @@ static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
   elem->value = EvalExpr(rep->elements[elem_idx % inner_count], ctx, arena);
 }
 
-// §10.9.1: Check if a pattern key is a type keyword (int, logic, etc.).
 static bool IsTypeKeyword(std::string_view key) {
   return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
          key == "byte" || key == "shortint" || key == "longint" ||
@@ -398,7 +352,6 @@ static bool IsTypeKeyword(std::string_view key) {
          key == "time" || key == "realtime" || key == "string";
 }
 
-// §10.9.1: Check if a type keyword string matches a DataTypeKind.
 static bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kInt: return key == "int";
@@ -418,11 +371,10 @@ static bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind) {
   }
 }
 
-// §10.9.1: Initialize array element from named pattern (index/type/default keys).
 static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
                                Variable* elem, SimContext& ctx, Arena& arena) {
   auto* init = var.init_expr;
-  // Pass 1: explicit index key.
+
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
     auto& key = init->pattern_keys[i];
@@ -433,7 +385,7 @@ static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
       return;
     }
   }
-  // Pass 2: type key — matches if element type matches the keyword.
+
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
     auto& key = init->pattern_keys[i];
@@ -443,7 +395,7 @@ static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
       return;
     }
   }
-  // Pass 3: default key.
+
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
     if (init->pattern_keys[i] == "default") {
@@ -454,7 +406,6 @@ static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
   elem->value = MakeLogic4VecVal(arena, var.width, 0);
 }
 
-// §7.4: Create individual element variables for unpacked arrays.
 static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
                                 Arena& arena) {
   if (var.unpacked_size == 0) return;
@@ -466,7 +417,7 @@ static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
   info.is_4state = var.is_4state;
   info.elem_type_kind = var.elem_type_kind;
   ctx.RegisterArray(var.name, info);
-  // §5.11: Detect replication and named array pattern forms.
+
   bool named = var.init_expr && !var.init_expr->pattern_keys.empty();
   bool replicate = var.init_expr && var.init_expr->elements.size() == 1 &&
                    var.init_expr->elements[0]->kind == ExprKind::kReplicate;
@@ -486,19 +437,17 @@ static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
   }
 }
 
-// §7.9.11: Strip surrounding quotes from a string literal key.
 static std::string StripQuotes(std::string_view s) {
   if (s.size() >= 2 && s.front() == '"' && s.back() == '"')
     return std::string(s.substr(1, s.size() - 2));
   return std::string(s);
 }
 
-// §7.5: Initialize dynamic array from init expression.
 void Lowerer::LowerDynArrayInit(const RtlirVariable& var) {
   if (!var.init_expr) return;
   auto* q = ctx_.FindQueue(var.name);
   if (!q) return;
-  // Accept both '{...} (assignment pattern) and {...} (concatenation) syntax.
+
   if (var.init_expr->kind != ExprKind::kAssignmentPattern &&
       var.init_expr->kind != ExprKind::kConcatenation)
     return;
@@ -507,7 +456,6 @@ void Lowerer::LowerDynArrayInit(const RtlirVariable& var) {
   }
 }
 
-// §7.9.11: Initialize assoc array from '{key:val, default:val} literal.
 void Lowerer::InitAssocDefault(const Expr* init, AssocArrayObject* aa) {
   if (!init || init->kind != ExprKind::kAssignmentPattern) return;
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
@@ -526,7 +474,6 @@ void Lowerer::InitAssocDefault(const Expr* init, AssocArrayObject* aa) {
   }
 }
 
-// §7.2.2: Apply struct member default values to a packed struct variable.
 static void ApplyStructMemberDefaults(const RtlirVariable& var, Variable* v,
                                       SimContext& ctx, Arena& arena) {
   if (!var.dtype || var.dtype->struct_members.empty()) return;
@@ -534,7 +481,7 @@ static void ApplyStructMemberDefaults(const RtlirVariable& var, Variable* v,
   auto* sinfo = ctx.GetVariableStructType(var.name);
   if (!sinfo) return;
   for (const auto& f : sinfo->fields) {
-    // Find the matching struct member with an init_expr.
+
     for (const auto& m : var.dtype->struct_members) {
       if (m.name != f.name || !m.init_expr) continue;
       auto val = EvalExpr(m.init_expr, ctx, arena).ToUint64();
@@ -548,15 +495,14 @@ static void ApplyStructMemberDefaults(const RtlirVariable& var, Variable* v,
   }
 }
 
-// §7/§8: Lower aggregate (queue/assoc/array) storage for a variable.
 void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
   if (var.is_queue) {
     ctx_.CreateQueue(var.name, var.width, var.queue_max_size);
   } else if (var.is_dynamic) {
-    // §7.5: Dynamic arrays use queue storage for resize support.
+
     ctx_.CreateQueue(var.name, var.width);
     LowerDynArrayInit(var);
-    // §7.12: Register ArrayInfo so reduction/ordering/locator methods dispatch.
+
     ArrayInfo info;
     info.is_dynamic = true;
     info.elem_width = var.width;
@@ -573,17 +519,14 @@ void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
 }
 
 void Lowerer::LowerVar(const RtlirVariable& var) {
-  // §8: Class handles are 64-bit. §6.12: real and realtime store as C double
-  // (64 bits); shortreal stores as C float (32 bits). The elaborator already
-  // assigns 64 to real/realtime and 32 to shortreal in var.width, so just
-  // preserve it.
+
   uint32_t width = var.class_type_name.empty() ? var.width : 64;
   auto* v = ctx_.CreateVariable(var.name, width);
-  // §6.8 Table 6-7: 2-state types default to 0, real/shortreal to 0.0.
+
   if (!var.is_4state && !var.is_event && !var.is_string && !var.is_chandle) {
     v->value = MakeLogic4VecVal(arena_, width, 0);
   }
-  // §6.14: chandle defaults to null (0), not X.
+
   if (var.is_chandle) v->value = MakeLogic4VecVal(arena_, width, 0);
   v->is_4state = var.is_4state;
   if (var.is_event) v->is_event = true;
@@ -597,23 +540,22 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
   if (!var.init_expr) ApplyStructMemberDefaults(var, v, ctx_, arena_);
   if (!var.class_type_name.empty())
     ctx_.SetVariableClassType(var.name, var.class_type_name);
-  // §6.24.2: Register enum type info for $cast validation.
+
   if (!var.enum_type_name.empty() && var.dtype) {
     RegisterEnumForCast(var);
   }
   LowerVarAggregate(var);
 }
 
-// §10.9.2: Evaluate variable initializer with struct pattern awareness.
 void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
                            uint32_t width) {
-  // §15.5.5.2: Event initialized to null breaks the synchronization queue.
+
   if (var.is_event && var.init_expr->kind == ExprKind::kIdentifier &&
       var.init_expr->text == "null") {
     v->is_null_event = true;
     return;
   }
-  // §15.5.5: Event initialization from another event shares the handle.
+
   if (var.is_event && var.init_expr->kind == ExprKind::kIdentifier) {
     auto* target = ctx_.FindVariable(var.init_expr->text);
     if (target && target->is_event) {
@@ -622,8 +564,7 @@ void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
     }
   }
   auto* sinfo = ctx_.GetVariableStructType(var.name);
-  // §A.6.7.1: Unwrap typed assignment pattern expression (kCast wrapping
-  // pattern).
+
   auto* init = var.init_expr;
   if (init->kind == ExprKind::kCast && init->lhs &&
       init->lhs->kind == ExprKind::kAssignmentPattern)
@@ -637,13 +578,11 @@ void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
   auto val = EvalExpr(var.init_expr, ctx_, arena_);
   if (val.width != width && !var.is_real && !var.is_string)
     val = MakeLogic4VecVal(arena_, width, val.ToUint64());
-  // §6.16: When a string literal (or any byte-packed value) is the source of
-  // an initializer for a string variable, drop every '\0' byte before storing.
+
   if (var.is_string) val = StripStringZeros(val, arena_);
   v->value = val;
 }
 
-// §6.24.2: Register enum type info and variable mapping for $cast.
 void Lowerer::RegisterEnumForCast(const RtlirVariable& var) {
   ctx_.SetVariableEnumType(var.name, var.enum_type_name);
 }
@@ -660,7 +599,6 @@ void Lowerer::RegisterEnumTypes(const RtlirModule* mod) {
   }
 }
 
-// §8.22: Add or update a single vtable entry for a virtual method.
 static void AddOrUpdateVTableEntry(ClassTypeInfo* info,
                                    const ClassMember* member) {
   int idx = info->FindVTableIndex(member->method->name);
@@ -673,7 +611,6 @@ static void AddOrUpdateVTableEntry(ClassTypeInfo* info,
   }
 }
 
-// §8.22: Build vtable for polymorphic dispatch from class members.
 static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
   if (info->parent) info->vtable = info->parent->vtable;
   for (const auto* iface : info->extended_interfaces) {
@@ -688,9 +625,7 @@ static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
   }
   for (auto* member : cls->members) {
     if (member->kind != ClassMemberKind::kMethod || !member->method) continue;
-    // §8.20: A virtual method may override a non-virtual method, making it
-    // virtual from that point in the hierarchy. Also include pure_virtual
-    // and methods with ':extends' (which implies virtuality per §8.20).
+
     if (!member->is_virtual && !member->is_pure_virtual &&
         !(member->method && member->method->is_method_extends))
       continue;
@@ -698,7 +633,6 @@ static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
   }
 }
 
-// §8.9: Initialize static properties on the class type.
 static void InitStaticProperties(ClassTypeInfo* info, SimContext& ctx,
                                  Arena& arena) {
   for (const auto& p : info->properties) {
@@ -714,14 +648,13 @@ static void InitStaticProperties(ClassTypeInfo* info, SimContext& ctx,
   }
 }
 
-// §8: Create ClassTypeInfo from a ClassDecl AST node.
 void Lowerer::LowerClassDecl(const ClassDecl* cls) {
   auto* info = arena_.Create<ClassTypeInfo>();
   info->name = cls->name;
   info->decl = cls;
   info->is_abstract = cls->is_virtual;
   info->is_interface = cls->is_interface;
-  // §8.13: Wire parent linkage from base_class.
+
   if (!cls->base_class.empty())
     info->parent = ctx_.FindClassType(cls->base_class);
   for (const auto& ref : cls->extends_interfaces) {
@@ -746,8 +679,7 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
   }
   BuildVTable(info, cls);
   InitStaticProperties(info, ctx_, arena_);
-  // §8.23: Register class parameters as static properties so they are
-  // accessible via the scope resolution operator (ClassName::PARAM).
+
   for (const auto& [pname, pexpr] : cls->params) {
     info->properties.push_back({pname, 32, false});
     if (pexpr) {
@@ -758,7 +690,7 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
           MakeLogic4VecVal(arena_, 32, 0);
     }
   }
-  // §8.5: Collect enum members declared inside the class.
+
   for (const auto* member : cls->members) {
     if (member->kind != ClassMemberKind::kTypedef || !member->typedef_item)
       continue;
@@ -770,7 +702,7 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
       ++next_val;
     }
   }
-  // §8.26.3: Interface class params and typedefs are inherited through extends.
+
   if (cls->is_interface) {
     auto inherit_from = [&](const ClassTypeInfo* src) {
       for (const auto& [k, v] : src->static_properties) {
@@ -788,8 +720,7 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
       inherit_from(iface);
   }
   ctx_.RegisterClassType(cls->name, info);
-  // §8.23: Register nested class declarations with scope-qualified names
-  // (e.g., Outer::Inner) so they can be accessed via the :: operator.
+
   for (const auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kClassDecl && member->nested_class) {
       auto qualified =
@@ -831,7 +762,6 @@ void Lowerer::LowerProcesses(const std::vector<RtlirProcess>& procs,
   }
 }
 
-// §6.20: Create variables for resolved parameters.
 void Lowerer::LowerParams(const RtlirModule* mod) {
   for (const auto& p : mod->params) {
     if (p.is_unbounded) {
@@ -846,7 +776,6 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
   }
 }
 
-// §10.11: Lower net aliases.
 void Lowerer::LowerAliases(const RtlirModule* mod) {
   for (const auto& alias : mod->aliases) {
     if (alias.nets.size() < 2) continue;
@@ -863,8 +792,7 @@ void Lowerer::LowerAliases(const RtlirModule* mod) {
 }
 
 void Lowerer::LowerModule(const RtlirModule* mod) {
-  // §23.8: Record the module type at this instance-path prefix so that
-  // upward name lookups can match module_identifier.item_name forms.
+
   {
     std::string key = inst_prefix_;
     if (!key.empty() && key.back() == '.') key.pop_back();
@@ -892,8 +820,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   }
   for (auto* seq_decl : mod->sequence_decls) {
     ctx_.RegisterSequenceDecl(seq_decl->name, seq_decl);
-    // §9.4.4: Create the __seq_ endpoint event variable so that
-    // wait(seq.triggered) and @(seq) can reference it immediately.
+
     std::string ep_name = std::string("__seq_") + std::string(seq_decl->name);
     if (!ctx_.FindVariable(ep_name)) {
       auto* ep_var = ctx_.CreateVariable(ep_name, 1);
@@ -903,10 +830,10 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (auto* cls : mod->class_decls) {
     LowerClassDecl(cls);
   }
-  // §23.7: Register items from imported packages.
+
   LowerImports(mod);
   {
-    // §9.7: Register synthetic ClassTypeInfo for the built-in process class.
+
     auto* proc_type = arena_.Create<ClassTypeInfo>();
     proc_type->name = "process";
     proc_type->enum_members["FINISHED"] = 0;
@@ -922,11 +849,9 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (const auto& ca : mod->assigns) {
     LowerContAssign(ca, mod->is_program);
   }
-  // §23.6: Recursively lower child module instances for hierarchical access.
+
   LowerChildModules(mod);
 }
-
-// --- Process lowering ---
 
 static void RegisterSensitivity(const RtlirProcess& proc, Process* p,
                                 SimContext& ctx) {
@@ -940,9 +865,7 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
                            uint32_t program_block_id) {
   auto* p = arena_.Create<Process>();
   p->id = next_id_++;
-  // §4.4.2.6 ¶2: program-block bodies emit their blocking-assignment code into
-  // the Reactive region; route through Scheduler's named helper so the
-  // §4.4.2.6 routing rule is applied by name rather than hard-coded here.
+
   p->home_region = from_program ? Scheduler::HomeRegionForReactiveBlockingAssign()
                                 : Region::kActive;
   p->is_reactive = from_program;
@@ -983,26 +906,21 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
       p->kind = ProcessKind::kFinal;
       p->coro = MakeInitialCoroutine(proc.body, ctx_, arena_).Release();
       ctx_.RegisterFinalProcess(p);
-      return;  // Don't schedule at time 0.
+      return;
   }
 
   ScheduleProcess(p, ctx_);
 }
 
-// --- Continuous assignment lowering ---
-
 void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   auto* p = arena_.Create<Process>();
   p->kind = ProcessKind::kContAssign;
   p->id = next_id_++;
-  // §4.4.2.6 ¶2: continuous assigns in program blocks route their callbacks
-  // into the Reactive region via the named §4.4.2.6 helper.
+
   p->home_region = from_program ? Scheduler::HomeRegionForReactiveBlockingAssign()
                                 : Region::kActive;
   p->is_reactive = from_program;
-  // Inherit the lowerer's current instance prefix so that bare identifiers
-  // in the cont-assign expressions resolve to the enclosing scope's items
-  // through the FindVariable prefix lookup.
+
   p->inst_prefix = inst_prefix_;
   ContAssignParams cap;
   cap.lhs = ca.lhs;
@@ -1018,8 +936,6 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
 
   ScheduleProcess(p, ctx_);
 }
-
-// --- §23.7: Import resolution for package-scope name access ---
 
 PackageDecl* Lowerer::FindPackage(std::string_view name) const {
   if (!design_) return nullptr;
@@ -1042,8 +958,6 @@ void Lowerer::LowerPackageItem(ModuleItem* item) {
   }
 }
 
-// §26.6: Test whether an item matches a simple name, including the class-decl
-// naming pattern where the name lives inside item->class_decl.
 static bool PackageItemHasName(const ModuleItem* item, std::string_view name) {
   if (item->name == name) return true;
   if (item->kind == ModuleItemKind::kClassDecl && item->class_decl &&
@@ -1063,12 +977,12 @@ void Lowerer::LowerImportedName(
       return;
     }
   }
-  // §26.6: Not a direct declaration — try to resolve through export paths.
+
   for (auto* item : pkg->items) {
     if (item->kind != ModuleItemKind::kExportDecl) continue;
     const auto& ex = item->import_item;
     if (ex.package_name == "*") {
-      // §26.6: `export *::*;` re-exports whatever this package imports.
+
       for (auto* imp_item : pkg->items) {
         if (imp_item->kind != ModuleItemKind::kImportDecl) continue;
         auto* src = FindPackage(imp_item->import_item.package_name);
@@ -1098,7 +1012,7 @@ void Lowerer::LowerAllImported(
         item->kind == ModuleItemKind::kExportDecl) continue;
     LowerPackageItem(item);
   }
-  // §26.6: Follow exports to bring in re-exported items from source packages.
+
   for (auto* item : pkg->items) {
     if (item->kind != ModuleItemKind::kExportDecl) continue;
     const auto& ex = item->import_item;
@@ -1137,8 +1051,6 @@ void Lowerer::LowerImports(const RtlirModule* mod) {
   }
 }
 
-// --- §4.9.6: Port-connection lowering for module instances ---
-
 void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
                                 bool from_program) {
   for (const auto& binding : inst.port_bindings) {
@@ -1150,21 +1062,11 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
       continue;
     }
 
-    // Bare port-name identifier for the local (child) side. The cont-assign
-    // coroutine inherits inst_prefix_ via Process::inst_prefix, so a bare
-    // port name resolves to the prefixed local port through FindVariable.
     auto* name_str = arena_.Create<std::string>(std::string(binding.port_name));
     auto* local_id = arena_.Create<Expr>();
     local_id->kind = ExprKind::kIdentifier;
     local_id->text = *name_str;
 
-    // §4.9.6: An inout port is a non-strength-reducing transistor connecting
-    // the local net to the outside net — both sides observe a single shared
-    // storage location. Implement this by aliasing the local port's
-    // variable entry to the outside identifier's variable so a write on
-    // either side is the same write. Aliasing only applies when the outside
-    // is a plain identifier; expression connections fall through and the
-    // inout effectively becomes unconnected at the binding boundary.
     if (binding.direction == Direction::kInout) {
       if (binding.connection->kind != ExprKind::kIdentifier) continue;
       std::string local_qualified = inst_prefix_ + std::string(binding.port_name);
@@ -1172,8 +1074,6 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
       continue;
     }
 
-    // §4.9.6: An input port is a continuous assignment from the outside
-    // expression to the local input net or variable.
     if (binding.direction == Direction::kInput) {
       RtlirContAssign ca;
       ca.lhs = local_id;
@@ -1183,11 +1083,6 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
       continue;
     }
 
-    // §4.9.6: An output port is a continuous assignment from the local
-    // output expression to the outside net or variable. Only identifier
-    // outside expressions are valid lvalues here; complex selects or
-    // concatenations on the outside are not sinks the cont-assign coroutine
-    // can write into and are skipped.
     if (binding.connection->kind != ExprKind::kIdentifier) continue;
     RtlirContAssign ca;
     ca.lhs = binding.connection;
@@ -1197,22 +1092,18 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
   }
 }
 
-// --- §23.6: Recursive child module lowering for hierarchical access ---
-
 void Lowerer::LowerChildModules(const RtlirModule* mod) {
   for (const auto& child : mod->children) {
     if (!child.resolved) continue;
     auto saved_prefix = inst_prefix_;
     inst_prefix_ = inst_prefix_ + std::string(child.inst_name) + ".";
 
-    // §23.8: Record this child's module type at its instance-path prefix.
     {
       std::string key = inst_prefix_;
       if (!key.empty() && key.back() == '.') key.pop_back();
       ctx_.RegisterInstanceType(key, child.resolved->name);
     }
 
-    // Create child variables with hierarchical prefix.
     for (const auto& var : child.resolved->variables) {
       auto* name =
           arena_.Create<std::string>(inst_prefix_ + std::string(var.name));
@@ -1227,7 +1118,6 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
       if (var.is_signed) v->is_signed = true;
     }
 
-    // Create child ports with hierarchical prefix.
     for (const auto& port : child.resolved->ports) {
       auto* name =
           arena_.Create<std::string>(inst_prefix_ + std::string(port.name));
@@ -1237,12 +1127,8 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
       }
     }
 
-    // §4.9.6: Bridge each child port to the outside world via implicit
-    // assignments. Done before lowering the child's own processes so that
-    // input drivers are present in time for the first scheduled evaluation.
     LowerPortBindings(child, child.resolved->is_program);
 
-    // Lower child processes (inst_prefix_ is set on each Process).
     uint32_t child_block_id =
         child.resolved->is_program ? next_program_block_id_++ : 0;
     LowerProcesses(child.resolved->processes, child.resolved->is_program,
@@ -1251,14 +1137,11 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
       LowerContAssign(ca, child.resolved->is_program);
     }
 
-    // Recurse into grandchildren.
     LowerChildModules(child.resolved);
 
     inst_prefix_ = saved_prefix;
   }
 }
-
-// --- Design lowering ---
 
 void Lowerer::Lower(const RtlirDesign* design) {
   if (!design) return;
@@ -1266,8 +1149,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   for (const auto& [name, width] : design->type_widths) {
     ctx_.RegisterTypeWidth(name, width);
   }
-  // §23.7.1: Register package parameters as variables with qualified names
-  // (e.g., "pkg.WIDTH") so scope-prefixed access resolves at runtime.
+
   for (auto* pkg : design->packages) {
     for (auto* item : pkg->items) {
       if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
@@ -1278,16 +1160,13 @@ void Lowerer::Lower(const RtlirDesign* design) {
       }
     }
   }
-  // §23.7.1: Lower CU-scope class declarations so scope resolution
-  // (e.g., ClassName::member) can find their static properties.
+
   for (auto* cls : design->cu_class_decls) {
     if (!ctx_.FindClassType(cls->name)) {
       LowerClassDecl(cls);
     }
   }
-  // §23.8.1: Make CU-scope tasks/functions callable by bare name from
-  // within modules. Registered before module lowering so that a module-
-  // local task/function with the same name overwrites and takes precedence.
+
   for (auto* item : design->cu_function_decls) {
     if (!item->method_class.empty()) continue;
     ctx_.RegisterFunction(item->name, item);
@@ -1295,11 +1174,11 @@ void Lowerer::Lower(const RtlirDesign* design) {
   for (auto* mod : design->top_modules) {
     LowerModule(mod);
   }
-  // §11.12: Register CU-scope let declarations.
+
   for (auto* let_decl : design->cu_let_decls) {
     ctx_.RegisterLetDecl(let_decl->name, let_decl);
   }
-  // §8.24: Link out-of-block method bodies to their class types.
+
   for (auto* item : design->cu_function_decls) {
     if (item->method_class.empty()) continue;
     auto* cls = ctx_.FindClassType(item->method_class);
@@ -1309,4 +1188,4 @@ void Lowerer::Lower(const RtlirDesign* design) {
   }
 }
 
-}  // namespace delta
+}

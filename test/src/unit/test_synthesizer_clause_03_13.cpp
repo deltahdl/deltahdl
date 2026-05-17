@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §3.13(e): "The module name space ... unifies the definition of modules,
-// interfaces, programs, checkers, functions, tasks, named blocks, instance
-// names, parameters, named events, net declarations, variable
-// declarations, and user-defined types within the enclosing construct."
-// Synthesis must lower a module whose name space contains a parameter, a
-// net, and an instance — exercising several entries in a single module
-// name space.
 TEST(NameSpaceSynthesis, ModuleNameSpaceLowers) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
@@ -34,10 +27,6 @@ TEST(NameSpaceSynthesis, ModuleNameSpaceLowers) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §3.13(g): "A port name introduced in the port name space can be
-// reintroduced in the module name space by declaring a variable or a net
-// with the same name as the port name."  Synthesis must lower a non-ANSI
-// header where the port is reintroduced as an internal net.
 TEST(NameSpaceSynthesis, PortReintroducedAsNetLowers) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
@@ -53,9 +42,6 @@ TEST(NameSpaceSynthesis, PortReintroducedAsNetLowers) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §3.13(c) closing rule: within the compilation-unit scope name space, a
-// name shall not be redeclared.  Two CU-scope typedefs of the same name
-// must be rejected by the elaborator before reaching the synthesizer.
 TEST(NameSpaceSynthesis, DuplicateCuScopeTypedefRejectedBeforeSynth) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
@@ -71,4 +57,4 @@ TEST(NameSpaceSynthesis, DuplicateCuScopeTypedefRejectedBeforeSynth) {
   }
 }
 
-}  // namespace
+}

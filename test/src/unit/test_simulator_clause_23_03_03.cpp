@@ -6,12 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §23.3.3: "Each port connection shall be a continuous assignment of source
-// to sink, where one connected item shall be a signal source and the other
-// shall be a signal sink. The assignment shall be a continuous assignment
-// from source to sink for input or output ports." The value on the external
-// source signal shall propagate through the port to the internal sink at
-// simulation time.
 TEST(PortConnectionRulesSimulation, InputPortPropagatesSourceValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -34,10 +28,6 @@ TEST(PortConnectionRulesSimulation, InputPortPropagatesSourceValue) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
-// §23.3.3: "If the internal and external connections to a port are of
-// user-defined nettypes, they shall be of matching nettypes and shall be
-// merged into a single simulated net." A signal of the matching nettype on
-// the external side shall drive the internal port at runtime.
 TEST(PortConnectionRulesSimulation, MatchingNettypePropagatesValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -61,4 +51,4 @@ TEST(PortConnectionRulesSimulation, MatchingNettypePropagatesValue) {
   EXPECT_EQ(var->value.ToUint64(), 0x5Au);
 }
 
-}  // namespace
+}

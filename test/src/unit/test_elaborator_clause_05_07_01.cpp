@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
@@ -694,4 +694,4 @@ TEST(IntegerLiteralElaboration, ModuleWithUnbasedUnsizedLiteralElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

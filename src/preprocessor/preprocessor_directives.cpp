@@ -13,14 +13,11 @@ static std::string_view TrimDirective(std::string_view s) {
   return s;
 }
 
-// --- Timescale parsing ---
-
 static bool ParseTimescaleComponent(std::string_view text, int& magnitude,
                                     TimeUnit& unit) {
   auto trimmed = TrimDirective(text);
   if (trimmed.empty()) return false;
 
-  // Extract leading digits for magnitude.
   size_t i = 0;
   while (i < trimmed.size() &&
          std::isdigit(static_cast<unsigned char>(trimmed[i]))) {
@@ -39,8 +36,6 @@ static bool ParseTimescaleComponent(std::string_view text, int& magnitude,
   return ParseTimeUnitStr(unit_str, unit);
 }
 
-// Effective order: unit exponent + log10(magnitude). More negative = more
-// precise.
 static int EffectiveOrder(TimeUnit unit, int magnitude) {
   int order = static_cast<int>(unit);
   if (magnitude == 10)
@@ -51,7 +46,7 @@ static int EffectiveOrder(TimeUnit unit, int magnitude) {
 }
 
 void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
-  // Format: `timescale unit_mag unit / prec_mag precision
+
   auto slash = rest.find('/');
   if (slash == std::string_view::npos) {
     diag_.Error(loc, "invalid `timescale format: missing '/'");
@@ -70,7 +65,6 @@ void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
     return;
   }
 
-  // §22.7: precision shall be at least as precise as the unit.
   if (EffectiveOrder(ts.precision, ts.prec_magnitude) >
       EffectiveOrder(ts.unit, ts.magnitude)) {
     diag_.Error(loc, "`timescale precision is less precise than the time unit");
@@ -84,8 +78,6 @@ void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
   }
   has_timescale_ = true;
 }
-
-// --- default_nettype / unconnected_drive ---
 
 static bool ParseNetTypeName(std::string_view name, NetType& out) {
   if (name == "wire") {
@@ -142,7 +134,7 @@ void Preprocessor::HandleUnconnectedDrive(std::string_view rest,
 }
 
 void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
-  // Format: number "filename" level  (§22.12)
+
   auto trimmed = TrimDirective(rest);
   size_t i = 0;
   while (i < trimmed.size() &&
@@ -158,13 +150,11 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
     new_line = new_line * 10 + (trimmed[j] - '0');
   }
 
-  // §22.12: number must be a positive integer (zero is not positive).
   if (new_line == 0) {
     diag_.Error(loc, "`line number must be a positive integer");
     return;
   }
 
-  // Parse required filename (must be a string literal).
   auto after_num = TrimDirective(trimmed.substr(i));
   if (after_num.empty() || after_num[0] != '"') {
     diag_.Error(loc, "`line directive requires a quoted filename");
@@ -177,7 +167,6 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
   }
   auto filename = after_num.substr(1, end_quote - 1);
 
-  // Parse required level (must be 0, 1, or 2).
   auto after_file = TrimDirective(after_num.substr(end_quote + 1));
   if (after_file.empty() ||
       !std::isdigit(static_cast<unsigned char>(after_file[0]))) {
@@ -190,7 +179,6 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
     return;
   }
 
-  // §22.12: Only whitespace may appear after the level on the same line.
   auto after_level = TrimDirective(after_file.substr(1));
   if (!after_level.empty()) {
     diag_.Error(loc, "only whitespace may appear on the same line as `line");
@@ -210,7 +198,7 @@ std::string Preprocessor::ResolveInclude(std::string_view filename,
     std::ifstream ifs(path);
     if (ifs.good()) return path;
   }
-  // §22.4: try relative to source file directory first.
+
   if (!src_dir.empty()) {
     auto path = src_dir + "/" + std::string(filename);
     std::ifstream ifs(path);
@@ -260,9 +248,6 @@ void Preprocessor::HandleEndKeywords(SourceLoc loc, std::string& output) {
   output += '\n';
 }
 
-// --- Annex E: optional compiler directives ---
-
-// Validate that a string contains only digits and at most one dot.
 static bool ValidateDecayTimeChars(std::string_view arg, bool has_dot) {
   bool saw_dot = false;
   for (char c : arg) {
@@ -275,7 +260,6 @@ static bool ValidateDecayTimeChars(std::string_view arg, bool has_dot) {
   return true;
 }
 
-// Parse a real constant from a validated digit+dot string.
 static double ParseDecayTimeReal(std::string_view arg) {
   auto dot_pos = arg.find('.');
   auto int_part = arg.substr(0, dot_pos);
@@ -291,7 +275,6 @@ static double ParseDecayTimeReal(std::string_view arg) {
   return val + frac;
 }
 
-// Parse an integer constant from a validated digit string.
 static uint64_t ParseDecayTimeInt(std::string_view arg) {
   uint64_t val = 0;
   for (char c : arg) val = val * 10 + (c - '0');
@@ -345,7 +328,7 @@ void Preprocessor::HandleDefaultTriregStrength(std::string_view rest,
   }
   uint32_t val = 0;
   for (char c : arg) val = val * 10 + (c - '0');
-  // §E.3: value must be between 0 and 250.
+
   if (val > 250) {
     diag_.Error(loc,
                 "`default_trireg_strength value must be between 0 and 250");
@@ -355,4 +338,4 @@ void Preprocessor::HandleDefaultTriregStrength(std::string_view rest,
   has_default_trireg_strength_ = true;
 }
 
-}  // namespace delta
+}

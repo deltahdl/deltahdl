@@ -13,10 +13,6 @@
 
 using namespace delta;
 
-// §4.9 own-text atom: every kind of assignment listed in §4.9.1–§4.9.7
-// reduces to a scheduler event in the appropriate region. The seven labels
-// here correspond one-to-one with those subclauses; the per-kind semantics
-// are owned and tested by each subclause's own file.
 TEST(AssignmentSchedulingSim, AllAssignmentTypesUseSchedulerInfrastructure) {
   Arena arena;
   Scheduler sched(arena);
@@ -34,11 +30,6 @@ TEST(AssignmentSchedulingSim, AllAssignmentTypesUseSchedulerInfrastructure) {
   EXPECT_EQ(executed.size(), 7u);
 }
 
-// §4.9 own-text atom (end-to-end view): a real SV design that mixes several
-// of the seven assignment kinds (continuous, blocking, always_comb-wrapped
-// blocking, NBA with delay) flows through the same Lowerer→Scheduler pipeline
-// and produces consistent final values. This observes the unifying-pipeline
-// rule on real source rather than synthetic events.
 TEST(AssignmentSchedulingSim, MixedAssignmentKindsRunThroughUnifiedPipeline) {
   SimFixture f;
   auto* design = ElaborateSrc(

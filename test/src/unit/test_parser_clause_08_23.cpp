@@ -190,4 +190,4 @@ TEST(ClassScopeResolutionParsing, NestedClassDeclaration) {
   EXPECT_EQ(r.cu->classes[0]->members[0]->nested_class->name, "Inner");
 }
 
-}  // namespace
+}

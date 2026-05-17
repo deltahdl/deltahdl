@@ -181,4 +181,4 @@ TEST(VectorNetAccessibility, PlainWireNeitherFlag) {
   EXPECT_FALSE(item->data_type.is_scalared);
 }
 
-}  // namespace
+}

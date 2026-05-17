@@ -129,4 +129,4 @@ TEST(SpecparamElaboration, MultipleSpecparamsCreateVariables) {
   EXPECT_TRUE(found_fall);
 }
 
-}  // namespace
+}

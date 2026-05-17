@@ -97,9 +97,6 @@ TEST(IdentifierSim, IdentifierReferencesObject) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
-// §5.6: "If an identifier exceeds the implementation-specific length limit,
-// an error shall be reported." A 1025-character identifier reaching the
-// simulator-stage pipeline must cause an error on the diagnostic engine.
 TEST(IdentifierSim, IdentifierExceedingMaxLengthReportsError) {
   SimFixture f;
   std::string long_id(1025, 'a');

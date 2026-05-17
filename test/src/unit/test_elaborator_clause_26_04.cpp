@@ -87,4 +87,4 @@ TEST(PackageImportInHeader, InterfaceHeaderImportVisibleInBody) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

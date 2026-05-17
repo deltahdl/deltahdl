@@ -73,4 +73,4 @@ TEST(ImplicitNamedPortConnectionSimulation, MixedImplicitAndExplicitPropagate) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-}  // namespace
+}

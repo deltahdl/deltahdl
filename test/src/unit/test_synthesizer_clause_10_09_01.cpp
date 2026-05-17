@@ -22,4 +22,4 @@ TEST(ArrayLiteralSynth, PositionalArrayPatternSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

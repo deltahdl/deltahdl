@@ -143,8 +143,6 @@ TEST(GenerateElaboration, GenerateIfTrueNoElse) {
   EXPECT_TRUE(found);
 }
 
-// §27.5: else binds to the nearest preceding if, so the middle arm of an
-// if / else-if / else chain is taken when its condition is the first to hold.
 TEST(GenerateElaboration, GenerateIfElseIfChainSelectsMiddle) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -171,8 +169,6 @@ TEST(GenerateElaboration, GenerateIfElseIfChainSelectsMiddle) {
   EXPECT_FALSE(found_other);
 }
 
-// §27.5: a case-generate item with a comma-separated list of constant
-// expressions selects its body when any pattern equals the controlling value.
 TEST(GenerateElaboration, GenerateCaseMultiplePatternsPerItem) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -194,8 +190,6 @@ TEST(GenerateElaboration, GenerateCaseMultiplePatternsPerItem) {
   EXPECT_FALSE(found_late);
 }
 
-// §27.5: the generate_block body may be a single generate_item with no
-// surrounding begin/end.
 TEST(GenerateElaboration, GenerateIfBodyWithoutBeginEnd) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -212,4 +206,4 @@ TEST(GenerateElaboration, GenerateIfBodyWithoutBeginEnd) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

@@ -16,7 +16,6 @@ namespace delta {
 
 namespace {
 
-// Split `path` on '/' into segments; keep the absolute marker in `absolute`.
 std::vector<std::string_view> SplitSegments(std::string_view path,
                                             bool& absolute) {
   absolute = !path.empty() && path.front() == '/';
@@ -41,8 +40,6 @@ std::string Join(const std::vector<std::string_view>& segs, bool absolute) {
   return out;
 }
 
-// Apply `.` (skip) and `..` (pop previous concrete segment) per §33.3.1.
-// `...` and wildcard tokens (`*`, `?`) are preserved verbatim.
 std::vector<std::string_view> Normalize(std::vector<std::string_view> segs) {
   std::vector<std::string_view> out;
   for (auto seg : segs) {
@@ -61,9 +58,7 @@ std::vector<std::string_view> Normalize(std::vector<std::string_view> segs) {
 }
 
 bool GlobOne(std::string_view pat, std::string_view name) {
-  // Match a single path-component name against a pattern segment that may
-  // contain `*` and `?`.  The component never crosses '/', so neither
-  // wildcard advances past a '/'.
+
   size_t pi = 0, ni = 0;
   size_t star_p = std::string_view::npos;
   size_t star_n = 0;
@@ -85,16 +80,12 @@ bool GlobOne(std::string_view pat, std::string_view name) {
   return pi == pat.size();
 }
 
-// §33.3.1.1 spec-type priority: smaller value wins.
 enum class SpecKind : int {
   kExplicitFilename = 0,
   kWildcardFilename = 1,
   kDirectory = 2,
 };
 
-// Classify a file_path_spec by its trailing form.  The hierarchical
-// wildcard `...` denotes directories, so a spec ending with `...` is
-// also classified as a directory match.
 SpecKind ClassifySpec(std::string_view spec) {
   if (spec.empty()) return SpecKind::kExplicitFilename;
   if (spec.back() == '/') return SpecKind::kDirectory;
@@ -114,7 +105,7 @@ bool GlobMatchSegments(const std::vector<std::string_view>& pat_segs,
                        size_t si) {
   if (pi == pat_segs.size()) return si == path_segs.size();
   if (pat_segs[pi] == "...") {
-    // Hierarchical wildcard: zero or more whole segments.
+
     for (size_t k = si; k <= path_segs.size(); ++k) {
       if (GlobMatchSegments(pat_segs, pi + 1, path_segs, k)) return true;
     }
@@ -125,7 +116,7 @@ bool GlobMatchSegments(const std::vector<std::string_view>& pat_segs,
   return GlobMatchSegments(pat_segs, pi + 1, path_segs, si + 1);
 }
 
-}  // namespace
+}
 
 std::string LibraryMap::ResolveSpec(std::string_view spec,
                                     std::string_view base_dir) {
@@ -137,7 +128,7 @@ std::string LibraryMap::ResolveSpec(std::string_view spec,
     if (!combined.empty() && combined.back() != '/') combined += '/';
     combined.append(spec);
   }
-  // Trailing '/' means "all files in that directory" — same as "/*".
+
   if (!combined.empty() && combined.back() == '/') combined += '*';
 
   bool absolute = false;
@@ -168,10 +159,7 @@ void LibraryMap::AddDeclaration(const LibraryDecl& decl,
 }
 
 std::string_view LibraryMap::LibraryForFile(std::string_view path) const {
-  // §33.3.1.1 file-path resolution: collect every entry that matches, keep
-  // only the highest-priority spec-type tier, and surface cross-library
-  // ambiguity within that tier as an empty return.  §33.3.1's "work"
-  // fallback applies only when nothing matches at all.
+
   bool found_any = false;
   SpecKind best = SpecKind::kDirectory;
   std::string_view chosen;
@@ -208,10 +196,7 @@ std::vector<std::string_view> LibraryMap::LibraryDeclarationOrder() const {
 
 std::vector<std::string> LibraryMap::ResolveSearchOrder(
     const std::vector<std::string>& cli_override) const {
-  // §33.8.1: a non-empty CLI list overrides the lib.map's declaration
-  // order outright — it does not merge or splice with the map.  The
-  // override is names only, so any module's library label must already
-  // have been assigned from the lib.map for the override to bind it.
+
   if (!cli_override.empty()) return cli_override;
   std::vector<std::string> order;
   for (auto name : LibraryDeclarationOrder()) order.emplace_back(name);
@@ -243,8 +228,6 @@ bool LibraryMap::LoadMapFileImpl(const std::filesystem::path& map_file,
   fs::path canon = fs::weakly_canonical(map_file, ec);
   if (ec) canon = map_file;
 
-  // §33.3.2 says the include behaves "as though the contents appear in
-  // place"; with cycles that would never terminate, so detect and abort.
   for (const auto& p : stack) {
     if (p == canon) {
       if (errors) {
@@ -280,17 +263,11 @@ bool LibraryMap::LoadMapFileImpl(const std::filesystem::path& map_file,
     return false;
   }
 
-  // §33.3.2: relative paths in library statements anchor to the
-  // containing file's directory; AddDeclaration takes that directory as
-  // base_dir, so the existing §33.3.1 evaluator handles the resolution.
   std::string base_dir = canon.parent_path().string();
   for (auto* lib_decl : cu->libraries) {
     AddDeclaration(*lib_decl, base_dir);
   }
 
-  // §33.3.2: relative include paths anchor to the containing file's
-  // directory; recurse with the resolved absolute path so subsequent
-  // levels see their own parent dir as base.
   stack.push_back(canon);
   bool ok = true;
   for (auto* inc : cu->lib_includes) {
@@ -309,4 +286,4 @@ bool LibraryMap::LoadMapFileImpl(const std::filesystem::path& map_file,
   return ok;
 }
 
-}  // namespace delta
+}

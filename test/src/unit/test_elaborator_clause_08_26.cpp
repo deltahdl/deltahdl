@@ -134,4 +134,4 @@ TEST(InterfaceClassImplements, SubclassInheritsInterfaceImplementation) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

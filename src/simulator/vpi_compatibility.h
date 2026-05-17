@@ -1,15 +1,7 @@
-// IEEE 1800-2023 Annex L — vpi_compatibility.h
-// VPI compatibility mode support (normative).
-//
-// Per the standard, this file provides macro definitions required to support
-// VPI compatibility mode functionality (see §36.12).
+
 
 #ifndef VPI_COMPATIBILITY_H
 #define VPI_COMPATIBILITY_H
-
-// =============================================================================
-// Version chaining: newer versions imply older ones
-// =============================================================================
 
 #ifdef VPI_COMPATIBILITY_VERSION_1800v2023
 #define VPI_COMPATIBILITY_VERSION_1800v2012
@@ -18,11 +10,6 @@
 #ifdef VPI_COMPATIBILITY_VERSION_1800v2017
 #define VPI_COMPATIBILITY_VERSION_1800v2012
 #endif
-
-// =============================================================================
-// Version-specific function remapping
-// Only ONE version may be active at a time.
-// =============================================================================
 
 #ifdef VPI_COMPATIBILITY_VERSION_1364v1995
 #define vpi_compare_objects vpi_compare_objects_1364v1995
@@ -135,4 +122,4 @@
 #define vpi_scan vpi_scan_1800v2012
 #endif
 
-#endif  // VPI_COMPATIBILITY_H
+#endif

@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §27.5: else attaches to the nearest preceding if, allowing the parser to
-// nest a second if-generate as the else branch of the first.
 TEST(ConditionalGenerateParsing, IfElseIfChainNests) {
   auto r = Parse(
       "module m;\n"
@@ -29,11 +27,9 @@ TEST(ConditionalGenerateParsing, IfElseIfChainNests) {
   EXPECT_NE(middle->gen_cond, nullptr);
   ASSERT_NE(middle->gen_else, nullptr);
   auto* tail = middle->gen_else;
-  EXPECT_EQ(tail->gen_cond, nullptr);  // terminal else carries no condition
+  EXPECT_EQ(tail->gen_cond, nullptr);
 }
 
-// §27.5: a case-generate item may list several constant expressions separated
-// by commas; any match selects that item's generate block.
 TEST(ConditionalGenerateParsing, CaseItemWithMultiplePatterns) {
   auto r = Parse(
       "module m #(parameter SEL = 0) ();\n"
@@ -55,8 +51,6 @@ TEST(ConditionalGenerateParsing, CaseItemWithMultiplePatterns) {
   EXPECT_EQ(cg->gen_case_items[1].patterns.size(), 0u);
 }
 
-// §27.5: the body of a conditional generate construct is a generate_block,
-// which may be a single generate_item when no begin/end is used.
 TEST(ConditionalGenerateParsing, IfBodyWithoutBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -73,4 +67,4 @@ TEST(ConditionalGenerateParsing, IfBodyWithoutBeginEnd) {
   EXPECT_EQ(cg->gen_else, nullptr);
 }
 
-}  // namespace
+}

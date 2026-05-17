@@ -286,4 +286,4 @@ TEST(ClassConstructorSim, TwoObjectsIndependentConstruction) {
   LowerRunAndCheck(f, design, {{"r1", 11u}, {"r2", 22u}});
 }
 
-}  // namespace
+}

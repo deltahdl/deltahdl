@@ -217,7 +217,6 @@ TEST(ParameterizedClassParsing, ClassWithParams) {
   EXPECT_EQ(r.cu->classes[0]->params.size(), 1u);
 }
 
-// §8.25: typedef to avoid repeating specialization.
 TEST(ParameterizedClassParsing, TypedefSpecialization) {
   EXPECT_TRUE(
       ParseOk("class vector #(int size = 1);\n"
@@ -226,7 +225,6 @@ TEST(ParameterizedClassParsing, TypedefSpecialization) {
               "typedef vector#(4) Vfour;\n"));
 }
 
-// §8.25: typedef chain — typedef of typedef specialization.
 TEST(ParameterizedClassParsing, TypedefChainedSpecialization) {
   EXPECT_TRUE(
       ParseOk("class stack #(type T = int);\n"
@@ -238,7 +236,6 @@ TEST(ParameterizedClassParsing, TypedefChainedSpecialization) {
               "endmodule\n"));
 }
 
-// §8.25: Extending a parameterized base class with explicit #(...) params.
 TEST(ParameterizedClassParsing, ExtendsParameterizedBase) {
   auto r = Parse(
       "class C #(type T = bit);\n"
@@ -257,7 +254,6 @@ TEST(ParameterizedClassParsing, ExtendsParameterizedBase) {
   EXPECT_EQ(d->base_class_type_params[0].type_name, "integer");
 }
 
-// §8.25: Forwarding type parameter to parameterized base class.
 TEST(ParameterizedClassParsing, ExtendsBaseForwardingTypeParam) {
   auto r = Parse(
       "class C #(type T = bit);\n"
@@ -275,7 +271,6 @@ TEST(ParameterizedClassParsing, ExtendsBaseForwardingTypeParam) {
   EXPECT_EQ(d->base_class_type_params[0].type_name, "P");
 }
 
-// §8.25: Type parameter used as base class.
 TEST(ParameterizedClassParsing, TypeParamAsBaseClass) {
   EXPECT_TRUE(
       ParseOk("class C #(type T = bit);\n"
@@ -284,7 +279,6 @@ TEST(ParameterizedClassParsing, TypeParamAsBaseClass) {
               "endclass\n"));
 }
 
-// §8.25: Mixed type and value parameters.
 TEST(ParameterizedClassParsing, MixedTypeAndValueParams) {
   auto r = Parse(
       "class C #(type T = int, parameter int N = 8);\n"
@@ -302,7 +296,6 @@ TEST(ParameterizedClassParsing, MixedTypeAndValueParams) {
   EXPECT_FALSE(cls->type_param_names.count("N"));
 }
 
-// §8.25: Explicit default specialization C#() syntax.
 TEST(ParameterizedClassParsing, ExplicitDefaultSpecialization) {
   EXPECT_TRUE(
       ParseOk("class C #(int p = 1);\n"
@@ -312,7 +305,6 @@ TEST(ParameterizedClassParsing, ExplicitDefaultSpecialization) {
               "endmodule\n"));
 }
 
-// §8.25: User-defined type (struct) as type parameter default.
 TEST(ParameterizedClassParsing, StructAsTypeParamDefault) {
   EXPECT_TRUE(
       ParseOk("typedef struct { int x; int y; } point_t;\n"
@@ -321,7 +313,6 @@ TEST(ParameterizedClassParsing, StructAsTypeParamDefault) {
               "endclass\n"));
 }
 
-// §8.25: Class as type parameter argument.
 TEST(ParameterizedClassParsing, ClassAsTypeParamArg) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
@@ -335,7 +326,6 @@ TEST(ParameterizedClassParsing, ClassAsTypeParamArg) {
               "endmodule\n"));
 }
 
-// §8.25: Instantiation with bit-vector type specialization.
 TEST(ParameterizedClassParsing, BitVectorTypeSpecialization) {
   EXPECT_TRUE(
       ParseOk("class stack #(type T = int);\n"
@@ -346,7 +336,6 @@ TEST(ParameterizedClassParsing, BitVectorTypeSpecialization) {
               "endmodule\n"));
 }
 
-// §8.25: Static member declared inside parameterized class.
 TEST(ParameterizedClassParsing, StaticMemberInParameterizedClass) {
   auto r = Parse(
       "class vector #(int size = 1);\n"
@@ -359,4 +348,4 @@ TEST(ParameterizedClassParsing, StaticMemberInParameterizedClass) {
   ASSERT_GE(r.cu->classes[0]->members.size(), 2u);
 }
 
-}  // namespace
+}

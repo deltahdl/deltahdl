@@ -203,4 +203,4 @@ TEST(ElaborationOrder, GenerateForLoopExpandsWithFinalizedParameter) {
   EXPECT_EQ(u->children.size(), 3u);
 }
 
-}  // namespace
+}

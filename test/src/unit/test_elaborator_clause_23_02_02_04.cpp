@@ -3,8 +3,6 @@
 
 namespace {
 
-// --- Valid: input port with default elaborates ---
-
 TEST(DefaultPortValueElaboration, InputPortWithDefaultElaborates) {
   EXPECT_TRUE(ElabOk(
       "module m(input logic a = 1'b0); endmodule"));
@@ -42,16 +40,12 @@ TEST(DefaultPortValueElaboration, LrmExampleBusConnElaborates) {
       "endmodule"));
 }
 
-// --- Error: default on output port ---
-
 TEST(DefaultPortValueElaboration, OutputPortWithDefaultIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m(output logic q = 1'b0); endmodule", f, "m");
   EXPECT_TRUE(f.has_errors);
 }
-
-// --- Error: default on inout port ---
 
 TEST(DefaultPortValueElaboration, InoutPortWithDefaultIsError) {
   ElabFixture f;
@@ -60,16 +54,12 @@ TEST(DefaultPortValueElaboration, InoutPortWithDefaultIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// --- Error: default on ref port ---
-
 TEST(DefaultPortValueElaboration, RefPortWithDefaultIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m(ref logic x = 1'b0); endmodule", f, "m");
   EXPECT_TRUE(f.has_errors);
 }
-
-// --- Error: default on non-ANSI port ---
 
 TEST(DefaultPortValueElaboration, NonAnsiPortWithDefaultIsError) {
   ElabFixture f;
@@ -81,8 +71,6 @@ TEST(DefaultPortValueElaboration, NonAnsiPortWithDefaultIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// --- Error: default on interconnect port ---
-
 TEST(DefaultPortValueElaboration, InterconnectPortWithDefaultIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -90,16 +78,12 @@ TEST(DefaultPortValueElaboration, InterconnectPortWithDefaultIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// --- Error: default on non-singular (unpacked array) port ---
-
 TEST(DefaultPortValueElaboration, NonSingularPortWithDefaultIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m(input logic x [3:0] = '{0, 0, 0, 0}); endmodule", f, "m");
   EXPECT_TRUE(f.has_errors);
 }
-
-// --- Instantiation: default value inserted for omitted input port ---
 
 TEST(DefaultPortValueElaboration, OmittedInputUsesDefaultNamedConn) {
   ElabFixture f;
@@ -115,8 +99,6 @@ TEST(DefaultPortValueElaboration, OmittedInputUsesDefaultNamedConn) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- LRM example: default port scope resolution ---
 
 TEST(DefaultPortValueElaboration, DefaultEvaluatedInModuleScope) {
   ElabFixture f;
@@ -140,4 +122,4 @@ TEST(DefaultPortValueElaboration, DefaultEvaluatedInModuleScope) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

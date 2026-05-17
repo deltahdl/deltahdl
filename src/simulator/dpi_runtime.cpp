@@ -8,10 +8,6 @@
 
 namespace delta {
 
-// =============================================================================
-// DpiArgValue factory methods
-// =============================================================================
-
 DpiArgValue DpiArgValue::FromInt(int32_t v) {
   DpiArgValue a;
   a.type = DataTypeKind::kInt;
@@ -69,10 +65,6 @@ SvChandle DpiArgValue::AsChandle() const { return data.chandle_val; }
 SvBit DpiArgValue::AsBit() const { return data.bit_val; }
 SvLogic DpiArgValue::AsLogic() const { return data.logic_val; }
 
-// =============================================================================
-// DpiRuntime: import management
-// =============================================================================
-
 void DpiRuntime::RegisterImport(DpiRtFunction func) {
   import_index_[func.sv_name] = imports_.size();
   imports_.push_back(std::move(func));
@@ -91,10 +83,6 @@ bool DpiRuntime::HasImport(std::string_view sv_name) const {
 uint32_t DpiRuntime::ImportCount() const {
   return static_cast<uint32_t>(imports_.size());
 }
-
-// =============================================================================
-// DpiRuntime: export management
-// =============================================================================
 
 void DpiRuntime::RegisterExport(DpiRtExport exp) {
   export_index_[exp.sv_name] = exports_.size();
@@ -115,10 +103,6 @@ uint32_t DpiRuntime::ExportCount() const {
   return static_cast<uint32_t>(exports_.size());
 }
 
-// =============================================================================
-// DpiRuntime: function calls
-// =============================================================================
-
 DpiArgValue DpiRuntime::CallImport(std::string_view sv_name,
                                    const std::vector<DpiArgValue>& args) const {
   const auto* func = FindImport(sv_name);
@@ -132,10 +116,6 @@ DpiArgValue DpiRuntime::CallExport(std::string_view sv_name,
   if (!exp || !exp->impl) return DpiArgValue::FromInt(0);
   return exp->impl(args);
 }
-
-// =============================================================================
-// DpiRuntime: scope management
-// =============================================================================
 
 void DpiRuntime::PushScope(DpiScope scope) {
   scope_stack_.push_back(std::move(scope));
@@ -154,21 +134,13 @@ void DpiRuntime::SetScope(const DpiScope* scope) { current_scope_ = scope; }
 
 const DpiScope* DpiRuntime::GetScope() const { return current_scope_; }
 
-// =============================================================================
-// DpiRuntime: open array support
-// =============================================================================
-
-uint32_t DpiRuntime::SvLow(const SvOpenArrayHandle& /*h*/) { return 0; }
+uint32_t DpiRuntime::SvLow(const SvOpenArrayHandle& ) { return 0; }
 
 uint32_t DpiRuntime::SvHigh(const SvOpenArrayHandle& h) {
   return h.size > 0 ? h.size - 1 : 0;
 }
 
 uint32_t DpiRuntime::SvSize(const SvOpenArrayHandle& h) { return h.size; }
-
-// =============================================================================
-// AssertionApi
-// =============================================================================
 
 void AssertionApi::RegisterCallback(int reason, AssertionCbFunc cb,
                                     void* user_data) {
@@ -207,10 +179,6 @@ AssertionAction AssertionApi::GetAction(std::string_view name) const {
   return it->second;
 }
 
-// =============================================================================
-// CoverageApi
-// =============================================================================
-
 void CoverageApi::SetControl(CoverageControl ctrl) { control_ = ctrl; }
 CoverageControl CoverageApi::GetControl() const { return control_; }
 
@@ -229,10 +197,6 @@ double CoverageApi::GetValue(std::string_view key) const {
   if (it == values_.end()) return 0.0;
   return it->second;
 }
-
-// =============================================================================
-// DataReadApi
-// =============================================================================
 
 void DataReadApi::StoreVariable(std::string_view name,
                                 const DataReadValue& val) {
@@ -275,4 +239,4 @@ uint32_t DataReadApi::ValueChangeCbCount() const {
   return total;
 }
 
-}  // namespace delta
+}

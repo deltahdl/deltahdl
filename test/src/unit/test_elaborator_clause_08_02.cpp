@@ -90,4 +90,4 @@ TEST(ClassOverviewElaboration, ObjectDeclaredAsRefArgument) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

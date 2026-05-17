@@ -12,4 +12,4 @@ TEST(DesignBuildingBlockParsing, DelayToTicksSameUnit) {
   EXPECT_EQ(DelayToTicks(42, ts, TimeUnit::kNs), 42u);
 }
 
-}  // namespace
+}

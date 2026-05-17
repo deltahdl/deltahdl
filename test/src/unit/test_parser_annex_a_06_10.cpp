@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- Simple immediate assert (production 7) ---
-
 TEST(AssertionStatementSyntaxParsing, AssertSemicolonOnly) {
   auto r = Parse(
       "module m;\n"
@@ -232,8 +230,6 @@ TEST(AssertionStatementSyntaxParsing, AssertPassCanBeAssignment) {
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-// --- Simple immediate assume (production 8) ---
-
 TEST(AssertionStatementSyntaxParsing, AssumeBasicSemicolon) {
   auto r = Parse(
       "module m;\n"
@@ -289,8 +285,6 @@ TEST(AssertionStatementSyntaxParsing, AssumeExpressionPresent) {
   EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
   EXPECT_NE(stmt->assert_expr, nullptr);
 }
-
-// --- Simple immediate cover (production 9) ---
 
 TEST(AssertionStatementSyntaxParsing, CoverBasicSemicolon) {
   auto r = Parse(
@@ -348,8 +342,6 @@ TEST(AssertionStatementSyntaxParsing, CoverExpressionPresent) {
   EXPECT_NE(stmt->assert_expr, nullptr);
 }
 
-// --- All three kinds together ---
-
 TEST(AssertionStatementSyntaxParsing, AllThreeKindsInSequence) {
   auto r = Parse(
       "module m;\n"
@@ -381,8 +373,6 @@ TEST(AssertionStatementSyntaxParsing, ImmediateAssertAsStatement) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
 }
-
-// --- Deferred immediate assert (production 10) ---
 
 TEST(AssertionStatementSyntaxParsing, DeferredAssertHash0) {
   auto r = Parse(
@@ -445,8 +435,6 @@ TEST(AssertionStatementSyntaxParsing, DeferredAssertHash0ActionBlock) {
   ASSERT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-// --- Deferred immediate assume (production 11) ---
-
 TEST(AssertionStatementSyntaxParsing, DeferredAssumeHash0) {
   auto r = Parse(
       "module m;\n"
@@ -486,8 +474,6 @@ TEST(AssertionStatementSyntaxParsing, DeferredAssumeHash0WithAction) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// --- Deferred immediate cover (production 12) ---
-
 TEST(AssertionStatementSyntaxParsing, DeferredCoverHash0) {
   auto r = Parse(
       "module m;\n"
@@ -517,8 +503,6 @@ TEST(AssertionStatementSyntaxParsing, DeferredCoverFinal) {
   EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
   EXPECT_TRUE(stmt->is_deferred);
 }
-
-// --- Module-level deferred_immediate_assertion_item (production 2) ---
 
 TEST(AssertionStatementSyntaxParsing, DeferredAssertModuleLevel) {
   auto r = Parse(
@@ -624,8 +608,6 @@ TEST(AssertionStatementSyntaxParsing, LabeledDeferredAssertFinalModuleLevel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Error conditions ---
-
 TEST(AssertionStatementSyntaxParsing, ErrorAssertMissingExpression) {
   auto r = Parse(
       "module m;\n"
@@ -674,4 +656,4 @@ TEST(AssertionStatementSyntaxParsing, ErrorCoverWithElseClause) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

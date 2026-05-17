@@ -4,9 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §28.16.1 R1: a cont-assign with a mintypmax delay must elaborate — the
-// elaborator forwards the kMinTypMax node unchanged to the RtlirContAssign
-// delay slot; there is no ordering validator (R2 forbids one).
 TEST(MinTypMaxElaboration, ContinuousAssignDelay) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,8 +16,6 @@ TEST(MinTypMaxElaboration, ContinuousAssignDelay) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §28.16.1 R1: a gate-instance mintypmax delay must ride through gate
-// lowering to the RtlirContAssign delay slot without being reduced.
 TEST(MinTypMaxElaboration, GateDelay) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -33,9 +28,6 @@ TEST(MinTypMaxElaboration, GateDelay) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §28.16.1 R1: a net declaration with a mintypmax delay on a driven net
-// must elaborate — the net_delay must forward to the cont-assign lowered
-// for the net, carrying the kMinTypMax node through.
 TEST(MinTypMaxElaboration, NetDeclDelay) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -48,9 +40,6 @@ TEST(MinTypMaxElaboration, NetDeclDelay) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §28.16.1 R2: the elaborator must not reject a mintypmax spec whose min
-// value exceeds typ or max — there is no ordering invariant to enforce,
-// so any three expressions are acceptable.
 TEST(MinTypMaxElaboration, MinExceedsTypAndMax) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -63,10 +52,6 @@ TEST(MinTypMaxElaboration, MinExceedsTypAndMax) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §28.16.1 R1: a three-slot gate mintypmax spec must surface all three
-// slots to the RtlirContAssign (delay, delay_fall, delay_decay) with a
-// kMinTypMax node in each — this is the shape the simulator reads to run
-// DelayMode selection per slot.
 TEST(MinTypMaxElaboration, GateDelayThreeSlotForwards) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -87,4 +72,4 @@ TEST(MinTypMaxElaboration, GateDelayThreeSlotForwards) {
   EXPECT_EQ(mod->assigns[0].delay_decay->kind, ExprKind::kMinTypMax);
 }
 
-}  // namespace
+}

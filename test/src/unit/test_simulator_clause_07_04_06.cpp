@@ -118,4 +118,4 @@ TEST(ArrayOperationSimulation, ArrayInequalityEndToEnd) {
   EXPECT_EQ(v, 1u);
 }
 
-}  // namespace
+}

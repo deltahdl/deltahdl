@@ -48,14 +48,12 @@ TEST(IpcSync, SemaphoreTryGetZeroCount) {
   EXPECT_EQ(sem.key_count, 0);
 }
 
-// §15.3.4: Negative keyCount returns 0 and does not change key count.
 TEST(IpcSync, SemaphoreTryGetNegativeCountReturnsZero) {
   SemaphoreObject sem(5);
   EXPECT_EQ(sem.TryGet(-1), 0);
   EXPECT_EQ(sem.key_count, 5);
 }
 
-// §15.3.4: try_get() after put() brings keys positive succeeds.
 TEST(IpcSync, SemaphoreTryGetAfterPut) {
   SemaphoreObject sem(0);
   EXPECT_EQ(sem.TryGet(1), 0);
@@ -64,7 +62,6 @@ TEST(IpcSync, SemaphoreTryGetAfterPut) {
   EXPECT_EQ(sem.key_count, 1);
 }
 
-// §15.3.4: Consecutive try_get() calls reduce keys cumulatively.
 TEST(IpcSync, SemaphoreTryGetConsecutiveCalls) {
   SemaphoreObject sem(10);
   EXPECT_EQ(sem.TryGet(3), 1);
@@ -75,4 +72,4 @@ TEST(IpcSync, SemaphoreTryGetConsecutiveCalls) {
   EXPECT_EQ(sem.key_count, 3);
 }
 
-}  // namespace
+}

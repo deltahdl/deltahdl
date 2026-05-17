@@ -91,7 +91,6 @@ TEST(ClassSim, ParameterizedClassStaticMethod) {
   EXPECT_TRUE(it->second->is_static);
 }
 
-// §8.25: Each specialization has its own set of static member variables.
 TEST(ClassSim, SpecializationsHaveIndependentStaticMembers) {
   SimFixture f;
 
@@ -109,15 +108,12 @@ TEST(ClassSim, SpecializationsHaveIndependentStaticMembers) {
   typeB->static_properties["count"] = MakeLogic4VecVal(f.arena, 32, 0);
   f.ctx.RegisterClassType("Vec_16", typeB);
 
-  // Modify static in one specialization.
   typeA->static_properties["count"] = MakeLogic4VecVal(f.arena, 32, 42);
 
-  // Other specialization is unaffected.
   EXPECT_EQ(typeA->static_properties["count"].ToUint64(), 42u);
   EXPECT_EQ(typeB->static_properties["count"].ToUint64(), 0u);
 }
 
-// §8.25: Multiple params preserved through ClassTypeInfo.
 TEST(ClassSim, MultipleParamsPreserved) {
   SimFixture f;
 
@@ -141,7 +137,6 @@ TEST(ClassSim, MultipleParamsPreserved) {
   EXPECT_EQ(found->decl->params[2].first, "C_PARAM");
 }
 
-// §8.25: Type param names tracked in type_param_names set.
 TEST(ClassSim, TypeParamNamesTracked) {
   SimFixture f;
 
@@ -162,7 +157,6 @@ TEST(ClassSim, TypeParamNamesTracked) {
   EXPECT_FALSE(found->decl->type_param_names.count("N"));
 }
 
-// §8.25: Full pipeline — parameterized class lowered with default params.
 TEST(ClassSim, LoweredDefaultParamValues) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -178,13 +172,12 @@ TEST(ClassSim, LoweredDefaultParamValues) {
 
   auto* info = f.ctx.FindClassType("C");
   ASSERT_NE(info, nullptr);
-  // Default param value should be accessible as static property.
+
   auto it = info->static_properties.find("W");
   ASSERT_NE(it, info->static_properties.end());
   EXPECT_EQ(it->second.ToUint64(), 16u);
 }
 
-// §8.25: Full pipeline — parameterized class with mixed params.
 TEST(ClassSim, LoweredMixedParams) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -206,7 +199,6 @@ TEST(ClassSim, LoweredMixedParams) {
   EXPECT_FALSE(info->decl->type_param_names.count("N"));
 }
 
-// §8.25: Full pipeline — parameterized class extending non-param base.
 TEST(ClassSim, LoweredParamClassExtendsBase) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -231,4 +223,4 @@ TEST(ClassSim, LoweredParamClassExtendsBase) {
   EXPECT_EQ(info->decl->params.size(), 1u);
 }
 
-}  // namespace
+}

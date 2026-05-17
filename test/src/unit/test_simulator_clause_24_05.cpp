@@ -96,4 +96,4 @@ TEST(BlockingTasksCycleEventMode,
   EXPECT_EQ(r->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

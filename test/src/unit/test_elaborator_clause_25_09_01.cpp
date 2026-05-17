@@ -175,4 +175,4 @@ TEST(VirtualInterfaceClockingElaboration,
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

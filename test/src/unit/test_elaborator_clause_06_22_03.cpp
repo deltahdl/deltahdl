@@ -5,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §6.22.3: "All equivalent types, and all nonequivalent types that have
-// implicit casting rules defined between them, are assignment-compatible
-// types. For example, all integral types are assignment compatible."
 TEST(AssignmentCompatibleElaboration, AssignIntToLogicVector) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -21,8 +18,6 @@ TEST(AssignmentCompatibleElaboration, AssignIntToLogicVector) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.3: real and integral types share an implicit casting rule, so a
-// real-to-int assignment is assignment-compatible (with rounding).
 TEST(AssignmentCompatibleElaboration, AssignRealToInt) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -36,9 +31,6 @@ TEST(AssignmentCompatibleElaboration, AssignRealToInt) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.3: integral types are assignment compatible with each other in both
-// directions, so int ↔ bit signed [31:0] is interchangeable via assignment
-// (the §6.22 example that defers to §6.22.3 for the mechanism).
 TEST(AssignmentCompatibleElaboration, IntAndBitSignedAreInterchangeable) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -55,11 +47,6 @@ TEST(AssignmentCompatibleElaboration, IntAndBitSignedAreInterchangeable) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.3: "Compatibility can be in one direction only. For example, an
-// enum can be converted to an integral type without a cast, but not the
-// other way around." The IsAssignmentCompatible predicate that the
-// elaborator delegates to for port-connection checks shall reflect this
-// asymmetry.
 TEST(AssignmentCompatibleElaboration, EnumToIntegralIsOneDirectional) {
   DataType enum_t;
   enum_t.kind = DataTypeKind::kEnum;
@@ -70,4 +57,4 @@ TEST(AssignmentCompatibleElaboration, EnumToIntegralIsOneDirectional) {
   EXPECT_FALSE(IsAssignmentCompatible(int_t, enum_t));
 }
 
-}  // namespace
+}

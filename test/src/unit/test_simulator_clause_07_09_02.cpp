@@ -100,7 +100,7 @@ TEST(AssocMethods, DeleteNoArgOnEmptyArrayIsNoop) {
   f.ctx.CreateAssocArray("aa", 32, false);
   auto* call = MkAssocCallNoArg(f.arena, "aa", "delete");
   TryExecAssocMethodStmt(call, f.ctx, f.arena);
-  // No crash, no error — just a no-op.
+
 }
 
-}  // namespace
+}

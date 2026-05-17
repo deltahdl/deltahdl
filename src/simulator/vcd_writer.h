@@ -12,15 +12,13 @@ namespace delta {
 
 struct Variable;
 
-/// VCD signal entry: maps a simulation variable to a VCD identifier.
 struct VcdSignal {
   std::string_view name;
   uint32_t width = 1;
   Variable* var = nullptr;
-  char ident = '!';  // VCD short identifier character.
+  char ident = '!';
 };
 
-/// VCD waveform writer per IEEE 1800-2023 §21.7.
 class VcdWriter {
  public:
   explicit VcdWriter(const std::string& filename);
@@ -57,4 +55,4 @@ class VcdWriter {
   bool header_written_ = false;
 };
 
-}  // namespace delta
+}

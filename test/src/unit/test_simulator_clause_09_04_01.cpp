@@ -201,4 +201,4 @@ TEST(DelayControlSim, MultipleInitialBlocksWithDelays) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 20u);
 }
 
-}  // namespace
+}

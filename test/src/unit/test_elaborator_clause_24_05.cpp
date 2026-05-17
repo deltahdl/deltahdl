@@ -112,4 +112,4 @@ TEST(ProgramSubroutineCall, ProgramCallingOtherProgramFunctionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

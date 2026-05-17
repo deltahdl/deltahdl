@@ -84,4 +84,4 @@ TEST(DisableForkParsing, DisableForkMissingSemicolon) {
       "endmodule\n").has_errors);
 }
 
-}  // namespace
+}

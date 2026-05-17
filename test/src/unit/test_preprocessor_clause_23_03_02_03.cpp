@@ -45,4 +45,4 @@ TEST(ImplicitNamedPortConnectionPreprocessing, ImplicitPortMixedWithMacroInExpli
   EXPECT_EQ(inst->inst_ports[2].first, "c");
 }
 
-}  // namespace
+}

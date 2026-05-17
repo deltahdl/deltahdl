@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- delay_control simulation ---
-
 TEST(TimingControlSimulation, DelayControlSuspendsExecution) {
   auto val = RunAndGet(
       "module m;\n"
@@ -62,13 +60,6 @@ TEST(TimingControlSimulation, DelayControlSequentialDelays) {
   EXPECT_EQ(val, 3u);
 }
 
-// --- event_control simulation ---
-//
-// Runtime wakeup behavior for posedge/negedge event control is governed
-// by §9.4.2 (Table 9-2). The corresponding simulator tests live in the
-// canonical file test_simulator_clause_09_04_02.cpp; only @(*) implicit
-// sensitivity (§9.4.2.2) remains here.
-
 TEST(TimingControlSimulation, EventControlStarWaitsAnyChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -84,8 +75,6 @@ TEST(TimingControlSimulation, EventControlStarWaitsAnyChange) {
       f);
   LowerRunAndCheck(f, design, {{"y", 7u}});
 }
-
-// --- jump_statement simulation ---
 
 TEST(TimingControlSimulation, BreakExitsLoop) {
   auto val = RunAndGet(
@@ -152,8 +141,6 @@ TEST(TimingControlSimulation, ReturnVoidExitsFunction) {
   EXPECT_EQ(val, 44u);
 }
 
-// --- Ordering of delay and concurrent processes ---
-
 TEST(TimingControlSimulation, TwoProcessesSynchronizeViaDelay) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -172,4 +159,4 @@ TEST(TimingControlSimulation, TwoProcessesSynchronizeViaDelay) {
   LowerRunAndCheck(f, design, {{"x", 2u}, {"y", 2u}});
 }
 
-}  // namespace
+}

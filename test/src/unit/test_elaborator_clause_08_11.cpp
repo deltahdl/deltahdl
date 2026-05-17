@@ -130,4 +130,4 @@ TEST(ThisElaboration, BareThisInClassMethodOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

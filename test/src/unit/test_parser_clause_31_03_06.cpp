@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Moved from A.7.5.1: §31.3.6 Syntax 31-8 with the two required limits and no
-// trailing optional arguments.
 TEST(TimingCheckCommandParsing, RecremBasic) {
   auto r = Parse(
       "module m;\n"
@@ -21,9 +19,6 @@ TEST(TimingCheckCommandParsing, RecremBasic) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-// Moved from A.7.5.1: every optional argument after the notifier — including
-// the trailing pair of delayed signal identifiers §31.9 relies on — is
-// captured on the AST node.
 TEST(TimingCheckCommandParsing, RecremFullArgs) {
   auto r = Parse(
       "module m;\n"
@@ -41,9 +36,6 @@ TEST(TimingCheckCommandParsing, RecremFullArgs) {
   EXPECT_EQ(tc->delayed_data, "dRST");
 }
 
-// Moved from A.7.5.1: §31.3.6 Syntax 31-8 as a specify-block item with
-// edge-qualified reference first and bare data terminal second, both limits
-// captured.
 TEST(TimingCheckCommandParsing, RecremAsSpecifyItem) {
   auto sp = ParseSpecifySingle(
       "module m(input rst, clk);\n"
@@ -61,8 +53,6 @@ TEST(TimingCheckCommandParsing, RecremAsSpecifyItem) {
   ASSERT_EQ(si->timing_check.limits.size(), 2u);
 }
 
-// Moved from A.7.5.1: §31.3.6 Syntax 31-8 permits the notifier to appear
-// without any of the trailing negative-timing-check arguments.
 TEST(TimingCheckCommandParsing, RecremWithNotifierOnly) {
   auto r = Parse(
       "module m;\n"
@@ -82,8 +72,6 @@ TEST(TimingCheckCommandParsing, RecremWithNotifierOnly) {
   EXPECT_TRUE(tc->delayed_data.empty());
 }
 
-// §31.3.6 Syntax 31-8 requires two timing_check_limit arguments; providing
-// only one is ill-formed.
 TEST(TimingCheckCommandParsing, ErrorRecremMissingSecondLimit) {
   auto r = Parse(
       "module m;\n"
@@ -94,8 +82,6 @@ TEST(TimingCheckCommandParsing, ErrorRecremMissingSecondLimit) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §31.3.6 Syntax 31-8 requires two timing_check_limit arguments; omitting
-// both is ill-formed.
 TEST(TimingCheckCommandParsing, ErrorRecremMissingBothLimits) {
   auto r = Parse(
       "module m;\n"
@@ -106,8 +92,6 @@ TEST(TimingCheckCommandParsing, ErrorRecremMissingBothLimits) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §31.3.6 Table 31-6: recovery_limit and removal_limit are constant
-// expressions, so compound arithmetic must parse in either limit slot.
 TEST(TimingCheckCommandParsing, RecremConstantExpressionLimits) {
   auto r = Parse(
       "module m;\n"
@@ -121,4 +105,4 @@ TEST(TimingCheckCommandParsing, RecremConstantExpressionLimits) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-}  // namespace
+}

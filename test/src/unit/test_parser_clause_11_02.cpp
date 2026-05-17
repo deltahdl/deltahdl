@@ -5,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2: "Any legal operand, such as a net bit-select, without any operator
-// is considered an expression."  Each test verifies that one operand kind
-// from the §11.2 operand list parses as a standalone expression.
-
 TEST(OperandAsExpression, IntegerLiteral) {
   auto r = Parse(
       "module m;\n"
@@ -232,4 +228,4 @@ TEST(OperandAsExpression, SystemFunctionCall) {
   EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
 }
 
-}  // namespace
+}

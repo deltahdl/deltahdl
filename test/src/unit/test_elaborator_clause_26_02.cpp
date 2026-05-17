@@ -101,4 +101,4 @@ TEST(PackageDeclarationElaboration, TimeprecisionMismatchRejected) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

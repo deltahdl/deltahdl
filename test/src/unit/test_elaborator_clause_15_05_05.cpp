@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.5.5: Event declaration with initializer from another event elaborates.
 TEST(EventOperationsElaborator, EventInitializerFromAnotherEvent) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -13,7 +12,6 @@ TEST(EventOperationsElaborator, EventInitializerFromAnotherEvent) {
       "endmodule\n"));
 }
 
-// §15.5.5: Imperative event-to-event assignment elaborates without error.
 TEST(EventOperationsElaborator, ImperativeEventAssignment) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -26,7 +24,6 @@ TEST(EventOperationsElaborator, ImperativeEventAssignment) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §15.5.5: Multiple event variables can be assigned in sequence.
 TEST(EventOperationsElaborator, ChainedEventAssignment) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -38,4 +35,4 @@ TEST(EventOperationsElaborator, ChainedEventAssignment) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

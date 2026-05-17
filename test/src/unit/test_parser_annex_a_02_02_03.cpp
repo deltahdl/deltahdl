@@ -128,7 +128,6 @@ TEST(DelayParsing, Delay2ParenTwoValues) {
   EXPECT_EQ(item->gate_delay_fall->int_val, 20u);
 }
 
-// delay2 ::= # delay_value (non-paren single value on a delay2-context gate)
 TEST(DelayParsing, Delay2NonParenDelayValue) {
   auto r = Parse(
       "module m;\n"
@@ -227,8 +226,6 @@ TEST(DelayParsing, Delay3TriregWithChargeStrengthLarge) {
   EXPECT_EQ(item->net_delay->int_val, 10u);
 }
 
-// --- delay2: mintypmax in both positions ---
-
 TEST(DelayParsing, Delay2MintypMaxTwoValues) {
   auto r = Parse(
       "module m;\n"
@@ -243,8 +240,6 @@ TEST(DelayParsing, Delay2MintypMaxTwoValues) {
   ASSERT_NE(item->gate_delay_fall, nullptr);
   EXPECT_EQ(item->gate_delay_fall->kind, ExprKind::kMinTypMax);
 }
-
-// --- delay3: mintypmax in all three positions ---
 
 TEST(DelayParsing, Delay3MintypMaxThreeValues) {
   auto r = Parse(
@@ -290,8 +285,6 @@ TEST(DelayParsing, Delay3RiseFallDecay) {
   EXPECT_NE(item->net_delay_decay, nullptr);
 }
 
-// delay3 form 2 caps the mintypmax list at three; a fourth slot has no
-// production in §A.2.2.3 and must be rejected.
 TEST(DelayParsing, Delay3OverArityRejected) {
   auto r = Parse(
       "module m;\n"
@@ -300,4 +293,4 @@ TEST(DelayParsing, Delay3OverArityRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

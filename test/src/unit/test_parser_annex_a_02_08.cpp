@@ -121,10 +121,6 @@ TEST(BlockItemDeclParsing, BlockItemImportDecl) {
   EXPECT_EQ(stmt->decl_item->kind, ModuleItemKind::kImportDecl);
 }
 
-// Lifetime-keyword tests on block-scoped variable declarations are §6.21
-// rules; the corresponding parser tests live in test_parser_clause_06_21.cpp
-// (e.g. AutomaticVarDeclInBlock, StaticVarInBeginEnd).
-
 TEST(BlockItemDeclParsing, TaskBodyBlockItem) {
   auto r = Parse(
       "module m;\n"
@@ -169,8 +165,6 @@ TEST(BlockItemDeclParsing, MultipleBlockItemDecls) {
   EXPECT_EQ(stmts[2]->kind, StmtKind::kVarDecl);
 }
 
-// --- {attribute_instance} prefix ---
-
 TEST(BlockItemDeclParsing, DataDeclWithAttribute) {
   auto r = Parse(
       "module m;\n"
@@ -213,8 +207,6 @@ TEST(BlockItemDeclParsing, LetDeclWithAttribute) {
       "endmodule\n"));
 }
 
-// --- additional contexts ---
-
 TEST(BlockItemDeclParsing, FunctionBodyBlockItem) {
   auto r = Parse(
       "module m;\n"
@@ -242,8 +234,6 @@ TEST(BlockItemDeclParsing, AlwaysCombBlockItem) {
       "endmodule\n"));
 }
 
-// --- mixed alternatives ---
-
 TEST(BlockItemDeclParsing, MixedAlternativesInOneBlock) {
   auto r = Parse(
       "module m;\n"
@@ -265,8 +255,6 @@ TEST(BlockItemDeclParsing, MixedAlternativesInOneBlock) {
   EXPECT_EQ(stmts[3]->kind, StmtKind::kBlockItemDecl);
 }
 
-// --- data_declaration with var prefix ---
-
 TEST(BlockItemDeclParsing, DataDeclWithVarPrefix) {
   auto r = Parse(
       "module m;\n"
@@ -282,8 +270,6 @@ TEST(BlockItemDeclParsing, DataDeclWithVarPrefix) {
   EXPECT_EQ(stmt->var_name, "x");
 }
 
-// --- data_declaration: import wildcard ---
-
 TEST(BlockItemDeclParsing, ImportWildcardInBlock) {
   EXPECT_TRUE(ParseOk(
       "package pkg;\n"
@@ -295,8 +281,6 @@ TEST(BlockItemDeclParsing, ImportWildcardInBlock) {
       "  end\n"
       "endmodule\n"));
 }
-
-// --- let_declaration without arguments ---
 
 TEST(BlockItemDeclParsing, LetDeclNoArgsInBlock) {
   auto r = Parse(
@@ -314,10 +298,8 @@ TEST(BlockItemDeclParsing, LetDeclNoArgsInBlock) {
   EXPECT_EQ(stmt->decl_item->kind, ModuleItemKind::kLetDecl);
 }
 
-// --- { attribute_instance } prefix supports multiple attributes ---
-
 TEST(BlockItemDeclParsing, MultipleAttributeInstancesOnDataDecl) {
-  // §A.2.8: `{ attribute_instance }` allows zero or more attribute_instance.
+
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -331,8 +313,6 @@ TEST(BlockItemDeclParsing, MultipleAttributeInstancesOnDataDecl) {
   EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
   EXPECT_GE(stmt->attrs.size(), 2u);
 }
-
-// --- error: missing semicolon on local_parameter_declaration alternative ---
 
 TEST(BlockItemDeclParsing, ErrorBlockItemLocalparamMissingSemicolon) {
   auto r = Parse(
@@ -356,4 +336,4 @@ TEST(BlockItemDeclParsing, ErrorBlockItemParameterMissingSemicolon) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

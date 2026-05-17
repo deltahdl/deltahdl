@@ -43,4 +43,4 @@ TEST(UnpackedArrayConcatParsing, EmptyConcat) {
   EXPECT_TRUE(stmt->rhs->elements.empty());
 }
 
-}  // namespace
+}

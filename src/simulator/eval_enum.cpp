@@ -7,19 +7,16 @@
 
 namespace delta {
 
-// §6.19.5.1: first() — returns the value of the first enum member.
 static Logic4Vec EnumFirst(const EnumTypeInfo& info, Arena& arena) {
   if (info.members.empty()) return MakeLogic4VecVal(arena, 32, 0);
   return MakeLogic4VecVal(arena, 32, info.members.front().value);
 }
 
-// §6.19.5.2: last() — returns the value of the last enum member.
 static Logic4Vec EnumLast(const EnumTypeInfo& info, Arena& arena) {
   if (info.members.empty()) return MakeLogic4VecVal(arena, 32, 0);
   return MakeLogic4VecVal(arena, 32, info.members.back().value);
 }
 
-// Find the index of the member with the given value, or -1 if not found.
 static int FindMemberIndex(const EnumTypeInfo& info, uint64_t value) {
   for (size_t i = 0; i < info.members.size(); ++i) {
     if (info.members[i].value == value) return static_cast<int>(i);
@@ -27,7 +24,6 @@ static int FindMemberIndex(const EnumTypeInfo& info, uint64_t value) {
   return -1;
 }
 
-// §6.19.5.3: next(N) — returns the Nth next member, wrapping around.
 static Logic4Vec EnumNext(const EnumTypeInfo& info, uint64_t current,
                           uint32_t count, Arena& arena) {
   if (info.members.empty()) return MakeLogic4VecVal(arena, 32, 0);
@@ -38,7 +34,6 @@ static Logic4Vec EnumNext(const EnumTypeInfo& info, uint64_t current,
   return MakeLogic4VecVal(arena, 32, info.members[new_idx].value);
 }
 
-// §6.19.5.4: prev(N) — returns the Nth previous member, wrapping around.
 static Logic4Vec EnumPrev(const EnumTypeInfo& info, uint64_t current,
                           uint32_t count, Arena& arena) {
   if (info.members.empty()) return MakeLogic4VecVal(arena, 32, 0);
@@ -50,12 +45,10 @@ static Logic4Vec EnumPrev(const EnumTypeInfo& info, uint64_t current,
   return MakeLogic4VecVal(arena, 32, info.members[new_idx].value);
 }
 
-// §6.19.5.5: num() — returns the number of members in the enum.
 static Logic4Vec EnumNum(const EnumTypeInfo& info, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, info.members.size());
 }
 
-// §6.19.5.6: name() — returns the string name of the current value.
 static Logic4Vec EnumName(const EnumTypeInfo& info, uint64_t current,
                           Arena& arena) {
   for (auto& m : info.members) {
@@ -72,11 +65,10 @@ static Logic4Vec EnumName(const EnumTypeInfo& info, uint64_t current,
     }
     return vec;
   }
-  // Invalid value: return empty string (0).
+
   return MakeLogic4VecVal(arena, 8, 0);
 }
 
-// Parse the optional count argument for next()/prev(), defaulting to 1.
 static uint32_t ParseStepCount(const Expr* call_expr, SimContext& ctx,
                                Arena& arena) {
   if (call_expr->args.empty()) return 1;
@@ -84,8 +76,6 @@ static uint32_t ParseStepCount(const Expr* call_expr, SimContext& ctx,
       EvalExpr(call_expr->args[0], ctx, arena).ToUint64());
 }
 
-// Dispatch an enum method call. Returns true if dispatched.
-// Uses a struct to bundle context and stay within the 5-argument limit.
 struct EnumMethodArgs {
   const EnumTypeInfo& info;
   uint64_t current;
@@ -125,8 +115,6 @@ static bool DispatchEnumMethod(std::string_view method,
   return false;
 }
 
-// §6.19: Try to evaluate an enum method call.
-// Returns true and sets `out` if the call is an enum method.
 bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out) {
   MethodCallParts parts;
@@ -142,8 +130,6 @@ bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return DispatchEnumMethod(parts.method_name, args, out);
 }
 
-// §5.13: Property-style access for enum methods (no parentheses).
-// Handles methods with no required arguments or where all args have defaults.
 bool TryEvalEnumProperty(std::string_view var_name, std::string_view method,
                           SimContext& ctx, Arena& arena, Logic4Vec& out) {
   const auto* info = ctx.GetVariableEnumType(var_name);
@@ -161,11 +147,11 @@ bool TryEvalEnumProperty(std::string_view var_name, std::string_view method,
     return true;
   }
   if (method == "next") {
-    out = EnumNext(*info, current, /*count=*/1, arena);
+    out = EnumNext(*info, current, 1, arena);
     return true;
   }
   if (method == "prev") {
-    out = EnumPrev(*info, current, /*count=*/1, arena);
+    out = EnumPrev(*info, current, 1, arena);
     return true;
   }
   if (method == "num") {
@@ -175,4 +161,4 @@ bool TryEvalEnumProperty(std::string_view var_name, std::string_view method,
   return false;
 }
 
-}  // namespace delta
+}

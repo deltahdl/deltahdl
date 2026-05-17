@@ -152,4 +152,4 @@ TEST(ProgramControlTasksSim, ExitDoesNotTerminateOtherProgramBlock) {
   EXPECT_EQ(v->value.ToUint64(), 33u);
 }
 
-}  // namespace
+}

@@ -31,7 +31,6 @@ void Elaborator::ValidateElabSystemTask(const ModuleItem* item) {
   }
 }
 
-// §6.20.5: Elaborate a specparam as a simulation-accessible constant variable.
 void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   RtlirVariable var;
   var.name = ScopedName(item->name);
@@ -45,8 +44,6 @@ void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   mod->variables.push_back(var);
 }
 
-// §6.10: Check if an identifier is already declared as a variable, net, or
-// port.
 static bool IsNameDeclared(std::string_view name, const RtlirModule* mod) {
   for (const auto& v : mod->variables) {
     if (v.name == name) return true;
@@ -122,16 +119,16 @@ static int NetTypeGroup(NetType t) {
 static bool DissimilarNetTypeRequiresWarning(NetType internal,
                                              NetType external) {
   static constexpr bool kWarnTable[9][9] = {
-      // ext: wire  wand   wor  trireg tri0   tri1  uwire  sup0   sup1
-      {false, false, false, false, false, false, false, false, false},  // wire
-      {false, false, true,  true,  true,  true,  true,  false, false},  // wand
-      {false, true,  false, true,  true,  true,  true,  false, false},  // wor
-      {false, true,  true,  false, false, false, true,  false, false},  // trireg
-      {false, true,  true,  false, false, true,  true,  false, false},  // tri0
-      {false, true,  true,  false, true,  false, true,  false, false},  // tri1
-      {false, true,  true,  true,  true,  true,  false, false, false},  // uwire
-      {false, false, false, false, false, false, false, false, true},   // supply0
-      {false, false, false, false, false, false, false, true,  false},  // supply1
+
+      {false, false, false, false, false, false, false, false, false},
+      {false, false, true,  true,  true,  true,  true,  false, false},
+      {false, true,  false, true,  true,  true,  true,  false, false},
+      {false, true,  true,  false, false, false, true,  false, false},
+      {false, true,  true,  false, false, true,  true,  false, false},
+      {false, true,  true,  false, true,  false, true,  false, false},
+      {false, true,  true,  true,  true,  true,  false, false, false},
+      {false, false, false, false, false, false, false, false, true},
+      {false, false, false, false, false, false, false, true,  false},
   };
   int ig = NetTypeGroup(internal);
   int eg = NetTypeGroup(external);
@@ -198,7 +195,7 @@ bool IsProcBodyItem(ModuleItemKind k) {
          k == ModuleItemKind::kAlwaysLatchBlock;
 }
 
-}  // namespace
+}
 
 namespace {
 
@@ -260,24 +257,15 @@ void WalkStmtIdents(const Stmt* s, std::vector<const Expr*>& out) {
   WalkStmtIdents(s->assert_fail_stmt, out);
 }
 
-}  // namespace
+}
 
 void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
   explicit_imports_.clear();
   wildcard_packages_.clear();
   wildcard_claimed_.clear();
-  // §26.7: the built-in std package is implicitly wildcard-imported into
-  // the compilation-unit scope of every compilation unit, which makes its
-  // declarations visible here without an explicit import.
+
   wildcard_packages_.push_back("std");
 
-  // §26.3 opens by requiring that the compilation of a package precede the
-  // compilation of scopes in which the package is imported.  In a single
-  // compilation unit that maps to: an `import pkg::*` or `import pkg::x`
-  // referring to a package name that has not been declared anywhere in the
-  // unit cannot bind to any compiled package and must be rejected here.
-  // The built-in `std` package is exempt because §26.7 makes it implicitly
-  // available without a user-visible declaration.
   auto package_declared = [&](std::string_view pkg_name) {
     if (pkg_name == "std") return true;
     for (const auto* pkg : unit_->packages) {
@@ -480,14 +468,13 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   RtlirNet net;
   net.name = ScopedName(name);
   net.net_type = unit_->default_nettype;
-  net.width = 1;  // §6.10: Implicit nets are scalar.
+  net.width = 1;
   mod->nets.push_back(net);
   declared_names_.insert(name);
   net_names_.insert(name);
   return true;
 }
 
-// §10.3.2: Validate identifier-based continuous assignment targets.
 void Elaborator::ValidateContAssignIdentLhs(ModuleItem* item,
                                             RtlirModule* mod) {
   auto name = item->assign_lhs->text;
@@ -512,7 +499,6 @@ void Elaborator::ValidateContAssignIdentLhs(ModuleItem* item,
   }
 }
 
-// §10.3.2/§10.3.3: Validate nettype constraints on continuous assignment.
 void Elaborator::ValidateContAssignNettypeAndDelay(ModuleItem* item) {
   if (item->assign_lhs->kind == ExprKind::kSelect) {
     auto* base = item->assign_lhs->base;
@@ -542,7 +528,6 @@ void Elaborator::ValidateContAssignNettypeAndDelay(ModuleItem* item) {
   }
 }
 
-// §10.3.4: Validate drive strength on continuous assignment.
 void Elaborator::ValidateContAssignDriveStrength(ModuleItem* item,
                                                  RtlirModule* mod) {
   if (item->assign_lhs->kind != ExprKind::kIdentifier) return;
@@ -566,8 +551,7 @@ void Elaborator::ValidateContAssignDriveStrength(ModuleItem* item,
 void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
   if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier) {
     ValidateContAssignIdentLhs(item, mod);
-    // §10.3 Syntax 10-1: The variable form of continuous_assign does not
-    // permit drive_strength or delay3.
+
     bool is_var_target = net_names_.count(item->assign_lhs->text) == 0;
     if (is_var_target) {
       if (item->drive_strength0 != 0 || item->drive_strength1 != 0) {
@@ -598,13 +582,13 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
   ca.delay = item->assign_delay;
   ca.delay_fall = item->assign_delay_fall;
   ca.delay_decay = item->assign_delay_decay;
-  // §5.12: Resolve attributes.
+
   ca.attrs = ResolveAttributes(item->attrs, diag_);
   mod->assigns.push_back(ca);
 }
 
 void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
-  // §6.20.3: Type parameters register as typedefs.
+
   bool is_type = item->data_type.kind == DataTypeKind::kVoid &&
                  item->typedef_type.kind != DataTypeKind::kImplicit;
   if (is_type) {
@@ -613,13 +597,13 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   RtlirParamDecl pd;
   pd.name = item->name;
   pd.is_type_param = is_type;
-  // §6.20.1: Body parameter becomes localparam when parameter_port_list exists.
+
   pd.is_localparam = item->is_localparam || mod->has_param_port_list;
   pd.default_value = item->init_expr;
   if (!is_type) {
     PopulateParamTypeInfo(pd, item->data_type);
   }
-  // §6.20.7: detect $ as unbounded parameter value.
+
   if (item->init_expr && item->init_expr->kind == ExprKind::kIdentifier &&
       item->init_expr->text == "$") {
     pd.is_unbounded = true;
@@ -632,7 +616,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
     }
   }
   mod->params.push_back(pd);
-  // §6.20: Constants are named data objects that never change.
+
   const_names_.insert(item->name);
 }
 
@@ -679,17 +663,13 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:
-      // §23.9: Task/function names share the same scope as variables/nets.
+
       if (!item->name.empty() &&
           !declared_names_.insert(item->name).second) {
         diag_.Error(item->loc,
                     std::format("redeclaration of '{}'", item->name));
       }
-      // §9.2 footnote 25: dynamic_override_specifiers shall only be legal on
-      // method declarations inside a non-interface class scope. A function or
-      // task declared at module/interface/program/package scope (i.e., not as
-      // a class method and not as an out-of-block method of some class) may
-      // not carry :initial, :extends, or :final.
+
       if (item->method_class.empty() &&
           (item->is_method_initial || item->is_method_extends ||
            item->is_method_final)) {
@@ -701,7 +681,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       mod->function_decls.push_back(item);
       break;
     case ModuleItemKind::kGateInst:
-      // §23.9: A gate instance name cannot be the same as its output net.
+
       if (!item->gate_inst_name.empty() && !item->gate_terminals.empty() &&
           item->gate_terminals[0] &&
           item->gate_terminals[0]->kind == ExprKind::kIdentifier &&
@@ -711,16 +691,14 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
                                 "output net",
                                 item->gate_inst_name));
       }
-      // §23.9: Gate instance names occupy the enclosing scope's name space.
+
       if (!item->gate_inst_name.empty() &&
           !declared_names_.insert(item->gate_inst_name).second) {
         diag_.Error(item->loc,
                     std::format("redeclaration of '{}'",
                                 item->gate_inst_name));
       }
-      // §28.3.5: the range "shall be specified by two constant expressions".
-      // Resolve in the module's parameter scope so parameter-typed bounds
-      // remain valid; truly non-constant bounds are rejected here.
+
       if (item->inst_range_left && item->inst_range_right) {
         auto range_scope = BuildParamScope(mod);
         auto lhi = ConstEvalInt(item->inst_range_left, range_scope);
@@ -730,11 +708,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
                       "gate or switch instance range bound is not a constant "
                       "expression");
         } else {
-          // §28.3.6: For an array-of-instances, each terminal's port
-          // expression must be either the per-instance port width (broadcast)
-          // or the array length times that width (part-select). Built-in
-          // gate terminals are one bit per instance, so valid widths are 1
-          // or the array length.
+
           uint32_t array_len =
               static_cast<uint32_t>(std::abs(*lhi - *rhi) + 1);
           for (auto* term : item->gate_terminals) {
@@ -756,7 +730,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       break;
     case ModuleItemKind::kUdpInst:
-      // §23.9: UDP instance names occupy the enclosing scope's name space.
+
       if (!item->gate_inst_name.empty() &&
           !declared_names_.insert(item->gate_inst_name).second) {
         diag_.Error(item->loc,
@@ -790,7 +764,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kDefparam:
       break;
     case ModuleItemKind::kImportDecl: {
-      // §23.7: Collect import declarations for dotted name resolution.
+
       RtlirImport imp;
       imp.package_name = item->import_item.package_name;
       imp.item_name = item->import_item.item_name;
@@ -799,8 +773,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     }
     case ModuleItemKind::kExportDecl:
-      // §26.6: Export declarations only carry meaning inside packages; they
-      // are validated in ValidatePackageExports. No module-level lowering.
+
       break;
     case ModuleItemKind::kPropertyDecl:
     case ModuleItemKind::kAssertProperty:
@@ -836,9 +809,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
 }
 
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
-  // §6.18: A `typedef [forward_type] IDENT;` forward declaration records
-  // the basic data type the name is later required to resolve to. The actual
-  // typedef definition that follows must conform.
+
   static const auto kind_name = [](DataTypeKind k) -> std::string_view {
     switch (k) {
       case DataTypeKind::kEnum:   return "enum";
@@ -850,10 +821,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   bool is_forward = item->typedef_type.kind == DataTypeKind::kImplicit;
   if (is_forward) {
     if (item->forward_type_kind != DataTypeKind::kImplicit) {
-      // §6.18: "It shall be legal to have a forward type declaration in the
-      // same scope, either before or after the final type definition." If the
-      // real definition has already been elaborated, verify the basic kind
-      // conforms; do not overwrite the existing entry with a kImplicit.
+
       auto td_it = typedefs_.find(item->name);
       if (td_it != typedefs_.end() &&
           td_it->second.kind != DataTypeKind::kImplicit &&
@@ -865,18 +833,14 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
       }
       forward_typedef_kinds_[item->name] = item->forward_type_kind;
     }
-    // §6.18: A forward declaration that follows the final type definition
-    // shall not erase the real type. Only insert a placeholder if no entry
-    // is present yet.
+
     typedefs_.try_emplace(item->name, item->typedef_type);
     return;
   }
   auto it = forward_typedef_kinds_.find(item->name);
   if (it != forward_typedef_kinds_.end() &&
       it->second != item->typedef_type.kind) {
-    // §6.18: "It shall be an error if a basic data type was specified by the
-    // forward type declaration and the actual type definition does not
-    // conform to the specified basic data type."
+
     diag_.Error(item->loc,
                 std::format("typedef '{}' does not conform to its forward "
                             "declaration as {}",
@@ -906,11 +870,11 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
     if (member.value) {
       next_val = ConstEvalInt(member.value).value_or(next_val);
     }
-    // §6.19.2: Expand range members into concrete named constants.
+
     if (member.range_start) {
       auto n = ConstEvalInt(member.range_start).value_or(0);
       if (member.range_end) {
-        // name[N:M] form: generate nameN, nameN+1, ..., nameM (or decrement).
+
         auto m = ConstEvalInt(member.range_end).value_or(0);
         int step = (m >= n) ? 1 : -1;
         for (auto i = n;; i += step) {
@@ -928,7 +892,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
           if (i == m) break;
         }
       } else {
-        // name[N] form: generate name0, name1, ..., nameN-1.
+
         for (int64_t i = 0; i < n; ++i) {
           auto s = std::format("{}{}", member.name, i);
           auto* p = arena_.AllocString(s.c_str(), s.size());
@@ -944,7 +908,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
         }
       }
     } else {
-      // Plain member (no range).
+
       enum_member_names_.insert(member.name);
       members.push_back({member.name, next_val});
       RtlirVariable var;
@@ -958,12 +922,6 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   mod->enum_types[item->name] = std::move(members);
 }
 
-// §6.18: After all items in a scope have been elaborated, every forward
-// typedef declared in that scope must resolve to a real definition. A bare
-// forward (`typedef NAME;`) resolves only to a typedef with a non-implicit
-// type in the same scope; a kind-specific forward (`typedef enum NAME;`
-// etc.) may also resolve to a class with that name visible in the current
-// scope, supporting the `typedef class C;` pattern.
 void Elaborator::ValidateForwardTypedefsInScope(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kTypedef) continue;
@@ -995,11 +953,6 @@ void Elaborator::ValidateForwardTypedefsInScope(const ModuleDecl* decl) {
   }
 }
 
-// §6.18: "It shall be an error if the prefix does not resolve to a class."
-// When a typedef in this scope sources its type from `prefix::T` and `prefix`
-// was declared via a forward typedef in the same scope, `prefix` must resolve
-// to a class declaration visible from this scope; otherwise the elaborator
-// rejects the typedef.
 void Elaborator::ValidateForwardTypedefScopePrefix(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kTypedef) continue;
@@ -1028,20 +981,19 @@ void Elaborator::ValidateForwardTypedefScopePrefix(const ModuleDecl* decl) {
   }
 }
 
-// §6.6.7: Register a user-defined nettype so declarations using it create nets.
-void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* /*mod*/) {
+void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* ) {
   typedefs_[item->name] = item->typedef_type;
   nettype_names_.insert(item->name);
   if (!item->nettype_resolve_func.empty()) {
     nettype_resolve_funcs_[item->name] = item->nettype_resolve_func;
     nettype_canonical_[item->name] = item->name;
   } else if (item->typedef_type.kind == DataTypeKind::kNamed) {
-    // §6.6.7: Alias form inherits resolution function from base nettype.
+
     auto it = nettype_resolve_funcs_.find(item->typedef_type.type_name);
     if (it != nettype_resolve_funcs_.end()) {
       nettype_resolve_funcs_[item->name] = it->second;
     }
-    // §6.22.6(b): Alias resolves to the base's canonical name.
+
     auto cit = nettype_canonical_.find(item->typedef_type.type_name);
     nettype_canonical_[item->name] =
         (cit != nettype_canonical_.end()) ? cit->second
@@ -1051,7 +1003,6 @@ void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* /*mod*/) {
   }
 }
 
-// §6.22.6: Two nettype names match if they resolve to the same canonical base.
 bool Elaborator::NettypesMatch(std::string_view a, std::string_view b) const {
   if (a == b) return true;
   auto ait = nettype_canonical_.find(a);
@@ -1072,9 +1023,7 @@ void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
   for (auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kModuleInst) continue;
     if (!FindUdpByName(item->inst_module)) continue;
-    // UDP instantiation has no parameter value assignment in the LRM; ignore
-    // any inst_params the parser collected and let the UDP path report
-    // problems through its own diagnostics.
+
     item->kind = ModuleItemKind::kUdpInst;
     item->gate_inst_name = item->inst_name;
     item->inst_name = {};
@@ -1090,8 +1039,7 @@ void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
 
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ReclassifyForwardUdpInstances(decl);
-  // §6.18: Forward typedef kind tracking is scoped to one module's item list,
-  // so reset it before elaborating a new scope.
+
   forward_typedef_kinds_.clear();
   declared_names_.clear();
   net_names_.clear();
@@ -1132,7 +1080,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       nested_module_decls_[item->nested_module_decl->name] =
           item->nested_module_decl;
     }
-    // §25.9: virtual interface shall not be used as an interface item.
+
     if (decl->decl_kind == ModuleDeclKind::kInterface &&
         item->kind == ModuleItemKind::kVarDecl &&
         item->data_type.kind == DataTypeKind::kVirtualInterface) {
@@ -1160,8 +1108,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
                                 item->inst_module, decl->name));
       }
     }
-    // §24.3: Portless nested programs are implicitly instantiated under
-    // their declaration name.
+
     if (item->kind == ModuleItemKind::kNestedModuleDecl &&
         item->nested_module_decl &&
         item->nested_module_decl->decl_kind == ModuleDeclKind::kProgram &&
@@ -1178,13 +1125,11 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
                               item->nested_module_decl->name, decl->name));
     }
   }
-  // §6.20: Parameter port list names are constants that never change.
+
   for (const auto& [pname, pval] : decl->params) {
     const_names_.insert(pname);
   }
-  // §13.2: Collect task names so function body validation can detect task
-  // enables. §13.4.3: Collect function declarations for constant function
-  // validation.
+
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl) {
       task_names_.insert(item->name);
@@ -1193,8 +1138,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       func_decls_[item->name] = item;
     }
   }
-  // §13.4.2: Propagate module default lifetime to functions/tasks without
-  // an explicit qualifier.
+
   for (auto* item : decl->items) {
     if ((item->kind == ModuleItemKind::kFunctionDecl ||
          item->kind == ModuleItemKind::kTaskDecl) &&
@@ -1206,7 +1150,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       }
     }
   }
-  // §23.6 R12: Collect automatic task/function names for hier ref validation.
+
   for (const auto* item : decl->items) {
     if ((item->kind == ModuleItemKind::kTaskDecl ||
          item->kind == ModuleItemKind::kFunctionDecl) &&
@@ -1214,21 +1158,17 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       auto_task_func_names_.insert(item->name);
     }
   }
-  // §23.4: Save nested module list before the main loop since recursive
-  // ElaborateModule calls during child instantiation clear per-module state.
+
   std::vector<std::pair<std::string_view, ModuleDecl*>> local_nested_modules(
       nested_module_decls_.begin(), nested_module_decls_.end());
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
   }
-  // §23.4: Implicitly instantiate portless nested modules that were not
-  // explicitly instantiated.
-  // §25.3: Interfaces are never implicitly instantiated.
+
   for (const auto& [name, nested_decl] : local_nested_modules) {
     if (!nested_decl->ports.empty()) continue;
     if (nested_decl->decl_kind == ModuleDeclKind::kInterface) continue;
-    // §6.20.1: a design element with any non-defaulted parameter port shall
-    // not be implicitly instantiated.
+
     if (HasParamPortWithoutDefault(nested_decl)) continue;
     bool explicitly_instantiated = false;
     for (const auto& child : mod->children) {
@@ -1242,9 +1182,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
     inst.module_name = name;
     inst.inst_name = name;
     ParamList empty_params;
-    // §33.6.4: implicitly instantiated nested modules also become a
-    // node in the design hierarchy, so push their path onto the
-    // active hier_path for the duration of the recursive elaboration.
+
     std::string saved_inst_path = current_inst_path_;
     if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
     current_inst_path_.append(name.data(), name.size());
@@ -1252,7 +1190,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
     current_inst_path_ = std::move(saved_inst_path);
     mod->children.push_back(inst);
   }
-  // §9.2.2.2: Check for multi-driver violations on always_comb LHS variables.
+
   CheckAlwaysCombMultiDriver(decl, mod);
   ValidateModuleConstraints(decl);
   ValidateValueParams(decl, mod);
@@ -1325,7 +1263,7 @@ void CollectMemberAccessInStmt(const Stmt* s, std::vector<const Expr*>& out) {
   CollectMemberAccessInStmt(s->assert_fail_stmt, out);
 }
 
-}  // namespace
+}
 
 void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,
                                                const RtlirModule* mod) {
@@ -1383,10 +1321,6 @@ void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,
   for (const auto* ma : accesses) check_member_access(ma);
 }
 
-// §23.6: When a hierarchical name traverses an arrayed module instance,
-// the array name shall be followed by a constant-expression instance
-// select that evaluates to one of the legal index values of the array.
-// Bare references through an instance array (no select) are illegal.
 void Elaborator::ValidateHierRefInstanceArray(const ModuleDecl* decl) {
   struct ArrayBounds {
     int64_t low;
@@ -1451,8 +1385,6 @@ void Elaborator::ValidateHierRefInstanceArray(const ModuleDecl* decl) {
   }
 }
 
-// --- Module instantiation ---
-
 static uint32_t EvalInstDimSize(const Expr* left, const Expr* right) {
   if (left && right) {
     auto lv = ConstEvalInt(left);
@@ -1467,7 +1399,7 @@ static uint32_t EvalInstDimSize(const Expr* left, const Expr* right) {
 }
 
 void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
-  // §23.9: Instance names share the enclosing scope's name space.
+
   if (!item->inst_name.empty() &&
       !declared_names_.insert(item->inst_name).second) {
     diag_.Error(item->loc,
@@ -1477,10 +1409,6 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   inst.module_name = item->inst_module;
   inst.inst_name = item->inst_name;
 
-  // §33.6.4: extend the active hier_path with this instance's name so
-  // FindModuleInScope (and the recursive ElaborateModule below) sees
-  // the inheriting position when matching `instance ... liblist ...`
-  // rules.  Restored at every exit from this function.
   std::string saved_inst_path = current_inst_path_;
   if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
   current_inst_path_.append(item->inst_name.data(), item->inst_name.size());
@@ -1574,7 +1502,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   CheckPortCoercion(inst, item->loc);
   CheckUwirePortMerge(inst, item, mod);
   CheckInterconnectPortMerge(inst, item, mod);
-  // §5.12: Resolve attributes.
+
   inst.attrs = ResolveAttributes(item->attrs, diag_);
   mod->children.push_back(inst);
   current_inst_path_ = std::move(saved_inst_path);
@@ -1764,7 +1692,6 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       }
     }
 
-    // §11.4.12.1: Replication shall not appear on output/inout port connections.
     if (conn_expr && binding.direction != Direction::kInput) {
       std::function<bool(const Expr*)> has_rep = [&](const Expr* e) -> bool {
         if (!e) return false;
@@ -1782,8 +1709,6 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       }
     }
 
-    // §10.9: Assignment pattern expressions shall not be used in port
-    // expressions.
     if (conn_expr) {
       bool is_pattern = conn_expr->kind == ExprKind::kAssignmentPattern ||
                         (conn_expr->kind == ExprKind::kCast && conn_expr->lhs &&
@@ -1795,7 +1720,6 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       }
     }
 
-    // §10.3.2: Track variables driven by module output ports.
     if (conn_expr && conn_expr->kind == ExprKind::kIdentifier &&
         binding.direction != Direction::kInput &&
         net_names_.count(conn_expr->text) == 0) {
@@ -1813,7 +1737,6 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       binding.connection = it->default_value;
     }
 
-    // §22.9: Pull unconnected input ports.
     if (has_pull && !binding.connection &&
         binding.direction == Direction::kInput) {
       binding.connection = MakePullExpr(unit_->unconnected_drive);
@@ -2327,8 +2250,6 @@ void Elaborator::ValidateInstanceArrayPorts(
   }
 }
 
-// --- Generate expansion ---
-
 ScopeMap Elaborator::BuildParamScope(const RtlirModule* mod) const {
   ScopeMap scope = cu_param_scope_;
   for (const auto& p : mod->params) {
@@ -2436,8 +2357,7 @@ static bool IsGenerateConstruct(ModuleItemKind k) {
 }
 
 void Elaborator::AssignGenerateBlockNames(const ModuleDecl* decl) {
-  // Names that `genblk<n>` must not collide with: ports, parameters, and
-  // any named module item (including explicitly labeled generate blocks).
+
   std::unordered_set<std::string_view> used;
   for (const auto& port : decl->ports) used.insert(port.name);
   for (const auto& p : decl->params) used.insert(p.first);
@@ -2449,7 +2369,7 @@ void Elaborator::AssignGenerateBlockNames(const ModuleDecl* decl) {
   for (auto* it : decl->items) {
     if (!IsGenerateConstruct(it->kind)) continue;
     ++n;
-    if (!it->name.empty()) continue;  // explicit label kept as-is
+    if (!it->name.empty()) continue;
     std::string digits = std::to_string(n);
     std::string candidate = "genblk" + digits;
     while (used.count(candidate)) {
@@ -2464,7 +2384,6 @@ void Elaborator::AssignGenerateBlockNames(const ModuleDecl* decl) {
 
 static constexpr int64_t kMaxGenerateIterations = 65536;
 
-// True if `e` (or any subexpression) is an identifier reference to `name`.
 static bool ExprReferencesName(const Expr* e, std::string_view name) {
   if (!e) return false;
   if (e->kind == ExprKind::kIdentifier && e->text == name) return true;
@@ -2476,7 +2395,6 @@ static bool ExprReferencesName(const Expr* e, std::string_view name) {
   return false;
 }
 
-// LHS identifier assigned by a genvar_iteration step statement.
 static std::string_view StepLhsName(const Stmt* step) {
   if (!step) return {};
   if (step->lhs && step->lhs->kind == ExprKind::kIdentifier) {
@@ -2501,8 +2419,6 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   }
   auto genvar_name = item->gen_init->lhs->text;
 
-  // §27.4: the initialization assignment shall not reference the loop
-  // index on the right-hand side.
   if (ExprReferencesName(item->gen_init->rhs, genvar_name)) {
     diag_.Error(item->loc,
                 "generate-for init shall not reference the loop index on the "
@@ -2510,8 +2426,6 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     return;
   }
 
-  // §27.4: both the initialization and iteration assignments shall assign
-  // to the same genvar.
   auto step_lhs = StepLhsName(item->gen_step);
   if (!step_lhs.empty() && step_lhs != genvar_name) {
     diag_.Error(item->loc,
@@ -2529,7 +2443,6 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   loop_scope[genvar_name] = *init_val;
   std::string saved_prefix = gen_prefix_;
 
-  // §27.4: error if a genvar value is repeated during loop evaluation.
   std::unordered_set<int64_t> seen_values;
 
   int64_t iter = 0;
@@ -2548,8 +2461,6 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
                               loop_scope[genvar_name]);
     ElaborateGenerateItems(item->gen_body, mod, loop_scope);
 
-    // Evaluate genvar_iteration step: supports i = expr, i += expr,
-    // ++i, i++, --i, i-- (§A.4.2 genvar_iteration).
     std::optional<int64_t> next;
     if (item->gen_step->rhs) {
       next = ConstEvalInt(item->gen_step->rhs, loop_scope);
@@ -2571,7 +2482,6 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     loop_scope[genvar_name] = *next;
   }
 
-  // §27.4: non-termination shall be an error.
   if (iter == kMaxGenerateIterations) {
     diag_.Error(item->loc, "generate-for loop did not terminate");
   }
@@ -2579,4 +2489,4 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   gen_prefix_ = saved_prefix;
 }
 
-}  // namespace delta
+}

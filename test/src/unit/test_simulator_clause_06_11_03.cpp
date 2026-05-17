@@ -5,11 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §6.11.3: byte/shortint/int/integer/longint default to signed; time/bit/reg/
-// logic (and arrays of these types) default to unsigned. The simulator must
-// carry that signedness onto the lowered Variable so runtime arithmetic and
-// width conversions follow the declared signing.
-
 TEST(SignedAndUnsigned, DefaultSignedScalarsCarriedToSimulator) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -68,8 +63,7 @@ TEST(SignedAndUnsigned, PackedArraysOfUnsignedTypesAreUnsigned) {
 }
 
 TEST(SignedAndUnsigned, ExplicitSignedOverrideObservedAtRuntime) {
-  // A bit array declared `signed` extends its sign bit on widening, in
-  // contrast to its unsigned default.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -93,8 +87,7 @@ TEST(SignedAndUnsigned, ExplicitSignedOverrideObservedAtRuntime) {
 }
 
 TEST(SignedAndUnsigned, ExplicitUnsignedOverrideObservedAtRuntime) {
-  // An `int unsigned` source widened into a longint must zero-extend its
-  // MSB rather than sign-extend.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -117,4 +110,4 @@ TEST(SignedAndUnsigned, ExplicitUnsignedOverrideObservedAtRuntime) {
   EXPECT_EQ(dst->value.ToUint64(), 0x00000000FFFFFFFFull);
 }
 
-}  // namespace
+}

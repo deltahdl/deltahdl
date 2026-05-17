@@ -105,4 +105,4 @@ TEST(IoSystemTaskTest, Rewind) {
   std::remove(tmp_path.c_str());
 }
 
-}  // namespace
+}

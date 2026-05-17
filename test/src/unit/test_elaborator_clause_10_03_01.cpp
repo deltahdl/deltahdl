@@ -124,4 +124,4 @@ TEST(ContinuousAssignDeclElaboration, InterconnectVectorNetDeclAssignIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

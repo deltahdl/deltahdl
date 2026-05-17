@@ -52,4 +52,4 @@ TEST(SignalMultiBlockElab, ClockSignalSharedAcrossBlocks) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

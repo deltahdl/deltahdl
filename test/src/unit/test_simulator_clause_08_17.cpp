@@ -201,4 +201,4 @@ TEST(ChainedConstructorSimulation, PropertyDefaultsInitializedDuringChaining) {
       "endmodule\n", "result"), 75u);
 }
 
-}  // namespace
+}

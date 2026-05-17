@@ -161,4 +161,4 @@ TEST(SimulationAlgorithmSim, PostponedRunsWhenAllIterativeRegionsAreEmpty) {
   EXPECT_TRUE(postponed_ran);
 }
 
-}  // namespace
+}

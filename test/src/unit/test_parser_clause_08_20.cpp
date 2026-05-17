@@ -14,8 +14,6 @@ TEST(VirtualMethodParsing, DerivedOverrideWithoutVirtual) {
               "endclass\n"));
 }
 
-// === dynamic_override_specifiers ===
-
 TEST(VirtualMethodParsing, MethodInitialSpecifier) {
   auto r = Parse(
       "class C;\n"
@@ -221,4 +219,4 @@ TEST(VirtualMethodParsing, TaskInitialSpecifier) {
   EXPECT_TRUE(m->is_method_initial);
 }
 
-}  // namespace
+}

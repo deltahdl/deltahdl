@@ -16,4 +16,4 @@ TEST(TypeIncompatibleElaboration, StringToIntRejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

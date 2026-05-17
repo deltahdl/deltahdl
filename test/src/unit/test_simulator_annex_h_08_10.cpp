@@ -26,4 +26,4 @@ TEST(DpiRuntime, ImportWithStringArg) {
   EXPECT_EQ(result.AsInt(), 5);
 }
 
-}  // namespace
+}

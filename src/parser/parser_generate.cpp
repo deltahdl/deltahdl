@@ -4,17 +4,15 @@ namespace delta {
 
 void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
                                std::string_view& out_label) {
-  // RAII guard so §27.2 rules apply across all return paths.
+
   struct DepthGuard {
     int& d;
     explicit DepthGuard(int& d) : d(d) { ++d; }
     ~DepthGuard() { --d; }
   } guard(generate_block_depth_);
 
-  // generate_block_or_null: ';' produces an empty body (§A.4.2)
   if (Match(TokenKind::kSemicolon)) return;
 
-  // §9.3.5: label before generate begin-end block (identifier ':' 'begin')
   bool has_gen_label = false;
   if (CheckIdentifier()) {
     auto saved = lexer_.SavePos();
@@ -23,8 +21,7 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
       Consume();
       if (Check(TokenKind::kKwBegin)) {
         has_gen_label = true;
-        // §27.6: capture the prefix label so elaboration can use it as the
-        // block's external name instead of assigning a default genblk<n>.
+
         out_label = ident.text;
       } else {
         lexer_.RestorePos(saved);
@@ -36,7 +33,7 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
 
   if (Match(TokenKind::kKwBegin)) {
     if (!has_gen_label && Match(TokenKind::kColon)) {
-      // §27.6: the alternative `begin : name` form also names the block.
+
       if (CheckIdentifier()) {
         out_label = Consume().text;
       }
@@ -51,14 +48,14 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
     Expect(TokenKind::kKwEnd);
     if (Match(TokenKind::kColon)) Match(TokenKind::kIdentifier);
   } else {
-    ParseModuleItem(body);  // single generate item
+    ParseModuleItem(body);
   }
 }
 
 void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
   Expect(TokenKind::kKwGenerate);
-  // §27.3: generate regions shall not nest.
+
   if (in_generate_region_) {
     diag_.Error(loc, "generate regions shall not nest");
   }
@@ -77,7 +74,7 @@ ModuleItem* Parser::ParseGenerateFor() {
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwFor);
   Expect(TokenKind::kLParen);
-  Match(TokenKind::kKwGenvar);  // optional inline genvar (§27.4)
+  Match(TokenKind::kKwGenvar);
   item->gen_init = ParseAssignmentOrExprStmt();
   item->gen_cond = ParseExpr();
   Expect(TokenKind::kSemicolon);
@@ -140,4 +137,4 @@ ModuleItem* Parser::ParseGenerateCase() {
   return item;
 }
 
-}  // namespace delta
+}

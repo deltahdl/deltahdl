@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.3: put() call on a mailbox parses.
 TEST(MailboxPutParser, PutCallParses) {
   auto r = Parse(
       "module m;\n"
@@ -17,7 +16,6 @@ TEST(MailboxPutParser, PutCallParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.3: put() with a variable expression parses.
 TEST(MailboxPutParser, PutWithVariableExpression) {
   auto r = Parse(
       "module m;\n"
@@ -31,7 +29,6 @@ TEST(MailboxPutParser, PutWithVariableExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.3: put() on parameterized mailbox parses.
 TEST(MailboxPutParser, PutOnParameterizedMailbox) {
   auto r = Parse(
       "module m;\n"
@@ -45,7 +42,6 @@ TEST(MailboxPutParser, PutOnParameterizedMailbox) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.3: Multiple put() calls in sequence parse.
 TEST(MailboxPutParser, MultiplePutCalls) {
   auto r = Parse(
       "module m;\n"
@@ -60,4 +56,4 @@ TEST(MailboxPutParser, MultiplePutCalls) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

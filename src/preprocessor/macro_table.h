@@ -13,7 +13,7 @@ struct MacroDef {
   std::string name;
   std::string body;
   std::vector<std::string> params;
-  std::vector<std::string> param_defaults;  // Per-param default; "\x01" = none.
+  std::vector<std::string> param_defaults;
   SourceLoc def_loc;
   bool is_function_like = false;
 };
@@ -31,4 +31,4 @@ class MacroTable {
   std::unordered_map<std::string, MacroDef> macros_;
 };
 
-}  // namespace delta
+}

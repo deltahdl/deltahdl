@@ -1,4 +1,4 @@
-// §23.3.1
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -52,4 +52,4 @@ TEST(TopLevelModules, DollarRootMultiLevelHierPathParses) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

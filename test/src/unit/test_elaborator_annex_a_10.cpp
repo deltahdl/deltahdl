@@ -82,8 +82,6 @@ TEST(BnfClarificationElaboration, DollarInQueueSelectOk) {
              "endmodule\n"));
 }
 
-// Item 8: final_specifier illegal on pure virtual method
-
 TEST(BnfClarificationElaboration, FinalOnPureVirtualError) {
   ElabFixture f;
   ElaborateSrc(
@@ -95,4 +93,4 @@ TEST(BnfClarificationElaboration, FinalOnPureVirtualError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

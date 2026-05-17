@@ -7,10 +7,6 @@
 
 namespace delta {
 
-// =============================================================================
-// TwoStateDetector
-// =============================================================================
-
 bool TwoStateDetector::Is2State(const Logic4Vec& vec) {
   for (uint32_t i = 0; i < vec.nwords; ++i) {
     if (vec.words[i].bval != 0) {
@@ -19,10 +15,6 @@ bool TwoStateDetector::Is2State(const Logic4Vec& vec) {
   }
   return true;
 }
-
-// =============================================================================
-// EventCoalescer
-// =============================================================================
 
 void EventCoalescer::Add(uint32_t target_id, uint64_t value) {
   pending_[target_id] = value;
@@ -38,10 +30,6 @@ std::vector<CoalescedEntry> EventCoalescer::Drain() {
   return result;
 }
 
-// =============================================================================
-// DynArray
-// =============================================================================
-
 void DynArray::Push(uint64_t val) { data_.push_back(val); }
 
 uint64_t DynArray::At(uint32_t idx) const {
@@ -50,10 +38,6 @@ uint64_t DynArray::At(uint32_t idx) const {
 }
 
 void DynArray::Delete() { data_.clear(); }
-
-// =============================================================================
-// AssocArray
-// =============================================================================
 
 void AssocArray::Insert(const std::string& key, uint64_t val) {
   data_[key] = val;
@@ -71,4 +55,4 @@ bool AssocArray::Exists(const std::string& key) const {
 
 void AssocArray::Erase(const std::string& key) { data_.erase(key); }
 
-}  // namespace delta
+}

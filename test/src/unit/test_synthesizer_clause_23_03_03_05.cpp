@@ -4,8 +4,6 @@
 
 namespace {
 
-// --- R2: Scalar connection replicated to array of instances ---
-
 TEST(UnpackedArrayPortsAndArraysOfInstancesSynthesis,
      ScalarConnectionToInstanceArraySynthesizes) {
   SynthFixture f;
@@ -21,8 +19,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSynthesis,
   auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
 }
-
-// --- R3: Unpacked array connection to instance array ---
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesSynthesis,
      UnpackedArrayConnectionToInstanceArraySynthesizes) {
@@ -44,8 +40,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSynthesis,
   ASSERT_NE(aig, nullptr);
 }
 
-// --- R4: Packed array connection part-selected across instances ---
-
 TEST(UnpackedArrayPortsAndArraysOfInstancesSynthesis,
      PackedArrayConnectionToInstanceArraySynthesizes) {
   SynthFixture f;
@@ -62,4 +56,4 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSynthesis,
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

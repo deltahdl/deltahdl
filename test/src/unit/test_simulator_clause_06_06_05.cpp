@@ -9,7 +9,6 @@ using namespace delta;
 
 namespace {
 
-// Helper: resolve two 1-bit drivers on a net of the given type.
 static Logic4Word ResolveTwoBit(Arena& arena, NetType type, Logic4Word a,
                                 Logic4Word b) {
   auto* var = arena.Create<Variable>();
@@ -26,8 +25,6 @@ static Logic4Word ResolveTwoBit(Arena& arena, NetType type, Logic4Word a,
   net.Resolve(arena);
   return {var->value.words[0].aval & 1, var->value.words[0].bval & 1};
 }
-
-// --- Table 6-5: tri0 truth table (16 entries) ---
 
 TEST(Tri0Tri1Resolution, Tri0_0_0) {
   Arena arena;
@@ -141,8 +138,6 @@ TEST(Tri0Tri1Resolution, Tri0_z_z) {
   EXPECT_EQ(r.bval, 0u);
 }
 
-// --- Table 6-6: tri1 truth table (16 entries) ---
-
 TEST(Tri0Tri1Resolution, Tri1_0_0) {
   Arena arena;
   auto r = ResolveTwoBit(arena, NetType::kTri1, {0, 0}, {0, 0});
@@ -255,7 +250,6 @@ TEST(Tri0Tri1Resolution, Tri1_z_z) {
   EXPECT_EQ(r.bval, 0u);
 }
 
-// Driven value passes through unchanged.
 TEST(Tri0Tri1Resolution, Tri0DrivenValuePassesThrough) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -280,4 +274,4 @@ TEST(Tri0Tri1Resolution, Tri1DrivenValuePassesThrough) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
-}  // namespace
+}

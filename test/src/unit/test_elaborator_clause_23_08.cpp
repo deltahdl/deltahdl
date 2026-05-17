@@ -2,8 +2,6 @@
 
 namespace {
 
-// Upward reference using enclosing module's name resolves to an item in it.
-
 TEST(UpwardNameReferenceElaboration, UpwardVariableReferenceResolves) {
   EXPECT_TRUE(
       ElabOk("module child;\n"
@@ -79,8 +77,6 @@ TEST(UpwardNameReferenceElaboration, UpwardNamedBlockReferenceResolves) {
              "endmodule\n"));
 }
 
-// LRM canonical example: a.a_b1 / d.d_b1 with module c referencing b.i upward.
-
 TEST(UpwardNameReferenceElaboration, CanonicalFourModuleExampleElaborates) {
   EXPECT_TRUE(
       ElabOk("module c;\n"
@@ -101,8 +97,6 @@ TEST(UpwardNameReferenceElaboration, CanonicalFourModuleExampleElaborates) {
              "endmodule\n"));
 }
 
-// scope_name.item_name step (a): scope_name found in current scope walk.
-
 TEST(UpwardNameReferenceElaboration,
      ScopeNameFoundInCurrentScopeResolvesDownward) {
   EXPECT_TRUE(
@@ -115,8 +109,6 @@ TEST(UpwardNameReferenceElaboration,
              "  end\n"
              "endmodule\n"));
 }
-
-// scope_name.item_name step (b)/(c): search instantiation's parent scope upward.
 
 TEST(UpwardNameReferenceElaboration,
      ScopeNameFoundInInstantiationParentScope) {
@@ -132,4 +124,4 @@ TEST(UpwardNameReferenceElaboration,
              "endmodule\n"));
 }
 
-}  // namespace
+}

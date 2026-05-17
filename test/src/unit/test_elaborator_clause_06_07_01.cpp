@@ -30,4 +30,4 @@ TEST(NetDecl, InvalidNetDataTypeString) {
   EXPECT_FALSE(ValidateNetDataType(NetDataTypeKind::kString));
 }
 
-}  // namespace
+}

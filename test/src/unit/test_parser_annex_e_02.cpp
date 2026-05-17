@@ -44,4 +44,4 @@ TEST(OptionalDirectiveParsing, DefaultDecayTimeMultipleModules) {
   EXPECT_EQ(r.cu->modules[1]->name, "b");
 }
 
-}  // namespace
+}

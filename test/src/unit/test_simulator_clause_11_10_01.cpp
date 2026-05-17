@@ -164,8 +164,8 @@ TEST(StringLiteralOperationsSim, StringLiteralTruncatedInSmallerVector) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("s");
   ASSERT_NE(var, nullptr);
-  // "ABC" = 0x414243 (24 bits), truncated to 16 bits = 0x4243 ("BC")
+
   EXPECT_EQ(var->value.ToUint64(), 0x4243u);
 }
 
-}  // namespace
+}

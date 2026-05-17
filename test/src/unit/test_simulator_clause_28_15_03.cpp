@@ -24,4 +24,4 @@ TEST(NetStrengths, Supply1ValueIsOne) {
   EXPECT_EQ(info.value, Val4::kV1);
 }
 
-}  // namespace
+}

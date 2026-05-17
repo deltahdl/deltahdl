@@ -68,4 +68,4 @@ TEST(OperandElaboration, UnpackedArrayElementOperandElaborates) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

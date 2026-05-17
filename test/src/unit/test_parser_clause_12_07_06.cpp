@@ -71,4 +71,4 @@ TEST(LoopSyntaxParsing, ErrorForeverMissingBody) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

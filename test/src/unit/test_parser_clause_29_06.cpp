@@ -37,8 +37,6 @@ TEST(UdpEdgeSeq, DFlipFlopFromSource) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-// A row may describe at most one input transition; two parenthesized edge
-// indicators in the same row is the example the LRM calls out as illegal.
 TEST(UdpEdgeSeq, TwoParenthesizedEdgeIndicatorsInRowRejected) {
   auto r = Parse(
       "primitive bad(output reg q, input a, input b, input c);\n"
@@ -49,8 +47,6 @@ TEST(UdpEdgeSeq, TwoParenthesizedEdgeIndicatorsInRowRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Two single-letter edge symbols in the same row likewise describe more than
-// one input transition.
 TEST(UdpEdgeSeq, TwoSingleLetterEdgeSymbolsInRowRejected) {
   auto r = Parse(
       "primitive bad(output reg q, input a, input b);\n"
@@ -61,8 +57,6 @@ TEST(UdpEdgeSeq, TwoSingleLetterEdgeSymbolsInRowRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Mixing a single-letter edge symbol with a parenthesized edge in the same
-// row still describes two transitions, which is illegal.
 TEST(UdpEdgeSeq, MixedEdgeSymbolAndParenthesizedEdgeInRowRejected) {
   auto r = Parse(
       "primitive bad(output reg q, input a, input b);\n"
@@ -73,7 +67,6 @@ TEST(UdpEdgeSeq, MixedEdgeSymbolAndParenthesizedEdgeInRowRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// A single edge indicator is the common and legal case.
 TEST(UdpEdgeSeq, SingleEdgeIndicatorInRowAccepted) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -86,4 +79,4 @@ TEST(UdpEdgeSeq, SingleEdgeIndicatorInRowAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

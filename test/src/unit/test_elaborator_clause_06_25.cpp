@@ -183,4 +183,4 @@ TEST(Elaboration, ParameterizedType_DistinctSpecializationsInSameModule) {
   EXPECT_EQ(mod->variables[2].width, 1);
 }
 
-}  // namespace
+}

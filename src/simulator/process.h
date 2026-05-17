@@ -10,8 +10,6 @@
 
 namespace delta {
 
-// --- Coroutine return type for simulation processes ---
-
 struct SimCoroutine {
   struct promise_type {
     SimCoroutine get_return_object() {
@@ -74,11 +72,7 @@ struct SimCoroutine {
   }
 };
 
-// --- Process handle alias ---
-
 using ProcessHandle = std::coroutine_handle<SimCoroutine::promise_type>;
-
-// --- Process kinds matching SystemVerilog constructs ---
 
 enum class ProcessKind : uint8_t {
   kInitial,
@@ -90,8 +84,6 @@ enum class ProcessKind : uint8_t {
   kContAssign,
 };
 
-// --- §9.7: SV-visible process state enumeration ---
-
 enum class ProcessState : uint8_t {
   kFinished = 0,
   kRunning = 1,
@@ -100,14 +92,10 @@ enum class ProcessState : uint8_t {
   kKilled = 4,
 };
 
-// --- Wait-fork synchronization state (§9.6.1) ---
-
 struct WaitForkState {
   uint32_t remaining = 0;
   std::coroutine_handle<> waiter;
 };
-
-// --- Process: a schedulable simulation process ---
 
 struct Process {
   ProcessKind kind = ProcessKind::kInitial;
@@ -119,24 +107,18 @@ struct Process {
 
   uint32_t program_block_id = 0;
 
-  // §9.6.1: Tracks join_none children for wait fork.
   WaitForkState wait_fork_state;
 
-  // §9.6.3: Dynamic parent-child tracking for disable fork.
   std::vector<Process*> children;
 
-  // §9.7: SV-visible process state and await synchronization.
   ProcessState sv_state = ProcessState::kRunning;
   bool is_suspended = false;
   std::vector<std::coroutine_handle<>> await_waiters;
 
-  // §9.7/§18.13.3: Per-process RNG seed set via the process srandom() method.
   uint32_t rng_seed = 0;
 
-  // §12.4.2.1: Pending violation reports awaiting Observed region maturation.
   std::vector<std::string> pending_violations;
 
-  // §23.6: Instance hierarchy prefix for child module processes.
   std::string inst_prefix;
 
   ~Process() {
@@ -156,4 +138,4 @@ struct Process {
   }
 };
 
-}  // namespace delta
+}

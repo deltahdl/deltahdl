@@ -360,10 +360,6 @@ TEST(LexicalConventionLexing, DoubleNotTriple) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kEqEq);
 }
 
-// §5.5: "A conditional operator shall have two operator characters that
-// separate three operands." Lexer-stage observation: both `?` and `:` are
-// produced as separate single-character operator tokens, and the three
-// operands sit between/around them.
 TEST(LexicalConventionLexing, ConditionalOperatorTwoOperatorChars) {
   auto tokens = Lex("a ? b : c");
   ASSERT_GE(tokens.size(), 5u);
@@ -376,4 +372,4 @@ TEST(LexicalConventionLexing, ConditionalOperatorTwoOperatorChars) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kIdentifier);
 }
 
-}  // namespace
+}

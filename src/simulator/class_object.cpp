@@ -5,8 +5,6 @@
 
 namespace delta {
 
-// --- ClassTypeInfo ---
-
 int ClassTypeInfo::FindVTableIndex(std::string_view mname) const {
   for (size_t i = 0; i < vtable.size(); ++i) {
     if (vtable[i].method_name == mname) return static_cast<int>(i);
@@ -23,8 +21,6 @@ bool ClassTypeInfo::IsA(const ClassTypeInfo* other) const {
   }
   return false;
 }
-
-// --- ClassObject ---
 
 Logic4Vec ClassObject::GetProperty(std::string_view name, Arena& arena) const {
   std::string key(name);
@@ -92,7 +88,7 @@ void ClassObject::SetPropertyForType(std::string_view name,
     auto it = properties.find(scoped);
     if (it != properties.end()) {
       it->second = val;
-      // Keep the bare key in sync when writing through the most-derived type.
+
       if (declared_type == type)
         properties[std::string(name)] = val;
       return;
@@ -108,4 +104,4 @@ ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   return copy;
 }
 
-}  // namespace delta
+}

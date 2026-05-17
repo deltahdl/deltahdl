@@ -1,4 +1,4 @@
-// §28.7
+
 
 #include "fixture_elaborator.h"
 
@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// The driven output (first terminal) must appear as the lhs of the emitted
-// continuous assign.
 TEST(MosSwitchElaboration, OutputIsFirstTerminal) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -24,7 +22,6 @@ TEST(MosSwitchElaboration, OutputIsFirstTerminal) {
   EXPECT_EQ(mod->assigns[0].lhs->text, "y");
 }
 
-// nmos conducts when control is 1 — true arm passes data, false arm is Z.
 TEST(MosSwitchElaboration, NmosLowersToTernaryWithZOnBlocked) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -49,7 +46,6 @@ TEST(MosSwitchElaboration, NmosLowersToTernaryWithZOnBlocked) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-// pmos conducts when control is 0 — arms are swapped relative to nmos.
 TEST(MosSwitchElaboration, PmosLowersToTernaryWithZOnActiveControl) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -72,8 +68,6 @@ TEST(MosSwitchElaboration, PmosLowersToTernaryWithZOnActiveControl) {
   EXPECT_EQ(rhs->false_expr->text, "a");
 }
 
-// rnmos follows the nmos conduction polarity (conduct on 1). Data must not
-// be inverted — strength attenuation is modeled elsewhere.
 TEST(MosSwitchElaboration, RnmosConductsOnOneWithoutInverting) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -96,7 +90,6 @@ TEST(MosSwitchElaboration, RnmosConductsOnOneWithoutInverting) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-// rpmos follows the pmos conduction polarity (conduct on 0).
 TEST(MosSwitchElaboration, RpmosConductsOnZeroWithoutInverting) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -119,4 +112,4 @@ TEST(MosSwitchElaboration, RpmosConductsOnZeroWithoutInverting) {
   EXPECT_EQ(rhs->false_expr->text, "a");
 }
 
-}  // namespace
+}

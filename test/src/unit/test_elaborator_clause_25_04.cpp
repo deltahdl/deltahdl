@@ -1,4 +1,4 @@
-// §25.4
+
 
 #include "fixture_elaborator.h"
 
@@ -71,4 +71,4 @@ TEST(InterfacePorts, TwoInstancesShareExternalWire) {
   EXPECT_NE(top->children[1].resolved, nullptr);
 }
 
-}  // namespace
+}

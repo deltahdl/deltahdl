@@ -17,4 +17,4 @@ TEST(CycleDelayElab, WithoutDefaultClockingErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

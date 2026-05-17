@@ -267,4 +267,4 @@ TEST(ContinuousAssignment, SimpleNetAssign) {
   EXPECT_TRUE(has_assign);
 }
 
-}  // namespace
+}

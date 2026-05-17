@@ -1,4 +1,4 @@
-// §23.3.1
+
 
 #include "fixture_synthesizer.h"
 #include "synthesizer/synth_lower.h"
@@ -34,4 +34,4 @@ TEST(TopLevelModules, TopLevelWithChildInstanceSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

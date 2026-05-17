@@ -101,4 +101,4 @@ TEST(ModuleInstanceParameterAssignment, DifferentInstancesMayUseDifferentMethods
   EXPECT_EQ(u_named->params[0].resolved_value, 8);
 }
 
-}  // namespace
+}

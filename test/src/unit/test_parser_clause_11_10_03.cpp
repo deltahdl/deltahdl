@@ -41,4 +41,4 @@ TEST(EmptyStringLiteralParsing, EmptyStringInConditionalParses) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

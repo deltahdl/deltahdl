@@ -37,4 +37,4 @@ TEST(IoSystemTaskTest, FdisplayToFile) {
   std::remove(tmp_path.c_str());
 }
 
-}  // namespace
+}

@@ -327,4 +327,4 @@ TEST(NonAnsiStylePortDeclarations, Example1SignednessParses) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

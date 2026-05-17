@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §15.5.5.2: Event initialized to null parses correctly.
 TEST(NamedEventParser, EventInitializedToNull) {
   auto r = Parse(
       "module m;\n"
@@ -18,4 +17,4 @@ TEST(NamedEventParser, EventInitializedToNull) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-}  // namespace
+}

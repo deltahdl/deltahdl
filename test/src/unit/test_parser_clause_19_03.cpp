@@ -38,4 +38,4 @@ TEST_F(VerifyParseTest, CovergroupEndLabel) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}  // namespace
+}

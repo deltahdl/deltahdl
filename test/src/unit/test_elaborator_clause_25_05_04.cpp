@@ -80,4 +80,4 @@ TEST(ModportExpressionElaboration, HierarchicalAccessThroughModportSelectsBoundE
              "endmodule\n"));
 }
 
-}  // namespace
+}

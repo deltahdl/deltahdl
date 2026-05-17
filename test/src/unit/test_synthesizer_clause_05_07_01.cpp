@@ -133,4 +133,4 @@ TEST(IntegerLiteralSynthesis, SignedLiteralSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

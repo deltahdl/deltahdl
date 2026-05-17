@@ -143,11 +143,6 @@ TEST(NameSpaceParsing, LocalScopesDoNotConflict) {
               "module b; logic x; endmodule\n"));
 }
 
-// §3.13(g): "A port name introduced in the port name space can be
-// reintroduced in the module name space by declaring a variable or a net
-// with the same name."  The non-ANSI port style names a port, then the
-// body's data declaration reintroduces the same name in the module name
-// space.
 TEST(NameSpaceParsing, PortNameReintroducedAsVariableInModuleScope) {
   EXPECT_TRUE(
       ParseOk("module m(data);\n"
@@ -156,4 +151,4 @@ TEST(NameSpaceParsing, PortNameReintroducedAsVariableInModuleScope) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

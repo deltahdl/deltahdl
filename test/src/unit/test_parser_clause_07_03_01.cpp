@@ -57,7 +57,6 @@ TEST(PackedUnionParsing, TwoLogicMembers) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §7.3.1: packed union with signed qualifier.
 TEST(PackedUnionParsing, PackedSignedQualifier) {
   auto r = Parse(
       "module m;\n"
@@ -71,7 +70,6 @@ TEST(PackedUnionParsing, PackedSignedQualifier) {
   EXPECT_TRUE(item->data_type.is_signed);
 }
 
-// §7.3.1: packed union with explicit unsigned qualifier.
 TEST(PackedUnionParsing, PackedUnsignedExplicit) {
   auto r = Parse(
       "module m;\n"
@@ -85,7 +83,6 @@ TEST(PackedUnionParsing, PackedUnsignedExplicit) {
   EXPECT_FALSE(item->data_type.is_signed);
 }
 
-// §7.3.1: soft qualifier implies packed; parser records is_soft.
 TEST(PackedUnionParsing, SoftWithoutPackedKeyword) {
   auto r = Parse(
       "module m;\n"
@@ -98,4 +95,4 @@ TEST(PackedUnionParsing, SoftWithoutPackedKeyword) {
   EXPECT_TRUE(item->data_type.is_soft);
 }
 
-}  // namespace
+}

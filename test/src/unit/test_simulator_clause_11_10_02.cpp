@@ -115,8 +115,7 @@ TEST(StringLiteralPaddingSim, PaddedConcatPreservesZeroBits) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("combined");
   ASSERT_NE(var, nullptr);
-  // s1 = 0x00004142, s2 = 0x00004344.
-  // {s1,s2} = 0x0000414200004344 — padding zeros are preserved.
+
   EXPECT_EQ(var->value.ToUint64(), 0x0000414200004344ULL);
 }
 
@@ -139,7 +138,7 @@ TEST(StringLiteralPaddingSim, PaddingAffectsInequalityComparison) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // Padded concat differs from the un-padded literal.
+
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
@@ -157,7 +156,7 @@ TEST(StringLiteralPaddingSim, SingleCharPaddedInWideVector) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("s");
   ASSERT_NE(var, nullptr);
-  // "Z" is 0x5A, padded to 64 bits with zeros on the left.
+
   EXPECT_EQ(var->value.ToUint64(), 0x5AULL);
 }
 
@@ -182,4 +181,4 @@ TEST(StringLiteralPaddingSim, PaddedStringSelfCompare) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

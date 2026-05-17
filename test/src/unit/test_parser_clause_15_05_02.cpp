@@ -33,9 +33,6 @@ TEST(EventWaitParser, WaitForEventHierarchical) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
 }
 
-// §15.5.2: The wait syntax is literally "@ hierarchical_event_identifier;"
-// — the bare form, no parentheses. The parser must accept it as an
-// event-control statement bound to the named event identifier.
 TEST(EventWaitParser, BareAtSyntaxBindsToNamedEvent) {
   auto r = Parse(
       "module m;\n"
@@ -54,10 +51,6 @@ TEST(EventWaitParser, BareAtSyntaxBindsToNamedEvent) {
   EXPECT_EQ(stmt->events[0].signal->text, "ev");
 }
 
-// §15.5.2: "hierarchical_event_identifier" in the wait syntax allows the
-// named event to be reached through a dotted instance path. Combined with
-// the bare form (no parentheses), the parser must build the
-// event-control statement with a member-access signal expression.
 TEST(EventWaitParser, BareAtSyntaxBindsToHierarchicalNamedEvent) {
   auto r = Parse(
       "module m;\n"
@@ -75,4 +68,4 @@ TEST(EventWaitParser, BareAtSyntaxBindsToHierarchicalNamedEvent) {
   EXPECT_EQ(stmt->events[0].signal->kind, ExprKind::kMemberAccess);
 }
 
-}  // namespace
+}

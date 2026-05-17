@@ -23,7 +23,6 @@ TEST(GateStrengthValidity, DefaultStrengthIsStrong) {
   EXPECT_TRUE(ValidateGateDecl(info));
 }
 
-// --- Gate with strength elaborates normally ---
 TEST(GateElaboration, GateWithStrengthStillProducesAssign) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -42,4 +41,4 @@ TEST(GateElaboration, GateWithStrengthStillProducesAssign) {
   EXPECT_EQ(ca.rhs->op, TokenKind::kAmp);
 }
 
-}  // namespace
+}

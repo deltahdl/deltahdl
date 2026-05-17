@@ -217,8 +217,6 @@ TEST(ClockingBlockSim, InoutReadWriteSplit) {
   block.signals.push_back(sig);
   cmgr.Register(block);
 
-  // §14.3: inout acts as two clockvars — reading uses input skew,
-  // writing uses output skew.
   EXPECT_EQ(cmgr.GetInputSkew("cb", "bidir").ticks, 2u);
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "bidir").ticks, 5u);
 }
@@ -238,4 +236,4 @@ TEST(ClockingBlockSim, EdgeClockEdgeRegistered) {
   EXPECT_EQ(found->clock_edge, Edge::kEdge);
 }
 
-}  // namespace
+}

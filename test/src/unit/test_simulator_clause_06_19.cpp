@@ -6,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §6.19: "In the absence of a data type declaration, the default data type
-// shall be int." An anonymous enum with no explicit base type shall be
-// stored at int width (32 bits) at runtime.
 TEST(EnumerationSimulation, DefaultIntBaseTypeWidthAtRuntime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -30,10 +27,6 @@ TEST(EnumerationSimulation, DefaultIntBaseTypeWidthAtRuntime) {
   EXPECT_EQ(var->value.width, 32u);
 }
 
-// §6.19: "If the first name is not assigned a value, it is given the initial
-// value of 0." and "A name without a value is automatically assigned an
-// increment of the value of the previous name." The auto-incremented values
-// shall be the values stored in the corresponding variables at runtime.
 TEST(EnumerationSimulation, AutoIncrementedValuesPropagateAtRuntime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -54,4 +47,4 @@ TEST(EnumerationSimulation, AutoIncrementedValuesPropagateAtRuntime) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-}  // namespace
+}

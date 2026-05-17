@@ -163,8 +163,6 @@ TEST(ScopeAndLifetimeElaboration, StaticVarForceInTaskSucceeds) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.21: Automatic variables shall not be written by nonblocking
-// assignments, even when the auto var lives inside an initial block.
 TEST(ScopeAndLifetimeElaboration, AutoVarNonblockingInInitialIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -178,7 +176,6 @@ TEST(ScopeAndLifetimeElaboration, AutoVarNonblockingInInitialIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §6.21: Force on an automatic var inside an initial block is illegal.
 TEST(ScopeAndLifetimeElaboration, AutoVarForceInInitialIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -192,8 +189,6 @@ TEST(ScopeAndLifetimeElaboration, AutoVarForceInInitialIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §6.21: Procedural-continuous assign on an automatic var inside an
-// always block is illegal.
 TEST(ScopeAndLifetimeElaboration, AutoVarProcAssignInAlwaysIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -208,8 +203,6 @@ TEST(ScopeAndLifetimeElaboration, AutoVarProcAssignInAlwaysIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §6.21: A static var inside an initial block may participate in
-// nonblocking assignments — only automatic variables are restricted.
 TEST(ScopeAndLifetimeElaboration, StaticVarNonblockingInInitialOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -224,8 +217,6 @@ TEST(ScopeAndLifetimeElaboration, StaticVarNonblockingInInitialOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.21: A function may be declared automatic; the elaborator must
-// preserve the lifetime flag on the elaborated function declaration.
 TEST(ScopeAndLifetimeElaboration, FunctionDeclLifetimeAutomatic) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -240,7 +231,6 @@ TEST(ScopeAndLifetimeElaboration, FunctionDeclLifetimeAutomatic) {
   EXPECT_TRUE(mod->function_decls[0]->is_automatic);
 }
 
-// §6.21: A function may also be declared with an explicit static lifetime.
 TEST(ScopeAndLifetimeElaboration, FunctionDeclLifetimeStatic) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -255,8 +245,6 @@ TEST(ScopeAndLifetimeElaboration, FunctionDeclLifetimeStatic) {
   EXPECT_TRUE(mod->function_decls[0]->is_static);
 }
 
-// §6.21: A task may be declared automatic; the lifetime flag survives
-// elaboration on the task declaration.
 TEST(ScopeAndLifetimeElaboration, TaskDeclLifetimeAutomatic) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -272,7 +260,6 @@ TEST(ScopeAndLifetimeElaboration, TaskDeclLifetimeAutomatic) {
   EXPECT_TRUE(mod->function_decls[0]->is_automatic);
 }
 
-// §6.21: A task may also be declared with an explicit static lifetime.
 TEST(ScopeAndLifetimeElaboration, TaskDeclLifetimeStatic) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -288,9 +275,6 @@ TEST(ScopeAndLifetimeElaboration, TaskDeclLifetimeStatic) {
   EXPECT_TRUE(mod->function_decls[0]->is_static);
 }
 
-// §6.21: Elements of a dynamically sized array may not be the target of a
-// nonblocking assignment; the elaborator should reject this even when the
-// array name is a module-level static variable.
 TEST(ScopeAndLifetimeElaboration, DynamicArrayElementNonblockingIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -302,8 +286,6 @@ TEST(ScopeAndLifetimeElaboration, DynamicArrayElementNonblockingIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §6.21: Elements of a dynamically sized array may not be the target of a
-// procedural continuous assignment (force form).
 TEST(ScopeAndLifetimeElaboration, DynamicArrayElementForceIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -315,8 +297,6 @@ TEST(ScopeAndLifetimeElaboration, DynamicArrayElementForceIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §6.21: Elements of a dynamically sized array may not be the target of a
-// procedural continuous assignment (procedural assign form).
 TEST(ScopeAndLifetimeElaboration, DynamicArrayElementProcAssignIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -328,8 +308,6 @@ TEST(ScopeAndLifetimeElaboration, DynamicArrayElementProcAssignIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §6.21: An automatic task may carry an explicit-static local variable;
-// this is the task-side mirror of StaticVarInAutoFunc.
 TEST(ScopeAndLifetimeElaboration, StaticVarInAutoTask) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -344,8 +322,6 @@ TEST(ScopeAndLifetimeElaboration, StaticVarInAutoTask) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.21: A static task may carry an explicit-automatic local variable;
-// this is the task-side mirror of AutoVarInStaticFunc.
 TEST(ScopeAndLifetimeElaboration, AutoVarInStaticTask) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -360,8 +336,6 @@ TEST(ScopeAndLifetimeElaboration, AutoVarInStaticTask) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.21: A task with no explicit lifetime keyword elaborates and
-// inherits the default-static lifetime from its enclosing scope.
 TEST(ScopeAndLifetimeElaboration, DefaultLifetimeTask) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -375,8 +349,6 @@ TEST(ScopeAndLifetimeElaboration, DefaultLifetimeTask) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.21: An automatic task may also carry an explicit-automatic local
-// variable; the redundant keyword is accepted by the elaborator.
 TEST(ScopeAndLifetimeElaboration, AutoVarInAutoTask) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -391,8 +363,6 @@ TEST(ScopeAndLifetimeElaboration, AutoVarInAutoTask) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.21: A static task with an explicit-static local variable
-// elaborates without error; the redundant keyword is accepted.
 TEST(ScopeAndLifetimeElaboration, StaticVarInStaticTask) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -407,10 +377,6 @@ TEST(ScopeAndLifetimeElaboration, StaticVarInStaticTask) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.21: A class method without an explicit lifetime keyword shall be
-// treated as automatic regardless of the enclosing module's default
-// lifetime. The elaborator pre-pass sets the flag so downstream code
-// (function-body checks, simulator locals init) sees it.
 TEST(ScopeAndLifetimeElaboration, ClassMethodDefaultsAutomatic) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -428,8 +394,6 @@ TEST(ScopeAndLifetimeElaboration, ClassMethodDefaultsAutomatic) {
   EXPECT_TRUE(cls->members[0]->method->is_automatic);
 }
 
-// §6.21: A class declared inside a static module still has automatic
-// methods — the class-scope rule outranks the module's default-static.
 TEST(ScopeAndLifetimeElaboration,
      ClassMethodDefaultsAutomaticInsideStaticModule) {
   ElabFixture f;
@@ -450,4 +414,4 @@ TEST(ScopeAndLifetimeElaboration,
   EXPECT_TRUE(cls->members[0]->method->is_automatic);
 }
 
-}  // namespace
+}

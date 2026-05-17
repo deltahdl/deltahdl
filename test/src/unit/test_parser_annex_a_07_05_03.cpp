@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// A.7.5.3 timing_check_event_control: `posedge` on the data event.
 TEST(TimingCheckEventDefParsing, TimingCheckEventPosedge) {
   auto r = Parse(
       "module m;\n"
@@ -20,7 +19,6 @@ TEST(TimingCheckEventDefParsing, TimingCheckEventPosedge) {
   EXPECT_EQ(tc->data_terminal.name, "clk");
 }
 
-// A.7.5.3 timing_check_event_control: `negedge` on the reference event.
 TEST(TimingCheckEventDefParsing, TimingCheckEventNegedge) {
   auto r = Parse(
       "module m;\n"
@@ -35,8 +33,6 @@ TEST(TimingCheckEventDefParsing, TimingCheckEventNegedge) {
   EXPECT_EQ(tc->ref_terminal.name, "clk");
 }
 
-// A.7.5.3 controlled_timing_check_event: $period requires an edge on the
-// single event operand.
 TEST(TimingCheckEventDefParsing, ControlledTimingCheckEventPeriod) {
   auto r = Parse(
       "module m;\n"
@@ -51,7 +47,6 @@ TEST(TimingCheckEventDefParsing, ControlledTimingCheckEventPeriod) {
   EXPECT_EQ(tc->ref_terminal.name, "clk");
 }
 
-// A.7.5.3 specify_terminal_descriptor: part-select on the event signal.
 TEST(TimingCheckEventDefParsing, TerminalPartSelect) {
   auto r = Parse(
       "module m;\n"
@@ -68,8 +63,6 @@ TEST(TimingCheckEventDefParsing, TerminalPartSelect) {
   EXPECT_NE(tc->ref_terminal.range_right, nullptr);
 }
 
-// A.7.5.3 timing_check_event: the `timing_check_event_control` is optional;
-// a bare specify_terminal_descriptor on each side parses as no edge.
 TEST(TimingCheckEventDefParsing, TimingCheckEventNoEdge) {
   auto r = Parse(
       "module m;\n"
@@ -86,8 +79,6 @@ TEST(TimingCheckEventDefParsing, TimingCheckEventNoEdge) {
   EXPECT_EQ(tc->data_terminal.name, "clk");
 }
 
-// A.7.5.3 timing_check_event: both operands can carry their own
-// timing_check_event_control without conflict.
 TEST(TimingCheckEventDefParsing, BothEventsWithEdges) {
   auto sp = ParseSpecifySingle(
       "module m(input d, clk);\n"
@@ -106,8 +97,6 @@ TEST(TimingCheckEventDefParsing, BothEventsWithEdges) {
   EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
 }
 
-// A.7.5.3 specify_terminal_descriptor: a bare identifier parses as a whole
-// signal with no range kind attached.
 TEST(TimingCheckEventDefParsing, TerminalSimpleIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -124,4 +113,4 @@ TEST(TimingCheckEventDefParsing, TerminalSimpleIdentifier) {
   EXPECT_EQ(tc->data_terminal.range_kind, SpecifyRangeKind::kNone);
 }
 
-}  // namespace
+}

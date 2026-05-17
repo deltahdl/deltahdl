@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §7.8: General associative array declaration syntax parses.
 TEST(AssocArrayParsing, Declaration) {
   auto r = Parse(
       "module t;\n"
@@ -20,7 +19,6 @@ TEST(AssocArrayParsing, Declaration) {
   ASSERT_NE(item->unpacked_dims[0], nullptr);
 }
 
-// §7.8: Element type can be any data type.
 TEST(AssocArrayParsing, VectorElementType) {
   auto r = Parse(
       "module t;\n"
@@ -33,7 +31,6 @@ TEST(AssocArrayParsing, VectorElementType) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
 }
 
-// §7.8: Multiple associative arrays in one module.
 TEST(AssocArrayParsing, MultipleDeclarations) {
   auto r = Parse(
       "module t;\n"
@@ -45,4 +42,4 @@ TEST(AssocArrayParsing, MultipleDeclarations) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
-}  // namespace
+}

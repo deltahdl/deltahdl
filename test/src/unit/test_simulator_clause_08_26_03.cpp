@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Requirement 3: All parameters and typedefs in interface classes are static.
-
 TEST(InterfaceClassTypeAccess, InterfaceParamRegisteredAsStaticProperty) {
   SimFixture f;
   auto* type = MakeClassType(f, "IC", {});
@@ -37,8 +35,6 @@ TEST(InterfaceClassTypeAccess, InterfaceEnumMembersRegistered) {
   EXPECT_EQ(found->enum_members["TWO"], 1u);
   EXPECT_EQ(found->enum_members["THREE"], 2u);
 }
-
-// Requirement 4: Access via :: scope resolution operator.
 
 TEST(InterfaceClassTypeAccess, ScopeResolutionParamAccess) {
   EXPECT_EQ(RunAndGet(
@@ -82,8 +78,6 @@ TEST(InterfaceClassTypeAccess, ScopeResolutionMultipleParams) {
   LowerRunAndCheck(f, design, {{"r1", 8u}, {"r2", 16u}});
 }
 
-// Requirement 1: Params/typedefs inherited by extending interface classes.
-
 TEST(InterfaceClassTypeAccess, ExtendedInterfaceInheritsStaticProperties) {
   SimFixture f;
   auto* base = MakeClassType(f, "IA", {});
@@ -96,8 +90,6 @@ TEST(InterfaceClassTypeAccess, ExtendedInterfaceInheritsStaticProperties) {
 
   EXPECT_TRUE(ext->IsA(base));
 }
-
-// Requirement 2: Params/typedefs NOT inherited by implementing classes.
 
 TEST(InterfaceClassTypeAccess, ImplementingClassDoesNotInheritStaticProps) {
   SimFixture f;
@@ -112,4 +104,4 @@ TEST(InterfaceClassTypeAccess, ImplementingClassDoesNotInheritStaticProps) {
   EXPECT_EQ(it, impl->static_properties.end());
 }
 
-}  // namespace
+}

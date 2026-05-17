@@ -44,4 +44,4 @@ TEST(NonblockingAssignPreprocessing, MacroExpandedFullStatement) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

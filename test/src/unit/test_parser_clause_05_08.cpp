@@ -128,4 +128,4 @@ TEST(LexicalConventionParsing, TimeLiteralInExpression) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- Covergroup declaration keywords ---
-
 TEST(CovergroupKeywordLexing, CovergroupKeyword) {
   auto r = LexOne("covergroup");
   EXPECT_EQ(r.token.kind, TokenKind::kKwCovergroup);
@@ -68,8 +66,6 @@ TEST(CovergroupKeywordLexing, IntersectKeyword) {
   EXPECT_EQ(r.token.text, "intersect");
 }
 
-// --- Block event operator ---
-
 TEST(CovergroupOperatorLexing, DoubleAtOperator) {
   auto tokens = Lex("@@(begin phase)");
   ASSERT_GE(tokens.size(), 1u);
@@ -92,8 +88,6 @@ TEST(CovergroupOperatorLexing, DoubleAtInContext) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kAtAt);
 }
 
-// --- Keyword not confused with identifier ---
-
 TEST(CovergroupKeywordLexing, CovergroupNotIdentifier) {
   auto tokens = Lex("covergroup cg");
   ASSERT_GE(tokens.size(), 2u);
@@ -115,8 +109,6 @@ TEST(CovergroupKeywordLexing, BinsofNotIdentifier) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kLParen);
 }
 
-// --- Option and type_option are identifiers ---
-
 TEST(CovergroupKeywordLexing, OptionIsIdentifier) {
   auto r = LexOne("option");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
@@ -130,4 +122,4 @@ TEST(CovergroupKeywordLexing, TypeOptionIsIdentifier) {
   EXPECT_EQ(tokens[0].text, "type_option");
 }
 
-}  // namespace
+}

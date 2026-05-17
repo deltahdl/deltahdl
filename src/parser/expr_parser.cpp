@@ -30,17 +30,14 @@ static bool IsCastTypeToken(TokenKind kind) {
   }
 }
 
-// Parse a SystemVerilog integer literal text into a uint64_t value.
-// Handles: decimal "42", based "8'hFF", underscore "1_000".
 static uint64_t ParseIntText(std::string_view text) {
-  // Strip underscores and whitespace into a local buffer.
+
   std::string buf;
   buf.reserve(text.size());
   for (char c : text) {
     if (c != '_' && c != ' ' && c != '\t') buf.push_back(c);
   }
 
-  // Find tick for based literals (e.g., 8'hFF).
   auto tick = buf.find('\'');
   if (tick == std::string::npos) {
     uint64_t val = 0;
@@ -48,7 +45,6 @@ static uint64_t ParseIntText(std::string_view text) {
     return val;
   }
 
-  // Skip optional 's' after tick, then parse base letter.
   size_t i = tick + 1;
   if (i < buf.size() && (buf[i] == 's' || buf[i] == 'S')) ++i;
   int base = 10;
@@ -76,8 +72,6 @@ static uint64_t ParseIntText(std::string_view text) {
   return val;
 }
 
-// Extract the declared bit-width from a sized literal (digits before ').
-// Returns 0 for unsized literals.
 static uint32_t ExtractLiteralSize(std::string_view text) {
   auto tick = text.find('\'');
   if (tick == std::string_view::npos || tick == 0) return 0;
@@ -101,7 +95,6 @@ static bool HasXZDigits(std::string_view text) {
   return false;
 }
 
-// Parse a real/time literal into a double (strips underscores, uses strtod).
 static double ParseRealText(std::string_view text) {
   std::string buf;
   buf.reserve(text.size());
@@ -111,7 +104,6 @@ static double ParseRealText(std::string_view text) {
   return std::strtod(buf.c_str(), nullptr);
 }
 
-// Pratt parser: operator binding powers (IEEE 1800-2023 §11).
 static std::pair<int, int> InfixBp(TokenKind kind) {
   switch (kind) {
     case TokenKind::kPipeDashGt:
@@ -119,7 +111,7 @@ static std::pair<int, int> InfixBp(TokenKind kind) {
       return {1, 2};
     case TokenKind::kArrow:
     case TokenKind::kLtDashGt:
-      return {2, 1};  // right-assoc, below ||
+      return {2, 1};
     case TokenKind::kPipePipe:
       return {3, 4};
     case TokenKind::kAmpAmp:
@@ -157,7 +149,7 @@ static std::pair<int, int> InfixBp(TokenKind kind) {
     case TokenKind::kPercent:
       return {21, 22};
     case TokenKind::kPower:
-      return {23, 24};  // left-assoc
+      return {23, 24};
     default:
       return {-1, -1};
   }
@@ -190,7 +182,7 @@ Expr* Parser::ParseExprBp(int min_bp) {
 }
 
 Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
-  // Ternary: expr ? (* attr *) expr : expr
+
   if (tok.kind == TokenKind::kQuestion && min_bp <= 1) {
     Consume();
     ParseAttributes();
@@ -202,7 +194,7 @@ Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
     tern->false_expr = ParseExprBp(0);
     return tern;
   }
-  // §A.6.6: &&& in cond_predicate
+
   if (tok.kind == TokenKind::kAmpAmpAmp && min_bp <= 0) {
     Consume();
     auto* bin = arena_.Create<Expr>();
@@ -212,11 +204,11 @@ Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
     bin->rhs = ParseExprBp(1);
     return bin;
   }
-  // inside expression: expr inside { range_list }
+
   if (tok.kind == TokenKind::kKwInside && min_bp <= 15) {
     return ParseInsideExpr(lhs);
   }
-  // §12.6: matches expression
+
   if (tok.kind == TokenKind::kKwMatches && min_bp <= 1) {
     Consume();
     auto* bin = arena_.Create<Expr>();
@@ -244,7 +236,7 @@ Expr* Parser::ParseInfixBp(Expr* lhs, int min_bp) {
     if (lbp < 0 || lbp < min_bp) break;
 
     auto op = Consume();
-    ParseAttributes();  // optional attribute before RHS operand
+    ParseAttributes();
     auto* rhs = ParseExprBp(rbp);
     auto* bin = arena_.Create<Expr>();
     bin->kind = ExprKind::kBinary;
@@ -260,7 +252,6 @@ Expr* Parser::ParseInfixBp(Expr* lhs, int min_bp) {
 Expr* Parser::ParsePrefixExpr() {
   auto tok = CurrentToken();
 
-  // Prefix increment/decrement (§11.4.2)
   if (tok.kind == TokenKind::kPlusPlus || tok.kind == TokenKind::kMinusMinus) {
     auto op = Consume();
     auto* operand = ParsePrimaryExpr();
@@ -296,7 +287,7 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
     lit->int_val = ParseIntText(tok.text);
     WarnSizedOverflow(tok);
   } else if (kind == ExprKind::kUnbasedUnsizedLiteral) {
-    // §5.7.1: '1 fills all bits with 1; '0/'x/'z stay 0 in int_val.
+
     if (tok.text.size() >= 2 && tok.text[1] == '1') {
       lit->int_val = ~uint64_t{0};
     }
@@ -309,7 +300,7 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
 void Parser::WarnSizedOverflow(const Token& tok) {
   uint32_t size = ExtractLiteralSize(tok.text);
   if (size == 0) {
-    // §5.7.1: Size constant shall be nonzero.
+
     auto tick = tok.text.find('\'');
     if (tick != std::string_view::npos && tick > 0) {
       diag_.Error(tok.loc, "size of integer literal shall be nonzero");
@@ -330,7 +321,7 @@ Expr* Parser::ParseNewExpr() {
   expr->text = "new";
   expr->range.start = Consume().loc;
   if (Check(TokenKind::kLBracket)) {
-    // §7.5.1: new[size] — dynamic array constructor
+
     Consume();
     expr->args.push_back(ParseExpr());
     Expect(TokenKind::kRBracket);
@@ -338,7 +329,7 @@ Expr* Parser::ParseNewExpr() {
   } else if (Check(TokenKind::kLParen)) {
     ParseParenList(expr->args);
   }
-  // §8.12 shallow copy: new <identifier>
+
   if (CheckIdentifier()) expr->lhs = ParseExpr();
   return expr;
 }
@@ -359,8 +350,8 @@ Expr* Parser::ParseTaggedExpr() {
   } else if (Check(TokenKind::kApostropheLBrace)) {
     expr->lhs = ParseAssignmentPattern();
   } else if (Check(TokenKind::kDot)) {
-    // §A.6.7.1: tagged member_identifier .variable_identifier pattern
-    expr->lhs = ParsePrimaryExpr();  // handles .name and .*
+
+    expr->lhs = ParsePrimaryExpr();
   } else if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kComma) &&
              !Check(TokenKind::kRParen) && !Check(TokenKind::kRBrace) &&
              !Check(TokenKind::kColon) && !Check(TokenKind::kEof) &&
@@ -370,11 +361,10 @@ Expr* Parser::ParseTaggedExpr() {
   return expr;
 }
 
-// §8.11/§8.15: Parse 'this' or 'super' primary expression.
 Expr* Parser::ParseThisOrSuperExpr() {
   auto super_tok = Consume();
   Expr* result = ParseMemberAccessChain(super_tok);
-  // §8.15: super.super is not allowed.
+
   if (super_tok.kind == TokenKind::kKwSuper) {
     for (auto* e = result; e && e->kind == ExprKind::kMemberAccess;
          e = e->lhs) {
@@ -417,7 +407,7 @@ Expr* Parser::ParsePrimaryExpr() {
       return ParseAssignmentPattern();
     case TokenKind::kKwType: {
       auto* ref = ParseTypeRefExpr();
-      // §A.6.7.1: type_reference '{...} typed assignment pattern expression
+
       if (Check(TokenKind::kApostropheLBrace)) {
         auto* pat = ParseAssignmentPattern();
         auto* typed = arena_.Create<Expr>();
@@ -429,17 +419,17 @@ Expr* Parser::ParsePrimaryExpr() {
       }
       return ref;
     }
-    case TokenKind::kDollar:  // §6.20.7
-    case TokenKind::kKwNull:  // §8.4
+    case TokenKind::kDollar:
+    case TokenKind::kKwNull:
       return MakeLiteral(ExprKind::kIdentifier, tok);
     case TokenKind::kKwThis:
-    case TokenKind::kKwSuper:  // §8.11/§8.15
+    case TokenKind::kKwSuper:
       return ParseThisOrSuperExpr();
-    case TokenKind::kKwTagged:  // §11.9
+    case TokenKind::kKwTagged:
       return ParseTaggedExpr();
-    case TokenKind::kKwNew:  // §8.7
+    case TokenKind::kKwNew:
       return ParseNewExpr();
-    // §A.6.7.1: pattern ::= .* (wildcard)
+
     case TokenKind::kDotStar: {
       auto* pat = arena_.Create<Expr>();
       pat->kind = ExprKind::kIdentifier;
@@ -447,7 +437,7 @@ Expr* Parser::ParsePrimaryExpr() {
       pat->range.start = Consume().loc;
       return pat;
     }
-    // §A.6.7.1: pattern ::= . variable_identifier (binding)
+
     case TokenKind::kDot: {
       auto loc = Consume().loc;
       auto name = ExpectIdentifier();
@@ -474,7 +464,7 @@ Expr* Parser::ParsePrimaryExpr() {
 Expr* Parser::ParseCastOrTypedPattern() {
   auto saved = lexer_.SavePos();
   auto type_tok = Consume();
-  // §A.6.7.1: integer_atom_type'{...} typed assignment pattern
+
   if (Check(TokenKind::kApostropheLBrace)) {
     auto* pat = ParseAssignmentPattern();
     auto* typed = arena_.Create<Expr>();
@@ -484,22 +474,21 @@ Expr* Parser::ParseCastOrTypedPattern() {
     typed->lhs = pat;
     return typed;
   }
-  // §6.24 type cast: type'(expr)
+
   if (Check(TokenKind::kApostrophe)) {
     lexer_.RestorePos(saved);
     return ParseCastExpr();
   }
-  // Bare type keyword in expression context (§20.6 $typename(type))
+
   auto* id = arena_.Create<Expr>();
   id->kind = ExprKind::kIdentifier;
   id->text = type_tok.text;
   id->range.start = type_tok.loc;
-  // §A.8.2: data_type argument may include packed dimensions (e.g. logic [7:0])
+
   if (Check(TokenKind::kLBracket)) return ParseSelectExpr(id);
   return id;
 }
 
-// Returns true if token is a keyword valid as a method/member name after '.'.
 static bool IsMethodKeyword(TokenKind kind) {
   switch (kind) {
     case TokenKind::kKwNew:
@@ -513,10 +502,8 @@ static bool IsMethodKeyword(TokenKind kind) {
   }
 }
 
-// Build a member-access node: consumes '.' or '::' then the member name.
-// Accepts keywords that double as built-in method names (§7.12, §8.15).
 Expr* Parser::MakeMemberAccess(Expr* base) {
-  Consume();  // '.' or '::'
+  Consume();
   auto member_tok =
       IsMethodKeyword(CurrentToken().kind) ? Consume() : ExpectIdentifier();
   auto* member_id = arena_.Create<Expr>();
@@ -543,14 +530,11 @@ Expr* Parser::ParseMemberAccessChain(Token tok) {
   return result;
 }
 
-// §8.25.1/§13.8: ClassName#(params)::member — parameterized class scope
-// resolution.  Parse the parameter expressions and store them on the base
-// identifier's `elements` vector so the evaluator can bind them at call time.
 Expr* Parser::ParseParameterizedScope(Expr* base) {
-  Consume();  // #
+  Consume();
   if (!Check(TokenKind::kLParen)) return base;
   base->has_param_spec = true;
-  Consume();  // (
+  Consume();
   if (!Check(TokenKind::kRParen)) {
     base->elements.push_back(ParseExpr());
     while (Check(TokenKind::kComma)) {
@@ -565,12 +549,9 @@ Expr* Parser::ParseParameterizedScope(Expr* base) {
   return base;
 }
 
-// §6.19.4, §6.24: try to parse type_name'(expr) cast.
-// §A.6.7.1: also handles type_name'{...} typed assignment pattern expression.
-// Returns the cast/pattern Expr on success, or nullptr if not a cast/pattern.
 Expr* Parser::TryParseUserTypeCast(const Token& tok) {
   if (known_types_.count(tok.text) == 0) return nullptr;
-  // §A.6.7.1: type_name'{...} — typed assignment pattern expression
+
   if (Check(TokenKind::kApostropheLBrace)) {
     auto* pat = ParseAssignmentPattern();
     auto* typed = arena_.Create<Expr>();
@@ -582,12 +563,12 @@ Expr* Parser::TryParseUserTypeCast(const Token& tok) {
   }
   if (!Check(TokenKind::kApostrophe)) return nullptr;
   auto saved = lexer_.SavePos();
-  Consume();  // '
+  Consume();
   if (!Check(TokenKind::kLParen)) {
     lexer_.RestorePos(saved);
     return nullptr;
   }
-  Consume();  // (
+  Consume();
   auto* cast = arena_.Create<Expr>();
   cast->kind = ExprKind::kCast;
   cast->text = tok.text;
@@ -604,19 +585,10 @@ Expr* Parser::ParseIdentifierExpr() {
 
   Expr* result = ParseMemberAccessChain(tok);
 
-  // §8.25.1: ClassName#(params)::member — parameterized class scope
   if (Check(TokenKind::kHash) && known_types_.count(tok.text) != 0) {
     result = ParseParameterizedScope(result);
   }
 
-  // §A.2.2.1 casting_type ::= simple_type where simple_type ::=
-  //     ps_type_identifier | ps_parameter_identifier
-  // — a scope-qualified type (`pkg::byte_t'(v)`) or a bare parameter
-  // (`W'(v)`) followed by `' (` is a cast.  TryParseUserTypeCast above
-  // only handles the bare-known-type case; this branch handles the
-  // remaining simple_type forms after the member-access chain has been
-  // built.  The assignment-pattern form `simple_type'{...}` is handled
-  // analogously via the kApostropheLBrace token.
   if (Check(TokenKind::kApostropheLBrace)) {
     auto* pat = ParseAssignmentPattern();
     auto* typed = arena_.Create<Expr>();
@@ -628,9 +600,9 @@ Expr* Parser::ParseIdentifierExpr() {
   }
   if (Check(TokenKind::kApostrophe)) {
     auto saved = lexer_.SavePos();
-    Consume();  // '
+    Consume();
     if (Check(TokenKind::kLParen)) {
-      Consume();  // (
+      Consume();
       auto* cast = arena_.Create<Expr>();
       cast->kind = ExprKind::kCast;
       cast->range.start = result->range.start;
@@ -642,8 +614,6 @@ Expr* Parser::ParseIdentifierExpr() {
     lexer_.RestorePos(saved);
   }
 
-  // Postfix chain: calls, selects, member access, and attributes
-  // §5.12: attributes may appear before argument list.
   while (Check(TokenKind::kLParen) || Check(TokenKind::kLBracket) ||
          Check(TokenKind::kAttrStart)) {
     if (Check(TokenKind::kAttrStart)) {
@@ -660,7 +630,6 @@ Expr* Parser::ParseIdentifierExpr() {
     }
   }
 
-  // Postfix increment/decrement (§11.4.2)
   if (Check(TokenKind::kPlusPlus) || Check(TokenKind::kMinusMinus)) {
     auto op_tok = Consume();
     auto* post = arena_.Create<Expr>();
@@ -673,7 +642,6 @@ Expr* Parser::ParseIdentifierExpr() {
 
   result = ParseWithClause(result);
 
-  // §7.12: Range selects and properties shall follow the with clause.
   if (result->with_expr) {
     while (Check(TokenKind::kDot) || Check(TokenKind::kLBracket)) {
       if (Check(TokenKind::kDot)) {
@@ -688,7 +656,6 @@ Expr* Parser::ParseIdentifierExpr() {
   return result;
 }
 
-// Parse one or more named args: .name(expr) {, .name(expr)}
 void Parser::ParseTrailingNamedArgs(Expr* call) {
   ParseNamedArg(call);
   while (Match(TokenKind::kComma)) {
@@ -696,9 +663,8 @@ void Parser::ParseTrailingNamedArgs(Expr* call) {
   }
 }
 
-// Parse positional args, then optional named args: expr {, expr} {, .name(e)}
 void Parser::ParseCallArgs(Expr* call) {
-  // §A.1.9: super.new( [list_of_arguments | default] )
+
   if (Check(TokenKind::kKwDefault)) {
     auto tok = Consume();
     auto* expr = arena_.Create<Expr>();
@@ -746,13 +712,13 @@ Expr* Parser::ParseCallExpr(Expr* callee) {
 
 Expr* Parser::ParseWithClause(Expr* expr) {
   if (!Match(TokenKind::kKwWith)) return expr;
-  // §18.7: randomize() with { constraint_block }
+
   if (Check(TokenKind::kLBrace)) {
     Consume();
     SkipBraceBlock(lexer_);
     return expr;
   }
-  // §11.4.14.4: streaming with [ array_range_expression ]
+
   if (Check(TokenKind::kLBracket)) {
     Consume();
     auto* range = arena_.Create<Expr>();
@@ -774,7 +740,7 @@ Expr* Parser::ParseWithClause(Expr* expr) {
   Expect(TokenKind::kLParen);
   expr->with_expr = ParseExpr();
   Expect(TokenKind::kRParen);
-  // §18.7: randomize() with (id_list) { constraint_block }
+
   if (Check(TokenKind::kLBrace)) {
     Consume();
     SkipBraceBlock(lexer_);
@@ -783,7 +749,7 @@ Expr* Parser::ParseWithClause(Expr* expr) {
 }
 
 Expr* Parser::ParseSelectExpr(Expr* base) {
-  Consume();  // LBracket
+  Consume();
   auto* sel = arena_.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = base;
@@ -803,16 +769,13 @@ Expr* Parser::ParseSelectExpr(Expr* base) {
 
 Expr* Parser::ParseSystemCall() {
   auto tok = Consume();
-  // §31.2: timing check names only appear inside specify blocks, which drive
-  // their own parser. Hitting one here means it is being used as a system
-  // task in procedural or expression context — diagnose, then parse the
-  // remaining tokens as a system call to keep downstream recovery sane.
+
   if (IsTimingCheckName(tok.text)) {
     diag_.Error(tok.loc, "timing check cannot appear in procedural code");
   }
-  // §3.12.1: $unit::identifier — scope-qualified reference to CU scope.
+
   if (tok.text == "$unit" && Check(TokenKind::kColonColon)) {
-    Consume();  // ::
+    Consume();
     auto id = ExpectIdentifier();
     auto* expr = arena_.Create<Expr>();
     expr->kind = ExprKind::kIdentifier;
@@ -822,7 +785,7 @@ Expr* Parser::ParseSystemCall() {
     return expr;
   }
   if (tok.text == "$root" && Check(TokenKind::kDot)) {
-    Consume();  // .
+    Consume();
     auto id = ExpectIdentifier();
     auto* expr = arena_.Create<Expr>();
     expr->kind = ExprKind::kIdentifier;
@@ -841,7 +804,7 @@ Expr* Parser::ParseSystemCall() {
   call->range.start = tok.loc;
   if (!Match(TokenKind::kLParen)) return call;
   if (!Check(TokenKind::kRParen)) {
-    // §20.2/§21.2: system tasks allow empty arguments (,,)
+
     if (Check(TokenKind::kComma)) {
       call->args.push_back(nullptr);
     } else {
@@ -849,7 +812,7 @@ Expr* Parser::ParseSystemCall() {
     }
     while (Match(TokenKind::kComma)) {
       if (Check(TokenKind::kAt)) {
-        // §A.8.2: optional trailing clocking_event (@id or @(event))
+
         Consume();
         if (Match(TokenKind::kLParen)) {
           ParseEventList();
@@ -873,7 +836,6 @@ Expr* Parser::ParseConcatenation() {
   auto loc = CurrentLoc();
   Expect(TokenKind::kLBrace);
 
-  // Empty concatenation: {} (§7.10.4 — clear queue)
   if (Check(TokenKind::kRBrace)) {
     Consume();
     auto* cat = arena_.Create<Expr>();
@@ -882,7 +844,6 @@ Expr* Parser::ParseConcatenation() {
     return cat;
   }
 
-  // Streaming concatenation: {<< ...} or {>> ...}
   if (Check(TokenKind::kLtLt) || Check(TokenKind::kGtGt)) {
     auto dir = CurrentToken().kind;
     auto* sc = ParseStreamingConcat(dir);
@@ -892,7 +853,6 @@ Expr* Parser::ParseConcatenation() {
 
   auto* first = ParseExpr();
 
-  // Replication: {count{elements}}
   if (Check(TokenKind::kLBrace)) {
     Consume();
     auto* rep = arena_.Create<Expr>();
@@ -905,7 +865,7 @@ Expr* Parser::ParseConcatenation() {
     }
     Expect(TokenKind::kRBrace);
     Expect(TokenKind::kRBrace);
-    // §A.8.4: multiple_concatenation [ [ range_expression ] ]
+
     if (Check(TokenKind::kLBracket)) return ParseSelectExpr(rep);
     return rep;
   }
@@ -918,7 +878,7 @@ Expr* Parser::ParseConcatenation() {
     cat->elements.push_back(ParseExpr());
   }
   Expect(TokenKind::kRBrace);
-  // §11.4.12: postfix bit-select/part-select on concatenation: {b,c}[5:2]
+
   if (Check(TokenKind::kLBracket)) return ParseSelectExpr(cat);
   return cat;
 }
@@ -962,7 +922,7 @@ static bool IsAssignmentPatternKey(TokenKind k) {
 }
 
 Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
-  Consume();  // '{'
+  Consume();
   auto* rep = arena_.Create<Expr>();
   rep->kind = ExprKind::kReplicate;
   rep->repeat_count = count;
@@ -976,7 +936,7 @@ Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
 }
 
 bool Parser::ParseFirstPatternElement(Expr* pat, bool& named) {
-  // §12.6: .variable_identifier is a pattern binding
+
   if (Check(TokenKind::kDot)) {
     auto loc = CurrentLoc();
     Consume();
@@ -1030,7 +990,6 @@ Expr* Parser::ParseAssignmentPattern() {
   bool named = false;
   ParseFirstPatternElement(pat, named);
 
-  // Replication form: '{count{expr, ...}}
   if (!named && Check(TokenKind::kLBrace)) {
     auto* count = pat->elements[0];
     pat->elements.clear();
@@ -1045,7 +1004,7 @@ Expr* Parser::ParseAssignmentPattern() {
       pat->pattern_keys.push_back(key_tok.text);
       Expect(TokenKind::kColon);
     }
-    // §12.6: .variable_identifier is a pattern binding
+
     if (Check(TokenKind::kDot)) {
       Consume();
       auto name = ExpectIdentifier();
@@ -1063,4 +1022,4 @@ Expr* Parser::ParseAssignmentPattern() {
   return pat;
 }
 
-}  // namespace delta
+}

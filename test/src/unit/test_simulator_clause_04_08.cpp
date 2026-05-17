@@ -9,11 +9,6 @@
 
 using namespace delta;
 
-// §4.8: expression evaluation and net update events may be intermingled within
-// the same region. ExecuteRegion drains its queue without dispatching on
-// EventKind, so a kEvaluation and a kUpdate scheduled into Active resolve in
-// either order; the disjunction encodes the freedom rather than the FIFO
-// choice the implementation happens to make.
 TEST(RaceConditionSim, EvalAndUpdateEventsIntermingleInActive) {
   Arena arena;
   Scheduler sched(arena);
@@ -36,10 +31,6 @@ TEST(RaceConditionSim, EvalAndUpdateEventsIntermingleInActive) {
               (order[0] == "update" && order[1] == "eval"));
 }
 
-// §4.8 in the Reactive set: the kind-mixing rule is not phrased with an
-// Active-only restriction. ExecuteRegion drains every region with the same
-// loop, so a kEvaluation and a kUpdate scheduled into Reactive intermingle
-// the same way they would in Active.
 TEST(RaceConditionSim, EvalAndUpdateEventsIntermingleInReactive) {
   Arena arena;
   Scheduler sched(arena);
@@ -62,10 +53,6 @@ TEST(RaceConditionSim, EvalAndUpdateEventsIntermingleInReactive) {
               (order[0] == "update" && order[1] == "eval"));
 }
 
-// §4.8 LRM example: assign p = q with initial begin q = 1; #1 q = 0;
-// $display(p); end. The simulator may either continue and execute the
-// $display task or execute the update for p, followed by the $display task,
-// so the displayed value can be either 1 or 0.
 TEST(RaceConditionSim, ProcessContinuationRacesEnabledNetUpdate) {
   Arena arena;
   Scheduler sched(arena);

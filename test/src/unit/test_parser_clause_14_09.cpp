@@ -73,4 +73,4 @@ TEST(InterfaceClockingParse, TwoInterfacesWithModports) {
               "endinterface\n"));
 }
 
-}  // namespace
+}

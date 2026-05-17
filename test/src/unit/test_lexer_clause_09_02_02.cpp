@@ -12,4 +12,4 @@ TEST(AlwaysProcedureLexing, AlwaysCombKeyword) {
   EXPECT_EQ(r.token.text, "always_comb");
 }
 
-}  // namespace
+}

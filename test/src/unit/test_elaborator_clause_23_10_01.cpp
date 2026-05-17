@@ -143,11 +143,6 @@ TEST(DefparamElaboration, DefparamInGenerateBlockCannotEscapeScope) {
   EXPECT_NE(u->params[0].resolved_value, 99);
 }
 
-// §23.10.1: "The expression on the right-hand side of defparam assignments
-// shall be a constant expression involving only numbers and references to
-// parameters. The referenced parameters (on the right-hand side of the
-// defparam) shall be declared in the same module as the defparam statement."
-// A hierarchical reference on the RHS violates both clauses of this rule.
 TEST(DefparamElaboration, RhsRejectsHierarchicalReference) {
   ElabFixture f;
   ElaborateSrc(
@@ -165,11 +160,6 @@ TEST(DefparamElaboration, RhsRejectsHierarchicalReference) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §23.10.1: "Each instantiation of a generate block is considered to be a
-// separate hierarchy scope. Therefore, a defparam statement in a generate
-// block may not target a parameter in another instantiation of the same
-// generate block." The override from a sibling generate scope shall not
-// reach the target instance.
 TEST(DefparamElaboration, DefparamInGenerateCannotTargetSiblingScope) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -196,9 +186,6 @@ TEST(DefparamElaboration, DefparamInGenerateCannotTargetSiblingScope) {
   EXPECT_FALSE(saw_99);
 }
 
-// §23.10.1: "Similarly, a defparam statement in one instance of an array of
-// instances may not target a parameter in another instance of the array."
-// The override of one array index shall not propagate to other indices.
 TEST(DefparamElaboration, DefparamCannotTargetOtherArrayInstance) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -221,4 +208,4 @@ TEST(DefparamElaboration, DefparamCannotTargetOtherArrayInstance) {
   EXPECT_LE(count_77, 1);
 }
 
-}  // namespace
+}

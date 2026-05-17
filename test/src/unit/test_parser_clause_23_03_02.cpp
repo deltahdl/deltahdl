@@ -22,9 +22,6 @@ TEST(ModuleInstantiationParser, MixedPositionalAndNamedPortConnectionsRejected) 
   EXPECT_TRUE(r.has_errors);
 }
 
-// §23.3.2 Syntax 23-6: parameter_value_assignment ::= # ( [ list_of_parameter
-// _value_assignments ] ). The BNF must accept the named form using a leading
-// `#( .NAME(expr) )` before the instance name.
 TEST(ModuleInstantiationParser, NamedParameterValueAssignmentParses) {
   auto r = Parse(
       "module child #(parameter int WIDTH = 4) ();\n"
@@ -36,8 +33,6 @@ TEST(ModuleInstantiationParser, NamedParameterValueAssignmentParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §23.3.2 Syntax 23-6: parameter_value_assignment with ordered list shall
-// parse the positional `#(value, value)` form.
 TEST(ModuleInstantiationParser, OrderedParameterValueAssignmentParses) {
   auto r = Parse(
       "module child #(parameter int A = 1, parameter int B = 2) ();\n"
@@ -49,9 +44,6 @@ TEST(ModuleInstantiationParser, OrderedParameterValueAssignmentParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §23.3.2 Syntax 23-6: name_of_instance ::= instance_identifier {
-// unpacked_dimension }. An instance array shall parse with `[range]` between
-// the identifier and the port-connection list.
 TEST(ModuleInstantiationParser, InstanceArrayWithUnpackedDimensionParses) {
   auto r = Parse(
       "module child(); endmodule\n"
@@ -62,9 +54,6 @@ TEST(ModuleInstantiationParser, InstanceArrayWithUnpackedDimensionParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §23.3.2: "The parentheses shall be required on all module instantiations,
-// even when the instantiated module does not have ports." The parser must
-// require `()` after the instance identifier.
 TEST(ModuleInstantiationParser, PortlessInstanceWithoutParensRejected) {
   auto r = Parse(
       "module child; endmodule\n"
@@ -74,4 +63,4 @@ TEST(ModuleInstantiationParser, PortlessInstanceWithoutParensRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

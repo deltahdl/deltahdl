@@ -6,12 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Lifetime-keyword acceptance on function declarations, plus the
-// auto-var-in-static-func and static-var-in-auto-func cases, are §6.21
-// rules; the corresponding elaborator tests (FunctionDeclLifetime*,
-// StaticVarInAutoFunc, AutoVarInStaticFunc) live in
-// test_elaborator_clause_06_21.cpp.
-
 TEST(FunctionLifetimeElaboration, DefaultLifetimeFunctionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -24,9 +18,6 @@ TEST(FunctionLifetimeElaboration, DefaultLifetimeFunctionElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// The module-level `automatic` lifetime qualifier is a §6.21 rule;
-// see ModuleAutomaticLifetime in test_elaborator_clause_06_21.cpp.
 
 TEST(FunctionLifetimeElaboration, RecursiveAutomaticFunctionElaborates) {
   ElabFixture f;
@@ -55,4 +46,4 @@ TEST(FunctionLifetimeElaboration, StaticVarNonConstantInitializerError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

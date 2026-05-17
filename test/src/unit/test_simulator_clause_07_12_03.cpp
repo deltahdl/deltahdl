@@ -11,7 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Helper: create a fixed-size unpacked array with given element width.
 void MakeFixedArray(SimFixture& f, std::string_view name,
                     const std::vector<uint64_t>& vals, uint32_t elem_width) {
   for (size_t i = 0; i < vals.size(); ++i) {
@@ -27,7 +26,6 @@ void MakeFixedArray(SimFixture& f, std::string_view name,
   f.ctx.RegisterArray(name, info);
 }
 
-// Helper: create a dynamic array with a specific element width.
 void MakeDynArrayW(SimFixture& f, std::string_view name,
                    const std::vector<uint64_t>& vals, uint32_t elem_width) {
   auto* q = f.ctx.CreateQueue(name, elem_width);
@@ -86,8 +84,6 @@ TEST(ArrayReduction, XorAllElements) {
   EXPECT_EQ(out.ToUint64(), 0x00u);
 }
 
-// --- Fixed-size unpacked array reductions ---
-
 TEST(ArrayReduction, SumFixedSizeArray) {
   SimFixture f;
   MakeFixedArray(f, "arr", {10, 20, 30}, 32);
@@ -133,8 +129,6 @@ TEST(ArrayReduction, XorFixedSizeArray) {
   EXPECT_EQ(out.ToUint64(), 0xF0u);
 }
 
-// --- Empty array edge cases ---
-
 TEST(ArrayReduction, SumEmptyArray) {
   SimFixture f;
   MakeDynArray(f, "arr", {});
@@ -171,8 +165,6 @@ TEST(ArrayReduction, OrEmptyArray) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
-// --- Return width matches element type (not hardcoded 32) ---
-
 TEST(ArrayReduction, SumReturnWidthMatchesElementType) {
   SimFixture f;
   MakeDynArrayW(f, "arr", {1, 2, 3}, 8);
@@ -202,8 +194,6 @@ TEST(ArrayReduction, AndReturnWidthMatchesElementType) {
   EXPECT_EQ(out.width, 8u);
 }
 
-// --- Single-element array ---
-
 TEST(ArrayReduction, SumSingleElement) {
   SimFixture f;
   MakeDynArray(f, "arr", {42});
@@ -221,8 +211,6 @@ TEST(ArrayReduction, ProductSingleElement) {
   ASSERT_TRUE(ok);
   EXPECT_EQ(out.ToUint64(), 7u);
 }
-
-// --- Call syntax via TryEvalArrayMethodCall ---
 
 TEST(ArrayReduction, SumCallSyntax) {
   SimFixture f;
@@ -244,12 +232,10 @@ TEST(ArrayReduction, ProductCallSyntax) {
   EXPECT_EQ(out.ToUint64(), 30u);
 }
 
-// --- with clause transforms values before reducing ---
-
 TEST(ArrayReduction, SumWithClauseTransformsValues) {
   SimFixture f;
   MakeDynArrayW(f, "b", {1, 2, 3, 4}, 8);
-  // b.sum with (item + 10) should yield (11 + 12 + 13 + 14) = 50
+
   auto* with_expr = MakeBinary(f.arena, TokenKind::kPlus,
                                MakeId(f.arena, "item"), MakeInt(f.arena, 10));
   auto* call = MakeMethodCall(f.arena, "b", "sum", {});
@@ -263,7 +249,7 @@ TEST(ArrayReduction, SumWithClauseTransformsValues) {
 TEST(ArrayReduction, XorWithClauseTransformsValues) {
   SimFixture f;
   MakeDynArrayW(f, "b", {1, 2, 3, 4}, 8);
-  // b.xor with (item + 4) should yield 5^6^7^8 = 12
+
   auto* with_expr = MakeBinary(f.arena, TokenKind::kPlus,
                                MakeId(f.arena, "item"), MakeInt(f.arena, 4));
   auto* call = MakeMethodCall(f.arena, "b", "xor", {});
@@ -273,8 +259,6 @@ TEST(ArrayReduction, XorWithClauseTransformsValues) {
   ASSERT_TRUE(ok);
   EXPECT_EQ(out.ToUint64(), 12u);
 }
-
-// --- Integration tests ---
 
 TEST(ArrayReduction, SumIntegration) {
   SimFixture f;
@@ -356,4 +340,4 @@ TEST(ArrayReduction, XorIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 0xF0u);
 }
 
-}  // namespace
+}

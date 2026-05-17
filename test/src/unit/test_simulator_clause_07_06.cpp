@@ -114,12 +114,6 @@ TEST(ArrayAssignmentSimulation, LeftToRightCorrespondence) {
   EXPECT_EQ(v, 100u);
 }
 
-// §7.6: "Correspondence between elements is determined by the left-to-right
-// order of elements in each array. For example, if array A is declared as
-// int A[7:0] and array B is declared as int B[1:8], the assignment A = B;
-// will assign element B[1] to element A[7], and so on." Mirrors the LRM
-// example exactly: a descending-range target and ascending-range source must
-// map leftmost-to-leftmost regardless of declared bounds direction.
 TEST(ArrayAssignmentSimulation, LeftToRightCorrespondenceCrossRangeDirection) {
   auto v = RunAndGet(
       "module t;\n"
@@ -151,9 +145,6 @@ TEST(ArrayAssignmentSimulation, AssignmentPatternEndToEnd) {
   EXPECT_EQ(v, 15u);
 }
 
-// §7.6: "An assignment where the left-hand side contains a slice is treated as
-// a single assignment to the entire slice." The four-element b[3:0] = a[3:0]
-// assignment must copy every element in the slice in one statement.
 TEST(ArrayAssignmentSimulation, SliceLhsTreatedAsSingleAssignment) {
   auto v = RunAndGet(
       "module t;\n"
@@ -171,14 +162,6 @@ TEST(ArrayAssignmentSimulation, SliceLhsTreatedAsSingleAssignment) {
   EXPECT_EQ(v, 30u);
 }
 
-// §7.6: "If the target of the assignment is a queue or dynamic array, it
-// shall be resized to have the same number of elements as the source
-// expression and assignment shall then follow the same left-to-right element
-// correspondence as previously described." The sibling
-// FixedSourceResizesDynamicTarget covers the dynamic-target half of the
-// "queue or dynamic array" disjunction; this test covers the queue-target
-// half — assigning a fixed-size source to a queue must resize the queue to
-// the source's element count.
 TEST(ArrayAssignmentSimulation, FixedSourceResizesQueueTarget) {
   auto v = RunAndGet(
       "module t;\n"
@@ -195,13 +178,6 @@ TEST(ArrayAssignmentSimulation, FixedSourceResizesQueueTarget) {
   EXPECT_EQ(v, 3u);
 }
 
-// §7.5: "The size of a dynamic array is set by the new constructor or array
-// assignment, described in 7.5.1 and 7.6, respectively." §7.6: "If the target
-// of the assignment is a queue or dynamic array, it shall be resized to have
-// the same number of elements as the source expression." Mirrors the §7.6
-// example `int A[100:1]; int B[]; B = A; // OK. B has 100 elements`: a
-// fixed-size source must extend the dynamic target's size from zero to the
-// source's element count.
 TEST(ArrayAssignmentSimulation, FixedSourceResizesDynamicTarget) {
   auto v = RunAndGet(
       "module t;\n"
@@ -218,11 +194,6 @@ TEST(ArrayAssignmentSimulation, FixedSourceResizesDynamicTarget) {
   EXPECT_EQ(v, 5u);
 }
 
-// §7.6: A dynamic source whose runtime element count matches the fixed-size
-// target's element count shall copy element-by-element with no error. The
-// stale-ArrayInfo-size lookup would erroneously trigger the §7.6 run-time
-// error here; the queue-runtime-size path makes the matching-size positive
-// case work and applies the element copy through queue storage.
 TEST(ArrayAssignmentSimulation, DynamicSourceMatchingFixedSizeCopies) {
   auto v = RunAndGet(
       "module t;\n"
@@ -238,11 +209,6 @@ TEST(ArrayAssignmentSimulation, DynamicSourceMatchingFixedSizeCopies) {
   EXPECT_EQ(v, 22u);
 }
 
-// §7.6: "An attempt to copy a dynamic array or queue into a fixed-size array
-// target having a different number of elements shall result in a run-time
-// error and no operation shall be performed." Covers the queue half of the
-// "dynamic array or queue" disjunction (sibling
-// DynamicToFixedSizeMismatchRuntimeError covers the dynamic half).
 TEST(ArrayAssignmentSimulation, QueueToFixedSizeMismatchRuntimeError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -266,9 +232,6 @@ TEST(ArrayAssignmentSimulation, QueueToFixedSizeMismatchRuntimeError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.6: "An attempt to copy a dynamic array or queue into a fixed-size array
-// target having a different number of elements shall result in a run-time
-// error and no operation shall be performed."
 TEST(ArrayAssignmentSimulation, DynamicToFixedSizeMismatchRuntimeError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -287,7 +250,7 @@ TEST(ArrayAssignmentSimulation, DynamicToFixedSizeMismatchRuntimeError) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_TRUE(f.diag.HasErrors());
-  // §7.6: "no operation shall be performed" — dst must be unchanged.
+
   auto* d0 = f.ctx.FindVariable("dst[0]");
   auto* d1 = f.ctx.FindVariable("dst[1]");
   ASSERT_NE(d0, nullptr);
@@ -296,4 +259,4 @@ TEST(ArrayAssignmentSimulation, DynamicToFixedSizeMismatchRuntimeError) {
   EXPECT_EQ(d1->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

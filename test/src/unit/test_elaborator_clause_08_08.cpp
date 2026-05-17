@@ -77,4 +77,4 @@ TEST(TypedConstructorCallElaboration, TypedConstructorInDeclarationElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

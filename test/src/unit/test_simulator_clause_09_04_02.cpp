@@ -215,8 +215,8 @@ TEST(EventControlSim, PosedgeDetectsOnlyLsb) {
       "  logic [7:0] x;\n"
       "  initial begin\n"
       "    wide = 8'd0;\n"
-      "    #5 wide = 8'd2;\n"  // bit[1] changes, but bit[0] stays 0
-      "    #5 wide = 8'd3;\n"  // bit[0] goes 0->1: posedge
+      "    #5 wide = 8'd2;\n"
+      "    #5 wide = 8'd3;\n"
       "  end\n"
       "  initial begin\n"
       "    @(posedge wide) x = 8'd42;\n"
@@ -240,8 +240,8 @@ TEST(EventControlSim, NoEventOnSameValueWrite) {
       "  logic [7:0] x;\n"
       "  initial begin\n"
       "    sig = 8'd5;\n"
-      "    #5 sig = 8'd5;\n"  // same value: no event
-      "    #5 sig = 8'd7;\n"  // different value: event fires
+      "    #5 sig = 8'd5;\n"
+      "    #5 sig = 8'd7;\n"
       "  end\n"
       "  initial begin\n"
       "    x = 8'd0;\n"
@@ -258,8 +258,6 @@ TEST(EventControlSim, NoEventOnSameValueWrite) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §9.4.2 Table 9-2: a posedge shall be detected on the transition from 0
-// to z. Exercises the production CheckEdge path through @(posedge clk).
 TEST(EventControlSim, PosedgeFiresOnZeroToZ) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -284,8 +282,6 @@ TEST(EventControlSim, PosedgeFiresOnZeroToZ) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-// §9.4.2 Table 9-2: a posedge shall be detected on the transition from z
-// to 1.
 TEST(EventControlSim, PosedgeFiresOnZToOne) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -310,8 +306,6 @@ TEST(EventControlSim, PosedgeFiresOnZToOne) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
-// §9.4.2 Table 9-2: a negedge shall be detected on the transition from 1
-// to z.
 TEST(EventControlSim, NegedgeFiresOnOneToZ) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -336,8 +330,6 @@ TEST(EventControlSim, NegedgeFiresOnOneToZ) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §9.4.2 Table 9-2: a negedge shall be detected on the transition from z
-// to 0.
 TEST(EventControlSim, NegedgeFiresOnZToZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -362,9 +354,6 @@ TEST(EventControlSim, NegedgeFiresOnZToZero) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-// §9.4.2 Table 9-2: a posedge shall be detected on the transition from 0
-// to x. Exercises the production CheckEdge path through @(posedge clk),
-// complementing the existing reference-model EdgeDetection unit tests.
 TEST(EventControlSim, PosedgeFiresOnZeroToX) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -389,8 +378,6 @@ TEST(EventControlSim, PosedgeFiresOnZeroToX) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-// §9.4.2 Table 9-2: a posedge shall be detected on the transition from x
-// to 1.
 TEST(EventControlSim, PosedgeFiresOnXToOne) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -415,8 +402,6 @@ TEST(EventControlSim, PosedgeFiresOnXToOne) {
   EXPECT_EQ(var->value.ToUint64(), 22u);
 }
 
-// §9.4.2 Table 9-2: a negedge shall be detected on the transition from 1
-// to x.
 TEST(EventControlSim, NegedgeFiresOnOneToX) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -441,8 +426,6 @@ TEST(EventControlSim, NegedgeFiresOnOneToX) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-// §9.4.2 Table 9-2: a negedge shall be detected on the transition from x
-// to 0.
 TEST(EventControlSim, NegedgeFiresOnXToZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -467,9 +450,6 @@ TEST(EventControlSim, NegedgeFiresOnXToZero) {
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
-// §9.4.2: "An edge event shall be detected only on the LSB of the
-// expression." Symmetric to PosedgeDetectsOnlyLsb: a non-LSB-only change
-// in a multi-bit signal must not fire negedge.
 TEST(EventControlSim, NegedgeDetectsOnlyLsb) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -495,8 +475,6 @@ TEST(EventControlSim, NegedgeDetectsOnlyLsb) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-// §9.4.2: "An edge event shall be detected only on the LSB of the
-// expression." Same rule for the `edge` keyword.
 TEST(EventControlSim, EdgeDetectsOnlyLsb) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -522,9 +500,6 @@ TEST(EventControlSim, EdgeDetectsOnlyLsb) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
-// §9.4.2 Table 9-2: x -> z is "No edge" — @(posedge clk) shall stay blocked.
-// Exercises the production CheckEdge returning false on a value change that
-// the LRM table classifies as non-firing.
 TEST(EventControlSim, NoPosedgeOnXToZ) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -550,7 +525,6 @@ TEST(EventControlSim, NoPosedgeOnXToZ) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §9.4.2 Table 9-2: z -> x is "No edge" — @(posedge clk) shall stay blocked.
 TEST(EventControlSim, NoPosedgeOnZToX) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -576,7 +550,6 @@ TEST(EventControlSim, NoPosedgeOnZToX) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §9.4.2 Table 9-2: x -> z is "No edge" — @(negedge clk) shall stay blocked.
 TEST(EventControlSim, NoNegedgeOnXToZ) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -602,7 +575,6 @@ TEST(EventControlSim, NoNegedgeOnXToZ) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §9.4.2 Table 9-2: z -> x is "No edge" — @(negedge clk) shall stay blocked.
 TEST(EventControlSim, NoNegedgeOnZToX) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -628,9 +600,6 @@ TEST(EventControlSim, NoNegedgeOnZToX) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §9.4.2: A non-edge implicit event is detected on a change in the value
-// of the expression — including compound expressions whose operands are
-// individual variables. Drives the @(a|b) result transitioning 0->1.
 TEST(EventControlSim, CompoundExprResultChangeFiresEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -655,10 +624,6 @@ TEST(EventControlSim, CompoundExprResultChangeFiresEvent) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §9.4.2: "If the event expression is a reference to a simple object handle
-// or chandle variable, an event is created when a write to that variable is
-// not equal to its previous value." A null-to-null write leaves the chandle
-// bit-pattern unchanged, so @(h) shall not fire.
 TEST(EventControlSim, ChandleSameValueWriteIsNotEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -682,10 +647,6 @@ TEST(EventControlSim, ChandleSameValueWriteIsNotEvent) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §9.4.2: "A change of value in any operand of the expression without a
-// change in the result of the expression shall not be detected as an event."
-// First @(a|b) skips a's 1->0 transition (operand changed, but a|b stays 1),
-// then fires when b's 1->0 transition makes a|b change 1->0.
 TEST(EventControlSim, CompoundExprOperandChangeWithoutResultChangeIsNotEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -714,11 +675,6 @@ TEST(EventControlSim, CompoundExprOperandChangeWithoutResultChangeIsNotEvent) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §9.4.2: "If the event expression is a reference to a simple object handle
-// or chandle variable, an event is created when a write to that variable is
-// not equal to its previous value." Complements ChandleSameValueWriteIsNotEvent
-// with the positive case: a class handle whose value transitions from null to
-// a freshly allocated object shall fire @(h).
 TEST(EventControlSim, ObjectHandleChangeFiresEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -745,10 +701,6 @@ TEST(EventControlSim, ObjectHandleChangeFiresEvent) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §9.4.2: "Changing the value of object data members, aggregate elements, or
-// the size of a dynamically sized array referenced by a method or function
-// shall cause the event expression to be reevaluated." A push_back that
-// changes q.size() must reevaluate @(q.size()) and fire the event.
 TEST(EventControlSim, DynamicArraySizeChangeReevaluatesEventExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -772,9 +724,6 @@ TEST(EventControlSim, DynamicArraySizeChangeReevaluatesEventExpression) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-// §9.4.2: "An edge shall be detected whenever negedge or posedge is detected."
-// Table 9-2 classifies x->z as "No edge", so the `edge` keyword shall stay
-// blocked on this transition (since neither posedge nor negedge fires).
 TEST(EventControlSim, NoEdgeOnXToZ) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -800,7 +749,6 @@ TEST(EventControlSim, NoEdgeOnXToZ) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §9.4.2 Table 9-2: z->x is "No edge"; the `edge` keyword shall stay blocked.
 TEST(EventControlSim, NoEdgeOnZToX) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -826,8 +774,6 @@ TEST(EventControlSim, NoEdgeOnZToX) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §9.4.2: "An edge shall be detected whenever negedge or posedge is detected."
-// Table 9-2 classifies x->1 as a posedge, so the `edge` keyword shall fire.
 TEST(EventControlSim, EdgeFiresOnXToOne) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -852,8 +798,6 @@ TEST(EventControlSim, EdgeFiresOnXToOne) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-// §9.4.2: Table 9-2 classifies z->0 as a negedge, so the `edge` keyword
-// shall fire (per "edge whenever negedge or posedge is detected").
 TEST(EventControlSim, EdgeFiresOnZToZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -878,19 +822,6 @@ TEST(EventControlSim, EdgeFiresOnZToZero) {
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
-// §9.4.2: "If the expression denotes a clocking block input or inout,
-// the event control operator uses the synchronous values sampled by the
-// clocking event (see 14.13)." When @(cb.signal) is encountered, the
-// event control operator shall route the signal lookup through the
-// clocking manager — reaching the underlying input/inout variable that
-// holds the synchronously sampled value — rather than treating the
-// member access as an ordinary hierarchical reference. Constructs a
-// kEventControl Stmt for `@(cb.data) ;` and exercises it through the
-// EventAwaiter path: the production code shall attach a watcher to the
-// clocking-resolved variable, observable as a count increment on that
-// variable's watcher list. Without the clocking routing the lookup would
-// fall through to FindVariable("cb.data"), which has no entry, and the
-// watcher would never be attached.
 TEST(EventControlSim, ClockingBlockInputResolvesThroughClockingManager) {
   SimFixture f;
 
@@ -934,10 +865,7 @@ TEST(EventControlSim, ClockingBlockInputResolvesThroughClockingManager) {
   auto coro = DriverCoroutine(wait_stmt, f.ctx, f.arena, &result);
   coro.Resume();
 
-  // EventAwaiter shall have attached its watcher to the clocking-resolved
-  // underlying variable — the only observable trace of the §9.4.2
-  // clocking-block dispatch rule.
   EXPECT_EQ(data->watchers.size(), 1u);
 }
 
-}  // namespace
+}

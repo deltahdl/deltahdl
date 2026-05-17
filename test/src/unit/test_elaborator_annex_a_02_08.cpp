@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- data_declaration ---
-
 TEST(BlockItemDeclElaboration, DataDeclInInitialBlock) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -37,8 +35,6 @@ TEST(BlockItemDeclElaboration, DataDeclInTaskBody) {
       "endmodule\n"));
 }
 
-// --- local_parameter_declaration ---
-
 TEST(BlockItemDeclElaboration, LocalparamInBlock) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -48,8 +44,6 @@ TEST(BlockItemDeclElaboration, LocalparamInBlock) {
       "  end\n"
       "endmodule\n"));
 }
-
-// --- parameter_declaration ---
 
 TEST(BlockItemDeclElaboration, ParameterInBlock) {
   EXPECT_TRUE(ElabOk(
@@ -61,8 +55,6 @@ TEST(BlockItemDeclElaboration, ParameterInBlock) {
       "endmodule\n"));
 }
 
-// --- let_declaration ---
-
 TEST(BlockItemDeclElaboration, LetDeclInBlock) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -72,8 +64,6 @@ TEST(BlockItemDeclElaboration, LetDeclInBlock) {
       "  end\n"
       "endmodule\n"));
 }
-
-// --- data_declaration subtypes ---
 
 TEST(BlockItemDeclElaboration, TypedefInBlock) {
   EXPECT_TRUE(ElabOk(
@@ -96,8 +86,6 @@ TEST(BlockItemDeclElaboration, ImportInBlock) {
       "endmodule\n"));
 }
 
-// --- mixed alternatives ---
-
 TEST(BlockItemDeclElaboration, MixedAlternativesElaborate) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -111,9 +99,4 @@ TEST(BlockItemDeclElaboration, MixedAlternativesElaborate) {
       "endmodule\n"));
 }
 
-// Lifetime-qualifier elaboration on block-scoped variable declarations is a
-// §6.21 rule; the corresponding elaborator tests live in
-// test_elaborator_clause_06_21.cpp (e.g. AutomaticVarInInitialBlock,
-// StaticVarInInitialBlock).
-
-}  // namespace
+}

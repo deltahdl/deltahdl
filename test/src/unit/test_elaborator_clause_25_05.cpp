@@ -1,4 +1,4 @@
-// §25.5
+
 
 #include "fixture_elaborator.h"
 
@@ -41,4 +41,4 @@ TEST(InterfaceModport, ModuleWithGenericInterfacePortAndModportElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §7.8.2: Write and read back with a string key.
 TEST(StringIndexAssocArraySimulation, WriteAndRead) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
@@ -14,7 +13,6 @@ TEST(StringIndexAssocArraySimulation, WriteAndRead) {
   EXPECT_EQ(aa->str_data["hello"].ToUint64(), 42u);
 }
 
-// §7.8.2: Empty string "" is a valid index.
 TEST(StringIndexAssocArraySimulation, EmptyStringIndex) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
@@ -24,7 +22,6 @@ TEST(StringIndexAssocArraySimulation, EmptyStringIndex) {
   EXPECT_EQ(aa->str_data[""].ToUint64(), 99u);
 }
 
-// §7.8.2: Ordering is lexicographical (lesser to greater).
 TEST(StringIndexAssocArraySimulation, LexicographicOrdering) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
@@ -40,7 +37,6 @@ TEST(StringIndexAssocArraySimulation, LexicographicOrdering) {
   EXPECT_EQ(it->first, "cherry");
 }
 
-// §7.8.2: Multiple string keys stored independently.
 TEST(StringIndexAssocArraySimulation, MultipleKeys) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
@@ -54,7 +50,6 @@ TEST(StringIndexAssocArraySimulation, MultipleKeys) {
   EXPECT_EQ(aa->str_data["z"].ToUint64(), 30u);
 }
 
-// §7.8.2: Overwriting an existing string key updates the value.
 TEST(StringIndexAssocArraySimulation, OverwriteKey) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
@@ -64,7 +59,6 @@ TEST(StringIndexAssocArraySimulation, OverwriteKey) {
   EXPECT_EQ(aa->str_data["key"].ToUint64(), 200u);
 }
 
-// §7.8.2: End-to-end write and read with string-indexed array.
 TEST(StringIndexAssocArraySimulation, EndToEndWriteRead) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -84,7 +78,6 @@ TEST(StringIndexAssocArraySimulation, EndToEndWriteRead) {
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 55u);
 }
 
-// §7.8.2: End-to-end multiple string keys.
 TEST(StringIndexAssocArraySimulation, EndToEndMultipleKeys) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -106,7 +99,6 @@ TEST(StringIndexAssocArraySimulation, EndToEndMultipleKeys) {
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 20u);
 }
 
-// §7.8.2: End-to-end overwrite with string key.
 TEST(StringIndexAssocArraySimulation, EndToEndOverwrite) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -127,4 +119,4 @@ TEST(StringIndexAssocArraySimulation, EndToEndOverwrite) {
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 999u);
 }
 
-}  // namespace
+}

@@ -4,10 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §5.6.4: "The directive shall remain in effect for the rest of the
-// compilation unit (see 3.12.1) unless a different compiler directive
-// specifies otherwise."  A `define remains visible across all subsequent
-// modules within the same compilation unit.
 TEST(CompilerDirectiveParsing, DirectivePersistsAcrossModules) {
   auto r = ParseWithPreprocessor(
       "`define WIDTH 8\n"
@@ -25,9 +21,6 @@ TEST(CompilerDirectiveParsing, DirectivePersistsAcrossModules) {
   ASSERT_EQ(r.cu->modules.size(), 3u);
 }
 
-// §5.6.4: "The compiler behavior dictated by a compiler directive shall take
-// effect as soon as the compiler reads the directive."  The `define on the
-// preceding line must already be in effect when the parser reaches the use.
 TEST(CompilerDirectiveParsing, DirectiveTakesEffectBeforeNextLineParses) {
   auto r = ParseWithPreprocessor(
       "`define WIDTH 8\n"
@@ -39,9 +32,6 @@ TEST(CompilerDirectiveParsing, DirectiveTakesEffectBeforeNextLineParses) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §5.6.4: A compiler directive whose effect appears immediately after a
-// `define has been read parses without error — the macro has already been
-// installed.
 TEST(CompilerDirectiveParsing, ImmediateEffectVisibleInLocalparam) {
   auto r = ParseWithPreprocessor(
       "`define VAL 42\n"
@@ -54,8 +44,6 @@ TEST(CompilerDirectiveParsing, ImmediateEffectVisibleInLocalparam) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "P");
 }
 
-// §5.6.4: "A compiler directive shall not affect other compilation units."
-// A `define from one parse must not leak into a separate parse.
 TEST(CompilerDirectiveParsing, DirectiveDoesNotAffectOtherCU) {
   auto r1 = ParseWithPreprocessor(
       "`define FOO 1\n"
@@ -72,4 +60,4 @@ TEST(CompilerDirectiveParsing, DirectiveDoesNotAffectOtherCU) {
   EXPECT_TRUE(r2.has_errors);
 }
 
-}  // namespace
+}

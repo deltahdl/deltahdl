@@ -72,4 +72,4 @@ TEST(StringLiteralVectorParsing, StringLiteralToSmallerVector) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -162,4 +162,4 @@ TEST(InterfaceClassPrePostRandomizeSim, PostRandomizeViaInterfaceHandle) {
       "endmodule\n", "result"), 1u);
 }
 
-}  // namespace
+}

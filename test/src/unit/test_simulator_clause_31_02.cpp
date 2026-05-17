@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Overview-level dispatch: a specify block holding a mix of timing-check
-// kinds lowers and runs without disturbing surrounding procedural code.
 TEST(SystemTimingCheckSim, MultipleTimingChecksSimulate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -31,4 +29,4 @@ TEST(SystemTimingCheckSim, MultipleTimingChecksSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

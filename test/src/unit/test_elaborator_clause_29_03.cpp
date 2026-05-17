@@ -5,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// A UDP that is instantiated before its definition appears in the source
-// must still be recognized as a UDP instance during elaboration; the
-// elaborator should not emit "unknown module" for the forward reference.
 TEST(UdpForwardReferenceElaboration, UdpDefinedAfterInstantiationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -23,8 +20,6 @@ TEST(UdpForwardReferenceElaboration, UdpDefinedAfterInstantiationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Two modules instantiate the same UDP with opposite source orderings
-// relative to the UDP definition; both must elaborate without errors.
 TEST(UdpForwardReferenceElaboration, UdpReferencedBeforeAndAfterDefinition) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -44,4 +39,4 @@ TEST(UdpForwardReferenceElaboration, UdpReferencedBeforeAndAfterDefinition) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

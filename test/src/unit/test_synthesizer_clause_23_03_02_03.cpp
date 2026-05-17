@@ -34,4 +34,4 @@ TEST(ImplicitNamedPortConnectionSynthesis, MixedImplicitAndExplicitSynthesizes) 
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

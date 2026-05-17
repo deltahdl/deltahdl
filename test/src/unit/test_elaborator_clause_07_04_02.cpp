@@ -91,4 +91,4 @@ TEST(UnpackedArrayValidation, TwoDimUnpackedElaborates) {
   EXPECT_GT(mod->variables[0].unpacked_size, 0u);
 }
 
-}  // namespace
+}

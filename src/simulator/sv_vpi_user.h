@@ -1,8 +1,4 @@
-// IEEE 1800-2023 Annex M — sv_vpi_user.h
-// SystemVerilog-specific VPI extensions (normative).
-//
-// All constant names, type names, and function prototypes are MANDATED
-// by the IEEE 1800-2023 standard.
+
 
 #ifndef SV_VPI_USER_H
 #define SV_VPI_USER_H
@@ -13,13 +9,8 @@
 extern "C" {
 #endif
 
-// PLI type aliases used by IEEE-standard prototypes.
 using PLI_INT32 = int32_t;
 using PLI_BYTE8 = char;
-
-// =============================================================================
-// SV-specific object types (600-749)
-// =============================================================================
 
 #define vpiPackage 600
 #define vpiInterface 601
@@ -32,7 +23,6 @@ using PLI_BYTE8 = char;
 #define vpiRefObj 608
 #define vpiTypeParameter 609
 
-// Variable types
 #define vpiLongIntVar 610
 #define vpiShortIntVar 611
 #define vpiIntVar 612
@@ -49,7 +39,6 @@ using PLI_BYTE8 = char;
 #define vpiPackedArrayVar 623
 #define vpiVirtualInterfaceVar 728
 
-// Typespec types
 #define vpiLongIntTypespec 625
 #define vpiShortIntTypespec 626
 #define vpiIntTypespec 627
@@ -65,7 +54,6 @@ using PLI_BYTE8 = char;
 #define vpiPackedArrayTypespec 637
 #define vpiInterfaceTypespec 906
 
-// Assertion types
 #define vpiAssert 686
 #define vpiAssume 687
 #define vpiCover 688
@@ -76,25 +64,18 @@ using PLI_BYTE8 = char;
 #define vpiImmediateAssume 666
 #define vpiImmediateCover 667
 
-// Constraint types
 #define vpiConstraint 653
 #define vpiConstraintOrdering 654
 
-// Statement types
 #define vpiDoWhile 670
 #define vpiOrderedWait 671
 #define vpiForeachStmt 675
 
-// Net types
 #define vpiEnumNet 680
 #define vpiIntegerNet 681
 #define vpiTimeNet 682
 #define vpiStructNet 683
 #define vpiPackedArrayNet 693
-
-// =============================================================================
-// Traversal method constants
-// =============================================================================
 
 #define vpiActual 700
 #define vpiTypedefAlias 701
@@ -102,69 +83,53 @@ using PLI_BYTE8 = char;
 #define vpiElemTypespec 704
 #define vpiProperty 718
 
-// 1-to-many
 #define vpiTypedef 725
 #define vpiImport 726
 #define vpiDerivedClasses 727
 #define vpiMethods 730
 #define vpiAssertion 744
 
-// =============================================================================
-// Generic object properties
-// =============================================================================
-
 #define vpiTop 600
 #define vpiUnit 602
 
-// Join type
 #define vpiJoinType 601
 #define vpiJoin 0
 #define vpiJoinNone 1
 #define vpiJoinAny 2
 
-// Access type
 #define vpiAccessType 606
 #define vpiForkJoinAcc 1
 #define vpiExternAcc 2
 #define vpiDPIExportAcc 3
 #define vpiDPIImportAcc 4
 
-// Array type
 #define vpiArrayType 603
 #define vpiStaticArray 1
 #define vpiDynamicArray 2
 #define vpiAssocArray 3
 #define vpiQueueArray 4
 
-// Rand type
 #define vpiRandType 610
 #define vpiNotRand 1
 #define vpiRand 2
 #define vpiRandC 3
 
-// Visibility
 #define vpiVisibility 620
 #define vpiPublicVis 1
 #define vpiProtectedVis 2
 #define vpiLocalVis 3
 
-// Always type
 #define vpiAlwaysType 624
 #define vpiAlwaysComb 2
 #define vpiAlwaysFF 3
 #define vpiAlwaysLatch 4
 
-// DPI properties
 #define vpiDPIPure 665
 #define vpiDPIContext 666
 #define vpiDPICStr 667
 #define vpiDPI 1
 #define vpiDPIC 2
 #define vpiDPICIdentifier 668
-
-// =============================================================================
-// SV-specific operator constants
-// =============================================================================
 
 #define vpiImplyOp 50
 #define vpiNonOverlapImplyOp 51
@@ -190,18 +155,12 @@ using PLI_BYTE8 = char;
 #define vpiTypeOp 81
 #define vpiAssignmentOp 82
 
-// Temporal operators
 #define vpiNexttimeOp 89
 #define vpiAlwaysOp 90
 #define vpiEventuallyOp 91
 #define vpiUntilOp 92
 #define vpiUntilWithOp 93
 
-// =============================================================================
-// Callback reason constants
-// =============================================================================
-
-// Thread/frame callbacks
 #define cbStartOfThread 600
 #define cbEndOfThread 601
 #define cbEnterThread 602
@@ -209,12 +168,10 @@ using PLI_BYTE8 = char;
 #define cbEndOfFrame 604
 #define cbSizeChange 605
 
-// Object lifecycle
 #define cbCreateObj 700
 #define cbReclaimObj 701
 #define cbEndOfObject 702
 
-// Assertion callbacks (§39)
 #define cbAssertionStart 606
 #define cbAssertionSuccess 607
 #define cbAssertionFailure 608
@@ -225,7 +182,6 @@ using PLI_BYTE8 = char;
 #define cbAssertionReset 613
 #define cbAssertionKill 614
 
-// Assertion system callbacks
 #define cbAssertionSysInitialized 615
 #define cbAssertionSysOn 616
 #define cbAssertionSysOff 617
@@ -239,10 +195,6 @@ using PLI_BYTE8 = char;
 #define cbAssertionSysUnlock 660
 #define cbAssertionLock 661
 #define cbAssertionUnlock 662
-
-// =============================================================================
-// Coverage VPI constants (750-779)
-// =============================================================================
 
 #define vpiCoverageStart 750
 #define vpiCoverageStop 751
@@ -272,10 +224,6 @@ using PLI_BYTE8 = char;
 #define vpiFsmStateExpression 776
 #define vpiAssertKillCovered 777
 
-// =============================================================================
-// Assertion control constants
-// =============================================================================
-
 #define vpiAssertionLock 645
 #define vpiAssertionUnlock 646
 #define vpiAssertionDisable 620
@@ -286,7 +234,6 @@ using PLI_BYTE8 = char;
 #define vpiAssertionDisableStep 625
 #define vpiAssertionClockSteps 626
 
-// System-level assertion control
 #define vpiAssertionSysLock 627
 #define vpiAssertionSysUnlock 628
 #define vpiAssertionSysOn 629
@@ -294,10 +241,6 @@ using PLI_BYTE8 = char;
 #define vpiAssertionSysKill 631
 #define vpiAssertionSysEnd 632
 #define vpiAssertionSysReset 633
-
-// =============================================================================
-// Assertion API structures (§39)
-// =============================================================================
 
 typedef struct t_vpi_assertion_step_info {
   PLI_INT32 matched_expression_count;
@@ -314,10 +257,6 @@ typedef struct t_vpi_attempt_info {
   s_vpi_time attempt_start_time;
 } s_vpi_attempt_info, *p_vpi_attempt_info;
 
-// =============================================================================
-// Assertion callback function typedef and registration
-// =============================================================================
-
 typedef PLI_INT32 (*vpi_assertion_callback_func)(PLI_INT32 reason,
                                                  s_vpi_time* cb_time,
                                                  vpiHandle assertion,
@@ -332,4 +271,4 @@ vpiHandle vpi_register_assertion_cb(vpiHandle assertion, PLI_INT32 reason,
 }
 #endif
 
-#endif  // SV_VPI_USER_H
+#endif

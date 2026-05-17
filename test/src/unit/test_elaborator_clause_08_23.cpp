@@ -131,4 +131,4 @@ TEST(ClassScopeResolutionElaboration, NestedClassAsTypeOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

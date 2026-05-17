@@ -9,7 +9,6 @@ using namespace delta;
 
 namespace {
 
-// Helper: build a kMemberAccess node (field select / hierarchical reference).
 Expr* MakeMember(Arena& arena, Expr* obj, std::string_view field) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kMemberAccess;
@@ -17,8 +16,6 @@ Expr* MakeMember(Arena& arena, Expr* obj, std::string_view field) {
   e->rhs = MakeId(arena, field);
   return e;
 }
-
-// --- Edge cases ---
 
 TEST(ConstEval, LongestStaticPrefixNullExpr) {
   EXPECT_EQ(LongestStaticPrefix(nullptr), "");
@@ -44,8 +41,6 @@ TEST(ConstEval, LongestStaticPrefixAllVarMultiDim) {
   auto* outer = MakeSelectExpr(arena, inner, MakeId(arena, "j"));
   EXPECT_EQ(LongestStaticPrefix(outer), "m");
 }
-
-// --- Existing tests ---
 
 TEST(ConstEval, LongestStaticPrefixSimpleId) {
   Arena arena;
@@ -83,8 +78,6 @@ TEST(ConstEval, LongestStaticPrefixParamIdx) {
   EXPECT_EQ(LongestStaticPrefix(sel, scope), "m[7]");
 }
 
-// --- Field selects as static prefixes ---
-
 TEST(ConstEval, LongestStaticPrefixFieldSelect) {
   Arena arena;
   auto* expr = MakeMember(arena, MakeId(arena, "s"), "field");
@@ -112,8 +105,6 @@ TEST(ConstEval, LongestStaticPrefixVarIdxThenFieldSelect) {
   EXPECT_EQ(LongestStaticPrefix(expr), "arr");
 }
 
-// --- Package references as static prefixes ---
-
 TEST(ConstEval, LongestStaticPrefixPackageRef) {
   Arena arena;
   auto* id = MakeId(arena, "var");
@@ -129,4 +120,4 @@ TEST(ConstEval, LongestStaticPrefixPackageRefConstIdx) {
   EXPECT_EQ(LongestStaticPrefix(sel), "pkg::arr[3]");
 }
 
-}  // namespace
+}

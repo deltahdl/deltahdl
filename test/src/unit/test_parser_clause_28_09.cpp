@@ -1,4 +1,4 @@
-// §28.9
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -80,8 +80,6 @@ TEST(CmosSwitches, NamedRcmosInstantiation) {
   ASSERT_EQ(item->gate_terminals.size(), 4);
 }
 
-// cmos and rcmos must parse to distinct GateKind values so elaboration can
-// apply the resistive strength reduction to rcmos only.
 TEST(CmosSwitches, CmosAndRcmosParseToDistinctGateKinds) {
   auto r = Parse(
       "module m;\n"
@@ -95,8 +93,6 @@ TEST(CmosSwitches, CmosAndRcmosParseToDistinctGateKinds) {
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kRcmos), nullptr);
 }
 
-// Two-delay form: both values must land in their slots, leaving the decay
-// slot null so the simulator reuses the fall value for turn-off.
 TEST(CmosSwitches, CmosTwoValueDelay) {
   auto r = Parse(
       "module m;\n"
@@ -112,7 +108,6 @@ TEST(CmosSwitches, CmosTwoValueDelay) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-// rcmos accepts the same delay3 form as cmos; all three fields must surface.
 TEST(CmosSwitches, RcmosThreeValueDelay) {
   auto r = Parse(
       "module m;\n"
@@ -126,9 +121,6 @@ TEST(CmosSwitches, RcmosThreeValueDelay) {
   ASSERT_NE(g->gate_delay_decay, nullptr);
 }
 
-// Distinct int values pin the slot assignment: position 1 → rise,
-// position 2 → fall, position 3 → transition-to-z. A regression that
-// swapped any pair would leave the values crossed.
 TEST(CmosSwitches, CmosThreeValueDelayMapsToRiseFallDecay) {
   auto r = Parse(
       "module m;\n"
@@ -145,8 +137,6 @@ TEST(CmosSwitches, CmosThreeValueDelayMapsToRiseFallDecay) {
   EXPECT_EQ(g->gate_delay_decay->int_val, 33u);
 }
 
-// A single delay applies to every output transition; only the rise slot
-// should be populated by the parser.
 TEST(CmosSwitches, CmosOneValueDelay) {
   auto r = Parse(
       "module m;\n"
@@ -161,8 +151,6 @@ TEST(CmosSwitches, CmosOneValueDelay) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-// With no delay spec, all three slots stay null and the switch has no
-// propagation delay.
 TEST(CmosSwitches, CmosNoDelaySpec) {
   auto r = Parse(
       "module m;\n"
@@ -176,8 +164,6 @@ TEST(CmosSwitches, CmosNoDelaySpec) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-// A fourth delay term exceeds the cap; guards against a silent drop of the
-// extra value.
 TEST(CmosSwitches, CmosTooManyDelaysRejected) {
   auto r = Parse(
       "module m;\n"
@@ -186,8 +172,6 @@ TEST(CmosSwitches, CmosTooManyDelaysRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// The terminal list ordering is (out, data, ncontrol, pcontrol). Pinning
-// identifier text at each position catches any reordering regression.
 TEST(CmosSwitches, CmosTerminalOrderIsOutDataNctrlPctrl) {
   auto r = Parse(
       "module m;\n"
@@ -205,4 +189,4 @@ TEST(CmosSwitches, CmosTerminalOrderIsOutDataNctrlPctrl) {
   EXPECT_EQ(g->gate_terminals[3]->text, "pctrl");
 }
 
-}  // namespace
+}

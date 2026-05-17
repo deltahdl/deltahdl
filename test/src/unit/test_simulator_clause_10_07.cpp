@@ -394,7 +394,7 @@ TEST(AssignmentExtensionTruncationSim, TruncationChangesSignOfResult) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("dst");
   ASSERT_NE(var, nullptr);
-  // 120 = 0x78, truncated to 4 bits = 0x8 (sign bit set, now negative).
+
   EXPECT_EQ(var->value.ToUint64(), 0x8u);
 }
 
@@ -412,7 +412,7 @@ TEST(AssignmentExtensionTruncationSim, TruncationToOneBit) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("dst");
   ASSERT_NE(var, nullptr);
-  // 0xFE = ...11111110, LSB is 0.
+
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
@@ -431,7 +431,7 @@ TEST(AssignmentExtensionTruncationSim, ExtensionOneBitToWide) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("dst");
   ASSERT_NE(var, nullptr);
-  // 1-bit unsigned 1 zero-extends to 8'h01.
+
   EXPECT_EQ(var->value.ToUint64(), 0x01u);
 }
 
@@ -453,7 +453,7 @@ TEST(AssignmentExtensionTruncationSim, NBASignedExtension) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("wide");
   ASSERT_NE(var, nullptr);
-  // -3 in 4-bit signed = 0xD, sign-extended to 8-bit = 0xFD.
+
   EXPECT_EQ(var->value.ToUint64(), 0xFDu);
 }
 
@@ -472,7 +472,7 @@ TEST(AssignmentExtensionTruncationSim, ContAssignSignedExtension) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("wide");
   ASSERT_NE(var, nullptr);
-  // -5 in 4-bit signed = 0xB, sign-extended to 8-bit = 0xFB.
+
   EXPECT_EQ(var->value.ToUint64(), 0xFBu);
 }
 
@@ -491,7 +491,7 @@ TEST(AssignmentExtensionTruncationSim, ContAssignSignedTruncation) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("narrow");
   ASSERT_NE(var, nullptr);
-  // -113 = 0x8F, truncated to 4 bits = 0xF.
+
   EXPECT_EQ(var->value.ToUint64(), 0xFu);
 }
 
@@ -509,8 +509,8 @@ TEST(AssignmentExtensionTruncationSim, SignedLiteralTruncatedToUnsigned) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("a");
   ASSERT_NE(var, nullptr);
-  // 8'sh8F = 0x8F, truncated to 6 bits = 0x0F.
+
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
 
-}  // namespace
+}

@@ -115,4 +115,4 @@ TEST(NetAliasingParsing, AliasAmongOtherModuleItems) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-}  // namespace
+}

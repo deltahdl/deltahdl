@@ -17,4 +17,4 @@ TEST(OptionalSystemTaskExtendedParsing, Input) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-}  // namespace
+}

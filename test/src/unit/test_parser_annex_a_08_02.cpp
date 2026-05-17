@@ -317,8 +317,6 @@ TEST(SubroutineCallSyntaxParsing, VoidCastOfChainedMethodCall) {
   EXPECT_EQ(expr->lhs->kind, ExprKind::kCall);
 }
 
-// --- Error conditions ---
-
 TEST(SubroutineCallSyntaxParsing, ErrorCallMissingSemicolon) {
   auto r = Parse(
       "module m;\n"
@@ -458,4 +456,4 @@ TEST(SubroutineCallExprParsing, FunctionCallInBinaryExpr) {
   EXPECT_EQ(stmt->rhs->rhs->kind, ExprKind::kCall);
 }
 
-}  // namespace
+}

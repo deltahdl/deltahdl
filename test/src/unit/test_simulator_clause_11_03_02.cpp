@@ -37,7 +37,7 @@ TEST(Precedence, ShiftBeforeComparison) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // 2 << 3 = 16, then 1 < 16 = 1
+
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
@@ -55,7 +55,7 @@ TEST(Precedence, BitwiseAndBeforeOr) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // 0x0F & 0xF0 = 0x00, then 0xFF | 0x00 = 0xFF
+
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
@@ -73,7 +73,7 @@ TEST(Precedence, ParenthesesOverride) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // (2 + 3) * 4 = 20
+
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
@@ -91,7 +91,7 @@ TEST(Precedence, TernaryWithLogicalCondition) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // (0 || 1) ? 10 : 20 = 10
+
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
@@ -109,7 +109,7 @@ TEST(Precedence, AddLeftAssocValue) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // (10 - 3) - 2 = 5, NOT 10 - (3 - 2) = 9
+
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
@@ -127,8 +127,8 @@ TEST(Precedence, EqualityBeforeBitwiseAnd) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // 5 == 5 = 1, then 3 & 1 = 1
+
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

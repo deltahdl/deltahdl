@@ -78,4 +78,4 @@ TEST(ClockingBlockElab, InoutClockvarWriteOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

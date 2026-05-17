@@ -17,8 +17,6 @@ TEST(SimpleStateDependentPathElaboration, ParallelPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The subclause names the full form alongside the parallel form, so the
-// elaborator must accept `if (cond) (srcs *> dsts)` on equal footing.
 TEST(SimpleStateDependentPathElaboration, FullPathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -32,8 +30,6 @@ TEST(SimpleStateDependentPathElaboration, FullPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Multiple simple state-dependent paths that share endpoints should all
-// survive elaboration since each is an independent conditional contribution.
 TEST(SimpleStateDependentPathElaboration, MultipleCoexistingPathsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -48,4 +44,4 @@ TEST(SimpleStateDependentPathElaboration, MultipleCoexistingPathsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

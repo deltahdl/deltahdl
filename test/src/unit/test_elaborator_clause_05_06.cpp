@@ -51,11 +51,6 @@ TEST(IdentifierElaboration, IdentifierInExpressionElaborates) {
              "endmodule\n"));
 }
 
-// §5.6: "Identifiers shall be case sensitive." Referencing a name whose case
-// does not exactly match a declared identifier must fail elaboration's
-// symbol resolution (the only declared name is "foo"; "Foo" is a distinct,
-// undeclared identifier on the right-hand side and cannot be implicitly
-// netted into existence).
 TEST(IdentifierElaboration, CaseMismatchedReferenceFailsToResolve) {
   ElabFixture f;
   ElaborateSrc(
@@ -68,10 +63,6 @@ TEST(IdentifierElaboration, CaseMismatchedReferenceFailsToResolve) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §5.6: "If an identifier exceeds the implementation-specific length limit,
-// an error shall be reported." A 1025-character identifier in elaboration
-// input must cause an error to be reported on the elaborator's diagnostic
-// engine.
 TEST(IdentifierElaboration, IdentifierExceedingMaxLengthReportsError) {
   ElabFixture f;
   std::string long_id(1025, 'a');
@@ -84,4 +75,4 @@ TEST(IdentifierElaboration, IdentifierExceedingMaxLengthReportsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

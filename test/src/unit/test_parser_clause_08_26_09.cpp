@@ -95,4 +95,4 @@ TEST(InterfaceClassRandomizeParsing, PostRandomizeInImplementingClass) {
   ASSERT_GE(cls->members.size(), 2u);
 }
 
-}  // namespace
+}

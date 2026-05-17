@@ -44,7 +44,7 @@ VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
   return nullptr;
 }
 
-VpiHandle VpiContext::HandleByName(const char* name, VpiHandle /*scope*/) {
+VpiHandle VpiContext::HandleByName(const char* name, VpiHandle ) {
   if (!name) return nullptr;
   auto it = object_map_.find(std::string_view(name));
   if (it != object_map_.end()) return it->second;
@@ -61,9 +61,9 @@ VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
 
 VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   if (!ref) return nullptr;
-  // Return parent if it matches the requested type.
+
   if (ref->parent && ref->parent->type == type) return ref->parent;
-  // Search children for matching type.
+
   for (auto* child : ref->children) {
     if (child->type == type) return child;
   }
@@ -100,8 +100,6 @@ VpiHandle VpiContext::Scan(VpiHandle iterator) {
   }
   return iterator->children[iterator->scan_index++];
 }
-
-// --- Value format helpers ---
 
 static void GetValueBinStr(VpiHandle obj, VpiValue* value,
                            std::vector<std::string>& pool) {
@@ -214,19 +212,11 @@ void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
   }
 }
 
-void VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* /*time*/,
-                          int /*flags*/) {
+void VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* ,
+                          int ) {
   if (!obj || !value) return;
   if (!obj->var && !obj->net) return;
-  // §4.4.3.1 (Preponed) and §4.4.2.9 (Postponed) both forbid writing values
-  // to any net or variable while executing in their respective regions.
-  // §4.4.3.10 inherits the Postponed restriction because PLI callbacks
-  // landing in Postponed share the same region as the simulation events.
-  // NoteWriteAttempt routes the violation to the right counter based on the
-  // scheduler's current region. §4.4.3.1's "any net or variable" reaches
-  // every PLI write target, so the attempt is flagged even when obj names a
-  // net rather than a variable; the actual variable-store dispatch below
-  // still short-circuits for net-only targets.
+
   if (scheduler_) scheduler_->NoteWriteAttempt();
   if (!obj->var) return;
   if (value->format == kVpiIntVal) {
@@ -247,7 +237,7 @@ void VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* /*time*/,
 VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
   if (!data) return nullptr;
   callbacks_.push_back(*data);
-  // Create a callback handle object for removal.
+
   auto* cb_obj = AllocObject();
   cb_obj->type = kVpiCallback;
   cb_obj->index = static_cast<int>(callbacks_.size() - 1);
@@ -260,7 +250,7 @@ int VpiContext::RemoveCb(VpiHandle cb_handle) {
   if (cb_handle->type != kVpiCallback) return 0;
   int idx = cb_handle->index;
   if (idx >= 0 && idx < static_cast<int>(callbacks_.size())) {
-    callbacks_[idx].reason = -1;  // Mark as removed.
+    callbacks_[idx].reason = -1;
     return 1;
   }
   return 0;
@@ -299,9 +289,7 @@ const char* VpiContext::GetStr(int property, VpiHandle obj) {
     case kVpiDefName:
       if (obj->type == kVpiModule) return obj->name.data();
       return nullptr;
-    // §33.7: library/cell/config are string properties on vpiModule, similar
-    // to vpiName/vpiFullName. Return a (possibly empty) string rather than a
-    // null pointer so callers can always treat the result as a C string.
+
     case kVpiLibrary:
       if (obj->type != kVpiModule) return nullptr;
       return obj->library_name.c_str();
@@ -316,9 +304,9 @@ const char* VpiContext::GetStr(int property, VpiHandle obj) {
   }
 }
 
-int VpiContext::FreeObject(VpiHandle /*obj*/) { return 0; }
+int VpiContext::FreeObject(VpiHandle ) { return 0; }
 
-int VpiContext::Control(int operation, int /*diag_level*/) {
+int VpiContext::Control(int operation, int ) {
   if (operation == kVpiFinish) {
     finish_requested_ = true;
     return 1;
@@ -346,7 +334,7 @@ void VpiContext::GetVlogInfo(VpiVlogInfo* info) {
 
 VpiHandle VpiContext::HandleMulti(int type, VpiHandle ref1, VpiHandle ref2) {
   if (!ref1 && !ref2) return nullptr;
-  // Create an iterator-like object containing children of both refs.
+
   auto* result = AllocObject();
   result->type = type;
   if (ref1) {
@@ -392,7 +380,7 @@ VpiHandle VpiContext::CreateParameter(std::string_view name, int int_value) {
   auto* obj = AllocObject();
   obj->type = kVpiParameter;
   obj->name = name;
-  obj->size = int_value;  // Store param value in size field for simplicity.
+  obj->size = int_value;
   object_map_[name] = obj;
   return obj;
 }
@@ -409,17 +397,13 @@ VpiHandle VpiContext::CreateNetObj(std::string_view name, Net* net_ptr,
   return obj;
 }
 
-// --- §4.10 PLI callback control points ---
-
 Region RegionForPliCallback(int reason) {
   switch (reason) {
     case kCbAfterDelay:
     case kCbNextSimTime:
     case kCbAtStartOfSimTime:
       return Region::kPreActive;
-    // Table 4-1 lists "Pre-NBA or Post-NBA" for cbReadWriteSynch — the
-    // standard permits either; we pick Pre-NBA so the callback observes the
-    // latest active-region assignments before the NBA region drains.
+
     case kCbReadWriteSynch:
     case kCbNBASynch:
       return Region::kPreNBA;
@@ -436,8 +420,6 @@ bool IsOneShotPliCallback(int reason) {
   return RegionForPliCallback(reason) != Region::kCOUNT;
 }
 
-// --- Global context singleton ---
-
 static VpiContext* g_vpi_context = nullptr;
 static VpiContext g_default_context;
 
@@ -448,9 +430,7 @@ VpiContext& GetGlobalVpiContext() {
 
 void SetGlobalVpiContext(VpiContext* ctx) { g_vpi_context = ctx; }
 
-}  // namespace delta
-
-// --- C API implementations ---
+}
 
 vpiHandle vpi_register_systf(s_vpi_systf_data* data) {
   return delta::GetGlobalVpiContext().RegisterSystf(data);

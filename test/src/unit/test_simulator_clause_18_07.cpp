@@ -58,4 +58,4 @@ TEST(Constraint, InlineConstraintWithBlock) {
   EXPECT_LE(val, 60);
 }
 
-}  // namespace
+}

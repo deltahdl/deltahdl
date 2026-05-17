@@ -156,9 +156,6 @@ TEST(GenerateSimulation, GenerateCaseNoMatchNoDefault) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §27.5: else binds to the nearest preceding if, so in an if/else-if/else
-// chain only the first branch whose condition holds contributes continuous
-// assignments to the elaborated design.
 TEST(GenerateSimulation, GenerateIfElseIfChainSelectsMiddle) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -186,8 +183,6 @@ TEST(GenerateSimulation, GenerateIfElseIfChainSelectsMiddle) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-// §27.5: a case-generate item selects its block when any of its listed
-// constant expressions matches the controlling expression.
 TEST(GenerateSimulation, GenerateCaseMultiplePatternsPerItem) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -212,4 +207,4 @@ TEST(GenerateSimulation, GenerateCaseMultiplePatternsPerItem) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-}  // namespace
+}

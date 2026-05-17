@@ -48,8 +48,6 @@ TEST(UdpCombinational, UnmatchedIsX) {
   EXPECT_EQ(state.Evaluate({'1', '0'}), 'x');
 }
 
-// The default-x behavior holds for every unspecified combination, not just a
-// single case.
 TEST(UdpCombinational, EveryUnspecifiedCombinationYieldsX) {
   UdpBuilder b;
   b.SetCombinational().AddRow({'0', '0'}, '0');
@@ -59,8 +57,6 @@ TEST(UdpCombinational, EveryUnspecifiedCombinationYieldsX) {
   EXPECT_EQ(state.Evaluate({'1', '1'}), 'x');
 }
 
-// Specified rows continue to match after unspecified rows are queried — the
-// default-x behavior does not overwrite the table.
 TEST(UdpCombinational, SpecifiedRowsStillMatchAfterUnspecifiedQuery) {
   UdpBuilder b;
   b.SetCombinational().AddRow({'0', '0'}, '0').AddRow({'1', '1'}, '1');
@@ -70,8 +66,6 @@ TEST(UdpCombinational, SpecifiedRowsStillMatchAfterUnspecifiedQuery) {
   EXPECT_EQ(state.Evaluate({'1', '1'}), '1');
 }
 
-// Revisiting the same inputs produces the same output regardless of what was
-// evaluated in between — the UDP holds no memory of prior inputs.
 TEST(UdpCombinational, OutputDependsOnlyOnCurrentInputs) {
   UdpBuilder b;
   b.SetCombinational().AddRow({'0', '0'}, '0').AddRow({'1', '1'}, '1');
@@ -81,8 +75,6 @@ TEST(UdpCombinational, OutputDependsOnlyOnCurrentInputs) {
   EXPECT_EQ(state.Evaluate({'0', '0'}), '0');
 }
 
-// A table with no rows specifies no combination, so every evaluation falls
-// through to the default-x output.
 TEST(UdpCombinational, EmptyTableAlwaysReturnsX) {
   UdpBuilder b;
   b.SetCombinational();
@@ -91,4 +83,4 @@ TEST(UdpCombinational, EmptyTableAlwaysReturnsX) {
   EXPECT_EQ(state.Evaluate({'1'}), 'x');
 }
 
-}  // namespace
+}

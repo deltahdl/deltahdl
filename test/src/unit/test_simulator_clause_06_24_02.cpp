@@ -234,4 +234,4 @@ TEST(DynamicCastSim, CastEnumFirstMember) {
   EXPECT_EQ(c->value.ToUint64(), 0u);
 }
 
-}  // namespace
+}

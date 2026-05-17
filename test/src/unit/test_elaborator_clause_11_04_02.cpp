@@ -88,4 +88,4 @@ TEST(ExpressionElaboration, IncDecOnIntElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

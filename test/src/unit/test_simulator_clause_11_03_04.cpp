@@ -21,7 +21,7 @@ TEST(StateOps, MixedStateAddTreatedAsFourState) {
   SimFixture f;
   MakeVar(f, "a", 8, 5);
   auto* b_var = MakeVar(f, "b", 8, 0);
-  b_var->value.words[0] = {~uint64_t{0}, ~uint64_t{0}};  // all-x
+  b_var->value.words[0] = {~uint64_t{0}, ~uint64_t{0}};
   auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kPlus,
                                     MakeId(f.arena, "a"), MakeId(f.arena, "b")),
                          f.ctx, f.arena);
@@ -32,11 +32,11 @@ TEST(StateOps, MixedStateBitwiseOrTreatedAsFourState) {
   SimFixture f;
   MakeVar(f, "a", 8, 0xFF);
   auto* b_var = MakeVar(f, "b", 8, 0);
-  b_var->value.words[0].bval = 0xFF;  // all-x in low 8 bits
+  b_var->value.words[0].bval = 0xFF;
   auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kPipe,
                                     MakeId(f.arena, "a"), MakeId(f.arena, "b")),
                          f.ctx, f.arena);
-  // OR with all-ones known bits should produce all-ones regardless of x.
+
   EXPECT_EQ(result.words[0].aval & 0xFF, 0xFFu);
 }
 
@@ -87,7 +87,7 @@ TEST(StateOps, TwoStateBitwiseXorResult) {
 TEST(StateOps, XPlusKnownProducesX) {
   SimFixture f;
   auto* a_var = MakeVar(f, "a", 8, 0);
-  a_var->value.words[0] = {0, ~uint64_t{0}};  // all-x
+  a_var->value.words[0] = {0, ~uint64_t{0}};
   MakeVar(f, "b", 8, 8);
   auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kPlus,
                                     MakeId(f.arena, "a"), MakeId(f.arena, "b")),
@@ -151,4 +151,4 @@ TEST(StateOps, BitwiseOrWithXzLiteralCoercedToInt) {
   EXPECT_EQ(result, 12u);
 }
 
-}  // namespace
+}

@@ -3,8 +3,6 @@
 
 namespace {
 
-// --- Req 1: Nested module with explicit instantiation synthesizes ---
-
 TEST(NestedModuleSynthesis, NestedModuleExplicitlyInstantiatedSynthesizes) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -19,8 +17,6 @@ TEST(NestedModuleSynthesis, NestedModuleExplicitlyInstantiatedSynthesizes) {
   auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
 }
-
-// --- Req 4: Portless nested module implicitly instantiated synthesizes ---
 
 TEST(NestedModuleSynthesis, PortlessNestedModuleImplicitInstantiationSynthesizes) {
   SynthFixture f;
@@ -37,8 +33,6 @@ TEST(NestedModuleSynthesis, PortlessNestedModuleImplicitInstantiationSynthesizes
   ASSERT_NE(aig, nullptr);
 }
 
-// --- Req 5: Ported nested module not instantiated is ignored ---
-
 TEST(NestedModuleSynthesis, PortedNestedModuleNotInstantiatedSynthesizes) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -54,4 +48,4 @@ TEST(NestedModuleSynthesis, PortedNestedModuleNotInstantiatedSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

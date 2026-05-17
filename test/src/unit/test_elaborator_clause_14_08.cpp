@@ -42,4 +42,4 @@ TEST(MultiBlockExampleElab, HierExprInMultiBlockElaborates) {
              "endprogram\n"));
 }
 
-}  // namespace
+}

@@ -116,4 +116,4 @@ TEST(SysTask, UnpackedDimensionsOfQueue) {
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);
 }
 
-}  // namespace
+}

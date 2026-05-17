@@ -9,8 +9,6 @@
 
 using namespace delta;
 
-// §4.6(a): a process suspended in favor of others must resume at the next
-// statement, never reordered ahead of unrelated work the suspension yielded to.
 TEST(DeterminismSim, SuspendedProcessResumesInOrder) {
   Arena arena;
   Scheduler sched(arena);
@@ -38,8 +36,6 @@ TEST(DeterminismSim, SuspendedProcessResumesInOrder) {
   EXPECT_EQ(order[2], "A1");
 }
 
-// §4.6(a)+(b) bridge: when N statements run in source order and each schedules
-// one NBA, the NBAs must drain in the same order.
 TEST(DeterminismSim, SequentialStatementsProduceOrderedNBAs) {
   Arena arena;
   Scheduler sched(arena);
@@ -63,8 +59,6 @@ TEST(DeterminismSim, SequentialStatementsProduceOrderedNBAs) {
   EXPECT_EQ(log, expected);
 }
 
-// §4.6(a) end-to-end: blocking assignments inside a begin-end block produce a
-// computation chain whose final values reflect strict source-order execution.
 TEST(DeterminismSim, BlockingAssignmentsExecuteInSourceOrder) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -86,8 +80,6 @@ TEST(DeterminismSim, BlockingAssignmentsExecuteInSourceOrder) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 30u);
 }
 
-// §4.6(b) end-to-end: the LRM example. Two NBAs to the same variable in a
-// begin-end block must drain in execution order, so the second write wins.
 TEST(DeterminismSim, NBAExecutionOrderMatchesSourceOrder) {
   auto result = RunAndGet(
       "module t;\n"
@@ -101,11 +93,6 @@ TEST(DeterminismSim, NBAExecutionOrderMatchesSourceOrder) {
   EXPECT_EQ(result, 1u);
 }
 
-// §4.6(a) suspension clause: when a begin-end block suspends mid-execution
-// (here via #delay), control must resume at the next statement in source
-// order. The shift-and-or chain encodes ordering into the final value: only
-// strict source-order execution yields 0x123; any swap or skip produces a
-// different bit pattern.
 TEST(DeterminismSim, SourceOrderPreservedAcrossSuspension) {
   auto result = RunAndGet(
       "module t;\n"

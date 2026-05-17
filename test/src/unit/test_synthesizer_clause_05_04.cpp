@@ -103,4 +103,4 @@ TEST(CommentSynthesis, BlockCommentAsSeparatorSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

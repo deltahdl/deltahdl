@@ -46,12 +46,10 @@ class Lowerer {
   void LowerImports(const RtlirModule* mod);
   void LowerPackageItem(ModuleItem* item);
   PackageDecl* FindPackage(std::string_view name) const;
-  // §26.6: Lower the single item named `name` visible through `pkg` — either
-  // a direct package item, or an item re-exported from another package.
+
   void LowerImportedName(PackageDecl* pkg, std::string_view name,
                          std::unordered_set<const PackageDecl*>& visited);
-  // §26.6: Lower all items visible when wildcard-importing from `pkg`,
-  // following any `export p::*` or `export *::*` declarations in `pkg`.
+
   void LowerAllImported(PackageDecl* pkg,
                         std::unordered_set<const PackageDecl*>& visited);
   void LowerDynArrayInit(const RtlirVariable& var);
@@ -59,10 +57,7 @@ class Lowerer {
   void RegisterEnumForCast(const RtlirVariable& var);
   void RegisterEnumTypes(const RtlirModule* mod);
   void LowerChildModules(const RtlirModule* mod);
-  // §4.9.6: Materialize a child instance's port_bindings — input/output
-  // ports become implicit continuous assignments, inout ports alias the
-  // local port variable onto the outside identifier so the two sides
-  // share storage like a non-strength-reducing transistor.
+
   void LowerPortBindings(const RtlirModuleInst& inst, bool from_program);
 
   SimContext& ctx_;
@@ -73,4 +68,4 @@ class Lowerer {
   std::string inst_prefix_;
 };
 
-}  // namespace delta
+}

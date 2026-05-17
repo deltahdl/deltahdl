@@ -68,4 +68,4 @@ TEST(Coverage, AutoBinMaxControl) {
   EXPECT_EQ(cp->auto_bin_count, 8u);
 }
 
-}  // namespace
+}

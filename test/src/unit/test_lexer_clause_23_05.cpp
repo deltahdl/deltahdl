@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- Req 1: extern module token sequence ---
-
 TEST(ExternModuleLexing, ExternModuleTokenSequence) {
   auto tokens = Lex("extern module m");
   ASSERT_GE(tokens.size(), 3u);
@@ -24,4 +22,4 @@ TEST(ExternModuleLexing, ExternMacromoduleTokenSequence) {
   EXPECT_EQ(tokens[2].text, "m");
 }
 
-}  // namespace
+}

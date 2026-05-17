@@ -46,4 +46,4 @@ TEST(DpiRuntime, ContextFunctionFlag) {
   EXPECT_TRUE(found->is_context);
 }
 
-}  // namespace
+}

@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §15.5.5: Event declaration with initializer shares the Variable object.
 TEST(IpcSync, EventInitializerSharesVariable) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -28,7 +27,6 @@ TEST(IpcSync, EventInitializerSharesVariable) {
   EXPECT_EQ(v_done, v_done_too);
 }
 
-// §15.5.5: Imperative event assignment shares the Variable object.
 TEST(IpcSync, EventImperativeAssignmentSharesVariable) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -53,7 +51,6 @@ TEST(IpcSync, EventImperativeAssignmentSharesVariable) {
   EXPECT_EQ(va, vb);
 }
 
-// §15.5.5: Self-assignment of an event is harmless.
 TEST(IpcSync, EventSelfAssignment) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -76,7 +73,6 @@ TEST(IpcSync, EventSelfAssignment) {
   EXPECT_TRUE(v->is_event);
 }
 
-// §15.5.5: Event variables act as full-fledged variables with handle semantics.
 TEST(IpcSync, EventInitializerPreservesIsEventFlag) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -96,7 +92,6 @@ TEST(IpcSync, EventInitializerPreservesIsEventFlag) {
   EXPECT_TRUE(v->is_event);
 }
 
-// §15.5.5: Chained event assignment shares the same underlying variable.
 TEST(IpcSync, ChainedEventAssignmentSharesVariable) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -125,4 +120,4 @@ TEST(IpcSync, ChainedEventAssignmentSharesVariable) {
   EXPECT_EQ(vc, vb);
 }
 
-}  // namespace
+}

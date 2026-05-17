@@ -4,9 +4,6 @@ using namespace delta;
 
 namespace {
 
-// Distinct values confirm that the third delay — not the first or second —
-// becomes decay_ticks (the parent-clause test uses #(0,0,50), which cannot
-// catch a wrong-slot bug).
 TEST(ChargeDecaySpecElaboration, ThirdDelayFlowsToDecayTicks) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -27,9 +24,6 @@ TEST(ChargeDecaySpecElaboration, ThirdDelayFlowsToDecayTicks) {
   EXPECT_TRUE(found);
 }
 
-// A single delay is the common propagation delay, never the charge decay:
-// decay_ticks must stay at the ideal-storage default (0) even when the
-// value numerically matches a plausible decay.
 TEST(ChargeDecaySpecElaboration, SingleDelayDoesNotPopulateDecayTicks) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -50,8 +44,6 @@ TEST(ChargeDecaySpecElaboration, SingleDelayDoesNotPopulateDecayTicks) {
   EXPECT_TRUE(found);
 }
 
-// Pair with the parser-level parenthesized single-delay case: even via the
-// paren branch, a one-delay spec cannot produce a charge decay.
 TEST(ChargeDecaySpecElaboration, ParenthesizedSingleDelayDoesNotPopulateDecayTicks) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -72,8 +64,6 @@ TEST(ChargeDecaySpecElaboration, ParenthesizedSingleDelayDoesNotPopulateDecayTic
   EXPECT_TRUE(found);
 }
 
-// A two-delay form covers rise and fall only; without a third delay the
-// charge-decay slot is unspecified and decay_ticks stays ideal.
 TEST(ChargeDecaySpecElaboration, TwoDelaysDoNotPopulateDecayTicks) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -94,4 +84,4 @@ TEST(ChargeDecaySpecElaboration, TwoDelaysDoNotPopulateDecayTicks) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

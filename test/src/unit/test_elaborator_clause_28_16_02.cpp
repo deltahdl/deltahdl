@@ -24,9 +24,6 @@ TEST(ChargeDecayElaboration, NoDecaySpecMeansIdeal) {
   EXPECT_TRUE(found);
 }
 
-// §28.16.2 R3: the third delay shall specify the charge decay time. The
-// elaborator must propagate that literal third-delay value into the net's
-// decay_ticks so the simulator can use it as the decay process delay.
 TEST(ChargeDecayElaboration, ThirdDelayBecomesDecayTicks) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -47,4 +44,4 @@ TEST(ChargeDecayElaboration, ThirdDelayBecomesDecayTicks) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

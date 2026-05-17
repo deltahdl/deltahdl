@@ -23,8 +23,6 @@ static Expr* MakeAssocSelect(Arena& arena, std::string_view base_name,
 
 namespace {
 
-// --- Requirement 1: Assignment to nonexistent element allocates it ---
-
 TEST(AssocArrayAllocation, AssignToNonexistentIntKeyCreatesEntry) {
   SimFixture f;
   f.ctx.CreateAssocArray("aa", 32, false);
@@ -42,7 +40,6 @@ TEST(AssocArrayAllocation, AssignToNonexistentStringKeyCreatesEntry) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
 
-  // Write via direct map to verify the allocation mechanism.
   aa->str_data["newkey"] = MakeLogic4VecVal(f.arena, 32, 77);
 
   ASSERT_EQ(aa->str_data.count("newkey"), 1u);
@@ -95,8 +92,6 @@ TEST(AssocArrayAllocation, EndToEndAssignCreatesElement) {
       "result");
   EXPECT_EQ(v, 55u);
 }
-
-// --- Requirement 2: Read-modify-write allocates with default first ---
 
 TEST(AssocArrayAllocation, IncrementNonexistentUsesZeroDefault) {
   auto v = RunAndGet(
@@ -182,8 +177,6 @@ TEST(AssocArrayAllocation, CompoundAddAssignNonexistentUsesUserDefault) {
   EXPECT_EQ(v, 107u);
 }
 
-// --- Edge cases ---
-
 TEST(AssocArrayAllocation, IncrementThenReadSameKey) {
   auto v = RunAndGet(
       "module t;\n"
@@ -229,4 +222,4 @@ TEST(AssocArrayAllocation, StringKeyIncrementAllocates) {
   EXPECT_EQ(v, 1u);
 }
 
-}  // namespace
+}

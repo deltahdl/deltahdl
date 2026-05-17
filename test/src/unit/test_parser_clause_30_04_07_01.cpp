@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §30.4.7.1: absence of a + or - polarity operator on a parallel connection
-// records unknown polarity (stored as kNone).
 TEST(UnknownPolarityParsing, ParallelPathWithoutOperator) {
   auto r = Parse(
       "module m;\n"
@@ -22,7 +20,6 @@ TEST(UnknownPolarityParsing, ParallelPathWithoutOperator) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNone);
 }
 
-// §30.4.7.1: same rule applied to a full connection.
 TEST(UnknownPolarityParsing, FullPathWithoutOperator) {
   auto r = Parse(
       "module m;\n"
@@ -38,4 +35,4 @@ TEST(UnknownPolarityParsing, FullPathWithoutOperator) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNone);
 }
 
-}  // namespace
+}

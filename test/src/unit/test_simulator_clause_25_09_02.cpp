@@ -103,4 +103,4 @@ TEST(VirtualInterfaceModportClockingSim,
   EXPECT_EQ(observed->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- assert_property_statement errors ---
-
 TEST(ConcurrentAssertionParsing, ErrorAssertPropertyMissingSemicolon) {
   EXPECT_FALSE(
       ParseOk("module m;\n"
@@ -35,8 +33,6 @@ TEST(ConcurrentAssertionParsing, ErrorAssertPropertyMissingPropertyKw) {
               "endmodule\n"));
 }
 
-// --- assume_property_statement errors ---
-
 TEST(ConcurrentAssertionParsing, ErrorAssumePropertyMissingSemicolon) {
   EXPECT_FALSE(
       ParseOk("module m;\n"
@@ -50,8 +46,6 @@ TEST(ConcurrentAssertionParsing, ErrorAssumePropertyMissingCloseParen) {
               "  assume property (a |-> b;\n"
               "endmodule\n"));
 }
-
-// --- cover_property_statement errors ---
 
 TEST(ConcurrentAssertionParsing, ErrorCoverPropertyMissingSemicolon) {
   EXPECT_FALSE(
@@ -67,8 +61,6 @@ TEST(ConcurrentAssertionParsing, ErrorCoverPropertyMissingCloseParen) {
               "endmodule\n"));
 }
 
-// --- cover_sequence_statement errors ---
-
 TEST(ConcurrentAssertionParsing, ErrorCoverSequenceMissingSemicolon) {
   EXPECT_FALSE(
       ParseOk("module m;\n"
@@ -83,8 +75,6 @@ TEST(ConcurrentAssertionParsing, ErrorCoverSequenceMissingCloseParen) {
               "endmodule\n"));
 }
 
-// --- restrict_property_statement errors ---
-
 TEST(ConcurrentAssertionParsing, ErrorRestrictPropertyMissingSemicolon) {
   EXPECT_FALSE(
       ParseOk("module m;\n"
@@ -98,8 +88,6 @@ TEST(ConcurrentAssertionParsing, ErrorRestrictPropertyMissingCloseParen) {
               "  restrict property (a |-> b;\n"
               "endmodule\n"));
 }
-
-// --- property_declaration errors ---
 
 TEST(PropertyDeclParsing, ErrorMissingEndproperty) {
   EXPECT_FALSE(
@@ -146,8 +134,6 @@ TEST(PropertyDeclParsing, ErrorUnclosedPortList) {
               "endmodule\n"));
 }
 
-// --- sequence_declaration errors ---
-
 TEST(SequenceDeclParsing, ErrorMissingEndsequence) {
   EXPECT_FALSE(
       ParseOk("module m;\n"
@@ -192,8 +178,6 @@ TEST(SequenceDeclParsing, ErrorUnclosedPortList) {
               "  endsequence\n"
               "endmodule\n"));
 }
-
-// --- Edge cases: empty bodies, minimal constructs ---
 
 TEST(PropertyDeclParsing, MinimalPropertyDecl) {
   EXPECT_TRUE(
@@ -243,8 +227,6 @@ TEST(ConcurrentAssertionParsing, MinimalRestrictProperty) {
               "  restrict property (a);\n"
               "endmodule\n"));
 }
-
-// --- Multiple declarations ---
 
 TEST(PropertyDeclParsing, MultiplePropertyDecls) {
   auto r = Parse(
@@ -299,8 +281,6 @@ TEST(ConcurrentAssertionParsing, AllFiveAssertionTypes) {
             nullptr);
 }
 
-// --- Assertion in procedural context ---
-
 TEST(ConcurrentAssertionParsing, ErrorAssertPropertyInInitialBlock) {
   auto r = Parse(
       "module m;\n"
@@ -308,12 +288,9 @@ TEST(ConcurrentAssertionParsing, ErrorAssertPropertyInInitialBlock) {
       "    assert property (a |-> b);\n"
       "  end\n"
       "endmodule\n");
-  // assert property in initial block may be rejected or accepted
-  // depending on parser — just verify no crash
+
   ASSERT_NE(r.cu, nullptr);
 }
-
-// --- Concurrent assertion with action blocks ---
 
 TEST(ConcurrentAssertionParsing, AssertPropertyWithElseActionBlock) {
   EXPECT_TRUE(
@@ -333,4 +310,4 @@ TEST(ConcurrentAssertionParsing, AssertPropertyWithPassActionOnly) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -151,4 +151,4 @@ TEST(BuiltinMethodParsing, MethodNoParensInBinaryExpr) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

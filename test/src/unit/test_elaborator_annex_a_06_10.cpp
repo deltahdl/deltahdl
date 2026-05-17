@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- Simple immediate assertion elaboration ---
-
 TEST(AssertionStatementElaboration, AssertWithPassAndFail) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -113,8 +111,6 @@ TEST(AssertionStatementElaboration, AssertWithBeginEndActions) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Deferred assertion elaboration ---
-
 TEST(AssertionStatementElaboration, DeferredAssertElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -171,4 +167,4 @@ TEST(AssertionStatementElaboration, ModuleLevelDeferredAssertElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

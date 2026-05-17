@@ -23,4 +23,4 @@ TEST(AssertionSemanticsParsing, PropertyIfElse) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kPropertyDecl));
 }
 
-}  // namespace
+}

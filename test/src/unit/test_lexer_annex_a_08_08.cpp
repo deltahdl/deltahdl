@@ -136,4 +136,4 @@ TEST(StringLiteralLexing, QuotedStringNewlineTerminatesError) {
   EXPECT_TRUE(LexHasErrors("\"before\nafter\""));
 }
 
-}  // namespace
+}

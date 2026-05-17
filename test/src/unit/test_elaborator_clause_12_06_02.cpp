@@ -38,4 +38,4 @@ TEST(IfMatchesElaboration, IfMatchesWithGuardElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

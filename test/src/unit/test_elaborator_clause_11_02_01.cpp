@@ -122,4 +122,4 @@ TEST(ConstEvalReal, DivisionByZeroReturnsNullopt) {
   EXPECT_FALSE(val.has_value());
 }
 
-}  // namespace
+}

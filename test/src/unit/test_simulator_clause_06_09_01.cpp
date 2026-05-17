@@ -19,7 +19,7 @@ TEST(VectorSpecification, Modulo2nWrap) {
 
   auto* var = f.ctx.FindVariable("v");
   ASSERT_NE(var, nullptr);
-  // 5'b10001 = 17, modulo 2^4 = 1.
+
   EXPECT_EQ(var->value.ToUint64() & 0xF, 1u);
 }
 
@@ -37,7 +37,7 @@ TEST(VectorSpecification, OverflowAdditionWraps) {
 
   auto* var = f.ctx.FindVariable("v");
   ASSERT_NE(var, nullptr);
-  // 15 + 1 = 16, modulo 2^4 = 0.
+
   EXPECT_EQ(var->value.ToUint64() & 0xF, 0u);
 }
 
@@ -58,4 +58,4 @@ TEST(VectorSpecification, MaxValueFitsInVector) {
   EXPECT_EQ(var->value.ToUint64() & 0xFF, 255u);
 }
 
-}  // namespace
+}

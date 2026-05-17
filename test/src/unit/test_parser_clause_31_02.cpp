@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Exercises the specify-block dispatch: the overview grammar permits any mix
-// of system_timing_check forms within a single specify block.
 TEST(SystemTimingCheckParsing, MultipleTimingChecksInSpecifyBlock) {
   auto r = Parse(
       "module m(input d, clk, rst);\n"
@@ -30,8 +28,6 @@ TEST(SystemTimingCheckParsing, MultipleTimingChecksInSpecifyBlock) {
             TimingCheckKind::kRecovery);
 }
 
-// A timing-check name used outside a specify block must be diagnosed; the
-// leading $ is historical, not a signal that they behave like system tasks.
 TEST(SystemTimingCheckParsing, TimingCheckRejectedInAlwaysBlock) {
   auto r = Parse(
       "module m(input d, clk);\n"
@@ -48,7 +44,6 @@ TEST(SystemTimingCheckParsing, TimingCheckRejectedInInitialBlock) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Every one of the twelve timing-check names is banned from procedural code.
 TEST(SystemTimingCheckParsing, EveryTimingCheckRejectedInProceduralCode) {
   const char* names[] = {"$setup",    "$hold",     "$setuphold", "$recovery",
                          "$removal",  "$recrem",   "$skew",      "$timeskew",
@@ -62,8 +57,6 @@ TEST(SystemTimingCheckParsing, EveryTimingCheckRejectedInProceduralCode) {
   }
 }
 
-// Only timing checks may appear at a specify-block item position; any other
-// $identifier is a system task and shall not occur there.
 TEST(SystemTimingCheckParsing, SystemTaskRejectedInSpecifyBlock) {
   auto r = Parse(
       "module m;\n"
@@ -84,4 +77,4 @@ TEST(SystemTimingCheckParsing, FinishRejectedInSpecifyBlock) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

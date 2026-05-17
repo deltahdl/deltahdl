@@ -1,6 +1,4 @@
-// §A.2.2.1: lexer-stage coverage of the keyword terminals named in
-// integer_atom_type, integer_vector_type, non_integer_type, net_type,
-// signing, and struct_union.
+
 
 #include <gtest/gtest.h>
 
@@ -10,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §A.2.2.1 integer_atom_type ::= byte | shortint | int | longint | integer |
-// time — each terminal lexes to its own keyword kind.
 TEST(NetAndVariableTypeLexing, ByteKeyword) {
   auto tokens = Lex("byte");
   ASSERT_GE(tokens.size(), 1u);
@@ -48,7 +44,6 @@ TEST(NetAndVariableTypeLexing, TimeKeyword) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwTime);
 }
 
-// §A.2.2.1 integer_vector_type ::= bit | logic | reg
 TEST(NetAndVariableTypeLexing, BitKeyword) {
   auto tokens = Lex("bit");
   ASSERT_GE(tokens.size(), 1u);
@@ -67,7 +62,6 @@ TEST(NetAndVariableTypeLexing, RegKeyword) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwReg);
 }
 
-// §A.2.2.1 non_integer_type ::= shortreal | real | realtime
 TEST(NetAndVariableTypeLexing, ShortrealKeyword) {
   auto tokens = Lex("shortreal");
   ASSERT_GE(tokens.size(), 1u);
@@ -86,8 +80,6 @@ TEST(NetAndVariableTypeLexing, RealtimeKeyword) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwRealtime);
 }
 
-// §A.2.2.1 net_type ::= supply0 | supply1 | tri | triand | trior | trireg |
-// tri0 | tri1 | uwire | wire | wand | wor — each terminal is a distinct token.
 TEST(NetAndVariableTypeLexing, SupplyZeroNetKeyword) {
   auto tokens = Lex("supply0");
   ASSERT_GE(tokens.size(), 1u);
@@ -160,7 +152,6 @@ TEST(NetAndVariableTypeLexing, WorKeyword) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwWor);
 }
 
-// §A.2.2.1 signing ::= signed | unsigned
 TEST(NetAndVariableTypeLexing, SignedKeyword) {
   auto tokens = Lex("signed");
   ASSERT_GE(tokens.size(), 1u);
@@ -173,7 +164,6 @@ TEST(NetAndVariableTypeLexing, UnsignedKeyword) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwUnsigned);
 }
 
-// §A.2.2.1 struct_union ::= struct | union [ soft | tagged ]
 TEST(NetAndVariableTypeLexing, StructKeyword) {
   auto tokens = Lex("struct");
   ASSERT_GE(tokens.size(), 1u);
@@ -198,7 +188,6 @@ TEST(NetAndVariableTypeLexing, SoftKeyword) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwSoft);
 }
 
-// §A.2.2.1 data_type ::= ... | string | chandle | event | void | ...
 TEST(NetAndVariableTypeLexing, StringKeyword) {
   auto tokens = Lex("string");
   ASSERT_GE(tokens.size(), 1u);
@@ -223,20 +212,16 @@ TEST(NetAndVariableTypeLexing, VoidKeyword) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwVoid);
 }
 
-// §A.2.2.1 var_data_type ::= data_type | var data_type_or_implicit — the `var`
-// terminal is a distinct keyword token.
 TEST(NetAndVariableTypeLexing, VarKeyword) {
   auto tokens = Lex("var");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwVar);
 }
 
-// §A.2.2.1 data_type ::= ... | type_reference — the `type` keyword that opens
-// a type_reference is a distinct token from any identifier.
 TEST(NetAndVariableTypeLexing, TypeKeyword) {
   auto tokens = Lex("type");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwType);
 }
 
-}  // namespace
+}

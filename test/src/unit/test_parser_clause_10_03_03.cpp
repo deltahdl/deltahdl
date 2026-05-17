@@ -146,4 +146,4 @@ TEST(ContAssignDelayParsing, VectorNetDeclWithDelay) {
   EXPECT_EQ(item->net_delay_fall->int_val, 10u);
 }
 
-}  // namespace
+}

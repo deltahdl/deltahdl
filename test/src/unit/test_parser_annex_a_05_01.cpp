@@ -371,4 +371,4 @@ TEST(UdpDeclGrammar, AttributeOnExternUdp) {
   EXPECT_EQ(r.cu->udps[0]->name, "inv");
 }
 
-}  // namespace
+}

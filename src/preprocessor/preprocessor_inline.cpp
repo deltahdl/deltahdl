@@ -7,7 +7,6 @@
 
 namespace delta {
 
-// §22.5.1: Validate that all required macro args are provided.
 bool Preprocessor::ValidateMacroArgCount(const MacroDef& def,
                                          std::string_view args_text,
                                          SourceLoc loc, std::string_view name) {
@@ -53,7 +52,6 @@ bool Preprocessor::TryPredefinedMacro(std::string_view name,
   return false;
 }
 
-// Extract the macro name from the text after the backtick.
 static std::string_view ExtractMacroName(std::string_view macro_name) {
   if (!macro_name.empty() && macro_name[0] == '\\') {
     auto ws = macro_name.find_first_of(" \t");
@@ -65,7 +63,6 @@ static std::string_view ExtractMacroName(std::string_view macro_name) {
                                                : macro_name;
 }
 
-// Check whether the given macro name is currently being expanded (recursion).
 bool Preprocessor::IsRecursiveExpansion(std::string_view name,
                                         SourceLoc loc) const {
   for (const auto& expanding : expansion_stack_) {
@@ -78,7 +75,6 @@ bool Preprocessor::IsRecursiveExpansion(std::string_view name,
   return false;
 }
 
-// Expand a function-like macro invocation. Returns false if extraction fails.
 bool Preprocessor::ExpandFunctionLikeMacro(const MacroDef& def,
                                            std::string_view macro_name,
                                            SourceLoc loc, std::string& expanded,
@@ -157,8 +153,6 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
   return ExpandUserDefinedMacro(name, macro_name, output, loc, depth);
 }
 
-// Find the next backtick outside a string literal, starting at pos.
-// Returns npos if not found.  Updates in_string tracking.
 static size_t FindNextBacktick(std::string_view line, size_t pos,
                                bool& in_string) {
   for (size_t i = pos; i < line.size(); ++i) {
@@ -170,8 +164,6 @@ static size_t FindNextBacktick(std::string_view line, size_t pos,
   return std::string_view::npos;
 }
 
-// Parse the macro name starting just past the backtick. Returns the end
-// position of the name within `line`. If no valid name, returns name_start.
 static size_t ParseInlineMacroName(std::string_view line, size_t name_start) {
   size_t i = name_start;
   if (i < line.size() && line[i] == '\\') {
@@ -185,8 +177,6 @@ static size_t ParseInlineMacroName(std::string_view line, size_t name_start) {
   return i;
 }
 
-// Try to expand a predefined macro (__FILE__ or __LINE__) inline.
-// Returns true if the name matched a predefined macro.
 bool Preprocessor::TryExpandInlinePredefined(std::string_view name,
                                              uint32_t file_id,
                                              uint32_t line_num,
@@ -212,8 +202,6 @@ bool Preprocessor::TryExpandInlinePredefined(std::string_view name,
   return false;
 }
 
-// Handle a function-like macro during inline expansion.
-// Returns the updated scan position, or 0 on failure (caller appends literal).
 size_t Preprocessor::ExpandInlineFunctionMacro(const MacroDef& def,
                                                std::string_view line,
                                                size_t name_end, SourceLoc loc,
@@ -232,10 +220,6 @@ size_t Preprocessor::ExpandInlineFunctionMacro(const MacroDef& def,
   return advance;
 }
 
-// Expand a single inline macro at position `pos` (pointing at the backtick).
-// Appends expansion to `result` and returns the position after the macro.
-// If the backtick is not a valid macro, appends the literal text and returns
-// the position just past the backtick.
 size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
                                              uint32_t file_id,
                                              uint32_t line_num,
@@ -277,8 +261,6 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
   return i;
 }
 
-// §22.6: Find a `ifdef or `ifndef that is followed by a matching `endif
-// on the same line. Returns npos if none found.
 static bool MatchesDirective(std::string_view text, std::string_view dir) {
   if (text.size() < 1 + dir.size()) return false;
   if (text[0] != '`') return false;
@@ -288,8 +270,6 @@ static bool MatchesDirective(std::string_view text, std::string_view dir) {
   return true;
 }
 
-// Search for a matching `endif at the same nesting depth, starting from
-// the given offset past the directive keyword.
 static bool HasMatchingEndif(std::string_view line, size_t search_start) {
   int depth = 1;
   for (size_t j = search_start; j < line.size(); ++j) {
@@ -319,15 +299,12 @@ static size_t FindInlineConditional(std::string_view line) {
   return std::string_view::npos;
 }
 
-// Skip leading whitespace and return the position of the first non-space char.
 static size_t SkipWhitespace(const std::string& s, size_t pos) {
   while (pos < s.size() && std::isspace(static_cast<unsigned char>(s[pos])))
     ++pos;
   return pos;
 }
 
-// Parse a parenthesized expression, returning the position after the closing
-// ')'. If unmatched, returns result.size().
 static size_t ParseParenthesizedCondition(const std::string& result,
                                           size_t start) {
   int pdepth = 0;
@@ -341,8 +318,6 @@ static size_t ParseParenthesizedCondition(const std::string& result,
   return result.size();
 }
 
-// Parse the condition after `ifdef/`ifndef. Returns the end position of
-// the condition text. Sets has_expr to true if the condition is parenthesized.
 static size_t ParseInlineCondition(const std::string& result, size_t cond_start,
                                    bool& has_expr) {
   has_expr = (cond_start < result.size() && result[cond_start] == '(');
@@ -352,7 +327,6 @@ static size_t ParseInlineCondition(const std::string& result, size_t cond_start,
   return cond_end;
 }
 
-// Locate `else and `endif at nesting depth 0 within the inline conditional.
 struct InlineCondBounds {
   size_t else_pos;
   size_t endif_pos;
@@ -381,8 +355,6 @@ static InlineCondBounds FindElseAndEndif(const std::string& result,
   return {else_pos, endif_pos};
 }
 
-// Select the replacement text from an inline conditional based on the
-// condition result and the positions of `else/`endif.
 static std::string SelectConditionalBlock(const std::string& result,
                                           bool cond_result, size_t cond_end,
                                           size_t else_pos, size_t endif_pos) {
@@ -396,7 +368,6 @@ static std::string SelectConditionalBlock(const std::string& result,
   return {};
 }
 
-// §22.6: Process inline `ifdef/`ifndef...`else...`endif within a line.
 std::string Preprocessor::ExpandInlineConditionals(std::string_view line) {
   std::string result(line);
 
@@ -443,7 +414,7 @@ std::string Preprocessor::ExpandInlineMacros(std::string_view line,
   std::string result;
   result.reserve(line.size());
   size_t copied = 0;
-  in_string = false;  // reset for second pass
+  in_string = false;
 
   while (true) {
     size_t bt = FindNextBacktick(line, copied, in_string);
@@ -460,14 +431,10 @@ bool Preprocessor::IsActive() const {
                      [](const CondState& s) { return s.active; });
 }
 
-// §3.2 + §22.3: Track design element nesting for resetall validation.
-// A design element is a module, program, interface, checker, package,
-// primitive, or configuration.
-// Extract the identifier following "module " or "macromodule " for §22.10.
 static std::string_view ExtractModuleName(std::string_view trimmed,
                                           std::string_view keyword) {
   auto rest = trimmed.substr(keyword.size());
-  // Skip optional "automatic" keyword.
+
   if (rest.starts_with("automatic ")) rest = rest.substr(10);
   while (!rest.empty() && (rest[0] == ' ' || rest[0] == '\t'))
     rest.remove_prefix(1);
@@ -483,7 +450,7 @@ void Preprocessor::TrackDesignElement(std::string_view trimmed) {
       trimmed.starts_with("interface ") || trimmed.starts_with("checker ") ||
       trimmed.starts_with("package ") || trimmed.starts_with("primitive ") ||
       trimmed.starts_with("config ") || trimmed.starts_with("macromodule ")) {
-    // §22.10: Record module names defined inside `celldefine.
+
     if (in_celldefine_) {
       if (trimmed.starts_with("module ")) {
         auto name = ExtractModuleName(trimmed, "module ");
@@ -495,8 +462,7 @@ void Preprocessor::TrackDesignElement(std::string_view trimmed) {
     }
     ++design_element_depth_;
   }
-  // Also check for end keywords anywhere in the line (handles single-line
-  // declarations like "module m; endmodule").
+
   if (trimmed.find("endmodule") != std::string_view::npos ||
       trimmed.find("endprogram") != std::string_view::npos ||
       trimmed.find("endinterface") != std::string_view::npos ||
@@ -508,8 +474,6 @@ void Preprocessor::TrackDesignElement(std::string_view trimmed) {
   }
 }
 
-// Skip past a block comment starting at body[i] == '/', body[i+1] == '*'.
-// Advances i to the position after the closing "*/".
 static void SkipBlockComment(std::string_view body, size_t& i) {
   i += 2;
   while (i + 1 < body.size() && (body[i] != '*' || body[i + 1] != '/')) {
@@ -518,9 +482,6 @@ static void SkipBlockComment(std::string_view body, size_t& i) {
   if (i + 1 < body.size()) i += 2;
 }
 
-// Process a single character in the macro body for comment stripping.
-// Returns true if the character was handled (caller should continue).
-// Returns false if the main loop should break (line comment found).
 static bool ProcessMacroBodyChar(std::string_view body, size_t& i,
                                  bool& in_string, std::string& result) {
   if (body[i] == '"' && (i == 0 || body[i - 1] != '\\')) {
@@ -551,10 +512,6 @@ static bool ProcessMacroBodyChar(std::string_view body, size_t& i,
   return true;
 }
 
-// §22.5.1: Strip comments from macro body text.
-// Line comments (// ...) are removed entirely.
-// Block comments (/* ... */) are removed entirely.
-// Comments inside string literals or `" regions are preserved.
 static std::string StripMacroBodyComments(std::string_view body) {
   std::string result;
   result.reserve(body.size());
@@ -564,7 +521,7 @@ static std::string StripMacroBodyComments(std::string_view body) {
   while (i < body.size()) {
     if (!ProcessMacroBodyChar(body, i, in_string, result)) break;
   }
-  // Trim trailing whitespace left after comment removal.
+
   while (!result.empty() &&
          std::isspace(static_cast<unsigned char>(result.back()))) {
     result.pop_back();
@@ -572,8 +529,6 @@ static std::string StripMacroBodyComments(std::string_view body) {
   return result;
 }
 
-// Parse the macro name from a `define directive. Returns the end position
-// of the name and sets `escaped` if the name uses an escaped identifier.
 static size_t ParseDefineName(std::string_view rest, bool& escaped) {
   size_t name_end = 0;
   escaped = false;
@@ -631,7 +586,7 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
   macros_.Define(std::move(def));
 }
 
-void Preprocessor::HandleUndef(std::string_view rest, SourceLoc /*loc*/) {
+void Preprocessor::HandleUndef(std::string_view rest, SourceLoc ) {
   if (!IsActive()) return;
   auto name = Trim(rest);
   macros_.Undefine(name);
@@ -673,8 +628,6 @@ void Preprocessor::HandleEndif() {
   }
 }
 
-// Strip the quote delimiters from an include filename. Returns the stripped
-// filename via `fn` and any text after the closing delimiter via `after_close`.
 static void StripIncludeQuotes(std::string_view& fn,
                                std::string_view& after_close) {
   after_close = {};
@@ -690,7 +643,6 @@ static void StripIncludeQuotes(std::string_view& fn,
   }
 }
 
-// Validate that only whitespace or a comment follows the include filename.
 static void ValidateIncludeTrailing(std::string_view after_close,
                                     DiagEngine& diag, SourceLoc loc) {
   if (after_close.empty()) return;
@@ -700,7 +652,6 @@ static void ValidateIncludeTrailing(std::string_view after_close,
   diag.Error(loc, "only whitespace or a comment may follow `include filename");
 }
 
-// Resolve and read the include file. Appends the processed content to output.
 void Preprocessor::ResolveAndReadInclude(std::string_view fn, SourceLoc loc,
                                          int depth, std::string& output,
                                          bool angle_bracket) {
@@ -755,7 +706,4 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
   ResolveAndReadInclude(fn, loc, depth, output, angle_bracket);
 }
 
-// Ifdef evaluator and macro helpers in preprocessor_macros.cpp.
-// Directive handlers in preprocessor_directives.cpp.
-
-}  // namespace delta
+}

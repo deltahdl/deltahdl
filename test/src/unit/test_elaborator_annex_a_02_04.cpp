@@ -17,8 +17,6 @@ TEST(DeclarationAssignmentElaboration, NetDeclAssignmentWithUnpackedDims) {
   EXPECT_EQ(mod->nets.size(), 1u);
 }
 
-// --- param_assignment ---
-
 TEST(DeclarationAssignmentElaboration, ParamAssignmentResolvesConstant) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -46,8 +44,6 @@ TEST(DeclarationAssignmentElaboration, ParamAssignmentNoDefaultInPort) {
       "module m; child #(.P(10)) c(); endmodule\n"));
 }
 
-// --- type_assignment ---
-
 TEST(DeclarationAssignmentElaboration, TypeAssignmentRegistersType) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -63,8 +59,6 @@ TEST(DeclarationAssignmentElaboration, TypeAssignmentNoDefaultInPort) {
       "endmodule\n"
       "module m; child c(); endmodule\n"));
 }
-
-// --- variable_decl_assignment ---
 
 TEST(DeclarationAssignmentElaboration, VarDeclAssignmentPreservesInit) {
   ElabFixture f;
@@ -122,4 +116,4 @@ TEST(DeclarationAssignmentElaboration, VarDeclAssignmentClassVariable) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -167,4 +167,4 @@ TEST(InterfaceDefinitions, NestedInterfaceNotImplicitlyInstantiated) {
   EXPECT_TRUE(outer->children.empty());
 }
 
-}  // namespace
+}

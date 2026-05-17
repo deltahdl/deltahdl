@@ -5,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1: A port declared as input (output) but used as output (input) or inout
-//     may be coerced to inout ---
-
 TEST(PortCoercionElaboration, InputPortDrivenInternallyDoesNotError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -54,8 +51,6 @@ TEST(PortCoercionElaboration, InputPortUsedAsInoutDoesNotError) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- R2: If not coerced to inout, a warning shall be issued ---
 
 TEST(PortCoercionElaboration, InputPortDrivenInternallyWarns) {
   ElabFixture f;
@@ -107,8 +102,6 @@ TEST(PortCoercionElaboration, InputPortUsedAsInoutWarns) {
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-// --- Negative cases: correct usage produces no coercion warning ---
-
 TEST(PortCoercionElaboration, CorrectDirectionsNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -142,4 +135,4 @@ TEST(PortCoercionElaboration, InoutPortNeedsNoCoercion) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-}  // namespace
+}

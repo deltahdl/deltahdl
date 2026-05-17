@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- Req 1: A module can be declared within another module ---
-
 TEST(NestedModuleParsing, NestedModuleDeclaration) {
   auto r = ParseWithPreprocessor(
       "module outer;\n"
@@ -54,8 +52,6 @@ TEST(NestedModuleParsing, NestedInterfaceDeclaration) {
   EXPECT_EQ(nested->name, "inner_ifc");
 }
 
-// --- Req 4/5: Port presence distinguishes implicit instantiation ---
-
 TEST(NestedModuleParsing, NestedModuleWithPortsAstStructure) {
   auto r = ParseWithPreprocessor(
       "module outer;\n"
@@ -86,8 +82,6 @@ TEST(NestedModuleParsing, NestedModulePortlessAstStructure) {
   EXPECT_TRUE(nested->ports.empty());
 }
 
-// --- Macro expansion inside nested modules ---
-
 TEST(NestedModuleParsing, MacroInsideNestedModule) {
   auto r = ParseWithPreprocessor(
       "`define VAL 1'b1\n"
@@ -103,4 +97,4 @@ TEST(NestedModuleParsing, MacroInsideNestedModule) {
             ModuleItemKind::kNestedModuleDecl);
 }
 
-}  // namespace
+}

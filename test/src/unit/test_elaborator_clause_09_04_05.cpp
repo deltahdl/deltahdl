@@ -1,4 +1,4 @@
-// §9.4.5
+
 
 #include "helpers_scheduler.h"
 
@@ -401,4 +401,4 @@ TEST(IntraAssignTimingSimulation, RepeatCountEvaluatedOnce) {
   EXPECT_EQ(a->value.ToUint64(), 33u);
 }
 
-}  // namespace
+}

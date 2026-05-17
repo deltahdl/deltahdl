@@ -85,4 +85,4 @@ TEST(CompiledSim, CompileReturnsValidForCombinational) {
   EXPECT_EQ(compiled.Id(), 42u);
 }
 
-}  // namespace
+}

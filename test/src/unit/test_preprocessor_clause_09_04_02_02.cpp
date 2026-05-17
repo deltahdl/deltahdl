@@ -82,4 +82,4 @@ TEST(ImplicitEventPreprocessor, IfdefAroundAtStarBody) {
   EXPECT_EQ(result.find("a | b"), std::string::npos);
 }
 
-}  // namespace
+}

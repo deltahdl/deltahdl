@@ -4,9 +4,6 @@ using namespace delta;
 
 namespace {
 
-// Dotted names share the same lexical form regardless of whether they are
-// member selects or hierarchical names.
-
 TEST(DottedNameLexing, TwoComponentDottedName) {
   auto tokens = Lex("a.b");
   ASSERT_GE(tokens.size(), 4u);
@@ -40,4 +37,4 @@ TEST(DottedNameLexing, DottedNameTokensIdenticalForMemberSelectAndHierarchical) 
   EXPECT_EQ(member_tokens[2].kind, hier_tokens[2].kind);
 }
 
-}  // namespace
+}

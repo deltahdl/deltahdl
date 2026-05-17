@@ -98,4 +98,4 @@ TEST(InterfaceClassPartialImplementationSim,
       "endmodule\n", "result"), 7u);
 }
 
-}  // namespace
+}

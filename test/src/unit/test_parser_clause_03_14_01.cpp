@@ -85,4 +85,4 @@ TEST(DesignBuildingBlockParsing, ExactIntegerPassThrough) {
   EXPECT_EQ(RealDelayToTicks(3.0, ts, TimeUnit::kPs), 3000u);
 }
 
-}  // namespace
+}

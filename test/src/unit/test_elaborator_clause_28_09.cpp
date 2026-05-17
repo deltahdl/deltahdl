@@ -1,4 +1,4 @@
-// §28.9
+
 
 #include "fixture_elaborator.h"
 
@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// A single cmos instance lowers to exactly one continuous assign driving the
-// output from the ternary (ncontrol ? data : (pcontrol ? 'z : data)).
 TEST(CmosSwitchElaboration, CmosEmitsSingleContinuousAssign) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -36,8 +34,6 @@ TEST(CmosSwitchElaboration, RcmosEmitsSingleContinuousAssign) {
   EXPECT_EQ(design->top_modules[0]->assigns.size(), 1u);
 }
 
-// The first terminal is the driven data output; pinning the LHS identifier
-// guards against a reshuffling that would drive the wrong net.
 TEST(CmosSwitchElaboration, CmosOutputIsFirstTerminal) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -54,8 +50,6 @@ TEST(CmosSwitchElaboration, CmosOutputIsFirstTerminal) {
   EXPECT_EQ(mod->assigns[0].lhs->text, "out");
 }
 
-// cmos collapses to the nmos+pmos pair: when ncontrol asserts, data wins;
-// otherwise pcontrol selects between high-Z and data.
 TEST(CmosSwitchElaboration, CmosLowersToNestedTernary) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -88,8 +82,6 @@ TEST(CmosSwitchElaboration, CmosLowersToNestedTernary) {
   EXPECT_EQ(rhs->false_expr->false_expr->text, "data");
 }
 
-// rcmos must lower to the same ternary shape as cmos; strength attenuation
-// is modelled elsewhere and must not leak into the RHS structure.
 TEST(CmosSwitchElaboration, RcmosLowersToNestedTernary) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -113,4 +105,4 @@ TEST(CmosSwitchElaboration, RcmosLowersToNestedTernary) {
   EXPECT_EQ(rhs->false_expr->condition->text, "pctrl");
 }
 
-}  // namespace
+}

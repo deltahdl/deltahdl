@@ -8,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2: "Synchronization can also be based on the direction of an
-// implicit event's change, that is, toward the value 1 (posedge) or
-// toward the value 0 (negedge)..." A posedge-edge_identifier event
-// control marks the process as edge-sensitive; synthesizing
-// always_ff @(posedge clk) shall produce sequential storage (latches).
 TEST(EventControlSynthesis, PosedgeEdgeIdentifierProducesLatches) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -28,9 +23,6 @@ TEST(EventControlSynthesis, PosedgeEdgeIdentifierProducesLatches) {
   EXPECT_FALSE(aig->latches.empty());
 }
 
-// §9.4.2: A negedge edge_identifier is symmetric to posedge — a
-// transition toward value 0 — and shall likewise lower to sequential
-// storage.
 TEST(EventControlSynthesis, NegedgeEdgeIdentifierProducesLatches) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -46,10 +38,6 @@ TEST(EventControlSynthesis, NegedgeEdgeIdentifierProducesLatches) {
   EXPECT_FALSE(aig->latches.empty());
 }
 
-// §9.4.2: "An edge event indicates a change toward either 1 or 0... An
-// edge shall be detected whenever negedge or posedge is detected." The
-// `edge` edge_identifier therefore also denotes an edge-triggered
-// always_ff and shall lower to sequential storage.
 TEST(EventControlSynthesis, EdgeEdgeIdentifierProducesLatches) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -65,10 +53,6 @@ TEST(EventControlSynthesis, EdgeEdgeIdentifierProducesLatches) {
   EXPECT_FALSE(aig->latches.empty());
 }
 
-// §9.4.2: An OR-separated event_expression list combining posedge and
-// negedge edge_identifiers (the classic clk-or-async-reset shape) shall
-// synthesize: each edge_identifier marks an edge source, the body is
-// sequential.
 TEST(EventControlSynthesis, OrEdgeIdentifierListProducesLatches) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -86,12 +70,6 @@ TEST(EventControlSynthesis, OrEdgeIdentifierListProducesLatches) {
   EXPECT_FALSE(aig->latches.empty());
 }
 
-// §9.4.2: The non-edge implicit-event form ("a non-edge implicit event
-// shall be detected on any change in the value of the expression") with
-// every read identifier in the event_expression denotes a level-sensitive
-// combinational process — the same shape always @(*) infers. With every
-// dependency listed by name, the synthesizer shall produce combinational
-// logic, not sequential storage.
 TEST(EventControlSynthesis, NonEdgeEventExpressionIsCombinational) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -106,4 +84,4 @@ TEST(EventControlSynthesis, NonEdgeEventExpressionIsCombinational) {
   EXPECT_TRUE(aig->latches.empty());
 }
 
-}  // namespace
+}

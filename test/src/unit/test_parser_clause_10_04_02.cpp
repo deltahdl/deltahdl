@@ -310,7 +310,6 @@ TEST(NonblockingAssignParsing, SwapPattern) {
   EXPECT_EQ(s1->rhs->text, "a");
 }
 
-
 TEST(NonblockingAssignParsing, IdentifierLhsAndRhs) {
   auto r = Parse(
       "module m;\n"
@@ -521,4 +520,4 @@ TEST(NonblockingAssignParsing, DisambiguationBothInSameBlock) {
   EXPECT_EQ(s1->rhs->op, TokenKind::kLtEq);
 }
 
-}  // namespace
+}

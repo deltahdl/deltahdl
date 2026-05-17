@@ -134,7 +134,6 @@ TEST(StructAssignmentParsing, StructMemberDefaultInit) {
   EXPECT_NE(item->typedef_type.struct_members[2].init_expr, nullptr);
 }
 
-// §7.2.2: Default member value can be a constant expression, not just a literal.
 TEST(StructAssignmentParsing, StructMemberExpressionDefault) {
   auto r = Parse(
       "module t;\n"
@@ -154,4 +153,4 @@ TEST(StructAssignmentParsing, StructMemberExpressionDefault) {
   EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
 }
 
-}  // namespace
+}

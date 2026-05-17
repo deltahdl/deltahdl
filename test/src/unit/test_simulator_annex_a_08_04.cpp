@@ -90,7 +90,6 @@ TEST(PrimarySim, PrimaryParenthesizedExpr) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// §A.8.4: bit_select simulates correctly
 TEST(PrimarySim, BitSelectSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -112,7 +111,6 @@ TEST(PrimarySim, BitSelectSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §A.8.4: primary_literal — sized integer simulates
 TEST(PrimarySim, SizedIntegerLiteralSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -130,7 +128,6 @@ TEST(PrimarySim, SizedIntegerLiteralSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
-// §A.8.4: null primary simulates
 TEST(PrimarySim, NullSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -148,10 +145,6 @@ TEST(PrimarySim, NullSimulates) {
   f.scheduler.Run();
 }
 
-// §A.8.4 constant_primary ::= [ package_scope | class_scope ] enum_identifier
-// — the simulator must read the package-scoped enum member's constant value at
-// runtime.  Combines A.8.4 (primary slot), A.9.3 (package_scope,
-// enum_identifier) and A.2.2.1 (enum data_type).
 TEST(PrimarySim, PackageScopedEnumIdentifierSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -173,7 +166,6 @@ TEST(PrimarySim, PackageScopedEnumIdentifierSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §A.8.4: concatenation with range simulates
 TEST(PrimarySim, ConcatenationWithRangeSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -191,4 +183,4 @@ TEST(PrimarySim, ConcatenationWithRangeSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 0x5u);
 }
 
-}  // namespace
+}

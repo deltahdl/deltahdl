@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §A.9.4: white_space ::= space | tab | newline | formfeed | eof
-
 TEST(WhiteSpaceLexing, SpaceIsWhitespace) {
   auto tokens = Lex("a b");
   ASSERT_EQ(tokens.size(), 3u);
@@ -36,9 +34,6 @@ TEST(WhiteSpaceLexing, FormfeedIsWhitespace) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-// Bare end-of-file (no preceding explicit whitespace) must terminate the
-// preceding token just as the other whitespace characters do — the operational
-// meaning of EOF being a member of the white_space category.
 TEST(WhiteSpaceLexing, EndOfFileIsWhitespaceTerminator) {
   auto tokens = Lex("abc");
   ASSERT_EQ(tokens.size(), 2u);
@@ -47,13 +42,10 @@ TEST(WhiteSpaceLexing, EndOfFileIsWhitespaceTerminator) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
 }
 
-// Degenerate form of the eof alternative: with no preceding characters, the
-// lexer's first call must still recognise EOF as white_space and produce the
-// EOF token rather than e.g. looping or erroring.
 TEST(WhiteSpaceLexing, EmptyInputProducesOnlyEofToken) {
   auto tokens = Lex("");
   ASSERT_EQ(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-}  // namespace
+}

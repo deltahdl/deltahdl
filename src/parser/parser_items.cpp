@@ -58,8 +58,8 @@ bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
       return true;
     }
     if (is_disable) {
-      Consume();  // default
-      Consume();  // disable
+      Consume();
+      Consume();
       Expect(TokenKind::kKwIff);
       auto* item = arena_.Create<ModuleItem>();
       item->kind = ModuleItemKind::kDefaultDisableIff;
@@ -84,7 +84,7 @@ bool Parser::TryParseProcessBlock(std::vector<ModuleItem*>& items) {
   }
   auto ak = TokenToAlwaysKind(CurrentToken().kind);
   if (ak) {
-    if (InProgramBlock())  // §3.4
+    if (InProgramBlock())
       diag_.Error(CurrentLoc(), "always procedures not allowed in programs");
     items.push_back(ParseAlwaysBlock(*ak));
     return true;
@@ -126,9 +126,9 @@ bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
     bool forkjoin = Match(TokenKind::kKwForkjoin);
     ModuleItem* item = nullptr;
     if (forkjoin || Check(TokenKind::kKwTask)) {
-      item = ParseTaskDecl(/*prototype_only=*/true);
+      item = ParseTaskDecl( true);
     } else {
-      item = ParseFunctionDecl(/*prototype_only=*/true);
+      item = ParseFunctionDecl( true);
     }
     item->is_extern = true;
     item->is_forkjoin = forkjoin;
@@ -362,9 +362,7 @@ void Parser::ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,
   bool is_automatic = Match(TokenKind::kKwAutomatic);
   bool is_static = !is_automatic && Match(TokenKind::kKwStatic);
   bool is_rand = Match(TokenKind::kKwRand);
-  // §6.8 footnote 14b enforcement leans on this flag downstream: once a
-  // lifetime keyword has been consumed, the construct can only be a
-  // data_declaration, so omitting both the data_type and `var` is illegal.
+
   ParseTypedItemOrInst(items, is_automatic || is_static);
   for (size_t i = before; i < items.size(); ++i) {
     if (is_rand) items[i]->is_rand = true;
@@ -401,10 +399,7 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
     ParseVarPrefixed(items);
     return;
   }
-  // §6.8 footnote 18: when a type_reference is used in a variable declaration,
-  // it shall be preceded by the var keyword. Diagnose the bare form here, then
-  // recover by parsing the declaration so downstream stages still see a
-  // well-formed AST.
+
   if (Check(TokenKind::kKwType)) {
     diag_.Error(CurrentLoc(),
                 "type_reference in a variable declaration must be preceded "
@@ -417,7 +412,7 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
     return;
   }
   if (IsAtGateKeyword()) {
-    if (InProgramBlock())  // §3.4
+    if (InProgramBlock())
       diag_.Error(CurrentLoc(), "primitive instances not allowed in programs");
     ParseGateInst(items);
     return;
@@ -440,10 +435,7 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
     ParseVarDeclList(items, dtype);
     return;
   }
-  // §6.8 footnote 14b: a lifetime keyword unambiguously selects the
-  // data_declaration grammar production. Reaching this fall-through with no
-  // var keyword and no explicit data_type means the user wrote something
-  // like `static x = 0;` at module-item scope — illegal per the footnote.
+
   if (had_lifetime) {
     diag_.Error(CurrentLoc(),
                 "data_declaration without an explicit data type requires "
@@ -488,7 +480,7 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
     return;
   }
   if (known_udps_.count(name_tok.text) != 0) {
-    if (InProgramBlock())  // §3.4
+    if (InProgramBlock())
       diag_.Error(name_tok.loc, "primitive instances not allowed in programs");
     ParseUdpInstList(name_tok, items);
     return;
@@ -510,4 +502,4 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
   items.push_back(item);
 }
 
-}  // namespace delta
+}

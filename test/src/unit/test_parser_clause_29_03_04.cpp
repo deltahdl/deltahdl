@@ -22,8 +22,6 @@ TEST(UdpStateTable, UnspecifiedInputCombinationDefaultsToX) {
   EXPECT_EQ(state.Evaluate({'1', '0'}), 'x');
 }
 
-// The state table must open with the `table` keyword; a UDP body that places
-// rows directly after the port list is not a valid state table.
 TEST(UdpStateTable, MissingTableKeywordRejected) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -34,8 +32,6 @@ TEST(UdpStateTable, MissingTableKeywordRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// The state table must be closed with `endtable`; running to end-of-file with
-// no `endtable` is not a complete state table.
 TEST(UdpStateTable, MissingEndtableKeywordRejected) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -45,8 +41,6 @@ TEST(UdpStateTable, MissingEndtableKeywordRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Every row must end with a semicolon; running the next row's tokens straight
-// after the output symbol is a malformed row.
 TEST(UdpStateTable, RowMissingSemicolonRejected) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -58,8 +52,6 @@ TEST(UdpStateTable, RowMissingSemicolonRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Input field position i in a row corresponds to the i-th port identifier in
-// the UDP header port list.
 TEST(UdpStateTable, InputFieldOrderFollowsHeaderPortList) {
   auto r = Parse(
       "primitive gate(output y, input a, input b, input c);\n"
@@ -82,9 +74,6 @@ TEST(UdpStateTable, InputFieldOrderFollowsHeaderPortList) {
   EXPECT_EQ(udp->table[0].inputs[2], '0');
 }
 
-// A combinational row carries one input field per input port plus a single
-// output field separated from the inputs by a colon, with no current-state
-// field.
 TEST(UdpStateTable, CombinationalRowHasInputsAndOutputOnly) {
   auto r = Parse(
       "primitive and2(output y, input a, input b);\n"
@@ -104,8 +93,6 @@ TEST(UdpStateTable, CombinationalRowHasInputsAndOutputOnly) {
   EXPECT_EQ(udp->table[1].output, '1');
 }
 
-// A sequential row carries an additional current-state field between the
-// inputs and the next-state output, delimited by colons on both sides.
 TEST(UdpStateTable, SequentialRowHasInputsCurrentStateAndOutput) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -126,8 +113,6 @@ TEST(UdpStateTable, SequentialRowHasInputsCurrentStateAndOutput) {
   EXPECT_EQ(udp->table[1].output, '1');
 }
 
-// When every input field of a row is the literal x, the output field must also
-// be x; specifying 0 instead is illegal.
 TEST(UdpStateTable, AllXInputsWithZeroOutputRejected) {
   auto r = Parse(
       "primitive p(output y, input a, input b);\n"
@@ -138,8 +123,6 @@ TEST(UdpStateTable, AllXInputsWithZeroOutputRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// The all-x constraint applies even to a single-input UDP: x input with a 1
-// output is illegal.
 TEST(UdpStateTable, AllXInputsWithOneOutputRejected) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -150,8 +133,6 @@ TEST(UdpStateTable, AllXInputsWithOneOutputRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// An all-x input row with an x output is the legal way to express this case
-// explicitly.
 TEST(UdpStateTable, AllXInputsWithXOutputAccepted) {
   auto r = Parse(
       "primitive p(output y, input a, input b);\n"
@@ -165,8 +146,6 @@ TEST(UdpStateTable, AllXInputsWithXOutputAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Two rows with the same input combination but different outputs describe
-// conflicting behavior for one input vector.
 TEST(UdpStateTable, DuplicateInputsWithDifferentOutputsRejected) {
   auto r = Parse(
       "primitive bad(output y, input a, input b);\n"
@@ -178,8 +157,6 @@ TEST(UdpStateTable, DuplicateInputsWithDifferentOutputsRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Sequential rows with the same inputs and current state but different
-// next-state outputs are likewise conflicting.
 TEST(UdpStateTable, SequentialDuplicateInputsWithDifferentOutputsRejected) {
   auto r = Parse(
       "primitive bad(output reg q, input d, input en);\n"
@@ -191,8 +168,6 @@ TEST(UdpStateTable, SequentialDuplicateInputsWithDifferentOutputsRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// Two rows with identical inputs AND identical outputs are redundant but not
-// conflicting; the LRM's rule targets differing outputs.
 TEST(UdpStateTable, IdenticalDuplicateRowsNotFlagged) {
   auto r = Parse(
       "primitive p(output y, input a, input b);\n"
@@ -206,4 +181,4 @@ TEST(UdpStateTable, IdenticalDuplicateRowsNotFlagged) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

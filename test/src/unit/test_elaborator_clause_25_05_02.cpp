@@ -72,4 +72,4 @@ TEST(InterfaceModportInstantiation, WrongInterfaceTypeWithModportSelectorErrors)
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

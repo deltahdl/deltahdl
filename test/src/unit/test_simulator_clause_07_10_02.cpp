@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- §7.10.2 dispatch framework tests ---
-
 TEST(QueueMethodDispatch, EvalReturnsFalseForNonQueueVariable) {
   SimFixture f;
   MakeVar(f, "x", 32, 42);
@@ -55,4 +53,4 @@ TEST(QueueMethodDispatch, PropertyReturnsFalseForUnknownProperty) {
   EXPECT_FALSE(TryEvalQueueProperty("q", "nonexistent", f.ctx, f.arena, out));
 }
 
-}  // namespace
+}

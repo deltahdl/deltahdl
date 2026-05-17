@@ -181,4 +181,4 @@ TEST(RandcaseSyntaxParsing, RandcaseWeightExpressionsStored) {
   EXPECT_NE(stmt->randcase_items[1].second, nullptr);
 }
 
-}  // namespace
+}

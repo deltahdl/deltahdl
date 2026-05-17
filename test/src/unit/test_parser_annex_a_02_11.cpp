@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- covergroup_declaration ---
-
 TEST(CovergroupDeclParsing, CovergroupDecl_Basic) {
   auto r = Parse(
       "module m;\n"
@@ -150,8 +148,6 @@ TEST(CovergroupDeclParsing, CovergroupDecl_FormalSyntax) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- coverage_event ---
-
 TEST(CovergroupDeclParsing, CoverageEvent_ClockingEvent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -222,8 +218,6 @@ TEST(CovergroupDeclParsing, CoverGroup_SampleFunctionASTVerification) {
   EXPECT_EQ(item->name, "sampled_cg");
 }
 
-// --- block_event_expression, hierarchical_btf_identifier ---
-
 TEST(CovergroupDeclParsing, CoverageEvent_BlockEventBegin) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -286,8 +280,6 @@ TEST(CovergroupDeclParsing, HierarchicalBtfIdentifier_Dotted) {
               "  endgroup\n"
               "endmodule\n"));
 }
-
-// --- coverage_spec_or_option, coverage_option ---
 
 TEST(CovergroupDeclParsing, CoverageSpecOrOption_CoverSpec) {
   EXPECT_TRUE(
@@ -367,8 +359,6 @@ TEST(CovergroupDeclParsing, BinsSelectionOrOption_CoverageOption) {
               "  endgroup\n"
               "endmodule\n"));
 }
-
-// --- cover_point, bins_or_empty ---
 
 TEST(CovergroupDeclParsing, CoverageSpec_CoverPoint) {
   EXPECT_TRUE(
@@ -475,8 +465,6 @@ TEST(CovergroupDeclParsing, BinsOrEmpty_WithBraces) {
               "  endgroup\n"
               "endmodule\n"));
 }
-
-// --- bins_or_options, bins_keyword ---
 
 TEST(CovergroupDeclParsing, BinsKeyword_Bins) {
   EXPECT_TRUE(
@@ -677,8 +665,6 @@ TEST(CovergroupDeclParsing, CoverGroup_WildcardIllegalIgnore) {
               "endmodule\n"));
 }
 
-// --- covergroup_range_list, covergroup_value_range, covergroup_expression ---
-
 TEST(CovergroupDeclParsing, CovergroupRangeList_Single) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -801,8 +787,6 @@ TEST(CovergroupDeclParsing, CoverGroup_ValueRangesInBins) {
               "  endgroup\n"
               "endmodule\n"));
 }
-
-// --- trans_list, trans_set, trans_range_list, repeat_range ---
 
 TEST(CovergroupDeclParsing, TransList_Single) {
   EXPECT_TRUE(
@@ -951,8 +935,6 @@ TEST(CovergroupDeclParsing, CoverGroup_TransitionBins) {
               "  endgroup\n"
               "endmodule\n"));
 }
-
-// --- cover_cross, cross_body ---
 
 TEST(CovergroupDeclParsing, CoverageSpec_CoverCross) {
   EXPECT_TRUE(
@@ -1119,8 +1101,6 @@ TEST(CovergroupDeclParsing, CrossSetExpression) {
               "  endgroup\n"
               "endmodule\n"));
 }
-
-// --- bins_selection, select_expression, select_condition, bins_expression ---
 
 TEST(CovergroupDeclParsing, CrossBodyItem_BinsSelection) {
   EXPECT_TRUE(
@@ -1307,8 +1287,6 @@ TEST(CovergroupDeclParsing, CoverGroup_CrossWithBinsSelection) {
               "endmodule\n"));
 }
 
-// --- Comprehensive integration ---
-
 TEST(CovergroupDeclParsing, FullCovergroup_MultipleElements) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -1350,8 +1328,6 @@ TEST(CovergroupDeclParsing, CoverGroup_PortsWithBody) {
               "  endgroup\n"
               "endmodule\n"));
 }
-
-// --- covergroup_declaration errors ---
 
 TEST(CovergroupDeclParsing, ErrorMissingEndgroup) {
   EXPECT_FALSE(
@@ -1395,8 +1371,6 @@ TEST(CovergroupDeclParsing, ErrorUnclosedPortList) {
               "endmodule\n"));
 }
 
-// --- cover_point errors ---
-
 TEST(CovergroupDeclParsing, ErrorCoverPointMissingSemicolon) {
   EXPECT_FALSE(
       ParseOk("module m;\n"
@@ -1415,8 +1389,6 @@ TEST(CovergroupDeclParsing, ErrorCoverPointUnclosedBinsBlock) {
               "  endgroup\n"
               "endmodule\n"));
 }
-
-// --- cover_cross errors ---
 
 TEST(CovergroupDeclParsing, ErrorCrossUnclosedBody) {
   EXPECT_FALSE(
@@ -1441,8 +1413,6 @@ TEST(CovergroupDeclParsing, ErrorCrossMissingSemicolon) {
               "endmodule\n"));
 }
 
-// --- bins_or_options errors ---
-
 TEST(CovergroupDeclParsing, ErrorBinsMissingSemicolon) {
   EXPECT_FALSE(
       ParseOk("module m;\n"
@@ -1465,8 +1435,6 @@ TEST(CovergroupDeclParsing, ErrorBinsMissingEquals) {
               "endmodule\n"));
 }
 
-// --- select_expression errors ---
-
 TEST(CovergroupDeclParsing, ErrorBinsofMissingCloseParen) {
   EXPECT_FALSE(
       ParseOk("module m;\n"
@@ -1479,8 +1447,6 @@ TEST(CovergroupDeclParsing, ErrorBinsofMissingCloseParen) {
               "  endgroup\n"
               "endmodule\n"));
 }
-
-// --- Edge cases: minimal and empty constructs ---
 
 TEST(CovergroupDeclParsing, MinimalCovergroupDecl) {
   EXPECT_TRUE(
@@ -1497,8 +1463,6 @@ TEST(CovergroupDeclParsing, EmptyCovergroupDeclInClass) {
               "  endgroup\n"
               "endclass\n"));
 }
-
-// --- Multiple covergroup declarations ---
 
 TEST(CovergroupDeclParsing, MultipleCovergroupDecls) {
   auto r = Parse(
@@ -1518,8 +1482,6 @@ TEST(CovergroupDeclParsing, MultipleCovergroupDecls) {
       CountItemsByKind(r.cu->modules[0]->items, ModuleItemKind::kCovergroupDecl),
       3u);
 }
-
-// --- Covergroup with all spec types combined ---
 
 TEST(CovergroupDeclParsing, CovergroupWithAllSpecTypes) {
   EXPECT_TRUE(
@@ -1543,8 +1505,6 @@ TEST(CovergroupDeclParsing, CovergroupWithAllSpecTypes) {
               "  endgroup\n"
               "endmodule\n"));
 }
-
-// --- coverage_event validation ---
 
 TEST(CovergroupDeclParsing, ErrorWithFunctionWrongName) {
   EXPECT_FALSE(
@@ -1578,4 +1538,4 @@ TEST(CovergroupDeclParsing, BlockEventHierarchicalPath) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

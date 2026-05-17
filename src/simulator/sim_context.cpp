@@ -17,10 +17,7 @@ Variable* SimContext::FindVariable(std::string_view name) {
   if (local) return local;
   std::string prefix;
   if (current_process_) prefix = current_process_->inst_prefix;
-  // §23.6: Current module scope first — prefix + name resolves a name declared
-  // in the enclosing module before checking top-level globals with the same
-  // bare name (required by §23.8 shadowing when multiple enclosing modules
-  // declare items with the same identifier).
+
   if (!prefix.empty()) {
     std::string prefixed = prefix + std::string(name);
     auto it = variables_.find(prefixed);
@@ -28,11 +25,7 @@ Variable* SimContext::FindVariable(std::string_view name) {
   }
   auto it = variables_.find(name);
   if (it != variables_.end()) return it->second;
-  // §23.8: Upward walk. At each ancestor prefix try:
-  //   (a) module_identifier.item_name — ancestor's module type matches the
-  //       head of `name`; resolve the remainder beneath the ancestor.
-  //   (b) scope_name.item_name — the ancestor contains a scope named head;
-  //       resolve head.rest beneath the ancestor.
+
   auto dot = name.find('.');
   if (dot == std::string_view::npos) return nullptr;
   std::string_view head = name.substr(0, dot);
@@ -65,7 +58,7 @@ Variable* SimContext::FindVariable(std::string_view name) {
 Variable* SimContext::CreateVariable(std::string_view name, uint32_t width) {
   auto* var = arena_.Create<Variable>();
   var->value = MakeLogic4Vec(arena_, width);
-  // Initialize to X (bval=all-ones) per IEEE 1800-2023 §6.3.
+
   for (uint32_t i = 0; i < var->value.nwords; ++i) {
     var->value.words[i].bval = ~uint64_t{0};
   }
@@ -99,10 +92,9 @@ Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
   auto* var = CreateVariable(name, width);
   if (is_signed) var->is_signed = true;
   if (is_user_nettype) {
-    // §6.7.3: User-defined nettype defaults to data type default (x for logic).
-    // CreateVariable already initializes to x, so nothing more needed.
+
   } else {
-    // Initialize net value to z (aval=all-ones, bval=all-ones) per IEEE §6.5.
+
     for (uint32_t i = 0; i < var->value.nwords; ++i) {
       var->value.words[i].aval = ~uint64_t{0};
       var->value.words[i].bval = ~uint64_t{0};
@@ -273,9 +265,6 @@ const std::vector<Process*>& SimContext::FindNamedScopeProcesses(
   return (it != named_scope_map_.end()) ? it->second : kEmptyNamedScopeList;
 }
 
-// §24.3: When a program's main initial thread completes, kill its spawned
-// descendants.  When all program initials across the design have completed,
-// implicitly request $finish.
 static void KillDescendants(Process* proc) {
   for (auto* child : proc->children) {
     child->active = false;
@@ -392,8 +381,6 @@ const EnumTypeInfo* SimContext::GetVariableEnumType(
   return FindEnumType(it->second);
 }
 
-// --- §7.2: Struct type management ---
-
 void SimContext::RegisterStructType(std::string_view name,
                                     const StructTypeInfo& info) {
   struct_types_[name] = info;
@@ -416,8 +403,6 @@ const StructTypeInfo* SimContext::GetVariableStructType(
   return FindStructType(it->second);
 }
 
-// --- §20.6.2: Type width registry ---
-
 void SimContext::RegisterTypeWidth(std::string_view name, uint32_t width) {
   type_widths_[name] = width;
 }
@@ -426,8 +411,6 @@ uint32_t SimContext::FindTypeWidth(std::string_view name) const {
   auto it = type_widths_.find(name);
   return (it != type_widths_.end()) ? it->second : 0;
 }
-
-// --- §23.8: Instance-path → module-type registry ---
 
 void SimContext::RegisterInstanceType(std::string_view prefix,
                                       std::string_view type) {
@@ -439,8 +422,6 @@ std::string_view SimContext::FindInstanceType(std::string_view prefix) const {
   return (it != instance_types_.end()) ? std::string_view(it->second)
                                        : std::string_view{};
 }
-
-// --- §7.4/§7.5/§7.10: Array metadata ---
 
 void SimContext::RegisterArray(std::string_view name, const ArrayInfo& info) {
   array_infos_[name] = info;
@@ -455,8 +436,6 @@ const ArrayInfo* SimContext::FindArrayInfo(std::string_view name) const {
   auto it = array_infos_.find(name);
   return (it != array_infos_.end()) ? &it->second : nullptr;
 }
-
-// --- §7.10: Queue management ---
 
 void QueueObject::AssignFreshIds() {
   element_ids.resize(elements.size());
@@ -476,8 +455,6 @@ QueueObject* SimContext::FindQueue(std::string_view name) {
   auto it = queues_.find(name);
   return (it != queues_.end()) ? it->second : nullptr;
 }
-
-// --- §7.8: Associative array management ---
 
 uint32_t AssocArrayObject::Size() const {
   return static_cast<uint32_t>(is_string_key ? str_data.size()
@@ -504,8 +481,6 @@ AssocArrayObject* SimContext::FindAssocArray(std::string_view name) {
   auto it = assoc_arrays_.find(name);
   return (it != assoc_arrays_.end()) ? it->second : nullptr;
 }
-
-// --- §7.3.2: Tagged union tag management ---
 
 void SimContext::SetVariableTag(std::string_view var_name,
                                 std::string_view tag) {
@@ -565,13 +540,13 @@ MailboxObject* SimContext::FindMailbox(std::string_view name) {
 
 void SimContext::SetEventTriggered(std::string_view name) {
   event_triggered_[name] = scheduler_.CurrentTime().ticks;
-  // §15.5.5.1: Store on the Variable so merged aliases share triggered state.
+
   auto* var = FindVariable(name);
   if (var) var->triggered_ticks = scheduler_.CurrentTime().ticks;
 }
 
 bool SimContext::IsEventTriggered(std::string_view name) const {
-  // §15.5.5.1: Check the Variable first so merged events share triggered state.
+
   auto vit = variables_.find(name);
   if (vit != variables_.end())
     return vit->second->triggered_ticks == scheduler_.CurrentTime().ticks;
@@ -579,8 +554,6 @@ bool SimContext::IsEventTriggered(std::string_view name) const {
   if (it == event_triggered_.end()) return false;
   return it->second == scheduler_.CurrentTime().ticks;
 }
-
-// --- §8: Class type and object management ---
 
 void SimContext::RegisterClassType(std::string_view name, ClassTypeInfo* info) {
   class_types_[name] = info;
@@ -652,7 +625,7 @@ Reachability SimContext::GetReachability(uint64_t handle) const {
   auto it = class_objects_.find(handle);
   if (it == class_objects_.end()) return Reachability::kUnreachable;
   if (it->second->ref_count > 0) return Reachability::kStronglyReachable;
-  // §8.30.1: Object is weakly reachable if any weak reference points to it.
+
   for (const auto* wr : weak_references_) {
     if (wr->referent_handle == handle) return Reachability::kWeaklyReachable;
   }
@@ -662,7 +635,6 @@ Reachability SimContext::GetReachability(uint64_t handle) const {
 void SimContext::CollectGarbage() {
   if (class_objects_.empty()) return;
 
-  // Phase 1: Mark handles directly referenced by live variables.
   std::unordered_set<uint64_t> live;
 
   auto scan_var = [&](std::string_view name, Variable* var) {
@@ -683,13 +655,11 @@ void SimContext::CollectGarbage() {
     for (const auto& [name, var] : frame) scan_var(name, var);
   }
 
-  // Objects on the this_stack_ are strongly reachable.
   std::unordered_set<ClassObject*> this_live;
   for (auto* obj : this_stack_) {
     if (obj) this_live.insert(obj);
   }
 
-  // Phase 2: Transitively mark handles in properties of live objects.
   std::vector<uint64_t> worklist(live.begin(), live.end());
   while (!worklist.empty()) {
     uint64_t h = worklist.back();
@@ -706,7 +676,6 @@ void SimContext::CollectGarbage() {
     }
   }
 
-  // Phase 3: Clear weak references to unreachable objects atomically.
   for (auto* wr : weak_references_) {
     if (wr->referent_handle != kNullClassHandle &&
         !live.count(wr->referent_handle)) {
@@ -714,7 +683,6 @@ void SimContext::CollectGarbage() {
     }
   }
 
-  // Phase 4: Sweep — deallocate unreachable objects.
   for (auto it = class_objects_.begin(); it != class_objects_.end();) {
     if (!live.count(it->first) && !this_live.count(it->second)) {
       it->second->ref_count = 0;
@@ -758,8 +726,6 @@ ClassObject* SimContext::CurrentThis() const {
   return this_stack_.empty() ? nullptr : this_stack_.back();
 }
 
-// §9.7: Process handle registry for fine-grain process control.
-
 uint64_t SimContext::RegisterProcessHandle(Process* proc) {
   for (auto& [id, p] : process_handles_) {
     if (p == proc) return id;
@@ -774,12 +740,10 @@ Process* SimContext::FindProcessByHandle(uint64_t handle) const {
   return it != process_handles_.end() ? it->second : nullptr;
 }
 
-// §12.4.2.1: Deferred violation reports.
-
 void SimContext::AddPendingViolation(std::string msg) {
   if (current_process_) {
     current_process_->pending_violations.push_back(std::move(msg));
-    // Schedule Observed region event to mature violations.
+
     auto* ev = scheduler_.GetEventPool().Acquire();
     Process* proc = current_process_;
     ev->callback = [this, proc]() {
@@ -809,4 +773,4 @@ void SimContext::MaturePendingViolations() {
   }
 }
 
-}  // namespace delta
+}

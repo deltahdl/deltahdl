@@ -119,4 +119,4 @@ TEST(ParameterizedScopeResolutionElaboration, ExplicitDefaultIsNotError) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- Error conditions ---
-
 TEST(SpecifyPathParsing, ErrorPathDeclMissingSemicolon) {
   auto r = Parse(
       "module m;\n"
@@ -48,4 +46,4 @@ TEST(SpecifyPathParsing, ErrorPathDeclMissingOpenParen) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

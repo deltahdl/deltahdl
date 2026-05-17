@@ -63,4 +63,4 @@ TEST(DpiParsing, DpiExportTaskForSystf) {
   EXPECT_TRUE(items[0]->dpi_is_task);
 }
 
-}  // namespace
+}

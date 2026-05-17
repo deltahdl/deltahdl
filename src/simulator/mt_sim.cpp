@@ -28,11 +28,7 @@ bool WritesConflictWith(const std::vector<std::string_view>& writes,
   return false;
 }
 
-}  // namespace
-
-// =============================================================================
-// Partitioner
-// =============================================================================
+}
 
 void Partitioner::AddDependency(const SignalDep& dep) { deps_.push_back(dep); }
 
@@ -81,10 +77,6 @@ bool Partitioner::HasConflict(const SignalDep& a, const SignalDep& b) const {
   return false;
 }
 
-// =============================================================================
-// MtScheduler
-// =============================================================================
-
 MtScheduler::MtScheduler(uint32_t num_threads) : num_threads_(num_threads) {}
 
 void MtScheduler::SetPartitions(std::vector<SimPartition> partitions) {
@@ -117,14 +109,13 @@ void MtScheduler::RunTimestep(SimContext& ctx,
     return;
   }
 
-  // Multi-threaded: launch one thread per partition.
   std::vector<std::jthread> threads;
   threads.reserve(partitions_.size());
   for (const auto& part : partitions_) {
     threads.emplace_back(
         [&execute_partition, &part]() { execute_partition(part); });
   }
-  // jthreads auto-join on destruction.
+
 }
 
-}  // namespace delta
+}

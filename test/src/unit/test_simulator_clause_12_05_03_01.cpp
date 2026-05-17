@@ -214,4 +214,4 @@ TEST(CaseViolationDeferralSim, DeferredPriorityCasexNoMatchReported) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-}  // namespace
+}

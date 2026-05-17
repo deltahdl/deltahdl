@@ -179,4 +179,4 @@ TEST(ClassSim, IsAReturnsFalseForUnrelatedType) {
   EXPECT_FALSE(b->IsA(a));
 }
 
-}  // namespace
+}

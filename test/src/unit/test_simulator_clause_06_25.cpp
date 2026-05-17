@@ -71,4 +71,4 @@ TEST(ParameterizedTypeSim, DistinctSpecializationsHoldIndependentValues) {
   EXPECT_EQ(v_wide->value.width, 16u);
 }
 
-}  // namespace
+}

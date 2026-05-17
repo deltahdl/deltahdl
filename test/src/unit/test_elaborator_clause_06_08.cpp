@@ -85,7 +85,6 @@ TEST(VarDecl, MultipleVarsInOneStatement) {
   EXPECT_EQ(mod->variables[2].name, "t.c");
 }
 
-// §6.8: `var` with omitted data type elaborates as logic (4-state).
 TEST(VarDecl, VarImplicitElaboratesAsLogic) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -100,9 +99,6 @@ TEST(VarDecl, VarImplicitElaboratesAsLogic) {
   EXPECT_TRUE(mod->variables[0].is_4state);
 }
 
-// §6.8 footnote 14: a data_declaration that is not within a procedural
-// context shall not use the automatic keyword. Package items are
-// non-procedural, so an automatic variable inside a package is illegal.
 TEST(VarDecl, AutomaticInPackageIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -113,8 +109,6 @@ TEST(VarDecl, AutomaticInPackageIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §6.8 footnote 14: a static variable inside a package is allowed —
-// the rule only forbids the automatic keyword in non-procedural contexts.
 TEST(VarDecl, StaticInPackageOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -126,9 +120,6 @@ TEST(VarDecl, StaticInPackageOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.8 footnote 14: positive counterpart — the automatic keyword is permitted
-// when the data_declaration sits inside a procedural context. An initial
-// block is procedural, so the elaborator must accept the form unchanged.
 TEST(VarDecl, AutomaticInProceduralBlockOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -138,9 +129,6 @@ TEST(VarDecl, AutomaticInProceduralBlockOk) {
              "endmodule\n"));
 }
 
-// §6.8 footnote 17: applying a packed dimension to a struct type is
-// only legal when the struct is also marked packed; the elaborator
-// must reject the unpacked-struct + packed-dim combination.
 TEST(VarDecl, StructPackedDimWithoutPackedKeywordIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -151,8 +139,6 @@ TEST(VarDecl, StructPackedDimWithoutPackedKeywordIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §6.8 footnote 17: same rule for union — a packed dimension on an
-// unpacked union is illegal.
 TEST(VarDecl, UnionPackedDimWithoutPackedKeywordIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -163,9 +149,6 @@ TEST(VarDecl, UnionPackedDimWithoutPackedKeywordIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §6.8 footnote 17: a packed struct accepts a packed dimension; this
-// is the legal counterpart to the negative test above and confirms the
-// rule fires only when the packed keyword is missing.
 TEST(VarDecl, PackedStructWithPackedDimOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -177,8 +160,6 @@ TEST(VarDecl, PackedStructWithPackedDimOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.8 footnote 17: same legal counterpart for union — once the packed
-// keyword is present, applying a packed dimension is allowed.
 TEST(VarDecl, PackedUnionWithPackedDimOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -190,9 +171,6 @@ TEST(VarDecl, PackedUnionWithPackedDimOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.8 footnote 18: when a type_reference is used in a net declaration it
-// must be preceded by a net type keyword. Confirm at the elaborator stage
-// that the legal form `wire type(x) y;` survives elaboration.
 TEST(VarDecl, TypeRefInNetDeclWithWireOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -201,8 +179,6 @@ TEST(VarDecl, TypeRefInNetDeclWithWireOk) {
              "endmodule\n"));
 }
 
-// §6.8 footnote 18: the variable-declaration counterpart — `var type(x) y;`
-// elaborates cleanly because the var keyword satisfies the rule.
 TEST(VarDecl, TypeRefInVarDeclWithVarOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -211,11 +187,6 @@ TEST(VarDecl, TypeRefInVarDeclWithVarOk) {
              "endmodule\n"));
 }
 
-// §6.8 example: `var byte my_byte;` is "equivalent to" the bare form
-// `byte my_byte;`. Elaborating both side-by-side must produce variables
-// with matching width, signedness, and 4-state classification — the var
-// prefix may not change any observable property when the data_type is
-// already explicit.
 TEST(VarDecl, VarBytePrefixEquivalentToBareByte) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -233,9 +204,6 @@ TEST(VarDecl, VarBytePrefixEquivalentToBareByte) {
   EXPECT_EQ(mod->variables[0].is_4state, mod->variables[1].is_4state);
 }
 
-// §6.8 example: `var [15:0] vw;` is "equivalent to" `var logic [15:0] vw;`.
-// With only a range supplied, the implicit data type is logic, so both
-// forms must produce identical 16-bit 4-state variables.
 TEST(VarDecl, VarRangeOnlyEquivalentToVarLogic) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -254,4 +222,4 @@ TEST(VarDecl, VarRangeOnlyEquivalentToVarLogic) {
   EXPECT_EQ(mod->variables[0].is_signed, mod->variables[1].is_signed);
 }
 
-}  // namespace
+}

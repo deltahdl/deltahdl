@@ -311,4 +311,4 @@ TEST(Preprocessor, DirectivesStrippedFromOutput) {
   EXPECT_EQ(out.find("default_decay_time"), std::string::npos);
 }
 
-}  // namespace
+}

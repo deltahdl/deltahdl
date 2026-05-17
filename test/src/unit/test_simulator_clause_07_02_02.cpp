@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.2.2: Default member values applied when no explicit init.
 TEST(StructAssignmentSimulation, DefaultMemberValues_Applied) {
   auto v = RunAndGet(
       "module t;\n"
@@ -19,7 +18,6 @@ TEST(StructAssignmentSimulation, DefaultMemberValues_Applied) {
   EXPECT_EQ(v, 42u);
 }
 
-// §7.2.2: Members without defaults get type-appropriate zero.
 TEST(StructAssignmentSimulation, PartialDefaults_UnsetMembersZero) {
   auto v = RunAndGet(
       "module t;\n"
@@ -34,7 +32,6 @@ TEST(StructAssignmentSimulation, PartialDefaults_UnsetMembersZero) {
   EXPECT_EQ(v, 0u);
 }
 
-// §7.2.2: Explicit init suppresses typedef defaults.
 TEST(StructAssignmentSimulation, ExplicitInit_SuppressesDefaults) {
   auto v = RunAndGet(
       "module t;\n"
@@ -49,7 +46,6 @@ TEST(StructAssignmentSimulation, ExplicitInit_SuppressesDefaults) {
   EXPECT_EQ(v, 1u);
 }
 
-// §7.2.2: Whole struct assignment copies all members.
 TEST(StructAssignmentSimulation, WholeStructAssignment_CopiesAllMembers) {
   auto v = RunAndGet(
       "module t;\n"
@@ -66,7 +62,6 @@ TEST(StructAssignmentSimulation, WholeStructAssignment_CopiesAllMembers) {
   EXPECT_EQ(v, 10u);
 }
 
-// §7.2.2: Whole struct assignment copies second member too.
 TEST(StructAssignmentSimulation, WholeStructAssignment_SecondMember) {
   auto v = RunAndGet(
       "module t;\n"
@@ -83,9 +78,6 @@ TEST(StructAssignmentSimulation, WholeStructAssignment_SecondMember) {
   EXPECT_EQ(v, 20u);
 }
 
-// §7.2.2: "A structure can be assigned as a whole and passed to or from a
-// subroutine as a whole." Passing a struct as a task input and reading a
-// member through the formal exercises the whole-struct pass-in path.
 TEST(StructAssignmentSimulation, StructPassedToTaskAsWhole_InputArg) {
   auto v = RunAndGet(
       "module t;\n"
@@ -104,9 +96,6 @@ TEST(StructAssignmentSimulation, StructPassedToTaskAsWhole_InputArg) {
   EXPECT_EQ(v, 42u);
 }
 
-// §7.2.2: Counterpart — "passed ... from a subroutine as a whole". A task
-// returns a struct value through an output argument and the caller reads
-// a member of the returned struct.
 TEST(StructAssignmentSimulation, StructReturnedFromTaskAsWhole_OutputArg) {
   auto v = RunAndGet(
       "module t;\n"
@@ -125,7 +114,6 @@ TEST(StructAssignmentSimulation, StructReturnedFromTaskAsWhole_OutputArg) {
   EXPECT_EQ(v, 99u);
 }
 
-// §7.2.2: Multiple members with different default values.
 TEST(StructAssignmentSimulation, MultipleDefaults_AllApplied) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -143,4 +131,4 @@ TEST(StructAssignmentSimulation, MultipleDefaults_AllApplied) {
   LowerRunAndCheck(f, design, {{"ra", 10}, {"rb", 20}, {"rc", 30}});
 }
 
-}  // namespace
+}

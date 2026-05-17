@@ -97,4 +97,4 @@ TEST(UdpInstantiationPreprocessor, StrengthAndDelayThroughPreprocessor) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

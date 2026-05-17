@@ -101,4 +101,4 @@ TEST(InterfaceObjectAccessSim,
   EXPECT_EQ(observed->value.ToUint64(), 5u);
 }
 
-}  // namespace
+}

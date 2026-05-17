@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- sort ---
-
 TEST(ArrayOrdering, SortAscending) {
   SimFixture f;
   MakeDynArray(f, "arr", {40, 10, 30, 20});
@@ -90,8 +88,6 @@ TEST(ArrayOrdering, SortFixedArray) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 30u);
 }
 
-// --- rsort ---
-
 TEST(ArrayOrdering, RsortDescending) {
   SimFixture f;
   MakeDynArray(f, "arr", {40, 10, 30, 20});
@@ -126,8 +122,6 @@ TEST(ArrayOrdering, RsortFixedArray) {
   EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 20u);
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 10u);
 }
-
-// --- reverse ---
 
 TEST(ArrayOrdering, ReverseOrder) {
   SimFixture f;
@@ -196,8 +190,6 @@ TEST(ArrayOrdering, ReverseFixedArray) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xAA);
 }
 
-// --- shuffle ---
-
 TEST(ArrayOrdering, ShufflePreservesElements) {
   SimFixtureSeeded f;
   auto* q = f.ctx.CreateQueue("arr", 32);
@@ -235,8 +227,6 @@ TEST(ArrayOrdering, ShuffleSingleElement) {
   ASSERT_EQ(q->elements.size(), 1u);
   EXPECT_EQ(q->elements[0].ToUint64(), 42u);
 }
-
-// --- method call dispatch ---
 
 TEST(ArrayOrdering, SortViaMethodCall) {
   SimFixture f;
@@ -298,4 +288,4 @@ TEST(ArrayOrdering, ShuffleViaMethodCall) {
   EXPECT_EQ(sum, 60u);
 }
 
-}  // namespace
+}

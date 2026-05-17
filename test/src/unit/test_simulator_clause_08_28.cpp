@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §8.28(a): Structs are strictly static — usable immediately without new.
 TEST(ClassesAndStructures, StructMemberAccessWithoutNew) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -20,7 +19,6 @@ TEST(ClassesAndStructures, StructMemberAccessWithoutNew) {
       "endmodule\n", "result"), 30u);
 }
 
-// §8.28(a): Class declaration does not create the object — handle is null.
 TEST(ClassesAndStructures, ClassHandleNullBeforeNew) {
   EXPECT_EQ(RunAndGet(
       "class C;\n"
@@ -35,7 +33,6 @@ TEST(ClassesAndStructures, ClassHandleNullBeforeNew) {
       "endmodule\n", "result"), 1u);
 }
 
-// §8.28(a): After new, the class object exists and is no longer null.
 TEST(ClassesAndStructures, ClassHandleNonNullAfterNew) {
   EXPECT_EQ(RunAndGet(
       "class C;\n"
@@ -51,8 +48,6 @@ TEST(ClassesAndStructures, ClassHandleNonNullAfterNew) {
       "endmodule\n", "result"), 1u);
 }
 
-// §8.28(b): Handles provide pointer-like semantics — two handles to the
-// same object see each other's mutations.
 TEST(ClassesAndStructures, TwoHandlesSameObjectShareState) {
   EXPECT_EQ(RunAndGet(
       "class C;\n"
@@ -71,8 +66,6 @@ TEST(ClassesAndStructures, TwoHandlesSameObjectShareState) {
       "endmodule\n", "result"), 99u);
 }
 
-// §8.28(a,b): Struct assignment copies value — modifying the copy does not
-// affect the original, unlike class handle assignment.
 TEST(ClassesAndStructures, StructAssignmentCopiesValue) {
   EXPECT_EQ(RunAndGet(
       "module t;\n"
@@ -88,4 +81,4 @@ TEST(ClassesAndStructures, StructAssignmentCopiesValue) {
       "endmodule\n", "result"), 5u);
 }
 
-}  // namespace
+}

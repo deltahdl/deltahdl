@@ -25,7 +25,6 @@ TEST(ModuleAndHierarchyParsing, EndLabelProgram) {
   EXPECT_EQ(r.cu->programs[0]->name, "myprog");
 }
 
-// §3.1 — Error: mismatched end label.
 TEST(BlockNames, MismatchedEndLabelIsError) {
   EXPECT_FALSE(ParseOk("module foo; endmodule : bar\n"));
 }
@@ -255,4 +254,4 @@ TEST(BlockNameParsing, NamedEmptyForkBlock) {
   EXPECT_EQ(stmt->fork_stmts.size(), 0u);
 }
 
-}  // namespace
+}

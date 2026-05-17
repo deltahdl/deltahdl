@@ -104,4 +104,4 @@ TEST(EventOrOperatorElaboration, MixedOrCommaCountPreserved) {
   EXPECT_EQ(procs[0].sensitivity.size(), 5u);
 }
 
-}  // namespace
+}

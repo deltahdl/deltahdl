@@ -68,4 +68,4 @@ TEST(OperatorAndExpressionParsing, AssignInExprAsIfCondition) {
   EXPECT_EQ(stmt->condition->op, TokenKind::kEq);
 }
 
-}  // namespace
+}

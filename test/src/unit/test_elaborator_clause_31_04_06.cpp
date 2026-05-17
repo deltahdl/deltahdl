@@ -17,9 +17,6 @@ TEST(TimingCheckEventDefElaboration, NochangeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.4.6 Syntax 31-14: start_edge_offset and end_edge_offset are
-// mintypmax_expression productions; elaboration must reduce a
-// min:typ:max triple in each offset position without diagnostics.
 TEST(TimingCheckEventDefElaboration, NochangeMinTypMaxOffsetsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -33,9 +30,6 @@ TEST(TimingCheckEventDefElaboration, NochangeMinTypMaxOffsetsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.4.6: "The reference event can be specified with the posedge or
-// negedge keyword." Both keyword forms must elaborate cleanly; this
-// covers the negedge path.
 TEST(TimingCheckEventDefElaboration, NochangeNegedgeReferenceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -49,9 +43,6 @@ TEST(TimingCheckEventDefElaboration, NochangeNegedgeReferenceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.4.6 Syntax 31-14: the optional notifier trailing the two offsets
-// resolves to a variable_identifier; elaboration must accept the form
-// that binds an existing variable into that slot.
 TEST(TimingCheckEventDefElaboration, NochangeWithNotifierElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -66,10 +57,6 @@ TEST(TimingCheckEventDefElaboration, NochangeWithNotifierElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.4.6: negative offsets are explicitly allowed ("a negative offset
-// for start edge shrinks the region" / "a negative offset for the end
-// edge shrinks the region"). Elaboration must reduce a unary-minus
-// expression in each offset position without diagnostics.
 TEST(TimingCheckEventDefElaboration, NochangeNegativeOffsetsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -83,4 +70,4 @@ TEST(TimingCheckEventDefElaboration, NochangeNegativeOffsetsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.7: peek() call with ref argument parses.
 TEST(MailboxPeekParser, PeekCallParses) {
   auto r = Parse(
       "module m;\n"
@@ -18,7 +17,6 @@ TEST(MailboxPeekParser, PeekCallParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.7: peek() after put() parses.
 TEST(MailboxPeekParser, PeekAfterPut) {
   auto r = Parse(
       "module m;\n"
@@ -33,7 +31,6 @@ TEST(MailboxPeekParser, PeekAfterPut) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.7: Multiple peek() calls in sequence parse.
 TEST(MailboxPeekParser, MultiplePeekCalls) {
   auto r = Parse(
       "module m;\n"
@@ -48,4 +45,4 @@ TEST(MailboxPeekParser, MultiplePeekCalls) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

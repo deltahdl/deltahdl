@@ -50,4 +50,4 @@ TEST(OrderedPortSynthesis, OrderedPortWithExpressionSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

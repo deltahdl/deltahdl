@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.8: try_peek() call in initial block elaborates.
 TEST(MailboxTryPeekElaborator, TryPeekCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,7 +19,6 @@ TEST(MailboxTryPeekElaborator, TryPeekCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.8: try_peek() result assigned to variable elaborates.
 TEST(MailboxTryPeekElaborator, TryPeekResultAssigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -36,4 +34,4 @@ TEST(MailboxTryPeekElaborator, TryPeekResultAssigned) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

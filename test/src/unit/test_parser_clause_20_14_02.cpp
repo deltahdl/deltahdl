@@ -65,4 +65,4 @@ TEST(GlossaryParsing, DistChiSquare) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-}  // namespace
+}

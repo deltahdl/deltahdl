@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.6: try_get() call with ref argument parses.
 TEST(MailboxTryGetParser, TryGetCallParses) {
   auto r = Parse(
       "module m;\n"
@@ -18,7 +17,6 @@ TEST(MailboxTryGetParser, TryGetCallParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.6: try_get() result assigned to variable parses (returns int).
 TEST(MailboxTryGetParser, TryGetResultAssigned) {
   auto r = Parse(
       "module m;\n"
@@ -32,7 +30,6 @@ TEST(MailboxTryGetParser, TryGetResultAssigned) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.6: try_get() used in conditional parses.
 TEST(MailboxTryGetParser, TryGetInConditional) {
   auto r = Parse(
       "module m;\n"
@@ -48,4 +45,4 @@ TEST(MailboxTryGetParser, TryGetInConditional) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

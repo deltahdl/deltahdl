@@ -4,8 +4,6 @@
 
 using namespace delta;
 
-// §6.18 User-defined types (typedef)
-
 TEST(UserDefinedTypes, TypedefKeywordToken) {
   auto tokens = Lex("typedef");
   ASSERT_GE(tokens.size(), 2);

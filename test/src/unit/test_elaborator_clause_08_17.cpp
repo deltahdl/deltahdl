@@ -147,4 +147,4 @@ TEST(ChainedConstructorElaboration, ExtendsDefaultNoSuperNewOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

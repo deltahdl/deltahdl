@@ -170,4 +170,4 @@ TEST(AbstractClassElaboration, AbstractClassAddsNewPureVirtualsNotOverriddenErro
              "endmodule\n"));
 }
 
-}  // namespace
+}

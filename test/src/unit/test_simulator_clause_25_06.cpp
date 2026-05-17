@@ -46,4 +46,4 @@ TEST(TimingCheckEventDefSim, TerminalInterfaceDotPortSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-}  // namespace
+}

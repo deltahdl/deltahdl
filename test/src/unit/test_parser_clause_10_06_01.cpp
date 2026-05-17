@@ -295,7 +295,6 @@ TEST(ProceduralAssignDeassignParsing, AssignInCase) {
   EXPECT_EQ(stmt->case_items[2].body->kind, StmtKind::kDeassign);
 }
 
-
 TEST(ProceduralAssignDeassignParsing, AssignInAlwaysWithEvent) {
   auto r = Parse(
       "module m;\n"
@@ -698,4 +697,4 @@ TEST(ProceduralAssignDeassignParsing, ReAssignSameVariableSyntax) {
   EXPECT_EQ(s0->lhs->text, s1->lhs->text);
 }
 
-}  // namespace
+}

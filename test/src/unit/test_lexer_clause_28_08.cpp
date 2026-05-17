@@ -1,4 +1,4 @@
-// §28.8
+
 
 #include <gtest/gtest.h>
 
@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// Each bidirectional pass switch keyword must map to its own token kind so
-// downstream stages can distinguish conditional from unconditional variants
-// and full-strength from resistive variants.
 TEST(BidirectionalSwitchLexing, TranKeyword) {
   auto tokens = Lex("tran");
   ASSERT_GE(tokens.size(), 1u);
@@ -75,4 +72,4 @@ TEST(BidirectionalSwitchLexing, Tranif1InstantiationTokenSequence) {
   EXPECT_EQ(tokens[9].kind, TokenKind::kSemicolon);
 }
 
-}  // namespace
+}

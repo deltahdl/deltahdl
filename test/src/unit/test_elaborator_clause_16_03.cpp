@@ -4,11 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §16.3 "The immediate_assertion_statement is a statement_item and can be
-// specified anywhere a procedural statement is specified." Elaboration must
-// accept immediate assertions in initial, always, and always_comb procedural
-// scopes without producing diagnostics.
-
 TEST(ImmediateAssertionElaboration, AssertInInitialBlockElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -45,8 +40,6 @@ TEST(ImmediateAssertionElaboration, CoverInAlwaysBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.3 "The optional statement label (identifier and colon) creates a named
-// block around the assertion statement (or any other statement)."
 TEST(ImmediateAssertionElaboration, LabeledAssertElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -59,10 +52,6 @@ TEST(ImmediateAssertionElaboration, LabeledAssertElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.3 cross-links to §20.10 — the body says "The information about
-// assertion failure can be printed using one of the severity system tasks
-// in the action block, as described in 20.10." Elaboration must accept the
-// §20.10 severity tasks inside the action block.
 TEST(ImmediateAssertionElaboration, ActionBlockWithSeverityTasksElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -75,8 +64,6 @@ TEST(ImmediateAssertionElaboration, ActionBlockWithSeverityTasksElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.3 "There are two modes of immediate assertions, simple immediate
-// assertions and deferred immediate assertions." Both forms must elaborate.
 TEST(ImmediateAssertionElaboration, DeferredImmediateAssertionElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -93,4 +80,4 @@ TEST(ImmediateAssertionElaboration, DeferredImmediateAssertionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1: .* implicitly connects all ports where name and type match ---
-
 TEST(WildcardPortConnectionElaboration, MatchingSignalsConnectSuccessfully) {
   EXPECT_TRUE(
       ElabOk("module sub(input a, output b);\n"
@@ -100,9 +98,6 @@ TEST(WildcardPortConnectionElaboration, WildcardDoesNotCreateImplicitNet) {
   }
 }
 
-// --- R2: Named connections can mix with .* to override or leave ports
-//         unconnected ---
-
 TEST(WildcardPortConnectionElaboration, NamedOverrideWithWildcard) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -137,8 +132,6 @@ TEST(WildcardPortConnectionElaboration, EmptyPortOverrideDisconnectsPort) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- R4a: .* uses default value when name not in scope ---
-
 TEST(WildcardPortConnectionElaboration, DefaultValueUsedWhenNameNotInScope) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -168,8 +161,6 @@ TEST(WildcardPortConnectionElaboration, MultipleDefaultValuesUsed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- R7: Different instances in same parent can mix connection styles ---
-
 TEST(WildcardPortConnectionElaboration, MixedStylesInSameParent) {
   EXPECT_TRUE(
       ElabOk("module child(input logic a, output logic b);\n"
@@ -184,4 +175,4 @@ TEST(WildcardPortConnectionElaboration, MixedStylesInSameParent) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

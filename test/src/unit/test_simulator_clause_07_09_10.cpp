@@ -83,4 +83,4 @@ TEST(AssocMethods, AssocArgCallerUnchangedEndToEnd) {
   EXPECT_EQ(v, 42u);
 }
 
-}  // namespace
+}

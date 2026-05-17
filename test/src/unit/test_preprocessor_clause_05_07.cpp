@@ -19,4 +19,4 @@ TEST(NumberPreprocessor, ThreeTokenBasedLiteralFromMacros) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

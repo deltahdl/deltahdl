@@ -12,19 +12,11 @@
 
 namespace delta {
 
-// =============================================================================
-// DPI argument descriptor
-// =============================================================================
-
 struct DpiArg {
   std::string_view name;
   DataTypeKind type = DataTypeKind::kInt;
   Direction direction = Direction::kInput;
 };
-
-// =============================================================================
-// DpiFunction: a registered DPI-C function (import or export)
-// =============================================================================
 
 struct DpiFunction {
   std::string_view c_name;
@@ -33,10 +25,6 @@ struct DpiFunction {
   std::vector<DpiArg> args;
   std::function<uint64_t(const std::vector<uint64_t>&)> impl;
 };
-
-// =============================================================================
-// DpiImport/DpiExport: declaration wrappers
-// =============================================================================
 
 struct DpiImport {
   std::string_view c_name;
@@ -48,10 +36,6 @@ struct DpiExport {
   std::string_view c_name;
   std::string_view sv_name;
 };
-
-// =============================================================================
-// DpiContext: manages registered DPI-C functions
-// =============================================================================
 
 class DpiContext {
  public:
@@ -76,4 +60,4 @@ class DpiContext {
   std::unordered_map<std::string_view, size_t> export_index_;
 };
 
-}  // namespace delta
+}

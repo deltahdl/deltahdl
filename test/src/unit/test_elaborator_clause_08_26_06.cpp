@@ -1,13 +1,10 @@
-// §8.26.6
+
 
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
-
-// Req: When a class implements multiple interface classes, identifiers are
-// merged from different name spaces into a single name space.
 
 TEST(InterfaceClassNameMerging, ImplementsMultipleMergesDistinctMethods) {
   EXPECT_TRUE(
@@ -26,9 +23,6 @@ TEST(InterfaceClassNameMerging, ImplementsMultipleMergesDistinctMethods) {
              "module m;\n"
              "endmodule\n"));
 }
-
-// Req: When an interface class extends multiple interface classes, identifiers
-// are merged from different name spaces into a single name space.
 
 TEST(InterfaceClassNameMerging, ExtendsMultipleMergesDistinctMethods) {
   EXPECT_TRUE(
@@ -73,4 +67,4 @@ TEST(InterfaceClassNameMerging, TransitiveMergeViaExtendsChain) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

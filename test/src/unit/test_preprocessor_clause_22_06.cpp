@@ -569,7 +569,7 @@ TEST(Preprocessor, Pragma_InsideIfdef_Inactive) {
   Preprocess("`ifdef UNDEF_FLAG\n`pragma some_pragma\n`endif\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
-// §3.1 General — preprocessing of design element structures.
+
 TEST(IfdefConditionalCompilation, DefinedMacroTakesTrueBranch) {
   PreprocFixture f;
   auto result = Preprocess(

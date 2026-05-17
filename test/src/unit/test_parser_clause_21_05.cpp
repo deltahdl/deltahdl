@@ -32,4 +32,4 @@ TEST(IoSystemTaskParsing, WritemembCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

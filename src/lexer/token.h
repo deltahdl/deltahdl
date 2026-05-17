@@ -9,107 +9,103 @@
 namespace delta {
 
 enum class TokenKind : uint16_t {
-  // Sentinel
+
   kEof = 0,
   kError,
 
-  // Literals
   kIntLiteral,
   kRealLiteral,
   kTimeLiteral,
   kStringLiteral,
-  kUnbasedUnsizedLiteral,  // '0, '1, 'x, 'z
+  kUnbasedUnsizedLiteral,
 
-  // Identifiers
   kIdentifier,
   kEscapedIdentifier,
-  kSystemIdentifier,  // $display, $finish, etc.
+  kSystemIdentifier,
 
-  // Operators and punctuation
-  kPlus,              // +
-  kMinus,             // -
-  kStar,              // *
-  kSlash,             // /
-  kPercent,           // %
-  kPower,             // **
-  kAmp,               // &
-  kPipe,              // |
-  kCaret,             // ^
-  kTilde,             // ~
-  kTildeAmp,          // ~&
-  kTildePipe,         // ~|
-  kTildeCaret,        // ~^
-  kCaretTilde,        // ^~
-  kAmpAmp,            // &&
-  kPipePipe,          // ||
-  kBang,              // !
-  kEq,                // =
-  kEqEq,              // ==
-  kBangEq,            // !=
-  kEqEqEq,            // ===
-  kBangEqEq,          // !==
-  kEqEqQuestion,      // ==?
-  kBangEqQuestion,    // !=?
-  kLt,                // <
-  kGt,                // >
-  kLtEq,              // <=
-  kGtEq,              // >=
-  kLtLt,              // <<
-  kGtGt,              // >>
-  kLtLtLt,            // <<<
-  kGtGtGt,            // >>>
-  kPlusPlus,          // ++
-  kMinusMinus,        // --
-  kPlusEq,            // +=
-  kMinusEq,           // -=
-  kStarEq,            // *=
-  kSlashEq,           // /=
-  kPercentEq,         // %=
-  kAmpEq,             // &=
-  kPipeEq,            // |=
-  kCaretEq,           // ^=
-  kLtLtEq,            // <<=
-  kGtGtEq,            // >>=
-  kLtLtLtEq,          // <<<=
-  kGtGtGtEq,          // >>>=
-  kQuestion,          // ?
-  kColon,             // :
-  kColonColon,        // ::
-  kSemicolon,         // ;
-  kComma,             // ,
-  kDot,               // .
-  kDotStar,           // .*
-  kLParen,            // (
-  kRParen,            // )
-  kLBracket,          // [
-  kRBracket,          // ]
-  kLBrace,            // {
-  kRBrace,            // }
-  kHash,              // #
-  kHashHash,          // ##
-  kAt,                // @
-  kAtAt,              // @@
-  kArrow,             // ->
-  kDashGtGt,          // ->>
-  kEqGt,              // =>
-  kStarGt,            // *>
-  kAmpAmpAmp,         // &&&
-  kPipeDashGt,        // |->
-  kPipeEqGt,          // |=>
-  kLtDashGt,          // <->
-  kHashMinusHash,     // #-#
-  kHashEqHash,        // #=#
-  kApostrophe,        // '   (cast operator §6.24)
-  kApostropheLBrace,  // '{  (assignment pattern prefix)
-  kDollar,            // $   (queue dimension / last index)
-  kPlusColon,         // +:  (indexed part-select up)
-  kMinusColon,        // -:  (indexed part-select down)
-  kPlusSlashMinus,    // +/- (absolute tolerance §11.4.13)
-  kPlusPercentMinus,  // +%- (relative tolerance §11.4.13)
-  kAttrStart,         // (*  (attribute instance start)
-  kAttrEnd,           // *)  (attribute instance end)
+  kPlus,
+  kMinus,
+  kStar,
+  kSlash,
+  kPercent,
+  kPower,
+  kAmp,
+  kPipe,
+  kCaret,
+  kTilde,
+  kTildeAmp,
+  kTildePipe,
+  kTildeCaret,
+  kCaretTilde,
+  kAmpAmp,
+  kPipePipe,
+  kBang,
+  kEq,
+  kEqEq,
+  kBangEq,
+  kEqEqEq,
+  kBangEqEq,
+  kEqEqQuestion,
+  kBangEqQuestion,
+  kLt,
+  kGt,
+  kLtEq,
+  kGtEq,
+  kLtLt,
+  kGtGt,
+  kLtLtLt,
+  kGtGtGt,
+  kPlusPlus,
+  kMinusMinus,
+  kPlusEq,
+  kMinusEq,
+  kStarEq,
+  kSlashEq,
+  kPercentEq,
+  kAmpEq,
+  kPipeEq,
+  kCaretEq,
+  kLtLtEq,
+  kGtGtEq,
+  kLtLtLtEq,
+  kGtGtGtEq,
+  kQuestion,
+  kColon,
+  kColonColon,
+  kSemicolon,
+  kComma,
+  kDot,
+  kDotStar,
+  kLParen,
+  kRParen,
+  kLBracket,
+  kRBracket,
+  kLBrace,
+  kRBrace,
+  kHash,
+  kHashHash,
+  kAt,
+  kAtAt,
+  kArrow,
+  kDashGtGt,
+  kEqGt,
+  kStarGt,
+  kAmpAmpAmp,
+  kPipeDashGt,
+  kPipeEqGt,
+  kLtDashGt,
+  kHashMinusHash,
+  kHashEqHash,
+  kApostrophe,
+  kApostropheLBrace,
+  kDollar,
+  kPlusColon,
+  kMinusColon,
+  kPlusSlashMinus,
+  kPlusPercentMinus,
+  kAttrStart,
+  kAttrEnd,
 
-  // Keywords start here (mapped by keywords table)
   kKwModule,
   kKwEndmodule,
   kKwInput,
@@ -222,7 +218,6 @@ enum class TokenKind : uint16_t {
   kKwUnique0,
   kKwPriority,
 
-  // Remaining Annex B keywords (IEEE 1800-2023 Table B.1)
   kKwAcceptOn,
   kKwAlias,
   kKwAssert,
@@ -367,11 +362,10 @@ struct Token {
   SourceLoc loc;
   std::string_view text;
 
-  // For integer literals
   uint32_t bit_width = 0;
   bool has_size = false;
   bool is_signed = false;
-  uint8_t base = 10;  // 2, 8, 10, 16
+  uint8_t base = 10;
 
   bool Is(TokenKind k) const { return kind == k; }
   bool IsEof() const { return kind == TokenKind::kEof; }
@@ -379,4 +373,4 @@ struct Token {
 
 std::string_view TokenKindName(TokenKind kind);
 
-}  // namespace delta
+}

@@ -81,7 +81,7 @@ TEST(EnumMethods, NameReturnsCorrectStringWidth) {
   var->value = MakeLogic4VecVal(f.arena, 32, 1);
   auto* call = f.MakeEnumMethodCall("color", "name");
   auto result = EvalExpr(call, f.ctx, f.arena);
-  // "GREEN" is 5 characters, so width should be 5 * 8 = 40 bits.
+
   EXPECT_EQ(result.width, 40u);
 }
 
@@ -107,4 +107,4 @@ TEST(EnumMethods, NameEndToEnd) {
   EXPECT_NE(var->value.ToUint64(), 0u);
 }
 
-}  // namespace
+}

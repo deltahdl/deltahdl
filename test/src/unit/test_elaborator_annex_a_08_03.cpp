@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §A.8.3: constant_expression in parameter elaborates
 TEST(ExpressionElaboration, ConstantExpressionInParameter) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -17,7 +16,6 @@ TEST(ExpressionElaboration, ConstantExpressionInParameter) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.3: constant_expression with ternary in parameter
 TEST(ExpressionElaboration, ConstantTernaryInParameter) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -31,7 +29,6 @@ TEST(ExpressionElaboration, ConstantTernaryInParameter) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.3: constant_expression — localparam with binary operators
 TEST(ExpressionElaboration, ConstantExpressionInLocalparam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -45,7 +42,6 @@ TEST(ExpressionElaboration, ConstantExpressionInLocalparam) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.3: genvar_expression in generate for loop
 TEST(ExpressionElaboration, GenvarExpressionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -60,7 +56,6 @@ TEST(ExpressionElaboration, GenvarExpressionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.3: conditional_expression elaborates
 TEST(ExpressionElaboration, ConditionalExpressionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -73,7 +68,6 @@ TEST(ExpressionElaboration, ConditionalExpressionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.3: inside_expression elaborates
 TEST(ExpressionElaboration, InsideExpressionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -87,7 +81,6 @@ TEST(ExpressionElaboration, InsideExpressionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.3: inc_or_dec_expression elaborates
 TEST(ExpressionElaboration, IncDecExpressionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -106,7 +99,6 @@ TEST(ExpressionElaboration, IncDecExpressionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.3: part_select_range and indexed_range elaborate
 TEST(ExpressionElaboration, PartSelectAndIndexedRangeElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -122,8 +114,6 @@ TEST(ExpressionElaboration, PartSelectAndIndexedRangeElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.3: mintypmax_expression — a (min:typ:max) triple in a specify path
-// delay must survive elaboration without diagnostics.
 TEST(ExpressionElaboration, MintypMaxExpressionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -137,8 +127,6 @@ TEST(ExpressionElaboration, MintypMaxExpressionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.3: constant_param_expression with $ (queue bound) elaborates as a
-// queue dimension on a variable.
 TEST(ExpressionElaboration, ConstantParamExpressionDollarElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -150,10 +138,6 @@ TEST(ExpressionElaboration, ConstantParamExpressionDollarElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.3 → §A.2.2.1 cross-link: tagged_union_expression names a member of
-// a tagged union (§A.2.2.1: struct_union ::= union [tagged]). Both halves
-// of the cross-link appear in one design: the tagged union type is
-// declared, and a value is built with the tagged member expression.
 TEST(ExpressionElaboration, TaggedUnionExpressionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -167,10 +151,6 @@ TEST(ExpressionElaboration, TaggedUnionExpressionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.3 → §A.2.2.1 cross-link: param_expression ::= data_type — a named
-// type-parameter override drives §A.2.2.1's data_type into the parameter
-// slot. The elaborator must accept the override and elaborate the child
-// without diagnostics.
 TEST(ExpressionElaboration, ParamExpressionDataTypeOverrideElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -185,9 +165,6 @@ TEST(ExpressionElaboration, ParamExpressionDataTypeOverrideElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.3 ↔ §A.6.2 cross-link: expression ::= ( operator_assignment ) —
-// §A.8.3 allows a parenthesized §A.6.2 operator_assignment to stand as an
-// expression. The elaborator must accept the construct without diagnostics.
 TEST(ExpressionElaboration, ExprOperatorAssignmentElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -203,4 +180,4 @@ TEST(ExpressionElaboration, ExprOperatorAssignmentElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

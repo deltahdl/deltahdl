@@ -9,8 +9,6 @@
 
 namespace {
 
-// --- §15.5.3: Nonblocking trigger sets triggered state ---
-
 TEST(IpcSync, NonblockingTriggerSetsTriggeredState) {
   SyncFixture f;
 
@@ -27,12 +25,9 @@ TEST(IpcSync, NonblockingTriggerSetsTriggeredState) {
   auto result = RunStmt(trigger_stmt, f.ctx, f.arena);
   EXPECT_EQ(result, StmtResult::kDone);
 
-  // Triggered state is set after NBA region executes.
   f.scheduler.Run();
   EXPECT_TRUE(f.ctx.IsEventTriggered("my_event"));
 }
-
-// --- §15.5.3 tests ---
 
 TEST(IpcSync, TriggeredMethodReturnsOneWhenTriggered) {
   SimFixture f;
@@ -183,4 +178,4 @@ TEST(IpcSync, WaitTriggeredWithBodyStatement) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

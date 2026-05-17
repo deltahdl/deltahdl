@@ -35,5 +35,5 @@ TEST_F(VpiHandleByNameSim, HandleByNameNullReturnsNullptr) {
   EXPECT_EQ(h, nullptr);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

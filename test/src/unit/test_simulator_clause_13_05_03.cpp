@@ -171,4 +171,4 @@ TEST(DefaultArgumentSim, EmptyPlaceholderUsesDefault) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 6u);
 }
 
-}  // namespace
+}

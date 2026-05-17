@@ -657,4 +657,4 @@ TEST(ImplicitEventParsing, AtStarCaseOneHotPattern) {
   EXPECT_EQ(case_stmt->case_items.size(), 4u);
 }
 
-}  // namespace
+}

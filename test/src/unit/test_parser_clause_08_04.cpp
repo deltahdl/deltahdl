@@ -80,4 +80,4 @@ TEST(ClassParsing, ClassVariableNew) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -31,4 +31,4 @@ TEST(CompilerDirectiveParsing, BeginKeywords1364_1995_ClassAsIdentifier) {
                               "`end_keywords\n"));
 }
 
-}  // namespace
+}

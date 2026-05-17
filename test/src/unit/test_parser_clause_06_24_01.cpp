@@ -117,7 +117,6 @@ TEST(CastOperatorParsing, IntCastFromRealLiteral) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
-
 TEST(CastOperatorParsing, CastCompatibleRealToInt) {
   DataType a;
   a.kind = DataTypeKind::kReal;
@@ -288,4 +287,4 @@ TEST(CastOperatorParsing, CastInBinaryExpr) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kCast);
 }
 
-}  // namespace
+}

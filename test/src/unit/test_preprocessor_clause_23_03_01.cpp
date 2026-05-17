@@ -1,4 +1,4 @@
-// §23.3.1
+
 
 #include "fixture_parser.h"
 
@@ -47,4 +47,4 @@ TEST(TopLevelModules, UndefinedConditionalExcludesModule) {
   EXPECT_EQ(r.cu->modules[0]->name, "a");
 }
 
-}  // namespace
+}

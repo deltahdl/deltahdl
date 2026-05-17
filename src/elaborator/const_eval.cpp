@@ -8,7 +8,6 @@
 
 namespace delta {
 
-// Evaluate a constant power expression.
 static std::optional<int64_t> EvalPower(int64_t base, int64_t exp) {
   if (exp < 0) {
     if (base == 0) return std::nullopt;
@@ -23,7 +22,6 @@ static std::optional<int64_t> EvalPower(int64_t base, int64_t exp) {
   return result;
 }
 
-// Evaluate a binary operation on two constant integers.
 static std::optional<int64_t> EvalBinaryArith(TokenKind op, int64_t lhs,
                                               int64_t rhs) {
   switch (op) {
@@ -51,7 +49,6 @@ static std::optional<int64_t> EvalBinaryArith(TokenKind op, int64_t lhs,
   }
 }
 
-// Evaluate a binary bitwise or shift operation.
 static std::optional<int64_t> EvalBinaryBitwise(TokenKind op, int64_t lhs,
                                                 int64_t rhs) {
   switch (op) {
@@ -83,7 +80,6 @@ static std::optional<int64_t> EvalBinaryBitwise(TokenKind op, int64_t lhs,
   }
 }
 
-// Evaluate a binary comparison or logical operation.
 static std::optional<int64_t> EvalBinaryCompare(TokenKind op, int64_t lhs,
                                                 int64_t rhs) {
   switch (op) {
@@ -112,7 +108,6 @@ static std::optional<int64_t> EvalBinaryCompare(TokenKind op, int64_t lhs,
   }
 }
 
-// Evaluate a binary operation on two constant integers.
 static std::optional<int64_t> EvalBinary(TokenKind op, int64_t lhs,
                                          int64_t rhs) {
   auto result = EvalBinaryArith(op, lhs, rhs);
@@ -122,7 +117,6 @@ static std::optional<int64_t> EvalBinary(TokenKind op, int64_t lhs,
   return EvalBinaryCompare(op, lhs, rhs);
 }
 
-// Evaluate a unary operation on a constant integer.
 static std::optional<int64_t> EvalUnary(TokenKind op, int64_t operand) {
   switch (op) {
     case TokenKind::kMinus:
@@ -138,7 +132,6 @@ static std::optional<int64_t> EvalUnary(TokenKind op, int64_t operand) {
   }
 }
 
-// Width of a literal from its text (e.g., "4'd3" → 4, "8'hFF" → 8).
 static uint32_t ConstLiteralWidth(const Expr* expr) {
   auto tick = expr->text.find('\'');
   if (tick != std::string_view::npos && tick > 0) {
@@ -152,7 +145,6 @@ static uint32_t ConstLiteralWidth(const Expr* expr) {
   return 32;
 }
 
-// §20.4.1: $clog2 — ceiling of log base 2.
 static int64_t Clog2(int64_t val) {
   if (val <= 1) return 0;
   int64_t result = 0;
@@ -164,7 +156,6 @@ static int64_t Clog2(int64_t val) {
   return result;
 }
 
-// Constant-evaluate a concatenation: {a, b, c}.
 static std::optional<int64_t> EvalConcat(const Expr* expr,
                                          const ScopeMap& scope) {
   int64_t result = 0;
@@ -177,7 +168,6 @@ static std::optional<int64_t> EvalConcat(const Expr* expr,
   return result;
 }
 
-// Constant-evaluate a replication: {n{expr}}.
 static std::optional<int64_t> EvalReplicate(const Expr* expr,
                                             const ScopeMap& scope) {
   auto count = ConstEvalInt(expr->repeat_count, scope);
@@ -192,7 +182,6 @@ static std::optional<int64_t> EvalReplicate(const Expr* expr,
   return result;
 }
 
-// §20.9.2: $countones — count number of 1-bits.
 static int64_t Countones(int64_t val) {
   auto u = static_cast<uint64_t>(val);
   int64_t count = 0;
@@ -203,14 +192,12 @@ static int64_t Countones(int64_t val) {
   return count;
 }
 
-// Evaluate the first argument of a constant system call.
 static std::optional<int64_t> EvalFirstArg(const Expr* expr,
                                            const ScopeMap& scope) {
   if (expr->args.empty()) return std::nullopt;
   return ConstEvalInt(expr->args[0], scope);
 }
 
-// §20.6.2: Evaluate $bits in a constant context.
 static std::optional<int64_t> EvalConstBits(const Expr* expr) {
   if (expr->args.empty()) return std::nullopt;
   auto* a = expr->args[0];
@@ -219,7 +206,6 @@ static std::optional<int64_t> EvalConstBits(const Expr* expr) {
   return std::nullopt;
 }
 
-// Constant-evaluate a system call ($clog2, $bits, $countones, etc.).
 static std::optional<int64_t> EvalConstSysCall(const Expr* expr,
                                                const ScopeMap& scope) {
   if (expr->callee == "$bits") return EvalConstBits(expr);
@@ -234,14 +220,12 @@ static std::optional<int64_t> EvalConstSysCall(const Expr* expr,
   return std::nullopt;
 }
 
-// §11.3.3: Internal representation for constant evaluation with signedness.
 struct ConstVal {
   int64_t value;
   uint32_t width;
   bool is_signed;
 };
 
-// §11.3.3: Determine signedness of a literal from its text.
 static bool IsSignedLiteral(std::string_view text) {
   auto tick = text.find('\'');
   if (tick == std::string_view::npos) return true;
@@ -250,14 +234,12 @@ static bool IsSignedLiteral(std::string_view text) {
   return c == 's' || c == 'S';
 }
 
-// Truncate a value to the given bit width.
 static int64_t TruncateToWidth(int64_t val, uint32_t width) {
   if (width == 0 || width >= 64) return val;
   return static_cast<int64_t>(static_cast<uint64_t>(val) &
                                ((uint64_t{1} << width) - 1));
 }
 
-// Sign-extend a truncated value from the given bit width to 64 bits.
 static int64_t SignExtendFromWidth(int64_t val, uint32_t width) {
   if (width == 0 || width >= 64) return val;
   uint64_t mask = (uint64_t{1} << width) - 1;
@@ -268,7 +250,6 @@ static int64_t SignExtendFromWidth(int64_t val, uint32_t width) {
   return static_cast<int64_t>(uval);
 }
 
-// Constant-evaluate an expression, tracking signedness and width per §11.3.3.
 static std::optional<ConstVal> ConstEvalFull(const Expr* expr,
                                              const ScopeMap& scope) {
   if (!expr) return std::nullopt;
@@ -375,8 +356,7 @@ static std::optional<ConstVal> ConstEvalFull(const Expr* expr,
       return ConstVal{*val, 32, true};
     }
     case ExprKind::kMemberAccess: {
-      // §23.7.1: Resolve scope-prefixed names (e.g., pkg::WIDTH) by
-      // building a qualified key and looking it up in the scope map.
+
       if (expr->lhs && expr->rhs &&
           expr->lhs->kind == ExprKind::kIdentifier &&
           expr->rhs->kind == ExprKind::kIdentifier) {
@@ -402,8 +382,6 @@ std::optional<int64_t> ConstEvalInt(const Expr* expr) {
   static const ScopeMap kEmptyScope;
   return ConstEvalInt(expr, kEmptyScope);
 }
-
-// --- §11.2.1: Constant real evaluation ---
 
 static std::optional<double> EvalRealBinary(TokenKind op, double lhs,
                                             double rhs) {
@@ -474,9 +452,6 @@ std::optional<double> ConstEvalReal(const Expr* expr) {
   return ConstEvalReal(expr, kEmptyScope);
 }
 
-// --- §11.2.1: Constant expression predicate ---
-
-// System functions that are constant when their arguments are constant.
 static bool IsConstantSysFunc(std::string_view name) {
   static const std::unordered_set<std::string_view> kConstSysFuncs = {
       "$clog2",
@@ -485,10 +460,10 @@ static bool IsConstantSysFunc(std::string_view name) {
       "$onehot",
       "$onehot0",
       "$isunbounded",
-      // §20.4: Timescale system functions
+
       "$timescale",
       "$timeprecision",
-      // §20.5: Conversion functions
+
       "$itor",
       "$rtoi",
       "$bitstoreal",
@@ -497,7 +472,7 @@ static bool IsConstantSysFunc(std::string_view name) {
       "$shortrealtobits",
       "$signed",
       "$unsigned",
-      // §20.8: Math functions
+
       "$ln",
       "$log10",
       "$exp",
@@ -519,7 +494,7 @@ static bool IsConstantSysFunc(std::string_view name) {
       "$asinh",
       "$acosh",
       "$atanh",
-      // §20.7: Array query functions
+
       "$dimensions",
       "$unpacked_dimensions",
       "$left",
@@ -528,15 +503,14 @@ static bool IsConstantSysFunc(std::string_view name) {
       "$high",
       "$increment",
       "$size",
-      // §20.9: Bit vector system functions
+
       "$countbits",
-      // §21.3.3
+
       "$sformatf",
   };
   return kConstSysFuncs.count(name) > 0;
 }
 
-// Check that all elements in a vector are constant expressions.
 static bool AllElementsConstant(const std::vector<Expr*>& elems,
                                 const ScopeMap& scope) {
   for (auto* elem : elems) {
@@ -545,8 +519,6 @@ static bool AllElementsConstant(const std::vector<Expr*>& elems,
   return true;
 }
 
-// §11.2.1: Data query (§20.6) and array query (§20.7) system functions may be
-// constant even when their arguments are not constant.
 static bool IsConstEvenWithNonConstArgs(std::string_view name) {
   static const std::unordered_set<std::string_view> kFuncs = {
       "$bits",   "$dimensions", "$unpacked_dimensions", "$left",
@@ -556,19 +528,12 @@ static bool IsConstEvenWithNonConstArgs(std::string_view name) {
   return kFuncs.count(name) > 0;
 }
 
-// Check that a system call with constant arguments is a constant expression.
 static bool IsConstantSysCallExpr(const Expr* expr, const ScopeMap& scope) {
   if (!IsConstantSysFunc(expr->callee)) return false;
   if (IsConstEvenWithNonConstArgs(expr->callee)) return true;
   return AllElementsConstant(expr->args, scope);
 }
 
-// §11.2.1 + §5.13: Built-in methods whose value depends only on the type of
-// the identifier (not its current value). Constant built-in method calls of
-// these methods are constant expressions whenever their input arguments are
-// constant, even when the identifier is not constant. The set covers fixed
-// array properties — size and num for fixed-size unpacked arrays and the
-// §20.7 array query family that returns dimensional metadata.
 static bool IsTypeOnlyBuiltinMethod(std::string_view method) {
   static const std::unordered_set<std::string_view> kMethods = {
       "size",  "num",   "bits",      "dimensions",
@@ -578,9 +543,6 @@ static bool IsTypeOnlyBuiltinMethod(std::string_view method) {
   return kMethods.count(method) > 0;
 }
 
-// §11.2.1 + §5.13: Built-in method calls whose value depends on the current
-// value of the identifier (e.g., string.len). These require the identifier
-// itself to be a constant expression.
 static bool IsValueDependentBuiltinMethod(std::string_view method) {
   static const std::unordered_set<std::string_view> kMethods = {
       "len",
@@ -588,12 +550,6 @@ static bool IsValueDependentBuiltinMethod(std::string_view method) {
   return kMethods.count(method) > 0;
 }
 
-// §11.2.1: A constant built-in method call is a method call (kCall on a
-// member access, or a paren-less kMemberAccess) where:
-//  - the method has no side effects, and
-//  - the input arguments are constant, and
-//  - either the method depends only on the type of the identifier, or
-//    the identifier itself is a constant expression.
 static bool IsConstantBuiltinMethodCall(const Expr* expr,
                                         const ScopeMap& scope) {
   if (!expr) return false;
@@ -655,17 +611,13 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
     case ExprKind::kAssignmentPattern:
       return AllElementsConstant(expr->elements, scope);
     case ExprKind::kCall: {
-      // §11.2.1: Constant built-in method call (object.method(args)).
+
       if (IsConstantBuiltinMethodCall(expr, scope)) return true;
-      // §11.2.1: Non-void constant function call (see §13.4.3). The function
-      // declaration is checked separately for §13.4.3 conformance — here we
-      // only require that the arguments are themselves constant expressions.
+
       return AllElementsConstant(expr->args, scope);
     }
     case ExprKind::kMemberAccess: {
-      // §11.2.1 + §5.13: Constant built-in method call without parentheses
-      // (object.method per §13.5.5: empty parens are optional). The check is
-      // shared with the kCall case via IsConstantBuiltinMethodCall.
+
       if (IsConstantBuiltinMethodCall(expr, scope)) return true;
       if (expr->lhs && expr->rhs &&
           expr->lhs->kind == ExprKind::kIdentifier &&
@@ -681,9 +633,6 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
   }
 }
 
-// §11.5.3: Build the textual representation of a static prefix.
-// Returns the longest static prefix text and whether the expression itself is
-// fully static (i.e. the entire expression is a static prefix, not truncated).
 struct StaticPrefixResult {
   std::string text;
   bool is_static;
@@ -724,4 +673,4 @@ std::string LongestStaticPrefix(const Expr* expr, const ScopeMap& scope) {
   return BuildStaticPrefix(expr, scope).text;
 }
 
-}  // namespace delta
+}

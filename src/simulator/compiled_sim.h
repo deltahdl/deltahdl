@@ -12,10 +12,6 @@ namespace delta {
 
 class SimContext;
 
-// =============================================================================
-// CompiledProcess: a pre-compiled fast path for simple processes
-// =============================================================================
-
 class CompiledProcess {
  public:
   using CompiledFn = std::function<void(SimContext&)>;
@@ -31,18 +27,11 @@ class CompiledProcess {
   CompiledFn fn_;
 };
 
-// =============================================================================
-// ProcessCompiler: analyzes a process and generates a compiled version
-// =============================================================================
-
 class ProcessCompiler {
  public:
-  /// Returns true if the statement tree is eligible for compilation.
-  /// Only pure combinational processes (no timing controls) qualify.
+
   static bool IsCompilable(const Stmt* body);
 
-  /// Attempt to compile a process. Returns a CompiledProcess with a null
-  /// function if compilation is not possible.
   static CompiledProcess Compile(uint32_t id, const Stmt* body);
 
  private:
@@ -50,4 +39,4 @@ class ProcessCompiler {
   static bool HasTimingControlInBlock(const std::vector<Stmt*>& stmts);
 };
 
-}  // namespace delta
+}

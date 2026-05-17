@@ -119,4 +119,4 @@ TEST(StringLiteralExpressionsSim, ExactWidthNoPadding) {
   EXPECT_EQ(var->value.ToUint64(), 0x4869u);
 }
 
-}  // namespace
+}

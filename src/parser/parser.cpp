@@ -7,20 +7,18 @@ namespace delta {
 
 Parser::Parser(Lexer& lexer, Arena& arena, DiagEngine& diag)
     : lexer_(lexer), arena_(arena), diag_(diag) {
-  // §9.7: process is a built-in class type
+
   known_types_.insert("process");
-  // §19.4: semaphore and mailbox are built-in class types
+
   known_types_.insert("semaphore");
   known_types_.insert("mailbox");
-  // §8.30: weak_reference is a built-in parameterized class
+
   known_types_.insert("weak_reference");
 }
 
 Token Parser::CurrentToken() { return lexer_.Peek(); }
 bool Parser::Check(TokenKind kind) {
-  // §5.6.1: "an escaped identifier \cpu3 is treated the same as a nonescaped
-  // identifier cpu3." Wherever the parser expects a generic identifier, an
-  // escaped-identifier token must satisfy the check too.
+
   auto cur = CurrentToken().kind;
   if (kind == TokenKind::kIdentifier) {
     return cur == TokenKind::kIdentifier ||
@@ -80,16 +78,13 @@ void Parser::Synchronize() {
   }
 }
 
-// --- Attributes (§5.12) ---
-
 std::vector<Attribute> Parser::ParseAttributes() {
   std::vector<Attribute> attrs;
   while (Check(TokenKind::kAttrStart)) {
-    Consume();  // skip (*
+    Consume();
     do {
       Attribute attr;
-      // §A.9.1: attr_name ::= identifier; §A.9.3 admits both
-      // simple_identifier and escaped_identifier.
+
       auto tok = ExpectIdentifier();
       attr.name = tok.text;
       attr.loc = tok.loc;
@@ -111,8 +106,6 @@ void Parser::AttachAttrs(std::vector<ModuleItem*>& items, size_t before,
   }
 }
 
-// --- Top level ---
-
 static void SkipToSemicolon(Lexer& lexer) {
   while (!lexer.Peek().Is(TokenKind::kSemicolon) &&
          !lexer.Peek().Is(TokenKind::kEof)) {
@@ -126,11 +119,7 @@ CompilationUnit* Parser::Parse() {
   while (!AtEnd()) {
     ParseTopLevel(unit);
   }
-  // §33.5.1: a precompiling strategy in a single-pass tool maps every
-  // cell description from the input into the library, regardless of
-  // whether the cell is referenced.  Cells not bound to a specific
-  // library by a library-map driver fall back to the §33.3.1 "work"
-  // default so that the elaborator sees a fully library-tagged set.
+
   for (auto* m : unit->modules) {
     if (m->library.empty()) m->library = "work";
   }
@@ -151,8 +140,6 @@ CompilationUnit* Parser::Parse() {
   }
   return unit;
 }
-
-// --- Library source text (A.1.1) ---
 
 CompilationUnit* Parser::ParseLibraryText() {
   auto* unit = arena_.Create<CompilationUnit>();
@@ -191,7 +178,6 @@ LibraryDecl* Parser::ParseLibraryDecl() {
   Expect(TokenKind::kKwLibrary);
   decl->name = Expect(TokenKind::kIdentifier).text;
 
-  // Parse first file_path_spec (required).
   auto path = ParseFilePathSpec();
   if (path.empty()) {
     diag_.Error(CurrentLoc(), "expected at least one file path in library");
@@ -200,17 +186,15 @@ LibraryDecl* Parser::ParseLibraryDecl() {
   }
   decl->file_paths.push_back(path);
 
-  // Parse additional comma-separated file_path_specs.
   while (Match(TokenKind::kComma)) {
     decl->file_paths.push_back(ParseFilePathSpec());
   }
 
-  // Parse optional -incdir clause.
   if (Check(TokenKind::kMinus)) {
     auto saved = lexer_.SavePos();
-    Consume();  // '-'
+    Consume();
     if (Check(TokenKind::kKwIncdir)) {
-      Consume();  // 'incdir'
+      Consume();
       decl->incdir_paths.push_back(ParseFilePathSpec());
       while (Match(TokenKind::kComma)) {
         decl->incdir_paths.push_back(ParseFilePathSpec());
@@ -237,14 +221,11 @@ IncludeStmt* Parser::ParseLibraryIncludeStmt() {
   return stmt;
 }
 
-// --- Bind directive (§23.11 / A.1.2) ---
-
 BindDirective* Parser::ParseBindDirective() {
   auto* decl = arena_.Create<BindDirective>();
   decl->loc = CurrentLoc();
   Expect(TokenKind::kKwBind);
 
-  // Parse target: hierarchical_identifier with optional constant_bit_select.
   decl->target = ParseDottedPath();
   if (Check(TokenKind::kLBracket)) {
     Consume();
@@ -252,7 +233,6 @@ BindDirective* Parser::ParseBindDirective() {
     Expect(TokenKind::kRBracket);
   }
 
-  // Optional : bind_target_instance_list
   if (Match(TokenKind::kColon)) {
     do {
       decl->target_instances.push_back(ParseDottedPath());
@@ -266,18 +246,15 @@ BindDirective* Parser::ParseBindDirective() {
     } while (Match(TokenKind::kComma));
   }
 
-  // Parse bind_instantiation (module/interface/program/checker instantiation).
   auto mod_tok = ExpectIdentifier();
   decl->instantiation = ParseModuleInst(mod_tok);
   return decl;
 }
 
-// §18.5.1: out-of-block constraint —
-//   [static] constraint [dynamic_override_specifiers] class::name { ... }
 void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
   Match(TokenKind::kKwStatic);
   Expect(TokenKind::kKwConstraint);
-  // Optional dynamic_override_specifiers: [:initial|:extends] [:final]
+
   if (Match(TokenKind::kColon)) {
     Match(TokenKind::kKwInitial) || Match(TokenKind::kKwExtends) ||
         Match(TokenKind::kKwFinal);
@@ -300,7 +277,6 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
   (void)unit;
 }
 
-// Parse secondary top-level items (primitives, checkers, configs, etc.)
 bool Parser::TryParseSecondaryTopLevel(CompilationUnit* unit) {
   if (Check(TokenKind::kKwPrimitive)) {
     auto* udp = ParseUdpDecl();
@@ -331,7 +307,6 @@ bool Parser::TryParseSecondaryTopLevel(CompilationUnit* unit) {
   return false;
 }
 
-// anonymous_program: program ; { ... } endprogram (A.1.11)
 bool Parser::TryParseAnonymousProgram(CompilationUnit* unit) {
   auto saved = lexer_.SavePos();
   Consume();
@@ -382,8 +357,8 @@ bool Parser::TryParsePrimaryTopLevel(CompilationUnit* unit) {
 }
 
 void Parser::ParseTopLevel(CompilationUnit* unit) {
-  if (Match(TokenKind::kSemicolon)) return;  // null item
-  auto top_attrs = ParseAttributes();        // consume optional (* ... *)
+  if (Match(TokenKind::kSemicolon)) return;
+  auto top_attrs = ParseAttributes();
   auto udp_count = unit->udps.size();
   if (TryParsePrimaryTopLevel(unit)) {
     if (!top_attrs.empty()) {
@@ -395,7 +370,7 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     }
     return;
   }
-  // §3.12.1: CU-scope typedef declaration.
+
   if (Check(TokenKind::kKwTypedef)) {
     unit->cu_items.push_back(ParseTypedef());
     return;
@@ -416,9 +391,7 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
 }
 
 bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
-  // §3.12.1: CU-scope localparam/parameter declarations.
-  // §6.20.1: param_assignments in compilation-unit scope shall become
-  // localparam declarations.
+
   if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
     std::vector<ModuleItem*> items;
     in_cu_scope_param_ = true;
@@ -427,21 +400,21 @@ bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
     for (auto* item : items) unit->cu_items.push_back(item);
     return true;
   }
-  // §3.12.1: CU-scope import declarations.
+
   if (Check(TokenKind::kKwImport)) {
     std::vector<ModuleItem*> items;
     ParseImportDecl(items);
     for (auto* item : items) unit->cu_items.push_back(item);
     return true;
   }
-  // §3.12.1: CU-scope data declarations (variables/nets).
+
   if (TryParseCuScopeDataDecl(unit)) return true;
-  // CU-scope timeunit/timeprecision (§3.14.2.3 rule c)
+
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
     ParseTimeunitDecl(nullptr, unit);
     return true;
   }
-  // extern_constraint_declaration: static constraint ... (A.1.10)
+
   if (Check(TokenKind::kKwStatic)) {
     ParseOutOfBlockConstraint(unit);
     return true;
@@ -449,7 +422,6 @@ bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
   return false;
 }
 
-// §3.12.1: Parse a data/net declaration at CU scope.
 static bool IsCuScopeDataTypeKeyword(TokenKind tk) {
   switch (tk) {
     case TokenKind::kKwLogic:
@@ -485,7 +457,7 @@ bool Parser::TryParseCuScopeDataDecl(CompilationUnit* unit) {
 }
 
 void Parser::ParseExternTopLevel(CompilationUnit* unit) {
-  Consume();  // extern
+  Consume();
   if (Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule)) {
     unit->modules.push_back(ParseExternModuleDecl());
     return;
@@ -495,7 +467,7 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     decl->decl_kind = ModuleDeclKind::kInterface;
     decl->is_extern = true;
     decl->range.start = CurrentLoc();
-    Consume();  // interface
+    Consume();
     Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
     decl->name = Expect(TokenKind::kIdentifier).text;
     ParseParamsPortsAndSemicolon(*decl);
@@ -507,7 +479,7 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     decl->decl_kind = ModuleDeclKind::kProgram;
     decl->is_extern = true;
     decl->range.start = CurrentLoc();
-    Consume();  // program
+    Consume();
     Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
     decl->name = Expect(TokenKind::kIdentifier).text;
     ParseParamsPortsAndSemicolon(*decl);
@@ -522,8 +494,6 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
   }
   SkipToSemicolon(lexer_);
 }
-
-// --- Module parsing ---
 
 ModuleDecl* Parser::ParseExternModuleDecl() {
   auto* mod = arena_.Create<ModuleDecl>();
@@ -547,7 +517,6 @@ ModuleDecl* Parser::ParseModuleDecl() {
     Expect(TokenKind::kKwModule);
   }
 
-  // Optional lifetime qualifier (§13.4.2)
   mod->is_automatic = Match(TokenKind::kKwAutomatic);
   if (!mod->is_automatic) Match(TokenKind::kKwStatic);
 
@@ -563,9 +532,8 @@ ModuleDecl* Parser::ParseModuleDecl() {
   return mod;
 }
 
-// Parse a single item inside a package body. Returns true if handled.
 bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
-  // anonymous_program: program ; { ... } endprogram (A.1.11)
+
   if (Check(TokenKind::kKwProgram)) {
     Consume();
     Expect(TokenKind::kSemicolon);
@@ -580,7 +548,7 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
     Expect(TokenKind::kKwEndprogram);
     return true;
   }
-  // extern_constraint_declaration in package (A.1.11)
+
   if (Check(TokenKind::kKwConstraint)) {
     ParseOutOfBlockConstraint(nullptr);
     return true;
@@ -603,17 +571,15 @@ PackageDecl* Parser::ParsePackageDecl() {
   pkg->range.start = CurrentLoc();
   Expect(TokenKind::kKwPackage);
 
-  // Optional lifetime qualifier (§26.2 / A.1.2)
   Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
 
   pkg->name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kSemicolon);
-  // §6.20.1: param_assignments inside a package shall become localparam.
+
   ++package_body_depth_;
   while (!Check(TokenKind::kKwEndpackage) && !AtEnd()) {
-    if (Match(TokenKind::kSemicolon)) continue;  // null item (A.1.11)
-    // A specify block is only valid as a module item; reject it here before
-    // the shared module-item dispatcher would silently accept it.
+    if (Match(TokenKind::kSemicolon)) continue;
+
     if (Check(TokenKind::kKwSpecify)) {
       diag_.Error(CurrentLoc(),
                   "specify block must appear inside a module declaration");
@@ -631,12 +597,9 @@ PackageDecl* Parser::ParsePackageDecl() {
   return pkg;
 }
 
-// §11.12: Parse a single let port argument.
-// A.2.12: let_port_item ::= {attribute_instance} let_formal_type
-//         formal_port_identifier {variable_dimension} [= expression]
 FunctionArg Parser::ParseLetArg() {
   FunctionArg arg;
-  ParseAttributes();  // A.2.12: {attribute_instance}
+  ParseAttributes();
   if (!Match(TokenKind::kKwUntyped)) {
     arg.data_type = ParseDataType();
   }
@@ -648,17 +611,14 @@ FunctionArg Parser::ParseLetArg() {
   return arg;
 }
 
-// §11.12: let declaration — let name(args) = expr;
-// let_port_item ::= let_formal_type identifier {dim} [= expr]
-// let_formal_type ::= data_type_or_implicit | untyped
 ModuleItem* Parser::ParseLetDecl() {
-  Consume();  // 'let'
+  Consume();
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kLetDecl;
   item->loc = CurrentLoc();
   item->name = ExpectIdentifier().text;
   if (Check(TokenKind::kLParen)) {
-    Consume();  // '('
+    Consume();
     if (!Check(TokenKind::kRParen)) {
       item->func_args.push_back(ParseLetArg());
       while (Match(TokenKind::kComma)) {
@@ -674,7 +634,7 @@ ModuleItem* Parser::ParseLetDecl() {
 }
 
 void Parser::ParseGenvarDecl(std::vector<ModuleItem*>& items) {
-  Consume();  // genvar keyword
+  Consume();
   do {
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kVarDecl;
@@ -730,7 +690,7 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu) {
     auto prec_tok = Consume();
     TimeUnit prec = TimeUnit::kNs;
     TryParseTimeUnit(prec_tok.text, prec);
-    // §3.14: Precision shall be at least as precise as the unit.
+
     if (static_cast<int>(prec) > static_cast<int>(tu)) {
       diag_.Error(prec_tok.loc,
                   "time precision is less precise than the time unit");
@@ -740,4 +700,4 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu) {
   Expect(TokenKind::kSemicolon);
 }
 
-}  // namespace delta
+}

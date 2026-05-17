@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- sequence_declaration ---
-
 TEST(AssertionDeclParsing, AssertionItemDecl_SequenceDecl) {
   auto r = Parse(
       "module m;\n"
@@ -98,8 +96,6 @@ TEST(AssertionParsing, MulticlockSequenceDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- sequence_port_list / sequence_port_item ---
-
 TEST(AssertionDeclParsing, SequencePortItem_DefaultValue) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -136,8 +132,6 @@ TEST(AssertionDeclParsing, SequenceLvarPortDirection_Output) {
               "endmodule\n"));
 }
 
-// --- sequence_formal_type ---
-
 TEST(AssertionDeclParsing, SequenceFormalType_Sequence) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -164,8 +158,6 @@ TEST(AssertionDeclParsing, SequenceFormalType_DataType) {
               "  endsequence\n"
               "endmodule\n"));
 }
-
-// --- sequence_list_of_arguments / sequence_actual_arg ---
 
 TEST(AssertionDeclParsing, SequenceListOfArguments_Positional) {
   EXPECT_TRUE(
@@ -206,8 +198,6 @@ TEST(AssertionDeclParsing, SequenceActualArg_EventExpr) {
               "  assert property (@(posedge clk) s(posedge x, y));\n"
               "endmodule\n"));
 }
-
-// --- sequence_expr ---
 
 TEST(AssertionDeclParsing, SequenceExpr_CycleDelay) {
   EXPECT_TRUE(
@@ -395,8 +385,6 @@ TEST(AssertionParsing, SequenceThroughoutWithImplication) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- cycle_delay_range / cycle_delay_const_range_expression ---
-
 TEST(AssertionDeclParsing, CycleDelayRange_Constant) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -452,8 +440,6 @@ TEST(AssertionDeclParsing, CycleDelayConstRange_OpenEnd) {
               "  assert property (@(posedge clk) a ##[1:$] b);\n"
               "endmodule\n"));
 }
-
-// --- consecutive_repetition / nonconsecutive_repetition / goto_repetition ---
 
 TEST(AssertionDeclParsing, ConsecutiveRepetition_Exact) {
   EXPECT_TRUE(
@@ -566,8 +552,6 @@ TEST(AssertionParsing, SequenceGotoRepetitionChecksAst) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// --- sequence_match_item ---
-
 TEST(AssertionDeclParsing, SequenceMatchItem_Assignment) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -591,8 +575,6 @@ TEST(AssertionDeclParsing, SequenceMatchItem_SubroutineCall) {
               "    (a ##1 b, $display(\"match\")) |-> c);\n"
               "endmodule\n"));
 }
-
-// --- assertion_variable_declaration ---
 
 TEST(AssertionDeclParsing, AssertionVariableDecl_InProperty) {
   EXPECT_TRUE(
@@ -624,8 +606,6 @@ TEST(AssertionDeclParsing, AssertionVariableDecl_MultipleVars) {
               "  endproperty\n"
               "endmodule\n"));
 }
-
-// --- sequence_method_call ---
 
 TEST(AssertionDeclParsing, SequenceMethodCall_Triggered) {
   EXPECT_TRUE(
@@ -695,4 +675,4 @@ TEST(AssertionParsing, SequenceMatchedMethodWithReset) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

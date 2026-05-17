@@ -17,4 +17,4 @@ TEST(CheckerElab, ElaborateCheckerWithVars) {
   EXPECT_FALSE(mod->assigns.empty());
 }
 
-}  // namespace
+}

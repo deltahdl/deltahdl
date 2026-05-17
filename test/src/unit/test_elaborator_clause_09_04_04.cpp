@@ -121,4 +121,4 @@ TEST(SequenceTriggeredElaboration, TriggeredCheckAfterWaitElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -41,4 +41,4 @@ TEST(WildcardPortConnectionLexing, WildcardWithEmptyPortOverride) {
   EXPECT_EQ(tokens[9].kind, TokenKind::kRParen);
 }
 
-}  // namespace
+}

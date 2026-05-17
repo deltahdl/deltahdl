@@ -6,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §4.3 ¶2: "Examples of processes include... continuous assignments...". The
-// elaborator records each continuous assignment in the module's `assigns`
-// list as a distinct process-like construct, separate from procedural
-// `processes`. Both LHS and RHS are captured as evaluable expressions.
 TEST(EventSimulationElaboration, ContinuousAssignIsRecognizedAsAProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -28,9 +24,6 @@ TEST(EventSimulationElaboration, ContinuousAssignIsRecognizedAsAProcess) {
   EXPECT_TRUE(mod->processes.empty());
 }
 
-// §4.3 ¶2: "Processes are objects that can be evaluated". Every elaborated
-// RtlirProcess carries a non-null body that the simulator later evaluates;
-// a null body would prevent evaluation.
 TEST(EventSimulationElaboration, EveryProcessKindCarriesAnEvaluableBody) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,10 +44,6 @@ TEST(EventSimulationElaboration, EveryProcessKindCarriesAnEvaluableBody) {
   }
 }
 
-// §4.3 ¶2: the enumerated procedural process kinds (initial, always,
-// always_comb, always_latch, always_ff) all elaborate into distinct
-// RtlirProcessKind values. A module containing one of each exposes the full
-// set so the simulator can later schedule each as its own process.
 TEST(EventSimulationElaboration, EnumeratedProceduralProcessKindsAreDistinct) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -77,9 +66,6 @@ TEST(EventSimulationElaboration, EnumeratedProceduralProcessKindsAreDistinct) {
   EXPECT_EQ(kinds.size(), 5u);
 }
 
-// §4.3 ¶2 edge case: a module with no procedural processes elaborates to an
-// empty `processes` list. The "concurrently scheduled elements" of §4.3 ¶2
-// only exist when the source declares them.
 TEST(EventSimulationElaboration, ModuleWithoutProcessesHasEmptyProcessList) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -93,9 +79,6 @@ TEST(EventSimulationElaboration, ModuleWithoutProcessesHasEmptyProcessList) {
   EXPECT_TRUE(mod->assigns.empty());
 }
 
-// §4.3 ¶2 multiplicity: two procedures of the same kind in the same module
-// elaborate to two separate RtlirProcess entries — each is a "concurrently
-// scheduled" process per §4.3 ¶2, not a merged single process.
 TEST(EventSimulationElaboration, MultipleInitialBlocksProduceSeparateProcesses) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -112,4 +95,4 @@ TEST(EventSimulationElaboration, MultipleInitialBlocksProduceSeparateProcesses) 
   EXPECT_EQ(mod->processes[1].kind, RtlirProcessKind::kInitial);
 }
 
-}  // namespace
+}

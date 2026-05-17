@@ -205,10 +205,6 @@ TEST(DataTypeParsing, TypedefEnum) {
   EXPECT_EQ(var->data_type.type_name, "my_enum");
 }
 
-// §6.18: "hierarchical references to type identifiers shall not be allowed".
-// The parser only recognizes a typedef name as a data type when it appears
-// as a simple identifier in the active known_types_ set, so a dotted form
-// like `inst.my_type x;` cannot be parsed as a variable declaration.
 TEST(DataTypeParsing, HierarchicalTypeReferenceRejected) {
   auto r = Parse(
       "module inner;\n"
@@ -221,9 +217,6 @@ TEST(DataTypeParsing, HierarchicalTypeReferenceRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §6.18 Syntax 6-4 form 2: a typedef whose source type is qualified by an
-// interface port — `typedef interface_port_identifier . type_identifier
-// new_identifier ;` — declares an interface-based typedef.
 TEST(DataTypeParsing, InterfacePortTypedef) {
   auto r = Parse(
       "interface intf_i;\n"
@@ -247,9 +240,6 @@ TEST(DataTypeParsing, InterfacePortTypedef) {
   EXPECT_EQ(td->typedef_type.type_name, "data_t");
 }
 
-// §6.18: "The declaration of a user-defined data type shall precede any
-// reference to its type_identifier." A name not yet in the parser's known
-// types cannot be recognized as a type in a variable declaration.
 TEST(DataTypeParsing, TypeReferenceBeforeDeclarationRejected) {
   auto r = Parse(
       "module m;\n"
@@ -259,4 +249,4 @@ TEST(DataTypeParsing, TypeReferenceBeforeDeclarationRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

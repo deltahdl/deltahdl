@@ -84,4 +84,4 @@ TEST(ReadWriteInterfaceExample, BothModportsBindInTheSameTopology) {
   EXPECT_TRUE(ElabOk(src));
 }
 
-}  // namespace
+}

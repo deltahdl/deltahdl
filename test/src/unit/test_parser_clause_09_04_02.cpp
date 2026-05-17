@@ -115,7 +115,6 @@ TEST(EventControlParsing, NamedEventParenthesized) {
   EXPECT_EQ(stmt->events[0].signal->text, "ev");
 }
 
-
 TEST(EventControlParsing, PosedgeNullStatement) {
   auto r = Parse(
       "module m;\n"
@@ -184,8 +183,6 @@ TEST(EventControlParsing, EdgeKeywordInProceduralContext) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kEdge);
 }
 
-// Moved from test_parser_clause_09_04.cpp: §9.4.2 owns the rule that
-// `@(posedge clk) ;` parses with a null body statement.
 TEST(EventControlParsing, ProceduralTimingControlEventNull) {
   auto r = Parse(
       "module m;\n"
@@ -202,8 +199,6 @@ TEST(EventControlParsing, ProceduralTimingControlEventNull) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kNull);
 }
 
-// Moved from test_parser_clause_09_04.cpp: §9.4.2 owns the rule that
-// `@(posedge clk) begin ... end` parses with a block body.
 TEST(EventControlParsing, ProceduralTimingControlEventBlock) {
   auto r = Parse(
       "module m;\n"
@@ -223,8 +218,6 @@ TEST(EventControlParsing, ProceduralTimingControlEventBlock) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-// Moved from test_parser_annex_a_06_05.cpp: §9.4.2's posedge keyword
-// applies to hierarchical signal references.
 TEST(EventControlParsing, EventControlHierarchicalSignal) {
   auto r = Parse(
       "module m;\n"
@@ -259,4 +252,4 @@ TEST(EventControlParsing, MemberAccessInEventExpression) {
   EXPECT_EQ(stmt->events[0].signal->kind, ExprKind::kMemberAccess);
 }
 
-}  // namespace
+}

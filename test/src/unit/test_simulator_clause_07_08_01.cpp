@@ -24,7 +24,6 @@ static Expr* MakeAssocSelect(Arena& arena, std::string_view base_name,
 
 namespace {
 
-// §7.8.1: Write and read back an element with integral index.
 TEST(WildcardAssocArraySimulation, WriteAndRead) {
   SimFixture f;
   f.ctx.CreateAssocArray("aa", 32, false);
@@ -43,7 +42,6 @@ TEST(WildcardAssocArraySimulation, WriteAndRead) {
   EXPECT_EQ(result.ToUint64(), 100u);
 }
 
-// §7.8.1: Ordering is numerical — smallest to largest.
 TEST(WildcardAssocArraySimulation, NumericalOrdering) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -59,7 +57,6 @@ TEST(WildcardAssocArraySimulation, NumericalOrdering) {
   EXPECT_EQ(it->first, 30);
 }
 
-// §7.8.1: Multiple integral index values stored independently.
 TEST(WildcardAssocArraySimulation, MultipleKeys) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -73,7 +70,6 @@ TEST(WildcardAssocArraySimulation, MultipleKeys) {
   EXPECT_EQ(aa->int_data[3].ToUint64(), 30u);
 }
 
-// §7.8.1: End-to-end write and read with wildcard array.
 TEST(WildcardAssocArraySimulation, EndToEndWriteRead) {
   auto v = RunAndGet(
       "module t;\n"
@@ -88,7 +84,6 @@ TEST(WildcardAssocArraySimulation, EndToEndWriteRead) {
   EXPECT_EQ(v, 77u);
 }
 
-// §7.8.1: End-to-end multiple keys with wildcard array.
 TEST(WildcardAssocArraySimulation, EndToEndMultipleKeys) {
   auto v = RunAndGet(
       "module t;\n"
@@ -105,7 +100,6 @@ TEST(WildcardAssocArraySimulation, EndToEndMultipleKeys) {
   EXPECT_EQ(v, 20u);
 }
 
-// §7.8.1: Overwriting a key replaces the previous value.
 TEST(WildcardAssocArraySimulation, OverwriteKey) {
   auto v = RunAndGet(
       "module t;\n"
@@ -121,4 +115,4 @@ TEST(WildcardAssocArraySimulation, OverwriteKey) {
   EXPECT_EQ(v, 999u);
 }
 
-}  // namespace
+}

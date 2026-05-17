@@ -157,4 +157,4 @@ TEST(ReplicationEval, ZeroReplicationWidth) {
   EXPECT_EQ(result.width, 0u);
 }
 
-}  // namespace
+}

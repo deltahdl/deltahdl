@@ -14,4 +14,4 @@ TEST(OptionalSystemTaskParserParsing, Countdrivers) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
 
-}  // namespace
+}

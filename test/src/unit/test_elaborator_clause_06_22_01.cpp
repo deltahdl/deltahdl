@@ -18,7 +18,6 @@ TEST(MatchingTypesElaboration, MatchingTypesSameTypedef) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// Rule (c): anonymous struct same declaration elaborates
 TEST(MatchingTypesElaboration, AnonymousStructSameDeclElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -31,7 +30,6 @@ TEST(MatchingTypesElaboration, AnonymousStructSameDeclElaborates) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// Rule (d): typedef enum matching
 TEST(MatchingTypesElaboration, TypedefEnumAssignmentElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -46,7 +44,6 @@ TEST(MatchingTypesElaboration, TypedefEnumAssignmentElaborates) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// Rule (g): explicit signed matching default
 TEST(MatchingTypesElaboration, ByteSignedMatchesByteElaborates) {
   EXPECT_TRUE(
       ElabOk("module top;\n"
@@ -56,7 +53,6 @@ TEST(MatchingTypesElaboration, ByteSignedMatchesByteElaborates) {
              "endmodule\n"));
 }
 
-// Rule (h): package typedef used across import
 TEST(MatchingTypesElaboration, PackageTypedefImportElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -74,8 +70,6 @@ TEST(MatchingTypesElaboration, PackageTypedefImportElaborates) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.1(a): "Any built-in type matches every other occurrence of itself,
-// in every scope." Two `int` declarations across nested modules shall match.
 TEST(MatchingTypesElaboration, BuiltinIntMatchesAcrossScopes) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -91,9 +85,6 @@ TEST(MatchingTypesElaboration, BuiltinIntMatchesAcrossScopes) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.1(b): "A simple typedef ... that renames a built-in or user-defined
-// type matches that built-in or user-defined type within the scope of the
-// type identifier."
 TEST(MatchingTypesElaboration, SimpleTypedefMatchesUnderlyingBuiltin) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -108,4 +99,4 @@ TEST(MatchingTypesElaboration, SimpleTypedefMatchesUnderlyingBuiltin) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

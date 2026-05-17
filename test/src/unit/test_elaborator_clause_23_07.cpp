@@ -2,8 +2,6 @@
 
 namespace {
 
-// --- Rule (a): First component resolves to a data object ---
-
 TEST(DottedNameElaboration, StructDataObjectIsMemberSelect) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -66,8 +64,6 @@ TEST(DottedNameElaboration, NestedStructMemberSelect) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Rule (b): First component resolves to a directly visible scope name ---
-
 TEST(DottedNameElaboration, InstanceScopeIsHierarchicalName) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -103,9 +99,6 @@ TEST(DottedNameElaboration, MultiLevelScopeIsHierarchicalName) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Rules (a) and (b) coexist: same module uses both member selects and
-//     hierarchical names ---
-
 TEST(DottedNameElaboration, MemberSelectAndHierarchicalNameCoexist) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -127,8 +120,6 @@ TEST(DottedNameElaboration, MemberSelectAndHierarchicalNameCoexist) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- Rule (d): First component not found → treated as hierarchical name ---
-
 TEST(DottedNameElaboration, UnresolvedFirstComponentTreatedAsHierarchical) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -140,4 +131,4 @@ TEST(DottedNameElaboration, UnresolvedFirstComponentTreatedAsHierarchical) {
   ASSERT_NE(design, nullptr);
 }
 
-}  // namespace
+}

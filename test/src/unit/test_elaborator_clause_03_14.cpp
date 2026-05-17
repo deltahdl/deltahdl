@@ -40,4 +40,4 @@ TEST(DesignBuildingBlockElaboration, ModuleWithDelayElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

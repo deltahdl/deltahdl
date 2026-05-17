@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.3.1: new() with explicit key count parses in assignment.
 TEST(SemaphoreNewParser, NewWithExplicitKeyCount) {
   auto r = Parse(
       "module m;\n"
@@ -17,7 +16,6 @@ TEST(SemaphoreNewParser, NewWithExplicitKeyCount) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3.1: new() with no arguments (default keyCount = 0).
 TEST(SemaphoreNewParser, NewWithNoArguments) {
   auto r = Parse(
       "module m;\n"
@@ -30,7 +28,6 @@ TEST(SemaphoreNewParser, NewWithNoArguments) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3.1: new() in declaration initializer with zero keys.
 TEST(SemaphoreNewParser, DeclarationWithNewZeroKeys) {
   auto r = Parse(
       "module m;\n"
@@ -40,7 +37,6 @@ TEST(SemaphoreNewParser, DeclarationWithNewZeroKeys) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3.1: new() with large key count.
 TEST(SemaphoreNewParser, DeclarationWithLargeKeyCount) {
   auto r = Parse(
       "module m;\n"
@@ -50,7 +46,6 @@ TEST(SemaphoreNewParser, DeclarationWithLargeKeyCount) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3.1: new() returns the semaphore handle — variable stores it.
 TEST(SemaphoreNewParser, NewReturnAssignedToVariable) {
   auto r = Parse(
       "module m;\n"
@@ -65,4 +60,4 @@ TEST(SemaphoreNewParser, NewReturnAssignedToVariable) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

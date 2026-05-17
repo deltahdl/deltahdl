@@ -171,4 +171,4 @@ TEST(ExportTasksExample, TopBindsModportSelectorsToMemAndCpu) {
   EXPECT_TRUE(binds_initiator);
 }
 
-}  // namespace
+}

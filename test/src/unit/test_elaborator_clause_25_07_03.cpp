@@ -71,4 +71,4 @@ TEST(ExportTasksExample, ElaboratesWithHierarchicalTaskBodiesInExportingModule) 
   EXPECT_TRUE(ElabOk(src));
 }
 
-}  // namespace
+}

@@ -232,4 +232,4 @@ TEST(ClassScopeResolutionSim, SuperclassStaticAccessFromDerived) {
       "endmodule\n", "result"), 55u);
 }
 
-}  // namespace
+}

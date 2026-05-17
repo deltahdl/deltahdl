@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.3.2: put() call in initial block elaborates without error.
 TEST(SemaphorePutElaborator, PutCallInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,7 +18,6 @@ TEST(SemaphorePutElaborator, PutCallInInitialBlock) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.3.2: put() with default keyCount elaborates.
 TEST(SemaphorePutElaborator, PutDefaultKeyCount) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -34,7 +32,6 @@ TEST(SemaphorePutElaborator, PutDefaultKeyCount) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.3.2: multiple put() calls elaborate.
 TEST(SemaphorePutElaborator, MultiplePutCalls) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,4 +48,4 @@ TEST(SemaphorePutElaborator, MultiplePutCalls) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

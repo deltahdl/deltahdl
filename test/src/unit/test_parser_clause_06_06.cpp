@@ -36,4 +36,4 @@ TEST(DataTypeParsing, AllBuiltinNetTypes) {
   }
 }
 
-}  // namespace
+}

@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- Shared syntactic form: dotted names parse as kMemberAccess ---
-
 TEST(DottedNameParsing, MemberAccessExpression) {
   auto r = Parse(
       "module t;\n"
@@ -93,8 +91,6 @@ TEST(DottedNameParsing, DottedNameInConditionalExpression) {
               "endmodule\n"));
 }
 
-// Struct and hierarchical dotted names parse identically.
-
 TEST(DottedNameParsing, StructSelectAndHierarchicalSameSyntacticForm) {
   auto r1 = Parse(
       "module t;\n"
@@ -154,4 +150,4 @@ TEST(DottedNameParsing, DottedNameOnBothSidesOfAssignment) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

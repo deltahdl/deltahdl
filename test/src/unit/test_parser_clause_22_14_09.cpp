@@ -31,4 +31,4 @@ TEST(CompilerDirectiveParsing, BeginKeywords1800_2023) {
                               "`end_keywords\n"));
 }
 
-}  // namespace
+}

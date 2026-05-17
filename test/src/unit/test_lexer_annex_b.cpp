@@ -347,4 +347,4 @@ TEST(KeywordListLexing, NoDuplicateTokenKinds) {
   EXPECT_EQ(seen.size(), kTableB1Count);
 }
 
-}  // namespace
+}

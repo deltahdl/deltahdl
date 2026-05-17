@@ -9,8 +9,6 @@ using namespace delta;
 
 namespace {
 
-// Build a Net of the given type with the storage variable initialized to z,
-// matching what SimContext::CreateNet produces in production.
 Net MakeUndrivenNet(Arena& arena, NetType type, uint32_t width) {
   auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, width);
@@ -72,8 +70,6 @@ TEST(Tri0Tri1NetStrengths, Tri1NoDriverHasPullStrength) {
   EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kPull);
 }
 
-// "In the absence of an overriding source" covers both no drivers and a
-// driver that contributes only z (no overriding logic value).
 TEST(Tri0Tri1NetStrengths, Tri0AllZDriverProducesZero) {
   Arena arena;
   Net net = MakeUndrivenNet(arena, NetType::kTri0, 8);
@@ -94,7 +90,6 @@ TEST(Tri0Tri1NetStrengths, Tri1AllZDriverProducesOne) {
   EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
 }
 
-// Several drivers each contributing only z is still no overriding source.
 TEST(Tri0Tri1NetStrengths, Tri0MultipleAllZDriversProducesZero) {
   Arena arena;
   Net net = MakeUndrivenNet(arena, NetType::kTri0, 8);
@@ -121,8 +116,6 @@ TEST(Tri0Tri1NetStrengths, Tri1MultipleAllZDriversProducesOne) {
   EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kPull);
 }
 
-// Width spanning multiple 64-bit words exercises the per-word fill — a
-// single-word check would not catch a bug confined to bits >= 64.
 TEST(Tri0Tri1NetStrengths, Tri0WideUndrivenAllBitsZero) {
   constexpr uint32_t kWidth = 96;
   Arena arena;
@@ -167,4 +160,4 @@ TEST(Tri0Tri1NetStrengths, Tri1WideUndrivenAllBitsOne) {
   EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
 }
 
-}  // namespace
+}

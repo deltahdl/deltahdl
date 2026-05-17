@@ -139,4 +139,4 @@ TEST(RealLiteralParsing, RealLiteralAddition) {
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kRealLiteral);
 }
 
-}  // namespace
+}

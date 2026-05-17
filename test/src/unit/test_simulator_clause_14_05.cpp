@@ -69,10 +69,8 @@ TEST(ClockingHierExprSim, InoutHierSignalBidirectional) {
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
 
-  // Input side: sampled value captured.
   EXPECT_EQ(cmgr.GetSampledValue("cb", "bidir"), 0xEEu);
 
-  // Output side: can schedule a drive.
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [&cmgr, &f]() {
     cmgr.ScheduleOutputDrive("cb", "bidir", 0x11, f.ctx, f.scheduler);
@@ -82,4 +80,4 @@ TEST(ClockingHierExprSim, InoutHierSignalBidirectional) {
   EXPECT_EQ(bidir->value.ToUint64(), 0x11u);
 }
 
-}  // namespace
+}

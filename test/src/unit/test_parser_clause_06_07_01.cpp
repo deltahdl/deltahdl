@@ -895,4 +895,4 @@ TEST(NetDeclarations, WireWithPackedRange) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kNetDecl);
 }
 
-}  // namespace
+}

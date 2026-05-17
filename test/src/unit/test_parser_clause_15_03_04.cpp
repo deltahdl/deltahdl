@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.3.4: try_get() with explicit keyCount parses.
 TEST(SemaphoreTryGetParser, TryGetWithExplicitKeyCount) {
   auto r = Parse(
       "module m;\n"
@@ -16,7 +15,6 @@ TEST(SemaphoreTryGetParser, TryGetWithExplicitKeyCount) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3.4: try_get() with no arguments (default keyCount = 1).
 TEST(SemaphoreTryGetParser, TryGetWithDefaultKeyCount) {
   auto r = Parse(
       "module m;\n"
@@ -28,7 +26,6 @@ TEST(SemaphoreTryGetParser, TryGetWithDefaultKeyCount) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3.4: try_get() on a declared semaphore variable.
 TEST(SemaphoreTryGetParser, TryGetOnDeclaredSemaphore) {
   auto r = Parse(
       "module m;\n"
@@ -41,7 +38,6 @@ TEST(SemaphoreTryGetParser, TryGetOnDeclaredSemaphore) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.3.4: try_get() used in an expression context (returns int).
 TEST(SemaphoreTryGetParser, TryGetUsedInExpression) {
   auto r = Parse(
       "module m;\n"
@@ -55,4 +51,4 @@ TEST(SemaphoreTryGetParser, TryGetUsedInExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

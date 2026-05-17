@@ -103,4 +103,4 @@ TEST(LexicalConventionLexing, StringWithEscapeSequences) {
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
 }
 
-}  // namespace
+}

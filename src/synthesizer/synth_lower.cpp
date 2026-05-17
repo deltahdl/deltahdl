@@ -7,10 +7,6 @@ namespace delta {
 SynthLower::SynthLower(Arena& arena, DiagEngine& diag)
     : arena_(arena), diag_(diag) {}
 
-// =============================================================================
-// Synthesizability checker
-// =============================================================================
-
 bool SynthLower::CheckExprSynthesizable(const Expr* expr) {
   if (!expr) return true;
   if (expr->kind == ExprKind::kSystemCall) {
@@ -85,7 +81,7 @@ bool SynthLower::CheckCaseSynth(const Stmt* stmt) {
 
 bool SynthLower::CheckSynthesizable(const RtlirModule* mod) {
   for (const auto& proc : mod->processes) {
-    // Initial and final blocks are simulation-only; skip silently.
+
     if (proc.kind == RtlirProcessKind::kInitial ||
         proc.kind == RtlirProcessKind::kFinal)
       continue;
@@ -93,10 +89,6 @@ bool SynthLower::CheckSynthesizable(const RtlirModule* mod) {
   }
   return true;
 }
-
-// =============================================================================
-// Port I/O mapping
-// =============================================================================
 
 void SynthLower::MapPorts(const RtlirModule* mod, AigGraph& aig) {
   for (const auto& port : mod->ports) {
@@ -125,10 +117,6 @@ void SynthLower::MapPorts(const RtlirModule* mod, AigGraph& aig) {
   }
 }
 
-// =============================================================================
-// Signal bit access
-// =============================================================================
-
 void SynthLower::SetSignalBit(std::string_view name, uint32_t bit,
                               uint32_t lit) {
   auto it = signal_bits_.find(name);
@@ -150,10 +138,6 @@ uint32_t SynthLower::SignalWidth(std::string_view name) {
   if (it == signal_widths_.end()) return 1;
   return it->second;
 }
-
-// =============================================================================
-// Expression lowering (per-bit)
-// =============================================================================
 
 uint32_t SynthLower::LowerIdentBit(std::string_view name, uint32_t bit) {
   return GetSignalBit(name, bit);
@@ -230,10 +214,6 @@ uint32_t SynthLower::LowerExprBit(const Expr* expr, AigGraph& aig,
   }
 }
 
-// =============================================================================
-// Continuous assignment lowering
-// =============================================================================
-
 void SynthLower::LowerContAssign(const RtlirContAssign& assign, AigGraph& aig) {
   if (!assign.lhs || !assign.rhs) return;
   if (assign.lhs->kind != ExprKind::kIdentifier) return;
@@ -243,10 +223,6 @@ void SynthLower::LowerContAssign(const RtlirContAssign& assign, AigGraph& aig) {
     SetSignalBit(name, b, LowerExprBit(assign.rhs, aig, b));
   }
 }
-
-// =============================================================================
-// Statement lowering for combinational processes
-// =============================================================================
 
 void SynthLower::LowerIfStmt(const Stmt* stmt, AigGraph& aig) {
   auto saved = signal_bits_;
@@ -453,17 +429,9 @@ void SynthLower::MuxCaseBits(
   }
 }
 
-// =============================================================================
-// always_comb lowering
-// =============================================================================
-
 void SynthLower::LowerAlwaysComb(const RtlirProcess& proc, AigGraph& aig) {
   LowerStmt(proc.body, aig);
 }
-
-// =============================================================================
-// always_ff / always_latch lowering
-// =============================================================================
 
 void SynthLower::CreateLatches(
     const std::unordered_map<std::string_view, std::vector<uint32_t>>& saved,
@@ -491,10 +459,6 @@ void SynthLower::LowerAlwaysLatch(const RtlirProcess& proc, AigGraph& aig) {
   CreateLatches(saved, aig);
 }
 
-// =============================================================================
-// Output registration
-// =============================================================================
-
 void SynthLower::RegisterOutputs(AigGraph& aig) {
   for (const auto& [name, width] : output_ports_) {
     for (uint32_t b = 0; b < width; ++b) {
@@ -502,10 +466,6 @@ void SynthLower::RegisterOutputs(AigGraph& aig) {
     }
   }
 }
-
-// =============================================================================
-// Top-level Lower
-// =============================================================================
 
 AigGraph* SynthLower::Lower(const RtlirModule* mod) {
   if (!mod) return nullptr;
@@ -547,4 +507,4 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
   return aig;
 }
 
-}  // namespace delta
+}

@@ -15,7 +15,6 @@ LibraryDecl MakeDecl(std::string_view name,
   return d;
 }
 
-// Files outside any library spec land in "work".
 TEST(LibraryMapWorkDefault, UnmatchedFileFallsBackToWork) {
   LibraryMap m;
   EXPECT_EQ(m.LibraryForFile("/proj/rtl/top.v"), "work");
@@ -28,7 +27,6 @@ TEST(LibraryMapWorkDefault, UnmatchedAfterDeclarationsStillWork) {
   EXPECT_EQ(m.LibraryForFile("/proj/gates/top.vg"), "work");
 }
 
-// `*` wildcard: matches characters within a single name component.
 TEST(LibraryMapWildcards, StarMatchesSuffixInDirectory) {
   LibraryMap m;
   auto rtl = MakeDecl("rtlLib", {"*.v"});
@@ -69,7 +67,6 @@ TEST(LibraryMapWildcards, HierarchicalDotsMatchZeroDirectories) {
   EXPECT_EQ(m.LibraryForFile("/proj/top.v"), "rtlLib");
 }
 
-// Trailing '/' rule: "/foo/" means all files in /foo (identical to /foo/*).
 TEST(LibraryMapTrailingSlash, IncludesAllFilesInDirectory) {
   LibraryMap m;
   auto rtl = MakeDecl("rtlLib", {"/proj/rtl/"});
@@ -89,7 +86,6 @@ TEST(LibraryMapTrailingSlash, EquivalentToStarSuffix) {
   EXPECT_EQ(m_star.LibraryForFile("/dir/sub/file.v"), "work");
 }
 
-// Relative paths anchor to the .map file's directory.
 TEST(LibraryMapRelativePath, ResolvesRelativeToBaseDir) {
   LibraryMap m;
   auto rtl = MakeDecl("rtlLib", {"*.v"});
@@ -115,13 +111,8 @@ TEST(LibraryMapRelativePath, DotDotResolvesToParent) {
   EXPECT_EQ(m.LibraryForFile("/proj/lib/local.v"), "work");
 }
 
-// Order-of-declaration determines first-match win, satisfying §33.3.1's
-// "multiple map files shall be read in the order in which they are
-// specified" — within one map and across maps, the table reflects order.
 TEST(LibraryMapDeclarationOrder, MultipleMapFilesProcessedInOrder) {
-  // Simulating two .map files: first contributes one declaration, then
-  // the second contributes another.  The earlier file's spec wins for
-  // overlapping paths.
+
   LibraryMap m;
   m.AddDeclaration(MakeDecl("alpha", {"*.v"}), "/dirA");
   m.AddDeclaration(MakeDecl("beta", {"*.v"}), "/dirB");
@@ -129,7 +120,6 @@ TEST(LibraryMapDeclarationOrder, MultipleMapFilesProcessedInOrder) {
   EXPECT_EQ(m.LibraryForFile("/dirB/y.v"), "beta");
 }
 
-// Direct probe of the static matcher for spec-vs-path semantics.
 TEST(LibraryMapPathMatches, AbsoluteSpecMatchesAbsolutePath) {
   EXPECT_TRUE(LibraryMap::PathMatches("/x/y.v", "/proj", "/x/y.v"));
   EXPECT_FALSE(LibraryMap::PathMatches("/x/y.v", "/proj", "/x/z.v"));
@@ -145,4 +135,4 @@ TEST(LibraryMapPathMatches, HierarchicalDotsCrossDirectories) {
   EXPECT_FALSE(LibraryMap::PathMatches("/.../*.v", "/proj", "/a/b/c.sv"));
 }
 
-}  // namespace
+}

@@ -38,4 +38,4 @@ TEST(LexicalConventionElaboration, TimeLiteralInAssignmentElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

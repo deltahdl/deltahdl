@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §31.3.3: a bare `$setuphold` command should elaborate without errors when
-// the reference and data terminals resolve in scope.
 TEST(SystemTimingCheckElaboration, SetupholdElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,8 +17,6 @@ TEST(SystemTimingCheckElaboration, SetupholdElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.3.3 Table 31-3: the notifier argument is optional. The five-argument
-// form with a notifier variable must elaborate.
 TEST(SystemTimingCheckElaboration, SetupholdWithNotifierElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -34,8 +30,6 @@ TEST(SystemTimingCheckElaboration, SetupholdWithNotifierElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Moved from A.7.5.1: the full Syntax 31-5 invocation — notifier plus the
-// trailing pair of delayed signal identifiers — elaborates cleanly.
 TEST(TimingCheckCommandElaboration, SetupholdFullArgsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -49,8 +43,6 @@ TEST(TimingCheckCommandElaboration, SetupholdFullArgsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.3.3 Table 31-3: setup_limit and hold_limit are constant expressions.
-// Specparam-driven limits must resolve and elaborate.
 TEST(SystemTimingCheckElaboration, SetupholdSpecparamLimitsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -66,4 +58,4 @@ TEST(SystemTimingCheckElaboration, SetupholdSpecparamLimitsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -2,11 +2,6 @@
 
 namespace {
 
-// §33.4.2: an instance clause that names a path inside a hierarchy
-// already delegated to another config (via `instance ... use ...:config`)
-// is an error.  This is the LRM's worked example: the inner `instance
-// top.bot.a1 liblist lib4;` lies under `top.bot`, which has been handed
-// off to `lib1.bot:config`.
 TEST(ConfigHierarchicalRules,
      InstancePathInsideDelegatedHierarchyIsRejected) {
   ElabFixture f;
@@ -21,8 +16,6 @@ TEST(ConfigHierarchicalRules,
   EXPECT_TRUE(f.has_errors);
 }
 
-// Positive control: an instance rule on a disjoint subhierarchy is
-// allowed.
 TEST(ConfigHierarchicalRules, DisjointInstancePathsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -36,8 +29,6 @@ TEST(ConfigHierarchicalRules, DisjointInstancePathsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Positive control: a `:config`-bound instance with no further
-// instance rules underneath it elaborates cleanly.
 TEST(ConfigHierarchicalRules, IsolatedConfigBindingAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -50,9 +41,6 @@ TEST(ConfigHierarchicalRules, IsolatedConfigBindingAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Two `:config` delegations that themselves overlap (a delegated path
-// nested inside another delegated path) are also forbidden by the
-// "occurs within a hierarchy specified by another config" wording.
 TEST(ConfigHierarchicalRules, NestedDelegationIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -66,4 +54,4 @@ TEST(ConfigHierarchicalRules, NestedDelegationIsRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

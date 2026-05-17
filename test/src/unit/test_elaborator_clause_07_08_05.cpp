@@ -95,4 +95,4 @@ TEST(UserDefinedTypeAssocArrayElaboration, TypedefIndexNotStringOrWildcard) {
   }
 }
 
-}  // namespace
+}

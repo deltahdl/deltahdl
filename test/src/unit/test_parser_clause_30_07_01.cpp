@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Locate the first PATHPULSE$ specparam inside a module's specify block, or
-// at module scope. Returns nullptr when none exists.
 SpecifyItem* FindPathpulseInSpecify(ModuleDecl* mod) {
   auto* spec = FindSpecifyBlock(mod->items);
   if (spec == nullptr) return nullptr;
@@ -68,9 +66,6 @@ TEST(PulseControlSpecparamParsing, LimitValueMintypmax) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-// --- AST extraction: PATHPULSE$ must expose its input/output terminals and
-// both limit expressions so downstream stages can apply §30.7.1 semantics.
 
 TEST(PulseControlSpecparamParsing, PathpulseRejectOnlyExtraction) {
   auto r = Parse(
@@ -141,4 +136,4 @@ TEST(PulseControlSpecparamParsing, PathpulseMintypmaxExpressionPreserved) {
   EXPECT_EQ(item->pathpulse_error->kind, ExprKind::kMinTypMax);
 }
 
-}  // namespace
+}

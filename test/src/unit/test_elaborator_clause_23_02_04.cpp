@@ -309,4 +309,4 @@ TEST(ModuleItemsElaboration, AllProcessKindsElaborate) {
   EXPECT_EQ(design->top_modules[0]->processes.size(), 6u);
 }
 
-}  // namespace
+}

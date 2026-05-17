@@ -5,4 +5,4 @@ using namespace delta;
 
 namespace {
 
-}  // namespace
+}

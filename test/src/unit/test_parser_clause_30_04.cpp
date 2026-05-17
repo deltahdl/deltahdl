@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// The three path_declaration alternatives (simple, edge-sensitive,
-// state-dependent) must all be accepted inside a specify block.
 TEST(SpecifyPathParsing, MultiplePathDeclarations) {
   auto r = Parse(
       "module m;\n"
@@ -30,8 +28,6 @@ TEST(SpecifyPathParsing, MultiplePathDeclarations) {
   }
 }
 
-// More than one source can target the same destination, and the same source
-// can target multiple destinations — each appearing as its own path_declaration.
 TEST(SpecifyPathParsing, MultiplePathsInSpecifyBlock) {
   auto r = Parse(
       "module m(input a, b, output x, y);\n"
@@ -54,8 +50,6 @@ TEST(SpecifyPathParsing, MultiplePathsInSpecifyBlock) {
   EXPECT_EQ(spec->specify_items[2]->path.path_kind, SpecifyPathKind::kParallel);
 }
 
-// Module paths may connect any combination of vectors and scalars: both
-// endpoints scalar, both vector, and mixed-width with vector/scalar pairings.
 TEST(SpecifyPathParsing, VectorAndScalarEndpointsAccepted) {
   auto r = Parse(
       "module m(input sel, input [7:0] in1, in2, output [7:0] q);\n"
@@ -75,4 +69,4 @@ TEST(SpecifyPathParsing, VectorAndScalarEndpointsAccepted) {
   }
 }
 
-}  // namespace
+}

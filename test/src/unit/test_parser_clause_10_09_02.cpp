@@ -339,4 +339,4 @@ TEST(StructPatternParsing, AllThreeKeyTypes) {
   EXPECT_EQ(stmt->rhs->pattern_keys[2], "default");
 }
 
-}  // namespace
+}

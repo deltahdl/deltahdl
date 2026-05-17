@@ -73,4 +73,4 @@ TEST(IfElseIfElaboration, IfElseIfInInitialElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-}  // namespace
+}

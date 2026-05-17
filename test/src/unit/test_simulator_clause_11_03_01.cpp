@@ -9,8 +9,6 @@ using namespace delta;
 
 namespace {
 
-// --- Logical/relational on real → single-bit result ---
-
 TEST(RealOperandResult, RelationalLtOnRealIsSingleBit) {
   SimFixture f;
   MakeRealVar(f, "a", 1.5);
@@ -108,8 +106,6 @@ TEST(RealOperandResult, LogicalNotOnNonzeroRealIsFalse) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-// --- Equality on real operands → single-bit, compared as double values ---
-
 TEST(RealOperandResult, EqualityOnRealIsSingleBit) {
   SimFixture f;
   MakeRealVar(f, "a", 2.5);
@@ -131,8 +127,6 @@ TEST(RealOperandResult, InequalityOnRealIsSingleBit) {
   EXPECT_EQ(result.width, 1u);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
-
-// --- End-to-end simulation tests ---
 
 TEST(RealOperandResult, E2eRealAddResult) {
   auto v = RunAndGetReal(
@@ -201,8 +195,6 @@ TEST(RealOperandResult, E2eUnaryMinusOnReal) {
   EXPECT_DOUBLE_EQ(v, -3.5);
 }
 
-// §11.3.1: "The result of using ... the inside operator on real operands
-// shall be a single-bit value."
 TEST(RealOperandResult, E2eInsideOnRealIsSingleBit) {
   auto v = RunAndGet(
       "module t;\n"
@@ -217,9 +209,6 @@ TEST(RealOperandResult, E2eInsideOnRealIsSingleBit) {
   EXPECT_EQ(v, 1u);
 }
 
-// §11.3.1: "For other operators, if any operand, except before the ? in the
-// conditional operator, is real, the result is real." A real-and-integer
-// arithmetic expression must preserve fractional precision.
 TEST(RealOperandResult, E2eMixedRealIntArithResultIsReal) {
   auto v = RunAndGetReal(
       "module t;\n"
@@ -230,4 +219,4 @@ TEST(RealOperandResult, E2eMixedRealIntArithResultIsReal) {
   EXPECT_DOUBLE_EQ(v, 3.5);
 }
 
-}  // namespace
+}

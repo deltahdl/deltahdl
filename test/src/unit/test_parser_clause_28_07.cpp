@@ -1,4 +1,4 @@
-// §28.7
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- Terminal count error cases not covered by subsection files ---
 TEST(MosSwitchParsing, TooFewTerminals) {
   auto r = Parse(
       "module m;\n"
@@ -61,9 +60,6 @@ TEST(MosSwitchParsing, NmosAcceptsTwoValueDelay) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-// Three distinct values verify the §28.7 slot mapping: first → rise,
-// second → fall, third → transition to z. Using 2/3/4 keeps the values
-// trivially distinguishable if any pair is ever swapped in the parser.
 TEST(MosSwitchParsing, PmosAcceptsThreeValueDelay) {
   auto r = Parse(
       "module m;\n"
@@ -80,8 +76,6 @@ TEST(MosSwitchParsing, PmosAcceptsThreeValueDelay) {
   EXPECT_EQ(g->gate_delay_decay->int_val, 4u);
 }
 
-// A single delay value applies to all output transitions (§28.7). Only
-// the rise slot should be populated by the parser.
 TEST(MosSwitchParsing, PmosAcceptsOneValueDelay) {
   auto r = Parse(
       "module m;\n"
@@ -96,8 +90,6 @@ TEST(MosSwitchParsing, PmosAcceptsOneValueDelay) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-// With no delay specification the switch has no propagation delay
-// (§28.7): all three delay slots remain unpopulated.
 TEST(MosSwitchParsing, NmosNoDelaySpec) {
   auto r = Parse(
       "module m;\n"
@@ -111,9 +103,6 @@ TEST(MosSwitchParsing, NmosNoDelaySpec) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-// §28.7 caps the delay specification at three values. A fourth value in
-// the comma list must be rejected — otherwise a parser regression could
-// silently accept a malformed delay spec and discard the extra term.
 TEST(MosSwitchParsing, TooManyDelaysRejected) {
   auto r = Parse(
       "module m;\n"
@@ -140,8 +129,6 @@ TEST(MosSwitchParsing, AllFourKindsParseToDistinctGateKind) {
   }
 }
 
-// The first terminal is the driven output — verifying the identifier text
-// pins the (output, data, control) ordering the parser captures.
 TEST(MosSwitchParsing, TerminalOrderOutputDataControl) {
   auto r = Parse(
       "module m;\n"
@@ -158,4 +145,4 @@ TEST(MosSwitchParsing, TerminalOrderOutputDataControl) {
   EXPECT_EQ(g->gate_terminals[2]->text, "en");
 }
 
-}  // namespace
+}

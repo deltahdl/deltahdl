@@ -2,15 +2,12 @@
 
 namespace delta {
 
-// --- Interface declaration ---
-
 ModuleDecl* Parser::ParseInterfaceDecl() {
   auto* decl = arena_.Create<ModuleDecl>();
   decl->decl_kind = ModuleDeclKind::kInterface;
   decl->range.start = CurrentLoc();
   Expect(TokenKind::kKwInterface);
 
-  // Optional lifetime qualifier (§13.4.2)
   decl->is_automatic = Match(TokenKind::kKwAutomatic);
   if (!decl->is_automatic) Match(TokenKind::kKwStatic);
 
@@ -38,9 +35,6 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
   return decl;
 }
 
-// --- Modport declaration ---
-
-// §A.2.9 modport_tf_port ::= method_prototype | tf_identifier
 ModportPort Parser::ParseModportTfPort(bool is_import) {
   ModportPort port;
   port.is_import = is_import;
@@ -52,9 +46,8 @@ ModportPort Parser::ParseModportTfPort(bool is_import) {
     Consume();
     item->name = Expect(TokenKind::kIdentifier).text;
     if (Check(TokenKind::kLParen))
-      // §A.2.9 modport_tf_port = method_prototype, so port identifiers
-      // may be omitted per §13.3 footnote 28.
-      item->func_args = ParseFunctionArgs(/*require_identifiers=*/false);
+
+      item->func_args = ParseFunctionArgs( false);
     port.prototype = item;
     port.name = item->name;
   } else if (Check(TokenKind::kKwFunction)) {
@@ -65,9 +58,8 @@ ModportPort Parser::ParseModportTfPort(bool is_import) {
     item->data_type = ParseFunctionReturnType();
     item->name = Expect(TokenKind::kIdentifier).text;
     if (Check(TokenKind::kLParen))
-      // §A.2.9 modport_tf_port = method_prototype, so port identifiers
-      // may be omitted per §13.3 footnote 28.
-      item->func_args = ParseFunctionArgs(/*require_identifiers=*/false);
+
+      item->func_args = ParseFunctionArgs( false);
     port.prototype = item;
     port.name = item->name;
   } else {
@@ -76,8 +68,6 @@ ModportPort Parser::ParseModportTfPort(bool is_import) {
   return port;
 }
 
-// §A.2.9 modport_simple_port ::=
-//   port_identifier | . port_identifier ( [ expression ] )
 ModportPort Parser::ParseModportSimplePort(Direction dir) {
   ModportPort port;
   port.direction = dir;
@@ -107,11 +97,9 @@ static Direction TokenToDirection(TokenKind tk) {
   }
 }
 
-// §A.2.9 modport_item ::=
-//   modport_identifier ( modport_ports_declaration { , ... } )
 void Parser::ParseModportItem(ModportDecl* mp) {
   Direction cur_dir = Direction::kNone;
-  // 0=simple, 1=import, 2=export — tracks current tf group
+
   int tf_mode = 0;
   while (!Check(TokenKind::kRParen) && !AtEnd()) {
     ParseAttributes();
@@ -154,15 +142,12 @@ void Parser::ParseModportDecl(std::vector<ModportDecl*>& out) {
   Expect(TokenKind::kSemicolon);
 }
 
-// --- Program declaration ---
-
 ModuleDecl* Parser::ParseProgramDecl() {
   auto* decl = arena_.Create<ModuleDecl>();
   decl->decl_kind = ModuleDeclKind::kProgram;
   decl->range.start = CurrentLoc();
   Expect(TokenKind::kKwProgram);
 
-  // Optional lifetime qualifier (§13.4.2)
   decl->is_automatic = Match(TokenKind::kKwAutomatic);
   if (!decl->is_automatic) Match(TokenKind::kKwStatic);
 
@@ -188,9 +173,6 @@ ModuleDecl* Parser::ParseProgramDecl() {
   return decl;
 }
 
-// --- Class declaration ---
-
-// Parse the extends argument list: ( [list_of_arguments | default] )
 void Parser::ParseExtendsArgList(ClassDecl* decl) {
   Consume();
   if (Match(TokenKind::kKwDefault)) {
@@ -204,8 +186,7 @@ void Parser::ParseExtendsArgList(ClassDecl* decl) {
 }
 
 void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
-  // §8.26: interface classes may extend multiple base classes
-  // (comma-separated).
+
   do {
     auto name = Expect(TokenKind::kIdentifier).text;
     while (Match(TokenKind::kColonColon)) {
@@ -228,7 +209,7 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
     } else if (!is_first_base) {
       decl->extends_interfaces.push_back({name, std::move(tparams)});
     }
-    // §8.3: extends class_type [ ( [ list_of_arguments | default ] ) ]
+
     if (Check(TokenKind::kLParen)) {
       if (is_implements) {
         std::vector<Expr*> discard;
@@ -246,7 +227,7 @@ ClassDecl* Parser::ParseClassDecl() {
   decl->is_virtual = Match(TokenKind::kKwVirtual);
   decl->is_interface = Match(TokenKind::kKwInterface);
   Expect(TokenKind::kKwClass);
-  // final_specifier ::= : final (A.1.2 / §8.20)
+
   if (Match(TokenKind::kColon)) {
     Expect(TokenKind::kKwFinal);
     decl->is_final = true;
@@ -256,7 +237,6 @@ ClassDecl* Parser::ParseClassDecl() {
   decl->name = Expect(TokenKind::kIdentifier).text;
   known_types_.insert(decl->name);
 
-  // Optional parameter port list: #(parameter ...) (§8.25)
   if (Check(TokenKind::kHash)) {
     Consume();
     Expect(TokenKind::kLParen);
@@ -270,17 +250,16 @@ ClassDecl* Parser::ParseClassDecl() {
   }
 
   if (Match(TokenKind::kKwExtends)) ParseClassExtendsClause(decl, false);
-  // §8.26: 'implements' with optional #(...) parameter assignments
+
   if (Match(TokenKind::kKwImplements)) ParseClassExtendsClause(decl, true);
   Expect(TokenKind::kSemicolon);
 
-  // §6.20.1: param_assignments inside a class body shall become localparam.
   ++class_body_depth_;
   while (!Check(TokenKind::kKwEndclass) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
     auto before = lexer_.SavePos().pos;
     ParseClassMembers(decl->members);
-    // Safety: if no progress was made, skip a token to avoid infinite loops.
+
     if (lexer_.SavePos().pos == before) Consume();
   }
   --class_body_depth_;
@@ -289,8 +268,6 @@ ClassDecl* Parser::ParseClassDecl() {
   decl->range.end = CurrentLoc();
   return decl;
 }
-
-// --- Class member qualifier parsing ---
 
 bool Parser::TryConsumeClassQualifier(ClassMember* m, TokenKind kw,
                                       bool ClassMember::* flag,
@@ -303,7 +280,7 @@ bool Parser::TryConsumeClassQualifier(ClassMember* m, TokenKind kw,
 }
 
 bool Parser::TryConsumeAccessQualifier(ClassMember* m) {
-  // §8.3 fn 10: only one of protected or local
+
   if (Check(TokenKind::kKwLocal)) {
     if (m->is_protected)
       diag_.Error(CurrentLoc(),
@@ -327,7 +304,7 @@ bool Parser::TryConsumeAccessQualifier(ClassMember* m) {
 }
 
 bool Parser::TryConsumeRandQualifier(ClassMember* m) {
-  // §8.3 fn 10: only one of rand or randc
+
   if (Check(TokenKind::kKwRand)) {
     if (m->is_randc)
       diag_.Error(CurrentLoc(), "cannot combine 'rand' and 'randc' qualifiers");
@@ -379,12 +356,12 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
 }
 
 void Parser::ValidateClassMethod(ClassMember* member) {
-  // §8.6: Static lifetime on class methods is illegal.
+
   if (member->method->is_static) {
     diag_.Error(member->method->loc,
                 "class method shall not have static lifetime");
   }
-  // §8.10: Static methods cannot be virtual.
+
   if (member->is_static && member->is_virtual &&
       member->method->name != "new") {
     diag_.Error(member->method->loc,
@@ -393,7 +370,6 @@ void Parser::ValidateClassMethod(ClassMember* member) {
   if (member->is_static) member->method->is_static = true;
 }
 
-// §8.7: Validate constructor-specific constraints.
 void Parser::ValidateConstructorQualifiers(ClassMember* member) {
   if (member->method->name != "new") return;
   if (member->is_static) {
@@ -406,8 +382,6 @@ void Parser::ValidateConstructorQualifiers(ClassMember* member) {
   }
 }
 
-// Parse keyword-introduced class members (methods, constraints, typedefs,
-// parameters, nested classes, covergroups). Returns true if handled.
 bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
                                         ClassMember* member, bool proto) {
   if (Check(TokenKind::kKwFunction)) {
@@ -474,9 +448,9 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
 }
 
 void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
-  // §A.1.9: class_item ::= { attribute_instance } class_property | ...
+
   ParseAttributes();
-  // §26.3: package import declarations shall not appear in class scope.
+
   if (Check(TokenKind::kKwImport)) {
     diag_.Error(CurrentLoc(),
                 "package import declaration is not allowed in class scope");
@@ -490,7 +464,6 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
 
   if (TryParseKeywordClassMember(members, member, proto)) return;
 
-  // Property: type name [= expr] {, name [= expr]} ;
   DataType dtype = ParseDataType();
   member->kind = ClassMemberKind::kProperty;
   member->data_type = dtype;
@@ -523,8 +496,8 @@ void Parser::ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
 
 ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   member->kind = ClassMemberKind::kConstraint;
-  Consume();  // constraint keyword
-  // Optional dynamic_override_specifiers: [:initial|:extends] [:final]
+  Consume();
+
   if (Match(TokenKind::kColon)) {
     if (Match(TokenKind::kKwInitial)) {
       member->is_constraint_initial = true;
@@ -538,7 +511,7 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
     if (Match(TokenKind::kKwFinal)) member->is_constraint_final = true;
   }
   member->name = Expect(TokenKind::kIdentifier).text;
-  // §18.5.1: extern/implicit constraint declaration — no body
+
   if (Match(TokenKind::kSemicolon)) return member;
   Expect(TokenKind::kLBrace);
   int depth = 1;
@@ -554,4 +527,4 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   return member;
 }
 
-}  // namespace delta
+}

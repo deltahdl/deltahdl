@@ -158,4 +158,4 @@ TEST(TaskAndFunctionParsing, EmptyPlaceholderArg) {
   ASSERT_NE(call->args[1], nullptr);
 }
 
-}  // namespace
+}

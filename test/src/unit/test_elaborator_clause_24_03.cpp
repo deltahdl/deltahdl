@@ -150,4 +150,4 @@ TEST(ProgramConstruct, ReferencingProgramSignalFromOutsideIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -9,8 +9,6 @@ using namespace delta;
 
 namespace {
 
-// The runtime SpecifyManager must keep distinct entries for each (source,
-// destination) pair so that multiple module paths can coexist.
 TEST_F(SpecifyTest, RuntimeMultiplePathDelays) {
   SpecifyManager mgr;
   PathDelay pd1;
@@ -31,8 +29,6 @@ TEST_F(SpecifyTest, RuntimeMultiplePathDelays) {
   EXPECT_EQ(mgr.GetPathDelay("in2", "out2"), 8u);
 }
 
-// A specify block containing every path_declaration variant must not
-// disturb surrounding behavioral execution.
 TEST(SpecifyPathSim, PathDeclsDoNotInterfereBehavioral) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -53,4 +49,4 @@ TEST(SpecifyPathSim, PathDeclsDoNotInterfereBehavioral) {
   LowerRunAndCheck(f, design, {{"a", 11u}, {"b", 22u}});
 }
 
-}  // namespace
+}

@@ -103,13 +103,11 @@ TEST(ExpressionBitLength, CastWidensOperandPreservesCarry) {
   auto* add = MakeBinary(f.arena, TokenKind::kPlus, cast, MakeId(f.arena, "b"));
 
   auto result = EvalExpr(add, f.ctx, f.arena);
-  // int'(a) is 32-bit, so addition uses max(32, 4) = 32 bits.
-  // 0xF + 0x1 = 0x10, carry preserved.
+
   EXPECT_EQ(result.ToUint64(), 0x10u);
   EXPECT_EQ(result.width, 32u);
 }
 
-// Table 11-21: >> << >>> <<< → width of LHS, shift amount is self-determined.
 TEST(ExpressionBitLength, ShiftWidthIsLhsWidth) {
   SimFixture f;
   MakeVar(f, "sv", 8, 0xFF);
@@ -125,7 +123,6 @@ TEST(ExpressionBitLength, ShiftWidthIsLhsWidth) {
   }
 }
 
-// Table 11-21: ** → width of base (LHS).
 TEST(ExpressionBitLength, PowerWidthIsBaseWidth) {
   SimFixture f;
   MakeVar(f, "base", 8, 3);
@@ -137,7 +134,6 @@ TEST(ExpressionBitLength, PowerWidthIsBaseWidth) {
   EXPECT_EQ(result.ToUint64(), 9u);
 }
 
-// Table 11-21: reduction ops → 1-bit result at runtime.
 TEST(ExpressionBitLength, ReductionOpsProduceOneBit) {
   SimFixture f;
   MakeVar(f, "rv", 8, 0xFF);
@@ -152,7 +148,6 @@ TEST(ExpressionBitLength, ReductionOpsProduceOneBit) {
   }
 }
 
-// Table 11-21: ! → 1-bit result.
 TEST(ExpressionBitLength, LogicalNotProducesOneBit) {
   SimFixture f;
   MakeVar(f, "nv", 16, 0);
@@ -162,7 +157,6 @@ TEST(ExpressionBitLength, LogicalNotProducesOneBit) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-// Table 11-21: && || → 1-bit result, operands self-determined.
 TEST(ExpressionBitLength, LogicalAndOrProduceOneBit) {
   SimFixture f;
   MakeVar(f, "la", 16, 1);
@@ -179,7 +173,6 @@ TEST(ExpressionBitLength, LogicalAndOrProduceOneBit) {
   EXPECT_EQ(r2.width, 1u);
 }
 
-// Table 11-21: -> <-> → 1-bit result, operands self-determined.
 TEST(ExpressionBitLength, ImplicationAndEquivalenceProduceOneBit) {
   SimFixture f;
   MakeVar(f, "ia", 16, 1);
@@ -198,7 +191,6 @@ TEST(ExpressionBitLength, ImplicationAndEquivalenceProduceOneBit) {
   EXPECT_EQ(r2.ToUint64(), 0u);
 }
 
-// Table 11-21: comparison ops → 1-bit result at runtime.
 TEST(ExpressionBitLength, ComparisonOpsProduceOneBit) {
   SimFixture f;
   MakeVar(f, "ca", 16, 5);
@@ -215,7 +207,6 @@ TEST(ExpressionBitLength, ComparisonOpsProduceOneBit) {
   }
 }
 
-// Self-determined: shift amount does not affect result width.
 TEST(ExpressionBitLength, ShiftAmountIsSelfDetermined) {
   SimFixture f;
   MakeVar(f, "sd", 4, 0x8);
@@ -227,7 +218,6 @@ TEST(ExpressionBitLength, ShiftAmountIsSelfDetermined) {
   EXPECT_EQ(result.ToUint64(), 4u);
 }
 
-// Self-determined: ternary condition does not affect branch width.
 TEST(ExpressionBitLength, TernaryConditionIsSelfDetermined) {
   SimFixture f;
   MakeVar(f, "tc32", 32, 1);
@@ -243,7 +233,6 @@ TEST(ExpressionBitLength, TernaryConditionIsSelfDetermined) {
   EXPECT_EQ(result.width, 4u);
 }
 
-// Replication width at runtime: {3{8'hFF}} → 24 bits.
 TEST(ExpressionBitLength, ReplicationWidthIsCountTimesElement) {
   SimFixture f;
   MakeVar(f, "re", 8, 0xFF);
@@ -255,4 +244,4 @@ TEST(ExpressionBitLength, ReplicationWidthIsCountTimesElement) {
   EXPECT_EQ(result.width, 24u);
 }
 
-}  // namespace
+}

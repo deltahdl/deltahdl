@@ -197,8 +197,6 @@ TEST(BlockingAssignSim, BlockingAssignTernaryFalse) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// --- Moved from test_parser_clause_11_04_11_b.cpp ---
-
 TEST(ConstEvalReal, TernaryOnReals) {
   EvalFixture f;
   auto* e = ParseExprFrom("1 ? 2.5 : 3.5", f);
@@ -307,4 +305,4 @@ TEST(ConstEval, ChainedTernaryConstEval) {
             20);
 }
 
-}  // namespace
+}

@@ -157,4 +157,4 @@ TEST(InterfaceClassMethodDefaults, ConstantExpressionDefaultValueOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

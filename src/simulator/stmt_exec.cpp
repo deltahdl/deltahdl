@@ -21,8 +21,6 @@
 
 namespace delta {
 
-// --- Randcase (IEEE §18.16) ---
-
 static ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   uint64_t total_weight = 0;
   for (const auto& item : stmt->randcase_items) {
@@ -45,9 +43,6 @@ static ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-// --- Randsequence (IEEE §18.17) ---
-
-// Forward declare so recursive calls work.
 static ExecTask ExecRsProduction(const Stmt* stmt, std::string_view name,
                                  SimContext& ctx, Arena& arena);
 
@@ -59,7 +54,6 @@ static const RsProduction* FindProduction(const Stmt* stmt,
   return nullptr;
 }
 
-// Forward declare ExecRsProd for mutual recursion.
 static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
                            SimContext& ctx, Arena& arena);
 
@@ -101,7 +95,6 @@ static ExecTask ExecRsProdCase(const Stmt* stmt, const RsProd& prod,
   co_return StmtResult::kDone;
 }
 
-// Execute a single rs_prod item.
 static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
                            SimContext& ctx, Arena& arena) {
   switch (prod.kind) {
@@ -125,7 +118,6 @@ static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
   co_return StmtResult::kDone;
 }
 
-// Select a rule from a production by weighted random.
 static const RsRule& SelectRule(const RsProduction& production, SimContext& ctx,
                                 Arena& arena) {
   if (production.rules.size() <= 1) return production.rules[0];
@@ -145,7 +137,6 @@ static const RsRule& SelectRule(const RsProduction& production, SimContext& ctx,
   return production.rules[0];
 }
 
-// Execute rand join production items.
 static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
                                   SimContext& ctx, Arena& arena) {
   for (const auto& item : selected.rand_join_items) {
@@ -156,7 +147,6 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
   co_return StmtResult::kDone;
 }
 
-// Execute a rule's production list.
 static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
                               SimContext& ctx, Arena& arena) {
   for (const auto& prod : selected.prods) {
@@ -167,7 +157,6 @@ static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
   co_return StmtResult::kDone;
 }
 
-// Execute a selected rule's weight code and production list.
 static ExecTask ExecSelectedRule(const Stmt* stmt, const RsRule& selected,
                                  SimContext& ctx, Arena& arena) {
   for (auto* s : selected.weight_code) {
@@ -182,7 +171,6 @@ static ExecTask ExecSelectedRule(const Stmt* stmt, const RsRule& selected,
   co_return co_await ExecRuleProds(stmt, selected, ctx, arena);
 }
 
-// Execute a named production: select a rule, then run it.
 static ExecTask ExecRsProduction(const Stmt* stmt, std::string_view name,
                                  SimContext& ctx, Arena& arena) {
   const auto* production = FindProduction(stmt, name);
@@ -195,17 +183,14 @@ static ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
   if (stmt->rs_productions.empty()) co_return StmtResult::kDone;
 
-  // Determine top production.
   std::string_view top = stmt->rs_top_production;
   if (top.empty()) top = stmt->rs_productions[0].name;
 
   auto result = co_await ExecRsProduction(stmt, top, ctx, arena);
-  // Break from randsequence just terminates it (not outer loops).
+
   (void)result;
   co_return StmtResult::kDone;
 }
-
-// --- Container coroutines (return ExecTask, support suspension) ---
 
 static ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool named = !stmt->label.empty();
@@ -247,8 +232,7 @@ static ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       }
       co_return StmtResult::kDone;
     }
-    // §24.7: If $exit marked the current process inactive, stop executing
-    // subsequent statements in this block.
+
     if (auto* cur = ctx.CurrentProcess(); cur && !cur->active) {
       if (named) {
         ctx.PopActiveNamedScope();
@@ -265,8 +249,6 @@ static ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
   co_return StmtResult::kDone;
 }
-
-// --- If with unique/priority qualifiers ---
 
 struct UniqueIfResult {
   const Stmt* first_match = nullptr;
@@ -373,9 +355,6 @@ static ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-// --- Case matching helpers ---
-
-// Check if a bit position has X or Z in a Logic4Vec.
 static bool BitIsZ(const Logic4Vec& v, uint32_t bit) {
   if (v.nwords == 0 || !v.words) return false;
   uint32_t wi = bit / 64;
@@ -383,7 +362,7 @@ static bool BitIsZ(const Logic4Vec& v, uint32_t bit) {
   if (wi >= v.nwords) return false;
   bool a = (v.words[wi].aval >> bi) & 1;
   bool b = (v.words[wi].bval >> bi) & 1;
-  return a && b;  // Z: aval=1, bval=1
+  return a && b;
 }
 
 static bool BitIsXZ(const Logic4Vec& v, uint32_t bit) {
@@ -391,7 +370,7 @@ static bool BitIsXZ(const Logic4Vec& v, uint32_t bit) {
   uint32_t wi = bit / 64;
   uint32_t bi = bit % 64;
   if (wi >= v.nwords) return false;
-  return (v.words[wi].bval >> bi) & 1;  // bval=1 means X or Z
+  return (v.words[wi].bval >> bi) & 1;
 }
 
 using BitPredicate = bool (*)(const Logic4Vec&, uint32_t);
@@ -418,8 +397,6 @@ static bool CasezMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   return CaseDontCareMatch(sel, pat, BitIsZ);
 }
 
-// §12.5.4: Asymmetric wildcard value match — x/z in pattern are don't-cares,
-// x/z in selector produce no match.
 static bool CaseInsideValueMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   if (!sel.IsKnown()) return false;
   uint32_t nw = (sel.nwords > pat.nwords) ? sel.nwords : pat.nwords;
@@ -427,18 +404,17 @@ static bool CaseInsideValueMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
     uint64_t sa = (i < sel.nwords) ? sel.words[i].aval : 0;
     uint64_t pa = (i < pat.nwords) ? pat.words[i].aval : 0;
     uint64_t pb = (i < pat.nwords) ? pat.words[i].bval : 0;
-    // pb marks x/z bits in pattern — those are don't-cares.
+
     if ((sa ^ pa) & ~pb) return false;
   }
   return true;
 }
 
-// §12.5.4: Range match for case-inside (plain range, $ bounds, tolerance).
 static bool CaseInsideRangeMatch(const Logic4Vec& sel, const Expr* pat,
                                  SimContext& ctx, Arena& arena) {
   if (!sel.IsKnown()) return false;
   uint64_t sv = sel.ToUint64();
-  // Tolerance ranges [A +/- B] and [A +%- B].
+
   if (pat->op == TokenKind::kPlusSlashMinus ||
       pat->op == TokenKind::kPlusPercentMinus) {
     auto a_v = EvalExpr(pat->index, ctx, arena);
@@ -453,7 +429,7 @@ static bool CaseInsideRangeMatch(const Logic4Vec& sel, const Expr* pat,
     if (lo > hi) { uint64_t t = lo; lo = hi; hi = t; }
     return sv >= lo && sv <= hi;
   }
-  // Normal range [lo:hi] with possible $ bounds.
+
   auto is_dollar = [](const Expr* e) {
     return e->kind == ExprKind::kIdentifier && e->text == "$";
   };
@@ -468,7 +444,6 @@ static bool CaseInsideRangeMatch(const Logic4Vec& sel, const Expr* pat,
   return sv >= lo && sv <= hi;
 }
 
-// §12.5.4: Check if a case-inside pattern matches (value or range).
 static bool CaseInsidePatternMatch(const Logic4Vec& sel, const Expr* pat,
                                    SimContext& ctx, Arena& arena) {
   if (pat->kind == ExprKind::kSelect && pat->index && pat->index_end)
@@ -477,7 +452,6 @@ static bool CaseInsidePatternMatch(const Logic4Vec& sel, const Expr* pat,
   return CaseInsideValueMatch(sel, pat_val);
 }
 
-// §12.5: 4-state exact comparison — each bit must match exactly (0, 1, x, z).
 static bool CaseExactMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   uint32_t nw = (sel.nwords > pat.nwords) ? sel.nwords : pat.nwords;
   for (uint32_t i = 0; i < nw; ++i) {
@@ -490,9 +464,6 @@ static bool CaseExactMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   return true;
 }
 
-// §12.6: Pattern match — x/z in pattern are wildcards.
-// casez matches additionally treats z in selector as wildcard;
-// casex matches treats x/z in both as wildcards.
 static bool CaseMatchesMatch(const Logic4Vec& sel, const Logic4Vec& pat,
                              TokenKind case_kind) {
   if (case_kind == TokenKind::kKwCasex) return CasexMatch(sel, pat);
@@ -500,11 +471,10 @@ static bool CaseMatchesMatch(const Logic4Vec& sel, const Logic4Vec& pat,
   return CaseInsideValueMatch(sel, pat);
 }
 
-// §12.6.1: Check a case-matches pattern, handling &&& guard expressions.
 static bool CaseMatchesPatternMatch(const Logic4Vec& sel, const Expr* pat_expr,
                                     SimContext& ctx, Arena& arena,
                                     TokenKind case_kind) {
-  // §12.6.1: pattern &&& guard — pattern must match AND guard must be true.
+
   if (pat_expr->kind == ExprKind::kBinary &&
       pat_expr->op == TokenKind::kAmpAmpAmp) {
     auto pat_val = EvalExpr(pat_expr->lhs, ctx, arena);
@@ -516,15 +486,12 @@ static bool CaseMatchesPatternMatch(const Logic4Vec& sel, const Expr* pat_expr,
   return CaseMatchesMatch(sel, pv, case_kind);
 }
 
-// Check if a case item matches based on case_kind (non-inside, non-matches).
 static bool CaseItemMatches(const Logic4Vec& sel, const Logic4Vec& pat,
                             TokenKind case_kind) {
   if (case_kind == TokenKind::kKwCasex) return CasexMatch(sel, pat);
   if (case_kind == TokenKind::kKwCasez) return CasezMatch(sel, pat);
   return CaseExactMatch(sel, pat);
 }
-
-// --- Case with casex/casez/inside and qualifiers ---
 
 static bool CasePatternMatch(const Logic4Vec& sel, const Expr* pat,
                              const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -624,9 +591,6 @@ static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return r;
 }
 
-// --- Loops ---
-
-// Create for-init variables when the init declares a type (§12.7.1).
 static void CreateForInitVars(const Stmt* stmt, SimContext& ctx) {
   for (size_t i = 0; i < stmt->for_inits.size(); ++i) {
     if (i >= stmt->for_init_types.size()) break;
@@ -740,8 +704,6 @@ static ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-// --- Foreach (IEEE §12.7.3) ---
-
 static std::string GetForeachArrayName(const Expr* expr) {
   if (!expr) return {};
   if (expr->kind == ExprKind::kIdentifier) return std::string(expr->text);
@@ -783,7 +745,6 @@ static ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     co_return StmtResult::kDone;
   }
 
-  // Determine loop variable name (first non-empty foreach_vars entry).
   std::string_view iter_name;
   if (!stmt->foreach_vars.empty() && !stmt->foreach_vars[0].empty()) {
     iter_name = stmt->foreach_vars[0];
@@ -812,8 +773,6 @@ static ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (labeled) ctx.PopStaticScope(stmt->label);
   co_return StmtResult::kDone;
 }
-
-// --- Delay ---
 
 static ExecTask ExecCycleDelay(const Stmt* stmt, SimContext& ctx,
                                Arena& arena) {
@@ -846,8 +805,6 @@ static ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-// --- Event control ---
-
 static bool IsNamedEvent(const Stmt* stmt, SimContext& ctx) {
   if (stmt->events.size() != 1) return false;
   const auto& ev = stmt->events[0];
@@ -857,7 +814,6 @@ static bool IsNamedEvent(const Stmt* stmt, SimContext& ctx) {
   return var && var->is_event;
 }
 
-// §9.4.2.4: Check if any event in the list is a sequence event.
 static bool HasSequenceEvent(const Stmt* stmt) {
   for (const auto& ev : stmt->events) {
     if (ev.is_sequence_event) return true;
@@ -882,20 +838,17 @@ static ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
-// --- Event trigger (->ev) ---
-
 static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
   if (!stmt->expr || stmt->expr->kind != ExprKind::kIdentifier) {
     return StmtResult::kDone;
   }
   auto* var = ctx.FindVariable(stmt->expr->text);
   if (!var) return StmtResult::kDone;
-  // §15.5.5.2: Triggering a null event shall have no effect.
+
   if (var->is_null_event) return StmtResult::kDone;
-  // §15.5.3: Set sticky triggered state for this timeslot.
+
   ctx.SetEventTriggered(stmt->expr->text);
-  // §9.4.2: Schedule triggered processes in Active region rather than
-  // running them inline, so the triggering process continues first.
+
   auto pending = std::move(var->watchers);
   var->watchers.clear();
   auto& sched = ctx.GetScheduler();
@@ -908,8 +861,6 @@ static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
   return StmtResult::kDone;
 }
 
-// --- Nonblocking event trigger (->>ev) ---
-
 static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
                                          Arena& arena) {
   if (!stmt->expr || stmt->expr->kind != ExprKind::kIdentifier) {
@@ -917,13 +868,12 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
   }
   auto* var = ctx.FindVariable(stmt->expr->text);
   if (!var) return StmtResult::kDone;
-  // §15.5.5.2: Triggering a null event shall have no effect.
+
   if (var->is_null_event) return StmtResult::kDone;
 
   uint64_t delay = 0;
   if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();
 
-  // §15.5.1: Schedule the trigger in the NBA region.
   auto event_name = stmt->expr->text;
   auto& sched = ctx.GetScheduler();
   auto time = ctx.CurrentTime();
@@ -948,16 +898,12 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
-// --- Wait (IEEE §9.4.3) ---
-
 static ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
   std::unordered_set<std::string> reads;
   CollectExprReads(stmt->condition, reads);
-  // §9.4.4: Map sequence names to their __seq_ endpoint event variables so
-  // AnyChangeAwaiter watches the internal event rather than the (non-existent)
-  // sequence identifier.
+
   std::unordered_set<std::string> seq_adds;
   std::unordered_set<std::string> seq_removes;
   for (const auto& name : reads) {
@@ -993,11 +939,6 @@ static ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-// --- wait_order (IEEE §15.5.4) ---
-
-// Awaiter that watches multiple event variables and reports which one
-// triggered first. A shared done flag prevents double-resume when stale
-// watchers on unconsumed events fire later.
 struct WaitOrderStepAwaiter {
   SimContext& ctx;
   const std::vector<std::string_view>& event_names;
@@ -1039,12 +980,10 @@ static ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   for (size_t i = 0; i < events.size() && !failed; ++i) {
     auto expected_name = events[i]->text;
 
-    // §15.5.4: Only the first event can use persistent triggered state.
     if (i == 0 && ctx.IsEventTriggered(expected_name)) {
       continue;
     }
 
-    // Collect event names from this position onwards.
     std::vector<std::string_view> remaining;
     for (size_t j = i; j < events.size(); ++j) {
       remaining.push_back(events[j]->text);
@@ -1061,7 +1000,7 @@ static ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     if (stmt->else_branch) {
       co_return co_await ExecStmt(stmt->else_branch, ctx, arena);
     }
-    // §15.5.4: No else clause — generate default runtime error.
+
     ctx.GetDiag().Error({}, "wait_order failure: events triggered out of order");
     co_return StmtResult::kDone;
   }
@@ -1072,14 +1011,12 @@ static ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-// --- Fork/join (IEEE §9.3.2) ---
-
 static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
                                        Arena& arena, ForkJoinState* state,
                                        WaitForkState* parent_wfs,
                                        Process* parent_proc) {
   co_await ExecStmt(body, ctx, arena);
-  // §9.7: Mark the child process as finished and wake await waiters.
+
   auto* child_proc = ctx.CurrentProcess();
   if (child_proc && child_proc->sv_state != ProcessState::kKilled) {
     child_proc->sv_state = ProcessState::kFinished;
@@ -1113,7 +1050,6 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     co_return StmtResult::kDone;
   }
 
-  // §9.3.2: Initialize block_item_declaration variables before spawning.
   uint32_t process_count = 0;
   for (auto* s : stmt->fork_stmts) {
     if (IsForkBlockItemDecl(s)) {
@@ -1155,8 +1091,7 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     p->coro =
         ForkChildCoroutine(s, ctx, arena, state, parent_wfs, parent_proc)
             .Release();
-    // §9.6.2: Pre-register named scopes for fork children so that
-    // disable can target them before they start executing.
+
     if (s->kind == StmtKind::kExprStmt && s->expr) {
       std::string_view task_name;
       if (s->expr->kind == ExprKind::kCall)
@@ -1168,14 +1103,13 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     }
     if (s->kind == StmtKind::kBlock && !s->label.empty())
       ctx.RegisterNamedScope(s->label, p);
-    // §9.6.2 R3: Register fork children under enclosing named scopes
-    // so that disabling a parent block also terminates forked activities.
+
     for (auto scope : ctx.ActiveNamedScopes())
       ctx.RegisterNamedScope(scope, p);
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
     event->callback = [p, &ctx, state, parent_wfs, parent_proc]() {
       if (!p->active) {
-        // §9.6.2: Process was disabled before it started.
+
         state->remaining--;
         bool should_resume =
             state->join_any ? !state->resumed : (state->remaining == 0);
@@ -1205,8 +1139,6 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-// --- Wait fork (IEEE §9.6.1) ---
-
 static ExecTask ExecWaitFork(SimContext& ctx) {
   auto* proc = ctx.CurrentProcess();
   if (!proc) co_return StmtResult::kDone;
@@ -1214,12 +1146,6 @@ static ExecTask ExecWaitFork(SimContext& ctx) {
   co_return StmtResult::kDone;
 }
 
-// --- Immediate assertions (§16.3) ---
-
-// §16.4 P5/P8/P9: A deferred assertion's pass or fail action shall be a
-// single subroutine call. Execute the action's call/system-task expression
-// synchronously inside the scheduler callback so it lands in the named
-// region (Reactive for observed, Postponed for final).
 static void RunDeferredActionSync(const Stmt* action, SimContext& ctx,
                                   Arena& arena) {
   if (!action) return;
@@ -1227,28 +1153,19 @@ static void RunDeferredActionSync(const Stmt* action, SimContext& ctx,
     case StmtKind::kNull:
       return;
     case StmtKind::kExprStmt:
-      // §16.4: the legal action — a single task/void-function/system-task
-      // call expression — evaluates through the synchronous expr path.
+
       EvalExpr(action->expr, ctx, arena);
       return;
     case StmtKind::kBlockingAssign:
-      // Not strictly §16.4-conformant (assignment is not a subroutine call),
-      // but the §16.4.1 fixtures still rely on the legacy form, so the
-      // simulator stays permissive and still delivers the write into the
-      // §16.4-named region.
+
       ExecBlockingAssignImpl(action, ctx, arena);
       return;
     default:
-      // Other kinds violate §16.4; flagged by the elaborator pass.
+
       return;
   }
 }
 
-// §16.4 P11: pre-evaluate each pass-by-value actual at the deferred
-// assertion's expression-eval instant. Snapshots are stored on
-// SimContext keyed by the actual's AST node; EvalExpr consults the map
-// at action time and substitutes the snapshot before any re-evaluation
-// would happen.
 static void SnapshotDeferredCallArgs(const Stmt* action, SimContext& ctx,
                                      Arena& arena) {
   if (!action || action->kind != StmtKind::kExprStmt || !action->expr) return;
@@ -1263,8 +1180,6 @@ static void SnapshotDeferredCallArgs(const Stmt* action, SimContext& ctx,
   }
 }
 
-// §16.4 P11 cleanup: discard the snapshots for one action's actuals so
-// successive deferred actions don't see stale values.
 static void ClearDeferredCallArgSnapshots(const Stmt* action,
                                           SimContext& ctx) {
   if (!action || action->kind != StmtKind::kExprStmt || !action->expr) return;
@@ -1278,20 +1193,17 @@ static void ClearDeferredCallArgSnapshots(const Stmt* action,
   }
 }
 
-// §16.4 P13/P14: schedule the action block for the named region (Reactive
-// for observed, Postponed for final) instead of executing inline.
 static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
                                    SimContext& ctx, Arena& arena) {
   if (!action) return;
-  // §16.4 P11: snapshot pass-by-value actuals at the expression-eval
-  // instant so the action sees the schedule-time view of each argument.
+
   SnapshotDeferredCallArgs(action, ctx, arena);
   Region region =
       is_final_deferred ? Region::kPostponed : Region::kReactive;
   auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
   ev->callback = [action, &ctx, &arena]() {
     RunDeferredActionSync(action, ctx, arena);
-    // §16.4 P11: snapshots only apply to a single scheduled action.
+
     ClearDeferredCallArgSnapshots(action, ctx);
   };
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);
@@ -1300,7 +1212,7 @@ static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
 static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
                                     Arena& arena) {
   auto cond = EvalExpr(stmt->assert_expr, ctx, arena);
-  // §16.3: expression evaluating to x, z, or 0 is false; otherwise true.
+
   bool is_true = cond.IsTruthy();
   if (stmt->kind == StmtKind::kCoverImmediate) {
     ctx.IncrementCoverEvalCount();
@@ -1310,9 +1222,7 @@ static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
       ctx.IncrementCoverSuccessCount();
     }
     if (stmt->assert_pass_stmt) {
-      // §16.4 P7: the expression is evaluated at the time the deferred
-      // assertion statement is processed (above), but the action block is
-      // scheduled for a later region in the current time step.
+
       if (stmt->is_deferred) {
         ScheduleDeferredAction(stmt->assert_pass_stmt,
                                stmt->is_final_deferred, ctx, arena);
@@ -1329,8 +1239,7 @@ static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
       }
       co_return co_await ExecStmt(stmt->assert_fail_stmt, ctx, arena);
     } else if (stmt->kind != StmtKind::kCoverImmediate) {
-      // §16.3 / §20.10: tool shall, by default, call $error when assert or
-      // assume fails with no else clause.
+
       ctx.IncrementAssertionFailCount();
       EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
     }
@@ -1338,7 +1247,6 @@ static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
-// §9.7: Check if an expression is a process.await() call and execute it.
 static ExecTask ExecProcessAwait(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
   MethodCallParts parts;
@@ -1350,8 +1258,7 @@ static ExecTask ExecProcessAwait(const Expr* expr, SimContext& ctx,
       auto proc_handle = var->value.ToUint64();
       auto* proc = ctx.FindProcessByHandle(proc_handle);
       if (proc) {
-        // §9.7: await() is restricted to processes created by an initial
-        // procedure, always procedure, or fork block from those procedures.
+
         if (proc->kind == ProcessKind::kFinal ||
             proc->kind == ProcessKind::kContAssign) {
           ctx.GetDiag().Error(
@@ -1359,8 +1266,7 @@ static ExecTask ExecProcessAwait(const Expr* expr, SimContext& ctx,
                   "procedure, always procedure, or fork block");
           co_return StmtResult::kDone;
         }
-        // §9.7: "It shall be an error to call this task on the current
-        // process, i.e., a process cannot wait for its own termination."
+
         if (proc == ctx.CurrentProcess()) {
           ctx.GetDiag().Error(
               {}, "process cannot await its own termination");
@@ -1373,11 +1279,10 @@ static ExecTask ExecProcessAwait(const Expr* expr, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
-// §13: Inline task call — executes task body through coroutine dispatcher.
 static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   auto* expr = stmt->expr;
-  // §9.7: Intercept process.await() before general task dispatch.
+
   {
     MethodCallParts parts;
     if (ExtractMethodCallParts(expr, parts) &&
@@ -1420,8 +1325,6 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
-// §9.4.5: Blocking assignment with intra-assignment delay.
-// Evaluates RHS before the delay, then assigns after the delay.
 static ExecTask ExecBlockingAssignTimed(const Stmt* stmt, SimContext& ctx,
                                         Arena& arena) {
   auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
@@ -1431,7 +1334,6 @@ static ExecTask ExecBlockingAssignTimed(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
-// §9.4.5: Blocking assignment with intra-assignment event control.
 static ExecTask ExecBlockingAssignEvent(const Stmt* stmt, SimContext& ctx,
                                         Arena& arena) {
   auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
@@ -1440,8 +1342,6 @@ static ExecTask ExecBlockingAssignEvent(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
-// §9.4.5: Evaluate a repeat count, returning 0 if the assignment should
-// bypass the repeat (count ≤ 0 for signed, or unknown/high-impedance).
 static uint64_t EvalRepeatCount(const Expr* count_expr, SimContext& ctx,
                                 Arena& arena) {
   auto val = EvalExpr(count_expr, ctx, arena);
@@ -1451,7 +1351,6 @@ static uint64_t EvalRepeatCount(const Expr* count_expr, SimContext& ctx,
   return count;
 }
 
-// §9.4.5: Blocking assignment with repeat intra-assignment event control.
 static ExecTask ExecBlockingAssignRepeatEvent(const Stmt* stmt,
                                               SimContext& ctx, Arena& arena) {
   auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
@@ -1463,14 +1362,12 @@ static ExecTask ExecBlockingAssignRepeatEvent(const Stmt* stmt,
   co_return StmtResult::kDone;
 }
 
-// §9.4.5: Background coroutine for nonblocking intra-assignment event.
 static SimCoroutine NbaEventCoroutine(const Stmt* stmt, Logic4Vec rhs_val,
                                       SimContext& ctx, Arena& arena) {
   co_await EventAwaiter{ctx, stmt->events, arena};
   ScheduleNonblockingAssign(stmt, rhs_val, 0, ctx, arena);
 }
 
-// §9.4.5: Background coroutine for nonblocking repeat intra-assignment event.
 static SimCoroutine NbaRepeatEventCoroutine(const Stmt* stmt,
                                             Logic4Vec rhs_val, uint64_t count,
                                             SimContext& ctx, Arena& arena) {
@@ -1480,7 +1377,6 @@ static SimCoroutine NbaRepeatEventCoroutine(const Stmt* stmt,
   ScheduleNonblockingAssign(stmt, rhs_val, 0, ctx, arena);
 }
 
-// §9.4.5: Spawn a background process for nonblocking intra-assignment event.
 static void SpawnNbaEventProcess(SimCoroutine coro, SimContext& ctx,
                                  Arena& arena) {
   auto* p = arena.Create<Process>();
@@ -1499,7 +1395,6 @@ static void SpawnNbaEventProcess(SimCoroutine coro, SimContext& ctx,
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), p->home_region, event);
 }
 
-// §9.4.5: Nonblocking assignment with intra-assignment event or repeat event.
 static StmtResult ExecNbaWithEvent(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
@@ -1518,8 +1413,6 @@ static StmtResult ExecNbaWithEvent(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
-// --- Disable statement (IEEE §9.6.2) ---
-
 static StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
   if (!stmt->expr || stmt->expr->kind != ExprKind::kIdentifier)
     return StmtResult::kDone;
@@ -1528,7 +1421,7 @@ static StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
   if (target.empty()) return StmtResult::kDone;
 
   auto* current = ctx.CurrentProcess();
-  // Copy the list since cross-process disable may modify registrations.
+
   auto procs = ctx.FindNamedScopeProcesses(target);
   bool self_disable = false;
 
@@ -1537,9 +1430,7 @@ static StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
       self_disable = true;
       continue;
     }
-    // Cross-process disable: mark the other process as inactive.
-    // The coroutine is NOT destroyed — stale awaiter callbacks check
-    // proc->active and skip resume when false.
+
     proc->active = false;
   }
 
@@ -1550,8 +1441,6 @@ static StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
 
   return StmtResult::kDone;
 }
-
-// --- Disable fork statement (IEEE §9.6.3) ---
 
 static void DisableDescendants(Process* proc) {
   for (auto* child : proc->children) {
@@ -1568,8 +1457,6 @@ static StmtResult ExecDisableForkImpl(SimContext& ctx) {
   proc->children.clear();
   return StmtResult::kDone;
 }
-
-// --- Main dispatch ---
 
 ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt) return ExecTask::Immediate(StmtResult::kDone);
@@ -1661,15 +1548,8 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
 }
 
-// §4.7 ¶1 sentence 3: "Time control statements are the # expression and
-// @ expression constructs (see 9.4)." StmtKind::kDelay carries the #
-// expression and StmtKind::kEventControl carries the @ expression, so
-// only those two kinds satisfy §4.7's definition; every other kind —
-// including the broader StmtKind::kTimingControl wrapper and cycle-delay,
-// wait, and wait-fork constructs governed by other subclauses — returns
-// false.
 bool IsTimeControlStatement(StmtKind kind) {
   return kind == StmtKind::kDelay || kind == StmtKind::kEventControl;
 }
 
-}  // namespace delta
+}

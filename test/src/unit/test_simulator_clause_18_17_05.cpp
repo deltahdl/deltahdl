@@ -30,4 +30,4 @@ TEST(RandsequenceSim, RandJoinBothExecute) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-}  // namespace
+}

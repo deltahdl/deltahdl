@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.3.4: try_get() call in initial block elaborates without error.
 TEST(SemaphoreTryGetElaborator, TryGetCallInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,7 +18,6 @@ TEST(SemaphoreTryGetElaborator, TryGetCallInInitialBlock) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.3.4: try_get() with default keyCount elaborates.
 TEST(SemaphoreTryGetElaborator, TryGetDefaultKeyCount) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -34,7 +32,6 @@ TEST(SemaphoreTryGetElaborator, TryGetDefaultKeyCount) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.3.4: try_get() result assigned to variable elaborates.
 TEST(SemaphoreTryGetElaborator, TryGetResultAssigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -50,4 +47,4 @@ TEST(SemaphoreTryGetElaborator, TryGetResultAssigned) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -1,8 +1,4 @@
-// §28.3.6 — Primitive instance connection list, array-of-instances bit-length
-// rules.
-//
-// Each test here drives the elaborator-level checks for an array-of-instances
-// whose port-expression width is compared against the per-instance port width.
+
 
 #include "fixture_elaborator.h"
 
@@ -58,4 +54,4 @@ TEST(GateArrayConnection, TooManyBitsOnArrayPortIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

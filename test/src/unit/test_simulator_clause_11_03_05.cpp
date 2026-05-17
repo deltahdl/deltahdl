@@ -66,13 +66,10 @@ TEST(ShortCircuit, BitwiseAndAlwaysEvaluatesBothOperands) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-// Helper: build an assignment-in-expression (side = val), usable as an operand.
 inline Expr* MakeAssignExpr(Arena& arena, const char* name, uint64_t val) {
   return MakeBinary(arena, TokenKind::kEq, MakeId(arena, name),
                     MakeInt(arena, val));
 }
-
-// Side-effect tests: verify short-circuited operands are truly not evaluated.
 
 TEST(ShortCircuit, LogicalAndFalseLhsSkipsRhsSideEffect) {
   SimFixture f;
@@ -140,8 +137,6 @@ TEST(ShortCircuit, ImplicationTrueLhsExecutesRhsSideEffect) {
   EXPECT_EQ(f.ctx.FindVariable("se")->value.ToUint64(), 42u);
 }
 
-// Non-short-circuit operators: verify both operands are always evaluated.
-
 TEST(ShortCircuit, BitwiseOrAlwaysExecutesRhsSideEffect) {
   SimFixture f;
   MakeVar(f, "a", 8, 0xFF);
@@ -182,4 +177,4 @@ TEST(ShortCircuit, EqualityAlwaysExecutesRhsSideEffect) {
   EXPECT_EQ(f.ctx.FindVariable("se")->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

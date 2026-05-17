@@ -38,11 +38,6 @@ TEST(CompilerDirectiveIdentSim, DefineMacroAffectsSimulation) {
   EXPECT_EQ(result, 42u);
 }
 
-// §5.6.4: "The directive shall remain in effect for the rest of the
-// compilation unit ... unless a different compiler directive specifies
-// otherwise."  A `define before an intervening module remains visible in
-// a later module of the same compilation unit, end-to-end through the
-// simulator.
 TEST(CompilerDirectiveSimulation, DirectivePersistsInCompilationUnit) {
   auto result = PreprocessAndGet(
       "`define CONST 8'd99\n"
@@ -55,9 +50,6 @@ TEST(CompilerDirectiveSimulation, DirectivePersistsInCompilationUnit) {
   EXPECT_EQ(result, 99u);
 }
 
-// §5.6.4: "...unless a different compiler directive specifies otherwise."
-// A later `define overrides an earlier one before simulation observes the
-// macro's expanded value.
 TEST(CompilerDirectiveSimulation, DirectiveOverriddenBeforeSimulation) {
   auto result = PreprocessAndGet(
       "`define VAL 8'd11\n"
@@ -70,13 +62,8 @@ TEST(CompilerDirectiveSimulation, DirectiveOverriddenBeforeSimulation) {
   EXPECT_EQ(result, 55u);
 }
 
-// §5.6.4: "A compiler directive shall not affect other compilation units."
-// Each PreprocessAndGet invocation builds its own Preprocessor (i.e., its
-// own compilation unit); a `define from a prior simulation cannot leak
-// into a later one.  The second simulation must fail to elaborate because
-// the macro is undefined in its CU.
 TEST(CompilerDirectiveSimulation, MacroDoesNotLeakBetweenCus) {
-  // CU1: define and use the macro, simulate normally.
+
   auto first = PreprocessAndGet(
       "`define LEAK 8'd17\n"
       "module t;\n"
@@ -86,9 +73,6 @@ TEST(CompilerDirectiveSimulation, MacroDoesNotLeakBetweenCus) {
       "result");
   EXPECT_EQ(first, 17u);
 
-  // CU2: fresh fixture, fresh Preprocessor.  Reference the same macro
-  // without redefining it — preprocessing leaves `LEAK in the source,
-  // which the lexer rejects, leaving a missing variable in the simulator.
   SimFixture f2;
   auto fid = f2.mgr.AddFile(
       "<test>",

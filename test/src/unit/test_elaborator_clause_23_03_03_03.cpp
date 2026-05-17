@@ -5,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- R1: input net-type port can be connected to any expression of a
-//     compatible data type ---
-
 TEST(PortConnectionRulesForNetsElaboration,
      InputNetPortConnectsToCompatibleExpression) {
   EXPECT_TRUE(
@@ -62,8 +59,6 @@ TEST(PortConnectionRulesForNetsElaboration,
              "endmodule\n"));
 }
 
-// --- R2: unconnected input net-type port shall have the value 'z ---
-
 TEST(PortConnectionRulesForNetsElaboration,
      UnconnectedInputNetPortNoError) {
   EXPECT_TRUE(
@@ -84,9 +79,6 @@ TEST(PortConnectionRulesForNetsElaboration,
              "  child u(.b(w));\n"
              "endmodule\n"));
 }
-
-// --- R3: output net-type port can be connected to a net or variable (or a
-//     concatenation of nets or variables) of a compatible data type ---
 
 TEST(PortConnectionRulesForNetsElaboration,
      OutputNetPortConnectsToNet) {
@@ -136,9 +128,6 @@ TEST(PortConnectionRulesForNetsElaboration,
              "endmodule\n"));
 }
 
-// --- R4: inout net-type port can be connected to a net (or a concatenation
-//     of nets) of a compatible data type ---
-
 TEST(PortConnectionRulesForNetsElaboration,
      InoutNetPortConnectsToNet) {
   EXPECT_TRUE(
@@ -172,8 +161,6 @@ TEST(PortConnectionRulesForNetsElaboration,
              "endmodule\n"));
 }
 
-// --- R5: inout net-type port can be left unconnected ---
-
 TEST(PortConnectionRulesForNetsElaboration,
      InoutNetPortLeftUnconnectedNoError) {
   EXPECT_TRUE(
@@ -194,8 +181,6 @@ TEST(PortConnectionRulesForNetsElaboration,
              "  child u(.b(w));\n"
              "endmodule\n"));
 }
-
-// --- R6: inout net-type port cannot be connected to a variable ---
 
 TEST(PortConnectionRulesForNetsElaboration,
      VariableConnectedToInoutNetPortErrors) {
@@ -239,4 +224,4 @@ TEST(PortConnectionRulesForNetsElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

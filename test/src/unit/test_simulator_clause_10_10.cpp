@@ -14,10 +14,6 @@ Expr* MakeConcat(Arena& arena, std::vector<Expr*> elems) {
   return e;
 }
 
-// ---------------------------------------------------------------------------
-// Full-pipeline tests
-// ---------------------------------------------------------------------------
-
 TEST(UnpackedArrayConcatSim, ScalarItemsToFixedArray) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -121,10 +117,6 @@ TEST(UnpackedArrayConcatSim, ConcatToDynamicArray) {
   EXPECT_EQ(q->elements[2].ToUint64(), 30u);
 }
 
-// ---------------------------------------------------------------------------
-// Size-mismatch errors for fixed-size targets
-// ---------------------------------------------------------------------------
-
 TEST(UnpackedArrayConcatSim, FixedSizeTooFewElementsError) {
   SimFixture f;
   ArrayInfo info;
@@ -175,10 +167,6 @@ TEST(UnpackedArrayConcatSim, EmptyConcatToFixedSizeError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// ---------------------------------------------------------------------------
-// Bounded queue overflow
-// ---------------------------------------------------------------------------
-
 TEST(UnpackedArrayConcatSim, BoundedQueueOverflowTruncates) {
   SimFixture f;
   auto* q = f.ctx.CreateQueue("q", 32, 3);
@@ -205,4 +193,4 @@ TEST(UnpackedArrayConcatSim, BoundedQueueOverflowWarns) {
   EXPECT_GT(f.diag.WarningCount(), before);
 }
 
-}  // namespace
+}

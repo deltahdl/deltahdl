@@ -108,4 +108,4 @@ TEST(ImportExportElaboration, ImportedFunctionInExpressionElaborates) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

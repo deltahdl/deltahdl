@@ -9,8 +9,6 @@ using namespace delta;
 
 namespace {
 
-// --- Literal used as expression operand ---
-
 TEST(IntegerLiteralSim, LiteralAssignedThroughParameter) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -28,8 +26,6 @@ TEST(IntegerLiteralSim, LiteralAssignedThroughParameter) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
-
-// --- Negation of unsigned literal ---
 
 TEST(IntegerLiteralSim, NegatedUnsignedSizedLiteral) {
   auto result = RunAndGet(
@@ -50,8 +46,6 @@ TEST(IntegerLiteralSim, NegatedUnbasedLiteralIsTwosComplement) {
       "x");
   EXPECT_EQ(result, 255u);
 }
-
-// --- Negation/division examples from §11.3.3 ---
 
 TEST(IntegerLiteralSim, NegatedUnbasedDivThree) {
   auto result = RunAndGet(
@@ -93,4 +87,4 @@ TEST(IntegerLiteralSim, NegatedSizedSignedBasedDivThree) {
   EXPECT_EQ(result & 0xFFFFFFFFu, 1u);
 }
 
-}  // namespace
+}

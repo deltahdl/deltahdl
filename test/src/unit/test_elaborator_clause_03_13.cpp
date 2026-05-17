@@ -65,9 +65,6 @@ TEST(NameSpaceElaboration, DuplicatePackageDefinition) {
              "module m; endmodule\n"));
 }
 
-// §3.13(a): the definitions name space unifies module, primitive, program,
-// and interface identifiers.  Two primitives sharing a name in the same
-// compilation unit must collide under §3.13's closing rule.
 TEST(NameSpaceElaboration, DuplicateUdpDefinition) {
   EXPECT_FALSE(
       ElabOk("primitive p(output y, input a);\n"
@@ -97,8 +94,6 @@ TEST(NameSpaceElaboration, ModuleNameSpaceCoexist) {
              "endmodule\n"));
 }
 
-// §3.13(c) closing rule: within the compilation-unit scope name space, a
-// name shall not be redeclared by a later declaration.
 TEST(NameSpaceElaboration, DuplicateCuScopeTypedef) {
   EXPECT_FALSE(
       ElabOk("typedef int foo;\n"
@@ -141,18 +136,12 @@ TEST(NameSpaceElaboration, CheckerAndCuItemSameName) {
              "module m; endmodule\n"));
 }
 
-// §3.13(a) lists module/primitive/program/interface only; checkers belong to
-// §3.13(c), so a checker may share its name with a module without colliding.
 TEST(NameSpaceElaboration, ModuleAndCheckerSameNameOk) {
   EXPECT_TRUE(
       ElabOk("checker foo; endchecker\n"
              "module foo; endmodule\n"));
 }
 
-// §3.13(e): The module name space unifies variable declarations, net
-// declarations, functions, tasks, named blocks, instance names, and
-// user-defined types within the enclosing construct.  The closing rule of
-// §3.13 forbids redeclaring a name already declared by a prior declaration.
 TEST(NameSpaceElaboration, RedeclVarInModuleScope) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -230,9 +219,6 @@ TEST(NameSpaceElaboration, ModuleInstanceSameNameAsVariableError) {
              "endmodule\n"));
 }
 
-// §3.13(f): The block name space is introduced by named/unnamed blocks,
-// specify, function, and task constructs.  The closing rule of §3.13
-// forbids redeclaring a name within a single block name space.
 TEST(NameSpaceElaboration, BlockNameSpaceDuplicateDeclarationError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -243,10 +229,6 @@ TEST(NameSpaceElaboration, BlockNameSpaceDuplicateDeclarationError) {
              "endmodule\n"));
 }
 
-// §3.13(g): "A port name introduced in the port name space can be
-// reintroduced in the module name space by declaring a variable or a net
-// with the same name."  The reintroduction must survive elaboration, not
-// just parsing.
 TEST(NameSpaceElaboration, PortReintroducedAsVariableElaboratesOk) {
   EXPECT_TRUE(
       ElabOk("module m(data);\n"
@@ -255,4 +237,4 @@ TEST(NameSpaceElaboration, PortReintroducedAsVariableElaboratesOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -34,10 +34,10 @@ TEST(AssignmentExtensionTruncationSynth, ExtensionIncreasesOutputWidth) {
   ASSERT_NE(aig, nullptr);
   EXPECT_EQ(aig->inputs.size(), 4);
   EXPECT_EQ(aig->outputs.size(), 8);
-  // Upper 4 bits should be constant false (zero-extended).
+
   for (size_t i = 4; i < 8; ++i) {
     EXPECT_EQ(aig->outputs[i], AigGraph::kConstFalse);
   }
 }
 
-}  // namespace
+}

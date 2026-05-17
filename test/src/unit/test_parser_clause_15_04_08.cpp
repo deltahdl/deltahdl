@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4.8: try_peek() call with ref argument parses.
 TEST(MailboxTryPeekParser, TryPeekCallParses) {
   auto r = Parse(
       "module m;\n"
@@ -18,7 +17,6 @@ TEST(MailboxTryPeekParser, TryPeekCallParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.8: try_peek() result assigned to variable parses (returns int).
 TEST(MailboxTryPeekParser, TryPeekResultAssigned) {
   auto r = Parse(
       "module m;\n"
@@ -32,7 +30,6 @@ TEST(MailboxTryPeekParser, TryPeekResultAssigned) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §15.4.8: try_peek() used in conditional parses.
 TEST(MailboxTryPeekParser, TryPeekInConditional) {
   auto r = Parse(
       "module m;\n"
@@ -48,4 +45,4 @@ TEST(MailboxTryPeekParser, TryPeekInConditional) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

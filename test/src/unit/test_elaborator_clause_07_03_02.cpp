@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.3.2: Dynamic/chandle types may be used in tagged unions.
 TEST(TaggedUnionValidation, ChandleInTaggedUnion_Allowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -15,7 +14,6 @@ TEST(TaggedUnionValidation, ChandleInTaggedUnion_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.3.2: Void members allowed in tagged unions.
 TEST(TaggedUnionValidation, VoidMemberInTaggedUnion_Allowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -26,7 +24,6 @@ TEST(TaggedUnionValidation, VoidMemberInTaggedUnion_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.3.2: Dynamic/string types may be used in tagged unions.
 TEST(TaggedUnionValidation, StringInTaggedUnion_Allowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -37,7 +34,6 @@ TEST(TaggedUnionValidation, StringInTaggedUnion_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.3.2: Packed tagged union with integral members accepted.
 TEST(TaggedUnionValidation, PackedTaggedUnionIntegralMembers_Allowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -48,7 +44,6 @@ TEST(TaggedUnionValidation, PackedTaggedUnionIntegralMembers_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.3.2: Packed tagged union members need not be the same width.
 TEST(TaggedUnionValidation, PackedTaggedUnionDifferentWidths_Allowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -59,7 +54,6 @@ TEST(TaggedUnionValidation, PackedTaggedUnionDifferentWidths_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.3.2: Packed tagged union members must be packed types; real is rejected.
 TEST(TaggedUnionValidation, PackedTaggedUnionRealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -70,7 +64,6 @@ TEST(TaggedUnionValidation, PackedTaggedUnionRealMember_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.3.2: Multiple void members in tagged union.
 TEST(TaggedUnionValidation, MultipleVoidMembers_Allowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -81,4 +74,4 @@ TEST(TaggedUnionValidation, MultipleVoidMembers_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

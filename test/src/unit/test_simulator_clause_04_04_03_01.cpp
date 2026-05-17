@@ -70,8 +70,6 @@ TEST(PliPreponedSim, PreponedEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-// §4.4.3.1: scheduling into another region of the current time slot from
-// inside Preponed is illegal. The scheduler records the violation.
 TEST(PliPreponedSim, IllegalScheduleIntoOtherRegionInCurrentTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
@@ -89,10 +87,6 @@ TEST(PliPreponedSim, IllegalScheduleIntoOtherRegionInCurrentTimeSlot) {
   EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 1u);
 }
 
-// §4.4.3.1: scheduling into the same region (Preponed) at the current time
-// slot is not the "any other region" case, so it is not flagged. Likewise,
-// scheduling into another region at a *future* time slot is allowed because
-// the restriction is scoped to the current time slot.
 TEST(PliPreponedSim, LegalSchedulesFromPreponedAreNotFlagged) {
   Arena arena;
   Scheduler sched(arena);
@@ -109,9 +103,6 @@ TEST(PliPreponedSim, LegalSchedulesFromPreponedAreNotFlagged) {
   EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 0u);
 }
 
-// §4.4.3.1: scheduling from non-Preponed regions (e.g. Active) into other
-// regions of the current time slot is permitted by §4.4.3.1 — the rule is
-// specific to the Preponed region.
 TEST(PliPreponedSim, ScheduleFromActiveIntoOtherRegionIsNotFlagged) {
   Arena arena;
   Scheduler sched(arena);
@@ -128,7 +119,6 @@ TEST(PliPreponedSim, ScheduleFromActiveIntoOtherRegionIsNotFlagged) {
   EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 0u);
 }
 
-// §4.4.3.1: each illegal schedule from Preponed is counted independently.
 TEST(PliPreponedSim, MultipleIllegalSchedulesAreEachCounted) {
   Arena arena;
   Scheduler sched(arena);
@@ -147,9 +137,6 @@ TEST(PliPreponedSim, MultipleIllegalSchedulesAreEachCounted) {
   EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 3u);
 }
 
-// §4.4.3.1: while executing Preponed, the scheduler reports the current
-// region so the restriction can be inspected by code paths that emit nets
-// or variable writes.
 TEST(PliPreponedSim, CurrentRegionIsPreponedDuringPreponedCallback) {
   Arena arena;
   Scheduler sched(arena);
@@ -163,9 +150,6 @@ TEST(PliPreponedSim, CurrentRegionIsPreponedDuringPreponedCallback) {
   EXPECT_EQ(observed, Region::kPreponed);
 }
 
-// §4.4.3.1: the rule forbids scheduling into "any other region" within the
-// current time slot — the Preponed region itself is not "other" and must not
-// be flagged.
 TEST(PliPreponedSim, ScheduleIntoSamePreponedRegionAtCurrentTimeIsNotFlagged) {
   Arena arena;
   Scheduler sched(arena);
@@ -184,9 +168,6 @@ TEST(PliPreponedSim, ScheduleIntoSamePreponedRegionAtCurrentTimeIsNotFlagged) {
   EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 0u);
 }
 
-// §4.4.3.1: "any other region" includes the last region of the time slot —
-// the Postponed region. Scheduling into Postponed from inside Preponed at
-// the current time slot is a violation.
 TEST(PliPreponedSim, ScheduleIntoPostponedAtCurrentTimeIsFlagged) {
   Arena arena;
   Scheduler sched(arena);
@@ -203,10 +184,6 @@ TEST(PliPreponedSim, ScheduleIntoPostponedAtCurrentTimeIsFlagged) {
   EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 1u);
 }
 
-// §4.4.3.1: it is illegal to write values to any net or variable from inside
-// the Preponed region. The VPI write path (VpiContext::PutValue) is the
-// canonical PLI write entry point; when invoked from a Preponed callback,
-// the scheduler records the violation.
 TEST(PliPreponedSim, VpiPutValueFromPreponedRecordsWriteViolation) {
   Arena arena;
   Scheduler sched(arena);
@@ -236,9 +213,6 @@ TEST(PliPreponedSim, VpiPutValueFromPreponedRecordsWriteViolation) {
   EXPECT_EQ(sched.IllegalPreponedWriteCount(), 1u);
 }
 
-// §4.4.3.1: each illegal write from Preponed is counted independently, so
-// repeated VPI writes during a Preponed callback all register against the
-// "illegal to write values to any net or variable" rule.
 TEST(PliPreponedSim, MultipleIllegalWritesAreEachCounted) {
   Arena arena;
   Scheduler sched(arena);
@@ -269,8 +243,6 @@ TEST(PliPreponedSim, MultipleIllegalWritesAreEachCounted) {
   EXPECT_EQ(sched.IllegalPreponedWriteCount(), 4u);
 }
 
-// §4.4.3.1: VPI writes from regions other than Preponed are not flagged —
-// the rule is scoped to the Preponed region.
 TEST(PliPreponedSim, VpiPutValueOutsidePreponedDoesNotRecordViolation) {
   Arena arena;
   Scheduler sched(arena);
@@ -300,11 +272,6 @@ TEST(PliPreponedSim, VpiPutValueOutsidePreponedDoesNotRecordViolation) {
   EXPECT_EQ(var.value.words[0].aval, 42u);
 }
 
-// §4.4.3.1: "any other region within the current time slot" is universal —
-// every region except Preponed is forbidden as a current-time schedule
-// target from inside a Preponed callback. Iterate over every non-Preponed
-// region so the universal quantifier is observed end-to-end rather than via
-// a representative-region sample.
 TEST(PliPreponedSim,
      IllegalScheduleIntoEveryNonPreponedRegionAtCurrentTimeIsFlagged) {
   Arena arena;
@@ -326,10 +293,6 @@ TEST(PliPreponedSim,
   EXPECT_EQ(sched.IllegalPreponedScheduleCount(), kRegionCount - 1);
 }
 
-// §4.4.3.1: the illegal-write rule and the illegal-schedule rule are stated
-// as two distinct prohibitions. A Preponed callback that violates both in a
-// single execution must bump both counters — neither rule's counter may
-// absorb the other's tally.
 TEST(PliPreponedSim,
      WriteAndScheduleViolationsFromPreponedAreCountedIndependently) {
   Arena arena;
@@ -364,10 +327,6 @@ TEST(PliPreponedSim,
   EXPECT_EQ(sched.IllegalPreponedWriteCount(), 1u);
 }
 
-// §4.4.3.1: the rule prohibits writing values to "any net or variable" — net
-// targets count, not just variables. When a PLI write attempt names a net
-// rather than a variable, VpiContext::PutValue still notes the attempt so
-// the §4.4.3.1 violation is observable.
 TEST(PliPreponedSim, VpiPutValueOnNetFromPreponedRecordsWriteViolation) {
   Arena arena;
   Scheduler sched(arena);

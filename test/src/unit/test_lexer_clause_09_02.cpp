@@ -22,4 +22,4 @@ TEST(StructuredProcedureLexing, KeywordsAreNotIdentifiers) {
   }
 }
 
-}  // namespace
+}

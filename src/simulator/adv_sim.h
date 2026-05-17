@@ -9,18 +9,10 @@
 
 namespace delta {
 
-// =============================================================================
-// 2-state fast path detector
-// =============================================================================
-
 class TwoStateDetector {
  public:
   static bool Is2State(const Logic4Vec& vec);
 };
-
-// =============================================================================
-// Event coalescing
-// =============================================================================
 
 struct CoalescedEntry {
   uint32_t target_id;
@@ -36,10 +28,6 @@ class EventCoalescer {
   std::unordered_map<uint32_t, uint64_t> pending_;
 };
 
-// =============================================================================
-// Dynamic array (SV dynamic arrays)
-// =============================================================================
-
 class DynArray {
  public:
   uint32_t Size() const { return static_cast<uint32_t>(data_.size()); }
@@ -50,10 +38,6 @@ class DynArray {
  private:
   std::vector<uint64_t> data_;
 };
-
-// =============================================================================
-// Associative array (SV associative arrays)
-// =============================================================================
 
 class AssocArray {
  public:
@@ -67,10 +51,6 @@ class AssocArray {
   std::unordered_map<std::string, uint64_t> data_;
 };
 
-// =============================================================================
-// SystemVerilog string type
-// =============================================================================
-
 class SvString {
  public:
   uint32_t Len() const { return static_cast<uint32_t>(data_.size()); }
@@ -82,4 +62,4 @@ class SvString {
   std::string data_;
 };
 
-}  // namespace delta
+}

@@ -37,13 +37,6 @@ TEST(ProceduralAssignSim, AssignInCalledFunction) {
   EXPECT_EQ(result, 42u);
 }
 
-// §10.4: "Blocking and nonblocking procedural assignment statements
-// specify different procedural flows in sequential blocks." The two tests
-// below observe this contrast on the same sequential pattern. With
-// blocking semantics `a = b; b = a;` makes both variables equal, since
-// `b = a` reads the freshly-written value of `a`. With nonblocking
-// semantics `a <= b; b <= a;` swaps the values, because both RHSes are
-// sampled before any LHS update.
 TEST(ProceduralAssignSim, BlockingFlowIsSequentialOverwrite) {
   auto a = RunAndGet(
       "module t;\n"
@@ -98,4 +91,4 @@ TEST(ProceduralAssignSim, NonblockingFlowSwapsInSameBlock) {
   EXPECT_EQ(b, 1u);
 }
 
-}  // namespace
+}

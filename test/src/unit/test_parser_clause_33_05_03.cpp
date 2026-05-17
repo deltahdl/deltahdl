@@ -18,8 +18,6 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// Per-test scratch directory so concurrent runs do not collide on the
-// shared system temp area.
 struct TempPrecompDir {
   fs::path dir;
 
@@ -38,10 +36,6 @@ struct TempPrecompDir {
   }
 };
 
-// §33.5.3: "the compiled forms shall... exist somewhere in the
-// filesystem."  After Save returns, a non-empty file is on disk at the
-// path the caller asked for so that a later binding-tool invocation
-// can find it.
 TEST(SeparateCompilationTool, CompiledFormPersistsOnFilesystem) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
@@ -53,10 +47,6 @@ TEST(SeparateCompilationTool, CompiledFormPersistsOnFilesystem) {
   EXPECT_GT(fs::file_size(path), 0u);
 }
 
-// §33.5.3: "the source descriptions shall be parsed and compiled into
-// the library using one or more invocations of the compiler tool."
-// Two separate Save calls — modeling two compiler invocations — build
-// the library up incrementally.  A single Load surfaces every cell.
 TEST(SeparateCompilationTool, MultipleInvocationsAccumulateCells) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
@@ -80,10 +70,6 @@ TEST(SeparateCompilationTool, MultipleInvocationsAccumulateCells) {
   EXPECT_EQ(target.modules[1]->name, "b");
 }
 
-// §33.5.3: "all cells in a design shall be precompiled prior to
-// binding the design."  Save refuses to persist a cell that does not
-// parse, which guarantees that anything the binding tool later reads
-// from the library went through the compiler step.
 TEST(SeparateCompilationTool, SaveRejectsUnparseableSource) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
@@ -92,11 +78,6 @@ TEST(SeparateCompilationTool, SaveRejectsUnparseableSource) {
       "rtlLib", path));
 }
 
-// §33.5.3: every cell-kind design element (modules, interfaces,
-// programs, primitives, packages, configurations) is a candidate for
-// precompilation; round-tripping each kind through Save/Load preserves
-// the library tag and the cell's identity so the binding tool can
-// resolve any of them.
 TEST(SeparateCompilationTool, AllCellKindsRoundTrip) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
@@ -140,9 +121,6 @@ TEST(SeparateCompilationTool, AllCellKindsRoundTrip) {
   EXPECT_EQ(target.configs[0]->library, "rtlLib");
 }
 
-// §33.5.3: the format and location are tool-specific, so the file is
-// not interchangeable with arbitrary bytes; loading a path that lacks
-// the tool-specific marker fails cleanly.
 TEST(SeparateCompilationTool, LoadRejectsAlienFile) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "alien.bin";
@@ -155,8 +133,6 @@ TEST(SeparateCompilationTool, LoadRejectsAlienFile) {
   EXPECT_FALSE(PrecompiledLibrary::Load(path, target, mgr, arena, diag));
 }
 
-// §33.5.3: a missing precompiled library is also a hard failure — the
-// binding tool cannot manufacture cells out of thin air.
 TEST(SeparateCompilationTool, LoadFailsForMissingFile) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "does_not_exist.dpl";
@@ -167,11 +143,6 @@ TEST(SeparateCompilationTool, LoadFailsForMissingFile) {
   EXPECT_FALSE(PrecompiledLibrary::Load(path, target, mgr, arena, diag));
 }
 
-// §33.5.3: each invocation of the compiler tool tags its chunk with
-// the library it is populating.  Two invocations targeting different
-// libraries — sharing one on-disk archive — must keep their library
-// identifiers separate so the binding tool can later resolve cells in
-// the right library.
 TEST(SeparateCompilationTool, MultipleLibrariesPreserveTagsIndependently) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "shared.dpl";
@@ -197,17 +168,12 @@ TEST(SeparateCompilationTool, MultipleLibrariesPreserveTagsIndependently) {
   EXPECT_EQ(target.modules[1]->library, "libB");
 }
 
-// §33.5.3: a corrupted on-disk library cannot be silently absorbed.
-// Crafting a file that has the right magic but a chunk header pointing
-// past end-of-file models a partial write or transport corruption; the
-// loader must reject it rather than hand the binding tool a fragmentary
-// view of the library.
 TEST(SeparateCompilationTool, LoadFailsOnTruncatedChunk) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "truncated.dpl";
   std::ofstream os(path, std::ios::binary);
   os.write("DPLIB001", 8);
-  // A library_name length of 16 with no body bytes available.
+
   unsigned char bad[4] = {0x10, 0x00, 0x00, 0x00};
   os.write(reinterpret_cast<const char*>(bad), 4);
   os.close();
@@ -219,4 +185,4 @@ TEST(SeparateCompilationTool, LoadFailsOnTruncatedChunk) {
   EXPECT_FALSE(PrecompiledLibrary::Load(path, target, mgr, arena, diag));
 }
 
-}  // namespace
+}

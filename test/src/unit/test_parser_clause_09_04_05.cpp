@@ -792,4 +792,4 @@ TEST(IntraAssignTimingParsing, IntraAssignRepeatEventMissingAt) {
       "endmodule\n").has_errors);
 }
 
-}  // namespace
+}

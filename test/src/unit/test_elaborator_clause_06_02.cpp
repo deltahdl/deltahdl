@@ -102,4 +102,4 @@ TEST(DataTypesAndObjects, TypedefCreatesUserDefinedType) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

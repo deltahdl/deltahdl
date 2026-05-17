@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §15.5.5: Event declaration with initializer from another event parses.
 TEST(EventOperationsParser, EventInitializerFromAnotherEvent) {
   auto r = Parse(
       "module m;\n"
@@ -21,7 +20,6 @@ TEST(EventOperationsParser, EventInitializerFromAnotherEvent) {
   EXPECT_NE(item1->init_expr, nullptr);
 }
 
-// §15.5.5: Imperative event-to-event assignment parses as blocking assign.
 TEST(EventOperationsParser, ImperativeEventAssignment) {
   auto r = Parse(
       "module m;\n"
@@ -36,4 +34,4 @@ TEST(EventOperationsParser, ImperativeEventAssignment) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
-}  // namespace
+}

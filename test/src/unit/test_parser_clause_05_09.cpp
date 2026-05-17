@@ -113,10 +113,6 @@ TEST(LexicalConventionParsing, TripleQuotedStringInExpression) {
               "endmodule\n"));
 }
 
-// §5.9: "A quoted string shall be contained in a single line unless the
-// newline character is immediately preceded by \ (backslash). In this case,
-// the backslash and the newline character are ignored."  The construct must
-// reach the parser as a single string token.
 TEST(LexicalConventionParsing, StringWithLineContinuation) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -124,4 +120,4 @@ TEST(LexicalConventionParsing, StringWithLineContinuation) {
               "endmodule"));
 }
 
-}  // namespace
+}

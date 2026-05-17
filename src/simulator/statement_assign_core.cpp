@@ -21,7 +21,6 @@
 
 namespace delta {
 
-// §6.12.1: Get the base identifier name from an LHS expression.
 static std::string_view LhsIdentName(const Expr* lhs) {
   while (lhs) {
     if (lhs->kind == ExprKind::kIdentifier) return lhs->text;
@@ -34,7 +33,6 @@ static std::string_view LhsIdentName(const Expr* lhs) {
   return {};
 }
 
-// Clear x/z bits when writing to a 2-state variable.
 static void CoerceTo2State(Logic4Vec& v) {
   for (uint32_t i = 0; i < v.nwords; ++i) {
     v.words[i].aval &= ~v.words[i].bval;
@@ -42,14 +40,12 @@ static void CoerceTo2State(Logic4Vec& v) {
   }
 }
 
-// Write to a variable and notify watchers.
 static void WriteVar(Variable* var, const Logic4Vec& val, Arena& arena) {
   var->value = ResizeToWidth(val, var->value.width, arena);
   if (!var->is_4state) CoerceTo2State(var->value);
   var->NotifyWatchers();
 }
 
-// Handle indexed/select LHS in blocking assignments.
 static bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
                                     SimContext& ctx, Arena& arena) {
   if (auto* elem = TryResolveArrayElement(lhs, ctx)) {
@@ -63,9 +59,7 @@ static bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
     return true;
   }
   auto* var = ResolveLhsVariable(lhs, ctx);
-  // §6.16: s[i] = x replaces character i of the string variable.  A zero
-  // byte is dropped per "Assigning the value 0 to a string character shall
-  // be ignored."  The dot-form putc(j,x) is the same operation per §6.16.2.
+
   if (var && lhs->kind == ExprKind::kSelect && lhs->base && !lhs->index_end) {
     auto base_name = LhsIdentName(lhs->base);
     if (!base_name.empty() && ctx.IsStringVariable(base_name)) {
@@ -87,7 +81,6 @@ static bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
   return true;
 }
 
-// §7.9.9: Associative array whole-array copy assignment.
 static bool TryAssocCopyAssign(const Stmt* stmt, SimContext& ctx) {
   if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
   if (stmt->rhs->kind != ExprKind::kIdentifier) return false;
@@ -99,7 +92,6 @@ static bool TryAssocCopyAssign(const Stmt* stmt, SimContext& ctx) {
   return true;
 }
 
-// §8: Try to handle class `new` in a blocking assignment.
 static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall) return false;
   if (stmt->rhs->text != "new") return false;
@@ -107,7 +99,6 @@ static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto type_name = ctx.GetVariableClassType(stmt->lhs->text);
   if (type_name.empty()) return false;
 
-  // §8.12: shallow copy — `p2 = new p1;`
   if (stmt->rhs->lhs && stmt->rhs->lhs->kind == ExprKind::kIdentifier) {
     auto src_val = EvalExpr(stmt->rhs->lhs, ctx, arena);
     auto* src_obj = ctx.GetClassObject(src_val.ToUint64());
@@ -120,7 +111,6 @@ static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     }
   }
 
-  // §8.30.2: weak_reference new(T referent).
   if (type_name == "weak_reference") {
     uint64_t referent = kNullClassHandle;
     if (!stmt->rhs->args.empty()) {
@@ -140,9 +130,6 @@ static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return true;
 }
 
-// §8.8: Try to handle typed constructor call `D::new` (no parens) in a
-// blocking assignment.  The with-parens form `D::new(args)` is a kCall and
-// is handled by the expression evaluator via TryEvalClassScopeCall.
 static bool TryTypedClassNewAssign(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kMemberAccess) return false;
@@ -160,8 +147,6 @@ static bool TryTypedClassNewAssign(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
-// §A.6.7.1: Unwrap typed assignment pattern expression (kCast wrapping
-// pattern).
 static const Expr* UnwrapTypedPattern(const Expr* expr) {
   if (expr->kind == ExprKind::kCast && expr->lhs &&
       expr->lhs->kind == ExprKind::kAssignmentPattern)
@@ -169,18 +154,15 @@ static const Expr* UnwrapTypedPattern(const Expr* expr) {
   return expr;
 }
 
-// §11.6: Determine the context width from the LHS of an assignment.
 static uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx) {
   if (!lhs) return 0;
   auto* var = ResolveLhsVariable(lhs, ctx);
   return var ? var->value.width : 0;
 }
 
-// Execute a blocking assignment with full LHS support.
-// §10.9.2: Evaluate RHS as named struct pattern if applicable.
 static Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
                                           Arena& arena) {
-  // §11.6: LHS width determines context for RHS expression evaluation.
+
   uint32_t ctx_width = LhsContextWidth(stmt->lhs, ctx);
   if (!stmt->rhs || stmt->lhs->kind != ExprKind::kIdentifier) {
     return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
@@ -194,7 +176,6 @@ static Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
   return EvalStructPattern(inner, sinfo, ctx, arena);
 }
 
-// §7.4.3: Compute (lo, count) for an unpacked array slice expression.
 static std::pair<uint32_t, uint32_t> ComputeSliceRange(const Expr* expr,
                                                        SimContext& ctx,
                                                        Arena& arena) {
@@ -208,7 +189,6 @@ static std::pair<uint32_t, uint32_t> ComputeSliceRange(const Expr* expr,
   return {lo, std::max(start, end_val) - lo + 1};
 }
 
-// §7.4.3: Collect elements from a source unpacked array slice.
 static void CollectSliceSourceElements(const Expr* rhs, SimContext& ctx,
                                        Arena& arena,
                                        std::vector<Logic4Vec>& out) {
@@ -224,7 +204,6 @@ static void CollectSliceSourceElements(const Expr* rhs, SimContext& ctx,
   }
 }
 
-// §7.4.3/§7.4.6: Unpacked array slice assignment (arr_b[5:3] = arr_a[2:0]).
 static bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   auto* lhs = stmt->lhs;
@@ -255,7 +234,6 @@ static bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
-// Find or lazily create a compound element variable.
 static Variable* FindOrCreateElement(const std::string& name, uint32_t width,
                                      SimContext& ctx, Arena& arena) {
   auto* var = ctx.FindVariable(name);
@@ -263,13 +241,11 @@ static Variable* FindOrCreateElement(const std::string& name, uint32_t width,
   return ctx.CreateVariable(*arena.Create<std::string>(name), width);
 }
 
-// §7.4.5: Check if an expression is a compound array select (e.g., A[0][2]).
 static bool IsCompoundSelect(const Expr* expr) {
   return expr && expr->kind == ExprKind::kSelect && expr->base &&
          expr->base->kind == ExprKind::kSelect && !expr->index_end;
 }
 
-// §7.4.5: Multi-dimensional sub-array copy (B[1][1] = A[0][2]).
 static bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!IsCompoundSelect(stmt->lhs) || !IsCompoundSelect(stmt->rhs))
     return false;
@@ -292,7 +268,6 @@ static bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return true;
 }
 
-// §10.10/A.8.1: Concatenation as LHS — unpack RHS across elements.
 static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                             SimContext& ctx, Arena& arena) {
   uint64_t rhs_raw = rhs_val.ToUint64();
@@ -309,7 +284,6 @@ static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   }
 }
 
-// §11.4.14.3: Parse a digit-string identifier as an integer.
 static uint32_t ParseDigitIdentifier(std::string_view text) {
   uint32_t n = 0;
   for (char c : text) {
@@ -318,7 +292,6 @@ static uint32_t ParseDigitIdentifier(std::string_view text) {
   return n > 0 ? n : 1;
 }
 
-// §11.4.14.3: Map a type name to its bit width for streaming slicing.
 static uint32_t TypeNameToSliceWidth(std::string_view t) {
   if (t == "byte") return 8;
   if (t == "shortint") return 16;
@@ -330,7 +303,6 @@ static uint32_t TypeNameToSliceWidth(std::string_view t) {
   return 32;
 }
 
-// §11.4.14.3: Determine streaming slice size from optional type/expression.
 static uint32_t StreamSliceSizeForUnpack(const Expr* size_expr, SimContext& ctx,
                                          Arena& arena) {
   if (!size_expr) return 1;
@@ -350,14 +322,12 @@ static uint32_t StreamSliceSizeForUnpack(const Expr* size_expr, SimContext& ctx,
   return static_cast<uint32_t>(val);
 }
 
-// §11.4.14.3: Element info for streaming unpack.
 struct StreamElemInfo {
   const Expr* expr;
   uint32_t width;
-  std::string target_name;  // §11.4.14.4: set for expanded array elements.
+  std::string target_name;
 };
 
-// §11.4.14.4: Resolve a with-clause range into (start, count) indices.
 static bool ResolveWithRangeForUnpack(const Expr* with_expr, SimContext& ctx,
                                       Arena& arena, uint32_t array_size,
                                       uint32_t array_lo, uint32_t& out_start,
@@ -402,13 +372,11 @@ static bool ResolveWithRangeForUnpack(const Expr* with_expr, SimContext& ctx,
   return true;
 }
 
-// §11.4.14.3/§11.4.14.4: Collect LHS elements and compute total width.
-// rhs_width is needed for §11.4.14.4 greedy unpacking of dynamically sized types.
 static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
                                       Arena& arena,
                                       std::vector<StreamElemInfo>& elems,
                                       uint32_t rhs_width) {
-  // §11.4.14.4: Detect dynamically sized items (queues without with_expr).
+
   bool has_dynamic = false;
   for (auto* elem : lhs->elements) {
     if (elem->with_expr) continue;
@@ -418,7 +386,6 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
     }
   }
 
-  // §11.4.14.4: Pre-scan to compute total fixed-size width for greedy sizing.
   uint32_t fixed_sum = 0;
   if (has_dynamic) {
     for (auto* elem : lhs->elements) {
@@ -449,8 +416,7 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
   uint32_t total_width = 0;
   bool first_dynamic_consumed = false;
   for (auto* elem : lhs->elements) {
-    // §11.4.14.4: If the element has a with-clause and is an array, expand
-    // only the selected positions as individual targets.
+
     if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
       if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
         uint32_t start = 0, count = 0;
@@ -490,7 +456,7 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
         continue;
       }
     }
-    // §11.4.14.4: Queue without with_expr — greedy unpacking.
+
     if (has_dynamic && !elem->with_expr &&
         elem->kind == ExprKind::kIdentifier) {
       auto* queue = ctx.FindQueue(elem->text);
@@ -513,7 +479,7 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
             total_width += queue->elem_width;
           }
         } else {
-          // §11.4.14.4: Subsequent dynamic items are left empty.
+
           queue->elements.clear();
         }
         continue;
@@ -527,7 +493,6 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
   return total_width;
 }
 
-// §11.4.14.3: Reverse slice order for left-shift streaming (<<).
 static Logic4Vec ReverseStreamSlices(const Logic4Vec& stream,
                                      uint32_t total_width, uint32_t ss,
                                      Arena& arena) {
@@ -557,7 +522,6 @@ static Logic4Vec ReverseStreamSlices(const Logic4Vec& stream,
   return reordered;
 }
 
-// §11.4.14.3: Extract a bit-field from a stream vector.
 static Logic4Vec ExtractStreamBits(const Logic4Vec& stream,
                                    uint32_t bit_offset, uint32_t width,
                                    uint32_t total_width, Arena& arena) {
@@ -577,7 +541,6 @@ static Logic4Vec ExtractStreamBits(const Logic4Vec& stream,
   return result;
 }
 
-// §11.4.14.3: Streaming concatenation as LHS — unpack RHS into elements.
 static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                                      SimContext& ctx, Arena& arena) {
   std::vector<StreamElemInfo> elems;
@@ -618,8 +581,7 @@ static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   for (auto& ei : elems) {
     bit_offset -= ei.width;
     if (!ei.target_name.empty()) {
-      // §11.4.14.4: Expanded array element — write to specific position.
-      // Check for queue pseudo-name (name__q__index).
+
       auto qpos = ei.target_name.find("__q__");
       if (qpos != std::string::npos) {
         auto qname = std::string_view(ei.target_name).substr(0, qpos);
@@ -652,9 +614,6 @@ static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   }
 }
 
-
-// §6.12: decode a real-tagged Logic4Vec into a host double, honoring shortreal
-// (width 32, C-float bits) vs real/realtime (width 64, C-double bits).
 static double RealVecToDouble(const Logic4Vec& v) {
   if (v.width == 32) {
     float f = 0.0f;
@@ -668,9 +627,6 @@ static double RealVecToDouble(const Logic4Vec& v) {
   return d;
 }
 
-// §6.12: real↔integer conversion (§6.12.1) plus real precision conversion
-// when assigning across real/shortreal/realtime declarations of different
-// widths (§6.12: shortreal = C float, real/realtime = C double).
 static Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
                                      uint32_t target_width, SimContext& ctx,
                                      Arena& arena) {
@@ -728,11 +684,9 @@ static void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val,
                               SimContext& ctx, Arena& arena) {
   auto* var = ResolveLhsVariable(stmt->lhs, ctx);
   if (var) {
-    // §10.6.2: While forced, procedural assigns do not change the value.
+
     if (var->is_forced) return;
-    // §6.16: Storing a value into a string variable runs the string-literal
-    // conversion: '\0' bytes are dropped and the storage grows or shrinks to
-    // match the resulting byte count, no width-resize occurs.
+
     auto lhs_name = LhsIdentName(stmt->lhs);
     if (!lhs_name.empty() && ctx.IsStringVariable(lhs_name)) {
       var->value = StripStringZeros(rhs_val, arena);
@@ -744,7 +698,7 @@ static void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val,
     var->value = rhs_val;
     if (!var->is_4state) CoerceTo2State(var->value);
     var->NotifyWatchers();
-    // §7.3.2: Set tag when RHS is a tagged expression.
+
     if (stmt->rhs && stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs)
       ctx.SetVariableTag(stmt->lhs->text, stmt->rhs->rhs->text);
   } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
@@ -760,7 +714,7 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   if (TryTypedClassNewAssign(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryAssocCopyAssign(stmt, ctx)) return StmtResult::kDone;
   if (TryQueueBlockingAssign(stmt, ctx, arena)) return StmtResult::kDone;
-  // §15.5.5.2: Assigning null breaks the event synchronization association.
+
   if (stmt->lhs->kind == ExprKind::kIdentifier &&
       stmt->rhs && stmt->rhs->kind == ExprKind::kIdentifier &&
       stmt->rhs->text == "null") {
@@ -770,7 +724,7 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
       return StmtResult::kDone;
     }
   }
-  // §15.5.5: Event-to-event assignment shares the synchronization queue.
+
   if (stmt->lhs->kind == ExprKind::kIdentifier &&
       stmt->rhs && stmt->rhs->kind == ExprKind::kIdentifier) {
     auto* lhs_var = ctx.FindVariable(stmt->lhs->text);
@@ -780,12 +734,11 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
       return StmtResult::kDone;
     }
   }
-  // §7.4.3: Unpacked array slice assignment (arr_b[5:3] = arr_a[2:0]).
+
   if (TryUnpackedSliceAssign(stmt, ctx, arena)) return StmtResult::kDone;
-  // §7.4.5: Multi-dimensional sub-array copy (B[1][1] = A[0][2]).
+
   if (TrySubarrayAssign(stmt, ctx, arena)) return StmtResult::kDone;
 
-  // §11.4.1: Compound assignment — evaluate the LHS index only once.
   if (stmt->rhs && stmt->rhs->kind == ExprKind::kBinary &&
       IsCompoundAssignOp(stmt->rhs->op)) {
     auto base_op = CompoundAssignBaseOp(stmt->rhs->op);
@@ -825,7 +778,6 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
     return StmtResult::kDone;
   }
 
-  // §11.4.14.3: Streaming concatenation as assignment target (unpack).
   if (stmt->lhs->kind == ExprKind::kStreamingConcat) {
     UnpackStreamingConcatLhs(stmt->lhs, rhs_val, ctx, arena);
     return StmtResult::kDone;
@@ -842,7 +794,6 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
-// §10.10.2: Schedule per-element NBA events for array concatenation targets.
 static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) return false;
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kConcatenation) return false;
@@ -851,7 +802,6 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto* q = ctx.FindQueue(stmt->lhs->text);
   if (!ainfo && !q) return false;
 
-  // Collect flattened elements from the concatenation.
   std::vector<Logic4Vec> elems;
   for (auto* item : stmt->rhs->elements) {
     if (item->kind == ExprKind::kIdentifier) {
@@ -905,10 +855,9 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       ctx.GetScheduler().ScheduleEvent(schedule_time, nba_region, event);
     }
   } else {
-    // Queue target: schedule a single callback that replaces all elements.
+
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-    // §4.3 ¶3: replacing the queue's elements is a state change of the
-    // target variable, so the scheduled callback is an update event.
+
     event->kind = EventKind::kUpdate;
     event->callback = [q, elems = std::move(elems)]() {
       q->elements = elems;
@@ -922,18 +871,17 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
-  // §10.10.2: Concatenation targeting an unpacked array acts as array concat.
+
   if (TryArrayConcatNba(stmt, ctx, arena)) return StmtResult::kDone;
 
   auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
-  // §10.4.2: Intra-assignment delay offsets the NBA schedule time.
+
   uint64_t delay = 0;
   if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();
   ScheduleNonblockingAssign(stmt, rhs_val, delay, ctx, arena);
   return StmtResult::kDone;
 }
 
-// §10.4.1: Assign a pre-evaluated value to a blocking assignment LHS.
 void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
                            SimContext& ctx, Arena& arena) {
   if (!lhs) return;
@@ -942,7 +890,7 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
     UnpackConcatLhs(lhs, rhs_val, ctx, arena);
     return;
   }
-  // §11.4.14.3: Streaming concatenation as assignment target (unpack).
+
   if (lhs->kind == ExprKind::kStreamingConcat) {
     UnpackStreamingConcatLhs(lhs, rhs_val, ctx, arena);
     return;
@@ -954,7 +902,7 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
   }
   auto* var = ResolveLhsVariable(lhs, ctx);
   if (var) {
-    // §10.6.2: While forced, procedural assigns do not change the value.
+
     if (var->is_forced) return;
     auto converted = ConvertRealOnAssign(rhs_val, lhs, var->value.width, ctx,
                                          arena);
@@ -966,10 +914,9 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
   }
 }
 
-// §10.4.2: Create a whole-variable NBA callback.
 static void SetupWholeVarNbaCallback(Event* event, Variable* var,
                                      const Logic4Vec& rhs_val) {
-  // §4.3 ¶3: every change in state of a net or variable is an update event.
+
   event->kind = EventKind::kUpdate;
   var->pending_nba = rhs_val;
   var->has_pending_nba = true;
@@ -985,7 +932,6 @@ static void SetupWholeVarNbaCallback(Event* event, Variable* var,
   };
 }
 
-// §10.4.2: Schedule an NBA event at current_time + delay_ticks.
 void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
                                uint64_t delay_ticks, SimContext& ctx,
                                Arena& arena) {
@@ -996,18 +942,17 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
   if (!var) return;
 
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-  // §4.3 ¶3: every change in state of a net or variable is an update event;
-  // a bit/part-select NBA still mutates the target variable's state.
+
   event->kind = EventKind::kUpdate;
   if (is_select && !elem) {
-    // §10.4.2: Evaluate LHS index at schedule time, not at callback time.
+
     const Expr* lhs = stmt->lhs;
     auto idx_val = EvalExpr(lhs->index, ctx, arena);
     if (HasUnknownBits(idx_val)) return;
     uint32_t idx = static_cast<uint32_t>(idx_val.ToUint64());
 
     if (!lhs->index_end) {
-      // Single bit-select: capture evaluated index.
+
       event->callback = [var, idx, rhs_val, &arena]() {
         if (idx >= var->value.width) return;
         uint64_t old_val = var->value.ToUint64();
@@ -1018,13 +963,13 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
         var->NotifyWatchers();
       };
     } else {
-      // Part-select: compute lo and width at schedule time.
+
       uint32_t end_val = static_cast<uint32_t>(
           EvalExpr(lhs->index_end, ctx, arena).ToUint64());
       uint32_t lo = idx;
       uint32_t w = end_val;
       if (lhs->is_part_select_plus) {
-        // [idx +: w] — lo stays idx.
+
       } else if (lhs->is_part_select_minus) {
         lo = (idx >= w - 1) ? idx - w + 1 : 0;
       } else {
@@ -1055,7 +1000,7 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
 
 StmtResult ExecExprStmtImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto result = EvalExpr(stmt->expr, ctx, arena);
-  // §6.24.2: Task-form $cast issues a runtime error on invalid assignment.
+
   if (stmt->expr && stmt->expr->kind == ExprKind::kSystemCall &&
       stmt->expr->callee == "$cast" && result.ToUint64() == 0) {
     ctx.GetDiag().Error({}, "runtime error: $cast failed — invalid assignment");
@@ -1063,9 +1008,6 @@ StmtResult ExecExprStmtImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return StmtResult::kDone;
 }
 
-// --- Block-level variable declaration (IEEE §9.3.1) ---
-
-// §7.4: Create unpacked array elements for block-level variable declarations.
 static void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
                                      SimContext& ctx, Arena& arena) {
   if (stmt->var_unpacked_dims.empty()) return;
@@ -1089,7 +1031,6 @@ static void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
   }
 }
 
-// §8.30.2: Handle weak_reference variable declaration with optional new().
 static bool TryExecWeakRefVarDecl(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena) {
   if (stmt->var_decl_type.type_name != "weak_reference") return false;
@@ -1117,14 +1058,13 @@ static bool TryExecWeakRefVarDecl(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
-// §8: Handle block-level class-typed variable declaration.
 static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena) {
   auto class_type = stmt->var_decl_type.type_name;
   if (class_type.empty() || !ctx.FindClassType(class_type)) return false;
   ctx.CreateVariable(stmt->var_name, 64);
   ctx.SetVariableClassType(stmt->var_name, class_type);
-  // §8.5: Store specialization value expressions for parameter access.
+
   const auto& type_params = stmt->var_decl_type.type_params;
   if (!type_params.empty()) {
     std::vector<Expr*> exprs;
@@ -1137,7 +1077,6 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   if (stmt->var_init->kind != ExprKind::kCall) return true;
   if (stmt->var_init->text != "new") return true;
 
-  // §8.12: shallow copy — `C c2 = new c1;`
   if (stmt->var_init->lhs &&
       stmt->var_init->lhs->kind == ExprKind::kIdentifier) {
     auto src_val = EvalExpr(stmt->var_init->lhs, ctx, arena);
@@ -1158,7 +1097,6 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
-// §13.3.1: Create a variable in the appropriate scope.
 static Variable* CreateVarInScope(std::string_view name, uint32_t width,
                                   SimContext& ctx) {
   return ctx.HasLocalScope() ? ctx.CreateLocalVariable(name, width)
@@ -1182,7 +1120,7 @@ static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (TryExecWeakRefVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
-  // §13.3.1: Explicit static qualifier — reuse persistent variable.
+
   auto func_name = ctx.CurrentFuncName();
   if (stmt->var_is_static && !func_name.empty()) {
     auto* existing = ctx.FindStaticFuncVar(func_name, stmt->var_name);
@@ -1191,12 +1129,12 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return StmtResult::kDone;
     }
   } else if (!stmt->var_is_automatic) {
-    // Default lifetime: skip re-creation if the variable already exists locally.
+
     if (ctx.HasLocalScope() && ctx.FindLocalVariable(stmt->var_name)) {
       return StmtResult::kDone;
     }
   }
-  // var_is_automatic: always create fresh.
+
   uint32_t width = EvalTypeWidth(stmt->var_decl_type);
   bool is_real = (stmt->var_decl_type.kind == DataTypeKind::kReal ||
                   stmt->var_decl_type.kind == DataTypeKind::kShortreal ||
@@ -1210,7 +1148,7 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       var->value = EvalExpr(stmt->var_init, ctx, arena);
       if (!var->is_4state) CoerceTo2State(var->value);
     }
-    // §13.3.1: Save newly created static var to persistent frame.
+
     if (stmt->var_is_static && !func_name.empty()) {
       ctx.SaveStaticFuncVar(func_name, stmt->var_name, var);
     }
@@ -1218,9 +1156,6 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return StmtResult::kDone;
 }
 
-// --- Force / Release (IEEE §10.6) ---
-
-// §10.6: Collect all Variable* referenced by identifiers in an expression tree.
 static void CollectExprVars(const Expr* expr, SimContext& ctx,
                             std::vector<Variable*>& vars) {
   if (!expr) return;
@@ -1259,11 +1194,9 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
     var->assign_cont_rhs = stmt->rhs;
   var->NotifyWatchers();
 
-  // §10.6: Set up continuous reevaluation — if any RHS variable changes,
-  // reevaluate the expression and update the target while active.
   std::vector<Variable*> rhs_vars;
   CollectExprVars(stmt->rhs, ctx, rhs_vars);
-  // Deduplicate and exclude the target variable itself.
+
   std::sort(rhs_vars.begin(), rhs_vars.end());
   rhs_vars.erase(std::unique(rhs_vars.begin(), rhs_vars.end()), rhs_vars.end());
   rhs_vars.erase(std::remove(rhs_vars.begin(), rhs_vars.end(), var),
@@ -1299,16 +1232,14 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
   if (stmt->kind == StmtKind::kDeassign) {
     var->assign_cont_rhs = nullptr;
   } else if (stmt->lhs->kind == ExprKind::kIdentifier) {
-    // §10.6.2: When a release is executed on a net, the net shall immediately
-    // be assigned the value determined by its drivers. Re-resolving applies
-    // the current driver values now that is_forced has been cleared.
+
     if (auto* net = ctx.FindNet(stmt->lhs->text)) {
       net->Resolve(arena);
     }
   }
 
   if (var->assign_cont_rhs && stmt->kind != StmtKind::kDeassign) {
-    // Reestablish the active assign procedural continuous assignment.
+
     auto rhs_val = EvalExpr(var->assign_cont_rhs, ctx, arena);
     var->is_forced = true;
     var->forced_value = rhs_val;
@@ -1343,4 +1274,4 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
-}  // namespace delta
+}

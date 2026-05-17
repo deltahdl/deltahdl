@@ -483,4 +483,4 @@ TEST(ConditionalEventIffParsing, TwoEventsOrBothWithIff) {
   EXPECT_NE(stmt->events[1].iff_condition, nullptr);
 }
 
-}  // namespace
+}

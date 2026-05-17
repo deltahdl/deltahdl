@@ -508,4 +508,4 @@ TEST(VirtualInterfaceElaboration, PassAsTaskArgument_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

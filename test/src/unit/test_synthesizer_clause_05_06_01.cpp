@@ -63,10 +63,6 @@ TEST(EscapedIdentifierSynthesis, EscapedIdentMatchesSimpleIdentSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-// §5.6.1: rule (4) symmetry at synthesis — a net declared in the escaped form
-// is reachable through a simple-form reference when both denote the same
-// stored name. The synthesized AIG must bind the reference to the declared
-// net.
 TEST(EscapedIdentifierSynthesis, EscapedDeclSimpleRefSynthesizes) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
@@ -81,4 +77,4 @@ TEST(EscapedIdentifierSynthesis, EscapedDeclSimpleRefSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}  // namespace
+}

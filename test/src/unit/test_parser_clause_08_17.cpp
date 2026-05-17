@@ -181,4 +181,4 @@ TEST(ChainedConstructorParsing, SuperNewDefaultStoresIdentifier) {
   EXPECT_EQ(call_stmt->expr->args[0]->text, "default");
 }
 
-}  // namespace
+}

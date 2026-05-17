@@ -8,11 +8,9 @@ using namespace delta;
 
 namespace {
 
-// §15.4.9: Parameterized mailboxes provide all the same methods as dynamic.
-// At runtime, the MailboxObject is used identically regardless of parameterization.
 TEST(IpcSync, MailboxParameterizedSameMethodsAsDynamic) {
   MailboxObject mb;
-  // All methods available: Put, TryPut, Get, TryGet, Peek, TryPeek, Num.
+
   EXPECT_EQ(mb.Num(), 0);
   EXPECT_EQ(mb.Put(42), MbxPutStatus::kPlaced);
   EXPECT_EQ(mb.TryPut(43), 1);
@@ -30,8 +28,6 @@ TEST(IpcSync, MailboxParameterizedSameMethodsAsDynamic) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-// §15.4.9: Parameterized and unparameterized mailboxes share the same
-// runtime representation (MailboxObject).
 TEST(IpcSync, MailboxParameterizedSameRuntimeAsTypeless) {
   MailboxObject typed_mb(5);
   MailboxObject untyped_mb(5);
@@ -46,4 +42,4 @@ TEST(IpcSync, MailboxParameterizedSameRuntimeAsTypeless) {
   EXPECT_EQ(t_msg, u_msg);
 }
 
-}  // namespace
+}

@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- parameter_override (defparam) ---
-
 TEST(ParameterOverride, DefparamSingle) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
@@ -82,8 +80,6 @@ TEST(ParameterOverride, DefparamAssignmentHierarchical) {
   EXPECT_NE(item->defparam_assigns[0].second, nullptr);
 }
 
-// --- bind_directive ---
-
 TEST(BindDirective, BindDirectiveBasic) {
   auto r =
       ParseWithPreprocessor("bind target_mod checker_mod chk_inst(.a(sig));\n");
@@ -117,8 +113,6 @@ TEST(BindDirective, BindDirectiveHierarchical) {
   EXPECT_EQ(r.cu->bind_directives[0]->target, "top.dut.u1");
 }
 
-// --- elaboration_severity_system_task through preprocessor ---
-
 TEST(ElaborationSeverityTask, FatalThroughPreprocessor) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -146,8 +140,6 @@ TEST(ElaborationSeverityTask, AllSeverityFormsThroughPreprocessor) {
               ModuleItemKind::kElabSystemTask);
   }
 }
-
-// --- module_common_item alternatives through preprocessor ---
 
 TEST(ModuleItemsParsing, ContinuousAssignThroughPreprocessor) {
   auto r = ParseWithPreprocessor(
@@ -201,4 +193,4 @@ TEST(ModuleItemsParsing, SpecifyBlockThroughPreprocessor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -88,7 +88,6 @@ TEST(CaseMatchesItemParsing, CaseMatchesMultipleItems) {
   ASSERT_EQ(stmt->case_items.size(), 4u);
 }
 
-
 TEST(CaseMatchesItemParsing, CaseMatchesPattern) {
   auto r = Parse(
       "module m;\n"
@@ -121,4 +120,4 @@ TEST(CaseMatchesItemParsing, CaseMatchesCommaSeparatedPatterns) {
   EXPECT_EQ(stmt->case_items[0].patterns.size(), 3u);
 }
 
-}  // namespace
+}

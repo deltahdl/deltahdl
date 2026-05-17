@@ -4,9 +4,6 @@ using namespace delta;
 
 namespace {
 
-// Requirement 1: Parameters and typedefs inherited by extending interface
-// classes via extends.
-
 TEST(InterfaceClassTypeAccess, TypedefInheritedByExtendingInterface) {
   EXPECT_TRUE(
       ElabOk("interface class IntfA;\n"
@@ -62,9 +59,6 @@ TEST(InterfaceClassTypeAccess, ChainedTypedefInheritanceThroughExtends) {
              "endmodule\n"));
 }
 
-// Requirement 2: Parameters and typedefs NOT inherited by implementing classes
-// via implements.
-
 TEST(InterfaceClassTypeAccess, TypedefNotInheritedByImplementingClass) {
   EXPECT_TRUE(
       ElabOk("interface class IntfC;\n"
@@ -95,8 +89,6 @@ TEST(InterfaceClassTypeAccess, ParamNotInheritedByImplementingClass) {
              "  initial x = IC::SIZE;\n"
              "endmodule\n"));
 }
-
-// Requirement 4: Access via :: scope resolution operator.
 
 TEST(InterfaceClassTypeAccess, ScopeResolutionAccessToTypedef) {
   EXPECT_TRUE(
@@ -148,8 +140,6 @@ TEST(InterfaceClassTypeAccess, ScopeResolutionOnParameterizedInterfaceClass) {
              "endmodule\n"));
 }
 
-// Requirement 3: All parameters and typedefs in interface classes are static.
-
 TEST(InterfaceClassTypeAccess, ParamsAreStaticAccessibleWithoutInstance) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
@@ -162,4 +152,4 @@ TEST(InterfaceClassTypeAccess, ParamsAreStaticAccessibleWithoutInstance) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

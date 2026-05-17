@@ -104,4 +104,4 @@ TEST(SuperElaboration, SuperPropertyWriteInDerivedOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

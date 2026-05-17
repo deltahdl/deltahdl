@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §6.8: A variable declared with a packed vector type becomes a
-// bit-vector signal at synthesis. Verify that the synth lowerer maps a
-// `logic [7:0]` variable that is the sole driver of an output to eight
-// AIG primary outputs — the bit-width of the declared variable.
 TEST(VariableDeclarationSynthesis, LogicVectorBecomesBitVectorOutput) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
@@ -28,10 +24,6 @@ TEST(VariableDeclarationSynthesis, LogicVectorBecomesBitVectorOutput) {
   EXPECT_EQ(aig->outputs.size(), 8u);
 }
 
-// §6.8: A variable declared with the `var` keyword and an implicit data
-// type (no explicit type, only a range) defaults to logic per the
-// implicit-data-type rule. Synthesis must lower it identically to an
-// explicit `logic [N-1:0]` declaration.
 TEST(VariableDeclarationSynthesis, VarImplicitRangeSynthesizesAsLogic) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
@@ -48,9 +40,6 @@ TEST(VariableDeclarationSynthesis, VarImplicitRangeSynthesizesAsLogic) {
   EXPECT_EQ(aig->outputs.size(), 4u);
 }
 
-// §6.8: A variable with a declaration-time initializer must surface to
-// the synthesizer with its initial value preserved as a constant driver
-// — the lowered AIG must produce the constant on the output bits.
 TEST(VariableDeclarationSynthesis, InitializerDrivesConstantOutput) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
@@ -66,4 +55,4 @@ TEST(VariableDeclarationSynthesis, InitializerDrivesConstantOutput) {
   EXPECT_EQ(aig->outputs.size(), 4u);
 }
 
-}  // namespace
+}

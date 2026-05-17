@@ -188,4 +188,4 @@ TEST(ReplicationElaboration, NegativeMultiplierRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

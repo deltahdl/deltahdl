@@ -200,4 +200,4 @@ TEST(LetDeclElaboration, LetDeclWithTernaryBodyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

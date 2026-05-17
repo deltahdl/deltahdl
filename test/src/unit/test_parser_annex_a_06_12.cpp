@@ -198,8 +198,6 @@ TEST(RandsequenceSyntaxParsing, NestedRandsequence) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Tests moved from clause files ---
-
 TEST(RandsequenceSyntaxParsing, ComplexMixedProds) {
   auto r = Parse(
       "module m;\n"
@@ -793,4 +791,4 @@ TEST(RandsequenceSyntaxParsing, MissingColonInProductionErrors) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

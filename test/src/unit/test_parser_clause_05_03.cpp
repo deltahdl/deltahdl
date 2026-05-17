@@ -148,4 +148,4 @@ TEST(LexicalConventionParsing, AllWhitespaceTypesInputParsesEmpty) {
   EXPECT_TRUE(r.cu->modules.empty());
 }
 
-}  // namespace
+}

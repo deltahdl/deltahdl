@@ -70,7 +70,6 @@ TEST(ForceReleaseElaboration, ForceConstPartSelectNetElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.6.2: force LHS shall not be a bit-select of a variable.
 TEST(ForceReleaseElaboration, ForceBitSelectVariableLhsIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -82,7 +81,6 @@ TEST(ForceReleaseElaboration, ForceBitSelectVariableLhsIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §10.6.2: force LHS shall not be a part-select of a variable.
 TEST(ForceReleaseElaboration, ForcePartSelectVariableLhsIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -94,8 +92,6 @@ TEST(ForceReleaseElaboration, ForcePartSelectVariableLhsIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §10.6.2: force LHS shall not be a bit-select of a net with a user-defined
-// nettype.
 TEST(ForceReleaseElaboration, ForceBitSelectUserNettypeNetIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -108,8 +104,6 @@ TEST(ForceReleaseElaboration, ForceBitSelectUserNettypeNetIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §10.6.2: force LHS shall not be a part-select of a net with a user-defined
-// nettype.
 TEST(ForceReleaseElaboration, ForcePartSelectUserNettypeNetIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -122,8 +116,6 @@ TEST(ForceReleaseElaboration, ForcePartSelectUserNettypeNetIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §10.6.2: a force statement shall not be applied to a variable that is
-// being assigned by a mixture of continuous and procedural assignments.
 TEST(ForceReleaseElaboration, ForceOnMixedAssignmentVariableIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -139,8 +131,6 @@ TEST(ForceReleaseElaboration, ForceOnMixedAssignmentVariableIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §10.6.2: force in a concatenation, where one operand is a bit-select of
-// a variable, is illegal.
 TEST(ForceReleaseElaboration, ForceConcatWithBitSelectVariableIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -153,4 +143,4 @@ TEST(ForceReleaseElaboration, ForceConcatWithBitSelectVariableIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

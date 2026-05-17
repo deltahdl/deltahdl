@@ -101,12 +101,6 @@ TEST(BlockingAssignSim, SelfAssignmentPreservesValue) {
   EXPECT_EQ(result, 42u);
 }
 
-// §10.4.1: "If the variable_lvalue requires an evaluation, such as an index
-// expression, ..., it shall be evaluated at the time specified by the
-// intra-assignment timing control."  In `arr[idx] = #5 99`, the right-hand
-// side `99` is sampled at t=0 (per §9.4.5), but the lvalue index `idx`
-// must be re-evaluated at t=5 when the delay elapses.  A parallel block
-// updates `idx` at t=2; the write therefore lands in arr[3], not arr[1].
 TEST(BlockingAssignSim, IntraAssignmentDelayEvaluatesLvalueAfterDelay) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -133,4 +127,4 @@ TEST(BlockingAssignSim, IntraAssignmentDelayEvaluatesLvalueAfterDelay) {
   EXPECT_EQ(arr->unpacked_array[3].ToUint64(), 99u);
 }
 
-}  // namespace
+}

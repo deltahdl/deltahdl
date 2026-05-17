@@ -5,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Every keyword in Table 28-1 must be accepted as the opening token of a
-// gate-or-switch declaration. The terminal arities below are the minimum the
-// parser already enforces — this suite intentionally exercises nothing beyond
-// "declaration began with this keyword and parsed without errors".
 struct KeywordCase {
   const char* keyword;
   const char* terminals;
@@ -57,9 +53,6 @@ TEST(GateKeywordOpensDeclaration, AllTwentySixTableEntries) {
   }
 }
 
-// A non-keyword identifier before the terminal list is not a gate declaration
-// and must not be parsed as one. Using a fresh name (no prior module) makes
-// this a plain module-item parse error rather than an instantiation.
 TEST(GateKeywordOpensDeclaration, NonKeywordIsNotGateDecl) {
   auto r = Parse("module m;\n  notagate (o, a, b);\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -68,4 +61,4 @@ TEST(GateKeywordOpensDeclaration, NonKeywordIsNotGateDecl) {
   }
 }
 
-}  // namespace
+}

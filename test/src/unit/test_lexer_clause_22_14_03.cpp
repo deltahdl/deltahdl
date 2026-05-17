@@ -59,10 +59,10 @@ TEST(Lexer, KeywordVersion_1364_2001_Includes1364_1995Keywords) {
 }
 
 TEST(Lexer, KeywordVersion_1364_2001_LaterKeywordsNotRecognized) {
-  // 1364-2005 addition
+
   EXPECT_FALSE(
       LookupKeyword("uwire", KeywordVersion::kVer13642001).has_value());
-  // 1800-2005 additions
+
   EXPECT_FALSE(
       LookupKeyword("logic", KeywordVersion::kVer13642001).has_value());
   EXPECT_FALSE(
@@ -71,7 +71,7 @@ TEST(Lexer, KeywordVersion_1364_2001_LaterKeywordsNotRecognized) {
       LookupKeyword("interface", KeywordVersion::kVer13642001).has_value());
   EXPECT_FALSE(
       LookupKeyword("class", KeywordVersion::kVer13642001).has_value());
-  // 1800-2009 addition
+
   EXPECT_FALSE(
       LookupKeyword("checker", KeywordVersion::kVer13642001).has_value());
 }
@@ -81,4 +81,4 @@ TEST(Lexer, KeywordVersion_1364_2001_NonKeywordIdentifier) {
   EXPECT_FALSE(kw.has_value());
 }
 
-}  // namespace
+}

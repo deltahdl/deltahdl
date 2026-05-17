@@ -93,4 +93,4 @@ TEST(SupplyNetResolution, Supply1IgnoresZDriver) {
   EXPECT_EQ(var->value.ToUint64() & 0xFF, 0xFFu);
 }
 
-}  // namespace
+}

@@ -17,23 +17,15 @@
 
 namespace delta {
 
-// ============================================================================
-// Helpers
-// ============================================================================
-
 static uint32_t CountOnesInVec(const Logic4Vec& val) {
   uint32_t count = 0;
   for (uint32_t i = 0; i < val.nwords; ++i) {
-    // Count known-1 bits: aval set AND bval clear.
+
     uint64_t known_ones = val.words[i].aval & ~val.words[i].bval;
     count += static_cast<uint32_t>(std::popcount(known_ones));
   }
   return count;
 }
-
-// ============================================================================
-// §20 — $clog2
-// ============================================================================
 
 static Logic4Vec EvalClog2(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
@@ -48,13 +40,9 @@ static Logic4Vec EvalClog2(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(result));
 }
 
-// ============================================================================
-// §20 — $bits
-// ============================================================================
-
 static Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
-  // §20.6.2: $bits can accept a type name or an expression.
+
   auto* arg = expr->args[0];
   if (arg->kind == ExprKind::kIdentifier) {
     uint32_t tw = ctx.FindTypeWidth(arg->text);
@@ -64,10 +52,6 @@ static Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, val.width);
 }
 
-// ============================================================================
-// §20 — $unsigned, $signed
-// ============================================================================
-
 static Logic4Vec EvalSignCast(const Expr* expr, SimContext& ctx, Arena& arena,
                               bool make_signed) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
@@ -75,10 +59,6 @@ static Logic4Vec EvalSignCast(const Expr* expr, SimContext& ctx, Arena& arena,
   val.is_signed = make_signed;
   return val;
 }
-
-// ============================================================================
-// §20 — $countones, $onehot, $onehot0, $isunknown
-// ============================================================================
 
 static Logic4Vec EvalCountones(const Expr* expr, SimContext& ctx,
                                Arena& arena) {
@@ -108,10 +88,6 @@ static Logic4Vec EvalIsunknown(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, HasUnknownBits(val) ? 1 : 0);
 }
 
-// ============================================================================
-// §20 — $test$plusargs, $value$plusargs
-// ============================================================================
-
 static std::string ExtractStrArg(const Expr* arg) {
   auto text = arg->text;
   if (text.size() >= 2 && text.front() == '"') {
@@ -137,7 +113,6 @@ static Logic4Vec EvalValuePlusargs(const Expr* expr, SimContext& ctx,
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 1, 0);
   std::string pattern = ExtractStrArg(expr->args[0]);
 
-  // Split pattern at '%' to get prefix and format spec.
   auto pct_pos = pattern.find('%');
   std::string prefix =
       (pct_pos != std::string::npos) ? pattern.substr(0, pct_pos) : pattern;
@@ -145,12 +120,12 @@ static Logic4Vec EvalValuePlusargs(const Expr* expr, SimContext& ctx,
   for (const auto& arg : ctx.GetPlusArgs()) {
     if (arg.substr(0, prefix.size()) != prefix) continue;
     std::string value_str = arg.substr(prefix.size());
-    // Remove leading '=' if present.
+
     if (!value_str.empty() && value_str[0] == '=') {
       value_str = value_str.substr(1);
     }
     uint64_t parsed_val = std::strtoull(value_str.c_str(), nullptr, 10);
-    // Write to the destination variable.
+
     if (expr->args[1]->kind == ExprKind::kIdentifier) {
       auto* var = ctx.FindVariable(expr->args[1]->text);
       if (var)
@@ -160,10 +135,6 @@ static Logic4Vec EvalValuePlusargs(const Expr* expr, SimContext& ctx,
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }
-
-// ============================================================================
-// §20 — $typename
-// ============================================================================
 
 static Logic4Vec EvalTypename(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) {
@@ -175,10 +146,6 @@ static Logic4Vec EvalTypename(const Expr* expr, SimContext& ctx, Arena& arena) {
   return StringToLogic4Vec(arena, name);
 }
 
-// ============================================================================
-// §21.3.3 — $sformatf
-// ============================================================================
-
 static Logic4Vec EvalSformatf(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return StringToLogic4Vec(arena, "");
   std::string fmt = ExtractFormatString(expr->args[0]);
@@ -189,10 +156,6 @@ static Logic4Vec EvalSformatf(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string result = FormatDisplay(fmt, arg_vals);
   return StringToLogic4Vec(arena, result);
 }
-
-// ============================================================================
-// §20.5 — Type conversion functions
-// ============================================================================
 
 static Logic4Vec EvalItor(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
@@ -225,17 +188,13 @@ static Logic4Vec EvalRealtobits(const Expr* expr, SimContext& ctx,
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
   auto val = EvalExpr(expr->args[0], ctx, arena);
   uint64_t raw_bits = val.ToUint64();
-  // If argument is a real literal, convert from double directly.
+
   if (expr->args[0]->kind == ExprKind::kRealLiteral) {
     double d = expr->args[0]->real_val;
     std::memcpy(&raw_bits, &d, sizeof(double));
   }
   return MakeLogic4VecVal(arena, 64, raw_bits);
 }
-
-// ============================================================================
-// §20.9 — $countbits
-// ============================================================================
 
 static uint32_t CountMatchingBits(const Logic4Vec& val, const bool match[4]) {
   uint32_t count = 0;
@@ -267,11 +226,6 @@ static Logic4Vec EvalCountbits(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 32, CountMatchingBits(val, match));
 }
 
-// ============================================================================
-// §20.7 Array query functions
-// ============================================================================
-
-// §7.11/§20.7: Determine whether the argument names an aggregate object.
 static bool HasUnpackedDim(const Expr* arg, SimContext& ctx) {
   if (!arg || arg->kind != ExprKind::kIdentifier) return false;
   if (ctx.FindArrayInfo(arg->text)) return true;
@@ -305,13 +259,9 @@ Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 32, width);
 }
 
-// ============================================================================
-// §20.11-20.16 Verification system calls
-// ============================================================================
-
 Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            std::string_view name) {
-  // §20.12 sampled value functions.
+
   if (name == "$sampled") {
     if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
     return EvalExpr(expr->args[0], ctx, arena);
@@ -324,21 +274,16 @@ Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
       name == "$changed") {
     return MakeLogic4VecVal(arena, 1, 0);
   }
-  // §20.11 assertion control.
+
   if (name.starts_with("$assert")) return MakeLogic4VecVal(arena, 1, 0);
-  // §20.13 coverage.
+
   if (name.starts_with("$coverage")) return MakeLogic4VecVal(arena, 32, 0);
-  // §20.15 stochastic analysis.
+
   if (name.starts_with("$q_")) return MakeLogic4VecVal(arena, 32, 0);
-  // §20.16 PLA modeling.
+
   return MakeLogic4VecVal(arena, 32, 0);
 }
 
-// ============================================================================
-// §20 dispatch
-// ============================================================================
-
-// §20.5 type conversion sub-dispatch.
 static Logic4Vec EvalConversionSysCall(const Expr* expr, SimContext& ctx,
                                        Arena& arena, std::string_view name) {
   if (name == "$itor") return EvalItor(expr, ctx, arena);
@@ -373,7 +318,6 @@ static Logic4Vec EvalConversionSysCall(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// §6.20.7: $isunbounded(param) — returns 1 if parameter has $ value.
 static Logic4Vec EvalIsunbounded(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
   if (!expr->args.empty() && expr->args[0]->kind == ExprKind::kIdentifier) {
@@ -383,7 +327,6 @@ static Logic4Vec EvalIsunbounded(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// §6.24.2: Assign src_val to dest variable and return success.
 static Logic4Vec CastAssignSuccess(std::string_view dest_name, uint64_t src_val,
                                    SimContext& ctx, Arena& arena) {
   auto* var = ctx.FindVariable(dest_name);
@@ -391,7 +334,6 @@ static Logic4Vec CastAssignSuccess(std::string_view dest_name, uint64_t src_val,
   return MakeLogic4VecVal(arena, 32, 1);
 }
 
-// §6.24.2: Try enum cast — check if source value is a valid enum member.
 static bool TryCastEnum(std::string_view dest_name, uint64_t src_val,
                         SimContext& ctx, Arena& arena, Logic4Vec& out) {
   auto* enum_info = ctx.GetVariableEnumType(dest_name);
@@ -406,12 +348,10 @@ static bool TryCastEnum(std::string_view dest_name, uint64_t src_val,
   return true;
 }
 
-// §8.16: Check if two class types are cast compatible.
 static bool AreCastCompatible(const ClassTypeInfo* a, const ClassTypeInfo* b) {
   return a->IsA(b) || b->IsA(a) || a->is_interface || b->is_interface;
 }
 
-// §8.16: Try class handle cast.
 static bool TryCastClassHandle(std::string_view dest_name, uint64_t src_val,
                                const Expr* src_expr, SimContext& ctx,
                                Arena& arena, Logic4Vec& out) {
@@ -422,9 +362,7 @@ static bool TryCastClassHandle(std::string_view dest_name, uint64_t src_val,
     out = MakeLogic4VecVal(arena, 32, 0);
     return true;
   }
-  // §8.16: If the source is a class variable, check cast compatibility at the
-  // type level. $cast shall fail when types are not cast compatible, even if
-  // the source evaluates to null.
+
   if (src_expr && src_expr->kind == ExprKind::kIdentifier &&
       src_expr->text != "null") {
     auto src_class = ctx.GetVariableClassType(src_expr->text);
@@ -436,7 +374,7 @@ static bool TryCastClassHandle(std::string_view dest_name, uint64_t src_val,
       }
     }
   }
-  // §8.16 success case 3: source is the literal null.
+
   if (src_val == kNullClassHandle) {
     out = CastAssignSuccess(dest_name, 0, ctx, arena);
     return true;
@@ -450,7 +388,6 @@ static bool TryCastClassHandle(std::string_view dest_name, uint64_t src_val,
   return true;
 }
 
-// §6.24.2/§8.16: $cast(dest, source) — dynamic cast, returns 1 on success.
 static Logic4Vec EvalCastSysFunc(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
   if (expr->args.size() < 2 || !expr->args[0]) {
@@ -489,10 +426,6 @@ Logic4Vec EvalUtilitySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return EvalConversionSysCall(expr, ctx, arena, name);
 }
 
-// ============================================================================
-// §21 — $fopen
-// ============================================================================
-
 static Logic4Vec EvalFopen(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
   std::string filename = ExtractStrArg(expr->args[0]);
@@ -501,20 +434,12 @@ static Logic4Vec EvalFopen(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(fd));
 }
 
-// ============================================================================
-// §21 — $fclose
-// ============================================================================
-
 static Logic4Vec EvalFclose(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
   int fd = static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
   ctx.CloseFile(fd);
   return MakeLogic4VecVal(arena, 1, 0);
 }
-
-// ============================================================================
-// §21 — $fdisplay, $fwrite
-// ============================================================================
 
 static Logic4Vec EvalFdisplayWrite(const Expr* expr, SimContext& ctx,
                                    Arena& arena, std::string_view name) {
@@ -540,10 +465,6 @@ static Logic4Vec EvalFdisplayWrite(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// ============================================================================
-// §21 — $readmemh, $readmemb
-// ============================================================================
-
 static uint64_t ParseHexLine(const std::string& line) {
   return std::strtoull(line.c_str(), nullptr, 16);
 }
@@ -564,28 +485,22 @@ static Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
-  // Find the target variable.
   Variable* target = nullptr;
   if (expr->args[1]->kind == ExprKind::kIdentifier) {
     target = ctx.FindVariable(expr->args[1]->text);
   }
   if (!target) return MakeLogic4VecVal(arena, 1, 0);
 
-  // Read the first value and store it into the variable.
   std::string line;
   while (std::getline(ifs, line)) {
-    // Skip blank lines and comments.
+
     if (line.empty() || line[0] == '/' || line[0] == '#') continue;
     uint64_t val = is_hex ? ParseHexLine(line) : ParseBinLine(line);
     target->value = MakeLogic4VecVal(arena, target->value.width, val);
-    break;  // For flat variable, store only first value.
+    break;
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }
-
-// ============================================================================
-// §21 — $writememh, $writememb
-// ============================================================================
 
 static Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
                               bool is_hex) {
@@ -616,10 +531,6 @@ static Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// ============================================================================
-// §21 — $sscanf
-// ============================================================================
-
 static int SpecToBase(char spec) {
   if (spec == 'd') return 10;
   if (spec == 'h' || spec == 'x') return 16;
@@ -643,7 +554,6 @@ static ScanResult ScanOneValue(const std::string& input, size_t pos, int base) {
   return sr;
 }
 
-// Extract a runtime string value from an expression.
 static std::string EvalStringArg(const Expr* arg, SimContext& ctx,
                                  Arena& arena) {
   if (arg->kind == ExprKind::kStringLiteral) return ExtractStrArg(arg);
@@ -689,10 +599,6 @@ static Logic4Vec EvalSscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, matched);
 }
 
-// ============================================================================
-// §21 dispatch
-// ============================================================================
-
 Logic4Vec EvalIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                         std::string_view name) {
   if (name == "$fopen") return EvalFopen(expr, ctx, arena);
@@ -708,4 +614,4 @@ Logic4Vec EvalIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-}  // namespace delta
+}

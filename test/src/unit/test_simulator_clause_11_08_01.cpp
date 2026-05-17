@@ -474,4 +474,4 @@ TEST(ExprType, ShiftUnsignedLeftStaysUnsigned) {
   EXPECT_FALSE(result.is_signed);
 }
 
-}  // namespace
+}

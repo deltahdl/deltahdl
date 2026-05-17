@@ -18,9 +18,6 @@
 
 namespace delta {
 
-// §6.16: Decode byte at character index `i` (leftmost = 0) of a byte-packed
-// Logic4Vec.  Storage holds the leftmost character in the most-significant
-// byte position, so the raw byte index is mirrored.
 static uint8_t ByteAtChar(const Logic4Vec& packed, uint32_t i) {
   uint32_t nbytes = packed.width / 8;
   if (i >= nbytes) return 0;
@@ -31,8 +28,6 @@ static uint8_t ByteAtChar(const Logic4Vec& packed, uint32_t i) {
   return static_cast<uint8_t>((packed.words[word].aval >> bit) & 0xFF);
 }
 
-// §6.16: Re-pack a byte vector into a Logic4Vec, leftmost byte first.  An
-// empty input yields a one-byte zero vector so the result remains indexable.
 static Logic4Vec PackBytes(const std::vector<uint8_t>& bytes, Arena& arena) {
   uint32_t width = static_cast<uint32_t>(bytes.size()) * 8;
   if (width == 0) width = 8;
@@ -46,7 +41,6 @@ static Logic4Vec PackBytes(const std::vector<uint8_t>& bytes, Arena& arena) {
   return out;
 }
 
-// §6.16: Drop every '\0' byte from a byte-packed value.
 Logic4Vec StripStringZeros(const Logic4Vec& packed, Arena& arena) {
   uint32_t nbytes = packed.width / 8;
   std::vector<uint8_t> kept;
@@ -58,8 +52,6 @@ Logic4Vec StripStringZeros(const Logic4Vec& packed, Arena& arena) {
   return PackBytes(kept, arena);
 }
 
-// §6.16: Overwrite character `idx` of a string variable with `byte_val`,
-// silently dropping a zero byte and silently ignoring an out-of-range index.
 void StringWriteByte(Variable* var, uint32_t idx, uint8_t byte_val,
                      Arena& arena) {
   if (!var) return;
@@ -72,8 +64,6 @@ void StringWriteByte(Variable* var, uint32_t idx, uint8_t byte_val,
   bytes[idx] = byte_val;
   var->value = PackBytes(bytes, arena);
 }
-
-// --- String <-> Logic4Vec helpers ---
 
 static std::string Logic4VecToString(const Logic4Vec& vec) {
   uint32_t nbytes = vec.width / 8;
@@ -104,20 +94,15 @@ Logic4Vec StringToLogic4Vec(Arena& arena, std::string_view str) {
   return vec;
 }
 
-// Assign a string value to an existing variable, resizing as needed.
 static void AssignStringToVar(Variable* var, Arena& arena,
                               std::string_view str) {
   var->value = StringToLogic4Vec(arena, str);
 }
 
-// --- Individual method implementations ---
-
-// §6.16.1: len() — returns string length.
 static Logic4Vec StringLen(const std::string& str, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, str.size());
 }
 
-// §6.16.2: putc(i, c) — replace byte at index i with character c.
 static void StringPutc(Variable* var, const std::string& str,
                        const Expr* call_expr, SimContext& ctx, Arena& arena) {
   if (call_expr->args.size() < 2) return;
@@ -131,7 +116,6 @@ static void StringPutc(Variable* var, const std::string& str,
   }
 }
 
-// §6.16.3: getc(i) — return byte at index i.
 static Logic4Vec StringGetc(const std::string& str, const Expr* call_expr,
                             SimContext& ctx, Arena& arena) {
   if (call_expr->args.empty()) return MakeLogic4VecVal(arena, 8, 0);
@@ -140,28 +124,24 @@ static Logic4Vec StringGetc(const std::string& str, const Expr* call_expr,
   return MakeLogic4VecVal(arena, 8, static_cast<unsigned char>(str[idx]));
 }
 
-// §6.16.4: toupper() — return uppercased copy.
 static Logic4Vec StringToupper(const std::string& str, Arena& arena) {
   std::string upper = str;
   for (auto& c : upper) c = static_cast<char>(std::toupper(c));
   return StringToLogic4Vec(arena, upper);
 }
 
-// §6.16.5: tolower() — return lowercased copy.
 static Logic4Vec StringTolower(const std::string& str, Arena& arena) {
   std::string lower = str;
   for (auto& c : lower) c = static_cast<char>(std::tolower(c));
   return StringToLogic4Vec(arena, lower);
 }
 
-// Extract the string value of an argument (identifier or string literal).
 static std::string EvalArgAsString(const Expr* arg, SimContext& ctx,
                                    Arena& arena) {
   auto val = EvalExpr(arg, ctx, arena);
   return Logic4VecToString(val);
 }
 
-// §6.16.6: compare(s) — lexicographic compare.
 static Logic4Vec StringCompare(const std::string& str, const Expr* call_expr,
                                SimContext& ctx, Arena& arena) {
   if (call_expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
@@ -170,7 +150,6 @@ static Logic4Vec StringCompare(const std::string& str, const Expr* call_expr,
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(cmp));
 }
 
-// §6.16.7: icompare(s) — case-insensitive compare.
 static Logic4Vec StringIcompare(const std::string& str, const Expr* call_expr,
                                 SimContext& ctx, Arena& arena) {
   if (call_expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
@@ -183,7 +162,6 @@ static Logic4Vec StringIcompare(const std::string& str, const Expr* call_expr,
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(cmp));
 }
 
-// §6.16.8: substr(i, j) — extract substring from index i to j (inclusive).
 static Logic4Vec StringSubstr(const std::string& str, const Expr* call_expr,
                               SimContext& ctx, Arena& arena) {
   if (call_expr->args.size() < 2) return StringToLogic4Vec(arena, "");
@@ -195,7 +173,6 @@ static Logic4Vec StringSubstr(const std::string& str, const Expr* call_expr,
   return StringToLogic4Vec(arena, str.substr(i, j - i + 1));
 }
 
-// §6.16.9: atoi() / atohex() / atooct() / atobin()
 static Logic4Vec StringAtoBase(const std::string& str, int base, Arena& arena) {
   uint64_t val = 0;
   bool found_digit = false;
@@ -216,7 +193,6 @@ static Logic4Vec StringAtoBase(const std::string& str, int base, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, val);
 }
 
-// §6.16.10: atoreal() — convert string to real.
 static Logic4Vec StringAtoreal(const std::string& str, Arena& arena) {
   double d = std::strtod(str.c_str(), nullptr);
   uint64_t bits = 0;
@@ -224,7 +200,6 @@ static Logic4Vec StringAtoreal(const std::string& str, Arena& arena) {
   return MakeLogic4VecVal(arena, 64, bits);
 }
 
-// §6.16.11-14: itoa(i), hextoa(i), octtoa(i), bintoa(i)
 static void StringXtoa(Variable* var, const Expr* call_expr, SimContext& ctx,
                        Arena& arena, int base) {
   if (call_expr->args.empty()) return;
@@ -256,7 +231,6 @@ static void StringXtoa(Variable* var, const Expr* call_expr, SimContext& ctx,
   AssignStringToVar(var, arena, result);
 }
 
-// §6.16.15: realtoa(r) — assign real string representation to variable.
 static void StringRealtoa(Variable* var, const Expr* call_expr, SimContext& ctx,
                           Arena& arena) {
   if (call_expr->args.empty()) return;
@@ -268,9 +242,6 @@ static void StringRealtoa(Variable* var, const Expr* call_expr, SimContext& ctx,
   AssignStringToVar(var, arena, buf);
 }
 
-// --- Dispatch ---
-
-// Bundle context to stay within the 5-argument limit.
 struct StringMethodArgs {
   Variable* var;
   std::string str;
@@ -367,8 +338,6 @@ static bool DispatchMutatingMethod(std::string_view method,
   return false;
 }
 
-// §6.16: Try to evaluate a string method call.
-// Returns true and sets `out` if the call is a string method.
 bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              Logic4Vec& out) {
   MethodCallParts parts;
@@ -384,4 +353,4 @@ bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return DispatchMutatingMethod(parts.method_name, args, out);
 }
 
-}  // namespace delta
+}

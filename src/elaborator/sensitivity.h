@@ -8,7 +8,6 @@
 
 namespace delta {
 
-// Forward declarations
 struct Expr;
 struct Stmt;
 struct EventExpr;
@@ -30,4 +29,4 @@ std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena,
                                         const FuncMap* funcs = nullptr,
                                         bool exclude_written = true);
 
-}  // namespace delta
+}

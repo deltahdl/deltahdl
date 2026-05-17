@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- From test_parser_clause_05_11.cpp ---
-
 TEST(ArrayLiteralParsing, PositionalArrayLiteral) {
   auto r = Parse(
       "module m;\n"
@@ -143,8 +141,6 @@ TEST(ArrayLiteralParsing, IndexKeyOnly) {
   ASSERT_EQ(item->init_expr->pattern_keys.size(), 3u);
 }
 
-// --- From test_parser_clause_10_09.cpp ---
-
 TEST(AssignmentPatternParsing, TypedefPrefixedArray) {
   auto r = Parse(
       "module m;\n"
@@ -251,4 +247,4 @@ TEST(ArrayLiteralParsing, TypeKeyArrayPattern) {
   ASSERT_EQ(item->init_expr->pattern_keys.size(), 2u);
 }
 
-}  // namespace
+}

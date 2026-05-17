@@ -29,5 +29,5 @@ TEST_F(VpiFreeObjectSim, FreeObjectReturnsZero) {
   EXPECT_EQ(result, 0);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

@@ -545,8 +545,6 @@ TEST(UdpInstantiationParsing, UdpInst_ExternUdp) {
   EXPECT_EQ(insts[0]->inst_module, "my_udp");
 }
 
-// --- error conditions ---
-
 TEST(UdpInstantiationParsing, SingleTerminalError) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -561,8 +559,6 @@ TEST(UdpInstantiationParsing, SingleTerminalError) {
     EXPECT_EQ(insts[0]->gate_terminals.size(), 1u);
   }
 }
-
-// --- edge cases ---
 
 TEST(UdpInstantiationParsing, MultipleUnnamedInstances) {
   auto r = Parse(
@@ -656,4 +652,4 @@ TEST(UdpInstantiationParsing, AllStrengthKeywords) {
   }
 }
 
-}  // namespace
+}
