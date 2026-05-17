@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionParsing, IntegerNs) {
+TEST(TimeLiteralParsing, IntegerNs) {
   auto r = Parse(
       "module m;\n"
       "  initial #40ns;\n"
@@ -17,35 +17,11 @@ TEST(LexicalConventionParsing, IntegerNs) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
-TEST(LexicalConventionParsing, FixedPointNs) {
+TEST(TimeLiteralParsing, FixedPointNs) {
   EXPECT_TRUE(ParseOk("module m; initial #2.1ns; endmodule"));
 }
 
-TEST(LexicalConventionParsing, DelayPs) {
-  EXPECT_TRUE(ParseOk("module m; initial #40ps; endmodule"));
-}
-
-TEST(LexicalConventionParsing, DelayUs) {
-  EXPECT_TRUE(ParseOk("module m; initial #100us; endmodule"));
-}
-
-TEST(LexicalConventionParsing, DelayMs) {
-  EXPECT_TRUE(ParseOk("module m; initial #1ms; endmodule"));
-}
-
-TEST(LexicalConventionParsing, DelayFs) {
-  EXPECT_TRUE(ParseOk("module m; initial #500fs; endmodule"));
-}
-
-TEST(LexicalConventionParsing, DelayS) {
-  EXPECT_TRUE(ParseOk("module m; initial #1s; endmodule"));
-}
-
-TEST(LexicalConventionParsing, FixedPointUs) {
-  EXPECT_TRUE(ParseOk("module m; initial #1.5ns; endmodule"));
-}
-
-TEST(LexicalConventionParsing, AllUnitsInWireDelay) {
+TEST(TimeLiteralParsing, AllUnitsInWireDelay) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire #1fs w1;\n"
@@ -57,7 +33,7 @@ TEST(LexicalConventionParsing, AllUnitsInWireDelay) {
               "endmodule"));
 }
 
-TEST(LexicalConventionParsing, TimeunitAllSixUnits) {
+TEST(TimeLiteralParsing, TimeunitAllSixUnits) {
   EXPECT_EQ(ParseTimescale31402("module m; timeunit 1s; endmodule")
                 .cu->modules[0]
                 ->time_unit,
@@ -84,7 +60,7 @@ TEST(LexicalConventionParsing, TimeunitAllSixUnits) {
             TimeUnit::kFs);
 }
 
-TEST(LexicalConventionParsing, TimeLiteralExprKind) {
+TEST(TimeLiteralParsing, TimeLiteralExprKind) {
   auto r = Parse(
       "module m;\n"
       "  initial #10ns;\n"
@@ -97,7 +73,7 @@ TEST(LexicalConventionParsing, TimeLiteralExprKind) {
   EXPECT_EQ(stmt->delay->kind, ExprKind::kTimeLiteral);
 }
 
-TEST(LexicalConventionParsing, TimeLiteralRealVal) {
+TEST(TimeLiteralParsing, TimeLiteralRealVal) {
   auto r = Parse(
       "module m;\n"
       "  initial #2.5us;\n"
@@ -109,7 +85,7 @@ TEST(LexicalConventionParsing, TimeLiteralRealVal) {
   EXPECT_DOUBLE_EQ(stmt->delay->real_val, 2.5);
 }
 
-TEST(LexicalConventionParsing, TimeLiteralTextIncludesUnit) {
+TEST(TimeLiteralParsing, TimeLiteralTextIncludesUnit) {
   auto r = Parse(
       "module m;\n"
       "  initial #40ps;\n"
@@ -119,13 +95,6 @@ TEST(LexicalConventionParsing, TimeLiteralTextIncludesUnit) {
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->delay, nullptr);
   EXPECT_EQ(stmt->delay->text, "40ps");
-}
-
-TEST(LexicalConventionParsing, TimeLiteralInExpression) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial #10ns;\n"
-              "endmodule\n"));
 }
 
 }

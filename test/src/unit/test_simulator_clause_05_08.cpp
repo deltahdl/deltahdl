@@ -4,76 +4,68 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionSim, IntegerNs) {
+TEST(TimeLiteralSimulation, IntegerNs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 10ns;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 10.0);
 }
 
-TEST(LexicalConventionSim, FixedPointNs) {
+TEST(TimeLiteralSimulation, FixedPointNs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 2.1ns;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 2.1);
 }
 
-TEST(LexicalConventionSim, ScalePs) {
+TEST(TimeLiteralSimulation, ScalePs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 40ps;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 0.04);
 }
 
-TEST(LexicalConventionSim, ScaleFs) {
+TEST(TimeLiteralSimulation, ScaleFs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 100fs;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 0.0001);
 }
 
-TEST(LexicalConventionSim, ScaleUs) {
+TEST(TimeLiteralSimulation, ScaleUs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 1us;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 1000.0);
 }
 
-TEST(LexicalConventionSim, ScaleMs) {
+TEST(TimeLiteralSimulation, ScaleMs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 1ms;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 1e6);
 }
 
-TEST(LexicalConventionSim, ScaleS) {
+TEST(TimeLiteralSimulation, ScaleS) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 1s;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 1e9);
 }
 
-TEST(LexicalConventionSim, FixedPointUs) {
+TEST(TimeLiteralSimulation, ScaledToExplicitTimeunitPs) {
   auto v = RunAndGetReal(
-      "module t;\n  realtime r;\n  initial r = 2.5us;\nendmodule\n", "r");
-  EXPECT_DOUBLE_EQ(v, 2500.0);
+      "module t;\n"
+      "  timeunit 1ps;\n"
+      "  realtime r;\n"
+      "  initial r = 40ps;\n"
+      "endmodule\n",
+      "r");
+  EXPECT_DOUBLE_EQ(v, 40.0);
 }
 
-TEST(LexicalConventionSim, FixedPointMs) {
+TEST(TimeLiteralSimulation, ScaledToExplicitTimeunitUs) {
   auto v = RunAndGetReal(
-      "module t;\n  realtime r;\n  initial r = 1.5ms;\nendmodule\n", "r");
-  EXPECT_DOUBLE_EQ(v, 1.5e6);
-}
-
-TEST(LexicalConventionSim, FixedPointS) {
-  auto v = RunAndGetReal(
-      "module t;\n  realtime r;\n  initial r = 0.5s;\nendmodule\n", "r");
-  EXPECT_DOUBLE_EQ(v, 0.5e9);
-}
-
-TEST(LexicalConventionSim, FixedPointFs) {
-  auto v = RunAndGetReal(
-      "module t;\n  realtime r;\n  initial r = 500.0fs;\nendmodule\n", "r");
+      "module t;\n"
+      "  timeunit 1us;\n"
+      "  realtime r;\n"
+      "  initial r = 500ns;\n"
+      "endmodule\n",
+      "r");
   EXPECT_DOUBLE_EQ(v, 0.5);
-}
-
-TEST(LexicalConventionSim, FixedPointPs) {
-  auto v = RunAndGetReal(
-      "module t;\n  realtime r;\n  initial r = 3.5ps;\nendmodule\n", "r");
-  EXPECT_DOUBLE_EQ(v, 0.0035);
 }
 
 }

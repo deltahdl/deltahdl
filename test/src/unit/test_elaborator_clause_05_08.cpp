@@ -2,21 +2,7 @@
 
 namespace {
 
-TEST(LexicalConventionElaboration, ModuleWithTimeLiteralElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  initial #10ns;\n"
-             "endmodule\n"));
-}
-
-TEST(LexicalConventionElaboration, FixedPointTimeLiteralElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  initial #2.5us;\n"
-             "endmodule\n"));
-}
-
-TEST(LexicalConventionElaboration, AllSixUnitsElaborate) {
+TEST(TimeLiteralElaboration, AllSixUnitsElaborate) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  initial begin\n"
@@ -30,7 +16,7 @@ TEST(LexicalConventionElaboration, AllSixUnitsElaborate) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, TimeLiteralInAssignmentElaborates) {
+TEST(TimeLiteralElaboration, TimeLiteralInAssignmentElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  realtime r;\n"

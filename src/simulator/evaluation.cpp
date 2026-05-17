@@ -916,15 +916,6 @@ static Logic4Vec EvalTaggedExpr(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-static double ScaleTimeLiteral(const Expr* e) {
-  double v = e->real_val;
-  TimeUnit u = TimeUnit::kNs;
-  auto t = e->text;
-  if (t.size() < 2 || !ParseTimeUnitStr(t.substr(t.size() - 2), u))
-    if (!t.empty()) ParseTimeUnitStr(t.substr(t.size() - 1), u);
-  return v *
-         std::pow(10.0, static_cast<int>(u) - static_cast<int>(TimeUnit::kNs));
-}
 Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
                    uint32_t context_width) {
   if (!expr) return MakeLogic4Vec(arena, 1);
@@ -941,8 +932,7 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
       return EvalStringLiteral(expr, arena);
     case ExprKind::kRealLiteral:
     case ExprKind::kTimeLiteral: {
-      double v = (expr->kind == ExprKind::kTimeLiteral) ? ScaleTimeLiteral(expr)
-                                                        : expr->real_val;
+      double v = expr->real_val;
       uint64_t bits = 0;
       std::memcpy(&bits, &v, sizeof(double));
       auto rv = MakeLogic4VecVal(arena, 64, bits);

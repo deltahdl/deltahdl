@@ -1,4 +1,5 @@
 #include <charconv>
+#include <cmath>
 #include <cstdlib>
 
 #include "parser/parser.h"
@@ -293,6 +294,23 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
     }
   } else if (kind == ExprKind::kRealLiteral || kind == ExprKind::kTimeLiteral) {
     lit->real_val = ParseRealText(tok.text);
+    if (kind == ExprKind::kTimeLiteral) {
+      TimeUnit literal_unit = TimeUnit::kNs;
+      auto t = tok.text;
+      if (t.size() < 2 ||
+          !ParseTimeUnitStr(t.substr(t.size() - 2), literal_unit)) {
+        if (!t.empty()) {
+          ParseTimeUnitStr(t.substr(t.size() - 1), literal_unit);
+        }
+      }
+      TimeUnit current_unit = current_module_ ? current_module_->time_unit
+                                              : TimeUnit::kNs;
+      int exp =
+          static_cast<int>(literal_unit) - static_cast<int>(current_unit);
+      if (exp != 0) {
+        lit->real_val *= std::pow(10.0, exp);
+      }
+    }
   }
   return lit;
 }

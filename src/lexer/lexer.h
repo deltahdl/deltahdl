@@ -63,7 +63,6 @@ class Lexer {
   void ValidateDecimalXZ(SourceLoc loc, char base_letter, uint32_t digit_start);
   void ValidateBaseDigits(SourceLoc loc, char base_letter,
                           uint32_t digit_start);
-  void LexRealSuffix();
   void LexFractionalPart();
   void LexExponentPart();
   bool IsWordBoundary(uint32_t p) const;

@@ -337,11 +337,6 @@ void Lexer::LexExponentPart() {
   }
 }
 
-void Lexer::LexRealSuffix() {
-  LexFractionalPart();
-  LexExponentPart();
-}
-
 bool Lexer::IsWordBoundary(uint32_t p) const {
   return p >= source_.size() ||
          (!std::isalnum(source_[p]) && source_[p] != '_');
@@ -396,10 +391,13 @@ Token Lexer::LexNumber() {
   pos_ = before_ws;
 
   uint32_t before_real = pos_;
-  LexRealSuffix();
+  LexFractionalPart();
+  uint32_t before_exp = pos_;
+  LexExponentPart();
+  bool has_exponent = (pos_ != before_exp);
   bool is_real = (pos_ != before_real);
 
-  bool is_time = TryLexTimeSuffix();
+  bool is_time = !has_exponent && TryLexTimeSuffix();
 
   Token tok;
   tok.kind = is_time   ? TokenKind::kTimeLiteral
