@@ -110,6 +110,30 @@ TEST(PliPostponedSim, PliScheduleIntoFutureTimeSlotIsNotFlagged) {
   EXPECT_EQ(sched.IllegalPostponedScheduleCount(), 0u);
 }
 
+// §4.4.3.10: "create read-only events after processing all other regions."
+// A PLI callback in Postponed creating another Postponed event at the current
+// time slot is not scheduling into "any previous region" — Postponed is the
+// current region, not a prior one. The production schedule check in
+// scheduler.cpp (region != Region::kPostponed) lets this through; observing
+// the count stays at zero proves the legal same-region branch fires from a
+// §4.4.3.10 PLI vantage. Companion positive case for
+// PliScheduleIntoEarlierRegionIsFlagged.
+TEST(PliPostponedSim, PliScheduleIntoSameRegionAtCurrentTimeIsNotFlagged) {
+  Arena arena;
+  Scheduler sched(arena);
+
+  auto* pli_cb = sched.GetEventPool().Acquire();
+  pli_cb->callback = [&]() {
+    auto* same_region = sched.GetEventPool().Acquire();
+    same_region->callback = []() {};
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kPostponed, same_region);
+  };
+  sched.ScheduleEvent({0}, Region::kPostponed, pli_cb);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPostponedScheduleCount(), 0u);
+}
+
 TEST(PliPostponedSim, PostponedInfrastructureWithFullRegionChain) {
   Arena arena;
   Scheduler sched(arena);

@@ -132,23 +132,34 @@ TEST(PostponedRegionSim, PostponedAdvancesToNextTimeSlot) {
   EXPECT_EQ(order[1], "preponed_t1");
 }
 
-TEST(PostponedRegionSim, PostponedPLIEventsExecuteInRegion) {
+// §4.4.2.9 ¶4: "Postponed region PLI events are also scheduled in this
+// region (see 4.4.3.10)." Observe the cross-link from §4.4.2.9's vantage by
+// consulting the production PLI callback router for the canonical Postponed
+// PLI reason (cbReadOnlySynch) and confirming its routing target is the same
+// Region::kPostponed that §4.4.2.9 names. The sim event scheduled into that
+// region during the same time slot executes in the same Postponed drain,
+// demonstrating that this region accepts both sim ($monitor/$strobe per ¶1)
+// and PLI (per ¶4) events without distinction.
+TEST(PostponedRegionSim, PostponedPLIEventsRouteIntoThisRegion) {
+  Region pli_target = RegionForPliCallback(kCbReadOnlySynch);
+  ASSERT_EQ(pli_target, Region::kPostponed);
+
   Arena arena;
   Scheduler sched(arena);
-  std::vector<std::string> order;
+  Region pli_observed = Region::kCOUNT;
+  Region sim_observed = Region::kCOUNT;
 
   auto* pli_ev = sched.GetEventPool().Acquire();
-  pli_ev->callback = [&order]() { order.push_back("pli"); };
-  sched.ScheduleEvent({0}, Region::kPostponed, pli_ev);
+  pli_ev->callback = [&]() { pli_observed = sched.CurrentRegion(); };
+  sched.ScheduleEvent({0}, pli_target, pli_ev);
 
   auto* sim_ev = sched.GetEventPool().Acquire();
-  sim_ev->callback = [&order]() { order.push_back("sim"); };
+  sim_ev->callback = [&]() { sim_observed = sched.CurrentRegion(); };
   sched.ScheduleEvent({0}, Region::kPostponed, sim_ev);
 
   sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "pli");
-  EXPECT_EQ(order[1], "sim");
+  EXPECT_EQ(pli_observed, Region::kPostponed);
+  EXPECT_EQ(sim_observed, Region::kPostponed);
 }
 
 TEST(PostponedRegionSim, PostponedEventsAcrossMultipleTimeSlots) {
