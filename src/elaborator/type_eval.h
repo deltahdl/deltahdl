@@ -77,6 +77,18 @@ bool IsAggregateType(const DataType& dtype);
 /// §6.11.1: Return true if the type kind represents an integral type.
 bool IsIntegralType(DataTypeKind kind);
 
+/// §6.11.1: Return true if the type kind represents a *simple bit vector type*.
+/// §6.11.1 defines a simple bit vector type as one that can directly represent
+/// a one-dimensional packed array of bits; the integer types listed in
+/// Table 6-8 (bit, logic, reg, byte, shortint, int, longint, integer, time)
+/// are simple bit vector types with predefined widths.
+bool IsSimpleBitVectorType(DataTypeKind kind);
+
+/// §6.11.1: Overload that rejects packed structures (§7.2.1), packed unions
+/// (§7.2.2), and multidimensional packed array types (§7.4) — each is
+/// equivalent to a simple bit vector type but is not itself one.
+bool IsSimpleBitVectorType(const DataType& dtype);
+
 /// Return true if two types match (IEEE §6.22.1).
 bool TypesMatch(const DataType& a, const DataType& b);
 

@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionSim, PositionalTwoFields) {
+TEST(StructLiteralSim, PositionalTwoFields) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -18,7 +18,7 @@ TEST(LexicalConventionSim, PositionalTwoFields) {
   EXPECT_EQ(v, 0xAABBu);
 }
 
-TEST(LexicalConventionSim, PositionalThreeFields) {
+TEST(StructLiteralSim, PositionalThreeFields) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -31,7 +31,7 @@ TEST(LexicalConventionSim, PositionalThreeFields) {
   EXPECT_EQ(v, 0x112233u);
 }
 
-TEST(LexicalConventionSim, MemberNameAndValue) {
+TEST(StructLiteralSim, MemberNameAndValue) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -42,7 +42,7 @@ TEST(LexicalConventionSim, MemberNameAndValue) {
   EXPECT_EQ(v, 0x1122u);
 }
 
-TEST(LexicalConventionSim, MemberNameReverseOrder) {
+TEST(StructLiteralSim, MemberNameReverseOrder) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -53,7 +53,7 @@ TEST(LexicalConventionSim, MemberNameReverseOrder) {
   EXPECT_EQ(v, 0x1122u);
 }
 
-TEST(LexicalConventionSim, DefaultAllOnes) {
+TEST(StructLiteralSim, DefaultAllOnes) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -64,7 +64,7 @@ TEST(LexicalConventionSim, DefaultAllOnes) {
   EXPECT_EQ(v, 0xFFFFu);
 }
 
-TEST(LexicalConventionSim, DefaultZero) {
+TEST(StructLiteralSim, DefaultZero) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -75,7 +75,7 @@ TEST(LexicalConventionSim, DefaultZero) {
   EXPECT_EQ(v, 0u);
 }
 
-TEST(LexicalConventionSim, DefaultDifferentFieldWidths) {
+TEST(StructLiteralSim, DefaultDifferentFieldWidths) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [3:0] b; } ab_t;\n"
@@ -86,7 +86,7 @@ TEST(LexicalConventionSim, DefaultDifferentFieldWidths) {
   EXPECT_EQ(v, 0xFFFu);
 }
 
-TEST(LexicalConventionSim, VarInitPositional) {
+TEST(StructLiteralSim, VarInitPositional) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -96,7 +96,7 @@ TEST(LexicalConventionSim, VarInitPositional) {
   EXPECT_EQ(v, 0x55AAu);
 }
 
-TEST(LexicalConventionSim, VarInitNamed) {
+TEST(StructLiteralSim, VarInitNamed) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] x; logic [7:0] y; } pt_t;\n"
@@ -106,7 +106,7 @@ TEST(LexicalConventionSim, VarInitNamed) {
   EXPECT_EQ(v, 0xAABBu);
 }
 
-TEST(LexicalConventionSim, FieldAccessAfterAssign) {
+TEST(StructLiteralSim, FieldAccessAfterAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -134,7 +134,7 @@ TEST(LexicalConventionSim, FieldAccessAfterAssign) {
   EXPECT_EQ(vry->value.ToUint64(), 0xADu);
 }
 
-TEST(LexicalConventionSim, TypePrefixedStructLiteral) {
+TEST(StructLiteralSim, TypePrefixedStructLiteral) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -145,7 +145,7 @@ TEST(LexicalConventionSim, TypePrefixedStructLiteral) {
   EXPECT_EQ(v, 0xDEADu);
 }
 
-TEST(LexicalConventionSim, ReplicationStructLiteral) {
+TEST(StructLiteralSim, ReplicationStructLiteral) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -158,7 +158,7 @@ TEST(LexicalConventionSim, ReplicationStructLiteral) {
   EXPECT_EQ(v, 0xAAAAAAu);
 }
 
-TEST(LexicalConventionSim, NestedBracesArrayOfStructs) {
+TEST(StructLiteralSim, NestedBracesArrayOfStructs) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

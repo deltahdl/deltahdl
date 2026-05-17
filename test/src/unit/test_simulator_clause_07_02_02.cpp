@@ -83,6 +83,48 @@ TEST(StructAssignmentSimulation, WholeStructAssignment_SecondMember) {
   EXPECT_EQ(v, 20u);
 }
 
+// §7.2.2: "A structure can be assigned as a whole and passed to or from a
+// subroutine as a whole." Passing a struct as a task input and reading a
+// member through the formal exercises the whole-struct pass-in path.
+TEST(StructAssignmentSimulation, StructPassedToTaskAsWhole_InputArg) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct { int a; int b; } s_t;\n"
+      "  s_t src;\n"
+      "  int result;\n"
+      "  task get_b(input s_t arg, output int o);\n"
+      "    o = arg.b;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    src = '{10, 42};\n"
+      "    get_b(src, result);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 42u);
+}
+
+// §7.2.2: Counterpart — "passed ... from a subroutine as a whole". A task
+// returns a struct value through an output argument and the caller reads
+// a member of the returned struct.
+TEST(StructAssignmentSimulation, StructReturnedFromTaskAsWhole_OutputArg) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct { int a; int b; } s_t;\n"
+      "  s_t dst;\n"
+      "  int result;\n"
+      "  task make(output s_t o);\n"
+      "    o = '{7, 99};\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    make(dst);\n"
+      "    result = dst.b;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 99u);
+}
+
 // §7.2.2: Multiple members with different default values.
 TEST(StructAssignmentSimulation, MultipleDefaults_AllApplied) {
   SimFixture f;

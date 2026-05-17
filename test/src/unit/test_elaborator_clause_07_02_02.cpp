@@ -103,6 +103,25 @@ TEST(StructAssignmentValidation, PackedStructTypedefMemberDefault_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §7.2.2: "The assigned expression shall be a constant expression."
+// A struct member default that references a runtime variable (not a constant)
+// must be diagnosed by the elaborator. The production rule lives in
+// ValidateStructMemberDefaultsConstant.
+TEST(StructAssignmentValidation, NonConstantMemberDefault_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int n;\n"
+      "  typedef struct {\n"
+      "    int a = n;\n"
+      "    int b;\n"
+      "  } s_t;\n"
+      "  s_t s;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 // §7.2.2: Unpacked struct with nested union, default on the union member itself.
 TEST(StructAssignmentValidation,
      UnpackedStructWithUnionMemberDefault_OnUnionMember_Rejected) {

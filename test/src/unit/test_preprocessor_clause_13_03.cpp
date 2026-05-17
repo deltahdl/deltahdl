@@ -11,7 +11,7 @@ static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, TaskAllDirectionsAndBlocking) {
+TEST(TaskDeclPreprocessing, TaskAllDirectionsAndBlocking) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  task my_task(input int a, output int b, inout int c, ref int d);\n"

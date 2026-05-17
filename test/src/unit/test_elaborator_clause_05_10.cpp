@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionElaboration, ModuleWithStructureLiteralElaborates) {
+TEST(StructLiteralElaboration, ModuleWithStructureLiteralElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct { int a; int b; } ab_t;\n"
@@ -13,7 +13,7 @@ TEST(LexicalConventionElaboration, ModuleWithStructureLiteralElaborates) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, PositionalStructLiteral) {
+TEST(StructLiteralElaboration, PositionalStructLiteral) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -22,7 +22,7 @@ TEST(LexicalConventionElaboration, PositionalStructLiteral) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, NamedMemberStructLiteral) {
+TEST(StructLiteralElaboration, NamedMemberStructLiteral) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -31,7 +31,7 @@ TEST(LexicalConventionElaboration, NamedMemberStructLiteral) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, DefaultStructLiteral) {
+TEST(StructLiteralElaboration, DefaultStructLiteral) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -40,7 +40,7 @@ TEST(LexicalConventionElaboration, DefaultStructLiteral) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, TypePrefixedPattern) {
+TEST(StructLiteralElaboration, TypePrefixedPattern) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct packed { logic [7:0] x; logic [7:0] y; } pt_t;\n"
@@ -49,7 +49,7 @@ TEST(LexicalConventionElaboration, TypePrefixedPattern) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, StructLiteralVarInit) {
+TEST(StructLiteralElaboration, StructLiteralVarInit) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -57,7 +57,7 @@ TEST(LexicalConventionElaboration, StructLiteralVarInit) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, InvalidMemberName) {
+TEST(StructLiteralElaboration, InvalidMemberName) {
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -68,7 +68,7 @@ TEST(LexicalConventionElaboration, InvalidMemberName) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(LexicalConventionElaboration, DuplicateMemberKey) {
+TEST(StructLiteralElaboration, DuplicateMemberKey) {
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -79,7 +79,7 @@ TEST(LexicalConventionElaboration, DuplicateMemberKey) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(LexicalConventionElaboration, NestedBracesArrayOfStructs) {
+TEST(StructLiteralElaboration, NestedBracesArrayOfStructs) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -88,7 +88,22 @@ TEST(LexicalConventionElaboration, NestedBracesArrayOfStructs) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, ReplicationStructLiteral) {
+// §5.10: "The C-like alternative '{1, 1.0, 2, 2.0} for the preceding example
+// is not allowed." For an array-of-structs initializer, the structure must
+// appear under its own nested '{...} — a flat element list whose count
+// matches the *flattened* member count is normatively rejected.
+TEST(StructLiteralElaboration, CLikeFlatLiteralForArrayOfStructsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { int a; shortreal b; } ab;\n"
+      "  ab abarr[1:0] = '{1, 1.0, 2, 2.0};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(StructLiteralElaboration, ReplicationStructLiteral) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct packed { logic [7:0] x; logic [7:0] y; logic [7:0] z; } xyz_t;\n"

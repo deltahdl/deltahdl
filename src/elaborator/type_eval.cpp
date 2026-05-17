@@ -296,6 +296,38 @@ bool IsIntegralType(DataTypeKind kind) {
   }
 }
 
+bool IsSimpleBitVectorType(DataTypeKind kind) {
+  // §6.11.1: The Table 6-8 integer types are simple bit vector types — those
+  // with predefined widths plus the unsized bit/logic/reg.
+  switch (kind) {
+    case DataTypeKind::kBit:
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kInteger:
+    case DataTypeKind::kTime:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool IsSimpleBitVectorType(const DataType& dtype) {
+  // §6.11.1: Packed structures (§7.2.1) and packed unions (§7.2.2) are
+  // equivalent to a simple bit vector type but are not themselves one.
+  if ((dtype.kind == DataTypeKind::kStruct ||
+       dtype.kind == DataTypeKind::kUnion) &&
+      (dtype.is_packed || dtype.is_soft))
+    return false;
+  // §6.11.1: Multidimensional packed array types (§7.4) are not simple bit
+  // vector types — only a one-dimensional packed array of bits qualifies.
+  if (!dtype.extra_packed_dims.empty()) return false;
+  return IsSimpleBitVectorType(dtype.kind);
+}
+
 // §6.22.1(e): Types with a predefined width.
 static bool HasPredefinedWidth(DataTypeKind kind) {
   switch (kind) {

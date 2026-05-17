@@ -73,7 +73,7 @@ TEST(BlockItemDeclParsing, BlockItemInTask) {
   ASSERT_GE(item->func_body_stmts.size(), 1u);
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
 }
-TEST(Parser, TaskDecl) {
+TEST(TaskDeclParsing, BasicTaskDecl) {
   auto r = Parse(
       "module t;\n"
       "  task my_task(input int x);\n"
@@ -440,7 +440,7 @@ TEST(TaskAndFunctionParsing, FormalArgExplicitDirectionDefaultsLogic) {
 // states that a and b default to inputs and u and v are outputs. By the
 // data-type rule, a and b default to logic (first arg / direction not
 // explicit but applied at first position) while v inherits u's logic [15:0].
-TEST(TaskAndFunctionParsing, FormalArgListMatchesLrmMytask3) {
+TEST(TaskAndFunctionParsing, FormalArgListMixedExplicitAndDefault) {
   auto r = Parse(
       "module m;\n"
       "  task mytask3(a, b, output logic [15:0] u, v);\n"
@@ -579,6 +579,18 @@ TEST(TaskAndFunctionParsing,
   EXPECT_TRUE(item->func_args[0].is_ref_static);
   EXPECT_EQ(item->func_args[1].direction, Direction::kRef);
   EXPECT_FALSE(item->func_args[1].is_ref_static);
+}
+
+// §13.3 footnote 25: "The dynamic_override_specifiers shall only be legal on
+// method declarations inside a non-interface class scope." A `virtual` task
+// declared at module scope (i.e., outside any class) must be diagnosed.
+TEST(TaskAndFunctionParsing, VirtualTaskAtModuleScopeRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  virtual task t;\n"
+      "  endtask\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 // §13.3: For a function (not just a task), the same data-type inheritance

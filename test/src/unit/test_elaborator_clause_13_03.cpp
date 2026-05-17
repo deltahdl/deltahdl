@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(TaskElaboration, ElabTaskDeclInModule) {
+TEST(TaskElaboration, TaskDeclInModuleElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"

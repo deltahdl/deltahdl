@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionParsing, StructLiteralExprKind) {
+TEST(StructLiteralParsing, StructLiteralExprKind) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct { int a; int b; } ab_t;\n"
@@ -19,7 +19,7 @@ TEST(LexicalConventionParsing, StructLiteralExprKind) {
   EXPECT_EQ(rhs->elements.size(), 2u);
 }
 
-TEST(LexicalConventionParsing, NestedBracesParses) {
+TEST(StructLiteralParsing, NestedBracesParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int a; shortreal b; } ab;\n"
@@ -28,7 +28,7 @@ TEST(LexicalConventionParsing, NestedBracesParses) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, NestedBracesExprKind) {
+TEST(StructLiteralParsing, NestedBracesExprKind) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct { int a; int b; } ab_t;\n"
@@ -44,7 +44,7 @@ TEST(LexicalConventionParsing, NestedBracesExprKind) {
   EXPECT_EQ(rhs->elements[1]->kind, ExprKind::kAssignmentPattern);
 }
 
-TEST(LexicalConventionParsing, TypePrefixedStructLiteralParses) {
+TEST(StructLiteralParsing, TypePrefixedStructLiteralParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int a; shortreal b; } ab;\n"
@@ -53,7 +53,7 @@ TEST(LexicalConventionParsing, TypePrefixedStructLiteralParses) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, ReplicationInStructLiteralParses) {
+TEST(StructLiteralParsing, ReplicationInStructLiteralParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int x; int y; int z; } xyz_t;\n"
@@ -62,16 +62,7 @@ TEST(LexicalConventionParsing, ReplicationInStructLiteralParses) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, StructureLiteralParses) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  typedef struct { int a; int b; } ab_t;\n"
-              "  ab_t s;\n"
-              "  initial s = '{0, 1};\n"
-              "endmodule\n"));
-}
-
-TEST(LexicalConventionParsing, StructureLiteralWithNamedMembersParses) {
+TEST(StructLiteralParsing, StructureLiteralWithNamedMembersParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int a; int b; } ab_t;\n"
@@ -80,7 +71,7 @@ TEST(LexicalConventionParsing, StructureLiteralWithNamedMembersParses) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, StructureLiteralWithDefaultParses) {
+TEST(StructLiteralParsing, StructureLiteralWithDefaultParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int a; int b; } ab_t;\n"

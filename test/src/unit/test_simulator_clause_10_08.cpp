@@ -281,6 +281,26 @@ TEST(AssignmentLikeContextSim, NestedParenInConditionalPropagatesContext) {
       "result"), 0xFEu);
 }
 
+// --- Item 8: Nondefault correspondence in an assignment pattern ---
+
+// §10.8: "A nondefault correspondence between an expression in an assignment
+// pattern and a field or element in a data object or data value" is an
+// assignment-like context. The named-member correspondence `a: 16'hCAFE`
+// against an 8-bit field truncates the RHS to the field width.
+TEST(AssignmentLikeContextSim, NondefaultCorrespondenceTruncatesToFieldWidth) {
+  EXPECT_EQ(RunAndGet(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
+      "  ab_t s;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    s = '{a: 16'hCAFE, b: 8'h22};\n"
+      "    result = s.a;\n"
+      "  end\n"
+      "endmodule\n",
+      "result"), 0xFEu);
+}
+
 // --- Item 9: Static cast of an expression ---
 
 TEST(AssignmentLikeContextSim, StaticCastTruncatesInAssignLikeContext) {
