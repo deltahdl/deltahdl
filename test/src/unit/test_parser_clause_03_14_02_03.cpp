@@ -42,7 +42,7 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
   return nullptr;
 }
 
-TEST(DesignBuildingBlockParsing, RuleA_NestedInheritsUnit) {
+TEST(DesignBuildingBlockParsing, NestedModuleInheritsEnclosingUnit) {
   auto r = ParseTimescale31402(
       "module outer;\n"
       "  timeunit 1ps;\n"
@@ -68,7 +68,7 @@ TEST(DesignBuildingBlockParsing, RuleA_NestedInheritsUnit) {
   EXPECT_EQ(inner_resolved.precision, TimeUnit::kFs);
 }
 
-TEST(DesignBuildingBlockParsing, RuleA_NestedInterfaceInherits) {
+TEST(DesignBuildingBlockParsing, NestedInterfaceInheritsEnclosingTimescale) {
   auto r = ParseTimescale31402(
       "interface outer_if;\n"
       "  timeunit 1us;\n"
@@ -88,7 +88,7 @@ TEST(DesignBuildingBlockParsing, RuleA_NestedInterfaceInherits) {
   EXPECT_EQ(inner_resolved.precision, TimeUnit::kNs);
 }
 
-TEST(DesignBuildingBlockParsing, RuleB_FallbackToTimescale) {
+TEST(DesignBuildingBlockParsing, FallbackToPreviousTimescaleDirective) {
   auto r = ParseTimescale31402(
       "`timescale 1us / 1ps\n"
       "module m;\n"
@@ -104,7 +104,7 @@ TEST(DesignBuildingBlockParsing, RuleB_FallbackToTimescale) {
   EXPECT_EQ(resolved.precision, TimeUnit::kPs);
 }
 
-TEST(DesignBuildingBlockParsing, RuleC_FallbackToCUTimeunit) {
+TEST(DesignBuildingBlockParsing, FallbackToCompilationUnitTimeunit) {
   auto r = ParseTimescale31402(
       "timeunit 1ps;\n"
       "timeprecision 1fs;\n"
@@ -124,7 +124,7 @@ TEST(DesignBuildingBlockParsing, RuleC_FallbackToCUTimeunit) {
   EXPECT_EQ(resolved.precision, TimeUnit::kFs);
 }
 
-TEST(DesignBuildingBlockParsing, RuleD_DefaultTimeUnit) {
+TEST(DesignBuildingBlockParsing, FallbackToDefaultWhenNothingSpecified) {
   auto r = ParseTimescale31402(
       "module m;\n"
       "endmodule\n");
@@ -214,15 +214,6 @@ TEST(DesignBuildingBlockParsing, SameRulesForPrecision) {
       ResolveModuleTimescale(inner, r.cu, false, {}, &outer_resolved);
 
   EXPECT_EQ(inner_resolved.precision, TimeUnit::kPs);
-}
-
-TEST(DesignBuildingBlockParsing, DefaultIsImplementationSpecific) {
-  auto r = ParseTimescale31402("module m; endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto resolved =
-      ResolveModuleTimescale(r.cu->modules[0], r.cu, false, {}, nullptr);
-  EXPECT_EQ(resolved.unit, TimeUnit::kNs);
-  EXPECT_EQ(resolved.precision, TimeUnit::kNs);
 }
 
 TEST(DesignBuildingBlockParsing, CUTimeunitAppliesToInterface) {

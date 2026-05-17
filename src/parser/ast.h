@@ -1016,6 +1016,9 @@ struct CompilationUnit {
   int cu_time_prec_magnitude = 1;
   bool has_cu_timeunit = false;
   bool has_cu_timeprecision = false;
+
+  TimeScale preproc_timescale;
+  bool has_preproc_timescale = false;
 };
 
 struct ResolvedTimescale {

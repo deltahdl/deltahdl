@@ -1095,6 +1095,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateForwardClassTypedefs();
 
+  ValidateTimescaleConsistency();
+
   ResolveExternModules();
 }
 

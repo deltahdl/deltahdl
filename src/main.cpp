@@ -349,6 +349,9 @@ struct PreprocResult {
 
   delta::DelayModeDirective delay_mode_directive =
       delta::DelayModeDirective::kNone;
+
+  delta::TimeScale timescale;
+  bool has_timescale = false;
 };
 
 PreprocResult PreprocessSources(const CliOptions& opts,
@@ -377,6 +380,8 @@ PreprocResult PreprocessSources(const CliOptions& opts,
   result.default_trireg_strength = preproc.DefaultTriregStrength();
   result.has_default_trireg_strength = preproc.HasDefaultTriregStrength();
   result.delay_mode_directive = preproc.DelayModeDirective();
+  result.timescale = preproc.CurrentTimescale();
+  result.has_timescale = preproc.HasTimescale();
   return result;
 }
 
@@ -555,6 +560,8 @@ int main(int argc, char* argv[]) {
   cu->default_trireg_strength = pp.default_trireg_strength;
   cu->has_default_trireg_strength = pp.has_default_trireg_strength;
   cu->delay_mode_directive = pp.delay_mode_directive;
+  cu->preproc_timescale = pp.timescale;
+  cu->has_preproc_timescale = pp.has_timescale;
 
   if (opts.dump_ast) {
     DumpAst(cu);

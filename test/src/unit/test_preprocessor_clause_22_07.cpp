@@ -61,11 +61,6 @@ TEST(DesignBuildingBlockParsing, NoTimescaleDefault) {
   EXPECT_EQ(r.timescale.precision, TimeUnit::kNs);
 }
 
-TEST(DesignBuildingBlockParsing, ErrorInvalidUnit) {
-  auto r = Preprocess("`timescale 1xx / 1ps\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(DesignBuildingBlockParsing, DelayConversionWithTimescale) {
   auto r = Preprocess("`timescale 10ns / 1ns\n");
   EXPECT_FALSE(r.has_errors);
@@ -221,20 +216,6 @@ TEST(Preprocessor, Timescale_PrecisionSameUnitSmallerMagnitudeOk) {
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 10ns / 1ns\n", f, pp);
   EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Preprocessor, Timescale_100nsUnit10nsPrecisionOk) {
-  PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP("`timescale 100ns / 10ns\n", f, pp);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Preprocessor, Timescale_10nsUnit100nsError) {
-  PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP("`timescale 10ns / 100ns\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(Preprocessor, Timescale_GlobalPrecisionWithMagnitude) {

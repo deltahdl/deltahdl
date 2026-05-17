@@ -189,6 +189,8 @@ class Elaborator {
 
   void ValidateModuleConstraints(const ModuleDecl* decl);
 
+  void ValidateTimescaleConsistency();
+
   void ValidateEnumDecl(const DataType& dtype, SourceLoc loc);
 
   void ValidatePackedStructDefaults(const DataType& dtype, SourceLoc loc);

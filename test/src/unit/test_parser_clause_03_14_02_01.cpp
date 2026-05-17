@@ -1,6 +1,7 @@
 #include "fixture_parser.h"
 #include "fixture_preprocessor_timescale.h"
 #include "helpers_parser_verify.h"
+#include "parser/time_resolve.h"
 
 using namespace delta;
 
@@ -34,6 +35,22 @@ TEST(DesignBuildingBlockParsing, KeywordsOverrideTimescale) {
   EXPECT_TRUE(mod->has_timeprecision);
   EXPECT_EQ(mod->time_unit, TimeUnit::kUs);
   EXPECT_EQ(mod->time_prec, TimeUnit::kNs);
+}
+
+TEST(DesignBuildingBlockParsing, TimescaleSuppliesDefaultsToFollowingModule) {
+  auto r = ParseTimescale31402(
+      "`timescale 10ns / 1ns\n"
+      "module m;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto resolved =
+      ResolveModuleTimescale(r.cu->modules[0], r.cu, r.has_preproc_timescale,
+                             r.preproc_timescale, nullptr);
+  EXPECT_TRUE(resolved.has_unit);
+  EXPECT_EQ(resolved.unit, TimeUnit::kNs);
+  EXPECT_TRUE(resolved.has_precision);
+  EXPECT_EQ(resolved.precision, TimeUnit::kNs);
 }
 
 TEST(DesignBuildingBlockParsing, TimeScaleTwoComponents) {

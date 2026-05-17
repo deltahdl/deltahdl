@@ -72,6 +72,41 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   }
 }
 
+void Elaborator::ValidateTimescaleConsistency() {
+  bool cu_fallback_unit =
+      unit_->has_preproc_timescale || unit_->has_cu_timeunit;
+  bool cu_fallback_prec =
+      unit_->has_preproc_timescale || unit_->has_cu_timeprecision;
+
+  bool any_specified = false;
+  bool any_unspecified = false;
+  SourceLoc unspecified_loc;
+
+  auto inspect = [&](bool el_has_unit, bool el_has_prec, SourceLoc loc) {
+    bool has_unit = el_has_unit || cu_fallback_unit;
+    bool has_prec = el_has_prec || cu_fallback_prec;
+    if (has_unit && has_prec) {
+      any_specified = true;
+    } else {
+      if (!any_unspecified) unspecified_loc = loc;
+      any_unspecified = true;
+    }
+  };
+
+  for (const auto* mod : unit_->modules)
+    inspect(mod->has_timeunit, mod->has_timeprecision, mod->range.start);
+  for (const auto* iface : unit_->interfaces)
+    inspect(iface->has_timeunit, iface->has_timeprecision, iface->range.start);
+  for (const auto* prog : unit_->programs)
+    inspect(prog->has_timeunit, prog->has_timeprecision, prog->range.start);
+
+  if (any_specified && any_unspecified) {
+    diag_.Error(unspecified_loc,
+                "some design elements specify time unit and precision while "
+                "others do not");
+  }
+}
+
 static int64_t ParseLiteralWidth(std::string_view txt) {
   auto apos = txt.find('\'');
   if (apos == std::string_view::npos || apos == 0) return 0;
