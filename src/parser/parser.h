@@ -55,7 +55,8 @@ class Parser {
   FunctionArg ParseLetArg();
   void ParseGenvarDecl(std::vector<ModuleItem*>& items);
   void ParseTimeunitDecl(ModuleDecl* mod = nullptr,
-                         CompilationUnit* cu = nullptr);
+                         CompilationUnit* cu = nullptr,
+                         PackageDecl* pkg = nullptr);
   bool TryParseClockingOrVerification(std::vector<ModuleItem*>& items);
   void ParseParamPortDecl(
       std::vector<std::pair<std::string_view, Expr*>>& params,
@@ -361,6 +362,7 @@ class Parser {
   std::unordered_set<std::string_view> known_types_;
   std::unordered_set<std::string_view> known_udps_;
   ModuleDecl* current_module_ = nullptr;
+  PackageDecl* current_package_ = nullptr;
   bool InProgramBlock() const {
     return current_module_ &&
            current_module_->decl_kind == ModuleDeclKind::kProgram;

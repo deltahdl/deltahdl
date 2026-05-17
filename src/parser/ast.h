@@ -686,6 +686,12 @@ struct PackageDecl {
   SourceRange range;
   std::vector<ModuleItem*> items;
   std::string_view library;
+  TimeUnit time_unit = TimeUnit::kNs;
+  TimeUnit time_prec = TimeUnit::kNs;
+  int time_unit_magnitude = 1;
+  int time_prec_magnitude = 1;
+  bool has_timeunit = false;
+  bool has_timeprecision = false;
 };
 
 enum class ClassMemberKind : uint8_t {

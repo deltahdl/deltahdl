@@ -153,26 +153,59 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
-    bool validate = current_module_ &&
-                    current_module_->decl_kind == ModuleDeclKind::kModule;
-    bool was_unit_set = validate && current_module_->has_timeunit;
-    bool was_prec_set = validate && current_module_->has_timeprecision;
-    TimeUnit old_unit = was_unit_set ? current_module_->time_unit : TimeUnit{};
-    TimeUnit old_prec = was_prec_set ? current_module_->time_prec : TimeUnit{};
+    bool validate_mod =
+        current_module_ &&
+        (current_module_->decl_kind == ModuleDeclKind::kModule ||
+         current_module_->decl_kind == ModuleDeclKind::kInterface ||
+         current_module_->decl_kind == ModuleDeclKind::kProgram);
+    bool validate_pkg = !current_module_ && current_package_ != nullptr;
+    bool* p_has_unit = nullptr;
+    bool* p_has_prec = nullptr;
+    TimeUnit* p_unit = nullptr;
+    TimeUnit* p_prec = nullptr;
+    int* p_unit_mag = nullptr;
+    int* p_prec_mag = nullptr;
+    bool has_other_items = false;
+    if (validate_mod) {
+      p_has_unit = &current_module_->has_timeunit;
+      p_has_prec = &current_module_->has_timeprecision;
+      p_unit = &current_module_->time_unit;
+      p_prec = &current_module_->time_prec;
+      p_unit_mag = &current_module_->time_unit_magnitude;
+      p_prec_mag = &current_module_->time_prec_magnitude;
+      has_other_items = !current_module_->items.empty();
+    } else if (validate_pkg) {
+      p_has_unit = &current_package_->has_timeunit;
+      p_has_prec = &current_package_->has_timeprecision;
+      p_unit = &current_package_->time_unit;
+      p_prec = &current_package_->time_prec;
+      p_unit_mag = &current_package_->time_unit_magnitude;
+      p_prec_mag = &current_package_->time_prec_magnitude;
+      has_other_items = !current_package_->items.empty();
+    }
+    bool was_unit_set = p_has_unit && *p_has_unit;
+    bool was_prec_set = p_has_prec && *p_has_prec;
+    TimeUnit old_unit = was_unit_set ? *p_unit : TimeUnit{};
+    int old_unit_mag = was_unit_set ? *p_unit_mag : 0;
+    TimeUnit old_prec = was_prec_set ? *p_prec : TimeUnit{};
+    int old_prec_mag = was_prec_set ? *p_prec_mag : 0;
     auto loc = CurrentLoc();
-    ParseTimeunitDecl(current_module_);
-    if (validate) {
-      if (current_module_->has_timeunit && !was_unit_set)
+    ParseTimeunitDecl(current_module_, nullptr,
+                      validate_pkg ? current_package_ : nullptr);
+    if (validate_mod || validate_pkg) {
+      if (*p_has_unit && !was_unit_set && has_other_items)
         diag_.Error(loc,
-                    "timeunit as module item requires a matching prior "
-                    "declaration in the same scope");
-      else if (was_unit_set && current_module_->time_unit != old_unit)
+                    "timeunit as a later item requires a matching prior "
+                    "declaration in the same time scope");
+      else if (was_unit_set &&
+               (*p_unit != old_unit || *p_unit_mag != old_unit_mag))
         diag_.Error(loc, "timeunit does not match prior declaration");
-      if (current_module_->has_timeprecision && !was_prec_set)
+      if (*p_has_prec && !was_prec_set && has_other_items)
         diag_.Error(loc,
-                    "timeprecision as module item requires a matching prior "
-                    "declaration in the same scope");
-      else if (was_prec_set && current_module_->time_prec != old_prec)
+                    "timeprecision as a later item requires a matching prior "
+                    "declaration in the same time scope");
+      else if (was_prec_set &&
+               (*p_prec != old_prec || *p_prec_mag != old_prec_mag))
         diag_.Error(loc, "timeprecision does not match prior declaration");
     }
     return true;

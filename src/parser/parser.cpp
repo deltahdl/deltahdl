@@ -411,7 +411,38 @@ bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
   if (TryParseCuScopeDataDecl(unit)) return true;
 
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
+    bool was_unit_set = unit->has_cu_timeunit;
+    bool was_prec_set = unit->has_cu_timeprecision;
+    TimeUnit old_unit = unit->cu_time_unit;
+    int old_unit_mag = unit->cu_time_unit_magnitude;
+    TimeUnit old_prec = unit->cu_time_prec;
+    int old_prec_mag = unit->cu_time_prec_magnitude;
+    bool has_other_items =
+        !unit->modules.empty() || !unit->packages.empty() ||
+        !unit->interfaces.empty() || !unit->programs.empty() ||
+        !unit->classes.empty() || !unit->udps.empty() ||
+        !unit->checkers.empty() || !unit->configs.empty() ||
+        !unit->cu_items.empty();
+    auto loc = CurrentLoc();
     ParseTimeunitDecl(nullptr, unit);
+    if (unit->has_cu_timeunit && !was_unit_set && has_other_items) {
+      diag_.Error(loc,
+                  "timeunit as a later item requires a matching prior "
+                  "declaration in the same time scope");
+    } else if (was_unit_set &&
+               (unit->cu_time_unit != old_unit ||
+                unit->cu_time_unit_magnitude != old_unit_mag)) {
+      diag_.Error(loc, "timeunit does not match prior declaration");
+    }
+    if (unit->has_cu_timeprecision && !was_prec_set && has_other_items) {
+      diag_.Error(loc,
+                  "timeprecision as a later item requires a matching prior "
+                  "declaration in the same time scope");
+    } else if (was_prec_set &&
+               (unit->cu_time_prec != old_prec ||
+                unit->cu_time_prec_magnitude != old_prec_mag)) {
+      diag_.Error(loc, "timeprecision does not match prior declaration");
+    }
     return true;
   }
 
@@ -576,6 +607,8 @@ PackageDecl* Parser::ParsePackageDecl() {
   pkg->name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kSemicolon);
 
+  auto* prev_package = current_package_;
+  current_package_ = pkg;
   ++package_body_depth_;
   while (!Check(TokenKind::kKwEndpackage) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
@@ -591,6 +624,7 @@ PackageDecl* Parser::ParsePackageDecl() {
     }
   }
   --package_body_depth_;
+  current_package_ = prev_package;
   Expect(TokenKind::kKwEndpackage);
   MatchEndLabel(pkg->name);
   pkg->range.end = CurrentLoc();
@@ -645,8 +679,9 @@ void Parser::ParseGenvarDecl(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kSemicolon);
 }
 
-static void ApplyTimeUnit(ModuleDecl* mod, CompilationUnit* cu, bool is_unit,
-                          TimeUnit tu, int mag) {
+static void ApplyTimeUnit(ModuleDecl* mod, CompilationUnit* cu,
+                          PackageDecl* pkg, bool is_unit, TimeUnit tu,
+                          int mag) {
   if (mod) {
     if (is_unit) {
       mod->time_unit = tu;
@@ -669,10 +704,21 @@ static void ApplyTimeUnit(ModuleDecl* mod, CompilationUnit* cu, bool is_unit,
       cu->has_cu_timeprecision = true;
     }
   }
+  if (pkg) {
+    if (is_unit) {
+      pkg->time_unit = tu;
+      pkg->time_unit_magnitude = mag;
+      pkg->has_timeunit = true;
+    } else {
+      pkg->time_prec = tu;
+      pkg->time_prec_magnitude = mag;
+      pkg->has_timeprecision = true;
+    }
+  }
 }
 
 static void ApplyTimePrecision(ModuleDecl* mod, CompilationUnit* cu,
-                               TimeUnit prec, int mag) {
+                               PackageDecl* pkg, TimeUnit prec, int mag) {
   if (mod) {
     mod->time_prec = prec;
     mod->time_prec_magnitude = mag;
@@ -683,9 +729,15 @@ static void ApplyTimePrecision(ModuleDecl* mod, CompilationUnit* cu,
     cu->cu_time_prec_magnitude = mag;
     cu->has_cu_timeprecision = true;
   }
+  if (pkg) {
+    pkg->time_prec = prec;
+    pkg->time_prec_magnitude = mag;
+    pkg->has_timeprecision = true;
+  }
 }
 
-void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu) {
+void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
+                               PackageDecl* pkg) {
   bool is_unit = Check(TokenKind::kKwTimeunit);
   Consume();
   auto tok = Consume();
@@ -696,7 +748,7 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu) {
                 "time literal must use magnitude 1, 10, or 100 and unit "
                 "s/ms/us/ns/ps/fs");
   }
-  ApplyTimeUnit(mod, cu, is_unit, tu, mag);
+  ApplyTimeUnit(mod, cu, pkg, is_unit, tu, mag);
   if (Match(TokenKind::kSlash)) {
     auto prec_tok = Consume();
     TimeUnit prec = TimeUnit::kNs;
@@ -711,7 +763,7 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu) {
       diag_.Error(prec_tok.loc,
                   "time precision is less precise than the time unit");
     }
-    if (is_unit) ApplyTimePrecision(mod, cu, prec, prec_mag);
+    if (is_unit) ApplyTimePrecision(mod, cu, pkg, prec, prec_mag);
   }
   Expect(TokenKind::kSemicolon);
 }
