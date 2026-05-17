@@ -29,7 +29,9 @@ Stmt* Parser::ParseImmediateAssertLike(StmtKind kind, TokenKind keyword) {
     ExpectDeferredHashZero(diag_, tok);
     stmt->is_deferred = true;
   } else if (Match(TokenKind::kKwFinal)) {
+    // §16.4 P14: final deferred assertion — schedules action in Postponed.
     stmt->is_deferred = true;
+    stmt->is_final_deferred = true;
   }
 
   Expect(TokenKind::kLParen);
@@ -73,7 +75,9 @@ Stmt* Parser::ParseImmediateCover() {
     ExpectDeferredHashZero(diag_, tok);
     stmt->is_deferred = true;
   } else if (Match(TokenKind::kKwFinal)) {
+    // §16.4 P14: final deferred cover — schedules action in Postponed.
     stmt->is_deferred = true;
+    stmt->is_final_deferred = true;
   }
 
   Expect(TokenKind::kLParen);
@@ -139,8 +143,15 @@ ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
   stmt->kind = kind;
   stmt->range.start = loc;
   stmt->is_deferred = true;
-  if (Match(TokenKind::kHash)) Expect(TokenKind::kIntLiteral);
-  Match(TokenKind::kKwFinal);
+  if (Match(TokenKind::kHash)) {
+    auto tok = Expect(TokenKind::kIntLiteral);
+    // §16.4 Syntax 16-2: the only legal hash value after the verification
+    // directive is 0; reject other integer literals at module level too.
+    ExpectDeferredHashZero(diag_, tok);
+  } else if (Match(TokenKind::kKwFinal)) {
+    // §16.4 P14: final deferred at module level — Postponed-region action.
+    stmt->is_final_deferred = true;
+  }
   Expect(TokenKind::kLParen);
   stmt->assert_expr = ParseExpr();
   Expect(TokenKind::kRParen);
@@ -213,8 +224,14 @@ ModuleItem* Parser::ParseCoverProperty() {
     stmt->kind = StmtKind::kCoverImmediate;
     stmt->range.start = item->loc;
     stmt->is_deferred = true;
-    if (Match(TokenKind::kHash)) Expect(TokenKind::kIntLiteral);
-    Match(TokenKind::kKwFinal);
+    if (Match(TokenKind::kHash)) {
+      auto tok = Expect(TokenKind::kIntLiteral);
+      // §16.4 Syntax 16-2: cover #0 is the only legal hash form.
+      ExpectDeferredHashZero(diag_, tok);
+    } else if (Match(TokenKind::kKwFinal)) {
+      // §16.4 P14: module-level final deferred cover.
+      stmt->is_final_deferred = true;
+    }
     Expect(TokenKind::kLParen);
     stmt->assert_expr = ParseExpr();
     Expect(TokenKind::kRParen);

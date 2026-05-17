@@ -382,6 +382,11 @@ struct Stmt {
   Stmt* assert_pass_stmt = nullptr;  // Optional pass action
   Stmt* assert_fail_stmt = nullptr;  // Optional else (fail) action
   bool is_deferred = false;          // #0 deferred assertion
+  // §16.4: deferred assertions come in two kinds — observed (#0) and final.
+  // The two kinds schedule their action block in different regions per
+  // §16.4 P13/P14 (Reactive for observed, Postponed for final), so the kind
+  // must survive parsing.
+  bool is_final_deferred = false;
 
   // wait_order (§15.5.4)
   std::vector<Expr*> wait_order_events;

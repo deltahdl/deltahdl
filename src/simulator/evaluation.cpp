@@ -943,6 +943,12 @@ static double ScaleTimeLiteral(const Expr* e) {
 Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
                    uint32_t context_width) {
   if (!expr) return MakeLogic4Vec(arena, 1);
+  // §16.4 P11: if a deferred-assertion snapshot exists for this AST node
+  // (populated at expression-eval instant by ScheduleDeferredAction),
+  // return the snapshot value instead of re-evaluating at action time.
+  if (const auto* snap = ctx.FindDeferredArgSnapshot(expr)) {
+    return *snap;
+  }
   switch (expr->kind) {
     case ExprKind::kIntegerLiteral:
       return EvalIntLiteral(expr, arena);

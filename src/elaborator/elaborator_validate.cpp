@@ -2847,4 +2847,196 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl) {
   }
 }
 
+// =============================================================================
+// §16.4 — Deferred assertion action block restrictions
+// =============================================================================
+
+// §16.4 P5/P8/P9: "Action blocks may only contain a single subroutine call."
+// "The pass and fail statements in a deferred assertion's action_block, if
+// present, shall each consist of a single subroutine call." "The requirement
+// of a single subroutine call implies that no begin-end block shall surround
+// the pass or fail statements, as begin is itself a statement that is not
+// a subroutine call." A subroutine call shows up in the AST as an expression
+// statement whose expression is a call or system call.
+static bool IsSingleSubroutineCall(const Stmt* action) {
+  if (!action) return true;  // No action is always allowed.
+  if (action->kind == StmtKind::kNull) return true;
+  if (action->kind != StmtKind::kExprStmt) return false;
+  if (!action->expr) return false;
+  return action->expr->kind == ExprKind::kCall ||
+         action->expr->kind == ExprKind::kSystemCall;
+}
+
+// §16.4 P10: "In the case of a final deferred assertion, the subroutine
+// shall be one that may be legally called in the Postponed region (see
+// 4.4.2.9)." Per §4.4.2.9 the Postponed region forbids new value changes
+// and scheduling into earlier regions; statements that create those
+// effects therefore disqualify a subroutine from the final-deferred
+// path. Returns true when the supplied stmt subtree contains any such
+// disqualifying statement.
+static bool ContainsPostponedIllegalStmt(const Stmt* s) {
+  if (!s) return false;
+  switch (s->kind) {
+    case StmtKind::kBlockingAssign:
+    case StmtKind::kNonblockingAssign:
+    case StmtKind::kAssign:
+    case StmtKind::kDeassign:
+    case StmtKind::kForce:
+    case StmtKind::kRelease:
+    case StmtKind::kEventTrigger:
+    case StmtKind::kNbEventTrigger:
+    case StmtKind::kDelay:
+    case StmtKind::kEventControl:
+    case StmtKind::kWait:
+    case StmtKind::kCycleDelay:
+      return true;
+    default:
+      break;
+  }
+  for (auto* sub : s->stmts) {
+    if (ContainsPostponedIllegalStmt(sub)) return true;
+  }
+  if (ContainsPostponedIllegalStmt(s->then_branch)) return true;
+  if (ContainsPostponedIllegalStmt(s->else_branch)) return true;
+  if (ContainsPostponedIllegalStmt(s->body)) return true;
+  if (ContainsPostponedIllegalStmt(s->for_body)) return true;
+  for (const auto& ci : s->case_items) {
+    if (ContainsPostponedIllegalStmt(ci.body)) return true;
+  }
+  return false;
+}
+
+// §16.4 P10: walk a callee's body (function or task) for Postponed-illegal
+// statements. Functions store their body in func_body_stmts; tasks reuse
+// `body`. Returns true on first hit so the caller can flag the call.
+static bool CalleeBodyHasPostponedIllegal(const ModuleItem* callee) {
+  if (!callee) return false;
+  if (callee->body && ContainsPostponedIllegalStmt(callee->body)) return true;
+  for (auto* s : callee->func_body_stmts) {
+    if (ContainsPostponedIllegalStmt(s)) return true;
+  }
+  return false;
+}
+
+using DeferredSubroutineMap =
+    std::unordered_map<std::string_view, const ModuleItem*>;
+
+// §16.4 P10: for a final-deferred assertion whose action is a kCall to a
+// user-defined task/function, look the callee up by name and warn if its
+// body contains Postponed-illegal statements. System calls (kSystemCall)
+// are accepted: $info/$warning/$error/$fatal/$display and similar
+// read-only severity tasks are the canonical legal Postponed callees.
+static void CheckFinalDeferredCallee(const Stmt* action,
+                                     const DeferredSubroutineMap& subs,
+                                     DiagEngine& diag) {
+  if (!IsSingleSubroutineCall(action)) return;
+  if (!action || action->kind != StmtKind::kExprStmt || !action->expr) return;
+  if (action->expr->kind != ExprKind::kCall) return;
+  auto it = subs.find(action->expr->callee);
+  if (it == subs.end()) return;
+  if (CalleeBodyHasPostponedIllegal(it->second)) {
+    diag.Warning(action->range.start,
+                 std::format(
+                     "§16.4: final deferred assertion calls '{}', whose body "
+                     "contains statements not legally callable in the "
+                     "Postponed region (§4.4.2.9)",
+                     action->expr->callee));
+  }
+}
+
+// §16.4 P12: "It shall be an error to pass automatic or dynamic variables
+// as actuals to a ref or const ref formal." For a deferred-assertion
+// action call to a user-defined subroutine, walk each formal; for any
+// ref / const ref formal, check whether the actual at the same position
+// is a class-member access (kMemberAccess) — class properties live on a
+// dynamically-allocated object so passing them by reference violates the
+// rule.
+static void CheckDeferredCallRefArgs(const Stmt* action,
+                                     const DeferredSubroutineMap& subs,
+                                     DiagEngine& diag) {
+  if (!IsSingleSubroutineCall(action)) return;
+  if (!action || action->kind != StmtKind::kExprStmt || !action->expr) return;
+  if (action->expr->kind != ExprKind::kCall) return;
+  auto it = subs.find(action->expr->callee);
+  if (it == subs.end()) return;
+  const auto& formals = it->second->func_args;
+  const auto& actuals = action->expr->args;
+  size_t n = std::min(formals.size(), actuals.size());
+  for (size_t i = 0; i < n; ++i) {
+    if (formals[i].direction != Direction::kRef) continue;
+    const Expr* a = actuals[i];
+    if (!a) continue;
+    if (a->kind == ExprKind::kMemberAccess) {
+      diag.Error(a->range.start,
+                 std::format(
+                     "§16.4: cannot pass dynamic variable as actual for "
+                     "ref{} formal '{}' in deferred-assertion call",
+                     formals[i].is_const ? " const" : "",
+                     formals[i].name));
+    }
+  }
+}
+
+static void CheckDeferredActionStmt(const Stmt* s,
+                                    const DeferredSubroutineMap& subs,
+                                    DiagEngine& diag) {
+  if (!s->is_deferred) return;
+  if (s->kind != StmtKind::kAssertImmediate &&
+      s->kind != StmtKind::kAssumeImmediate &&
+      s->kind != StmtKind::kCoverImmediate) {
+    return;
+  }
+  if (s->assert_pass_stmt && !IsSingleSubroutineCall(s->assert_pass_stmt)) {
+    diag.Warning(s->assert_pass_stmt->range.start,
+                 "§16.4: deferred assertion pass action shall be a single "
+                 "subroutine call");
+  }
+  if (s->assert_fail_stmt && !IsSingleSubroutineCall(s->assert_fail_stmt)) {
+    diag.Warning(s->assert_fail_stmt->range.start,
+                 "§16.4: deferred assertion fail action shall be a single "
+                 "subroutine call");
+  }
+  // §16.4 P10: final-deferred subroutine must be Postponed-callable.
+  if (s->is_final_deferred) {
+    CheckFinalDeferredCallee(s->assert_pass_stmt, subs, diag);
+    CheckFinalDeferredCallee(s->assert_fail_stmt, subs, diag);
+  }
+  // §16.4 P12: ref formals shall not receive automatic/dynamic actuals.
+  CheckDeferredCallRefArgs(s->assert_pass_stmt, subs, diag);
+  CheckDeferredCallRefArgs(s->assert_fail_stmt, subs, diag);
+}
+
+void Elaborator::WalkStmtsForDeferredActions(const Stmt* s) {
+  if (!s) return;
+  CheckDeferredActionStmt(s, deferred_subroutine_map_, diag_);
+  for (auto* sub : s->stmts) WalkStmtsForDeferredActions(sub);
+  WalkStmtsForDeferredActions(s->then_branch);
+  WalkStmtsForDeferredActions(s->else_branch);
+  WalkStmtsForDeferredActions(s->body);
+  WalkStmtsForDeferredActions(s->for_body);
+  WalkStmtsForDeferredActions(s->assert_pass_stmt);
+  WalkStmtsForDeferredActions(s->assert_fail_stmt);
+  for (const auto& ci : s->case_items) WalkStmtsForDeferredActions(ci.body);
+}
+
+void Elaborator::ValidateDeferredAssertionActions(const ModuleDecl* decl) {
+  // Build the module-local map of callable subroutines once so P10 / P12
+  // lookups have access to formal-direction and body information.
+  deferred_subroutine_map_.clear();
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kTaskDecl ||
+        item->kind == ModuleItemKind::kFunctionDecl) {
+      deferred_subroutine_map_[item->name] = item;
+    }
+  }
+  for (const auto* item : decl->items) {
+    // §16.4: deferred assertion may also be used as a module_common_item;
+    // when parsed at module level, it's wrapped as an assert/cover-property
+    // item whose body is the assertion statement.
+    if (item->body) {
+      WalkStmtsForDeferredActions(item->body);
+    }
+  }
+}
+
 }  // namespace delta

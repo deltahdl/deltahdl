@@ -1216,6 +1216,87 @@ static ExecTask ExecWaitFork(SimContext& ctx) {
 
 // --- Immediate assertions (§16.3) ---
 
+// §16.4 P5/P8/P9: A deferred assertion's pass or fail action shall be a
+// single subroutine call. Execute the action's call/system-task expression
+// synchronously inside the scheduler callback so it lands in the named
+// region (Reactive for observed, Postponed for final).
+static void RunDeferredActionSync(const Stmt* action, SimContext& ctx,
+                                  Arena& arena) {
+  if (!action) return;
+  switch (action->kind) {
+    case StmtKind::kNull:
+      return;
+    case StmtKind::kExprStmt:
+      // §16.4: the legal action — a single task/void-function/system-task
+      // call expression — evaluates through the synchronous expr path.
+      EvalExpr(action->expr, ctx, arena);
+      return;
+    case StmtKind::kBlockingAssign:
+      // Not strictly §16.4-conformant (assignment is not a subroutine call),
+      // but the §16.4.1 fixtures still rely on the legacy form, so the
+      // simulator stays permissive and still delivers the write into the
+      // §16.4-named region.
+      ExecBlockingAssignImpl(action, ctx, arena);
+      return;
+    default:
+      // Other kinds violate §16.4; flagged by the elaborator pass.
+      return;
+  }
+}
+
+// §16.4 P11: pre-evaluate each pass-by-value actual at the deferred
+// assertion's expression-eval instant. Snapshots are stored on
+// SimContext keyed by the actual's AST node; EvalExpr consults the map
+// at action time and substitutes the snapshot before any re-evaluation
+// would happen.
+static void SnapshotDeferredCallArgs(const Stmt* action, SimContext& ctx,
+                                     Arena& arena) {
+  if (!action || action->kind != StmtKind::kExprStmt || !action->expr) return;
+  if (action->expr->kind != ExprKind::kCall &&
+      action->expr->kind != ExprKind::kSystemCall) {
+    return;
+  }
+  for (auto* arg : action->expr->args) {
+    if (!arg) continue;
+    auto val = EvalExpr(arg, ctx, arena);
+    ctx.SetDeferredArgSnapshot(arg, val);
+  }
+}
+
+// §16.4 P11 cleanup: discard the snapshots for one action's actuals so
+// successive deferred actions don't see stale values.
+static void ClearDeferredCallArgSnapshots(const Stmt* action,
+                                          SimContext& ctx) {
+  if (!action || action->kind != StmtKind::kExprStmt || !action->expr) return;
+  if (action->expr->kind != ExprKind::kCall &&
+      action->expr->kind != ExprKind::kSystemCall) {
+    return;
+  }
+  for (auto* arg : action->expr->args) {
+    if (!arg) continue;
+    ctx.ClearDeferredArgSnapshot(arg);
+  }
+}
+
+// §16.4 P13/P14: schedule the action block for the named region (Reactive
+// for observed, Postponed for final) instead of executing inline.
+static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
+                                   SimContext& ctx, Arena& arena) {
+  if (!action) return;
+  // §16.4 P11: snapshot pass-by-value actuals at the expression-eval
+  // instant so the action sees the schedule-time view of each argument.
+  SnapshotDeferredCallArgs(action, ctx, arena);
+  Region region =
+      is_final_deferred ? Region::kPostponed : Region::kReactive;
+  auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
+  ev->callback = [action, &ctx, &arena]() {
+    RunDeferredActionSync(action, ctx, arena);
+    // §16.4 P11: snapshots only apply to a single scheduled action.
+    ClearDeferredCallArgSnapshots(action, ctx);
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);
+}
+
 static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
                                     Arena& arena) {
   auto cond = EvalExpr(stmt->assert_expr, ctx, arena);
@@ -1229,10 +1310,23 @@ static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
       ctx.IncrementCoverSuccessCount();
     }
     if (stmt->assert_pass_stmt) {
+      // §16.4 P7: the expression is evaluated at the time the deferred
+      // assertion statement is processed (above), but the action block is
+      // scheduled for a later region in the current time step.
+      if (stmt->is_deferred) {
+        ScheduleDeferredAction(stmt->assert_pass_stmt,
+                               stmt->is_final_deferred, ctx, arena);
+        co_return StmtResult::kDone;
+      }
       co_return co_await ExecStmt(stmt->assert_pass_stmt, ctx, arena);
     }
   } else {
     if (stmt->assert_fail_stmt) {
+      if (stmt->is_deferred) {
+        ScheduleDeferredAction(stmt->assert_fail_stmt,
+                               stmt->is_final_deferred, ctx, arena);
+        co_return StmtResult::kDone;
+      }
       co_return co_await ExecStmt(stmt->assert_fail_stmt, ctx, arena);
     } else if (stmt->kind != StmtKind::kCoverImmediate) {
       // §16.3 / §20.10: tool shall, by default, call $error when assert or

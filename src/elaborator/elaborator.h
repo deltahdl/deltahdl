@@ -402,6 +402,19 @@ class Elaborator {
   /// Per-item validation within ValidateModuleConstraints.
   void ValidateItemConstraints(const ModuleItem* item);
 
+  /// §16.4 P5/P8/P9/P10/P12: validate deferred-assertion action blocks.
+  /// P5/P8/P9 — pass/fail must each be a single subroutine call (no
+  /// begin-end). P10 — final-deferred subroutine must be one legally
+  /// callable in the Postponed region (no value changes or timing
+  /// controls per §4.4.2.9). P12 — actuals passed to ref / const ref
+  /// formals shall not be automatic or dynamic variables. The walker
+  /// shares a module-local map of subroutines (populated at the start of
+  /// the pass) so P10 and P12 can resolve callees by name.
+  void ValidateDeferredAssertionActions(const ModuleDecl* decl);
+  void WalkStmtsForDeferredActions(const Stmt* s);
+  std::unordered_map<std::string_view, const ModuleItem*>
+      deferred_subroutine_map_;
+
   /// §6.14: chandle cannot be used in continuous assignment.
   void ValidateChandleContAssign(const ModuleItem* item);
 

@@ -391,6 +391,27 @@ class SimContext {
   void SetCoverageDB(class CoverageDB* db) { coverage_db_ = db; }
   class CoverageDB* GetCoverageDB() { return coverage_db_; }
 
+  // §16.4 P11: "Actual argument expressions that are passed by value,
+  // including function calls, shall be fully evaluated at the instant
+  // the deferred assertion expression is evaluated." The deferred-action
+  // scheduler walks the call's actuals, evaluates each at expression-eval
+  // time, and stores the resulting Logic4Vec keyed by the actual's AST
+  // node. When the action later runs, EvalExpr consults this map first
+  // and returns the snapshotted value instead of re-evaluating the
+  // expression — so the action sees the schedule-time view of every
+  // pass-by-value actual.
+  void SetDeferredArgSnapshot(const Expr* arg, const Logic4Vec& val) {
+    deferred_arg_snapshots_[arg] = val;
+  }
+  const Logic4Vec* FindDeferredArgSnapshot(const Expr* arg) const {
+    auto it = deferred_arg_snapshots_.find(arg);
+    if (it == deferred_arg_snapshots_.end()) return nullptr;
+    return &it->second;
+  }
+  void ClearDeferredArgSnapshot(const Expr* arg) {
+    deferred_arg_snapshots_.erase(arg);
+  }
+
  private:
   Scheduler& scheduler_;
   Arena& arena_;
@@ -415,6 +436,10 @@ class SimContext {
   DpiContext* dpi_context_ = nullptr;
   Process* current_process_ = nullptr;
   bool stop_requested_ = false;
+  // §16.4 P11: per-actual snapshot map populated at deferred-assertion
+  // schedule time and consulted by EvalExpr at action time. Keys are AST
+  // nodes; entries are cleared once the action runs.
+  std::unordered_map<const Expr*, Logic4Vec> deferred_arg_snapshots_;
   uint32_t pending_program_initials_ = 0;  // §24.3
   // §24.7: Per-program-block list of active initials for targeted termination.
   std::unordered_map<uint32_t, std::vector<Process*>> program_initials_by_block_;

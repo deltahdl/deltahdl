@@ -41,6 +41,9 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateVirtualInterfaceOps(decl);
   ValidateVirtualInterfaceClocking(decl);
   ValidateInterfaceObjectAccess(decl);
+  // §16.4: deferred assertion pass/fail action shall be a single subroutine
+  // call — no begin-end blocks and no other statement kinds.
+  ValidateDeferredAssertionActions(decl);
   ValidateAggregateComparisons(decl);
   ValidateRealOperatorRestrictions(decl);
   ValidateAssignInExprRestrictions(decl);
