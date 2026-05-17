@@ -39,45 +39,37 @@ TEST(NbaRegionSim, AllInactiveEventsCompleteBeforeNBA) {
   EXPECT_EQ(order[3], "nba");
 }
 
-TEST(NbaRegionSim, NonblockingAssignmentSchedulesNBACurrentTime) {
+// §4.4.2.4 ¶1: "after **all** the Inactive events are processed" — including
+// Inactive events scheduled into the same time slot from inside another
+// Inactive callback. Distinct from AllInactiveEventsCompleteBeforeNBA, which
+// pre-queues every inactive before Run() and so never exercises the
+// reentrant-push path through DrainQueue's `while (!queue.empty())` loop. If
+// that loop snapshotted queue length on entry (instead of testing emptiness
+// on each pop), the mid-drain inactive2 would defer past NBA and the observed
+// order would put "nba" before "inactive2".
+TEST(NbaRegionSim, InactivesScheduledDuringDrainRunBeforeNBA) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() {
-    order.push_back("active");
-
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->callback = [&order]() { order.push_back("nba"); };
-    sched.ScheduleEvent({0}, Region::kNBA, nba);
+  auto* inact1 = sched.GetEventPool().Acquire();
+  inact1->callback = [&]() {
+    order.push_back("inactive1");
+    auto* inact2 = sched.GetEventPool().Acquire();
+    inact2->callback = [&]() { order.push_back("inactive2"); };
+    sched.ScheduleEvent({0}, Region::kInactive, inact2);
   };
-  sched.ScheduleEvent({0}, Region::kActive, active);
+  sched.ScheduleEvent({0}, Region::kInactive, inact1);
+
+  auto* nba = sched.GetEventPool().Acquire();
+  nba->callback = [&]() { order.push_back("nba"); };
+  sched.ScheduleEvent({0}, Region::kNBA, nba);
 
   sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "active");
-  EXPECT_EQ(order[1], "nba");
-}
-
-TEST(NbaRegionSim, NonblockingAssignmentSchedulesNBALaterTime) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<uint64_t> nba_times;
-
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() {
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->callback = [&nba_times, &sched]() {
-      nba_times.push_back(sched.CurrentTime().ticks);
-    };
-    sched.ScheduleEvent({5}, Region::kNBA, nba);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  sched.Run();
-  ASSERT_EQ(nba_times.size(), 1u);
-  EXPECT_EQ(nba_times[0], 5u);
+  ASSERT_EQ(order.size(), 3u);
+  EXPECT_EQ(order[0], "inactive1");
+  EXPECT_EQ(order[1], "inactive2");
+  EXPECT_EQ(order[2], "nba");
 }
 
 TEST(NbaRegionSim, NBAToActiveIteration) {
