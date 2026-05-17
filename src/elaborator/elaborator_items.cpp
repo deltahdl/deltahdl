@@ -685,6 +685,18 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
         diag_.Error(item->loc,
                     std::format("redeclaration of '{}'", item->name));
       }
+      // §9.2 footnote 25: dynamic_override_specifiers shall only be legal on
+      // method declarations inside a non-interface class scope. A function or
+      // task declared at module/interface/program/package scope (i.e., not as
+      // a class method and not as an out-of-block method of some class) may
+      // not carry :initial, :extends, or :final.
+      if (item->method_class.empty() &&
+          (item->is_method_initial || item->is_method_extends ||
+           item->is_method_final)) {
+        diag_.Error(item->loc,
+                    "dynamic_override_specifiers shall only be legal on "
+                    "method declarations inside a non-interface class scope");
+      }
       ValidateFunctionBody(item);
       mod->function_decls.push_back(item);
       break;

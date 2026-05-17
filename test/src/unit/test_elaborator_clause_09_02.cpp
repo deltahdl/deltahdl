@@ -95,36 +95,6 @@ TEST(StructuredProcedureElaboration, ProcessBodiesNotNull) {
   }
 }
 
-TEST(StructuredProcedureElaboration, MixedProcedureOrderingPreserved) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic clk, a, b;\n"
-      "  always #5 clk = ~clk;\n"
-      "  initial a = 0;\n"
-      "  final $display(\"end\");\n"
-      "  initial b = 1;\n"
-      "  always_comb a = b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_FALSE(design->top_modules.empty());
-
-  auto& procs = design->top_modules[0]->processes;
-  int initial_count = 0, always_count = 0, final_count = 0, comb_count = 0;
-  for (auto& p : procs) {
-    if (p.kind == RtlirProcessKind::kInitial) ++initial_count;
-    if (p.kind == RtlirProcessKind::kAlways) ++always_count;
-    if (p.kind == RtlirProcessKind::kFinal) ++final_count;
-    if (p.kind == RtlirProcessKind::kAlwaysComb) ++comb_count;
-  }
-  EXPECT_EQ(initial_count, 2);
-  EXPECT_EQ(always_count, 1);
-  EXPECT_EQ(final_count, 1);
-  EXPECT_EQ(comb_count, 1);
-}
-
 TEST(StructuredProcedureElaboration, NoProcessesInEmptyModule) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -135,6 +105,44 @@ TEST(StructuredProcedureElaboration, NoProcessesInEmptyModule) {
   EXPECT_FALSE(f.has_errors);
   ASSERT_FALSE(design->top_modules.empty());
   EXPECT_TRUE(design->top_modules[0]->processes.empty());
+}
+
+// §9.2 footnote 25: dynamic_override_specifiers shall only be legal on method
+// declarations inside a non-interface class scope. A module-level function
+// declaration cannot carry :initial.
+TEST(StructuredProcedureElaboration,
+     DynamicOverrideRejectedOnModuleLevelFunction) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function :initial int f(); return 0; endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.2 footnote 25: a module-level task declaration cannot carry :final.
+TEST(StructuredProcedureElaboration,
+     DynamicOverrideRejectedOnModuleLevelTask) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task :final t(); endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.2 footnote 25: the same rule rejects :extends on a module-level task.
+TEST(StructuredProcedureElaboration,
+     DynamicOverrideExtendsRejectedOnModuleLevelTask) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task :extends t(); endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace

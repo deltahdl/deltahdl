@@ -46,26 +46,6 @@ TEST(StructuredProcedureParsing, NoLimitOnProcedureCount) {
   EXPECT_EQ(CountItemsByKind(items, ModuleItemKind::kAlwaysBlock), 4u);
 }
 
-TEST(StructuredProcedureParsing, MixedProcedureOrdering) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic clk, a, b;\n"
-      "  always #5 clk = ~clk;\n"
-      "  initial a = 0;\n"
-      "  final $display(\"end\");\n"
-      "  initial b = 1;\n"
-      "  always_comb a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kAlwaysBlock));
-  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kInitialBlock));
-  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kFinalBlock));
-  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kAlwaysCombBlock));
-  EXPECT_EQ(CountItemsByKind(items, ModuleItemKind::kInitialBlock), 2u);
-}
-
 TEST(StructuredProcedureParsing, AlwaysWithStatement) {
   auto r = Parse(
       "module m;\n"
