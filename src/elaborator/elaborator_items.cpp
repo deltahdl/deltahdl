@@ -706,14 +706,23 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
                     std::format("redeclaration of '{}'",
                                 item->gate_inst_name));
       }
-      // §28.3.6: For an array-of-instances, each terminal's port expression
-      // must be either the per-instance port width (broadcast) or the array
-      // length times that width (part-select). Built-in gate terminals are
-      // one bit per instance, so valid widths are 1 or the array length.
+      // §28.3.5: the range "shall be specified by two constant expressions".
+      // Resolve in the module's parameter scope so parameter-typed bounds
+      // remain valid; truly non-constant bounds are rejected here.
       if (item->inst_range_left && item->inst_range_right) {
-        auto lhi = ConstEvalInt(item->inst_range_left);
-        auto rhi = ConstEvalInt(item->inst_range_right);
-        if (lhi && rhi) {
+        auto range_scope = BuildParamScope(mod);
+        auto lhi = ConstEvalInt(item->inst_range_left, range_scope);
+        auto rhi = ConstEvalInt(item->inst_range_right, range_scope);
+        if (!lhi || !rhi) {
+          diag_.Error(item->loc,
+                      "gate or switch instance range bound is not a constant "
+                      "expression");
+        } else {
+          // §28.3.6: For an array-of-instances, each terminal's port
+          // expression must be either the per-instance port width (broadcast)
+          // or the array length times that width (part-select). Built-in
+          // gate terminals are one bit per instance, so valid widths are 1
+          // or the array length.
           uint32_t array_len =
               static_cast<uint32_t>(std::abs(*lhi - *rhi) + 1);
           for (auto* term : item->gate_terminals) {

@@ -80,6 +80,25 @@ TEST(GateLevelModelingParsing, GateArrayEqualBounds) {
   EXPECT_NE(g->inst_range_right, nullptr);
 }
 
+// "Neither of the two constant expressions are required to be zero, and
+// lhi is not required to be larger than rhi." Cover the case the other tests
+// miss: both bounds non-zero with lhi < rhi.
+TEST(GateLevelModelingParsing, GateArrayBothBoundsNonZero) {
+  auto r = Parse(
+      "module m;\n"
+      "  nand n[3:7](out, a, b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNand);
+  ASSERT_NE(g, nullptr);
+  ASSERT_NE(g->inst_range_left, nullptr);
+  ASSERT_NE(g->inst_range_right, nullptr);
+  EXPECT_EQ(g->inst_range_left->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(g->inst_range_right->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(g->inst_range_left->int_val, 3u);
+  EXPECT_EQ(g->inst_range_right->int_val, 7u);
+}
+
 TEST(GateLevelModelingParsing, SwitchArrayOnNmos) {
   auto r = Parse(
       "module m;\n"
@@ -112,6 +131,25 @@ TEST(GateLevelModelingParsing, GateArrayDuplicateIdentifierIsError) {
       "  nand #2 t_nand[0:3](o1, a, b), t_nand[4:7](o2, c, d);\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
+}
+
+// §28.3.5 LRM corrective example: two arrays with unique names of four
+// elements each may be declared in a single statement. Observes the
+// pass-through branch of the identifier-uniqueness check in ParseGateInst.
+TEST(GateLevelModelingParsing, GateArrayTwoUniqueArrayNamesInOneDeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  nand #2 x_nand[0:3](o1, a, b), y_nand[4:7](o2, c, d);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto gates = FindAllGates(r.cu->modules[0]->items);
+  ASSERT_EQ(gates.size(), 2u);
+  EXPECT_EQ(gates[0]->gate_inst_name, "x_nand");
+  EXPECT_EQ(gates[1]->gate_inst_name, "y_nand");
+  EXPECT_NE(gates[0]->inst_range_left, nullptr);
+  EXPECT_NE(gates[0]->inst_range_right, nullptr);
+  EXPECT_NE(gates[1]->inst_range_left, nullptr);
+  EXPECT_NE(gates[1]->inst_range_right, nullptr);
 }
 
 }  // namespace
