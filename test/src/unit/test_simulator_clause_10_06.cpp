@@ -59,4 +59,31 @@ TEST(ProceduralContinuousAssignSim, ForceRhsReevaluatesOnVariableChange) {
   EXPECT_EQ(a->value.ToUint64(), 52u);
 }
 
+// §10.6: "if any variable on the right-hand side of the assignment changes,
+// the assignment shall be reevaluated" — the universal "any variable" must
+// cover every RHS operand, not just the first one. Mirrors the LRM's
+// "if b or c changes" wording for the force a = b + f(c) example.
+TEST(ProceduralContinuousAssignSim, ForceReevaluatesForEachRhsVariableChange) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] b, c, a;\n"
+      "  initial begin\n"
+      "    b = 8'd1;\n"
+      "    c = 8'd2;\n"
+      "    force a = b + c;\n"
+      "    #1; b = 8'd10;\n"
+      "    #1; c = 8'd20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* a = f.ctx.FindVariable("a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 30u);
+}
+
 }  // namespace

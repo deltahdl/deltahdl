@@ -38,4 +38,15 @@ TEST(ProceduralContinuousAssignmentParsing, ForceWithFuncCallExpressionRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
+// Syntax 10-4: variable_assignment ::= variable_lvalue = expression. An assign
+// procedural continuous assignment without the "= expression" suffix violates
+// the BNF and the parser must reject it.
+TEST(ProceduralContinuousAssignmentParsing, AssignWithoutEqualsExpressionIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin assign q; end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
