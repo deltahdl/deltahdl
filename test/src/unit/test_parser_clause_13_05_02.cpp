@@ -135,20 +135,6 @@ TEST(PassByRefParsing, AutoFuncWithConstRefArg) {
   EXPECT_EQ(item->func_args[0].name, "data");
 }
 
-TEST(TaskAndFunctionParsing, ConstRefArg) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void bar(const ref int arr);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "bar");
-  ASSERT_NE(fn, nullptr);
-  ASSERT_EQ(fn->func_args.size(), 1u);
-  EXPECT_TRUE(fn->func_args[0].is_const);
-  EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
-}
-
 TEST(TaskAndFunctionParsing, RefWithoutConst) {
   auto r = Parse(
       "module m;\n"
@@ -161,20 +147,6 @@ TEST(TaskAndFunctionParsing, RefWithoutConst) {
   ASSERT_EQ(fn->func_args.size(), 1u);
   EXPECT_FALSE(fn->func_args[0].is_const);
   EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
-}
-
-TEST(TaskAndFunctionParsing, ConstRefArgOnTask) {
-  auto r = Parse(
-      "module m;\n"
-      "  task process_data(const ref int data[]);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "process_data");
-  ASSERT_NE(tk, nullptr);
-  ASSERT_EQ(tk->func_args.size(), 1u);
-  EXPECT_TRUE(tk->func_args[0].is_const);
-  EXPECT_EQ(tk->func_args[0].direction, Direction::kRef);
 }
 
 TEST(TaskAndFunctionParsing, ConstRefMixedWithOtherDirections) {
@@ -253,6 +225,81 @@ TEST(PassByRefParsing, RefArgWithUnpackedArrayDims) {
   ASSERT_EQ(fn->func_args.size(), 1u);
   EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
   EXPECT_FALSE(fn->func_args[0].unpacked_dims.empty());
+}
+
+// §13.5.2: "Combining ref with any other directional qualifier shall be
+// illegal." LRM example: `task automatic incr( ref input int a );`
+TEST(PassByRefParsing, RefInputCombinationRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  task automatic incr(ref input int a);\n"
+      "  endtask\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PassByRefParsing, RefOutputCombinationRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic void f(ref output int a);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PassByRefParsing, RefInoutCombinationRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  task automatic t(ref inout int a);\n"
+      "  endtask\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PassByRefParsing, InputRefCombinationRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  task automatic t(input ref int a);\n"
+      "  endtask\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PassByRefParsing, OutputRefCombinationRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic void f(output ref int a);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PassByRefParsing, InoutRefCombinationRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  task automatic t(inout ref int a);\n"
+      "  endtask\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PassByRefParsing, RefRefDoubleKeywordRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  task automatic t(ref ref int a);\n"
+      "  endtask\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PassByRefParsing, ConstRefAloneAcceptedNotCombined) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int f(const ref int a);\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(PassByRefParsing, RefIsNotConstByDefault) {

@@ -1,3 +1,5 @@
+#include "builders_ast.h"
+#include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
@@ -28,19 +30,6 @@ TEST(PassByRefValidation, AcceptRefInAutoFunc) {
   func->name = "good_func";
   func->is_automatic = true;
   func->func_args = {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
-
-  ValidateRefLifetime(func, f.diag);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(PassByRefValidation, RefArgAutoFunctionOk) {
-  SimFixture f;
-
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "add_ref";
-  func->is_automatic = true;
-  func->func_args = {{Direction::kRef, false, false, false, {}, "x", nullptr, {}}};
 
   ValidateRefLifetime(func, f.diag);
   EXPECT_FALSE(f.diag.HasErrors());
@@ -102,6 +91,227 @@ TEST(PassByRefValidation, MultipleRefArgsInStaticFuncAllRejected) {
   };
 
   ValidateRefLifetime(func, f.diag);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §13.5.2: "Nets and selects into nets shall not be passed by reference."
+TEST(PassByRefValidation, NetActualPassedByRefRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  wire w;\n"
+      "  function automatic void take(ref logic v);\n"
+      "  endfunction\n"
+      "  initial take(w);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(PassByRefValidation, NetSelectPassedByRefRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  wire [7:0] w;\n"
+      "  function automatic void take(ref logic v);\n"
+      "  endfunction\n"
+      "  initial take(w[0]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(PassByRefValidation, NetActualPassedByConstRefRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  wire w;\n"
+      "  function automatic int take(const ref logic v);\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "  int x;\n"
+      "  initial x = take(w);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(PassByRefValidation, VariableActualPassedByRefAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic v;\n"
+      "  function automatic void take(ref logic x);\n"
+      "  endfunction\n"
+      "  initial take(v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §13.5.2: bit-select into a packed variable is a select into a variable,
+// not a net — the production net-walker must accept it as the legal
+// "element of an unpacked array" / variable-select shape.
+TEST(PassByRefValidation, VariableBitSelectPassedByRefAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [7:0] v;\n"
+      "  function automatic void take(ref logic x);\n"
+      "  endfunction\n"
+      "  initial take(v[0]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §13.5.2: "A member of an unpacked structure" is a legal pass-by-ref
+// shape — the production net-walker descends member accesses by base and
+// must not flag a struct-field actual as a net.
+TEST(PassByRefValidation, StructMemberPassedByRefAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  struct { logic a; logic b; } s;\n"
+      "  function automatic void take(ref logic x);\n"
+      "  endfunction\n"
+      "  initial take(s.a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §13.5.2: "When the formal argument is declared as a const ref, the
+// subroutine cannot alter the variable, and an attempt to do so shall
+// generate a compiler error."
+TEST(PassByRefValidation, ConstRefBlockingWriteRejected) {
+  SimFixture f;
+
+  auto* func = f.arena.Create<ModuleItem>();
+  func->kind = ModuleItemKind::kFunctionDecl;
+  func->name = "read_only";
+  func->is_automatic = true;
+  func->func_args = {
+      {Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
+  func->func_body_stmts = {
+      MakeAssign(f.arena, "data", MakeInt(f.arena, 7))};
+
+  ValidateConstRefWriteProtection(func, f.diag);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(PassByRefValidation, ConstRefNonblockingWriteRejected) {
+  SimFixture f;
+
+  auto* func = f.arena.Create<ModuleItem>();
+  func->kind = ModuleItemKind::kFunctionDecl;
+  func->name = "read_only";
+  func->is_automatic = true;
+  func->func_args = {
+      {Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
+  auto* nba = f.arena.Create<Stmt>();
+  nba->kind = StmtKind::kNonblockingAssign;
+  nba->lhs = MakeId(f.arena, "data");
+  nba->rhs = MakeInt(f.arena, 0);
+  func->func_body_stmts = {nba};
+
+  ValidateConstRefWriteProtection(func, f.diag);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(PassByRefValidation, ConstRefReadOnlyAccepted) {
+  SimFixture f;
+
+  auto* func = f.arena.Create<ModuleItem>();
+  func->kind = ModuleItemKind::kFunctionDecl;
+  func->name = "show";
+  func->is_automatic = true;
+  func->func_args = {
+      {Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
+  func->func_body_stmts = {MakeReturn(f.arena, MakeId(f.arena, "data"))};
+
+  ValidateConstRefWriteProtection(func, f.diag);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PassByRefValidation, PlainRefWriteAccepted) {
+  SimFixture f;
+
+  auto* func = f.arena.Create<ModuleItem>();
+  func->kind = ModuleItemKind::kFunctionDecl;
+  func->name = "writer";
+  func->is_automatic = true;
+  func->func_args = {
+      {Direction::kRef, false, false, false, {}, "data", nullptr, {}}};
+  func->func_body_stmts = {
+      MakeAssign(f.arena, "data", MakeInt(f.arena, 7))};
+
+  ValidateConstRefWriteProtection(func, f.diag);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PassByRefValidation, ConstRefWriteInIfBranchRejected) {
+  SimFixture f;
+
+  auto* func = f.arena.Create<ModuleItem>();
+  func->kind = ModuleItemKind::kFunctionDecl;
+  func->name = "guarded_write";
+  func->is_automatic = true;
+  func->func_args = {
+      {Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
+  auto* if_stmt = f.arena.Create<Stmt>();
+  if_stmt->kind = StmtKind::kIf;
+  if_stmt->condition = MakeInt(f.arena, 1);
+  if_stmt->then_branch = MakeAssign(f.arena, "data", MakeInt(f.arena, 5));
+  func->func_body_stmts = {if_stmt};
+
+  ValidateConstRefWriteProtection(func, f.diag);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §13.5.2: const-ref writes are illegal anywhere in the body; verify the
+// production walker also descends else_branch.
+TEST(PassByRefValidation, ConstRefWriteInElseBranchRejected) {
+  SimFixture f;
+
+  auto* func = f.arena.Create<ModuleItem>();
+  func->kind = ModuleItemKind::kFunctionDecl;
+  func->name = "guarded_write";
+  func->is_automatic = true;
+  func->func_args = {
+      {Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
+  auto* if_stmt = f.arena.Create<Stmt>();
+  if_stmt->kind = StmtKind::kIf;
+  if_stmt->condition = MakeInt(f.arena, 0);
+  if_stmt->then_branch = MakeReturn(f.arena, MakeInt(f.arena, 0));
+  if_stmt->else_branch = MakeAssign(f.arena, "data", MakeInt(f.arena, 9));
+  func->func_body_stmts = {if_stmt};
+
+  ValidateConstRefWriteProtection(func, f.diag);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §13.5.2: const-ref writes nested inside a case-item body are also
+// illegal; verify the production walker descends case_items.
+TEST(PassByRefValidation, ConstRefWriteInCaseItemRejected) {
+  SimFixture f;
+
+  auto* func = f.arena.Create<ModuleItem>();
+  func->kind = ModuleItemKind::kFunctionDecl;
+  func->name = "case_write";
+  func->is_automatic = true;
+  func->func_args = {
+      {Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
+  auto* case_stmt = f.arena.Create<Stmt>();
+  case_stmt->kind = StmtKind::kCase;
+  case_stmt->condition = MakeInt(f.arena, 1);
+  CaseItem ci;
+  ci.is_default = true;
+  ci.body = MakeAssign(f.arena, "data", MakeInt(f.arena, 3));
+  case_stmt->case_items.push_back(ci);
+  func->func_body_stmts = {case_stmt};
+
+  ValidateConstRefWriteProtection(func, f.diag);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 

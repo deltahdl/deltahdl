@@ -330,25 +330,48 @@ ModuleItem* Parser::ParseNettypeDecl() {
 Direction Parser::ParseArgDirection(FunctionArg& arg, Direction sticky_dir,
                                     bool* was_explicit) {
   if (was_explicit) *was_explicit = true;
+  auto reject_extra_direction = [&](Direction first) {
+    // §13.5.2: "Combining ref with any other directional qualifier shall be
+    // illegal." The rule applies symmetrically: ref followed by another
+    // direction, or another direction followed by ref. Pairs that do not
+    // involve ref (e.g. input followed by output) are caught by the parser's
+    // normal data-type parsing because the second keyword is not a valid
+    // data-type start.
+    while (Check(TokenKind::kKwRef) || Check(TokenKind::kKwInput) ||
+           Check(TokenKind::kKwOutput) || Check(TokenKind::kKwInout)) {
+      bool involves_ref =
+          first == Direction::kRef || Check(TokenKind::kKwRef);
+      if (!involves_ref) break;
+      diag_.Error(CurrentLoc(),
+                  "combining ref with another directional qualifier is "
+                  "illegal");
+      Consume();
+      Match(TokenKind::kKwStatic);
+    }
+  };
   if (Check(TokenKind::kKwInput)) {
     arg.direction = Direction::kInput;
     Consume();
+    reject_extra_direction(Direction::kInput);
     return Direction::kInput;
   }
   if (Check(TokenKind::kKwOutput)) {
     arg.direction = Direction::kOutput;
     Consume();
+    reject_extra_direction(Direction::kOutput);
     return Direction::kOutput;
   }
   if (Check(TokenKind::kKwInout)) {
     arg.direction = Direction::kInout;
     Consume();
+    reject_extra_direction(Direction::kInout);
     return Direction::kInout;
   }
   if (Check(TokenKind::kKwRef)) {
     arg.direction = Direction::kRef;
     Consume();
     arg.is_ref_static = Match(TokenKind::kKwStatic);  // A.2.7: ref [static]
+    reject_extra_direction(Direction::kRef);
     return Direction::kRef;
   }
   arg.direction = sticky_dir;

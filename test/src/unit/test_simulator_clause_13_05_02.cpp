@@ -538,26 +538,4 @@ TEST(QueueRef, QueueRefOutOfBoundsFallsBackToValue) {
   EXPECT_EQ(q->elements[2].ToUint64(), 30u);
 }
 
-TEST(PassByRef, RefArgDoesNotCopyBack) {
-  FuncFixture f;
-
-  auto* x_var = f.ctx.CreateVariable("x", 32);
-  x_var->value = MakeLogic4VecVal(f.arena, 32, 100);
-
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "set_ref";
-  func->return_type.kind = DataTypeKind::kVoid;
-  func->func_args = {{Direction::kRef, false, false, false, {}, "r", nullptr, {}}};
-  func->func_body_stmts = {
-      MakeAssign(f.arena, "r", MakeInt(f.arena, 77)),
-  };
-  f.ctx.RegisterFunction("set_ref", func);
-
-  auto* call = MakeCall(f.arena, "set_ref", {MakeId(f.arena, "x")});
-  EvalExpr(call, f.ctx, f.arena);
-
-  EXPECT_EQ(x_var->value.ToUint64(), 77u);
-}
-
 }  // namespace

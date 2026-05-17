@@ -13,6 +13,14 @@
 
 namespace delta {
 
+// §13.5.2 semantic validators; the implementation currently lives alongside
+// other ModuleItem-shaped validators in eval_function.cpp. Forward-declared
+// here so the elaborator's per-subroutine validation can invoke them without
+// pulling a downstream-stage header into this translation unit.
+void ValidateRefLifetime(const ModuleItem* func, DiagEngine& diag);
+void ValidateConstRefWriteProtection(const ModuleItem* func, DiagEngine& diag);
+
+
 // §10.9.2: Type key strings that are valid in assignment patterns.
 static bool IsTypeKeyword(std::string_view key) {
   return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
@@ -1891,6 +1899,14 @@ static void CollectAutoVarNames(const Stmt* s, bool task_is_auto,
 }
 
 void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
+  // §13.5.2: "It shall be illegal to use argument passing by reference for
+  // subroutines with a lifetime of static."
+  ValidateRefLifetime(item, diag_);
+  // §13.5.2: "When the formal argument is declared as a const ref, the
+  // subroutine cannot alter the variable, and an attempt to do so shall
+  // generate a compiler error."
+  ValidateConstRefWriteProtection(item, diag_);
+
   // §8.30.1: Validate weak_reference type parameter on function/task arguments.
   for (const auto& arg : item->func_args) {
     if (arg.data_type.kind == DataTypeKind::kNamed &&
@@ -2217,11 +2233,50 @@ static void CheckOutputArgs(const Expr* expr, const ModuleItem* func,
   }
 }
 
+// §13.5.2: Walk an actual argument expression bound to a ref formal and
+// return the net identifier text if the actual is a net or a select into a
+// net. Returns an empty view otherwise. A bare identifier names a net when
+// it appears in `nets`; a select expression names a select-into-net when
+// its base identifier is in `nets`.
+static std::string_view RefActualNetName(
+    const Expr* e, const std::unordered_set<std::string_view>& nets) {
+  if (!e || nets.empty()) return {};
+  if (e->kind == ExprKind::kIdentifier) {
+    return nets.count(e->text) ? e->text : std::string_view{};
+  }
+  if (e->kind == ExprKind::kSelect) {
+    return RefActualNetName(e->base, nets);
+  }
+  return {};
+}
+
+// §13.5.2: "Nets and selects into nets shall not be passed by reference."
+// Applied at every subroutine call site that supplies an actual for a ref
+// or const ref formal.
+static void CheckRefArgsNotNets(
+    const Expr* expr, const ModuleItem* func, size_t positional_count,
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
+  if (net_names.empty()) return;
+  for (size_t i = 0; i < func->func_args.size(); ++i) {
+    if (func->func_args[i].direction != Direction::kRef) continue;
+    int ai =
+        ResolveCallArgIndex(expr, i, func->func_args[i].name, positional_count);
+    if (ai < 0) continue;
+    auto* arg = expr->args[static_cast<size_t>(ai)];
+    auto net = RefActualNetName(arg, net_names);
+    if (net.empty()) continue;
+    diag.Error(arg->range.start,
+               std::format("net '{}' cannot be passed by reference to "
+                           "argument '{}' of '{}'",
+                           net, func->func_args[i].name, func->name));
+  }
+}
+
 // §13.5: Validate a single call expression against its declaration.
 static void CheckCallArgs(
     const Expr* expr,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
-    DiagEngine& diag) {
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
   if (!expr || expr->kind != ExprKind::kCall || expr->callee.empty()) return;
   auto it = func_decls.find(expr->callee);
   if (it == func_decls.end()) return;
@@ -2237,6 +2292,7 @@ static void CheckCallArgs(
   CheckRequiredArgs(expr, func, positional_count, diag);
   CheckNamedArgs(expr, func, diag);
   CheckOutputArgs(expr, func, positional_count, diag);
+  CheckRefArgsNotNets(expr, func, positional_count, net_names, diag);
 }
 
 // §13.4.1: A void function cannot be used as an expression operand.
@@ -2433,23 +2489,24 @@ static void CheckCallNoOutInoutRefInExpr(
 static void WalkExprForCallArgs(
     const Expr* expr,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
-    DiagEngine& diag) {
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
   if (!expr) return;
-  CheckCallArgs(expr, func_decls, diag);
-  WalkExprForCallArgs(expr->lhs, func_decls, diag);
-  WalkExprForCallArgs(expr->rhs, func_decls, diag);
-  WalkExprForCallArgs(expr->condition, func_decls, diag);
-  WalkExprForCallArgs(expr->true_expr, func_decls, diag);
-  WalkExprForCallArgs(expr->false_expr, func_decls, diag);
-  for (auto* a : expr->args) WalkExprForCallArgs(a, func_decls, diag);
-  for (auto* e : expr->elements) WalkExprForCallArgs(e, func_decls, diag);
+  CheckCallArgs(expr, func_decls, net_names, diag);
+  WalkExprForCallArgs(expr->lhs, func_decls, net_names, diag);
+  WalkExprForCallArgs(expr->rhs, func_decls, net_names, diag);
+  WalkExprForCallArgs(expr->condition, func_decls, net_names, diag);
+  WalkExprForCallArgs(expr->true_expr, func_decls, net_names, diag);
+  WalkExprForCallArgs(expr->false_expr, func_decls, net_names, diag);
+  for (auto* a : expr->args) WalkExprForCallArgs(a, func_decls, net_names, diag);
+  for (auto* e : expr->elements)
+    WalkExprForCallArgs(e, func_decls, net_names, diag);
 }
 
 // §13.5: Walk statement tree for call validation.
 static void WalkStmtForCallArgs(
     const Stmt* s,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
-    DiagEngine& diag) {
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
   if (!s) return;
   // §13.5 footnote 42: bare identifier call must be a task or void function.
   if (s->kind == StmtKind::kExprStmt && s->expr &&
@@ -2496,19 +2553,23 @@ static void WalkStmtForCallArgs(
       CheckNoTaskCallInExpr(ev.iff_condition, func_decls, diag);
     }
   }
-  WalkExprForCallArgs(s->expr, func_decls, diag);
-  WalkExprForCallArgs(s->lhs, func_decls, diag);
-  WalkExprForCallArgs(s->rhs, func_decls, diag);
-  WalkExprForCallArgs(s->condition, func_decls, diag);
-  for (auto* sub : s->stmts) WalkStmtForCallArgs(sub, func_decls, diag);
-  WalkStmtForCallArgs(s->then_branch, func_decls, diag);
-  WalkStmtForCallArgs(s->else_branch, func_decls, diag);
-  WalkStmtForCallArgs(s->body, func_decls, diag);
-  for (auto* fi : s->for_inits) WalkStmtForCallArgs(fi, func_decls, diag);
-  WalkStmtForCallArgs(s->for_body, func_decls, diag);
-  for (auto* fs : s->for_steps) WalkStmtForCallArgs(fs, func_decls, diag);
-  WalkExprForCallArgs(s->for_cond, func_decls, diag);
-  for (auto& ci : s->case_items) WalkStmtForCallArgs(ci.body, func_decls, diag);
+  WalkExprForCallArgs(s->expr, func_decls, net_names, diag);
+  WalkExprForCallArgs(s->lhs, func_decls, net_names, diag);
+  WalkExprForCallArgs(s->rhs, func_decls, net_names, diag);
+  WalkExprForCallArgs(s->condition, func_decls, net_names, diag);
+  for (auto* sub : s->stmts)
+    WalkStmtForCallArgs(sub, func_decls, net_names, diag);
+  WalkStmtForCallArgs(s->then_branch, func_decls, net_names, diag);
+  WalkStmtForCallArgs(s->else_branch, func_decls, net_names, diag);
+  WalkStmtForCallArgs(s->body, func_decls, net_names, diag);
+  for (auto* fi : s->for_inits)
+    WalkStmtForCallArgs(fi, func_decls, net_names, diag);
+  WalkStmtForCallArgs(s->for_body, func_decls, net_names, diag);
+  for (auto* fs : s->for_steps)
+    WalkStmtForCallArgs(fs, func_decls, net_names, diag);
+  WalkExprForCallArgs(s->for_cond, func_decls, net_names, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtForCallArgs(ci.body, func_decls, net_names, diag);
 }
 
 void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
@@ -2556,7 +2617,7 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
                          item->kind == ModuleItemKind::kAlwaysLatchBlock ||
                          item->kind == ModuleItemKind::kFinalBlock;
     if (is_proc_block) {
-      WalkStmtForCallArgs(item->body, all_decls, diag_);
+      WalkStmtForCallArgs(item->body, all_decls, net_names_, diag_);
       // §9.4.2: event expressions shall return singular values; walk the
       // body for any @(unpacked-aggregate-var) references.
       WalkStmtForEventSingular(item->body, non_singular_vars,
@@ -2583,7 +2644,7 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
       for (auto* s : item->func_body_stmts) {
-        WalkStmtForCallArgs(s, all_decls, diag_);
+        WalkStmtForCallArgs(s, all_decls, net_names_, diag_);
       }
     }
     if (item->kind == ModuleItemKind::kContAssign) {
