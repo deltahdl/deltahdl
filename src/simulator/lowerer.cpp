@@ -940,7 +940,11 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
                            uint32_t program_block_id) {
   auto* p = arena_.Create<Process>();
   p->id = next_id_++;
-  p->home_region = from_program ? Region::kReactive : Region::kActive;
+  // §4.4.2.6 ¶2: program-block bodies emit their blocking-assignment code into
+  // the Reactive region; route through Scheduler's named helper so the
+  // §4.4.2.6 routing rule is applied by name rather than hard-coded here.
+  p->home_region = from_program ? Scheduler::HomeRegionForReactiveBlockingAssign()
+                                : Region::kActive;
   p->is_reactive = from_program;
   p->inst_prefix = inst_prefix_;
 
@@ -991,7 +995,10 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   auto* p = arena_.Create<Process>();
   p->kind = ProcessKind::kContAssign;
   p->id = next_id_++;
-  p->home_region = from_program ? Region::kReactive : Region::kActive;
+  // §4.4.2.6 ¶2: continuous assigns in program blocks route their callbacks
+  // into the Reactive region via the named §4.4.2.6 helper.
+  p->home_region = from_program ? Scheduler::HomeRegionForReactiveBlockingAssign()
+                                : Region::kActive;
   p->is_reactive = from_program;
   // Inherit the lowerer's current instance prefix so that bare identifiers
   // in the cont-assign expressions resolve to the enclosing scope's items

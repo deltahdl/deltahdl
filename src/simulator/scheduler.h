@@ -185,6 +185,28 @@ class Scheduler {
     return mid_statement_suspension_count_;
   }
 
+  // §4.4.2.6 ¶2 sentence 1: "The code specified by blocking assignments in
+  // checkers, program blocks and the code in action blocks of concurrent
+  // assertions are scheduled in the Reactive region." Lowering paths that
+  // emit a checker-body process, a program-block process, or a
+  // concurrent-assertion action callback route through this named helper so
+  // the single §4.4.2.6 routing decision is expressed once and applied
+  // uniformly across the three §4.4.2.6-named sources.
+  static constexpr Region HomeRegionForReactiveBlockingAssign() {
+    return Region::kReactive;
+  }
+
+  // §4.4.2.6 ¶2 sentence 2: "The Reactive region is the reactive region set
+  // dual of the Active region (see 4.4.2.2)." Codifies the §4.4.2.6 duality
+  // so callers can name the dual of the Active region rather than naming
+  // Region::kReactive directly. The dual is defined only between the two
+  // anchor regions that §4.4.2.2 and §4.4.2.6 each describe as holding their
+  // set's events and permitting any-order processing; other inputs return
+  // kCOUNT to keep the dual one-to-one.
+  static constexpr Region ReactiveSetDualOf(Region active) {
+    return active == Region::kActive ? Region::kReactive : Region::kCOUNT;
+  }
+
  private:
   void ExecuteTimeSlot(TimeSlot& slot);
   void ExecuteActiveRegions(TimeSlot& slot);
