@@ -1350,6 +1350,22 @@ static ExecTask ExecProcessAwait(const Expr* expr, SimContext& ctx,
       auto proc_handle = var->value.ToUint64();
       auto* proc = ctx.FindProcessByHandle(proc_handle);
       if (proc) {
+        // §9.7: await() is restricted to processes created by an initial
+        // procedure, always procedure, or fork block from those procedures.
+        if (proc->kind == ProcessKind::kFinal ||
+            proc->kind == ProcessKind::kContAssign) {
+          ctx.GetDiag().Error(
+              {}, "await() shall only target a process created by an initial "
+                  "procedure, always procedure, or fork block");
+          co_return StmtResult::kDone;
+        }
+        // §9.7: "It shall be an error to call this task on the current
+        // process, i.e., a process cannot wait for its own termination."
+        if (proc == ctx.CurrentProcess()) {
+          ctx.GetDiag().Error(
+              {}, "process cannot await its own termination");
+          co_return StmtResult::kDone;
+        }
         co_await ProcessAwaitAwaiter{proc};
       }
     }

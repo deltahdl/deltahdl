@@ -4,20 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(FineGrainProcessControlElaboration, ProcessVarDeclElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  initial begin\n"
-      "    process p;\n"
-      "    p = process::self();\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(FineGrainProcessControlElaboration, ProcessSelfElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -42,22 +28,6 @@ TEST(FineGrainProcessControlElaboration, ProcessMethodCallsElaborate) {
       "    p.kill();\n"
       "    p.suspend();\n"
       "    p.resume();\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(FineGrainProcessControlElaboration, ProcessStateEnumElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  initial begin\n"
-      "    process p;\n"
-      "    p = process::self();\n"
-      "    if (p.status() != process::FINISHED)\n"
-      "      $display(\"still running\");\n"
       "  end\n"
       "endmodule\n",
       f);

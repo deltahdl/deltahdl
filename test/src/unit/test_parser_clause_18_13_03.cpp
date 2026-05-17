@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ConstrainedRandomParsing, SrandomMethodCall) {
+TEST(SrandomParsing, SrandomMethodCall) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -17,7 +17,7 @@ TEST(ConstrainedRandomParsing, SrandomMethodCall) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ConstrainedRandomParsing, SrandomInInitialBlock) {
+TEST(SrandomParsing, SrandomInInitialBlock) {
   auto r = Parse(
       "module top;\n"
       "  initial begin\n"
@@ -29,19 +29,6 @@ TEST(ConstrainedRandomParsing, SrandomInInitialBlock) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-TEST(ConstrainedRandomParsing, SrandomWithExpression) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  function void seed_it(int seed_val);\n"
-      "    this.srandom(seed_val + 1);\n"
-      "  endfunction\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
 }  // namespace

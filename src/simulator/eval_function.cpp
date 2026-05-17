@@ -1212,6 +1212,15 @@ static bool TryEvalProcessStaticCall(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// §9.7: kill/await/suspend/resume are restricted to processes created by an
+// initial procedure, always procedure, or fork block from one of those
+// procedures. Final blocks and continuous assignments are excluded.
+static bool IsRestrictedTarget(const Process* proc) {
+  if (!proc) return false;
+  return proc->kind == ProcessKind::kFinal ||
+         proc->kind == ProcessKind::kContAssign;
+}
+
 // §9.7: Dispatch process instance method calls (status/kill/suspend/resume).
 static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
                                      Arena& arena, Logic4Vec& out) {
@@ -1231,6 +1240,13 @@ static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
     return true;
   }
   if (parts.method_name == "kill") {
+    if (IsRestrictedTarget(proc)) {
+      ctx.GetDiag().Error(
+          {}, "kill() shall only target a process created by an initial "
+              "procedure, always procedure, or fork block");
+      out = MakeLogic4VecVal(arena, 1, 0);
+      return true;
+    }
     if (proc && proc->sv_state != ProcessState::kFinished &&
         proc->sv_state != ProcessState::kKilled) {
       proc->active = false;
@@ -1257,6 +1273,21 @@ static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
     return true;
   }
   if (parts.method_name == "suspend") {
+    if (IsRestrictedTarget(proc)) {
+      ctx.GetDiag().Error(
+          {}, "suspend() shall only target a process created by an initial "
+              "procedure, always procedure, or fork block");
+      out = MakeLogic4VecVal(arena, 1, 0);
+      return true;
+    }
+    // §9.7: "It shall be an error for a function to call suspend() on the
+    // current process, i.e., a function cannot suspend its own execution."
+    if (proc && proc == ctx.CurrentProcess() && ctx.InFunction()) {
+      ctx.GetDiag().Error(
+          {}, "function cannot suspend its own execution");
+      out = MakeLogic4VecVal(arena, 1, 0);
+      return true;
+    }
     if (proc && proc->sv_state != ProcessState::kFinished &&
         proc->sv_state != ProcessState::kKilled) {
       proc->is_suspended = true;
@@ -1265,7 +1296,23 @@ static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
     out = MakeLogic4VecVal(arena, 1, 0);
     return true;
   }
+  if (parts.method_name == "srandom") {
+    // §9.7/§18.13.3: srandom() seeds the process's RNG with the given seed.
+    if (proc && !expr->args.empty()) {
+      auto seed_val = EvalExpr(expr->args[0], ctx, arena);
+      proc->rng_seed = static_cast<uint32_t>(seed_val.ToUint64());
+    }
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
   if (parts.method_name == "resume") {
+    if (IsRestrictedTarget(proc)) {
+      ctx.GetDiag().Error(
+          {}, "resume() shall only target a process created by an initial "
+              "procedure, always procedure, or fork block");
+      out = MakeLogic4VecVal(arena, 1, 0);
+      return true;
+    }
     if (proc && proc->is_suspended) {
       proc->is_suspended = false;
       if (proc->sv_state == ProcessState::kSuspended) {
@@ -1429,7 +1476,9 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     ret_var = existing ? existing : ctx.CreateLocalVariable(func->name, ret_width);
   }
 
+  ctx.EnterFunction();
   ExecFunctionBody(func, ret_var, ctx, arena);
+  ctx.ExitFunction();
   WritebackOutputArgs(func, expr, ctx, arena);
   WritebackQueueRefs(ctx);
   result = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
@@ -1463,6 +1512,7 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
     }
     ctx.PushQueueRefFrame();
     ctx.PushFuncName(func->name);
+    if (is_void_func) ctx.EnterFunction();
     if (!func->func_args.empty()) BindFunctionArgs(func, expr, ctx, arena);
     return func;
   }
@@ -1486,6 +1536,9 @@ void TeardownTaskCall(const ModuleItem* func, const Expr* expr,
                       SimContext& ctx, Arena& arena) {
   WritebackOutputArgs(func, expr, ctx, arena);
   WritebackQueueRefs(ctx);
+  bool is_void_func = func->kind == ModuleItemKind::kFunctionDecl &&
+                      func->return_type.kind == DataTypeKind::kVoid;
+  if (is_void_func) ctx.ExitFunction();
   ctx.PopFuncName();
   bool is_static = func->is_static && !func->is_automatic;
   if (is_static) {

@@ -130,6 +130,9 @@ struct Process {
   bool is_suspended = false;
   std::vector<std::coroutine_handle<>> await_waiters;
 
+  // §9.7/§18.13.3: Per-process RNG seed set via the process srandom() method.
+  uint32_t rng_seed = 0;
+
   // §12.4.2.1: Pending violation reports awaiting Observed region maturation.
   std::vector<std::string> pending_violations;
 

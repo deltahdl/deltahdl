@@ -192,6 +192,12 @@ class SimContext {
   void PopFuncName();
   std::string_view CurrentFuncName() const;
 
+  // §9.7: Track whether execution is currently inside a function body, so
+  // suspend() can enforce "a function cannot suspend its own execution".
+  void EnterFunction() { ++function_depth_; }
+  void ExitFunction() { if (function_depth_ > 0) --function_depth_; }
+  bool InFunction() const { return function_depth_ > 0; }
+
   // §7.10.3: Queue ref frame management for function calls.
   void PushQueueRefFrame();
   void RecordQueueRef(const QueueRefBinding& binding);
@@ -488,6 +494,8 @@ class SimContext {
   // §9.7: Process handle registry (SV handle ID → Process*).
   std::unordered_map<uint64_t, Process*> process_handles_;
   uint64_t next_process_handle_id_ = 1;
+  // §9.7: Depth counter for nested function-body execution.
+  int function_depth_ = 0;
   // §8.11: Stack of `this` pointers for nested method calls.
   std::vector<ClassObject*> this_stack_;
   // §7.10.3: Stack of queue ref binding frames for nested function calls.

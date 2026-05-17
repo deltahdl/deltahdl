@@ -36,6 +36,9 @@ struct DelayAwaiter {
     auto* proc = ctx.CurrentProcess();
     event->callback = [h, proc, &ctx]() mutable {
       if (proc && !proc->active) return;
+      // §9.7: A process suspended while in the WAITING state is
+      // desensitized to the delay expiration on which it is blocked.
+      if (proc && proc->is_suspended) return;
       if (proc) ctx.SetCurrentProcess(proc);
       h.resume();
     };
@@ -101,6 +104,8 @@ struct EventAwaiter {
         auto* ctx_ptr = &ctx;
         var->AddWatcher([h, proc, ctx_ptr]() mutable {
           if (proc && !proc->active) return true;
+          // §9.7: WAITING-state suspension desensitizes the event watcher.
+          if (proc && proc->is_suspended) return false;
           ResumeMaybeReactive(h, proc, *ctx_ptr);
           return true;
         });
@@ -111,6 +116,8 @@ struct EventAwaiter {
       var->AddWatcher([h, var, edge = ev.edge, iff_cond = ev.iff_condition,
                        ctx_ptr, proc]() mutable {
         if (proc && !proc->active) return true;
+        // §9.7: WAITING-state suspension desensitizes the edge watcher.
+        if (proc && proc->is_suspended) return false;
         return HandleEdgeEvent(h, var, edge, iff_cond, *ctx_ptr, proc);
       });
     }
