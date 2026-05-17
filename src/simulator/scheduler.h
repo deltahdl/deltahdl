@@ -199,17 +199,21 @@ class Scheduler {
   // §4.4.2.6 ¶2 sentence 2: "The Reactive region is the reactive region set
   // dual of the Active region (see 4.4.2.2)." §4.4.2.7 ¶2 sentence 2: "The
   // Re-Inactive region is the reactive region set dual of the Inactive region
-  // (see 4.4.2.3)." Codifies both active-set/reactive-set duals so callers
-  // can name the dual of an active-set anchor rather than naming the
-  // reactive-set region directly. The dual is defined only between the two
-  // anchor pairs the LRM names (Active↔Reactive, Inactive↔Re-Inactive);
-  // other inputs return kCOUNT to keep the dual one-to-one.
+  // (see 4.4.2.3)." §4.4.2.8 ¶2 sentence 2: "The Re-NBA region is the reactive
+  // region set dual of the NBA region (see 4.4.2.4)." Codifies the three
+  // active-set/reactive-set duals so callers can name the dual of an
+  // active-set anchor rather than naming the reactive-set region directly.
+  // The dual is defined only between the three anchor pairs the LRM names
+  // (Active↔Reactive, Inactive↔Re-Inactive, NBA↔Re-NBA); other inputs return
+  // kCOUNT to keep the dual one-to-one.
   static constexpr Region ReactiveSetDualOf(Region active) {
     switch (active) {
       case Region::kActive:
         return Region::kReactive;
       case Region::kInactive:
         return Region::kReInactive;
+      case Region::kNBA:
+        return Region::kReNBA;
       default:
         return Region::kCOUNT;
     }
