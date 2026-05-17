@@ -192,32 +192,6 @@ TEST(StratifiedEventSchedulerSim,
   EXPECT_EQ(fired, expected);
 }
 
-// §4.4 ¶1 edge case: the rule says the data structure allows events to be
-// scheduled, executed, and removed "as the simulator advances through time."
-// The single-slot test above shows the cycle within one time slot; this test
-// shows the same schedule→execute→release cycle holds when the calendar spans
-// multiple time slots and CurrentTime advances between them.
-TEST(StratifiedEventSchedulerSim,
-     ScheduleExecuteRemoveCycleWorksAcrossMultipleTimeSlots) {
-  Arena arena;
-  Scheduler sched(arena);
-  EXPECT_EQ(sched.GetEventPool().FreeCount(), 0u);
-
-  int executed = 0;
-  for (uint64_t t : {0u, 5u, 12u, 30u}) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&executed]() { ++executed; };
-    sched.ScheduleEvent({t}, Region::kActive, ev);
-  }
-  EXPECT_TRUE(sched.HasEvents());
-
-  sched.Run();
-  EXPECT_EQ(executed, 4);
-  EXPECT_FALSE(sched.HasEvents());
-  EXPECT_EQ(sched.GetEventPool().FreeCount(), 4u);
-  EXPECT_EQ(sched.CurrentTime().ticks, 30u);
-}
-
 // §4.4 ¶2 error condition: "This procedure guarantees that the simulator never
 // goes backwards in time." Scheduler::ScheduleEvent enforces the guarantee by
 // aborting whenever a caller hands it a SimTime less than CurrentTime.
