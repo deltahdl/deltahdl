@@ -1268,6 +1268,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ValidateCycleDelayDefaultClocking(decl);
   ValidateDuplicateDefaultClocking(decl);
   ValidateDuplicateGlobalClocking(decl);
+  ValidateGlobalClockReference(decl);
   ValidateContAssignToClockvar(decl);
   ValidateConstantFunctionCalls(decl);
   ValidateSequenceEventArgs(decl);

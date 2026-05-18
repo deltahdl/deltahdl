@@ -16,4 +16,27 @@ TEST(GlobalClockingElab, DuplicateGlobalClockingErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(GlobalClockingElab, GlobalClockInEventControlWithoutDeclarationErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  always @($global_clock) x = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(GlobalClockingElab, GlobalClockInEventControlWithDeclarationIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, x;\n"
+      "  global clocking gclk @(posedge clk); endclocking\n"
+      "  always @($global_clock) x = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }

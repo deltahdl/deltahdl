@@ -2685,6 +2685,95 @@ void Elaborator::ValidateDuplicateGlobalClocking(const ModuleDecl* decl) {
   }
 }
 
+namespace {
+
+bool ExprRefsGlobalClock(const Expr* e) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kSystemCall && e->callee == "$global_clock") {
+    return true;
+  }
+  if (ExprRefsGlobalClock(e->lhs)) return true;
+  if (ExprRefsGlobalClock(e->rhs)) return true;
+  if (ExprRefsGlobalClock(e->condition)) return true;
+  if (ExprRefsGlobalClock(e->true_expr)) return true;
+  if (ExprRefsGlobalClock(e->false_expr)) return true;
+  if (ExprRefsGlobalClock(e->base)) return true;
+  if (ExprRefsGlobalClock(e->index)) return true;
+  if (ExprRefsGlobalClock(e->index_end)) return true;
+  if (ExprRefsGlobalClock(e->repeat_count)) return true;
+  if (ExprRefsGlobalClock(e->with_expr)) return true;
+  for (auto* a : e->args) {
+    if (ExprRefsGlobalClock(a)) return true;
+  }
+  for (auto* el : e->elements) {
+    if (ExprRefsGlobalClock(el)) return true;
+  }
+  return false;
+}
+
+const Expr* FindGlobalClockRefInStmt(const Stmt* s) {
+  if (!s) return nullptr;
+  if (ExprRefsGlobalClock(s->expr)) return s->expr;
+  if (ExprRefsGlobalClock(s->lhs)) return s->lhs;
+  if (ExprRefsGlobalClock(s->rhs)) return s->rhs;
+  if (ExprRefsGlobalClock(s->condition)) return s->condition;
+  if (ExprRefsGlobalClock(s->assert_expr)) return s->assert_expr;
+  if (ExprRefsGlobalClock(s->for_cond)) return s->for_cond;
+  for (const auto& ev : s->events) {
+    if (ExprRefsGlobalClock(ev.signal)) return ev.signal;
+  }
+  for (auto* sub : s->stmts) {
+    if (auto* hit = FindGlobalClockRefInStmt(sub)) return hit;
+  }
+  if (auto* hit = FindGlobalClockRefInStmt(s->then_branch)) return hit;
+  if (auto* hit = FindGlobalClockRefInStmt(s->else_branch)) return hit;
+  if (auto* hit = FindGlobalClockRefInStmt(s->body)) return hit;
+  if (auto* hit = FindGlobalClockRefInStmt(s->for_body)) return hit;
+  for (auto& ci : s->case_items) {
+    if (auto* hit = FindGlobalClockRefInStmt(ci.body)) return hit;
+  }
+  return nullptr;
+}
+
+}
+
+void Elaborator::ValidateGlobalClockReference(const ModuleDecl* decl) {
+  bool has_global = false;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kClockingBlock &&
+        item->is_global_clocking) {
+      has_global = true;
+      break;
+    }
+  }
+  if (has_global) return;
+
+  for (const auto* item : decl->items) {
+    const Expr* ref = nullptr;
+    if (item->body) ref = FindGlobalClockRefInStmt(item->body);
+    if (!ref && ExprRefsGlobalClock(item->init_expr)) ref = item->init_expr;
+    if (!ref && ExprRefsGlobalClock(item->assign_lhs)) ref = item->assign_lhs;
+    if (!ref && ExprRefsGlobalClock(item->assign_rhs)) ref = item->assign_rhs;
+    if (!ref && ExprRefsGlobalClock(item->prop_body_expr)) {
+      ref = item->prop_body_expr;
+    }
+    if (!ref) {
+      for (const auto& ev : item->sensitivity) {
+        if (ExprRefsGlobalClock(ev.signal)) {
+          ref = ev.signal;
+          break;
+        }
+      }
+    }
+    if (ref) {
+      diag_.Error(ref->range.start,
+                  "$global_clock has no effective global clocking declaration "
+                  "in any enclosing scope up to the top-level hierarchy block");
+      return;
+    }
+  }
+}
+
 void Elaborator::ValidateContAssignToClockvar(const ModuleDecl* decl) {
   if (clocking_signals_.empty()) return;
   for (const auto* item : decl->items) {

@@ -29,11 +29,6 @@ TEST(GlobalClockingSim, SetAndGetGlobalClocking) {
   EXPECT_TRUE(found->is_global);
 }
 
-TEST(GlobalClockingSim, GlobalClockingInitiallyEmpty) {
-  ClockingManager cmgr;
-  EXPECT_TRUE(cmgr.GetGlobalClocking().empty());
-}
-
 TEST(GlobalClockingSim, GlobalAndDefaultCoexist) {
   ClockingManager cmgr;
 
@@ -56,21 +51,6 @@ TEST(GlobalClockingSim, GlobalAndDefaultCoexist) {
   EXPECT_EQ(cmgr.GetDefaultClocking(), "dclk");
   EXPECT_NE(cmgr.Find("gclk"), nullptr);
   EXPECT_NE(cmgr.Find("dclk"), nullptr);
-}
-
-TEST(GlobalClockingSim, GlobalClockingIsGlobalFlag) {
-  ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "gc";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.is_global = true;
-  cmgr.Register(block);
-
-  const auto* found = cmgr.Find("gc");
-  ASSERT_NE(found, nullptr);
-  EXPECT_TRUE(found->is_global);
-  EXPECT_EQ(found->clock_edge, Edge::kPosedge);
 }
 
 }

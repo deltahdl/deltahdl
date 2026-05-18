@@ -45,6 +45,10 @@ ModuleItem* Parser::ParseClockingDecl() {
     item->is_default_clocking = true;
   } else if (Match(TokenKind::kKwGlobal)) {
     item->is_global_clocking = true;
+    if (InGenerateBlock()) {
+      diag_.Error(item->loc,
+                  "global clocking shall not be declared in a generate block");
+    }
   }
 
   Expect(TokenKind::kKwClocking);
