@@ -52,9 +52,10 @@ TEST(StringLiteralLexing, TripleQuotedStringItemNewline) {
 }
 
 TEST(StringLiteralLexing, TripleQuotedStringItemDoubleQuote) {
-  auto tokens = Lex("\"\"\"say \\\"hi\\\"\"\"\"");
+  auto tokens = Lex("\"\"\"A\"B\"\"\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
+  EXPECT_EQ(tokens[0].text, "\"\"\"A\"B\"\"\"");
 }
 
 TEST(StringLiteralLexing, StringEscapeSeqAnyAsciiNamed) {
@@ -134,6 +135,18 @@ TEST(StringLiteralLexing, TripleQuotedStringEmpty) {
 
 TEST(StringLiteralLexing, QuotedStringNewlineTerminatesError) {
   EXPECT_TRUE(LexHasErrors("\"before\nafter\""));
+}
+
+TEST(StringLiteralLexing, QuotedStringUnterminatedAtEofError) {
+  EXPECT_TRUE(LexHasErrors("\"no close quote"));
+}
+
+TEST(StringLiteralLexing, TripleQuotedStringPartialCloseError) {
+  EXPECT_TRUE(LexHasErrors("\"\"\"only two closing quotes\"\""));
+}
+
+TEST(StringLiteralLexing, QuotedStringCarriageReturnTerminatesError) {
+  EXPECT_TRUE(LexHasErrors("\"before\rafter\""));
 }
 
 }

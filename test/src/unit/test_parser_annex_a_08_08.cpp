@@ -5,26 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(StringLiteralSyntaxParsing, StringLiteralQuotedStringAsPrimary) {
-  auto r = Parse(
-      "module m;\n"
-      "  string s;\n"
-      "  initial s = \"hello\";\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(StringLiteralSyntaxParsing, StringLiteralTripleQuotedStringAsPrimary) {
-  auto r = Parse(
-      "module m;\n"
-      "  string s;\n"
-      "  initial s = \"\"\"hello\"\"\";\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(StringLiteralSyntaxParsing, QuotedStringWithQuotedStringItems) {
   auto r = Parse(
       "module m;\n"
