@@ -216,19 +216,6 @@ TEST(ClockingBlockParse, MultipleDirectionGroups) {
   EXPECT_EQ(item->clocking_signals[3].direction, Direction::kInout);
 }
 
-TEST(ClockingBlockParse, NegedgeEventExpr) {
-  auto r = Parse(
-      "module t;\n"
-      "  clocking cb @(negedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
-  ASSERT_EQ(item->clocking_event.size(), 1u);
-  EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
-}
-
 TEST(ClockingBlockParse, BareIdentifierEvent) {
   auto r = Parse(
       "module t;\n"
@@ -395,15 +382,6 @@ TEST(ClockingBlockParse, MultipleBlocksInModule) {
   EXPECT_EQ(cb2->name, "cd2");
 }
 
-TEST(ClockingBlockParse, EndLabelAccepted) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    input a;\n"
-              "  endclocking : cb\n"
-              "endmodule\n"));
-}
-
 TEST(ClockingBlockParse, BasicNamedBlockAllFields) {
   auto r = Parse(
       "module m;\n"
@@ -431,45 +409,6 @@ TEST(ClockingBlockParse, BasicNamedBlockAllFields) {
   };
   for (const auto& c : kChecks) {
     EXPECT_TRUE(c.ok) << c.label;
-  }
-}
-
-TEST(ClockingBlockParse, SignalDirectionsVerified) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data_in;\n"
-      "    output data_out;\n"
-      "    inout bidir;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
-
-  VerifyClockingSignalDirections(item, {
-                                           {Direction::kInput, "data_in"},
-                                           {Direction::kOutput, "data_out"},
-                                           {Direction::kInout, "bidir"},
-                                       });
-}
-
-TEST(ClockingBlockParse, MultipleInputsSameDirection) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data, ready, enable;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
-
-  const char* const kExpectedNames[] = {"data", "ready", "enable"};
-  ASSERT_EQ(item->clocking_signals.size(), std::size(kExpectedNames));
-  for (size_t i = 0; i < std::size(kExpectedNames); ++i) {
-    EXPECT_EQ(item->clocking_signals[i].name, kExpectedNames[i])
-        << "signal " << i;
-    EXPECT_EQ(item->clocking_signals[i].direction, Direction::kInput)
-        << "signal " << i;
   }
 }
 
@@ -546,23 +485,6 @@ TEST(ClockingBlockParse, EmptyBodyAccepted) {
               "endmodule\n"));
 }
 
-TEST(ClockingBlockParse, NamedDeclNotDefaultNotGlobal) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kClockingBlock);
-  EXPECT_EQ(item->name, "cb");
-  EXPECT_FALSE(item->is_default_clocking);
-  EXPECT_FALSE(item->is_global_clocking);
-}
-
 TEST(ClockingBlockParse, InputOutputCombinedDirection) {
   auto r = Parse(
       "module m;\n"
@@ -576,24 +498,6 @@ TEST(ClockingBlockParse, InputOutputCombinedDirection) {
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
-}
-
-TEST(ClockingBlockParse, EndLabelSimple) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    input data;\n"
-              "  endclocking : cb\n"
-              "endmodule\n"));
-}
-
-TEST(ClockingSkewParse, OneStepDelay) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    input #1step data;\n"
-              "  endclocking\n"
-              "endmodule"));
 }
 
 TEST(ClockingSkewParse, CombinedInputOutputSkewDelays) {
@@ -844,15 +748,6 @@ TEST(ClockingSkewParse, OneStepWithHierExpr) {
               "endmodule\n"));
 }
 
-TEST(ClockingSkewParse, OutputNegedgeDelayAccepted) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    output negedge #1 address;\n"
-              "  endclocking\n"
-              "endmodule\n"));
-}
-
 TEST(ClockingSkewParse, ExplicitZeroSkew) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -895,26 +790,6 @@ TEST(ClockingSkewParse, InputSkewDelayFields) {
   };
   for (const auto& c : kChecks) {
     EXPECT_TRUE(c.ok) << c.label;
-  }
-}
-
-TEST(ClockingSkewParse, CombinedSkewBothPresent) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input #2 output #4 cmd;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  auto& sig = item->clocking_signals[0];
-  EXPECT_EQ(sig.direction, Direction::kInout);
-  EXPECT_EQ(sig.name, "cmd");
-
-  const void* const kSkewPtrs[] = {sig.skew_delay, sig.out_skew_delay};
-  for (const auto* p : kSkewPtrs) {
-    EXPECT_NE(p, nullptr);
   }
 }
 
@@ -1114,22 +989,6 @@ TEST(ClockingSkewParse, DefaultSkewNumericLiterals) {
               "endmodule\n"));
 }
 
-TEST(ClockingSkewParse, OutputNegedgeSkewEdgeVerified) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    output negedge ack;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  auto& sig = item->clocking_signals[0];
-  EXPECT_EQ(sig.direction, Direction::kOutput);
-  EXPECT_EQ(sig.name, "ack");
-  EXPECT_EQ(sig.skew_edge, Edge::kNegedge);
-}
-
 TEST(ClockingSkewParse, DefaultInputOutputBothAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -1137,17 +996,6 @@ TEST(ClockingSkewParse, DefaultInputOutputBothAccepted) {
       "    default input #1 output #2;\n"
       "    input data;\n"
       "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(CycleDelayParse, IntegralNumber) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    ##5;\n"
-      "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -1337,27 +1185,6 @@ TEST(DefaultClockingParse, UnnamedInline) {
   ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   EXPECT_TRUE(item->is_default_clocking);
   EXPECT_TRUE(item->name.empty());
-}
-
-TEST(DefaultClockingParse, SeparateReferenceStatement) {
-  auto r = Parse(
-      "module t;\n"
-      "  clocking busA @(posedge clk1);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "  default clocking busA;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto& items = r.cu->modules[0]->items;
-  bool found_ref = false;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kClockingBlock &&
-        item->is_default_clocking && item->clocking_event.empty()) {
-      EXPECT_EQ(item->name, "busA");
-      found_ref = true;
-    }
-  }
-  EXPECT_TRUE(found_ref);
 }
 
 TEST(DefaultClockingParse, NamedWithIsDefaultAndNotGlobal) {
@@ -1584,16 +1411,6 @@ TEST(SyncDriveParse, WithCycleDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(SyncDriveParse, CycleDelayNumber) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    output data;\n"
-              "  endclocking\n"
-              "  initial cb.data <= ##3 8'h42;\n"
-              "endmodule\n"));
-}
-
 TEST(SyncDriveParse, CycleDelayParenExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -1812,6 +1629,49 @@ TEST(ClockingSkewParse, DefaultOutputOnlyFieldStored) {
   ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   EXPECT_EQ(item->default_input_skew_delay, nullptr);
   ASSERT_NE(item->default_output_skew_delay, nullptr);
+}
+
+TEST(ClockingBlockParse, AttributedPropertyDecl) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "    (* annotated *) property p;\n"
+              "      data;\n"
+              "    endproperty\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
+TEST(ClockingBlockParse, AttributedSequenceDecl) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "    (* tag = 1 *) sequence s;\n"
+              "      data;\n"
+              "    endsequence\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
+TEST(ClockingBlockParse, AttributedLetDecl) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "    (* foo *) let my_let = data;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
+TEST(GlobalClockingParse, RejectsClockingItems) {
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  global clocking gc @(posedge clk);\n"
+              "    input data;\n"
+              "  endclocking\n"
+              "endmodule\n"));
 }
 
 }

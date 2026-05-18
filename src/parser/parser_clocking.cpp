@@ -119,6 +119,15 @@ void Parser::ParseClockingItem(ModuleItem* item) {
     return;
   }
 
+  // The assertion-item alternative of clocking_item may be preceded by
+  // attribute instances. Consume them here; they apply to the
+  // property/sequence/let declaration that follows.
+  bool had_attributes = false;
+  if (Check(TokenKind::kAttrStart)) {
+    ParseAttributes();
+    had_attributes = true;
+  }
+
   if (Check(TokenKind::kKwProperty)) {
     ParsePropertyDecl();
     return;
@@ -129,6 +138,14 @@ void Parser::ParseClockingItem(ModuleItem* item) {
   }
   if (Check(TokenKind::kKwLet)) {
     ParseLetDecl();
+    return;
+  }
+
+  if (had_attributes) {
+    diag_.Error(CurrentLoc(),
+                "expected property, sequence, or let declaration after "
+                "attribute instances in clocking block");
+    Synchronize();
     return;
   }
 
