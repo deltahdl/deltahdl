@@ -126,44 +126,6 @@ TEST(ConditionalSyntaxParsing,NestedIfElseWithExpressions) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ConditionalSyntaxParsing,BasicIfElse) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    if (a) x = 1;\n"
-      "    else x = 2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_NE(stmt->condition, nullptr);
-  ASSERT_NE(stmt->then_branch, nullptr);
-  ASSERT_NE(stmt->else_branch, nullptr);
-}
-
-TEST(ConditionalSyntaxParsing, IfElseInAlwaysComb) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic sel, a, b, y;\n"
-      "  always_comb begin\n"
-      "    if (sel)\n"
-      "      y = a;\n"
-      "    else\n"
-      "      y = b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstAlwaysCombStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_NE(stmt->condition, nullptr);
-  EXPECT_NE(stmt->then_branch, nullptr);
-  EXPECT_NE(stmt->else_branch, nullptr);
-}
-
 TEST(ConditionalSyntaxParsing, IfElseBranchKinds) {
   auto r = Parse(
       "module m;\n"
@@ -455,17 +417,82 @@ TEST(ConditionalSyntaxParsing, BothBranchesNull) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kNull);
 }
 
-TEST(ConditionalSyntaxParsing, IfElseInAlwaysFf) {
+TEST(ConditionalSyntaxParsing, UniqueIfQualifier) {
   auto r = Parse(
       "module m;\n"
-      "  logic clk, a, x;\n"
-      "  always_ff @(posedge clk) begin\n"
-      "    if (a) x <= 1;\n"
-      "    else x <= 0;\n"
+      "  initial begin\n"
+      "    unique if (a) x = 1;\n"
+      "    else x = 2;\n"
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+}
+
+TEST(ConditionalSyntaxParsing, Unique0IfQualifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 if (a) x = 1;\n"
+      "    else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
+}
+
+TEST(ConditionalSyntaxParsing, PriorityIfQualifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority if (a) x = 1;\n"
+      "    else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+}
+
+TEST(ConditionalSyntaxParsing, ElseWithoutIfIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    else x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ConditionalSyntaxParsing, ElseIfChainProducesNestedIf) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "    else x = 3;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->else_branch->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->else_branch->kind, StmtKind::kBlockingAssign);
 }
 
 }

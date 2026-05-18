@@ -282,6 +282,28 @@ TEST(ConditionalStatementSim, IfConditionXIsFalse) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
+TEST(ConditionalStatementSim, IfConditionXTakesElse) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic cond;\n"
+      "  initial begin\n"
+      "    cond = 1'bx;\n"
+      "    if (cond) x = 8'd42;\n"
+      "    else x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
 TEST(ConditionalStatementSim, IfConditionZTakesElse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -431,6 +453,94 @@ TEST(ConditionalStatementSim, BothBranchesNullNoEffect) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
+TEST(ConditionalStatementSim, CompiledIfXSkipsThenBranch) {
+  CompiledSimFixture f;
+  auto* sel = f.ctx.CreateVariable("sel", 1);
+  sel->value = MakeLogic4Vec(f.arena, 1);
+  sel->value.words[0].aval = 1;
+  sel->value.words[0].bval = 1;
+  auto* out = f.ctx.CreateVariable("out", 32);
+  out->value = MakeLogic4VecVal(f.arena, 32, 99);
+
+  auto* cond = f.arena.Create<Expr>();
+  cond->kind = ExprKind::kIdentifier;
+  cond->text = "sel";
+
+  auto* then_lhs = f.arena.Create<Expr>();
+  then_lhs->kind = ExprKind::kIdentifier;
+  then_lhs->text = "out";
+  auto* then_rhs = f.arena.Create<Expr>();
+  then_rhs->kind = ExprKind::kIntegerLiteral;
+  then_rhs->int_val = 42;
+  auto* then_stmt = f.arena.Create<Stmt>();
+  then_stmt->kind = StmtKind::kBlockingAssign;
+  then_stmt->lhs = then_lhs;
+  then_stmt->rhs = then_rhs;
+
+  auto* if_stmt = f.arena.Create<Stmt>();
+  if_stmt->kind = StmtKind::kIf;
+  if_stmt->condition = cond;
+  if_stmt->then_branch = then_stmt;
+
+  auto* block = f.arena.Create<Stmt>();
+  block->kind = StmtKind::kBlock;
+  block->stmts.push_back(if_stmt);
+
+  auto compiled = ProcessCompiler::Compile(1, block);
+  compiled.Execute(f.ctx);
+  EXPECT_EQ(out->value.ToUint64(), 99u);
+}
+
+TEST(ConditionalStatementSim, CompiledIfZRunsElseBranch) {
+  CompiledSimFixture f;
+  auto* sel = f.ctx.CreateVariable("sel", 1);
+  sel->value = MakeLogic4Vec(f.arena, 1);
+  sel->value.words[0].aval = 0;
+  sel->value.words[0].bval = 1;
+  auto* out = f.ctx.CreateVariable("out", 32);
+  out->value = MakeLogic4VecVal(f.arena, 32, 7);
+
+  auto* cond = f.arena.Create<Expr>();
+  cond->kind = ExprKind::kIdentifier;
+  cond->text = "sel";
+
+  auto* then_lhs = f.arena.Create<Expr>();
+  then_lhs->kind = ExprKind::kIdentifier;
+  then_lhs->text = "out";
+  auto* then_rhs = f.arena.Create<Expr>();
+  then_rhs->kind = ExprKind::kIntegerLiteral;
+  then_rhs->int_val = 42;
+  auto* then_stmt = f.arena.Create<Stmt>();
+  then_stmt->kind = StmtKind::kBlockingAssign;
+  then_stmt->lhs = then_lhs;
+  then_stmt->rhs = then_rhs;
+
+  auto* else_lhs = f.arena.Create<Expr>();
+  else_lhs->kind = ExprKind::kIdentifier;
+  else_lhs->text = "out";
+  auto* else_rhs = f.arena.Create<Expr>();
+  else_rhs->kind = ExprKind::kIntegerLiteral;
+  else_rhs->int_val = 11;
+  auto* else_stmt = f.arena.Create<Stmt>();
+  else_stmt->kind = StmtKind::kBlockingAssign;
+  else_stmt->lhs = else_lhs;
+  else_stmt->rhs = else_rhs;
+
+  auto* if_stmt = f.arena.Create<Stmt>();
+  if_stmt->kind = StmtKind::kIf;
+  if_stmt->condition = cond;
+  if_stmt->then_branch = then_stmt;
+  if_stmt->else_branch = else_stmt;
+
+  auto* block = f.arena.Create<Stmt>();
+  block->kind = StmtKind::kBlock;
+  block->stmts.push_back(if_stmt);
+
+  auto compiled = ProcessCompiler::Compile(1, block);
+  compiled.Execute(f.ctx);
+  EXPECT_EQ(out->value.ToUint64(), 11u);
 }
 
 }

@@ -42,7 +42,7 @@ static CompiledFn CompileIf(const Stmt* stmt) {
   return [stmt, then_fn = std::move(then_fn),
           else_fn = std::move(else_fn)](SimContext& ctx) {
     auto cond = EvalExpr(stmt->condition, ctx, ctx.GetArena());
-    if (cond.ToUint64() != 0) {
+    if (cond.IsTruthy()) {
       if (then_fn) then_fn(ctx);
     } else {
       if (else_fn) else_fn(ctx);
