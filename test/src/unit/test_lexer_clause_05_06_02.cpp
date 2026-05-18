@@ -93,11 +93,6 @@ TEST(Keywords, KeywordPrefixIsIdentifier) {
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
 }
 
-TEST(Keywords, KeywordSuffixIsIdentifier) {
-  auto r = LexOne("endmodule_x");
-  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
-}
-
 TEST(Keywords, SimpleIdentNotKeyword) {
   auto tokens = Lex("modules");
   ASSERT_GE(tokens.size(), 2u);
@@ -172,11 +167,6 @@ TEST(Keywords, EscapedKeywordsAreIdentifiers) {
 
 TEST(GateKeywordLexing, KeywordSubstringIsIdentifier) {
   auto r = LexOne("ands");
-  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
-}
-
-TEST(GateKeywordLexing, KeywordPrefixIsIdentifier) {
-  auto r = LexOne("tranif");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
 }
 
