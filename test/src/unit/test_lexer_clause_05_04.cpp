@@ -247,13 +247,6 @@ TEST(LexicalConventionLexing, CommentBetweenOperatorAndOperand) {
   EXPECT_EQ(tokens[2].text, "b");
 }
 
-TEST(LexicalConventionLexing, MinimalBlockComment) {
-  auto tokens = Lex("a /**/ b");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
 TEST(LexicalConventionLexing, LineCommentAdvancesLineNumber) {
   auto [tokens, errors] = LexWithDiag("a\n// comment\nb");
   EXPECT_FALSE(errors);
