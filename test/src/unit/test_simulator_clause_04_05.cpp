@@ -10,19 +10,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SimulationAlgorithmSim, ExecuteSimulationStartsAtTimeZero) {
-  Arena arena;
-  Scheduler sched(arena);
-  uint64_t observed_time = UINT64_MAX;
-
-  auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&]() { observed_time = sched.CurrentTime().ticks; };
-  sched.ScheduleEvent({0}, Region::kActive, ev);
-
-  sched.Run();
-  EXPECT_EQ(observed_time, 0u);
-}
-
 TEST(SimulationAlgorithmSim, ExecuteSimulationAdvancesThroughNonemptyTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
@@ -148,17 +135,183 @@ TEST(SimulationAlgorithmSim,
   EXPECT_EQ(order[5], "pre_postponed");
 }
 
-TEST(SimulationAlgorithmSim, PostponedRunsWhenAllIterativeRegionsAreEmpty) {
+TEST(SimulationAlgorithmSim, OuterLoopRestartsWhenPrePostponedSchedulesActive) {
   Arena arena;
   Scheduler sched(arena);
-  bool postponed_ran = false;
+  std::vector<std::string> order;
 
-  auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&]() { postponed_ran = true; };
-  sched.ScheduleEvent({0}, Region::kPostponed, ev);
+  auto* pp = sched.GetEventPool().Acquire();
+  pp->callback = [&]() {
+    order.push_back("pre_postponed");
+    auto* restart = sched.GetEventPool().Acquire();
+    restart->callback = [&]() { order.push_back("active_after_pp"); };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, restart);
+  };
+  sched.ScheduleEvent({0}, Region::kPrePostponed, pp);
+
+  auto* post = sched.GetEventPool().Acquire();
+  post->callback = [&]() { order.push_back("postponed"); };
+  sched.ScheduleEvent({0}, Region::kPostponed, post);
 
   sched.Run();
-  EXPECT_TRUE(postponed_ran);
+  ASSERT_EQ(order.size(), 3u);
+  EXPECT_EQ(order[0], "pre_postponed");
+  EXPECT_EQ(order[1], "active_after_pp");
+  EXPECT_EQ(order[2], "postponed");
+}
+
+TEST(SimulationAlgorithmSim, UpdateEventSchedulesEvaluationOfSensitiveProcess) {
+  Arena arena;
+  Scheduler sched(arena);
+  int sampled_value = -1;
+  int target = 0;
+  std::vector<std::string> order;
+
+  auto* update = sched.GetEventPool().Acquire();
+  update->kind = EventKind::kUpdate;
+  update->callback = [&]() {
+    target = 42;
+    order.push_back("update");
+    auto* eval = sched.GetEventPool().Acquire();
+    eval->kind = EventKind::kEvaluation;
+    eval->callback = [&]() {
+      sampled_value = target;
+      order.push_back("evaluation");
+    };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, eval);
+  };
+  sched.ScheduleEvent({0}, Region::kActive, update);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 2u);
+  EXPECT_EQ(order[0], "update");
+  EXPECT_EQ(order[1], "evaluation");
+  EXPECT_EQ(sampled_value, 42);
+}
+
+TEST(SimulationAlgorithmSim, IterativeRegionsMatchLrmEnumeration) {
+  constexpr Region kExpectedIterative[] = {
+      Region::kActive,       Region::kInactive,    Region::kPreNBA,
+      Region::kNBA,          Region::kPostNBA,     Region::kPreObserved,
+      Region::kObserved,     Region::kPostObserved, Region::kReactive,
+      Region::kReInactive,   Region::kPreReNBA,    Region::kReNBA,
+      Region::kPostReNBA,    Region::kPrePostponed};
+  for (Region r : kExpectedIterative) {
+    EXPECT_TRUE(IsIterativeRegion(r))
+        << "Expected iterative region: " << static_cast<int>(r);
+  }
+  EXPECT_FALSE(IsIterativeRegion(Region::kPreponed));
+  EXPECT_FALSE(IsIterativeRegion(Region::kPreActive));
+  EXPECT_FALSE(IsIterativeRegion(Region::kPostponed));
+}
+
+TEST(SimulationAlgorithmSim, RegionDrainsEventsScheduledDuringExecution) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<int> order;
+
+  auto* first = sched.GetEventPool().Acquire();
+  first->callback = [&]() {
+    order.push_back(1);
+    auto* second = sched.GetEventPool().Acquire();
+    second->callback = [&]() {
+      order.push_back(2);
+      auto* third = sched.GetEventPool().Acquire();
+      third->callback = [&]() { order.push_back(3); };
+      sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, third);
+    };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, second);
+  };
+  sched.ScheduleEvent({0}, Region::kActive, first);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 3u);
+  EXPECT_EQ(order[0], 1);
+  EXPECT_EQ(order[1], 2);
+  EXPECT_EQ(order[2], 3);
+}
+
+TEST(SimulationAlgorithmSim, ActiveInnerLoopReentersWhenNbaSchedulesActive) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+
+  auto* active_first = sched.GetEventPool().Acquire();
+  active_first->callback = [&]() {
+    order.push_back("active_first");
+    auto* nba = sched.GetEventPool().Acquire();
+    nba->callback = [&]() {
+      order.push_back("nba");
+      auto* active_second = sched.GetEventPool().Acquire();
+      active_second->callback = [&]() { order.push_back("active_second"); };
+      sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, active_second);
+    };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
+  };
+  sched.ScheduleEvent({0}, Region::kActive, active_first);
+
+  auto* postponed = sched.GetEventPool().Acquire();
+  postponed->callback = [&]() { order.push_back("postponed"); };
+  sched.ScheduleEvent({0}, Region::kPostponed, postponed);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 4u);
+  EXPECT_EQ(order[0], "active_first");
+  EXPECT_EQ(order[1], "nba");
+  EXPECT_EQ(order[2], "active_second");
+  EXPECT_EQ(order[3], "postponed");
+}
+
+TEST(SimulationAlgorithmSim, ReactiveInnerLoopReentersWhenReNbaSchedulesReactive) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+
+  auto* reactive_first = sched.GetEventPool().Acquire();
+  reactive_first->callback = [&]() {
+    order.push_back("reactive_first");
+    auto* re_nba = sched.GetEventPool().Acquire();
+    re_nba->callback = [&]() {
+      order.push_back("re_nba");
+      auto* reactive_second = sched.GetEventPool().Acquire();
+      reactive_second->callback = [&]() { order.push_back("reactive_second"); };
+      sched.ScheduleEvent(sched.CurrentTime(), Region::kReactive,
+                          reactive_second);
+    };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kReNBA, re_nba);
+  };
+  sched.ScheduleEvent({0}, Region::kReactive, reactive_first);
+
+  auto* pp = sched.GetEventPool().Acquire();
+  pp->callback = [&]() { order.push_back("pre_postponed"); };
+  sched.ScheduleEvent({0}, Region::kPrePostponed, pp);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 4u);
+  EXPECT_EQ(order[0], "reactive_first");
+  EXPECT_EQ(order[1], "re_nba");
+  EXPECT_EQ(order[2], "reactive_second");
+  EXPECT_EQ(order[3], "pre_postponed");
+}
+
+TEST(SimulationAlgorithmSim, FutureTimeSlotCreatedDuringExecutionIsAdvancedTo) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<uint64_t> times;
+
+  auto* now = sched.GetEventPool().Acquire();
+  now->callback = [&]() {
+    times.push_back(sched.CurrentTime().ticks);
+    auto* later = sched.GetEventPool().Acquire();
+    later->callback = [&]() { times.push_back(sched.CurrentTime().ticks); };
+    sched.ScheduleEvent({5}, Region::kActive, later);
+  };
+  sched.ScheduleEvent({0}, Region::kActive, now);
+
+  sched.Run();
+  ASSERT_EQ(times.size(), 2u);
+  EXPECT_EQ(times[0], 0u);
+  EXPECT_EQ(times[1], 5u);
 }
 
 }
