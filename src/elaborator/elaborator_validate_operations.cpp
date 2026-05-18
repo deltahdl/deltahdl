@@ -707,8 +707,8 @@ void Elaborator::ValidateUnsizedInConcat(const ModuleDecl* decl) {
 
 static bool IsSelectOnConcat(const Expr* expr) {
   if (!expr || expr->kind != ExprKind::kSelect) return false;
-  const Expr* base = expr->lhs;
-  while (base && base->kind == ExprKind::kSelect) base = base->lhs;
+  const Expr* base = expr->base;
+  while (base && base->kind == ExprKind::kSelect) base = base->base;
   return base && base->kind == ExprKind::kConcatenation;
 }
 

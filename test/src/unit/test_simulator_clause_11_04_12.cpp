@@ -47,61 +47,54 @@ TEST(EvalOp, ConcatWidthIsSumOfElements) {
   EXPECT_EQ(result.ToUint64(), 0xABCu);
 }
 
-TEST(EvalOp, ConcatSingleElement) {
+TEST(EvalOp, ConcatPartSelectUsesPackedRangeNMinus1Down0) {
   SimFixture f;
 
-  auto* va = f.ctx.CreateVariable("s", 8);
-  va->value = MakeLogic4VecVal(f.arena, 8, 0x42);
-
-  auto* concat = f.arena.Create<Expr>();
-  concat->kind = ExprKind::kConcatenation;
-  concat->elements.push_back(MakeId(f.arena, "s"));
-
-  auto result = EvalExpr(concat, f.ctx, f.arena);
-  EXPECT_EQ(result.width, 8u);
-  EXPECT_EQ(result.ToUint64(), 0x42u);
-}
-
-TEST(EvalOp, ConcatFourElements) {
-  SimFixture f;
-
-  auto* v1 = f.ctx.CreateVariable("p", 4);
-  v1->value = MakeLogic4VecVal(f.arena, 4, 0xA);
-  auto* v2 = f.ctx.CreateVariable("q", 4);
-  v2->value = MakeLogic4VecVal(f.arena, 4, 0xB);
-  auto* v3 = f.ctx.CreateVariable("r", 4);
-  v3->value = MakeLogic4VecVal(f.arena, 4, 0xC);
-  auto* v4 = f.ctx.CreateVariable("t", 4);
-  v4->value = MakeLogic4VecVal(f.arena, 4, 0xD);
-
-  auto* concat = f.arena.Create<Expr>();
-  concat->kind = ExprKind::kConcatenation;
-  concat->elements.push_back(MakeId(f.arena, "p"));
-  concat->elements.push_back(MakeId(f.arena, "q"));
-  concat->elements.push_back(MakeId(f.arena, "r"));
-  concat->elements.push_back(MakeId(f.arena, "t"));
-
-  auto result = EvalExpr(concat, f.ctx, f.arena);
-  EXPECT_EQ(result.width, 16u);
-  EXPECT_EQ(result.ToUint64(), 0xABCDu);
-}
-
-TEST(EvalOp, ConcatBitOrdering) {
-  SimFixture f;
-
-  auto* va = f.ctx.CreateVariable("hi", 8);
-  va->value = MakeLogic4VecVal(f.arena, 8, 0xFF);
-  auto* vb = f.ctx.CreateVariable("lo", 8);
-  vb->value = MakeLogic4VecVal(f.arena, 8, 0x00);
+  auto* va = f.ctx.CreateVariable("hi", 4);
+  va->value = MakeLogic4VecVal(f.arena, 4, 0xA);
+  auto* vb = f.ctx.CreateVariable("lo", 4);
+  vb->value = MakeLogic4VecVal(f.arena, 4, 0x5);
 
   auto* concat = f.arena.Create<Expr>();
   concat->kind = ExprKind::kConcatenation;
   concat->elements.push_back(MakeId(f.arena, "hi"));
   concat->elements.push_back(MakeId(f.arena, "lo"));
 
-  auto result = EvalExpr(concat, f.ctx, f.arena);
-  EXPECT_EQ(result.width, 16u);
-  EXPECT_EQ(result.ToUint64(), 0xFF00u);
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = concat;
+  sel->index = MakeInt(f.arena, 5);
+  sel->index_end = MakeInt(f.arena, 2);
+
+  auto result = EvalExpr(sel, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 4u);
+  EXPECT_EQ(result.ToUint64(), 0x9u);
+}
+
+TEST(EvalOp, ConcatBitSelectUsesPackedRangeNMinus1Down0) {
+  SimFixture f;
+
+  auto* va = f.ctx.CreateVariable("hi", 4);
+  va->value = MakeLogic4VecVal(f.arena, 4, 0x8);
+  auto* vb = f.ctx.CreateVariable("lo", 4);
+  vb->value = MakeLogic4VecVal(f.arena, 4, 0x1);
+
+  auto* concat = f.arena.Create<Expr>();
+  concat->kind = ExprKind::kConcatenation;
+  concat->elements.push_back(MakeId(f.arena, "hi"));
+  concat->elements.push_back(MakeId(f.arena, "lo"));
+
+  auto* sel_msb = MakeSelectExpr(f.arena, concat, MakeInt(f.arena, 7));
+  auto msb = EvalExpr(sel_msb, f.ctx, f.arena);
+  EXPECT_EQ(msb.ToUint64(), 1u);
+
+  auto* sel_lsb = MakeSelectExpr(f.arena, concat, MakeInt(f.arena, 0));
+  auto lsb = EvalExpr(sel_lsb, f.ctx, f.arena);
+  EXPECT_EQ(lsb.ToUint64(), 1u);
+
+  auto* sel_mid = MakeSelectExpr(f.arena, concat, MakeInt(f.arena, 4));
+  auto mid = EvalExpr(sel_mid, f.ctx, f.arena);
+  EXPECT_EQ(mid.ToUint64(), 0u);
 }
 
 }

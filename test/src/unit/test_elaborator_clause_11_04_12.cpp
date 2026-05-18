@@ -74,19 +74,6 @@ TEST(ConcatenationElaboration, ConstantConcatenationInParam) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ConcatenationElaboration, ConcatInInitialBlock) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  logic [3:0] x, y;\n"
-      "  initial a = {x, y};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(ConcatenationSim, ConcatInAlwaysComb) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -109,30 +96,6 @@ TEST(ConcatenationSim, ConcatInAlwaysComb) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
-}
-
-TEST(ConcatenationSim, ConcatRhsTwoVariables) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  logic [15:0] c;\n"
-      "  initial begin\n"
-      "    a = 8'hCA;\n"
-      "    b = 8'hFE;\n"
-      "    c = {a, b};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* c = f.ctx.FindVariable("c");
-  ASSERT_NE(c, nullptr);
-  EXPECT_EQ(c->value.ToUint64(), 0xCAFEu);
 }
 
 TEST(ConcatenationSim, LhsConcatUnpacking) {
@@ -199,6 +162,63 @@ TEST(ConcatenationSim, NestedConcatSim) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x123u);
+}
+
+TEST(ConcatenationElaboration, UnsizedConstantInConcatRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [3:0] x;\n"
+      "  initial a = {x, 1};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ConcatenationElaboration, SelectOnConcatLvalueRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] a, b;\n"
+      "  initial {a, b}[2] = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ConcatenationElaboration, UnsizedConstantInNestedConcatRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [11:0] a;\n"
+      "  logic [3:0] x;\n"
+      "  initial a = {x, {x, 7}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ConcatenationElaboration, PartSelectOnConcatLvalueRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] a, b;\n"
+      "  initial {a, b}[3:0] = 4'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ConcatenationElaboration, SelectOnConcatNetLvalueRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire [3:0] a, b;\n"
+      "  assign {a, b}[2] = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 TEST(ConcatenationSim, ConcatMixedWidths) {

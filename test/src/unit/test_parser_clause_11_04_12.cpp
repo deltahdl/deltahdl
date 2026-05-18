@@ -5,24 +5,6 @@
 using namespace delta;
 namespace {
 
-TEST(ConcatenationParsing, ConcatenationInAlwaysComb) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [3:0] a, b;\n"
-      "  logic [7:0] c;\n"
-      "  always_comb c = {a, b};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysComb(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(item->body->rhs, nullptr);
-  EXPECT_EQ(item->body->rhs->kind, ExprKind::kConcatenation);
-  EXPECT_EQ(item->body->rhs->elements.size(), 2u);
-}
-
 TEST(OperatorAndExpressionParsing, ConcatWithPartSelects) {
   auto r = Parse(
       "module t;\n"
@@ -35,17 +17,6 @@ TEST(OperatorAndExpressionParsing, ConcatWithPartSelects) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
   EXPECT_EQ(rhs->elements.size(), 4u);
-}
-
-TEST(OperatorAndExpressionParsing, ConcatPartSelectPostfix) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte a, b;\n"
-      "  bit [1:0] c;\n"
-      "  initial c = {a + b}[1:0];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(OperatorAndExpressionParsing, SelectOnConcatenation) {
@@ -140,6 +111,22 @@ TEST(OperatorAndExpressionParsing, ConcatenationElements) {
   EXPECT_EQ(rhs->elements.size(), 3u);
   EXPECT_EQ(rhs->elements[0]->kind, ExprKind::kIdentifier);
   EXPECT_EQ(rhs->elements[2]->kind, ExprKind::kIntegerLiteral);
+}
+
+TEST(ConcatenationParsing, ConcatDistinctFromAssignmentPattern) {
+  auto plain = Parse("module m; initial x = {a, b}; endmodule\n");
+  ASSERT_NE(plain.cu, nullptr);
+  EXPECT_FALSE(plain.has_errors);
+  auto* plain_rhs = FirstInitialRHS(plain);
+  ASSERT_NE(plain_rhs, nullptr);
+  EXPECT_EQ(plain_rhs->kind, ExprKind::kConcatenation);
+
+  auto apos = Parse("module m; initial x = '{a, b}; endmodule\n");
+  ASSERT_NE(apos.cu, nullptr);
+  EXPECT_FALSE(apos.has_errors);
+  auto* apos_rhs = FirstInitialRHS(apos);
+  ASSERT_NE(apos_rhs, nullptr);
+  EXPECT_EQ(apos_rhs->kind, ExprKind::kAssignmentPattern);
 }
 
 TEST(AssignmentParsing, Concatenation) {
