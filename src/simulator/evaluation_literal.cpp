@@ -142,12 +142,33 @@ static bool IsSignedLiteral(std::string_view text) {
   char c = text[tick + 1];
   return c == 's' || c == 'S';
 }
+
+static bool IsUnsizedLiteral(std::string_view text) {
+  return !text.empty() && text.front() == '\'';
+}
+
+static bool MsbBvalSet(const Logic4Vec& vec, uint32_t width) {
+  if (width == 0 || vec.nwords == 0) return false;
+  uint32_t msb_word = (width - 1) / 64;
+  uint64_t msb_mask = uint64_t{1} << ((width - 1) % 64);
+  return (vec.words[msb_word].bval & msb_mask) != 0;
+}
+
 Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena) {
   uint32_t width = LiteralWidth(expr->text, expr->int_val);
   bool is_signed = IsSignedLiteral(expr->text);
   if (TextHasXZ(expr->text)) {
     auto vec = ParseBasedXZLiteral(expr->text, width, arena);
     vec.is_signed = is_signed;
+    // An unsized literal whose high-order bit ended up as x or z must
+    // propagate that high-order bit through any wider context the
+    // value is used in. ResizeToWidth performs MSB-pattern extension
+    // when is_signed is set, so we piggy-back on that mechanism here
+    // without claiming the literal is signed for arithmetic — x/z
+    // contaminate any operation regardless of signedness.
+    if (IsUnsizedLiteral(expr->text) && MsbBvalSet(vec, width)) {
+      vec.is_signed = true;
+    }
     return vec;
   }
   auto vec = MakeLogic4VecVal(arena, width, expr->int_val);

@@ -38,7 +38,20 @@ static ReplicateInner EvalReplicateInner(const Expr* expr, SimContext& ctx,
   ReplicateInner inner;
   std::vector<Logic4Vec> parts;
   for (auto* elem : expr->elements) {
-    parts.push_back(EvalExpr(elem, ctx, arena));
+    auto vec = EvalExpr(elem, ctx, arena);
+    // The inner expression of a replication is a self-determined
+    // context, so an unbased unsized literal contributes one bit
+    // (per §5.7.1) rather than its default wide carrier.
+    if (elem && elem->kind == ExprKind::kUnbasedUnsizedLiteral &&
+        vec.width > 1) {
+      auto bit = MakeLogic4Vec(arena, 1);
+      if (vec.nwords > 0) {
+        bit.words[0].aval = vec.words[0].aval & 1;
+        bit.words[0].bval = vec.words[0].bval & 1;
+      }
+      vec = bit;
+    }
+    parts.push_back(vec);
     if (parts.back().is_string) inner.is_string = true;
     inner.width += parts.back().width;
   }

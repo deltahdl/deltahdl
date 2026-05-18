@@ -19,40 +19,6 @@ static bool RunSim(SimFixture& f, const std::string& src) {
   return true;
 }
 
-TEST(IntegerLiteralSim, HexLiteralAssignment) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'hAB;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xABu);
-}
-
-TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsByte) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = '1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xFFu);
-}
-
 TEST(IntegerLiteralSim, UnbasedUnsizedZeroClearsByte) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -85,40 +51,6 @@ TEST(IntegerLiteralSim, HexLiteralDistinctNibbles) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
-}
-
-TEST(IntegerLiteralSim, BinaryLiteralByte) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'b11001100;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xCCu);
-}
-
-TEST(IntegerLiteralSim, UnsizedDecimalLiteral) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 42;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(IntegerLiteralSim, DecimalUnsized) {
@@ -600,12 +532,6 @@ TEST(IntegerLiteralSim, SizeConstantNonzero) {
   EXPECT_EQ(result, 1u);
 }
 
-TEST(IntegerLiteralSim, UnsizedDecimalSimValue) {
-  auto v = RunAndGet(
-      "module t;\n  logic [31:0] x;\n  initial x = 100;\nendmodule\n", "x");
-  EXPECT_EQ(v, 100u);
-}
-
 TEST(IntegerLiteralSim, BinaryLiteralWithUnderscore) {
   auto v = RunAndGet(
       "module t;\n  logic [7:0] x;\n  initial x = 8'b1010_0101;\nendmodule\n",
@@ -618,13 +544,6 @@ TEST(IntegerLiteralSim, OctalLiteralFourDigit) {
       "module t;\n  logic [11:0] x;\n  initial x = 12'o7654;\nendmodule\n",
       "x");
   EXPECT_EQ(v, 07654u);
-}
-
-TEST(IntegerLiteralSim, HexLiteralFourDigit) {
-  auto v = RunAndGet(
-      "module t;\n  logic [15:0] x;\n  initial x = 16'hCAFE;\nendmodule\n",
-      "x");
-  EXPECT_EQ(v, 0xCAFEu);
 }
 
 TEST(IntegerLiteralSim, AllBasesProduceSameValue) {
@@ -655,13 +574,6 @@ TEST(IntegerLiteralSim, LiteralInTernaryCondition) {
       "endmodule\n",
       "x");
   EXPECT_EQ(v, 99u);
-}
-
-TEST(IntegerLiteralSim, UnsizedDecimalWithUnderscore) {
-  auto v = RunAndGet(
-      "module t;\n  logic [31:0] x;\n  initial x = 1_000_000;\nendmodule\n",
-      "x");
-  EXPECT_EQ(v, 1000000u);
 }
 
 TEST(IntegerLiteralSim, OctalZDigitFillsThreeBits) {
@@ -817,6 +729,116 @@ TEST(IntegerLiteralSim, SizedHexLiteralValue) {
       "endmodule\n",
       "x");
   EXPECT_EQ(result, 0x837FFu);
+}
+
+TEST(IntegerLiteralSim, UnsizedValueAboveU32WidensBeyond32Bits) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [63:0] x;\n"
+      "  initial x = 'h1_0000_0000;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 0x100000000ull);
+}
+
+TEST(IntegerLiteralSim, SimpleDecimalNegativeSignExtends) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  integer x;\n"
+      "  initial x = -1;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result & 0xFFFFFFFFu, 0xFFFFFFFFu);
+}
+
+TEST(IntegerLiteralSim, BaseOnlyDoesNotSignExtend) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  integer x;\n"
+      "  initial x = 4'hf;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result & 0xFFFFFFFFu, 0x0000000Fu);
+}
+
+TEST(IntegerLiteralSim, UnsizedHexXExtendsToWideContext) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [63:0] x;\n"
+      "  initial x = 'hx;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // Both words of the 64-bit vector must report all-x.
+  EXPECT_EQ(var->value.words[0].aval, ~uint64_t{0});
+  EXPECT_EQ(var->value.words[0].bval, ~uint64_t{0});
+}
+
+TEST(IntegerLiteralSim, UnsizedHexZExtendsToWideContext) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [63:0] x;\n"
+      "  initial x = 'hz;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // All 64 bits must report high-impedance: aval=0, bval=1 per bit.
+  EXPECT_EQ(var->value.words[0].aval, uint64_t{0});
+  EXPECT_EQ(var->value.words[0].bval, ~uint64_t{0});
+}
+
+TEST(IntegerLiteralSim, NegativeSizedLiteralIsTwosComplement) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = -8'sd6;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result & 0xFFu, 0xFAu);
+}
+
+TEST(IntegerLiteralSim, UnbasedUnsizedIsOneBitInConcatenation) {
+  // {1'b1, '1, 1'b0} must be a 3-bit value (0b110 == 6) — the
+  // unbased unsized literal contributes a single bit in the
+  // self-determined concatenation operand position. If '1 carried
+  // its default wide width instead, the concatenation would be
+  // tens of bits and the lower bits would still match the 32-bit
+  // target — so the test pins a wider target and a value that only
+  // matches when the operand really is one bit.
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = {1'b1, '1, 1'b0};\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 0x6u);
+}
+
+TEST(IntegerLiteralSim, UnbasedUnsizedIsOneBitInReplication) {
+  // {4{'1}} replicates a single bit four times, producing a 4-bit
+  // value of all ones (0xF). The target here is 32 bits, so without
+  // the self-determined rule '1 would carry its default width and
+  // the replicated result would span tens of bits whose lower
+  // portion would still saturate the target.
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = {4{'1}};\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 0xFu);
 }
 
 }

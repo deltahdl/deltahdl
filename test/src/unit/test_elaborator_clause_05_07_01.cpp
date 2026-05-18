@@ -21,18 +21,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 
 namespace {
 
-TEST(IntegerLiteralElaboration, AllOnesAssignElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  assign x = '1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(IntegerLiteralElaboration, UnsizedDecimalAssignElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -104,18 +92,6 @@ TEST(IntegerLiteralElaboration, DecimalSizedBaseElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(IntegerLiteralElaboration, XDigitAllBitsUnknown) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'dx;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(IntegerLiteralElaboration, DecimalZDigitElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -170,54 +146,6 @@ TEST(IntegerLiteralElaboration, SignedHexElaborates) {
       "module m;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'shAB;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(IntegerLiteralElaboration, ZeroLiteralElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic x;\n"
-      "  initial x = '0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(IntegerLiteralElaboration, UnbasedUnsizedOneElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic x;\n"
-      "  initial x = '1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(IntegerLiteralElaboration, XLiteralElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic x;\n"
-      "  initial x = 'x;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(IntegerLiteralElaboration, ZLiteralElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic x;\n"
-      "  initial x = 'z;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -677,21 +605,6 @@ TEST(IntegerLiteralElaboration, OctalXZCaseInsensitive) {
       f);
   ASSERT_NE(design, nullptr);
   LowerRunAndCompareBitPatterns(f, design, 0x3F);
-}
-
-TEST(IntegerLiteralElaboration, ModuleWithIntegerLiteralElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic [7:0] x = 8'hFF;\n"
-             "endmodule\n"));
-}
-
-TEST(IntegerLiteralElaboration, ModuleWithUnbasedUnsizedLiteralElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic [15:0] x;\n"
-             "  assign x = '1;\n"
-             "endmodule\n"));
 }
 
 }

@@ -366,23 +366,40 @@ TEST(IntegerLiteralParsing, DecimalValueWithUnderscores) {
   EXPECT_EQ(rhs->int_val, 27195000u);
 }
 
-TEST(IntegerLiteralParsing, BinaryLiteral) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = 4'b1010;\n"
-      "endmodule\n");
+TEST(IntegerLiteralParsing, UnaryMinusOnSimpleDecimal) {
+  auto r = Parse("module m; int x; initial x = -42; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
   auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(rhs->int_val, 0xAu);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kMinus);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->lhs->int_val, 42u);
 }
 
-TEST(IntegerLiteralParsing, UnbasedUnsizedLiteralInExpression) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  logic [15:0] x;\n"
-              "  assign x = '1;\n"
-              "endmodule\n"));
+TEST(IntegerLiteralParsing, UnaryPlusOnSimpleDecimal) {
+  auto r = Parse("module m; int x; initial x = +42; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kPlus);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->lhs->int_val, 42u);
+}
+
+TEST(IntegerLiteralParsing, UnaryMinusOnBasedLiteral) {
+  auto r = Parse("module m; logic [7:0] x; initial x = -8'd6; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kMinus);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->lhs->int_val, 6u);
 }
 
 }

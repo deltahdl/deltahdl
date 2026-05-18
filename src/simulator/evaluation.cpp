@@ -678,12 +678,31 @@ Logic4Vec AssembleConcatParts(const std::vector<Logic4Vec>& parts,
   return result;
 }
 
+static Logic4Vec SelfDeterminedOperand(const Expr* elem, Logic4Vec vec,
+                                       Arena& arena) {
+  // Concatenation operands are self-determined; an unbased unsized
+  // literal contributes one bit (per §5.7.1) rather than its default
+  // wide carrier.
+  if (elem && elem->kind == ExprKind::kUnbasedUnsizedLiteral &&
+      vec.width > 1) {
+    auto bit = MakeLogic4Vec(arena, 1);
+    if (vec.nwords > 0) {
+      bit.words[0].aval = vec.words[0].aval & 1;
+      bit.words[0].bval = vec.words[0].bval & 1;
+    }
+    return bit;
+  }
+  return vec;
+}
+
 static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t total_width = 0;
   bool any_string = false;
   std::vector<Logic4Vec> parts;
   for (auto* elem : expr->elements) {
-    parts.push_back(EvalExpr(elem, ctx, arena));
+    auto vec = EvalExpr(elem, ctx, arena);
+    vec = SelfDeterminedOperand(elem, vec, arena);
+    parts.push_back(vec);
     if (parts.back().is_string) any_string = true;
     total_width += parts.back().width;
   }
