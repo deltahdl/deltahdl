@@ -300,6 +300,7 @@ ModuleItem* Parser::ParsePropertyDecl() {
   if (Match(TokenKind::kLParen)) {
     int depth = 1;
     bool expect_formal_name = true;
+    bool saw_local = false;
     while (depth > 0 && !AtEnd()) {
       if (Check(TokenKind::kLParen)) {
         Consume();
@@ -311,9 +312,31 @@ ModuleItem* Parser::ParsePropertyDecl() {
       } else if (depth == 1 && Check(TokenKind::kComma)) {
         Consume();
         expect_formal_name = true;
+        saw_local = false;
       } else if (depth == 1 && Check(TokenKind::kEq)) {
         Consume();
         expect_formal_name = false;
+      } else if (depth == 1 && Check(TokenKind::kKwLocal)) {
+        Consume();
+        saw_local = true;
+      } else if (depth == 1 &&
+                 (Check(TokenKind::kKwOutput) ||
+                  Check(TokenKind::kKwInout))) {
+        // property_lvar_port_direction is restricted to `input` only;
+        // `output` and `inout` have no legal role inside a property port,
+        // with or without a preceding `local`.
+        diag_.Error(CurrentLoc(),
+                    "property port direction must be 'input'");
+        Consume();
+        saw_local = false;
+      } else if (depth == 1 && Check(TokenKind::kKwInput)) {
+        // `input` is permitted only after `local`.
+        if (!saw_local) {
+          diag_.Error(CurrentLoc(),
+                      "property port direction 'input' requires 'local'");
+        }
+        Consume();
+        saw_local = false;
       } else if (expect_formal_name && depth == 1 &&
                  Check(TokenKind::kIdentifier)) {
         auto name_tok = Consume();
@@ -325,6 +348,7 @@ ModuleItem* Parser::ParsePropertyDecl() {
         }
         item->prop_formals.push_back(name_tok.text);
         expect_formal_name = false;
+        saw_local = false;
       } else {
         Consume();
       }

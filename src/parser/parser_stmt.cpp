@@ -184,6 +184,8 @@ Stmt* Parser::ParseNbEventTriggerStmt() {
   s->range.start = CurrentLoc();
   Consume();
 
+  // delay_or_event_control = delay_control | event_control
+  //                       | repeat ( expression ) event_control
   if (Check(TokenKind::kHash)) {
     Consume();
     if (Check(TokenKind::kLParen)) {
@@ -192,6 +194,32 @@ Stmt* Parser::ParseNbEventTriggerStmt() {
       Expect(TokenKind::kRParen);
     } else {
       s->delay = ParsePrimaryExpr();
+    }
+  } else if (Check(TokenKind::kKwRepeat)) {
+    Consume();
+    Expect(TokenKind::kLParen);
+    s->repeat_event_count = ParseExpr();
+    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kAt);
+    Expect(TokenKind::kLParen);
+    s->events = ParseEventList();
+    Expect(TokenKind::kRParen);
+  } else if (Check(TokenKind::kAt)) {
+    Consume();
+    if (Match(TokenKind::kStar)) {
+      s->is_star_event = true;
+    } else if (Check(TokenKind::kLParen)) {
+      Consume();
+      if (Match(TokenKind::kStar)) {
+        s->is_star_event = true;
+      } else {
+        s->events = ParseEventList();
+      }
+      Expect(TokenKind::kRParen);
+    } else {
+      EventExpr ev;
+      ev.signal = ParseExpr();
+      s->events.push_back(ev);
     }
   }
   s->expr = ParseExpr();

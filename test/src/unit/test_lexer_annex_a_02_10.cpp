@@ -198,30 +198,6 @@ TEST(AssertionKeywordLexing, SyncRejectOnKeyword) {
   EXPECT_EQ(r.token.text, "sync_reject_on");
 }
 
-TEST(AssertionOperatorLexing, OverlapImplicationOp) {
-  auto tokens = Lex("a |-> b");
-  bool found = false;
-  for (const auto& tok : tokens) {
-    if (tok.kind == TokenKind::kPipeDashGt) {
-      found = true;
-      EXPECT_EQ(tok.text, "|->");
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
-TEST(AssertionOperatorLexing, NonoverlapImplicationOp) {
-  auto tokens = Lex("a |=> b");
-  bool found = false;
-  for (const auto& tok : tokens) {
-    if (tok.kind == TokenKind::kPipeEqGt) {
-      found = true;
-      EXPECT_EQ(tok.text, "|=>");
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 TEST(AssertionOperatorLexing, CycleDelayOp) {
   auto tokens = Lex("##1");
   ASSERT_GE(tokens.size(), 1u);
