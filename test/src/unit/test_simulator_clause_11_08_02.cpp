@@ -331,6 +331,65 @@ TEST(EvalSteps, SignedOperandSignExtendsInWiderContext) {
   EXPECT_EQ(var->value.ToUint64(), 0xFEu);
 }
 
+TEST(EvalSteps, MixedSignedAndUnsignedOperandUsesUnsignedExtension) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic signed [3:0] s;\n"
+      "  logic [3:0] u;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    s = -4'sd1;\n"
+      "    u = 4'd1;\n"
+      "    result = s + u;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x10u);
+}
+
+TEST(EvalSteps, RelationalWithMixedRealAndIntReturnsOneBitUnsigned) {
+  SimFixture f;
+  MakeVar(f, "iv", 8, 5);
+  auto* vr = f.ctx.CreateVariable("rv", 64);
+  double rval = 3.5;
+  uint64_t rbits = 0;
+  std::memcpy(&rbits, &rval, sizeof(double));
+  vr->value = MakeLogic4VecVal(f.arena, 64, rbits);
+  vr->value.is_real = true;
+  auto* expr = MakeBinary(f.arena, TokenKind::kLt, MakeId(f.arena, "rv"),
+                          MakeId(f.arena, "iv"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_FALSE(result.is_real);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalSteps, NonRealOperandIsSelfDeterminedAndConvertedWhenMixedWithReal) {
+  SimFixture f;
+  MakeVar(f, "iv", 8, 0xFF);
+  auto* vr = f.ctx.CreateVariable("rv", 64);
+  double rval = 0.5;
+  uint64_t rbits = 0;
+  std::memcpy(&rbits, &rval, sizeof(double));
+  vr->value = MakeLogic4VecVal(f.arena, 64, rbits);
+  vr->value.is_real = true;
+  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "iv"),
+                          MakeId(f.arena, "rv"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  ASSERT_TRUE(result.is_real);
+  uint64_t bits = result.ToUint64();
+  double got = 0.0;
+  std::memcpy(&got, &bits, sizeof(double));
+  EXPECT_DOUBLE_EQ(got, 255.5);
+}
+
 TEST(EvalSteps, UnsignedOperandZeroExtendsInWiderContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
