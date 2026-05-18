@@ -208,4 +208,32 @@ TEST(LexicalConventionLexing, EmptyInputProducesEofOnly) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
+TEST(LexicalConventionLexing, WhitespaceOnlyInputProducesEofOnly) {
+  auto tokens = Lex("   \t\n\r\n  \f ");
+  ASSERT_EQ(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
+}
+
+TEST(LexicalConventionLexing, LineCommentOnlyInputProducesEofOnly) {
+  auto tokens = Lex("// nothing but a line comment\n");
+  ASSERT_EQ(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
+}
+
+TEST(LexicalConventionLexing, BlockCommentOnlyInputProducesEofOnly) {
+  auto tokens = Lex("/* nothing but a block comment */");
+  ASSERT_EQ(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
+}
+
+TEST(LexicalConventionLexing, BlockCommentSpanningMultipleLinesAsSeparator) {
+  auto tokens = Lex("a /* line one\n   line two\n   line three */ b");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "b");
+  EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
+}
+
 }

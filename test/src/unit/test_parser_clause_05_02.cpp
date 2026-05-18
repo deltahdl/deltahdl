@@ -54,10 +54,6 @@ TEST(LexicalConventionParsing, TabsAndFormfeedsAsWhitespace) {
   EXPECT_TRUE(ParseOk("module\tt\f;\flogic\ta\t;\tendmodule"));
 }
 
-TEST(LexicalConventionParsing, EmptyModuleBody) {
-  EXPECT_TRUE(ParseOk("module t; endmodule"));
-}
-
 TEST(LexicalConventionParsing, BlockCommentAsSeparatorParses) {
   EXPECT_TRUE(ParseOk("module/**/t;logic/**/a;endmodule"));
 }

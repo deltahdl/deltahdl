@@ -12,20 +12,6 @@ TEST(LexicalConventionElaboration, FreeFormatSpreadElaborates) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, FreeFormatWhitespaceVariationsElaborateIdentically) {
-  ElabFixture f1;
-  auto* compact = ElaborateSrc("module t;logic a;assign a=1'b0;endmodule", f1);
-  ElabFixture f2;
-  auto* spread = ElaborateSrc(
-      "module\n  t\n;\n  logic\n  a\n;\n  assign\n  a\n=\n1'b0\n;\n"
-      "endmodule\n",
-      f2);
-  ASSERT_NE(compact, nullptr);
-  ASSERT_NE(spread, nullptr);
-  EXPECT_FALSE(f1.has_errors);
-  EXPECT_FALSE(f2.has_errors);
-}
-
 TEST(LexicalConventionElaboration, FreeFormatExcessiveWhitespaceElaborates) {
   EXPECT_TRUE(
       ElabOk("  module   t  ;   logic   a  ;   assign  a  =  1'b0  ;   "
