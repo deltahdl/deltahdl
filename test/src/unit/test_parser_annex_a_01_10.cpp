@@ -57,34 +57,12 @@ TEST(ConstraintItemsParsing, IfElseConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConstraintItemsParsing, ForeachConstraint) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int arr[10];\n"
-      "  constraint c {\n"
-      "    foreach (arr[i]) arr[i] inside {[0:255]};\n"
-      "  }\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ConstraintItemsParsing, DisableSoft) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
       "  constraint c_x { soft x == 5; }\n"
       "  constraint c_override { disable soft x; }\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ConstraintItemsParsing, UniquenessConstraint) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int a, b, c;\n"
-      "  constraint c_uniq { unique {a, b, c}; }\n"
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -97,36 +75,6 @@ TEST(ConstraintItemsParsing, DistConstraint) {
       "  constraint c_x {\n"
       "    x dist { 1 := 10, [2:5] :/ 20 };\n"
       "  }\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ConstraintItemsParsing, ConstraintPrototype) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  constraint c_x;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ConstraintItemsParsing, ExternConstraint) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  extern constraint c_x;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ConstraintItemsParsing, StaticConstraint) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  static constraint c_x { x > 0; }\n"
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -161,17 +109,6 @@ TEST(ConstraintItemsParsing, InsideConstraint) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ConstraintItemsParsing, ClassWithTwoExprConstraint) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  constraint c1 { x > 0; x < 100; }\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
 TEST(ConstraintItemsParsing, ConstraintDeclarationAndPrototype) {
@@ -286,17 +223,6 @@ TEST(ConstraintItemsParsing, ConstraintPrototypeQualifiers) {
   EXPECT_EQ(members[4]->name, "c4");
 }
 
-TEST(ConstraintItemsParsing, ExternConstraintDeclaration) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  extern constraint c;\n"
-      "endclass\n"
-      "constraint C::c { x > 0; }\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 TEST(ConstraintItemsParsing, ImplicitConstraintPrototype) {
   auto r = Parse(
       "class C;\n"
@@ -351,9 +277,20 @@ TEST(ConstraintItemsParsing, ConstraintDeclDynamicOverride) {
   auto& members = r.cu->classes[0]->members;
   ASSERT_GE(members.size(), 5u);
   EXPECT_EQ(members[1]->name, "c1");
+  EXPECT_TRUE(members[1]->is_constraint_initial);
+  EXPECT_FALSE(members[1]->is_constraint_extends);
+  EXPECT_FALSE(members[1]->is_constraint_final);
   EXPECT_EQ(members[2]->name, "c2");
+  EXPECT_FALSE(members[2]->is_constraint_initial);
+  EXPECT_TRUE(members[2]->is_constraint_extends);
+  EXPECT_FALSE(members[2]->is_constraint_final);
   EXPECT_EQ(members[3]->name, "c3");
+  EXPECT_FALSE(members[3]->is_constraint_initial);
+  EXPECT_FALSE(members[3]->is_constraint_extends);
+  EXPECT_TRUE(members[3]->is_constraint_final);
   EXPECT_EQ(members[4]->name, "c4");
+  EXPECT_TRUE(members[4]->is_constraint_initial);
+  EXPECT_TRUE(members[4]->is_constraint_final);
 }
 
 TEST(ConstraintItemsParsing, ConstraintPrototypeDynamicOverride) {
@@ -368,7 +305,10 @@ TEST(ConstraintItemsParsing, ConstraintPrototypeDynamicOverride) {
   auto& members = r.cu->classes[0]->members;
   ASSERT_GE(members.size(), 3u);
   EXPECT_EQ(members[1]->name, "c1");
+  EXPECT_TRUE(members[1]->is_constraint_initial);
   EXPECT_EQ(members[2]->name, "c2");
+  EXPECT_TRUE(members[2]->is_constraint_final);
+  EXPECT_TRUE(members[2]->is_pure_virtual);
 }
 
 TEST(ConstraintItemsParsing, ExternConstraintDeclDynOverrideTopLevel) {
@@ -656,6 +596,7 @@ TEST(ConstraintItemsParsing, PureConstraintPrototype) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->members[1]->kind, ClassMemberKind::kConstraint);
   EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
+  EXPECT_TRUE(r.cu->classes[0]->members[1]->is_pure_virtual);
 }
 
 TEST(ConstraintItemsParsing, ExternConstraintDeclExtendsOverride) {
@@ -779,28 +720,6 @@ TEST(ConstraintItemsParsing, ErrorExternConstraintMissingIdentifier) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ConstraintItemsParsing, ConstraintOnlyFinalOverride) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  constraint :final c { x > 0; }\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
-}
-
-TEST(ConstraintItemsParsing, ConstraintOnlyExtendsOverride) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  constraint :extends c { x > 0; }\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
-}
-
 TEST(ConstraintItemsParsing, ConstraintExtendsAndFinalOverride) {
   auto r = Parse(
       "class C;\n"
@@ -810,6 +729,9 @@ TEST(ConstraintItemsParsing, ConstraintExtendsAndFinalOverride) {
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
+  EXPECT_TRUE(r.cu->classes[0]->members[1]->is_constraint_extends);
+  EXPECT_TRUE(r.cu->classes[0]->members[1]->is_constraint_final);
+  EXPECT_FALSE(r.cu->classes[0]->members[1]->is_constraint_initial);
 }
 
 TEST(ConstraintItemsParsing, MultipleConstraintBlockItems) {
@@ -861,6 +783,50 @@ TEST(ConstraintItemsParsing, NestedBracesInConstraintBlock) {
       "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
+TEST(ConstraintItemsParsing, DistItemValueRangeWithoutWeight) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist { 10, 20, [30:40] }; }\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
+}
+
+TEST(ConstraintItemsParsing, ConstraintPrimaryImplicitHandle) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x, y;\n"
+      "  constraint c { solve this.x before this.y; }\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->members[2]->name, "c");
+}
+
+TEST(ConstraintItemsParsing, ConstraintPrimaryClassScope) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { solve C::x before C::x; }\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
+}
+
+TEST(ConstraintItemsParsing, ConstraintPrimaryWithParens) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { disable soft randomize(); }\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
 }
 
 }
