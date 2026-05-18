@@ -99,4 +99,44 @@ TEST(AttributeInstanceElaboration, AttrStringValueResolves) {
   EXPECT_EQ(m.attrs[0].string_value, "synplify");
 }
 
+TEST(AttributeInstanceElaboration, AttrSpecWithoutValueDefaultsToOne) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "(* mark_debug *)\n"
+      "module m;\n"
+      "  logic x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto& m = *design->top_modules[0];
+  ASSERT_GE(m.attrs.size(), 1u);
+  EXPECT_EQ(m.attrs[0].name, "mark_debug");
+  ASSERT_TRUE(m.attrs[0].resolved_value.has_value());
+  EXPECT_EQ(*m.attrs[0].resolved_value, 1);
+}
+
+TEST(AttributeInstanceElaboration, AttrInstanceListPreservesOrder) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "(* a = 1, b = 2, c = 3 *)\n"
+      "module m;\n"
+      "  logic x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto& m = *design->top_modules[0];
+  ASSERT_GE(m.attrs.size(), 3u);
+  EXPECT_EQ(m.attrs[0].name, "a");
+  EXPECT_EQ(m.attrs[1].name, "b");
+  EXPECT_EQ(m.attrs[2].name, "c");
+  ASSERT_TRUE(m.attrs[0].resolved_value.has_value());
+  ASSERT_TRUE(m.attrs[1].resolved_value.has_value());
+  ASSERT_TRUE(m.attrs[2].resolved_value.has_value());
+  EXPECT_EQ(*m.attrs[0].resolved_value, 1);
+  EXPECT_EQ(*m.attrs[1].resolved_value, 2);
+  EXPECT_EQ(*m.attrs[2].resolved_value, 3);
+}
+
 }

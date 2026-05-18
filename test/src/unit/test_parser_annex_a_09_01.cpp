@@ -186,4 +186,38 @@ TEST(AttributeSyntaxParsing, ErrorMissingValueAfterEquals) {
   EXPECT_FALSE(ParseOk("(* depth = *) module m; endmodule\n"));
 }
 
+TEST(AttributeSyntaxParsing, AttrNameUnderscoreStart) {
+  auto r = Parse(
+      "(* _internal = 1 *)\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->attrs.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->attrs[0].name, "_internal");
+}
+
+TEST(AttributeSyntaxParsing, AttrOnPortDeclaration) {
+  auto r = Parse(
+      "module m((* ramstyle = \"block\" *) input [7:0] a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(AttributeSyntaxParsing, AttrInstanceCanBeRepeatedAcrossDeclarations) {
+  auto r = Parse(
+      "module m;\n"
+      "  (* keep *) logic a;\n"
+      "  (* keep *) logic b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  ASSERT_GE(items[0]->attrs.size(), 1u);
+  ASSERT_GE(items[1]->attrs.size(), 1u);
+  EXPECT_EQ(items[0]->attrs[0].name, "keep");
+  EXPECT_EQ(items[1]->attrs[0].name, "keep");
+}
+
 }

@@ -402,8 +402,27 @@ Expr* Parser::ParsePrimaryExpr() {
   auto tok = CurrentToken();
 
   switch (tok.kind) {
-    case TokenKind::kIntLiteral:
-      return MakeLiteral(ExprKind::kIntegerLiteral, tok);
+    case TokenKind::kIntLiteral: {
+      auto* lit = MakeLiteral(ExprKind::kIntegerLiteral, tok);
+      // casting_type allows constant_primary; an integer literal followed by
+      // '(expr) is a width-cast (the literal is the target width).
+      if (Check(TokenKind::kApostrophe)) {
+        auto saved = lexer_.SavePos();
+        Consume();
+        if (Check(TokenKind::kLParen)) {
+          Consume();
+          auto* cast = arena_.Create<Expr>();
+          cast->kind = ExprKind::kCast;
+          cast->range.start = lit->range.start;
+          cast->rhs = lit;
+          cast->lhs = ParseExpr();
+          Expect(TokenKind::kRParen);
+          return cast;
+        }
+        lexer_.RestorePos(saved);
+      }
+      return lit;
+    }
     case TokenKind::kUnbasedUnsizedLiteral:
       return MakeLiteral(ExprKind::kUnbasedUnsizedLiteral, tok);
     case TokenKind::kRealLiteral:

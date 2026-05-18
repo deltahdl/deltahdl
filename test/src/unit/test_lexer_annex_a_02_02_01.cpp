@@ -224,4 +224,63 @@ TEST(NetAndVariableTypeLexing, TypeKeyword) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwType);
 }
 
+TEST(NetAndVariableTypeLexing, InterconnectKeyword) {
+  auto tokens = Lex("interconnect");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwInterconnect);
+}
+
+TEST(NetAndVariableTypeLexing, InterfaceKeyword) {
+  auto tokens = Lex("interface");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwInterface);
+}
+
+TEST(NetAndVariableTypeLexing, VirtualKeyword) {
+  auto tokens = Lex("virtual");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwVirtual);
+}
+
+TEST(NetAndVariableTypeLexing, PackedKeyword) {
+  auto tokens = Lex("packed");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwPacked);
+}
+
+TEST(NetAndVariableTypeLexing, ConstKeyword) {
+  auto tokens = Lex("const");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwConst);
+}
+
+TEST(NetAndVariableTypeLexing, EnumKeyword) {
+  auto tokens = Lex("enum");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwEnum);
+}
+
+TEST(NetAndVariableTypeLexing, ConstantPrimaryCastUsesApostropheToken) {
+  // 5'(x) — the constant_primary alternative of casting_type. The bare digit
+  // must lex as an integer literal and the apostrophe as its own token so the
+  // parser can build the cast; an eager sized-literal pass would mis-tokenize
+  // the parenthesis as a base letter.
+  auto tokens = Lex("5'(x)");
+  ASSERT_GE(tokens.size(), 4u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "5");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kApostrophe);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kLParen);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kIdentifier);
+}
+
+TEST(NetAndVariableTypeLexing, SizedLiteralStillLexesAsOneToken) {
+  // The lookahead must not break sized literals such as 4'd5 — the apostrophe
+  // followed by a base letter still folds into one kIntLiteral token.
+  auto tokens = Lex("4'd5");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "4'd5");
+}
+
 }

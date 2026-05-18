@@ -207,4 +207,32 @@ TEST(IdentifierElaboration, PsTypeIdentifierFromPackageResolves) {
              "endmodule\n"));
 }
 
+TEST(IdentifierElaboration, SimpleIdentifierWithMixedAlphaNumericResolves) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic abc123;\n"
+             "  assign abc123 = 1'b1;\n"
+             "endmodule\n"));
+}
+
+TEST(IdentifierElaboration, PsParameterFromPackageResolves) {
+  EXPECT_TRUE(
+      ElabOk("package pkg;\n"
+             "  parameter int W = 4;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  logic [pkg::W-1:0] bus;\n"
+             "  assign bus = '0;\n"
+             "endmodule\n"));
+}
+
+TEST(IdentifierElaboration, ModportIdentifierIsAcceptedAsIdentifier) {
+  EXPECT_TRUE(
+      ElabOk("interface my_if;\n"
+             "  logic d;\n"
+             "  modport mp(input d);\n"
+             "endinterface\n"
+             "module m; endmodule\n"));
+}
+
 }

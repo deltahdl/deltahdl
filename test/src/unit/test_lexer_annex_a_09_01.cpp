@@ -83,4 +83,12 @@ TEST(AttributeTokenLexing, AttrWithExprValueTokens) {
   EXPECT_EQ(tokens[6].kind, TokenKind::kAttrEnd);
 }
 
+TEST(AttributeTokenLexing, AttrNameEscapedIdentifierToken) {
+  auto tokens = Lex("(* \\multi-word-name *)");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[1].text, "multi-word-name");
+}
+
 }

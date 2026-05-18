@@ -627,4 +627,129 @@ TEST(IdentifierSyntaxParsing, PsParameterIdentifierFromGenerateBlock) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(IdentifierSyntaxParsing, PsOrHierarchicalNetIdentifierAcrossPackage) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "package pkg;\n"
+      "  parameter int W = 8;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  logic [pkg::W-1:0] bus;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, ModportIdentifierAfterDot) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "interface my_if;\n"
+      "  logic d;\n"
+      "  modport mp(input d);\n"
+      "endinterface\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, NettypeIdentifier) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "package pkg;\n"
+      "  nettype real my_real_net;\n"
+      "endpackage\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, SimpleIdentifierAllowsUnderscoreAndDigits) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m_1;\n"
+      "  logic abc_2_x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(cu->modules[0]->name, "m_1");
+}
+
+TEST(IdentifierSyntaxParsing, EscapedIdentifierWithPlus) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m;\n"
+      "  logic \\sig+1 ;\n"
+      "  assign \\sig+1 = 1'b0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, HierarchicalIdentifierTfCall) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module sub;\n"
+      "  function int helper(); return 1; endfunction\n"
+      "endmodule\n"
+      "module m;\n"
+      "  sub u();\n"
+      "  int y;\n"
+      "  initial y = u.helper();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, PsOrHierarchicalPropertyIdentifier) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module sub(input clk, input a);\n"
+      "  property p_ok;\n"
+      "    @(posedge clk) a;\n"
+      "  endproperty\n"
+      "endmodule\n"
+      "module m(input clk, input a);\n"
+      "  sub u(.clk(clk), .a(a));\n"
+      "  assert property (u.p_ok);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, PsOrHierarchicalSequenceIdentifier) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module sub(input clk, input a, input b);\n"
+      "  sequence s_ab;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n"
+      "module m(input clk, input a, input b);\n"
+      "  sub u(.clk(clk), .a(a), .b(b));\n"
+      "  cover property (u.s_ab);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, HierarchicalIdentifierConstantBitSelectInPath) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module sub(input [3:0] d, output [3:0] q); assign q = d; endmodule\n"
+      "module m;\n"
+      "  logic [3:0] data;\n"
+      "  sub arr[0:3](.d(4'h0), .q());\n"
+      "  initial data = arr[2].q;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }

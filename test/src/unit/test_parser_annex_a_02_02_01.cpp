@@ -393,4 +393,251 @@ TEST(NetAndVariableTypeParsing, StructWithExtraPackedDimensions) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(NetAndVariableTypeParsing, CastingTypeIntegerAtom) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  initial x = int'(3.14);\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(NetAndVariableTypeParsing, CastingTypeSigning) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] u;\n"
+      "  logic [7:0] s;\n"
+      "  initial s = signed'(u);\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(NetAndVariableTypeParsing, CastingTypeUnsigned) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic signed [7:0] s;\n"
+      "  logic [7:0] u;\n"
+      "  initial u = unsigned'(s);\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(NetAndVariableTypeParsing, CastingTypeString) {
+  auto r = Parse(
+      "module m;\n"
+      "  string s;\n"
+      "  initial s = string'(\"hello\");\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(NetAndVariableTypeParsing, CastingTypeConst) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int y;\n"
+              "  initial y = const'(5);\n"
+              "endmodule\n"));
+}
+
+TEST(NetAndVariableTypeParsing, VirtualInterfaceDataType) {
+  auto r = Parse(
+      "module m;\n"
+      "  virtual interface my_if v;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kVirtualInterface);
+  EXPECT_EQ(item->data_type.type_name, "my_if");
+}
+
+TEST(NetAndVariableTypeParsing, VirtualInterfaceWithModport) {
+  auto r = Parse(
+      "module m;\n"
+      "  virtual interface my_if.mp v;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kVirtualInterface);
+  EXPECT_EQ(item->data_type.type_name, "my_if");
+  EXPECT_EQ(item->data_type.modport_name, "mp");
+}
+
+TEST(NetAndVariableTypeParsing, EnumBaseTypeIntegerVector) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef enum logic [3:0] { A, B, C } e_t;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kEnum);
+  EXPECT_EQ(item->typedef_type.enum_base_kind, DataTypeKind::kLogic);
+}
+
+TEST(NetAndVariableTypeParsing, EnumNameDeclarationWithRange) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef enum { S[4] } e_t;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_GE(item->typedef_type.enum_members.size(), 1u);
+  EXPECT_NE(item->typedef_type.enum_members[0].range_start, nullptr);
+}
+
+TEST(NetAndVariableTypeParsing, EnumNameDeclarationWithConstantExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef enum { RED = 1, GREEN = 2, BLUE = 4 } color_t;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_EQ(item->typedef_type.enum_members.size(), 3u);
+  EXPECT_NE(item->typedef_type.enum_members[0].value, nullptr);
+}
+
+TEST(NetAndVariableTypeParsing, TypeReferenceFromDataType) {
+  auto r = Parse(
+      "module m;\n"
+      "  type(int) y;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(NetAndVariableTypeParsing, ConstDataDeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  const int x = 5;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(NetAndVariableTypeParsing, InterconnectImplicitNetPortType) {
+  EXPECT_TRUE(
+      ParseOk("module m(interconnect [3:0] bus);\n"
+              "endmodule\n"));
+}
+
+TEST(NetAndVariableTypeParsing, ImplicitDataTypeSigningOnly) {
+  auto r = Parse(
+      "module m(input signed a);\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_GE(mod->ports.size(), 1u);
+  EXPECT_TRUE(mod->ports[0].data_type.is_signed);
+}
+
+TEST(NetAndVariableTypeParsing, StructUnionMemberRandQualifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct { rand int x; randc bit [1:0] y; } s_t;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_EQ(item->typedef_type.struct_members.size(), 2u);
+  EXPECT_TRUE(item->typedef_type.struct_members[0].is_rand);
+  EXPECT_TRUE(item->typedef_type.struct_members[1].is_randc);
+}
+
+TEST(NetAndVariableTypeParsing, ClassTypeAsDataType) {
+  auto r = Parse(
+      "class my_cls;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module m;\n"
+      "  my_cls h;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 1u);
+  EXPECT_EQ(mod->items[0]->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(mod->items[0]->data_type.type_name, "my_cls");
+}
+
+TEST(NetAndVariableTypeParsing, ClassTypeWithParameterValueAssignment) {
+  auto r = Parse(
+      "class my_cls #(int W = 8);\n"
+      "  logic [W-1:0] x;\n"
+      "endclass\n"
+      "module m;\n"
+      "  my_cls#(16) h;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 1u);
+  EXPECT_EQ(mod->items[0]->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(mod->items[0]->data_type.type_name, "my_cls");
+  EXPECT_FALSE(mod->items[0]->data_type.type_params.empty());
+}
+
+TEST(NetAndVariableTypeParsing, EnumBaseTypeFromTypeIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [3:0] base_t;\n"
+      "  typedef enum base_t { A, B, C } e_t;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(NetAndVariableTypeParsing, PackageScopedTypeIdentifierAsDataType) {
+  auto r = Parse(
+      "package p;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  p::byte_t b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 1u);
+  EXPECT_EQ(mod->items[0]->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(mod->items[0]->data_type.scope_name, "p");
+  EXPECT_EQ(mod->items[0]->data_type.type_name, "byte_t");
+}
+
+TEST(NetAndVariableTypeParsing, CastingTypeConstantPrimaryWidth) {
+  // The constant_primary alternative of casting_type — a width literal as the
+  // cast's target type, e.g. 8'(x) reshapes x to eight bits.
+  auto r = Parse(
+      "module m;\n"
+      "  logic [3:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  initial b = 8'(a);\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(NetAndVariableTypeParsing, ClassScopeTypeAccess) {
+  auto r = Parse(
+      "class outer;\n"
+      "  typedef logic [3:0] inner_t;\n"
+      "endclass\n"
+      "module m;\n"
+      "  outer::inner_t v;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }

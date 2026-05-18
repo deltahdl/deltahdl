@@ -386,7 +386,24 @@ Token Lexer::LexNumber() {
   }
 
   if (!AtEnd() && Current() == '\'') {
-    return LexBasedNumber(loc, start);
+    // The size-prefixed integer literal grammar requires the apostrophe to be
+    // followed by an optional s/S signed marker and one of the base letters
+    // d/D/b/B/o/O/h/H. Anything else — most importantly a left parenthesis or
+    // left brace — keeps the apostrophe as a separate token so that
+    // size'(expr) and size'{...} cast/assignment-pattern forms tokenize
+    // correctly.
+    uint32_t look = pos_ + 1;
+    if (look < source_.size() &&
+        (source_[look] == 's' || source_[look] == 'S')) {
+      ++look;
+    }
+    char base = (look < source_.size()) ? source_[look] : '\0';
+    bool looks_like_base = base == 'd' || base == 'D' || base == 'b' ||
+                           base == 'B' || base == 'o' || base == 'O' ||
+                           base == 'h' || base == 'H';
+    if (looks_like_base) {
+      return LexBasedNumber(loc, start);
+    }
   }
   pos_ = before_ws;
 

@@ -211,3 +211,23 @@ TEST(IdentifierLexing, SystemIdentDollarAsFirstBodyChar) {
   EXPECT_EQ(tokens[0].text, "$$bar");
 }
 
+TEST(IdentifierLexing, SimpleIdentAllowsTrailingUnderscores) {
+  auto tokens = Lex("foo___");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "foo___");
+}
+
+TEST(IdentifierLexing, SimpleIdentFirstCharCannotBeDigit) {
+  auto tokens = Lex("9abc");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_NE(tokens[0].kind, TokenKind::kIdentifier);
+}
+
+TEST(IdentifierLexing, EscapedIdentifierTerminatedByTab) {
+  auto tokens = Lex("\\x_y\t");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[0].text, "x_y");
+}
+

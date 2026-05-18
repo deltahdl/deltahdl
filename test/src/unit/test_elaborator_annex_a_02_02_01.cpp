@@ -162,4 +162,40 @@ TEST(NetAndVariableTypeElaboration, TypeReferenceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(NetAndVariableTypeElaboration, EnumBaseTypeElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef enum logic [2:0] { A = 0, B = 1, C = 4 } e_t;\n"
+      "  e_t x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(NetAndVariableTypeElaboration, EnumNameRangeElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef enum bit [1:0] { S[3] } e_t;\n"
+      "  e_t x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(NetAndVariableTypeElaboration, ConstDeclarationElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  const int W = 8;\n"
+      "  logic [W-1:0] data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }
