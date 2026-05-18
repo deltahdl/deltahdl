@@ -4,12 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(FormalSyntaxParsing, NetDeclTriWandWor) {
-  auto r = Parse("module m; tri t; wand wa; wor wo; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items.size(), 3u);
-}
 TEST(DataTypeParsing, AllBuiltinNetTypes) {
   auto r = Parse(
       "module t;\n"

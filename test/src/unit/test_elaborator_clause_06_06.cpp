@@ -84,4 +84,60 @@ TEST(NetTypes, AllBuiltinNetTypesElaborate) {
   EXPECT_EQ(n->net_type, NetType::kUwire);
 }
 
+TEST(NetTypes, BuiltinNetsAreNotMarkedAsUserDefined) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire w;\n"
+      "  tri tr;\n"
+      "  wand wa;\n"
+      "  wor wo;\n"
+      "  triand ta;\n"
+      "  trior to_;\n"
+      "  tri0 t0;\n"
+      "  tri1 t1;\n"
+      "  trireg tg;\n"
+      "  supply0 s0;\n"
+      "  supply1 s1;\n"
+      "  uwire uw;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->nets.size(), 12u);
+  for (const auto& n : mod->nets) {
+    EXPECT_FALSE(n.is_user_nettype)
+        << "built-in net '" << n.name << "' must not be user-defined";
+    EXPECT_TRUE(n.nettype_name.empty())
+        << "built-in net '" << n.name << "' must carry no nettype identifier";
+  }
+}
+
+TEST(NetTypes, UserDefinedNettypeIsDistinguishedFromBuiltin) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  nettype logic my_net;\n"
+      "  wire w;\n"
+      "  my_net u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->nets.size(), 2u);
+
+  const RtlirNet* builtin = nullptr;
+  const RtlirNet* user = nullptr;
+  for (const auto& n : mod->nets) {
+    if (n.name == "w") builtin = &n;
+    if (n.name == "u") user = &n;
+  }
+  ASSERT_NE(builtin, nullptr);
+  ASSERT_NE(user, nullptr);
+  EXPECT_FALSE(builtin->is_user_nettype);
+  EXPECT_TRUE(user->is_user_nettype);
+}
+
 }
