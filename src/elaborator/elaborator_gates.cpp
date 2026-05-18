@@ -255,6 +255,8 @@ static void ApplyGateDelays(RtlirContAssign& ca, const ModuleItem* item) {
   ca.delay = item->gate_delay;
   ca.delay_fall = item->gate_delay_fall;
   ca.delay_decay = item->gate_delay_decay;
+  ca.drive_strength0 = item->drive_strength0;
+  ca.drive_strength1 = item->drive_strength1;
 }
 
 static Expr* BuildOutputGateExpr(Arena& arena, GateKind kind,

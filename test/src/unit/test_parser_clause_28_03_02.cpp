@@ -103,4 +103,120 @@ TEST(GateInstStrengthParsing, Strength1BeforeStrength0Encoding) {
   EXPECT_EQ(item->drive_strength1, 3u);
 }
 
+TEST(PullupStrengthForms, NoStrengthAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire out;\n"
+      "  pullup pu1(out);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(PullupStrengthForms, OnlyStrength1Accepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire out;\n"
+      "  pullup (strong1) pu1(out);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(PullupStrengthForms, BothStrengthsAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire out;\n"
+      "  pullup (weak0, strong1) pu1(out);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(PullupStrengthForms, OnlyStrength0Rejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire out;\n"
+      "  pullup (strong0) pu1(out);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PulldownStrengthForms, NoStrengthAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire out;\n"
+      "  pulldown pd1(out);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(PulldownStrengthForms, OnlyStrength0Accepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire out;\n"
+      "  pulldown (strong0) pd1(out);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(PulldownStrengthForms, BothStrengthsAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire out;\n"
+      "  pulldown (strong0, weak1) pd1(out);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(PulldownStrengthForms, OnlyStrength1Rejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire out;\n"
+      "  pulldown (strong1) pd1(out);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(SwitchStrengthRejection, NmosStrengthRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, in, ctrl;\n"
+      "  nmos (strong0, strong1) g(y, in, ctrl);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(GateInstStrengthParsing, BufWithStrengthAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a;\n"
+      "  buf (pull0, supply1) g(y, a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[2];
+  EXPECT_EQ(item->drive_strength0, 3u);
+  EXPECT_EQ(item->drive_strength1, 5u);
+}
+
+TEST(GateInstStrengthParsing, Bufif1WithStrengthAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, en;\n"
+      "  bufif1 (weak0, strong1) g(y, a, en);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[3];
+  EXPECT_EQ(item->drive_strength0, 2u);
+  EXPECT_EQ(item->drive_strength1, 4u);
+}
+
+TEST(GateInstStrengthParsing, MissingCommaBetweenStrengthsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  and (strong0 strong1) g(y, a, b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }
