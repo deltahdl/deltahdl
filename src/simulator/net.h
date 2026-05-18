@@ -51,6 +51,13 @@ void DisconnectCharge(Net& net);
 
 NetStrength CombineAmbiguousStrength(NetStrength a, NetStrength b);
 
+enum class WiredLogicKind : uint8_t { kAnd, kOr };
+
+// Pairwise per LRM §28.12.4: the per-side max/min shortcut used for
+// non-wired-logic ambiguous combinations does not commute with wired AND/OR.
+NetStrength CombineWiredLogicAmbiguous(NetStrength a, NetStrength b,
+                                       WiredLogicKind kind);
+
 Logic4Word ResolveWireWord(Logic4Word a, Logic4Word b);
 
 Logic4Word ResolveWandWord(Logic4Word a, Logic4Word b);

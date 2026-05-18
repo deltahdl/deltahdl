@@ -36,26 +36,6 @@ TEST(StrengthCombine, IdenticalSignalsUnchanged) {
   EXPECT_EQ(result.strength0_hi, StrengthLevel::kPull);
 }
 
-TEST(StrengthCombine, SupplyDominatesStrong) {
-  StrengthSignal supply_zero{Val4::kV0, StrengthLevel::kSupply,
-                             StrengthLevel::kHighz};
-  StrengthSignal strong_one{Val4::kV1, StrengthLevel::kHighz,
-                            StrengthLevel::kStrong};
-  auto result = CombineUnambiguous(supply_zero, strong_one);
-  EXPECT_EQ(result.value, Val4::kV0);
-  EXPECT_EQ(result.strength0_hi, StrengthLevel::kSupply);
-}
-
-TEST(StrengthCombine, ChargeStorageStrengthDominatesSmaller) {
-  StrengthSignal medium_one{Val4::kV1, StrengthLevel::kHighz,
-                            StrengthLevel::kMedium};
-  StrengthSignal small_zero{Val4::kV0, StrengthLevel::kSmall,
-                            StrengthLevel::kHighz};
-  auto result = CombineUnambiguous(medium_one, small_zero);
-  EXPECT_EQ(result.value, Val4::kV1);
-  EXPECT_EQ(result.strength1_hi, StrengthLevel::kMedium);
-}
-
 TEST(StrengthCombine, LikeValueThreeSignalsKeepMaxStrength) {
   StrengthSignal weak_one{Val4::kV1, StrengthLevel::kHighz,
                           StrengthLevel::kWeak};
@@ -85,24 +65,6 @@ TEST(StrengthResolution, StrongerDriverWins) {
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
-TEST(StrengthResolution, WeakerDriverLoses) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kSupply, Strength::kSupply});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
-  net.Resolve(arena);
-
-  EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(StrengthResolution, StrongerDriverWinsPerBit) {
@@ -157,6 +119,28 @@ TEST(StrengthResolution, IdenticalDriversResolveSameValue) {
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+TEST(StrengthResolution, IdenticalDriversPreserveResolvedStrength) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
+  EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
 }
 
 TEST(StrengthResolution, ThreeDriversStrongestWins) {

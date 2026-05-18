@@ -389,6 +389,50 @@ TEST(StrengthResolution, WorZeroOrXRecordsCombinedStrength) {
   EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
 }
 
+TEST(StrengthResolution, WandLikeOnesRecordStrengthOnOneSide) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWand;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kHighz);
+}
+
+TEST(StrengthResolution, WorLikeZerosRecordStrengthOnZeroSide) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWor;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
+}
+
 TEST(StrengthResolution, WandThreeDriversFoldToAnd) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -425,6 +469,107 @@ TEST(StrengthResolution, WorThreeDriversFoldToOr) {
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(WiredLogicAmbig, AndPairwiseAcrossStrengthRanges) {
+  NetStrength a;
+  a.s0_lo = Strength::kPull;
+  a.s0_hi = Strength::kStrong;
+  NetStrength b;
+  b.s1_lo = Strength::kLarge;
+  b.s1_hi = Strength::kPull;
+
+  auto r = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kAnd);
+
+  EXPECT_EQ(r.s0_lo, Strength::kPull);
+  EXPECT_EQ(r.s0_hi, Strength::kStrong);
+  EXPECT_EQ(r.s1_hi, Strength::kHighz);
+  EXPECT_EQ(r.s1_lo, Strength::kHighz);
+}
+
+TEST(WiredLogicAmbig, OrPairwiseAcrossStrengthRanges) {
+  NetStrength a;
+  a.s0_lo = Strength::kPull;
+  a.s0_hi = Strength::kStrong;
+  NetStrength b;
+  b.s1_lo = Strength::kLarge;
+  b.s1_hi = Strength::kPull;
+
+  auto r = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kOr);
+
+  EXPECT_EQ(r.s0_lo, Strength::kPull);
+  EXPECT_EQ(r.s0_hi, Strength::kStrong);
+  EXPECT_EQ(r.s1_lo, Strength::kPull);
+  EXPECT_EQ(r.s1_hi, Strength::kPull);
+}
+
+TEST(WiredLogicAmbig, LikeValuesKeepSingleSideUnionedRange) {
+  NetStrength a;
+  a.s1_lo = Strength::kWeak;
+  a.s1_hi = Strength::kPull;
+  NetStrength b;
+  b.s1_lo = Strength::kLarge;
+  b.s1_hi = Strength::kStrong;
+
+  auto r_and = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kAnd);
+  auto r_or = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kOr);
+
+  EXPECT_EQ(r_and.s0_hi, Strength::kHighz);
+  EXPECT_EQ(r_and.s1_lo, Strength::kLarge);
+  EXPECT_EQ(r_and.s1_hi, Strength::kStrong);
+  EXPECT_EQ(r_or.s0_hi, Strength::kHighz);
+  EXPECT_EQ(r_or.s1_lo, Strength::kLarge);
+  EXPECT_EQ(r_or.s1_hi, Strength::kStrong);
+}
+
+TEST(WiredLogicAmbig, UnambigInputsAgreeWithPerPairRule) {
+  NetStrength a;
+  a.s0_lo = Strength::kStrong;
+  a.s0_hi = Strength::kStrong;
+  NetStrength b;
+  b.s1_lo = Strength::kStrong;
+  b.s1_hi = Strength::kStrong;
+
+  auto r_and = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kAnd);
+  auto r_or = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kOr);
+
+  EXPECT_EQ(r_and.s0_lo, Strength::kStrong);
+  EXPECT_EQ(r_and.s0_hi, Strength::kStrong);
+  EXPECT_EQ(r_and.s1_hi, Strength::kHighz);
+  EXPECT_EQ(r_or.s1_lo, Strength::kStrong);
+  EXPECT_EQ(r_or.s1_hi, Strength::kStrong);
+  EXPECT_EQ(r_or.s0_hi, Strength::kHighz);
+}
+
+TEST(WiredLogicAmbig, AndProducesDualSidedRange) {
+  NetStrength a;
+  a.s0_lo = Strength::kPull;
+  a.s0_hi = Strength::kPull;
+  a.s1_lo = Strength::kStrong;
+  a.s1_hi = Strength::kStrong;
+  NetStrength b;
+  b.s1_lo = Strength::kPull;
+  b.s1_hi = Strength::kPull;
+
+  auto r = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kAnd);
+
+  EXPECT_EQ(r.s0_lo, Strength::kPull);
+  EXPECT_EQ(r.s0_hi, Strength::kPull);
+  EXPECT_EQ(r.s1_lo, Strength::kStrong);
+  EXPECT_EQ(r.s1_hi, Strength::kStrong);
+  EXPECT_FALSE(r.IsAmbiguous());
+}
+
+TEST(WiredLogicAmbig, EmptyInputProducesEmptyRange) {
+  NetStrength a;
+  NetStrength b;
+  b.s0_lo = Strength::kPull;
+  b.s0_hi = Strength::kPull;
+
+  auto r = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kAnd);
+
+  EXPECT_EQ(r.s0_hi, Strength::kHighz);
+  EXPECT_EQ(r.s1_hi, Strength::kHighz);
 }
 
 }

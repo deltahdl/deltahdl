@@ -21,6 +21,87 @@ NetStrength CombineAmbiguousStrength(NetStrength a, NetStrength b) {
   return r;
 }
 
+namespace {
+
+struct StrengthComponent {
+  uint8_t val;
+  uint8_t level;
+};
+
+static void CollectComponents(NetStrength s,
+                              std::vector<StrengthComponent>& out) {
+  if (s.s0_hi != Strength::kHighz) {
+    for (uint8_t lvl = static_cast<uint8_t>(s.s0_lo);
+         lvl <= static_cast<uint8_t>(s.s0_hi); ++lvl) {
+      out.push_back({0, lvl});
+    }
+  }
+  if (s.s1_hi != Strength::kHighz) {
+    for (uint8_t lvl = static_cast<uint8_t>(s.s1_lo);
+         lvl <= static_cast<uint8_t>(s.s1_hi); ++lvl) {
+      out.push_back({1, lvl});
+    }
+  }
+}
+
+static StrengthComponent ReduceWiredPair(StrengthComponent a,
+                                         StrengthComponent b,
+                                         WiredLogicKind kind) {
+  if (a.level != b.level) {
+    return (a.level > b.level) ? a : b;
+  }
+  if (a.val == b.val) {
+    return a;
+  }
+  uint8_t resolved =
+      (kind == WiredLogicKind::kAnd) ? std::min(a.val, b.val)
+                                     : std::max(a.val, b.val);
+  return {resolved, a.level};
+}
+
+}  // namespace
+
+NetStrength CombineWiredLogicAmbiguous(NetStrength a, NetStrength b,
+                                       WiredLogicKind kind) {
+  std::vector<StrengthComponent> ca;
+  std::vector<StrengthComponent> cb;
+  CollectComponents(a, ca);
+  CollectComponents(b, cb);
+
+  NetStrength r;
+  if (ca.empty() || cb.empty()) return r;
+
+  bool has0 = false;
+  bool has1 = false;
+  uint8_t s0_min = 255;
+  uint8_t s0_max = 0;
+  uint8_t s1_min = 255;
+  uint8_t s1_max = 0;
+  for (const auto& x : ca) {
+    for (const auto& y : cb) {
+      auto rc = ReduceWiredPair(x, y, kind);
+      if (rc.val == 0) {
+        has0 = true;
+        if (rc.level < s0_min) s0_min = rc.level;
+        if (rc.level > s0_max) s0_max = rc.level;
+      } else {
+        has1 = true;
+        if (rc.level < s1_min) s1_min = rc.level;
+        if (rc.level > s1_max) s1_max = rc.level;
+      }
+    }
+  }
+  if (has0) {
+    r.s0_lo = static_cast<Strength>(s0_min);
+    r.s0_hi = static_cast<Strength>(s0_max);
+  }
+  if (has1) {
+    r.s1_lo = static_cast<Strength>(s1_min);
+    r.s1_hi = static_cast<Strength>(s1_max);
+  }
+  return r;
+}
+
 Logic4Word ResolveWireWord(Logic4Word a, Logic4Word b) {
 
   uint64_t a_z = a.aval & a.bval;
