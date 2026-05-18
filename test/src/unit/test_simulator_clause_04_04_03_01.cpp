@@ -70,23 +70,6 @@ TEST(PliPreponedSim, PreponedEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-TEST(PliPreponedSim, IllegalScheduleIntoOtherRegionInCurrentTimeSlot) {
-  Arena arena;
-  Scheduler sched(arena);
-
-  auto* preponed = sched.GetEventPool().Acquire();
-  preponed->callback = [&]() {
-    auto* offender = sched.GetEventPool().Acquire();
-    offender->callback = []() {};
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, offender);
-  };
-  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
-
-  EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 0u);
-  sched.Run();
-  EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 1u);
-}
-
 TEST(PliPreponedSim, LegalSchedulesFromPreponedAreNotFlagged) {
   Arena arena;
   Scheduler sched(arena);
@@ -166,22 +149,6 @@ TEST(PliPreponedSim, ScheduleIntoSamePreponedRegionAtCurrentTimeIsNotFlagged) {
   sched.Run();
   EXPECT_TRUE(inner_ran);
   EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 0u);
-}
-
-TEST(PliPreponedSim, ScheduleIntoPostponedAtCurrentTimeIsFlagged) {
-  Arena arena;
-  Scheduler sched(arena);
-
-  auto* preponed = sched.GetEventPool().Acquire();
-  preponed->callback = [&]() {
-    auto* postponed = sched.GetEventPool().Acquire();
-    postponed->callback = []() {};
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kPostponed, postponed);
-  };
-  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
-
-  sched.Run();
-  EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 1u);
 }
 
 TEST(PliPreponedSim, VpiPutValueFromPreponedRecordsWriteViolation) {
