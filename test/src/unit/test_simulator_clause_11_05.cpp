@@ -1,22 +1,11 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/evaluation.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(Eval, VariableLookup) {
-  ExprFixture f;
-  auto* var = f.ctx.CreateVariable("myvar", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 123);
-
-  auto* expr = f.arena.Create<Expr>();
-  expr->kind = ExprKind::kIdentifier;
-  expr->text = "myvar";
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 123u);
-}
 
 TEST(Eval, VariableReferenceUsesAllBits) {
   ExprFixture f;
@@ -111,6 +100,49 @@ TEST(Eval, ParameterReferenceAsOperand) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+TEST(Eval, BitSelectAsOperand) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic b;\n"
+      "  initial begin a = 8'hA5; b = a[7]; end\n"
+      "endmodule\n",
+      "b");
+  EXPECT_EQ(v, 1u);
+}
+
+TEST(Eval, PartSelectAsOperand) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [3:0] b;\n"
+      "  initial begin a = 8'hA5; b = a[3:0]; end\n"
+      "endmodule\n",
+      "b");
+  EXPECT_EQ(v, 0x5u);
+}
+
+TEST(Eval, UnpackedArrayElementAsOperand) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  int x;\n"
+      "  initial begin arr[2] = 42; x = arr[2]; end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(v, 42u);
+}
+
+TEST(Eval, NetReferenceUsesAllBits) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  wire [31:0] w;\n"
+      "  assign w = 32'hDEADBEEF;\n"
+      "endmodule\n",
+      "w");
+  EXPECT_EQ(v, 0xDEADBEEFu);
 }
 
 }

@@ -79,7 +79,46 @@ struct Expr {
   std::vector<Expr*> elements;
   Expr* repeat_count = nullptr;
   std::vector<std::string_view> pattern_keys;
+
+  bool is_parenthesized = false;
 };
+
+// §11.5: an operand is "simple" iff it is not parenthesized AND is a primary
+// (as defined in A.8.4). The example given is `1'b1 - 2'b00 + (1'b1 + 1'b1)`,
+// where `1'b1 - 2'b00` (binary, not a primary) and `(1'b1 + 1'b1)`
+// (parenthesized) are operands but not simple operands.
+inline bool IsSimpleOperand(const Expr* e) {
+  if (e == nullptr) return false;
+  if (e->is_parenthesized) return false;
+  switch (e->kind) {
+    case ExprKind::kIntegerLiteral:
+    case ExprKind::kRealLiteral:
+    case ExprKind::kTimeLiteral:
+    case ExprKind::kStringLiteral:
+    case ExprKind::kUnbasedUnsizedLiteral:
+    case ExprKind::kIdentifier:
+    case ExprKind::kSelect:
+    case ExprKind::kMemberAccess:
+    case ExprKind::kCall:
+    case ExprKind::kSystemCall:
+    case ExprKind::kConcatenation:
+    case ExprKind::kReplicate:
+    case ExprKind::kAssignmentPattern:
+    case ExprKind::kCast:
+    case ExprKind::kStreamingConcat:
+    case ExprKind::kTypeRef:
+    case ExprKind::kTagged:
+      return true;
+    case ExprKind::kUnary:
+    case ExprKind::kBinary:
+    case ExprKind::kTernary:
+    case ExprKind::kPostfixUnary:
+    case ExprKind::kInside:
+    case ExprKind::kMinTypMax:
+      return false;
+  }
+  return false;
+}
 
 struct Attribute {
   std::string_view name;

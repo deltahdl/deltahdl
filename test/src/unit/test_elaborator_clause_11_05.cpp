@@ -68,4 +68,42 @@ TEST(OperandElaboration, UnpackedArrayElementOperandElaborates) {
       "endmodule\n"));
 }
 
+TEST(OperandElaboration, BitSelectOperandElaborates) {
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic b;\n"
+      "  initial b = a[3];\n"
+      "endmodule\n"));
+}
+
+TEST(OperandElaboration, PartSelectOperandElaborates) {
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [3:0] b;\n"
+      "  initial b = a[3:0];\n"
+      "endmodule\n"));
+}
+
+TEST(OperandElaboration, NetReferenceElaborates) {
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  wire [7:0] w;\n"
+      "  logic [7:0] x;\n"
+      "  assign w = 8'hA5;\n"
+      "  initial x = w;\n"
+      "endmodule\n"));
+}
+
+TEST(OperandElaboration, BitSelectOfNetElaborates) {
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  wire [7:0] w;\n"
+      "  logic b;\n"
+      "  assign w = 8'hA5;\n"
+      "  initial b = w[3];\n"
+      "endmodule\n"));
+}
+
 }

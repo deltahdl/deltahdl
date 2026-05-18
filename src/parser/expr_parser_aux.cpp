@@ -96,6 +96,7 @@ Expr* Parser::ParseParenExpr() {
     Expect(TokenKind::kRParen);
     return cast;
   }
+  lhs->is_parenthesized = true;
   return lhs;
 }
 
