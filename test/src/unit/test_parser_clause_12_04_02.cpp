@@ -4,22 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(QualifiedIfParsing, Unique0IfChainElseIf) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    unique0 if (a == 0) x = 0;\n"
-      "    else if (a == 1) x = 1;\n"
-      "    else if (a == 2) x = 2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
-}
-
 TEST(QualifiedIfParsing, PriorityIfWithElse) {
   auto r = Parse(
       "module t;\n"
@@ -117,23 +101,6 @@ TEST(QualifiedIfParsing, UniqueIfElseIfElse) {
   EXPECT_EQ(stmt->else_branch->qualifier, CaseQualifier::kNone);
 }
 
-TEST(QualifiedIfParsing, UniqueIfElseIfChain) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    unique if (a) x = 1;\n"
-      "    else if (b) x = 2;\n"
-      "    else x = 3;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
-}
-
 TEST(QualifiedIfParsing, Unique0IfElseIfNoFinalElse) {
   auto r = Parse(
       "module m;\n"
@@ -202,6 +169,79 @@ TEST(QualifiedIfParsing, Unique0IfWithElse) {
   ASSERT_NE(stmt->else_branch, nullptr);
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
   EXPECT_NE(stmt->else_branch->else_branch, nullptr);
+}
+
+TEST(QualifiedIfParsing, QualifiedElseIfRejectedAfterUniqueOuter) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a) x = 1;\n"
+      "    else unique if (b) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(QualifiedIfParsing, QualifiedElseIfRejectedAfterPriorityOuter) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority if (a) x = 1;\n"
+      "    else priority if (b) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(QualifiedIfParsing, QualifiedElseIfRejectedAfterUnique0Outer) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 if (a) x = 1;\n"
+      "    else unique0 if (b) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(QualifiedIfParsing, QualifiedElseIfRejectedDeepInChain) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "    else priority if (c) x = 3;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(QualifiedIfParsing, UnqualifiedOuterAllowsQualifiedElseIf) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "    else unique if (b) x = 2;\n"
+      "    else x = 3;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(QualifiedIfParsing, BeginEndPermitsNestedQualifiedIf) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a) x = 1;\n"
+      "    else begin\n"
+      "      priority if (b) x = 2;\n"
+      "      else x = 3;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(QualifiedIfParsing, NestedQualifiedIfs) {

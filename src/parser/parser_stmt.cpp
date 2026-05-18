@@ -75,6 +75,17 @@ Stmt* Parser::ParseStmt() {
     }
     if (!attrs.empty()) stmt->attrs = std::move(attrs);
     if (qual != CaseQualifier::kNone) stmt->qualifier = qual;
+    if (qual != CaseQualifier::kNone && stmt->kind == StmtKind::kIf) {
+      for (Stmt* cur = stmt->else_branch; cur && cur->kind == StmtKind::kIf;
+           cur = cur->else_branch) {
+        if (cur->qualifier != CaseQualifier::kNone) {
+          diag_.Error(cur->range.start,
+                      "unique, unique0, or priority cannot appear on an "
+                      "else-if branch; wrap the nested if in begin-end");
+          break;
+        }
+      }
+    }
   }
   return stmt;
 }

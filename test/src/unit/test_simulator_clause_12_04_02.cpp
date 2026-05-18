@@ -123,6 +123,219 @@ TEST(QualifiedIfSimulation, Unique0IfTakesCorrectBranch) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
+TEST(QualifiedIfSimulation, UniqueIfNoMatchNoElseEmitsViolation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, x;\n"
+      "  initial begin\n"
+      "    a = 8'd7;\n"
+      "    unique if (a == 8'd0) x = 8'd10;\n"
+      "    else if (a == 8'd1) x = 8'd20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+TEST(QualifiedIfSimulation, PriorityIfNoMatchNoElseEmitsViolation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, x;\n"
+      "  initial begin\n"
+      "    a = 8'd9;\n"
+      "    priority if (a == 8'd0) x = 8'd10;\n"
+      "    else if (a == 8'd1) x = 8'd20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+TEST(QualifiedIfSimulation, UniqueIfWithExplicitElseSuppressesViolation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, x;\n"
+      "  initial begin\n"
+      "    a = 8'd7;\n"
+      "    unique if (a == 8'd0) x = 8'd10;\n"
+      "    else if (a == 8'd1) x = 8'd20;\n"
+      "    else x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(QualifiedIfSimulation, Unique0IfNoMatchEmitsNoViolation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, x;\n"
+      "  initial begin\n"
+      "    a = 8'd9;\n"
+      "    unique0 if (a == 8'd0) x = 8'd10;\n"
+      "    else if (a == 8'd1) x = 8'd20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(QualifiedIfSimulation, UniqueIfOverlapEmitsViolationAndTakesFirst) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    unique if (1) x = 8'd10;\n"
+      "    else if (1) x = 8'd20;\n"
+      "    else if (1) x = 8'd30;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+TEST(QualifiedIfSimulation, Unique0IfOverlapEmitsViolation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    unique0 if (1) x = 8'd10;\n"
+      "    else if (1) x = 8'd20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+TEST(QualifiedIfSimulation, PriorityIfWithExplicitElseSuppressesViolation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, x;\n"
+      "  initial begin\n"
+      "    a = 8'd7;\n"
+      "    priority if (a == 8'd0) x = 8'd10;\n"
+      "    else if (a == 8'd1) x = 8'd20;\n"
+      "    else x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(QualifiedIfSimulation, UniqueIfChainSingleMatchEmitsNoViolation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, x;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"
+      "    unique if (a == 8'd0) x = 8'd10;\n"
+      "    else if (a == 8'd1) x = 8'd20;\n"
+      "    else if (a == 8'd2) x = 8'd30;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(QualifiedIfSimulation, PriorityIfOverlapDoesNotEmitViolation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    priority if (1) x = 8'd10;\n"
+      "    else if (1) x = 8'd20;\n"
+      "    else if (1) x = 8'd30;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(QualifiedIfSimulation, UniqueIfOverlapWithElseStillEmitsViolation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    unique if (1) x = 8'd10;\n"
+      "    else if (1) x = 8'd20;\n"
+      "    else x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
 TEST(QualifiedIfSimulation, QualifiedIfFallsToElse) {
   SimFixture f;
   auto* design = ElaborateSrc(
