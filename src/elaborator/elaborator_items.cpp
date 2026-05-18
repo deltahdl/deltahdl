@@ -1110,6 +1110,14 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
                   "virtual interface cannot be declared inside an interface");
     }
   }
+  const bool parent_is_program =
+      decl->decl_kind == ModuleDeclKind::kProgram;
+  const bool parent_is_checker =
+      decl->decl_kind == ModuleDeclKind::kChecker;
+  const std::string_view parent_kind_word =
+      parent_is_program ? std::string_view{"program"}
+                        : std::string_view{"checker"};
+
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kModuleInst) {
       auto* child = FindModuleInScope(item->inst_module);
@@ -1129,6 +1137,20 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
                                 "interface '{}'",
                                 item->inst_module, decl->name));
       }
+      if ((parent_is_program || parent_is_checker) && child &&
+          child->decl_kind != ModuleDeclKind::kChecker) {
+        diag_.Error(item->loc,
+                    std::format("only checkers can be instantiated inside "
+                                "{} '{}'",
+                                parent_kind_word, decl->name));
+      }
+    }
+    if ((parent_is_program || parent_is_checker) &&
+        item->kind == ModuleItemKind::kUdpInst) {
+      diag_.Error(item->loc,
+                  std::format("primitive cannot be instantiated inside "
+                              "{} '{}'",
+                              parent_kind_word, decl->name));
     }
 
     if (item->kind == ModuleItemKind::kNestedModuleDecl &&
