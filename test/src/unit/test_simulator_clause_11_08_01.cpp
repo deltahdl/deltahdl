@@ -208,6 +208,38 @@ TEST(ExprType, UnaryPlusOnRealIsReal) {
   EXPECT_DOUBLE_EQ(ToDouble(result), 3.5);
 }
 
+TEST(ExprType, RealCastToIntIsSigned) {
+  SimFixture f;
+  MakeRealVar(f, "r", 3.5);
+  auto* cast = f.arena.Create<Expr>();
+  cast->kind = ExprKind::kCast;
+  cast->text = "int";
+  cast->lhs = MakeId(f.arena, "r");
+  auto result = EvalExpr(cast, f.ctx, f.arena);
+  EXPECT_FALSE(result.is_real);
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(ExprType, RealImplicitlyCoercedOnAssignIsSigned) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    r = 3.75;\n"
+      "    i = r;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("i");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->value.is_real);
+  EXPECT_TRUE(var->value.is_signed);
+}
+
 TEST(ExprType, BasedBinaryLiteralIsUnsigned) {
   SimFixture f;
   auto* lit = MakeInt(f.arena, 5);
@@ -472,6 +504,32 @@ TEST(ExprType, ShiftUnsignedLeftStaysUnsigned) {
                                     MakeId(f.arena, "amt")),
                          f.ctx, f.arena);
   EXPECT_FALSE(result.is_signed);
+}
+
+TEST(ExprType, ComparisonOfRealsIsUnsigned) {
+  SimFixture f;
+  MakeRealVar(f, "a", 1.5);
+  MakeRealVar(f, "b", 2.5);
+  auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kLt,
+                                    MakeId(f.arena, "a"), MakeId(f.arena, "b")),
+                         f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_FALSE(result.is_real);
+  EXPECT_FALSE(result.is_signed);
+}
+
+TEST(ExprType, PartSelectAssignedToWiderVarIsZeroExtended) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [15:0] a;\n"
+      "  logic signed [7:0] b;\n"
+      "  initial begin\n"
+      "    b = 8'shFF;\n"
+      "    a = b[7:0];\n"
+      "  end\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(val, 0x00FFu);
 }
 
 }
