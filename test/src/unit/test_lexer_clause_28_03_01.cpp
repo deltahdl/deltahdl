@@ -5,6 +5,11 @@
 
 using namespace delta;
 
+struct GateKeywordEntry {
+  const char* text;
+  TokenKind expected;
+};
+
 static const GateKeywordEntry kGateKeywords[] = {
     {"and", TokenKind::kKwAnd},
     {"nand", TokenKind::kKwNand},
