@@ -34,6 +34,7 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator.cpp
     elaborator/elaborator_items.cpp
     elaborator/property_rewrite.cpp
+    elaborator/rewrite_item.cpp
     elaborator/elaborator_defparam.cpp
     elaborator/elaborator_gates.cpp
     elaborator/elaborator_validate.cpp
