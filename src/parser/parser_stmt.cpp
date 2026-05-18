@@ -413,8 +413,18 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
     }
     stmt->case_matches = true;
   }
+  bool seen_default = false;
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
+    auto item_loc = CurrentLoc();
+    bool is_default_here = Check(TokenKind::kKwDefault);
     stmt->case_items.push_back(ParseCaseItem(stmt->case_inside));
+    if (is_default_here) {
+      if (seen_default) {
+        diag_.Error(item_loc,
+                    "case statement shall have at most one 'default' item");
+      }
+      seen_default = true;
+    }
   }
   Expect(TokenKind::kKwEndcase);
   return stmt;

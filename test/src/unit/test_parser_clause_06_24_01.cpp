@@ -287,4 +287,30 @@ TEST(CastOperatorParsing, CastInBinaryExpr) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kCast);
 }
 
+TEST(CastOperatorParsing, ConstCastParses) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a;\n"
+      "  initial a = const'(7);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCast);
+}
+
+TEST(CastOperatorParsing, UnsignedCastParses) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  initial a = unsigned'(-4);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCast);
+}
+
 }

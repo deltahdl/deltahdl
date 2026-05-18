@@ -20,7 +20,7 @@ static Expr* MkBin(Arena& a, TokenKind op, Expr* l, Expr* r) {
 
 namespace {
 
-TEST(ClassSim, SimpleMethodCall) {
+TEST(ObjectMethodSim,SimpleMethodCall) {
   SimFixture f;
   auto* type = MakeClassType(f, "Counter", {"count"});
 
@@ -39,7 +39,7 @@ TEST(ClassSim, SimpleMethodCall) {
   EXPECT_EQ(resolved->name, "get_count");
 }
 
-TEST(ClassSim, MethodWithArgs) {
+TEST(ObjectMethodSim,MethodWithArgs) {
   SimFixture f;
   auto* type = MakeClassType(f, "Adder", {"total"});
 
@@ -58,7 +58,7 @@ TEST(ClassSim, MethodWithArgs) {
   EXPECT_NE(resolved, nullptr);
 }
 
-TEST(ClassSim, MethodNotFound) {
+TEST(ObjectMethodSim,MethodNotFound) {
   SimFixture f;
   auto* type = MakeClassType(f, "Simple", {});
   auto [handle, obj] = MakeObj(f, type);
@@ -67,7 +67,7 @@ TEST(ClassSim, MethodNotFound) {
   EXPECT_EQ(resolved, nullptr);
 }
 
-TEST(ClassSim, MethodCallReturnValue) {
+TEST(ObjectMethodSim,MethodCallReturnValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "class Counter;\n"
@@ -91,7 +91,7 @@ TEST(ClassSim, MethodCallReturnValue) {
   LowerRunAndCheck(f, design, {{"result", 42u}});
 }
 
-TEST(ClassSim, MethodCallModifiesProperty) {
+TEST(ObjectMethodSim,MethodCallModifiesProperty) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "class Acc;\n"
@@ -120,7 +120,7 @@ TEST(ClassSim, MethodCallModifiesProperty) {
   LowerRunAndCheck(f, design, {{"result", 17u}});
 }
 
-TEST(ClassSim, MultipleMethodsSameObject) {
+TEST(ObjectMethodSim,MultipleMethodsSameObject) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "class Pair;\n"

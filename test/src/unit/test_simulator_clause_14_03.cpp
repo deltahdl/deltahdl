@@ -89,7 +89,7 @@ TEST(ClockingBlockSim, MultipleBlocks) {
   EXPECT_NE(cmgr.Find("cb_slow"), nullptr);
 }
 
-TEST(ClockingSim, DeclareWithClockEvent) {
+TEST(ClockingBlockSim,DeclareWithClockEvent) {
   ClockingSimFixture f;
   ClockingManager cmgr;
 
@@ -107,13 +107,13 @@ TEST(ClockingSim, DeclareWithClockEvent) {
   EXPECT_EQ(found->clock_edge, Edge::kPosedge);
 }
 
-TEST(ClockingSim, NegedgeClockEvent) {
+TEST(ClockingBlockSim,NegedgeClockEvent) {
   ClockingSimFixture f;
   ClockingManager cmgr;
   TestNegedgeSampling(f, cmgr);
 }
 
-TEST(ClockingSim, SimContextClockingManagerAccess) {
+TEST(ClockingBlockSim,SimContextClockingManagerAccess) {
   ClockingSimFixture f;
   ClockingManager cmgr;
 
@@ -129,7 +129,7 @@ TEST(ClockingSim, SimContextClockingManagerAccess) {
   EXPECT_EQ(f.ctx.GetClockingManager(), &cmgr);
 }
 
-TEST(Clocking, RegisterAndFind) {
+TEST(ClockingBlockSim,RegisterAndFind) {
   ClockingManager mgr;
   ClockingBlock block;
   block.name = "cb_main";
@@ -146,12 +146,12 @@ TEST(Clocking, RegisterAndFind) {
   EXPECT_EQ(found->default_input_skew.ticks, 2u);
 }
 
-TEST(Clocking, FindNonexistent) {
+TEST(ClockingBlockSim,FindNonexistent) {
   ClockingManager mgr;
   EXPECT_EQ(mgr.Find("nonexistent"), nullptr);
 }
 
-TEST(ClockingSim, DefaultSkewAppliedToAllSignals) {
+TEST(ClockingBlockSim,DefaultSkewAppliedToAllSignals) {
   ClockingManager cmgr;
   ClockingBlock block;
   block.name = "cb";
@@ -176,7 +176,7 @@ TEST(ClockingSim, DefaultSkewAppliedToAllSignals) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "b").ticks, 7u);
 }
 
-TEST(Clocking, DefaultInputSkew) {
+TEST(ClockingBlockSim,DefaultInputSkew) {
   ClockingManager mgr;
   ClockingBlock block;
   block.name = "cb";
@@ -189,7 +189,7 @@ TEST(Clocking, DefaultInputSkew) {
   EXPECT_EQ(skew.ticks, 5u);
 }
 
-TEST(Clocking, OutputSkew) {
+TEST(ClockingBlockSim,OutputSkew) {
   ClockingManager mgr;
   ClockingBlock block;
   block.name = "cb";

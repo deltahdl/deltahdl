@@ -115,7 +115,7 @@ TEST(CastOperatorSim, ConstCastPreservesValue) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(CastOperatorSim, UnsignedCastLrmExample) {
+TEST(CastOperatorSim, UnsignedCastOfNegativeFour) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -132,7 +132,7 @@ TEST(CastOperatorSim, UnsignedCastLrmExample) {
   EXPECT_EQ(var->value.ToUint64(), 0xFCu);
 }
 
-TEST(CastOperatorSim, SignedCastLrmExample) {
+TEST(CastOperatorSim, SignedCastOfFourBitVector) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

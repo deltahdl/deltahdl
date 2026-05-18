@@ -54,7 +54,7 @@ TEST(OperatorElaboration, BinaryCaseNeqElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(EqualityOperatorSim, AlwaysCombEqualityCheck) {
+TEST(EqualityOperatorElaboration,AlwaysCombEqualityCheck) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -80,7 +80,7 @@ TEST(EqualityOperatorSim, AlwaysCombEqualityCheck) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-TEST(EqualityOperatorSim, BlockingAssignComparisonOps) {
+TEST(EqualityOperatorElaboration,BlockingAssignComparisonOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -122,6 +122,32 @@ TEST(EqualityOperatorSim, BlockingAssignComparisonOps) {
   EXPECT_EQ(r_gt->value.ToUint64(), 0u);
   EXPECT_EQ(r_le->value.ToUint64(), 1u);
   EXPECT_EQ(r_ge->value.ToUint64(), 0u);
+}
+
+TEST(OperatorElaboration, ChandleEqualityWithNullElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  chandle h;\n"
+      "  logic r;\n"
+      "  initial r = (h == null);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(OperatorElaboration, ChandleInequalityWithNullElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  chandle h;\n"
+      "  logic r;\n"
+      "  initial r = (h != null);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }

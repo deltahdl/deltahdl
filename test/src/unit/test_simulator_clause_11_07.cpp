@@ -125,7 +125,7 @@ TEST(SignedExprSim, EmptyArgsReturnsZero) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(SignedExprSim, LrmExampleUnsignedNeg4) {
+TEST(SignedExprSim, UnsignedOfNegativeFour) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -140,7 +140,7 @@ TEST(SignedExprSim, LrmExampleUnsignedNeg4) {
   EXPECT_EQ(var->value.ToUint64(), 0xFCu);
 }
 
-TEST(SignedExprSim, LrmExampleSignedBitLiteral) {
+TEST(SignedExprSim, SignedOfFourBitVector) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

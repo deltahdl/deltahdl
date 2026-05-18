@@ -424,4 +424,50 @@ TEST(EqualityOperatorEval, AllEqualityOperatorsReturnOneBit) {
   EXPECT_EQ(EvalExpr(cneq, f.ctx, f.arena).width, 1u);
 }
 
+TEST(EqualityOperatorSim, UnsignedZeroExtendsSmallerOperand) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] narrow;\n"
+      "  logic [7:0] wide;\n"
+      "  logic y;\n"
+      "  initial begin\n"
+      "    narrow = 4'b1111;\n"
+      "    wide   = 8'h0F;\n"
+      "    y = (narrow == wide);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 1u);
+}
+
+TEST(EqualityOperatorSim, UnsignedNarrowMismatchesWiderTopBits) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] narrow;\n"
+      "  logic [7:0] wide;\n"
+      "  logic y;\n"
+      "  initial begin\n"
+      "    narrow = 4'b1111;\n"
+      "    wide   = 8'hFF;\n"
+      "    y = (narrow == wide);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 0u);
+}
+
 }

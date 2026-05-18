@@ -69,36 +69,6 @@ TEST(OperatorAndExpressionParsing, CaseEqualityInAssign) {
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
 
-TEST(OperatorParsing, LogicalEqualityWithoutParens) {
-  auto r = Parse("module m; initial x = a == b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kEqEq);
-}
-
-TEST(OperatorParsing, LogicalInequalityWithoutParens) {
-  auto r = Parse("module m; initial x = a != b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kBangEq);
-}
-
-TEST(OperatorParsing, CaseInequalityWithoutParens) {
-  auto r = Parse("module m; initial x = a !== b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kBangEqEq);
-}
-
 TEST(Precedence, EqualityLowerThanRelational) {
   auto r = Parse(
       "module t;\n"

@@ -414,4 +414,19 @@ TEST(ScopeAndLifetimeElaboration,
   EXPECT_TRUE(cls->members[0]->method->is_automatic);
 }
 
+TEST(ScopeAndLifetimeElaboration, ForLoopVariableDefaultsAutomaticElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 4; i++) begin\n"
+      "      int local_val = i;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }

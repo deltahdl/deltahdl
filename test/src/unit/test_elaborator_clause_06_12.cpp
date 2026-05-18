@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(RealDataType, RealNegedge_Error) {
+TEST(RealDataType, RealNegedgeError) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -24,7 +24,7 @@ TEST(RealDataType, RealTypesNotIntegral) {
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kRealtime));
 }
 
-TEST(RealDataType, RealEdge_Error) {
+TEST(RealDataType, RealPosedgeError) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -36,7 +36,7 @@ TEST(RealDataType, RealEdge_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(RealDataType, RealIndex_Error) {
+TEST(RealDataType, RealIndexInBitSelectError) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -82,7 +82,7 @@ TEST(RealDataType, RealtimePosedgeError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(RealDataType, RealAssign_Ok) {
+TEST(RealDataType, RealAssignmentOk) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -92,7 +92,7 @@ TEST(RealDataType, RealAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(RealDataType, RealEdgeKeyword_Error) {
+TEST(RealDataType, RealEdgeKeywordError) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"

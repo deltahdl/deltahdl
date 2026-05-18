@@ -600,4 +600,18 @@ TEST(OperatorAndExpressionParsing, ChainedCondPredicateTripleAndInTernary) {
   EXPECT_EQ(rhs->condition->lhs->op, TokenKind::kAmpAmpAmp);
 }
 
+TEST(CondPredicateParsing, MatchesPatternInTernaryCondition) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = (a matches 3) ? y : z;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->condition, nullptr);
+  EXPECT_EQ(rhs->condition->op, TokenKind::kKwMatches);
+}
+
 }

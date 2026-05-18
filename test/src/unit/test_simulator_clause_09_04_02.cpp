@@ -868,4 +868,26 @@ TEST(EventControlSim, ClockingBlockInputResolvesThroughClockingManager) {
   EXPECT_EQ(data->watchers.size(), 1u);
 }
 
+TEST(EventControlSim, NamedEventTriggerReleasesWaiter) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event e;\n"
+      "  int hit;\n"
+      "  initial begin\n"
+      "    hit = 0;\n"
+      "    fork\n"
+      "      begin @e; hit = 1; end\n"
+      "      begin #1 ->e; end\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("hit");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }

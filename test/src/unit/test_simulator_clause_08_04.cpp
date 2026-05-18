@@ -179,4 +179,21 @@ TEST(ClassSim, IsAReturnsFalseForUnrelatedType) {
   EXPECT_FALSE(b->IsA(a));
 }
 
+TEST(ClassSim, UninitializedHandleDetectableAsNull) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C h;\n"
+      "  logic is_null;\n"
+      "  initial is_null = (h == null);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("is_null");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }

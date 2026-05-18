@@ -452,4 +452,32 @@ TEST(CaseSyntaxParsing, CaseDefaultInMiddle) {
   EXPECT_FALSE(stmt->case_items[2].is_default);
 }
 
+TEST(CaseSyntaxParsing, TwoDefaultItemsIsIllegal) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case (x)\n"
+      "      0: y = 1;\n"
+      "      default: y = 2;\n"
+      "      default: y = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(CaseSyntaxParsing, SingleDefaultItemAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case (x)\n"
+      "      0: y = 1;\n"
+      "      default: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }

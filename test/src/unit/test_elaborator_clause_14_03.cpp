@@ -78,4 +78,41 @@ TEST(ClockingBlockElab, InoutClockvarWriteOk) {
              "endmodule\n"));
 }
 
+TEST(ClockingBlockElab, NamedClockingBlockWithMultipleSignalsElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic a, b, c;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    input a;\n"
+             "    output b;\n"
+             "    inout c;\n"
+             "  endclocking\n"
+             "endmodule\n"));
+}
+
+TEST(ClockingBlockElab, DefaultInputAndOutputSkewElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic a, b;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    default input #1step output #0;\n"
+             "    input a;\n"
+             "    output b;\n"
+             "  endclocking\n"
+             "endmodule\n"));
+}
+
+TEST(ClockingBlockElab, ClockingBlockNegedgeEventElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic data;\n"
+             "  clocking cb @(negedge clk);\n"
+             "    input data;\n"
+             "  endclocking\n"
+             "endmodule\n"));
+}
+
 }

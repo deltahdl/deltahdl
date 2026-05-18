@@ -305,4 +305,32 @@ TEST(ConstEval, ChainedTernaryConstEval) {
             20);
 }
 
+TEST(ConditionalElaboration, TernaryWithBothBranchesNullElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C h;\n"
+      "  logic sel;\n"
+      "  initial h = sel ? null : null;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ConditionalElaboration, TernaryWithOneNullBranchElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C a, b;\n"
+      "  logic sel;\n"
+      "  initial a = sel ? b : null;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }

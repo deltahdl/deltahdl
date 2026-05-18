@@ -5,6 +5,7 @@
 #include "helpers_clocking.h"
 #include "parser/ast.h"
 #include "simulator/clocking.h"
+#include "simulator/evaluation.h"
 #include "simulator/variable.h"
 
 using namespace delta;
@@ -234,6 +235,35 @@ TEST(InputSamplingSim, SampledBeforeBlockEventFires) {
   f.scheduler.Run();
 
   EXPECT_EQ(value_seen_in_callback, 0x42u);
+}
+
+TEST(InputSamplingSim, ClockvarMemberAccessResolvesToSampledValue) {
+  SimFixture f;
+  auto* data = f.ctx.CreateVariable("data", 8);
+  data->value = MakeLogic4VecVal(f.arena, 8, 0xA5);
+
+  ClockingManager cmgr;
+  SetupClockingBlock(
+      f, cmgr,
+      {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput});
+  f.ctx.SetClockingManager(&cmgr);
+
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+  SchedulePosedge(f, clk, 10);
+  f.scheduler.Run();
+
+  auto* member = f.arena.Create<Expr>();
+  member->kind = ExprKind::kMemberAccess;
+  member->lhs = f.arena.Create<Expr>();
+  member->lhs->kind = ExprKind::kIdentifier;
+  member->lhs->text = "cb";
+  member->rhs = f.arena.Create<Expr>();
+  member->rhs->kind = ExprKind::kIdentifier;
+  member->rhs->text = "data";
+
+  auto result = EvalExpr(member, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0xA5u);
 }
 
 }
