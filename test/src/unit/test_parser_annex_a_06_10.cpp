@@ -182,22 +182,6 @@ TEST(AssertionStatementSyntaxParsing, LabeledAssert) {
               "endmodule\n"));
 }
 
-TEST(AssertionStatementSyntaxParsing, AssertWithSeverityTaskInFail) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assert(f) $info(\"passed\"); else $error(\"failed\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
-  EXPECT_NE(stmt->assert_pass_stmt, nullptr);
-  EXPECT_NE(stmt->assert_fail_stmt, nullptr);
-}
-
 TEST(AssertionStatementSyntaxParsing, AssertFailCanBeAssignment) {
   auto r = Parse(
       "module m;\n"
@@ -358,20 +342,6 @@ TEST(AssertionStatementSyntaxParsing, AllThreeKindsInSequence) {
   EXPECT_EQ(stmts[0]->kind, StmtKind::kAssertImmediate);
   EXPECT_EQ(stmts[1]->kind, StmtKind::kAssumeImmediate);
   EXPECT_EQ(stmts[2]->kind, StmtKind::kCoverImmediate);
-}
-
-TEST(AssertionStatementSyntaxParsing, ImmediateAssertAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assert (x == 1);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
 }
 
 TEST(AssertionStatementSyntaxParsing, DeferredAssertHash0) {
@@ -548,26 +518,6 @@ TEST(AssertionStatementSyntaxParsing, AssertFinalModuleLevel) {
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(AssertionStatementSyntaxParsing, DeferredAssertHash0Module) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic x;\n"
-      "  assert #0 (x);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(AssertionStatementSyntaxParsing, DeferredAssertFinalModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic x;\n"
-      "  assert final (x);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(AssertionStatementSyntaxParsing, AssumeFinalModuleLevel) {
   auto r = Parse(
       "module m;\n"
@@ -603,6 +553,46 @@ TEST(AssertionStatementSyntaxParsing, LabeledDeferredAssertFinalModuleLevel) {
       "module m;\n"
       "  logic a;\n"
       "  chk: assert final (a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(AssertionStatementSyntaxParsing, LabeledDeferredAssumeHash0ModuleLevel) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a;\n"
+      "  chk: assume #0 (a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(AssertionStatementSyntaxParsing, LabeledDeferredAssumeFinalModuleLevel) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a;\n"
+      "  chk: assume final (a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(AssertionStatementSyntaxParsing, LabeledDeferredCoverHash0ModuleLevel) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a;\n"
+      "  hit: cover #0 (a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(AssertionStatementSyntaxParsing, LabeledDeferredCoverFinalModuleLevel) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a;\n"
+      "  hit: cover final (a);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -652,6 +642,60 @@ TEST(AssertionStatementSyntaxParsing, ErrorCoverWithElseClause) {
   auto r = Parse(
       "module m;\n"
       "  initial cover(1) $display(\"hit\"); else $display(\"miss\");\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(AssertionStatementSyntaxParsing, AssumeWithPassActionOnly) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assume(x) $display(\"ok\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
+  EXPECT_NE(stmt->assert_pass_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
+}
+
+TEST(AssertionStatementSyntaxParsing, ErrorDeferredAssertHashNonZero) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert #1 (a);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(AssertionStatementSyntaxParsing, ErrorDeferredAssumeHashNonZero) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assume #2 (a);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverHashNonZero) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial cover #3 (a);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverHash0WithElseClause) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial cover #0 (1) $display(\"hit\"); else $display(\"miss\");\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverFinalWithElseClause) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial cover final (1) $display(\"hit\"); else $display(\"miss\");\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }

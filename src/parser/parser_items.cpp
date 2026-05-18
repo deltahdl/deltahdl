@@ -340,11 +340,40 @@ bool Parser::TryParseNonPortItem(std::vector<ModuleItem*>& items) {
   return false;
 }
 
+std::string_view Parser::TryParseAssertionItemLabel() {
+  if (!CheckIdentifier()) return {};
+  auto saved = lexer_.SavePos();
+  auto label_tok = Consume();
+  if (!Match(TokenKind::kColon)) {
+    lexer_.RestorePos(saved);
+    return {};
+  }
+  if (!Check(TokenKind::kKwAssert) && !Check(TokenKind::kKwAssume) &&
+      !Check(TokenKind::kKwCover)) {
+    lexer_.RestorePos(saved);
+    return {};
+  }
+  return label_tok.text;
+}
+
 void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
   auto attrs = ParseAttributes();
   size_t before = items.size();
 
+  // §A.6.10 deferred_immediate_assertion_item permits an optional
+  // [ block_identifier : ] label, mirroring concurrent_assertion_item.
+  // Consume the label here so the dispatch below sees the bare keyword.
+  auto assertion_label = TryParseAssertionItemLabel();
+
   if (TryParseKeywordItem(items)) {
+    if (!assertion_label.empty()) {
+      for (size_t i = before; i < items.size(); ++i) {
+        if (items[i]->name.empty()) items[i]->name = assertion_label;
+        if (items[i]->body && items[i]->body->label.empty()) {
+          items[i]->body->label = assertion_label;
+        }
+      }
+    }
     AttachAttrs(items, before, attrs);
     return;
   }

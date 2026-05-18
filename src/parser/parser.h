@@ -41,6 +41,7 @@ class Parser {
   void ParseModuleBody(ModuleDecl& mod);
   void ParseNonAnsiPortDecls(ModuleDecl& mod);
   void ParseModuleItem(std::vector<ModuleItem*>& items);
+  std::string_view TryParseAssertionItemLabel();
   void ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,
                          const std::vector<Attribute>& attrs);
   bool TryParseTypeRef(std::vector<ModuleItem*>& items);
