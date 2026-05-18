@@ -11,6 +11,7 @@
 
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -530,6 +531,9 @@ class Elaborator {
   std::unordered_set<std::string_view> scalar_var_names_;
   std::unordered_set<std::string_view> task_names_;
   std::unordered_set<std::string_view> sequence_names_;
+  // §16.12 / §F.4.1: registry of property and sequence declarations used
+  // to flatten an instance's body for legality checks.
+  PropertyRegistry property_registry_;
 
   std::unordered_map<std::string_view, const ModuleItem*> func_decls_;
   std::unordered_map<std::string_view, std::string_view>

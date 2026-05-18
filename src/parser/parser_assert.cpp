@@ -288,6 +288,8 @@ ModuleItem* Parser::ParseRestrictProperty() {
   return item;
 }
 
+// §16.12 + §F.4.1: capture formal names, body disable-iff count, and nested
+// property/sequence instance references so the rewriter has what it needs.
 ModuleItem* Parser::ParsePropertyDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kPropertyDecl;
@@ -297,11 +299,32 @@ ModuleItem* Parser::ParsePropertyDecl() {
 
   if (Match(TokenKind::kLParen)) {
     int depth = 1;
+    bool expect_formal_name = true;
     while (depth > 0 && !AtEnd()) {
-      if (Match(TokenKind::kLParen)) {
+      if (Check(TokenKind::kLParen)) {
+        Consume();
         ++depth;
-      } else if (Match(TokenKind::kRParen)) {
+      } else if (Check(TokenKind::kRParen)) {
+        Consume();
         --depth;
+        if (depth == 0) break;
+      } else if (depth == 1 && Check(TokenKind::kComma)) {
+        Consume();
+        expect_formal_name = true;
+      } else if (depth == 1 && Check(TokenKind::kEq)) {
+        Consume();
+        expect_formal_name = false;
+      } else if (expect_formal_name && depth == 1 &&
+                 Check(TokenKind::kIdentifier)) {
+        auto name_tok = Consume();
+        if (!Check(TokenKind::kComma) && !Check(TokenKind::kRParen) &&
+            !Check(TokenKind::kEq)) {
+          if (Check(TokenKind::kIdentifier)) {
+            name_tok = Consume();
+          }
+        }
+        item->prop_formals.push_back(name_tok.text);
+        expect_formal_name = false;
       } else {
         Consume();
       }
@@ -311,6 +334,21 @@ ModuleItem* Parser::ParsePropertyDecl() {
   Expect(TokenKind::kSemicolon);
 
   while (!Check(TokenKind::kKwEndproperty) && !AtEnd()) {
+    if (Check(TokenKind::kKwDisable)) {
+      Consume();
+      if (Check(TokenKind::kKwIff)) {
+        Consume();
+        ++item->prop_disable_iff_count;
+      }
+      continue;
+    }
+    if (Check(TokenKind::kIdentifier)) {
+      auto tok = Consume();
+      if (Check(TokenKind::kLParen)) {
+        item->prop_instance_refs.push_back(tok.text);
+      }
+      continue;
+    }
     Consume();
   }
   Expect(TokenKind::kKwEndproperty);

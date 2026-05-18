@@ -645,6 +645,12 @@ struct ModuleItem {
   Stmt* assert_fail_stmt = nullptr;
   Expr* prop_body_expr = nullptr;
 
+  // §16.12 / §F.4.1: metadata the rewriter needs to flatten property
+  // instances and enforce the disable-iff no-nesting rule.
+  std::vector<std::string_view> prop_formals;
+  int prop_disable_iff_count = 0;
+  std::vector<std::string_view> prop_instance_refs;
+
   std::vector<EventExpr> clocking_event;
   std::vector<ClockingSignalDecl> clocking_signals;
   bool is_default_clocking = false;

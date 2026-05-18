@@ -9,6 +9,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -796,7 +797,20 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kExportDecl:
 
       break;
-    case ModuleItemKind::kPropertyDecl:
+    case ModuleItemKind::kPropertyDecl: {
+      // §16.12: nesting of disable iff is forbidden, explicitly or through
+      // property instantiations. The flattened count via §F.4.1's rewriter
+      // catches both cases.
+      int flat_disable_iff =
+          property_registry_.FlattenedDisableIffCount(item);
+      if (flat_disable_iff > 1) {
+        diag_.Error(item->loc,
+                    "property \"" + std::string(item->name) +
+                        "\" nests disable iff clauses (§16.12)");
+      }
+      ValidateClockingBlock(item);
+      break;
+    }
     case ModuleItemKind::kAssertProperty:
     case ModuleItemKind::kAssumeProperty:
     case ModuleItemKind::kCoverProperty:
@@ -1205,6 +1219,18 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
 
   std::vector<std::pair<std::string_view, ModuleDecl*>> local_nested_modules(
       nested_module_decls_.begin(), nested_module_decls_.end());
+
+  // §16.12 lets a property be instantiated before its declaration, and
+  // §F.4.1 assumes names are resolved before the rewriter runs. Build the
+  // property/sequence registry up-front so flatten works for any decl.
+  property_registry_ = PropertyRegistry();
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kPropertyDecl ||
+        item->kind == ModuleItemKind::kSequenceDecl) {
+      property_registry_.Register(item);
+    }
+  }
+
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
   }
