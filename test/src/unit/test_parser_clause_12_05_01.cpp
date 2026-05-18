@@ -49,20 +49,6 @@ TEST(CasexSyntaxParsing, CasexMultipleItemsWithExpressions) {
   ASSERT_EQ(stmt->case_items.size(), 4u);
 }
 
-TEST(CasexSyntaxParsing, CasexKeyword) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    casex(sel) 3'b1??: x = 1; default: x = 0; endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
-}
-
 TEST(CasexSyntaxParsing, AlwaysLatchCasexStatement) {
   auto r = Parse(
       "module m;\n"
@@ -177,20 +163,6 @@ TEST(CasezSyntaxParsing, CasezWithQuestionMark) {
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
   ASSERT_EQ(stmt->case_items.size(), 4u);
-}
-
-TEST(CasezSyntaxParsing, CasezKeyword) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    casez(sel) 3'b1??: x = 1; default: x = 0; endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
 }
 
 TEST(CasezSyntaxParsing, CasezInsideAlwaysFF) {
