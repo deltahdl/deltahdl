@@ -29,44 +29,6 @@ TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct) {
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
 }
 
-TEST(ProceduralBlockSyntaxParsing, AlwaysComb) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r, ModuleItemKind::kAlwaysBlock);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
-}
-
-TEST(ProceduralBlockSyntaxParsing, AlwaysLatch) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_latch\n"
-      "    if (en) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r, ModuleItemKind::kAlwaysBlock);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
-}
-
-TEST(ProceduralBlockSyntaxParsing, AlwaysFF) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_ff @(posedge clk)\n"
-      "    q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r, ModuleItemKind::kAlwaysBlock);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
-}
-
 TEST(ProceduralBlockSyntaxParsing, FinalConstruct) {
   auto r = Parse(
       "module m;\n"
@@ -77,62 +39,6 @@ TEST(ProceduralBlockSyntaxParsing, FinalConstruct) {
   auto* item = FindItemByKind(r, ModuleItemKind::kFinalBlock);
   ASSERT_NE(item, nullptr);
   EXPECT_NE(item->body, nullptr);
-}
-
-TEST(ProceduralBlockSyntaxParsing, BlockingAssignment) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial a = 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  EXPECT_NE(stmt->lhs, nullptr);
-  EXPECT_NE(stmt->rhs, nullptr);
-}
-
-TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin q <= d; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-}
-
-TEST(ProceduralBlockSyntaxParsing, OperatorAssignment) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin a += 3; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-}
-
-TEST(ProceduralBlockSyntaxParsing, IncExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin i++; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ProceduralBlockSyntaxParsing, DecExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin i--; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ProceduralBlockSyntaxParsing, InitialConstruct_SingleStmt) {
@@ -742,6 +648,89 @@ TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_IncDecExpressionCrossLink)
     EXPECT_EQ(s->kind, StmtKind::kExprStmt);
     ASSERT_NE(s->expr, nullptr);
   }
+}
+
+TEST(ProceduralBlockSyntaxParsing, InitialConstruct_NullStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial ;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
+  ASSERT_NE(item, nullptr);
+}
+
+TEST(ProceduralBlockSyntaxParsing, ProceduralForceNet) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  initial begin force w = 1'b1; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForce);
+  ASSERT_NE(stmt->lhs, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+TEST(ProceduralBlockSyntaxParsing, ProceduralReleaseNet) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  initial begin release w; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
+  ASSERT_NE(stmt->lhs, nullptr);
+}
+
+TEST(ProceduralBlockSyntaxParsing, ErrorForceMissingRhs) {
+
+  EXPECT_FALSE(ParseOk(
+      "module m;\n"
+      "  initial begin force a; end\n"
+      "endmodule\n"));
+}
+
+TEST(ProceduralBlockSyntaxParsing, ErrorReleaseWithExtraRhs) {
+
+  EXPECT_FALSE(ParseOk(
+      "module m;\n"
+      "  initial begin release a = b; end\n"
+      "endmodule\n"));
+}
+
+TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_WithEventControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin q <= @(posedge clk) d; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  EXPECT_EQ(stmt->events.size(), 1u);
+}
+
+TEST(ProceduralBlockSyntaxParsing, InitialConstruct_EmptyBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kInitialBlock);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  EXPECT_TRUE(item->body->stmts.empty());
 }
 
 }

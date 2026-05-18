@@ -413,4 +413,56 @@ TEST(ExpressionParsing, ErrorIncompletePartSelect) {
   EXPECT_FALSE(ParseOk("module m; initial x = a[7:]; endmodule\n"));
 }
 
+TEST(ExpressionParsing, ConstantIndexedRangePlusInPackedDimSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  parameter BASE = 8;\n"
+      "  parameter WIDTH = 4;\n"
+      "  logic [15:0] data;\n"
+      "  logic [WIDTH-1:0] hi;\n"
+      "  initial hi = data[BASE+:WIDTH];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ExpressionParsing, ConstantIndexedRangeMinusInPackedDimSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  parameter TOP = 15;\n"
+      "  parameter WIDTH = 4;\n"
+      "  logic [15:0] data;\n"
+      "  logic [WIDTH-1:0] hi;\n"
+      "  initial hi = data[TOP-:WIDTH];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ExpressionParsing, ErrorTaggedExpressionMissingMember) {
+
+  EXPECT_FALSE(ParseOk(
+      "module m;\n"
+      "  initial x = tagged ;\n"
+      "endmodule\n"));
+}
+
+TEST(ExpressionParsing, ErrorBinaryOperatorMissingRhs) {
+
+  EXPECT_FALSE(ParseOk(
+      "module m;\n"
+      "  initial x = a + ;\n"
+      "endmodule\n"));
+}
+
+TEST(ExpressionParsing, ConstantRangeReversedBounds) {
+
+  auto r = Parse(
+      "module m;\n"
+      "  logic [0:7] x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }
