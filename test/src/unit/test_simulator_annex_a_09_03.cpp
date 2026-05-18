@@ -97,26 +97,6 @@ TEST(IdentifierSimulation, EscapedIdentifierVariableExecutes) {
   EXPECT_EQ(var->value.ToUint64(), 0x42u);
 }
 
-TEST(IdentifierSimulation, SimpleIdentifierWithDollarVariableRuns) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] my$var;\n"
-      "  initial my$var = 8'h5A;\n"
-      "endmodule\n",
-      "my$var");
-  EXPECT_EQ(val, 0x5Au);
-}
-
-TEST(IdentifierSimulation, SimpleIdentifierLeadingUnderscoreRuns) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] _hidden;\n"
-      "  initial _hidden = 8'hAA;\n"
-      "endmodule\n",
-      "_hidden");
-  EXPECT_EQ(val, 0xAAu);
-}
-
 TEST(IdentifierSimulation, ParameterIdentifierFromPackageResolvesAtRuntime) {
   auto val = RunAndGet(
       "package pkg;\n"

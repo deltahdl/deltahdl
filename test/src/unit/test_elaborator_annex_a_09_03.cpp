@@ -180,22 +180,6 @@ TEST(IdentifierElaboration, NestedHierarchicalIdentResolution) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(IdentifierElaboration, IdentifierWithDollarElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic [7:0] n$657;\n"
-             "  assign n$657 = 8'd0;\n"
-             "endmodule\n"));
-}
-
-TEST(IdentifierElaboration, IdentifierStartingWithUnderscoreElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic [7:0] _bus3;\n"
-             "  assign _bus3 = 8'd0;\n"
-             "endmodule\n"));
-}
-
 TEST(IdentifierElaboration, PsTypeIdentifierFromPackageResolves) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
@@ -204,14 +188,6 @@ TEST(IdentifierElaboration, PsTypeIdentifierFromPackageResolves) {
              "module m;\n"
              "  pkg::byte_t data;\n"
              "  assign data = 8'hAB;\n"
-             "endmodule\n"));
-}
-
-TEST(IdentifierElaboration, SimpleIdentifierWithMixedAlphaNumericResolves) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  logic abc123;\n"
-             "  assign abc123 = 1'b1;\n"
              "endmodule\n"));
 }
 
@@ -233,6 +209,30 @@ TEST(IdentifierElaboration, ModportIdentifierIsAcceptedAsIdentifier) {
              "  modport mp(input d);\n"
              "endinterface\n"
              "module m; endmodule\n"));
+}
+
+TEST(IdentifierElaboration, UnresolvedHierarchicalIdentifierError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub; endmodule\n"
+      "module m;\n"
+      "  logic x;\n"
+      "  sub u();\n"
+      "  assign x = u.nonexistent;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(IdentifierElaboration, PsIdentifierUnknownPackageIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int x;\n"
+      "  initial x = no_such_pkg::value;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 }

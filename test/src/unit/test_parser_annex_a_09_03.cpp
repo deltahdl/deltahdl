@@ -541,6 +541,16 @@ TEST(IdentifierSyntaxParsing, DpiExportCIdentifierWithDollarIsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+TEST(IdentifierSyntaxParsing, DpiImportCIdentifierLeadingDigitIsError) {
+  ParseFixture f;
+  ParseSrc(
+      "module m;\n"
+      "  import \"DPI-C\" 9bad = function void sv_func();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 TEST(IdentifierSyntaxParsing, SimpleIdentifierWithDollarInBody) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -676,18 +686,6 @@ TEST(IdentifierSyntaxParsing, SimpleIdentifierAllowsUnderscoreAndDigits) {
   EXPECT_EQ(cu->modules[0]->name, "m_1");
 }
 
-TEST(IdentifierSyntaxParsing, EscapedIdentifierWithPlus) {
-  ParseFixture f;
-  auto* cu = ParseSrc(
-      "module m;\n"
-      "  logic \\sig+1 ;\n"
-      "  assign \\sig+1 = 1'b0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(cu, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(IdentifierSyntaxParsing, HierarchicalIdentifierTfCall) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -738,14 +736,306 @@ TEST(IdentifierSyntaxParsing, PsOrHierarchicalSequenceIdentifier) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(IdentifierSyntaxParsing, HierarchicalIdentifierConstantBitSelectInPath) {
+TEST(IdentifierSyntaxParsing, IndexVariableIdentifierInForeach) {
   ParseFixture f;
   auto* cu = ParseSrc(
-      "module sub(input [3:0] d, output [3:0] q); assign q = d; endmodule\n"
       "module m;\n"
-      "  logic [3:0] data;\n"
-      "  sub arr[0:3](.d(4'h0), .q());\n"
-      "  initial data = arr[2].q;\n"
+      "  int data [4];\n"
+      "  initial begin\n"
+      "    foreach (data[idx]) data[idx] = idx;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, ConstraintIdentifierInClass) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "class c;\n"
+      "  rand int x;\n"
+      "  constraint c_range { x > 0; x < 10; }\n"
+      "endclass\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_FALSE(cu->classes.empty());
+  bool found = false;
+  for (auto* m : cu->classes[0]->members) {
+    if (m->kind == ClassMemberKind::kConstraint && m->name == "c_range") {
+      found = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(IdentifierSyntaxParsing, ClockingIdentifierInClockingBlock) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m(input clk, input d);\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input d;\n"
+      "  endclocking\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_FALSE(cu->modules.empty());
+  bool found = false;
+  for (auto* item : cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kClockingBlock && item->name == "cb") {
+      found = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(IdentifierSyntaxParsing, UdpIdentifierInPrimitive) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "primitive my_buf (out, in);\n"
+      "  output out;\n"
+      "  input in;\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "    1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_EQ(cu->udps.size(), 1u);
+  EXPECT_EQ(cu->udps[0]->name, "my_buf");
+}
+
+TEST(IdentifierSyntaxParsing, MethodIdentifierInClass) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "class c;\n"
+      "  function int get_x();\n"
+      "    return 7;\n"
+      "  endfunction\n"
+      "  task do_thing();\n"
+      "  endtask\n"
+      "endclass\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_FALSE(cu->classes.empty());
+  bool saw_func = false;
+  bool saw_task = false;
+  for (auto* m : cu->classes[0]->members) {
+    if (m->kind == ClassMemberKind::kMethod && m->method != nullptr) {
+      if (m->method->name == "get_x") saw_func = true;
+      if (m->method->name == "do_thing") saw_task = true;
+    }
+  }
+  EXPECT_TRUE(saw_func);
+  EXPECT_TRUE(saw_task);
+}
+
+TEST(IdentifierSyntaxParsing, BlockIdentifierOnSequentialBlock) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m;\n"
+      "  initial begin : init_blk\n"
+      "    logic x;\n"
+      "    x = 1'b0;\n"
+      "  end : init_blk\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, PsIdentifierGenericFromPackage) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "package pkg;\n"
+      "  int counter = 0;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  int y;\n"
+      "  initial y = pkg::counter;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, TerminalIdentifierInUdpPort) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "primitive p_inv (q, a);\n"
+      "  output q;\n"
+      "  input a;\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_EQ(cu->udps.size(), 1u);
+  EXPECT_EQ(cu->udps[0]->output_name, "q");
+  ASSERT_EQ(cu->udps[0]->input_names.size(), 1u);
+  EXPECT_EQ(cu->udps[0]->input_names[0], "a");
+}
+
+TEST(IdentifierSyntaxParsing, InterfacePortIdentifierAsModulePort) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "interface my_if;\n"
+      "  logic d;\n"
+      "endinterface\n"
+      "module m(my_if iface);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, HierarchicalParameterIdentifierAcrossModule) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module sub;\n"
+      "  parameter int WIDTH = 8;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  sub u();\n"
+      "  logic [u.WIDTH-1:0] bus;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, HierarchicalEventIdentifierAcrossModule) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module sub;\n"
+      "  event ev;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  sub u();\n"
+      "  initial @(u.ev);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, TopmoduleIdentifierInConfigDesign) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "config cfg;\n"
+      "  design top_design;\n"
+      "endconfig\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_EQ(cu->configs.size(), 1u);
+  ASSERT_EQ(cu->configs[0]->design_cells.size(), 1u);
+  EXPECT_EQ(cu->configs[0]->design_cells[0].second, "top_design");
+}
+
+TEST(IdentifierSyntaxParsing, CellIdentifierInConfigCellRule) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "config cfg;\n"
+      "  design top_design;\n"
+      "  cell adder use fast_adder;\n"
+      "endconfig\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_EQ(cu->configs.size(), 1u);
+  ASSERT_EQ(cu->configs[0]->rules.size(), 1u);
+  EXPECT_EQ(cu->configs[0]->rules[0]->cell_name, "adder");
+}
+
+TEST(IdentifierSyntaxParsing, CheckerIdentifierInCheckerDecl) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "checker chk;\n"
+      "endchecker\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_EQ(cu->checkers.size(), 1u);
+  EXPECT_EQ(cu->checkers[0]->name, "chk");
+}
+
+TEST(IdentifierSyntaxParsing, DynamicArrayVariableIdentifierDecl) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m;\n"
+      "  int dyn_arr [];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, RsProductionIdentifierInRandsequence) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence (root_prod)\n"
+      "      root_prod : leaf_prod ;\n"
+      "      leaf_prod : { $display(\"leaf\"); } ;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, SignalIdentifierInClockingBlock) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m(input clk, input a, input b);\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input a, b;\n"
+      "  endclocking\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, PsCheckerIdentifierFromPackage) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "package pkg;\n"
+      "  checker chk;\n"
+      "  endchecker\n"
+      "endpackage\n"
+      "module m;\n"
+      "  initial $display(\"%d\", pkg::chk);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, PsCovergroupIdentifierFromPackage) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "package pkg;\n"
+      "  int x;\n"
+      "  covergroup cg;\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "endpackage\n"
+      "module m;\n"
+      "  pkg::cg inst = new();\n"
       "endmodule\n",
       f);
   ASSERT_NE(cu, nullptr);

@@ -231,3 +231,41 @@ TEST(IdentifierLexing, EscapedIdentifierTerminatedByTab) {
   EXPECT_EQ(tokens[0].text, "x_y");
 }
 
+TEST(IdentifierLexing, EscapedIdentifierRejectsControlChar) {
+  std::string src = "\\foo";
+  src.push_back(static_cast<char>(0x07));
+  src.append(" rest");
+  auto [tokens, errors] = LexWithDiag(src);
+  EXPECT_TRUE(errors);
+}
+
+TEST(IdentifierLexing, SimpleIdentMaxLength) {
+  std::string id(1024, 'a');
+  auto [tokens, errors] = LexWithDiag(id);
+  EXPECT_FALSE(errors);
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text.size(), 1024u);
+}
+
+TEST(IdentifierLexing, SimpleIdentExceedsMaxLength) {
+  std::string id(1025, 'a');
+  auto [tokens, errors] = LexWithDiag(id);
+  EXPECT_TRUE(errors);
+}
+
+TEST(IdentifierLexing, EscapedIdentifierMaxLength) {
+  std::string src = "\\" + std::string(1024, 'q') + " ";
+  auto [tokens, errors] = LexWithDiag(src);
+  EXPECT_FALSE(errors);
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[0].text.size(), 1024u);
+}
+
+TEST(IdentifierLexing, EscapedIdentifierExceedsMaxLength) {
+  std::string src = "\\" + std::string(1025, 'q') + " ";
+  auto [tokens, errors] = LexWithDiag(src);
+  EXPECT_TRUE(errors);
+}
+
