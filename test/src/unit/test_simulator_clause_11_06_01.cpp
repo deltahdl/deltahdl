@@ -244,4 +244,117 @@ TEST(ExpressionBitLength, ReplicationWidthIsCountTimesElement) {
   EXPECT_EQ(result.width, 24u);
 }
 
+TEST(ExpressionBitLength, UnsizedConstantLiteralYieldsAtLeast32Bits) {
+  SimFixture f;
+  auto* lit = MakeInt(f.arena, 42);
+  auto result = EvalExpr(lit, f.ctx, f.arena);
+  EXPECT_GE(result.width, 32u);
+}
+
+TEST(ExpressionBitLength, SizedConstantLiteralYieldsGivenWidth) {
+  SimFixture f;
+  auto* lit = f.arena.Create<Expr>();
+  lit->kind = ExprKind::kIntegerLiteral;
+  lit->text = "8'hFF";
+  lit->int_val = 0xFF;
+  auto result = EvalExpr(lit, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 8u);
+}
+
+TEST(ExpressionBitLength, ArithmeticResultUsesMaxOperandWidth) {
+  SimFixture f;
+  MakeVar(f, "aw8", 8, 0xFF);
+  MakeVar(f, "bw16", 16, 0x0001);
+  for (TokenKind op :
+       {TokenKind::kPlus, TokenKind::kMinus, TokenKind::kStar,
+        TokenKind::kSlash, TokenKind::kPercent, TokenKind::kAmp,
+        TokenKind::kPipe, TokenKind::kCaret, TokenKind::kCaretTilde,
+        TokenKind::kTildeCaret}) {
+    auto* expr = MakeBinary(f.arena, op, MakeId(f.arena, "aw8"),
+                            MakeId(f.arena, "bw16"));
+    auto result = EvalExpr(expr, f.ctx, f.arena);
+    EXPECT_EQ(result.width, 16u);
+  }
+}
+
+TEST(ExpressionBitLength, UnaryPlusMinusTildePreserveOperandWidth) {
+  SimFixture f;
+  MakeVar(f, "uw", 12, 0x123);
+  for (TokenKind op :
+       {TokenKind::kPlus, TokenKind::kMinus, TokenKind::kTilde}) {
+    auto* expr = MakeUnary(f.arena, op, MakeId(f.arena, "uw"));
+    auto result = EvalExpr(expr, f.ctx, f.arena);
+    EXPECT_EQ(result.width, 12u);
+  }
+}
+
+TEST(ExpressionBitLength, ConcatenationResultIsSumOfOperandWidths) {
+  SimFixture f;
+  MakeVar(f, "cca", 8, 0xAA);
+  MakeVar(f, "ccb", 16, 0xBBCC);
+  auto* concat = f.arena.Create<Expr>();
+  concat->kind = ExprKind::kConcatenation;
+  concat->elements = {MakeId(f.arena, "cca"), MakeId(f.arena, "ccb")};
+  auto result = EvalExpr(concat, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 24u);
+}
+
+TEST(ExpressionBitLength, LogicalAndOperandIsSelfDetermined) {
+  SimFixture f;
+  MakeVar(f, "laa", 16, 0xFFFF);
+  MakeVar(f, "lab", 16, 0x0001);
+  auto* add = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "laa"),
+                         MakeId(f.arena, "lab"));
+  auto* one = MakeInt(f.arena, 1);
+  auto* land = MakeBinary(f.arena, TokenKind::kAmpAmp, add, one);
+  auto result = EvalExpr(land, f.ctx, f.arena, 64);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(ExpressionBitLength, ReductionXorOperandIsSelfDetermined) {
+  SimFixture f;
+  MakeVar(f, "rxa", 16, 0xFFFF);
+  MakeVar(f, "rxb", 16, 0x0001);
+  auto* add = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "rxa"),
+                         MakeId(f.arena, "rxb"));
+  auto* xor_reduce = MakeUnary(f.arena, TokenKind::kCaret, add);
+  auto result = EvalExpr(xor_reduce, f.ctx, f.arena, 64);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(ExpressionBitLength, ConcatenationOperandIsSelfDetermined) {
+  SimFixture f;
+  MakeVar(f, "csa", 16, 0xFFFF);
+  MakeVar(f, "csb", 16, 0x0001);
+  auto* add = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "csa"),
+                         MakeId(f.arena, "csb"));
+  auto* one_bit = f.arena.Create<Expr>();
+  one_bit->kind = ExprKind::kIntegerLiteral;
+  one_bit->text = "1'b1";
+  one_bit->int_val = 1;
+  auto* concat = f.arena.Create<Expr>();
+  concat->kind = ExprKind::kConcatenation;
+  concat->elements = {add, one_bit};
+  auto result = EvalExpr(concat, f.ctx, f.arena, 64);
+  EXPECT_EQ(result.width, 17u);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(ExpressionBitLength, ReplicationElementIsSelfDetermined) {
+  SimFixture f;
+  MakeVar(f, "rea", 16, 0xFFFF);
+  MakeVar(f, "reb", 16, 0x0001);
+  auto* add = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "rea"),
+                         MakeId(f.arena, "reb"));
+  auto* repl = f.arena.Create<Expr>();
+  repl->kind = ExprKind::kReplicate;
+  repl->repeat_count = MakeInt(f.arena, 2);
+  repl->elements.push_back(add);
+  auto result = EvalExpr(repl, f.ctx, f.arena, 64);
+  EXPECT_EQ(result.width, 32u);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
 }
