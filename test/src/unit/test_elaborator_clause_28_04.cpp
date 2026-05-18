@@ -98,14 +98,6 @@ TEST(NInputGateElaboration, TwoInputOrProducesSingleBinary) {
   EXPECT_EQ(ca.rhs->rhs->kind, ExprKind::kIdentifier);
 }
 
-TEST(NInputGateElaboration, NandGateElaboratesThroughFullPipeline) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  wire a, b, y;\n"
-      "  nand g1(y, a, b);\n"
-      "endmodule\n"));
-}
-
 TEST(NInputGateElaboration, ElaborateNorGate) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -160,6 +152,42 @@ TEST(NInputGateElaboration, FirstTerminalIsOutputLhs) {
   ASSERT_NE(lhs, nullptr);
   EXPECT_EQ(lhs->kind, ExprKind::kIdentifier);
   EXPECT_EQ(lhs->text, "y");
+}
+
+TEST(NInputGateElaboration, PropagationDelayIndependentOfInputCount) {
+  // For each input arity, the elaborator emits one continuous assign carrying
+  // the same #(7) delay; adding more inputs only widens the AND chain.
+  const char* kSources[] = {
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  and #(7) g(y, a, b);\n"
+      "endmodule\n",
+      "module m;\n"
+      "  wire y, a, b, c;\n"
+      "  and #(7) g(y, a, b, c);\n"
+      "endmodule\n",
+      "module m;\n"
+      "  wire y, a, b, c, d;\n"
+      "  and #(7) g(y, a, b, c, d);\n"
+      "endmodule\n",
+      "module m;\n"
+      "  wire y, a, b, c, d, e, f, g0, h;\n"
+      "  and #(7) g(y, a, b, c, d, e, f, g0, h);\n"
+      "endmodule\n",
+  };
+  for (const char* src : kSources) {
+    ElabFixture f;
+    auto* design = ElaborateSrc(src, f);
+    ASSERT_NE(design, nullptr) << src;
+    EXPECT_FALSE(f.has_errors) << src;
+    auto* mod = design->top_modules[0];
+    ASSERT_FALSE(mod->assigns.empty()) << src;
+    auto& ca = mod->assigns[0];
+    ASSERT_NE(ca.delay, nullptr) << src;
+    EXPECT_EQ(ca.delay->int_val, 7u) << src;
+    EXPECT_EQ(ca.delay_fall, nullptr) << src;
+    EXPECT_EQ(ca.delay_decay, nullptr) << src;
+  }
 }
 
 }

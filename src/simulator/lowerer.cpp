@@ -178,7 +178,10 @@ static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
       return m;
     }
     if (HasUnknownBits(old_val) || IsAllHighZ(old_val)) {
-      return std::min(d.rise, d.fall);
+      // Old value is x or z, new value is a known 0 or 1. The destination
+      // logic level selects the slot: 0 routes through the fall delay and 1
+      // through the rise delay, matching the x/z-source rows of Table 28-9.
+      return new_val.ToUint64() == 0 ? d.fall : d.rise;
     }
     uint64_t nv = new_val.ToUint64();
     uint64_t ov = old_val.ToUint64();

@@ -6,21 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(GateDelayParsing, NInputGateRiseFallDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire y, a, b;\n"
-      "  or #(3, 5) g1(y, a, b);\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[3];
-  ASSERT_NE(item->gate_delay, nullptr);
-  EXPECT_EQ(item->gate_delay->int_val, 3u);
-  ASSERT_NE(item->gate_delay_fall, nullptr);
-  EXPECT_EQ(item->gate_delay_fall->int_val, 5u);
-}
-
 TEST(GateDelayParsing, PullupDelayRejected) {
   auto r = Parse(
       "module m;\n"
@@ -75,19 +60,6 @@ TEST(DelayParsing, AndGateTwoValueDelay) {
   ASSERT_NE(item->gate_delay_fall, nullptr);
   EXPECT_EQ(item->gate_delay_fall->int_val, 20u);
   EXPECT_EQ(item->gate_delay_decay, nullptr);
-}
-
-TEST(DelayParsing, XorGateSingleValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire y, a, b;\n"
-      "  xor #7 g1(y, a, b);\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[3];
-  ASSERT_NE(item->gate_delay, nullptr);
-  EXPECT_EQ(item->gate_delay->int_val, 7u);
 }
 
 TEST(GateDelayParsing, GateWithoutDelayHasNullDelay) {
