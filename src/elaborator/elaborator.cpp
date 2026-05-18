@@ -1065,6 +1065,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateAnonymousProgramNameSharing();
 
+  ValidateAnonymousProgramHierRefs();
+
   ValidatePackageItems();
 
   ValidatePackageReferences();

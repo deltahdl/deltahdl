@@ -150,4 +150,56 @@ TEST(ProgramConstruct, ReferencingProgramSignalFromOutsideIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(ProgramConstruct, ImplicitlyInstantiatedNestedProgramReusesDeclName) {
+  ProgramElabFixture f;
+  auto* design = ElaborateSource(
+      "module top;\n"
+      "  program p;\n"
+      "    initial $display(\"hi\");\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  const auto* top = design->top_modules[0];
+  bool found = false;
+  for (const auto& child : top->children) {
+    if (child.module_name == "p") {
+      EXPECT_EQ(child.inst_name, child.module_name);
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(ProgramConstruct, HierRefBetweenProgramsIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program src;\n"
+      "    int sig;\n"
+      "  endprogram\n"
+      "  program dst;\n"
+      "    initial src.sig = 1;\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ProgramConstruct, AnonymousProgramHierRefToProgramIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program prog;\n"
+      "  int psig;\n"
+      "endprogram\n"
+      "program;\n"
+      "  task t;\n"
+      "    prog.psig = 1;\n"
+      "  endtask\n"
+      "endprogram\n",
+      f, "prog");
+  EXPECT_TRUE(f.has_errors);
+}
+
 }

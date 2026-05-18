@@ -61,6 +61,8 @@ class Elaborator {
 
   void ValidateAnonymousProgramNameSharing();
 
+  void ValidateAnonymousProgramHierRefs();
+
   void ValidatePackageItems();
 
   void ValidatePackageReferences();

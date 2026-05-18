@@ -13,6 +13,14 @@ TEST_F(ProgramTestParse, ProgramAutomaticLifetime) {
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
 }
 
+TEST_F(ProgramTestParse, ProgramStaticLifetime) {
+  auto* unit = Parse("program static static_prog; endprogram");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "static_prog");
+  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  EXPECT_FALSE(unit->programs[0]->is_automatic);
+}
+
 TEST_F(ProgramTestParse, MultipleProgramsCoexist) {
   auto* unit = Parse(
       "program p1; endprogram\n"
@@ -160,6 +168,15 @@ TEST(ProgramItemsParsing, ProgramTimeunits) {
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ProgramItemsParsing, ProgramTimeunitAfterOtherItemRejected) {
+  auto r = Parse(
+      "program test_prg;\n"
+      "  int x;\n"
+      "  timeunit 1ns;\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 TEST(ProgramItemsParsing, ProgramGenFor) {
@@ -664,6 +681,79 @@ TEST(ProgramItemsParsing, CannotContainProgramInst) {
       "  other o0();\n"
       "endprogram\n");
   EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramDeclaration, AnonymousProgramAcceptsTaskFunctionClass) {
+  auto r = Parse(
+      "program;\n"
+      "  task anon_t; endtask\n"
+      "  function int anon_f; return 0; endfunction\n"
+      "  class anon_c; int data; endclass\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->programs.empty());
+  bool saw_task = false, saw_func = false, saw_class = false;
+  for (const auto* item : r.cu->cu_items) {
+    EXPECT_TRUE(item->from_anonymous_program);
+    if (item->kind == ModuleItemKind::kTaskDecl && item->name == "anon_t")
+      saw_task = true;
+    if (item->kind == ModuleItemKind::kFunctionDecl && item->name == "anon_f")
+      saw_func = true;
+    if (item->kind == ModuleItemKind::kClassDecl && item->name == "anon_c")
+      saw_class = true;
+  }
+  EXPECT_TRUE(saw_task);
+  EXPECT_TRUE(saw_func);
+  EXPECT_TRUE(saw_class);
+}
+
+TEST(ProgramDeclaration, AnonymousProgramAllowsEmptyItemAndCovergroup) {
+  auto r = Parse(
+      "program;\n"
+      "  ;\n"
+      "  covergroup cg_anon @(posedge clk);\n"
+      "    coverpoint clk;\n"
+      "  endgroup\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ProgramDeclaration, AnsiHeaderPackageImportRequiresPortList) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  int x;\n"
+      "endpackage\n"
+      "program prg import pkg::*;\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramDeclaration, AnsiHeaderPackageImportWithPortListSucceeds) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  int x;\n"
+      "endpackage\n"
+      "program prg import pkg::*; (input logic clk);\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "prg");
+  ASSERT_EQ(r.cu->programs[0]->ports.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->ports[0].name, "clk");
+}
+
+TEST(ProgramDeclaration, AnonymousProgramAllowsInterfaceClassDecl) {
+  auto r = Parse(
+      "program;\n"
+      "  interface class iface_c;\n"
+      "    pure virtual function int get();\n"
+      "  endclass\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }

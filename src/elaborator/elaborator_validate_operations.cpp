@@ -1209,6 +1209,18 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
   }
 }
 
+void Elaborator::ValidateAnonymousProgramHierRefs() {
+  std::unordered_set<std::string_view> program_names;
+  for (const auto* p : unit_->programs) {
+    if (!p->name.empty()) program_names.insert(p->name);
+  }
+  if (program_names.empty()) return;
+  for (const auto* item : unit_->cu_items) {
+    if (!item->from_anonymous_program) continue;
+    if (item->body) WalkStmtsForProgramRef(item->body, program_names, diag_);
+  }
+}
+
 static void CollectHierPathComponents(const Expr* e,
                                       std::vector<std::string_view>& out) {
   if (!e) return;

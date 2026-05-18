@@ -60,6 +60,33 @@ TEST(ProgramConstructSim, NoImplicitFinishWithoutProgramInitial) {
   EXPECT_FALSE(f.ctx.StopRequested());
 }
 
+TEST(ProgramConstructSim, ImplicitFinishWaitsForAllProgramInitials) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  program p1;\n"
+      "    initial a = 8'd1;\n"
+      "  endprogram\n"
+      "  program p2;\n"
+      "    initial b = 8'd2;\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_TRUE(f.ctx.StopRequested());
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 1u);
+  EXPECT_EQ(b->value.ToUint64(), 2u);
+}
+
 TEST(ProgramConstructSim, ProgramInitialTerminatesDescendantThreads) {
   SimFixture f;
   auto* design = ElaborateSrc(
