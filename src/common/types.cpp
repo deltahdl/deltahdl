@@ -197,6 +197,7 @@ bool IsSimulationRegion(Region r) {
 
 bool IsPliRegion(Region r) {
   switch (r) {
+    case Region::kPreponed:
     case Region::kPreActive:
     case Region::kPreNBA:
     case Region::kPostNBA:
