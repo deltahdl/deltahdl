@@ -289,6 +289,98 @@ void ExecuteDeferredAssertionAction(const DeferredAssertion& da) {
   }
 }
 
+bool UsesErrorSeverityFallback(const DeferredAssertion& da) {
+  if (da.condition_val != 0) return false;
+  if (da.kind == AssertionKind::kCover) return false;
+  return !da.has_else_clause;
+}
+
+bool IsDeferredFlushPoint(FlushPointReason reason) {
+  switch (reason) {
+    case FlushPointReason::kEventControlResume:
+    case FlushPointReason::kWaitResume:
+    case FlushPointReason::kAlwaysCombSignalDelta:
+    case FlushPointReason::kAlwaysLatchSignalDelta:
+    case FlushPointReason::kDisableOuterScope:
+      return true;
+    case FlushPointReason::kNone:
+      return false;
+  }
+  return false;
+}
+
+void DeferredReportQueue::Enqueue(PendingDeferredReport report) {
+  report.matured = false;
+  entries_.push_back(std::move(report));
+}
+
+void DeferredReportQueue::MatureObservedReports() {
+  for (auto& e : entries_) {
+    if (e.deferral == DeferralKind::kObserved) e.matured = true;
+  }
+}
+
+void DeferredReportQueue::MatureFinalReports() {
+  for (auto& e : entries_) {
+    if (e.deferral == DeferralKind::kFinal) e.matured = true;
+  }
+}
+
+std::vector<PendingDeferredReport> DeferredReportQueue::TakeMaturedObserved() {
+  std::vector<PendingDeferredReport> taken;
+  std::vector<PendingDeferredReport> kept;
+  kept.reserve(entries_.size());
+  for (auto& e : entries_) {
+    if (e.matured && e.deferral == DeferralKind::kObserved) {
+      taken.push_back(std::move(e));
+    } else {
+      kept.push_back(std::move(e));
+    }
+  }
+  entries_ = std::move(kept);
+  return taken;
+}
+
+std::vector<PendingDeferredReport> DeferredReportQueue::TakeMaturedFinal() {
+  std::vector<PendingDeferredReport> taken;
+  std::vector<PendingDeferredReport> kept;
+  kept.reserve(entries_.size());
+  for (auto& e : entries_) {
+    if (e.matured && e.deferral == DeferralKind::kFinal) {
+      taken.push_back(std::move(e));
+    } else {
+      kept.push_back(std::move(e));
+    }
+  }
+  entries_ = std::move(kept);
+  return taken;
+}
+
+void DeferredReportQueue::FlushNonMatured() {
+  std::vector<PendingDeferredReport> kept;
+  kept.reserve(entries_.size());
+  for (auto& e : entries_) {
+    if (e.matured) kept.push_back(std::move(e));
+  }
+  entries_ = std::move(kept);
+}
+
+uint32_t DeferredReportQueue::Size() const {
+  return static_cast<uint32_t>(entries_.size());
+}
+
+uint32_t DeferredReportQueue::MaturedCount() const {
+  uint32_t n = 0;
+  for (const auto& e : entries_) {
+    if (e.matured) ++n;
+  }
+  return n;
+}
+
+uint32_t DeferredReportQueue::NonMaturedCount() const {
+  return Size() - MaturedCount();
+}
+
 bool AssertionControl::IsEnabled(std::string_view inst) const {
   if (global_off_) return false;
   return disabled_.find(std::string(inst)) == disabled_.end() &&
@@ -389,6 +481,68 @@ ProceduralAssertionQueue& SvaEngine::GetProceduralQueue(
     std::string_view process_id) {
 
   return procedural_queues_[std::string(process_id)];
+}
+
+DeferredReportQueue& SvaEngine::GetDeferredReportQueue(
+    std::string_view process_id) {
+  return per_process_reports_[std::string(process_id)];
+}
+
+const DeferredReportQueue* SvaEngine::PeekDeferredReportQueue(
+    std::string_view process_id) const {
+  auto it = per_process_reports_.find(std::string(process_id));
+  if (it == per_process_reports_.end()) return nullptr;
+  return &it->second;
+}
+
+void SvaEngine::QueuePendingReport(std::string_view process_id,
+                                   const DeferredAssertion& da,
+                                   DeferralKind kind) {
+  PendingDeferredReport report;
+  report.process_id = std::string(process_id);
+  report.deferral = kind;
+  report.da = da;
+  GetDeferredReportQueue(process_id).Enqueue(std::move(report));
+}
+
+void SvaEngine::MatureObservedReports(std::string_view process_id) {
+  GetDeferredReportQueue(process_id).MatureObservedReports();
+}
+
+void SvaEngine::MatureFinalReports(std::string_view process_id) {
+  GetDeferredReportQueue(process_id).MatureFinalReports();
+}
+
+uint32_t SvaEngine::ExecuteMaturedObservedInReactive(
+    std::string_view process_id, Scheduler& sched, SimTime time) {
+  auto matured = GetDeferredReportQueue(process_id).TakeMaturedObserved();
+  for (auto& report : matured) {
+    auto* event = sched.GetEventPool().Acquire();
+    event->callback = [da_copy = std::move(report.da)]() {
+      ExecuteDeferredAssertionAction(da_copy);
+    };
+    sched.ScheduleEvent(time, Region::kReactive, event);
+  }
+  return static_cast<uint32_t>(matured.size());
+}
+
+uint32_t SvaEngine::ExecuteMaturedFinalInPostponed(
+    std::string_view process_id, Scheduler& sched, SimTime time) {
+  auto matured = GetDeferredReportQueue(process_id).TakeMaturedFinal();
+  for (auto& report : matured) {
+    auto* event = sched.GetEventPool().Acquire();
+    event->callback = [da_copy = std::move(report.da)]() {
+      ExecuteDeferredAssertionAction(da_copy);
+    };
+    sched.ScheduleEvent(time, Region::kPostponed, event);
+  }
+  return static_cast<uint32_t>(matured.size());
+}
+
+void SvaEngine::OnDeferredFlushPoint(std::string_view process_id,
+                                     FlushPointReason reason) {
+  if (!IsDeferredFlushPoint(reason)) return;
+  GetDeferredReportQueue(process_id).FlushNonMatured();
 }
 
 }

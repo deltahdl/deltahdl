@@ -141,9 +141,53 @@ struct DeferredAssertion {
   AssertionSeverity severity = AssertionSeverity::kError;
 
   AssertionKind kind = AssertionKind::kAssert;
+
+  bool has_else_clause = true;
 };
 
 void ExecuteDeferredAssertionAction(const DeferredAssertion& da);
+
+bool UsesErrorSeverityFallback(const DeferredAssertion& da);
+
+enum class DeferralKind : uint8_t {
+  kObserved = 0,
+  kFinal = 1,
+};
+
+enum class FlushPointReason : uint8_t {
+  kNone = 0,
+  kEventControlResume = 1,
+  kWaitResume = 2,
+  kAlwaysCombSignalDelta = 3,
+  kAlwaysLatchSignalDelta = 4,
+  kDisableOuterScope = 5,
+};
+
+bool IsDeferredFlushPoint(FlushPointReason reason);
+
+struct PendingDeferredReport {
+  std::string process_id;
+  DeferralKind deferral = DeferralKind::kObserved;
+  DeferredAssertion da;
+  bool matured = false;
+};
+
+class DeferredReportQueue {
+ public:
+  void Enqueue(PendingDeferredReport report);
+  void MatureObservedReports();
+  void MatureFinalReports();
+  std::vector<PendingDeferredReport> TakeMaturedObserved();
+  std::vector<PendingDeferredReport> TakeMaturedFinal();
+  void FlushNonMatured();
+  uint32_t Size() const;
+  uint32_t MaturedCount() const;
+  uint32_t NonMaturedCount() const;
+  const std::vector<PendingDeferredReport>& Entries() const { return entries_; }
+
+ private:
+  std::vector<PendingDeferredReport> entries_;
+};
 
 struct PendingProceduralAssertion {
   AssertionKind kind = AssertionKind::kAssert;
@@ -243,10 +287,30 @@ class SvaEngine {
 
   ProceduralAssertionQueue& GetProceduralQueue(std::string_view process_id);
 
+  void QueuePendingReport(std::string_view process_id,
+                          const DeferredAssertion& da,
+                          DeferralKind kind);
+
+  void MatureObservedReports(std::string_view process_id);
+  void MatureFinalReports(std::string_view process_id);
+
+  uint32_t ExecuteMaturedObservedInReactive(std::string_view process_id,
+                                            Scheduler& sched, SimTime time);
+  uint32_t ExecuteMaturedFinalInPostponed(std::string_view process_id,
+                                          Scheduler& sched, SimTime time);
+
+  void OnDeferredFlushPoint(std::string_view process_id,
+                            FlushPointReason reason);
+
+  DeferredReportQueue& GetDeferredReportQueue(std::string_view process_id);
+  const DeferredReportQueue* PeekDeferredReportQueue(
+      std::string_view process_id) const;
+
  private:
   std::vector<DeferredAssertion> deferred_queue_;
   AssertionControl control_;
   std::unordered_map<std::string, ProceduralAssertionQueue> procedural_queues_;
+  std::unordered_map<std::string, DeferredReportQueue> per_process_reports_;
 };
 
 }
