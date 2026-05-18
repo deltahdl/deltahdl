@@ -87,6 +87,12 @@ void Scheduler::ScheduleEvent(SimTime time, Region region, Event* event) {
     std::abort();
   }
 
+  if (event->kind == EventKind::kPli && region == Region::kObserved) {
+    ++illegal_observed_pli_count_;
+    pool_.Release(event);
+    return;
+  }
+
   if (current_region_ == Region::kPreponed && time == current_time_ &&
       region != Region::kPreponed) {
     ++illegal_preponed_schedule_count_;

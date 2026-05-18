@@ -25,27 +25,6 @@ TEST(ObservedRegionSim, ObservedRegionHoldsMultipleEvents) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(ObservedRegionSim, ObservedSchedulesPassFailIntoReactive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* obs = sched.GetEventPool().Acquire();
-  obs->callback = [&]() {
-    order.push_back("observed");
-
-    auto* reactive = sched.GetEventPool().Acquire();
-    reactive->callback = [&order]() { order.push_back("reactive"); };
-    sched.ScheduleEvent({0}, Region::kReactive, reactive);
-  };
-  sched.ScheduleEvent({0}, Region::kObserved, obs);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "observed");
-  EXPECT_EQ(order[1], "reactive");
-}
-
 TEST(ObservedRegionSim, MultiplePassFailActionsScheduledInReactive) {
   Arena arena;
   Scheduler sched(arena);
@@ -144,6 +123,86 @@ TEST(ObservedRegionSim, ObservedExecutesBeforePostObserved) {
   ASSERT_EQ(order.size(), 2u);
   EXPECT_EQ(order[0], "observed");
   EXPECT_EQ(order[1], "post_observed");
+}
+
+TEST(ObservedRegionSim, PliCallbackScheduledIntoObservedIsRejected) {
+  Arena arena;
+  Scheduler sched(arena);
+  bool ran = false;
+
+  auto* pli = sched.GetEventPool().Acquire();
+  pli->kind = EventKind::kPli;
+  pli->callback = [&]() { ran = true; };
+  sched.ScheduleEvent({0}, Region::kObserved, pli);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalObservedPliCount(), 1u);
+  EXPECT_FALSE(ran);
+}
+
+TEST(ObservedRegionSim, PliCallbackInPreObservedIsNotRejected) {
+  Arena arena;
+  Scheduler sched(arena);
+  bool ran = false;
+
+  auto* pli = sched.GetEventPool().Acquire();
+  pli->kind = EventKind::kPli;
+  pli->callback = [&]() { ran = true; };
+  sched.ScheduleEvent({0}, Region::kPreObserved, pli);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalObservedPliCount(), 0u);
+  EXPECT_TRUE(ran);
+}
+
+TEST(ObservedRegionSim, EvaluationEventInObservedIsAllowed) {
+  Arena arena;
+  Scheduler sched(arena);
+  bool ran = false;
+
+  auto* eval = sched.GetEventPool().Acquire();
+  eval->kind = EventKind::kEvaluation;
+  eval->callback = [&]() { ran = true; };
+  sched.ScheduleEvent({0}, Region::kObserved, eval);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalObservedPliCount(), 0u);
+  EXPECT_TRUE(ran);
+}
+
+TEST(ObservedRegionSim, EveryAttemptedPliInObservedIsCounted) {
+  Arena arena;
+  Scheduler sched(arena);
+
+  for (int i = 0; i < 4; ++i) {
+    auto* pli = sched.GetEventPool().Acquire();
+    pli->kind = EventKind::kPli;
+    pli->callback = []() {};
+    sched.ScheduleEvent({0}, Region::kObserved, pli);
+  }
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalObservedPliCount(), 4u);
+}
+
+TEST(ObservedRegionSim, PassFailFromObservedAtNonZeroTimeLandsInSameSlot) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<uint64_t> reactive_times;
+
+  auto* obs = sched.GetEventPool().Acquire();
+  obs->callback = [&]() {
+    auto* reactive = sched.GetEventPool().Acquire();
+    reactive->callback = [&reactive_times, &sched]() {
+      reactive_times.push_back(sched.CurrentTime().ticks);
+    };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kReactive, reactive);
+  };
+  sched.ScheduleEvent({5}, Region::kObserved, obs);
+
+  sched.Run();
+  ASSERT_EQ(reactive_times.size(), 1u);
+  EXPECT_EQ(reactive_times[0], 5u);
 }
 
 TEST(ObservedRegionSim, ObservedEventsAcrossMultipleTimeSlots) {

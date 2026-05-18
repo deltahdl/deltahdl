@@ -12,6 +12,7 @@ namespace delta {
 enum class EventKind : uint8_t {
   kUpdate,
   kEvaluation,
+  kPli,
 };
 
 struct Event {
@@ -90,6 +91,10 @@ class Scheduler {
     return illegal_postponed_write_count_;
   }
 
+  size_t IllegalObservedPliCount() const {
+    return illegal_observed_pli_count_;
+  }
+
   size_t UpdateEventScheduledCount() const {
     return update_events_scheduled_count_;
   }
@@ -153,6 +158,7 @@ class Scheduler {
   size_t illegal_preponed_write_count_ = 0;
   size_t illegal_postponed_schedule_count_ = 0;
   size_t illegal_postponed_write_count_ = 0;
+  size_t illegal_observed_pli_count_ = 0;
   size_t update_events_scheduled_count_ = 0;
   size_t evaluation_events_scheduled_count_ = 0;
   size_t mid_statement_suspension_count_ = 0;
