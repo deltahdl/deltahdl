@@ -147,23 +147,6 @@ TEST(SpecifyTerminalParsing, OutputTerminalPartSelect) {
   EXPECT_NE(si->path.dst_ports[0].range_right, nullptr);
 }
 
-TEST(SpecifyTerminalParsing, BothInputOutputWithRanges) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a[3:0] => b[7:4]) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  EXPECT_EQ(si->path.src_ports[0].name, "a");
-  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
-  EXPECT_EQ(si->path.dst_ports[0].name, "b");
-  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
-}
-
 TEST(SpecifyTerminalParsing, MixedInputTerminalsFullPath) {
   auto r = Parse(
       "module m;\n"
@@ -322,6 +305,68 @@ TEST(SpecifyTerminalParsing, ErrorTrailingCommaInInputList) {
       "  endspecify\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
+}
+
+TEST(SpecifyTerminalParsing, ErrorEmptyOutputList) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => ) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(SpecifyTerminalParsing, ErrorTrailingCommaInOutputList) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b,) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(SpecifyTerminalParsing, ErrorOutputTerminalUnclosedBracket) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b[3) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(SpecifyTerminalParsing, InputIdentifierInterfaceForm) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (bus.a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.src_ports.size(), 1u);
+  EXPECT_EQ(si->path.src_ports[0].interface_name, "bus");
+  EXPECT_EQ(si->path.src_ports[0].name, "a");
+}
+
+TEST(SpecifyTerminalParsing, OutputIdentifierInterfaceForm) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => bus.x) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.dst_ports.size(), 1u);
+  EXPECT_EQ(si->path.dst_ports[0].interface_name, "bus");
+  EXPECT_EQ(si->path.dst_ports[0].name, "x");
 }
 
 TEST(TimingCheckEventDefParsing, TerminalBitSelect) {
