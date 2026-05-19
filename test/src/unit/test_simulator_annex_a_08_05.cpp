@@ -120,4 +120,39 @@ TEST(LvalueSim, VarLvalueStreamingConcatBlocking) {
   LowerRunAndCheck(f, design, {{"a", 0x42u}});
 }
 
+TEST(LvalueSim, NetLvalueConcatContAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire [3:0] a, b;\n"
+      "  assign {a, b} = 8'hC3;\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 0xCu}, {"b", 0x3u}});
+}
+
+TEST(LvalueSim, VarLvalueNestedConcatBlocking) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [1:0] a, b, c, d;\n"
+      "  initial {{a, b}, {c, d}} = 8'b11_01_10_00;\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design,
+      {{"a", 0x3u}, {"b", 0x1u}, {"c", 0x2u}, {"d", 0x0u}});
+}
+
+TEST(LvalueSim, VarLvalueNonblockingAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x <= 8'hA5;\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 0xA5u}});
+}
+
 }
