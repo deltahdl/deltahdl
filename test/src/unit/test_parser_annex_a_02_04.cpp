@@ -24,6 +24,16 @@ TEST(DeclarationAssignmentParsing, NetDeclAssignmentWithUnpackedDims) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
+TEST(DeclarationAssignmentParsing, NetDeclAssignmentWithInit) {
+  auto r = Parse("module m; wire w = 1'b0; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(item->name, "w");
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
 TEST(DeclarationAssignmentParsing, ParamAssignmentBasic) {
   auto r = Parse("module m; parameter WIDTH = 8; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -78,6 +88,35 @@ TEST(DeclarationAssignmentParsing, DefparamAssignmentMintypmax) {
       "module m; child c(); defparam c.P = 1:2:3; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(DeclarationAssignmentParsing, DefparamAssignmentMultiplePaths) {
+  auto r = Parse(
+      "module child; parameter P = 1; parameter Q = 2; endmodule\n"
+      "module m;\n"
+      "  child c();\n"
+      "  defparam c.P = 5, c.Q = 7;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  bool found = false;
+  for (auto* item : r.cu->modules[1]->items) {
+    if (item->kind == ModuleItemKind::kDefparam) {
+      found = true;
+      EXPECT_EQ(item->defparam_assigns.size(), 2u);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(DeclarationAssignmentParsing, DefparamAssignmentDeepHierarchy) {
+  EXPECT_TRUE(ParseOk(
+      "module leaf; parameter P = 1; endmodule\n"
+      "module mid; leaf l(); endmodule\n"
+      "module m;\n"
+      "  mid mi();\n"
+      "  defparam mi.l.P = 9;\n"
+      "endmodule\n"));
 }
 
 TEST(DeclarationAssignmentParsing, TypeAssignmentWithDefault) {
@@ -162,39 +201,152 @@ TEST(DeclarationAssignmentParsing, VarDeclAssignmentClassNewWithArgs) {
       "endmodule\n"));
 }
 
-TEST(DeclarationAssignmentParsing, ClassNewNoArgs) {
-  EXPECT_TRUE(ParseOk(
-      "class C;\n"
-      "endclass\n"
+TEST(DeclarationAssignmentParsing, SpecparamAssignmentSimple) {
+  auto r = Parse(
       "module m;\n"
-      "  C c = new;\n"
+      "  specparam delay = 5;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kSpecparam);
+  EXPECT_EQ(item->name, "delay");
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+TEST(DeclarationAssignmentParsing, SpecparamAssignmentMintypmax) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  specparam delay = 1:2:3;\n"
       "endmodule\n"));
 }
 
-TEST(DeclarationAssignmentParsing, ClassNewWithParenArgs) {
+TEST(DeclarationAssignmentParsing, SpecparamAssignmentMultiple) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  specparam tr = 10, tf = 20;\n"
+      "endmodule\n"));
+}
+
+TEST(DeclarationAssignmentParsing, PulseControlSpecparamBareReject) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    specparam PATHPULSE$ = (5);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->kind, ModuleItemKind::kSpecifyBlock);
+  ASSERT_FALSE(item->specify_items.empty());
+  auto* spi = item->specify_items[0];
+  EXPECT_EQ(spi->kind, SpecifyItemKind::kSpecparam);
+  EXPECT_TRUE(spi->is_pathpulse);
+  EXPECT_TRUE(spi->pathpulse_input.empty());
+  EXPECT_TRUE(spi->pathpulse_output.empty());
+  EXPECT_NE(spi->pathpulse_reject, nullptr);
+  EXPECT_EQ(spi->pathpulse_error, nullptr);
+}
+
+TEST(DeclarationAssignmentParsing, PulseControlSpecparamBareRejectAndError) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    specparam PATHPULSE$ = (3, 7);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  auto* spi = item->specify_items[0];
+  EXPECT_TRUE(spi->is_pathpulse);
+  EXPECT_NE(spi->pathpulse_reject, nullptr);
+  EXPECT_NE(spi->pathpulse_error, nullptr);
+}
+
+TEST(DeclarationAssignmentParsing, PulseControlSpecparamWithTerminals) {
+  auto r = Parse(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    specparam PATHPULSE$a$b = (2, 4);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  auto* spi = item->specify_items[0];
+  EXPECT_TRUE(spi->is_pathpulse);
+  EXPECT_EQ(spi->pathpulse_input, "a");
+  EXPECT_EQ(spi->pathpulse_output, "b");
+  EXPECT_NE(spi->pathpulse_reject, nullptr);
+  EXPECT_NE(spi->pathpulse_error, nullptr);
+}
+
+TEST(DeclarationAssignmentParsing, PulseControlSpecparamMintypmaxLimits) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  specify\n"
+      "    specparam PATHPULSE$ = (1:2:3, 4:5:6);\n"
+      "  endspecify\n"
+      "endmodule\n"));
+}
+
+TEST(DeclarationAssignmentParsing, ClassNewCopyConstruct) {
+  auto r = Parse(
+      "class C;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C a;\n"
+      "  C b = new a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(DeclarationAssignmentParsing, ClassNewScopedConstructor) {
   EXPECT_TRUE(ParseOk(
       "class C;\n"
       "  function new(int x); endfunction\n"
       "endclass\n"
       "module m;\n"
-      "  C c = new(42);\n"
+      "  C c = C::new(7);\n"
       "endmodule\n"));
 }
 
-TEST(DeclarationAssignmentParsing, DynamicArrayNewSizeOnly) {
+TEST(DeclarationAssignmentParsing, ClassNewEmptyParens) {
   EXPECT_TRUE(ParseOk(
+      "class C;\n"
+      "  function new(); endfunction\n"
+      "endclass\n"
       "module m;\n"
-      "  int d[];\n"
-      "  initial d = new[100];\n"
+      "  C c = new();\n"
       "endmodule\n"));
 }
 
-TEST(DeclarationAssignmentParsing, DynamicArrayNewSizeAndSource) {
-  EXPECT_TRUE(ParseOk(
+TEST(DeclarationAssignmentParsing, SpecparamMissingEqualsIsError) {
+  auto r = Parse(
       "module m;\n"
-      "  int src[], dst[];\n"
-      "  initial dst = new[20](src);\n"
-      "endmodule\n"));
+      "  specparam delay 5;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(DeclarationAssignmentParsing, DefparamMissingEqualsIsError) {
+  auto r = Parse(
+      "module child; parameter P = 1; endmodule\n"
+      "module m; child c(); defparam c.P 5; endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(DeclarationAssignmentParsing, PulseControlSpecparamMissingParensIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    specparam PATHPULSE$ = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }

@@ -116,4 +116,68 @@ TEST(DeclarationAssignmentElaboration, VarDeclAssignmentClassVariable) {
       "endmodule\n"));
 }
 
+TEST(DeclarationAssignmentElaboration, DefparamAssignmentOverridesChildParam) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module child;\n"
+      "  parameter P = 1;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  child c();\n"
+      "  defparam c.P = 42;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* top = design->top_modules[0];
+  ASSERT_FALSE(top->children.empty());
+  auto* inst = top->children[0].resolved;
+  ASSERT_NE(inst, nullptr);
+  bool found = false;
+  for (auto& p : inst->params) {
+    if (p.name == "P") {
+      found = true;
+      EXPECT_TRUE(p.is_resolved);
+      EXPECT_TRUE(p.from_override);
+      EXPECT_EQ(p.resolved_value, 42);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(DeclarationAssignmentElaboration, DefparamAssignmentDeepHierarchy) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module leaf;\n"
+      "  parameter P = 1;\n"
+      "endmodule\n"
+      "module mid;\n"
+      "  leaf l();\n"
+      "endmodule\n"
+      "module m;\n"
+      "  mid mi();\n"
+      "  defparam mi.l.P = 99;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* top = design->top_modules[0];
+  ASSERT_FALSE(top->children.empty());
+  auto* mid_inst = top->children[0].resolved;
+  ASSERT_NE(mid_inst, nullptr);
+  ASSERT_FALSE(mid_inst->children.empty());
+  auto* leaf_inst = mid_inst->children[0].resolved;
+  ASSERT_NE(leaf_inst, nullptr);
+  bool found = false;
+  for (auto& p : leaf_inst->params) {
+    if (p.name == "P") {
+      found = true;
+      EXPECT_TRUE(p.is_resolved);
+      EXPECT_TRUE(p.from_override);
+      EXPECT_EQ(p.resolved_value, 99);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
 }
