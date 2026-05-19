@@ -51,4 +51,45 @@ TEST(ContinuousAssignLexing, CommaSeparatedAssignments) {
   EXPECT_GE(comma_count, 1);
 }
 
+TEST(NetAliasLexing, AliasKeyword) {
+  auto r = LexOne("alias");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwAlias);
+}
+
+TEST(NetAliasLexing, BasicAliasTokenSequence) {
+  auto tokens = Lex("alias a = b ;");
+  ASSERT_GE(tokens.size(), 5u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwAlias);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kEq);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kSemicolon);
+}
+
+TEST(NetAliasLexing, AliasChainTokenSequence) {
+  auto tokens = Lex("alias a = b = c ;");
+  ASSERT_GE(tokens.size(), 7u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwAlias);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kEq);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kEq);
+  EXPECT_EQ(tokens[5].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[6].kind, TokenKind::kSemicolon);
+}
+
+TEST(ContinuousAssignLexing, AssignIsFullWordKeyword) {
+  // A longer identifier that merely starts with "assign" must lex as a
+  // single identifier, not as the kKwAssign keyword.
+  auto r = LexOne("assigned");
+  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
+}
+
+TEST(NetAliasLexing, AliasIsFullWordKeyword) {
+  // A longer identifier that merely starts with "alias" must lex as a
+  // single identifier, not as the kKwAlias keyword.
+  auto r = LexOne("aliased");
+  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
+}
+
 }

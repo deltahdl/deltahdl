@@ -272,6 +272,10 @@ ModuleItem* Parser::ParseAlias() {
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwAlias);
   item->alias_nets.push_back(ParseExpr());
+  // The grammar makes the first `=` and second net_lvalue mandatory; only
+  // further pairings are part of the optional repetition.
+  Expect(TokenKind::kEq);
+  item->alias_nets.push_back(ParseExpr());
   while (Match(TokenKind::kEq)) {
     item->alias_nets.push_back(ParseExpr());
   }
