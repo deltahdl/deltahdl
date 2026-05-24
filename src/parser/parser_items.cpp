@@ -40,7 +40,7 @@ bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
       diag_.Error(CurrentLoc(),
                   "specparam declaration not allowed inside a generate block");
     }
-    items.push_back(ParseSpecparamDecl());
+    ParseSpecparamDecl(items);
     return true;
   }
   if (Check(TokenKind::kKwClocking)) {

@@ -22,46 +22,42 @@ ModuleItem* Parser::ParseSpecifyBlock() {
   return item;
 }
 
-ModuleItem* Parser::ParseSpecparamDecl() {
-  auto* item = arena_.Create<ModuleItem>();
-  item->kind = ModuleItemKind::kSpecparam;
-  item->loc = CurrentLoc();
+void Parser::ParseSpecparamDecl(std::vector<ModuleItem*>& items) {
+  auto kw_loc = CurrentLoc();
   Expect(TokenKind::kKwSpecparam);
 
+  Expr* packed_left = nullptr;
+  Expr* packed_right = nullptr;
   if (Check(TokenKind::kLBracket)) {
     Consume();
-    item->data_type.packed_dim_left = ParseExpr();
+    packed_left = ParseExpr();
     Expect(TokenKind::kColon);
-    item->data_type.packed_dim_right = ParseExpr();
+    packed_right = ParseExpr();
     Expect(TokenKind::kRBracket);
   }
 
-  item->name = Expect(TokenKind::kIdentifier).text;
-  Expect(TokenKind::kEq);
-
-  if (item->name.starts_with("PATHPULSE$")) {
-    Expect(TokenKind::kLParen);
-    item->init_expr = ParseMinTypMaxExpr();
-    if (Match(TokenKind::kComma)) ParseMinTypMaxExpr();
-    Expect(TokenKind::kRParen);
-  } else {
-    item->init_expr = ParseMinTypMaxExpr();
-  }
-
-  while (Match(TokenKind::kComma)) {
-    auto name = Expect(TokenKind::kIdentifier).text;
+  auto parse_one = [&]() {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kSpecparam;
+    item->loc = kw_loc;
+    item->data_type.packed_dim_left = packed_left;
+    item->data_type.packed_dim_right = packed_right;
+    item->name = Expect(TokenKind::kIdentifier).text;
     Expect(TokenKind::kEq);
-    if (name.starts_with("PATHPULSE$")) {
+    if (item->name.starts_with("PATHPULSE$")) {
       Expect(TokenKind::kLParen);
-      ParseMinTypMaxExpr();
+      item->init_expr = ParseMinTypMaxExpr();
       if (Match(TokenKind::kComma)) ParseMinTypMaxExpr();
       Expect(TokenKind::kRParen);
     } else {
-      ParseMinTypMaxExpr();
+      item->init_expr = ParseMinTypMaxExpr();
     }
-  }
+    items.push_back(item);
+  };
+
+  parse_one();
+  while (Match(TokenKind::kComma)) parse_one();
   Expect(TokenKind::kSemicolon);
-  return item;
 }
 
 void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
@@ -79,7 +75,7 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
   }
 
   if (Check(TokenKind::kKwSpecparam)) {
-    items.push_back(ParseSpecparamInSpecify());
+    ParseSpecparamInSpecify(items);
     return;
   }
 
@@ -605,10 +601,8 @@ SpecifyItem* Parser::ParseShowcancelledDecl() {
   return item;
 }
 
-SpecifyItem* Parser::ParseSpecparamInSpecify() {
-  auto* first = arena_.Create<SpecifyItem>();
-  first->kind = SpecifyItemKind::kSpecparam;
-  first->loc = CurrentLoc();
+void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
+  auto kw_loc = CurrentLoc();
   Expect(TokenKind::kKwSpecparam);
 
   if (Check(TokenKind::kLBracket)) {
@@ -619,47 +613,41 @@ SpecifyItem* Parser::ParseSpecparamInSpecify() {
     Expect(TokenKind::kRBracket);
   }
 
-  first->param_name = Expect(TokenKind::kIdentifier).text;
-  Expect(TokenKind::kEq);
-
-  if (first->param_name.starts_with("PATHPULSE$")) {
-    first->is_pathpulse = true;
-
-    constexpr std::string_view kPrefix = "PATHPULSE$";
-    std::string_view rest = first->param_name.substr(kPrefix.size());
-    if (!rest.empty()) {
-      auto sep = rest.find('$');
-      if (sep == std::string_view::npos) {
-        first->pathpulse_input = rest;
-      } else {
-        first->pathpulse_input = rest.substr(0, sep);
-        first->pathpulse_output = rest.substr(sep + 1);
-      }
-    }
-    Expect(TokenKind::kLParen);
-    first->pathpulse_reject = ParseMinTypMaxExpr();
-    first->param_value = first->pathpulse_reject;
-    if (Match(TokenKind::kComma)) {
-      first->pathpulse_error = ParseMinTypMaxExpr();
-    }
-    Expect(TokenKind::kRParen);
-  } else {
-    first->param_value = ParseMinTypMaxExpr();
-  }
-  while (Match(TokenKind::kComma)) {
-    auto name = Expect(TokenKind::kIdentifier).text;
+  auto parse_one = [&]() {
+    auto* sp = arena_.Create<SpecifyItem>();
+    sp->kind = SpecifyItemKind::kSpecparam;
+    sp->loc = kw_loc;
+    sp->param_name = Expect(TokenKind::kIdentifier).text;
     Expect(TokenKind::kEq);
-    if (name.starts_with("PATHPULSE$")) {
+    if (sp->param_name.starts_with("PATHPULSE$")) {
+      sp->is_pathpulse = true;
+      constexpr std::string_view kPrefix = "PATHPULSE$";
+      std::string_view rest = sp->param_name.substr(kPrefix.size());
+      if (!rest.empty()) {
+        auto sep = rest.find('$');
+        if (sep == std::string_view::npos) {
+          sp->pathpulse_input = rest;
+        } else {
+          sp->pathpulse_input = rest.substr(0, sep);
+          sp->pathpulse_output = rest.substr(sep + 1);
+        }
+      }
       Expect(TokenKind::kLParen);
-      ParseMinTypMaxExpr();
-      if (Match(TokenKind::kComma)) ParseMinTypMaxExpr();
+      sp->pathpulse_reject = ParseMinTypMaxExpr();
+      sp->param_value = sp->pathpulse_reject;
+      if (Match(TokenKind::kComma)) {
+        sp->pathpulse_error = ParseMinTypMaxExpr();
+      }
       Expect(TokenKind::kRParen);
     } else {
-      ParseMinTypMaxExpr();
+      sp->param_value = ParseMinTypMaxExpr();
     }
-  }
+    items.push_back(sp);
+  };
+
+  parse_one();
+  while (Match(TokenKind::kComma)) parse_one();
   Expect(TokenKind::kSemicolon);
-  return first;
 }
 
 }

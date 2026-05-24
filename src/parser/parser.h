@@ -147,7 +147,7 @@ class Parser {
   void SkipCovergroupItem();
 
   ModuleItem* ParseSpecifyBlock();
-  ModuleItem* ParseSpecparamDecl();
+  void ParseSpecparamDecl(std::vector<ModuleItem*>& items);
   void ParseSpecifyItem(std::vector<SpecifyItem*>& items);
   SpecifyItem* ParseSpecifyPathDecl();
   SpecifyItem* ParseConditionalPathDecl(Expr* cond);
@@ -155,7 +155,7 @@ class Parser {
   SpecifyItem* ParseTimingCheck();
   SpecifyItem* ParsePulsestyleDecl();
   SpecifyItem* ParseShowcancelledDecl();
-  SpecifyItem* ParseSpecparamInSpecify();
+  void ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items);
   void ParsePathPorts(std::vector<SpecifyTerminal>& ports);
   SpecifyTerminal ParseSpecifyTerminal();
   void ParsePathDelays(std::vector<Expr*>& delays);
