@@ -35,6 +35,13 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_items.cpp
     elaborator/property_rewrite.cpp
     elaborator/concurrent_assertion_expr.cpp
+    elaborator/property_instantiation.cpp
+    elaborator/semantic_leading_clock.cpp
+    elaborator/sequence_admits_empty.cpp
+    elaborator/sequence_degeneracy.cpp
+    elaborator/sequence_match_attach.cpp
+    elaborator/sequence_repetition.cpp
+    elaborator/typed_sequence_formal.cpp
     elaborator/rewrite_item.cpp
     elaborator/elaborator_defparam.cpp
     elaborator/elaborator_gates.cpp
