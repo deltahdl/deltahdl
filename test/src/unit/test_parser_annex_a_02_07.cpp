@@ -1,5 +1,4 @@
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -437,17 +436,188 @@ TEST(TaskDeclParsing, TaskDeclDynOverrideInitialFinal) {
   EXPECT_TRUE(method->is_method_final);
 }
 
-TEST(TaskDeclParsing, TfPortAllDirections) {
+TEST(TaskDeclParsing, TaskDeclLifetimeAutomatic) {
   auto r = Parse(
       "module m;\n"
-      "  task my_task(input int a, output int b, inout int c, ref int d);\n"
+      "  task automatic my_task;\n"
       "  endtask\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  VerifyFuncArgDirections(r.cu->modules[0]->items[0],
-                          {Direction::kInput, Direction::kOutput,
-                           Direction::kInout, Direction::kRef});
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_TRUE(item->is_automatic);
+  EXPECT_FALSE(item->is_static);
+  EXPECT_EQ(item->name, "my_task");
+}
+
+TEST(TaskDeclParsing, TaskDeclLifetimeStatic) {
+  auto r = Parse(
+      "module m;\n"
+      "  task static my_task;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_FALSE(item->is_automatic);
+  EXPECT_TRUE(item->is_static);
+}
+
+TEST(TaskDeclParsing, TaskBodyClassScope) {
+  auto r = Parse(
+      "class c;\n"
+      "  extern task my_task;\n"
+      "endclass\n"
+      "task c::my_task;\n"
+      "endtask\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->cu_items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_EQ(item->method_class, "c");
+  EXPECT_EQ(item->name, "my_task");
+}
+
+TEST(TaskDeclParsing, TfPortItemImplicitDataType) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task(input a);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[0].name, "a");
+}
+
+TEST(TaskDeclParsing, TaskPrototypeWithDynOverride) {
+  auto r = Parse(
+      "class c;\n"
+      "  extern task :final my_task();\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* method = r.cu->classes[0]->members[0]->method;
+  EXPECT_TRUE(method->is_extern);
+  EXPECT_TRUE(method->is_method_final);
+  EXPECT_FALSE(method->is_method_initial);
+  EXPECT_FALSE(method->is_method_extends);
+}
+
+TEST(TaskDeclParsing, TaskBodyAnsiEmptyParens) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task();\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_TRUE(item->func_args.empty());
+}
+
+TEST(TaskDeclParsing, TfPortItemWithAttribute) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task((* my_attr *) input int x);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[0].name, "x");
+}
+
+TEST(TaskDeclParsing, TfPortDeclWithAttribute) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task;\n"
+      "    (* my_attr *) input int x;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[0].name, "x");
+}
+
+TEST(TaskDeclParsing, TfPortDirectionConstRefStatic) {
+  // tf_port_direction permits all three optional decorations together:
+  // `const' before, `ref' as the direction, and `static' as a trailing
+  // qualifier.
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task(const ref static int a);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_TRUE(item->func_args[0].is_const);
+  EXPECT_TRUE(item->func_args[0].is_ref_static);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
+}
+
+TEST(TaskDeclParsing, ErrorTfPortDirectionInputCombinedWithRef) {
+  // tf_port_direction is a choice between port_direction (input/output/inout)
+  // and the [const] ref [static] form; mixing them is not in the grammar.
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task(input ref int a);\n"
+      "  endtask\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(TaskDeclParsing, ErrorTfPortDirectionRefCombinedWithInout) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task(ref inout int a);\n"
+      "  endtask\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(TaskDeclParsing, TaskBodyWithNullStatement) {
+  // task_body_declaration permits any number of statement_or_null entries.
+  // A bare `;' is a null statement and must be accepted.
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task;\n"
+      "    ;\n"
+      "    ;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_GE(item->func_body_stmts.size(), 2u);
+}
+
+TEST(TaskDeclParsing, TaskPrototypeMultiplePorts) {
+  // task_prototype's optional ( [ tf_port_list ] ) accepts multi-item lists.
+  auto r = Parse(
+      "module m;\n"
+      "  extern task my_task(input int a, output int b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_TRUE(item->is_extern);
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
 }

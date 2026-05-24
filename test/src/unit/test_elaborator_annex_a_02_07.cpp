@@ -100,4 +100,33 @@ TEST(TaskDeclElaboration, MultipleTasksElaborate) {
   EXPECT_GE(mod->function_decls.size(), 3u);
 }
 
+TEST(TaskDeclElaboration, TaskLifetimeAutomaticElaborates) {
+  // task_declaration may carry an explicit `automatic' lifetime; the elaborator
+  // must accept the resulting AST.
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  task automatic my_task;\n"
+      "  endtask\n"
+      "endmodule\n"));
+}
+
+TEST(TaskDeclElaboration, TaskAnsiEmptyParensElaborates) {
+  // task_body_declaration's ANSI form permits an empty tf_port_list.
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  task my_task();\n"
+      "  endtask\n"
+      "endmodule\n"));
+}
+
+TEST(TaskDeclElaboration, TaskVarPortElaborates) {
+  // tf_port_item permits the optional `var' before data_type_or_implicit.
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  task my_task(input var int x);\n"
+      "    x = x + 1;\n"
+      "  endtask\n"
+      "endmodule\n"));
+}
+
 }

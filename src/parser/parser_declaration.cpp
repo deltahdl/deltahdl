@@ -359,6 +359,12 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers) {
   do {
     FunctionArg arg;
 
+    // tf_port_item permits a leading attribute_instance list; consume and
+    // discard any such list before the rest of the port item.
+    if (Check(TokenKind::kAttrStart)) {
+      ParseAttributes();
+    }
+
     if (Check(TokenKind::kKwDefault)) {
       if (seen_default) {
         diag_.Error(CurrentLoc(),
@@ -625,9 +631,20 @@ EventExpr Parser::ParseSingleEvent() {
 }
 
 void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
-  while (Check(TokenKind::kKwInput) || Check(TokenKind::kKwOutput) ||
-         Check(TokenKind::kKwInout) || Check(TokenKind::kKwRef) ||
-         Check(TokenKind::kKwConst)) {
+  while (true) {
+    // tf_port_declaration permits a leading attribute_instance list. Peek
+    // past any attributes and only commit to the declaration if a direction
+    // (or const) keyword follows.
+    auto saved = lexer_.SavePos();
+    if (Check(TokenKind::kAttrStart)) {
+      ParseAttributes();
+    }
+    if (!(Check(TokenKind::kKwInput) || Check(TokenKind::kKwOutput) ||
+          Check(TokenKind::kKwInout) || Check(TokenKind::kKwRef) ||
+          Check(TokenKind::kKwConst))) {
+      lexer_.RestorePos(saved);
+      break;
+    }
     Direction dir = Direction::kNone;
     bool is_const = Match(TokenKind::kKwConst);
     if (Check(TokenKind::kKwInput)) {
