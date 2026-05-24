@@ -1271,6 +1271,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ValidateGlobalClockReference(decl);
   ValidateContAssignToClockvar(decl);
   ValidateConstantFunctionCalls(decl);
+  ValidateBackgroundFuncCallContext(decl);
   ValidateSequenceEventArgs(decl);
   ValidateHierRefIntoChecker(decl);
   ValidateHierRefIntoProgram(decl);

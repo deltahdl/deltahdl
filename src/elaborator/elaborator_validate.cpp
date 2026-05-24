@@ -2065,6 +2065,80 @@ void Elaborator::ValidateConstantFunctionCalls(const ModuleDecl* decl) {
   ValidateConstFuncCallsInItems(decl->items, func_decls_, diag_);
 }
 
+// §13.4.4
+static bool StmtSpawnsBackgroundProcess(const Stmt* s) {
+  if (!s) return false;
+  if (s->kind == StmtKind::kNonblockingAssign) return true;
+  if (s->kind == StmtKind::kEventTrigger) return true;
+  if (s->kind == StmtKind::kNbEventTrigger) return true;
+  if (s->kind == StmtKind::kFork &&
+      s->join_kind == TokenKind::kKwJoinNone) {
+    return true;
+  }
+  for (auto* sub : s->stmts)
+    if (StmtSpawnsBackgroundProcess(sub)) return true;
+  for (auto* sub : s->fork_stmts)
+    if (StmtSpawnsBackgroundProcess(sub)) return true;
+  if (StmtSpawnsBackgroundProcess(s->then_branch)) return true;
+  if (StmtSpawnsBackgroundProcess(s->else_branch)) return true;
+  if (StmtSpawnsBackgroundProcess(s->body)) return true;
+  if (StmtSpawnsBackgroundProcess(s->for_body)) return true;
+  if (StmtSpawnsBackgroundProcess(s->assert_pass_stmt)) return true;
+  if (StmtSpawnsBackgroundProcess(s->assert_fail_stmt)) return true;
+  for (auto& ci : s->case_items)
+    if (StmtSpawnsBackgroundProcess(ci.body)) return true;
+  for (auto& ri : s->randcase_items)
+    if (StmtSpawnsBackgroundProcess(ri.second)) return true;
+  return false;
+}
+
+// §13.4.4
+static bool FuncSpawnsBackgroundProcess(const ModuleItem* func) {
+  if (!func) return false;
+  for (const auto* s : func->func_body_stmts) {
+    if (StmtSpawnsBackgroundProcess(s)) return true;
+  }
+  return false;
+}
+
+// §13.4.4
+static void CheckBackgroundFuncCallInExpr(
+    const Expr* expr,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
+    auto it = func_decls.find(expr->callee);
+    if (it != func_decls.end() && FuncSpawnsBackgroundProcess(it->second)) {
+      diag.Error(
+          expr->range.start,
+          std::format(
+              "function '{}' schedules a background event and cannot be "
+              "called from a continuous assignment",
+              expr->callee));
+    }
+  }
+  CheckBackgroundFuncCallInExpr(expr->lhs, func_decls, diag);
+  CheckBackgroundFuncCallInExpr(expr->rhs, func_decls, diag);
+  CheckBackgroundFuncCallInExpr(expr->condition, func_decls, diag);
+  CheckBackgroundFuncCallInExpr(expr->true_expr, func_decls, diag);
+  CheckBackgroundFuncCallInExpr(expr->false_expr, func_decls, diag);
+  CheckBackgroundFuncCallInExpr(expr->base, func_decls, diag);
+  CheckBackgroundFuncCallInExpr(expr->index, func_decls, diag);
+  CheckBackgroundFuncCallInExpr(expr->index_end, func_decls, diag);
+  for (auto* arg : expr->args)
+    CheckBackgroundFuncCallInExpr(arg, func_decls, diag);
+  for (auto* elem : expr->elements)
+    CheckBackgroundFuncCallInExpr(elem, func_decls, diag);
+}
+
+void Elaborator::ValidateBackgroundFuncCallContext(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kContAssign) continue;
+    CheckBackgroundFuncCallInExpr(item->assign_rhs, func_decls_, diag_);
+  }
+}
+
 static bool IsValidOutputArg(const Expr* e) {
   if (!e) return false;
   return e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kSelect ||

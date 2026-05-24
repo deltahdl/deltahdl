@@ -306,6 +306,9 @@ class Elaborator {
 
   void ValidateConstantFunctionCalls(const ModuleDecl* decl);
 
+  // §13.4.4
+  void ValidateBackgroundFuncCallContext(const ModuleDecl* decl);
+
   void ValidateSubroutineCallArgs(const ModuleDecl* decl);
 
   void ValidateArrayArgTypes(const ModuleDecl* decl);

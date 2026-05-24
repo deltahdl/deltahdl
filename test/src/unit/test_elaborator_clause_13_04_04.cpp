@@ -138,4 +138,116 @@ TEST(FunctionBackgroundProcessElaboration, WaitInsideForkJoinNoneOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(FunctionBackgroundProcessElaboration, ContAssignToFuncWithNbaError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic q;\n"
+      "  logic r;\n"
+      "  function automatic logic spawn_nba();\n"
+      "    q <= 1'b1;\n"
+      "    return 1'b0;\n"
+      "  endfunction\n"
+      "  assign r = spawn_nba();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionBackgroundProcessElaboration, ContAssignToFuncWithForkJoinNoneError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic r;\n"
+      "  function automatic logic spawn_bg();\n"
+      "    fork\n"
+      "      $display(\"bg\");\n"
+      "    join_none\n"
+      "    return 1'b1;\n"
+      "  endfunction\n"
+      "  assign r = spawn_bg();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionBackgroundProcessElaboration, ContAssignToFuncWithEventTriggerError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  event e;\n"
+      "  logic r;\n"
+      "  function automatic logic spawn_trigger();\n"
+      "    -> e;\n"
+      "    return 1'b1;\n"
+      "  endfunction\n"
+      "  assign r = spawn_trigger();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionBackgroundProcessElaboration, NbEventTriggerOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  event e;\n"
+      "  function void fire_nb();\n"
+      "    ->> e;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FunctionBackgroundProcessElaboration, ContAssignToFuncWithNbEventTriggerError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  event e;\n"
+      "  logic r;\n"
+      "  function automatic logic spawn_nb_trigger();\n"
+      "    ->> e;\n"
+      "    return 1'b1;\n"
+      "  endfunction\n"
+      "  assign r = spawn_nb_trigger();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionBackgroundProcessElaboration, ContAssignToPureFuncOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic r;\n"
+      "  function automatic logic pure_func(input logic a);\n"
+      "    return ~a;\n"
+      "  endfunction\n"
+      "  logic in;\n"
+      "  assign r = pure_func(in);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FunctionBackgroundProcessElaboration, InitialCallToBackgroundFuncOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic q;\n"
+      "  function automatic logic spawn_nba();\n"
+      "    q <= 1'b1;\n"
+      "    return 1'b0;\n"
+      "  endfunction\n"
+      "  logic r;\n"
+      "  initial r = spawn_nba();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }
