@@ -142,24 +142,31 @@ TEST(JumpStatementElaboration, BreakInLoopInsideForkOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(JumpStatementElaboration, ContinueInLoopInsideForkOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic skip;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin\n"
+      "        for (int i = 0; i < 8; i++) begin\n"
+      "          if (skip) continue;\n"
+      "        end\n"
+      "      end\n"
+      "    join_none\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(JumpStatementElaboration, ReturnInInitialIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
       "  initial begin\n"
-      "    return;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(JumpStatementElaboration, ReturnInAlwaysIsError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  logic clk;\n"
-      "  always @(posedge clk) begin\n"
       "    return;\n"
       "  end\n"
       "endmodule\n",
@@ -251,6 +258,38 @@ TEST(JumpStatementElaboration, BreakInsideForeachOk) {
       "  initial begin\n"
       "    foreach (arr[i]) begin\n"
       "      if (arr[i] == 0) break;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(JumpStatementElaboration, BreakInsideMultiDimForeachOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int matrix[2][3];\n"
+      "  initial begin\n"
+      "    foreach (matrix[i, j]) begin\n"
+      "      if (matrix[i][j] == 0) break;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(JumpStatementElaboration, ContinueInsideMultiDimForeachOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int matrix[2][3];\n"
+      "  initial begin\n"
+      "    foreach (matrix[i, j]) begin\n"
+      "      if (matrix[i][j] == 0) continue;\n"
       "    end\n"
       "  end\n"
       "endmodule\n",

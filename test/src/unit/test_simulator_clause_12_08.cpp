@@ -400,6 +400,54 @@ TEST(LoopStatementSim, ForeachContinueSkipsCurrentIteration) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
+TEST(JumpStatementSim, JumpBreakExitsMultiDimForeach) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] matrix [2][3];\n"
+      "  logic [7:0] cnt;\n"
+      "  initial begin\n"
+      "    cnt = 8'd0;\n"
+      "    foreach (matrix[i, j]) begin\n"
+      "      cnt = cnt + 8'd1;\n"
+      "      if (cnt == 8'd1) break;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("cnt");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(JumpStatementSim, JumpContinueInMultiDimForeach) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] matrix [2][3];\n"
+      "  logic [7:0] skipped;\n"
+      "  initial begin\n"
+      "    skipped = 8'd0;\n"
+      "    foreach (matrix[i, j]) begin\n"
+      "      continue;\n"
+      "      skipped = skipped + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("skipped");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
 TEST(LoopStatementSim, NestedLoopInnerContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(

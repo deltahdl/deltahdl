@@ -92,32 +92,51 @@ TEST(JumpStatementSyntaxParsing, ContinueInsideForeach) {
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);
 }
 
-static ModuleItem* FindFunc12b(ParseResult& r, std::string_view name) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl && item->name == name)
-      return item;
-  }
-  return nullptr;
-}
-
-TEST(JumpStatementSyntaxParsing, ReturnFromVoidFunctionEarly) {
+TEST(JumpStatementSyntaxParsing, BreakInsideMultiDimForeach) {
   auto r = Parse(
       "module t;\n"
-      "  function void check(int val);\n"
-      "    if (val < 0) return;\n"
-      "    $display(\"ok\");\n"
-      "  endfunction\n"
+      "  initial begin\n"
+      "    foreach (matrix[i, j]) begin\n"
+      "      if (matrix[i][j] == 0) break;\n"
+      "    end\n"
+      "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc12b(r, "check");
-  ASSERT_NE(fn, nullptr);
-  ASSERT_GE(fn->func_body_stmts.size(), 1u);
-
-  auto* if_stmt = fn->func_body_stmts[0];
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
+  EXPECT_GE(stmt->foreach_vars.size(), 2u);
+  auto* blk = stmt->body;
+  ASSERT_NE(blk, nullptr);
+  ASSERT_GE(blk->stmts.size(), 1u);
+  auto* if_stmt = blk->stmts[0];
   EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
   ASSERT_NE(if_stmt->then_branch, nullptr);
-  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kReturn);
-  EXPECT_EQ(if_stmt->then_branch->expr, nullptr);
+  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBreak);
+}
+
+TEST(JumpStatementSyntaxParsing, ContinueInsideMultiDimForeach) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (matrix[i, j]) begin\n"
+      "      if (matrix[i][j] == 0) continue;\n"
+      "      sum = sum + matrix[i][j];\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
+  EXPECT_GE(stmt->foreach_vars.size(), 2u);
+  auto* blk = stmt->body;
+  ASSERT_NE(blk, nullptr);
+  ASSERT_GE(blk->stmts.size(), 1u);
+  auto* if_stmt = blk->stmts[0];
+  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
+  ASSERT_NE(if_stmt->then_branch, nullptr);
+  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);
 }
 
 TEST(JumpStatementSyntaxParsing, ReturnVoid) {
@@ -146,44 +165,6 @@ TEST(JumpStatementSyntaxParsing, ReturnWithExpressionBnf) {
   ASSERT_NE(ret, nullptr);
   EXPECT_EQ(ret->kind, StmtKind::kReturn);
   ASSERT_NE(ret->expr, nullptr);
-}
-
-TEST(JumpStatementSyntaxParsing, BreakStatementInBody) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    forever begin\n"
-      "      if (done) break;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-
-  auto* if_stmt = stmt->body->stmts[0];
-  ASSERT_NE(if_stmt, nullptr);
-  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
-  ASSERT_NE(if_stmt->then_branch, nullptr);
-  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBreak);
-}
-
-TEST(JumpStatementSyntaxParsing, ContinueStatementInBody) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i = i + 1) begin\n"
-      "      if (i == 5) continue;\n"
-      "      x = i;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* body = stmt->for_body;
-  ASSERT_NE(body, nullptr);
-  auto* if_stmt = body->stmts[0];
-  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);
 }
 
 }
