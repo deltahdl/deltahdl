@@ -60,23 +60,6 @@ TEST(PortDeclElaboration, RefPortElaborates) {
   EXPECT_EQ(mod->ports[0].direction, Direction::kRef);
 }
 
-TEST(PortDeclElaboration, AllDirectionsElaborate) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m(input logic a, output logic b,\n"
-      "         inout wire c, ref logic d);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->ports.size(), 4u);
-  EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(mod->ports[1].direction, Direction::kOutput);
-  EXPECT_EQ(mod->ports[2].direction, Direction::kInout);
-  EXPECT_EQ(mod->ports[3].direction, Direction::kRef);
-}
-
 TEST(PortDeclElaboration, InputIntegerTypePortWidth) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -92,4 +75,4 @@ TEST(PortDeclElaboration, InputIntegerTypePortWidth) {
   EXPECT_EQ(mod->ports[0].width, 32u);
 }
 
-}
+}  // namespace

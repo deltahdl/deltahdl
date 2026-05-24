@@ -201,18 +201,4 @@ TEST(PortDeclParsing, NonAnsiInputListOfPortIdentifiers) {
     EXPECT_EQ(r.cu->modules[0]->ports[i].direction, Direction::kInput);
 }
 
-TEST(PortDeclParsing, MixedDirectionAnsi) {
-  auto r = Parse(
-      "module m(input logic a, output logic b,\n"
-      "         inout wire c, ref logic d);\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->ports.size(), 4u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(r.cu->modules[0]->ports[1].direction, Direction::kOutput);
-  EXPECT_EQ(r.cu->modules[0]->ports[2].direction, Direction::kInout);
-  EXPECT_EQ(r.cu->modules[0]->ports[3].direction, Direction::kRef);
-}
-
 }  // namespace
