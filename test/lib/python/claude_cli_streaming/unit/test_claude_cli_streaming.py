@@ -799,3 +799,145 @@ def test_filter_and_missing_result_have_independent_budgets(streaming: ModuleTyp
     ]
     inner, result, _ = _run_retry(streaming, side)
     assert (result, inner.call_count) == ("DONE", 3)
+
+
+# --- transient network errors -----------------------------------------------
+
+
+_SOCKET_STDERR = "API Error: the socket connection was closed unexpectedly"
+
+
+def test_transient_network_error_carries_stderr(streaming: ModuleType) -> None:
+    """The exception preserves the CLI stderr for the loud-fatal."""
+    assert streaming.TransientNetworkError("boom").stderr == "boom"
+
+
+def test_max_network_retries_matches_attempt_budget(streaming: ModuleType) -> None:
+    """The network budget mirrors the shared attempt budget minus the initial try."""
+    assert streaming.MAX_NETWORK_RETRIES == streaming.DEFAULT_MAX_ATTEMPTS - 1
+
+
+def test_run_claude_streaming_raises_transient_on_stderr_marker(
+    streaming: ModuleType,
+) -> None:
+    """A non-zero exit with a socket marker in stderr raises TransientNetworkError."""
+    with pytest.raises(streaming.TransientNetworkError):
+        _run(streaming, _OK_STREAM, returncode=1, stderr=_SOCKET_STDERR)
+
+
+def test_run_claude_streaming_raises_transient_on_stream_marker(
+    streaming: ModuleType,
+) -> None:
+    """A socket marker on a streamed line raises even when stderr is empty."""
+    lines = [_SOCKET_STDERR + "\n"] + _OK_STREAM
+    with pytest.raises(streaming.TransientNetworkError):
+        _run(streaming, lines, returncode=1, stderr="")
+
+
+def test_run_claude_streaming_transient_carries_stderr(
+    streaming: ModuleType,
+) -> None:
+    """The raised TransientNetworkError carries the captured stderr."""
+    captured = None
+    try:
+        _run(streaming, _OK_STREAM, returncode=1, stderr=_SOCKET_STDERR)
+    except streaming.TransientNetworkError as exc:
+        captured = exc.stderr
+    assert captured == _SOCKET_STDERR
+
+
+def _run_network_retry(
+    streaming: ModuleType, strikes: int, *, trailing: list[Any] | None = None,
+    retry_cmd: list[str] | None = None,
+) -> tuple[MagicMock, Any, SystemExit | None, MagicMock]:
+    """Drive the retry wrapper with *strikes* TransientNetworkErrors, sleep stubbed."""
+    side: list[Any] = [streaming.TransientNetworkError("NET_STDERR")] * strikes
+    side += trailing if trailing is not None else ["DONE"]
+    with patch.object(streaming, "sleep_before_retry") as sleep:
+        inner, result, exc = _run_retry(streaming, side, retry_cmd=retry_cmd)
+    return inner, result, exc, sleep
+
+
+def test_retry_recovers_after_one_network_error(streaming: ModuleType) -> None:
+    """One transient network strike then success returns the result in two calls."""
+    inner, result, _, _ = _run_network_retry(streaming, 1)
+    assert (result, inner.call_count) == ("DONE", 2)
+
+
+def test_retry_sleeps_once_after_one_network_error(streaming: ModuleType) -> None:
+    """One transient network strike causes exactly one backoff sleep."""
+    _, _, _, sleep = _run_network_retry(streaming, 1)
+    assert sleep.call_count == 1
+
+
+def test_retry_network_first_backoff_uses_attempt_zero(streaming: ModuleType) -> None:
+    """The first retry backs off with attempt index 0 (up to 1s)."""
+    _, _, _, sleep = _run_network_retry(streaming, 1)
+    assert sleep.call_args_list[0][0][0] == 0
+
+
+def test_retry_network_reuses_original_cmd(streaming: ModuleType) -> None:
+    """The re-run uses the original cmd, not retry_cmd (--continue is unsafe)."""
+    retry_cmd = ["claude", "--continue", "--marker"]
+    inner, _, _, _ = _run_network_retry(streaming, 1, retry_cmd=retry_cmd)
+    assert inner.call_args_list[1][0][0] == ["claude"]
+
+
+def test_retry_network_reuses_original_prompt(streaming: ModuleType) -> None:
+    """The re-run reuses the original prompt unchanged."""
+    inner, _, _, _ = _run_network_retry(streaming, 1)
+    assert inner.call_args_list[1][0][1] == "orig"
+
+
+def test_retry_network_warning_includes_attempt_number(
+    streaming: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The retry warning names the attempt number."""
+    _run_network_retry(streaming, 1)
+    assert "attempt 1" in capsys.readouterr().err
+
+
+def test_retry_network_exits_after_budget(streaming: ModuleType) -> None:
+    """Strikes exceeding the budget exit non-zero."""
+    _, _, exc, _ = _run_network_retry(
+        streaming, streaming.MAX_NETWORK_RETRIES + 1, trailing=[],
+    )
+    assert exc is not None
+
+
+def test_retry_network_makes_ten_calls_before_exit(streaming: ModuleType) -> None:
+    """Persistent transient failure makes DEFAULT_MAX_ATTEMPTS inner calls."""
+    inner, _, _, _ = _run_network_retry(
+        streaming, streaming.MAX_NETWORK_RETRIES + 1, trailing=[],
+    )
+    assert inner.call_count == streaming.MAX_NETWORK_RETRIES + 1
+
+
+def test_retry_network_exit_dumps_stderr(
+    streaming: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The terminal error dumps the captured network stderr."""
+    _run_network_retry(streaming, streaming.MAX_NETWORK_RETRIES + 1, trailing=[])
+    assert "NET_STDERR" in capsys.readouterr().err
+
+
+def test_retry_network_exit_message_names_role(
+    streaming: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The terminal network error names the caller's role."""
+    side = [streaming.TransientNetworkError("x")] * (streaming.MAX_NETWORK_RETRIES + 1)
+    with patch.object(streaming, "sleep_before_retry"):
+        _run_retry(streaming, side, role="Oracle")
+    assert "Oracle" in capsys.readouterr().err
+
+
+def test_network_and_filter_have_independent_budgets(streaming: ModuleType) -> None:
+    """Network and content-filter strikes track separate counters and recover."""
+    side = [
+        streaming.TransientNetworkError("x"),
+        streaming.ContentFilterError("blocked"),
+        "DONE",
+    ]
+    with patch.object(streaming, "sleep_before_retry"):
+        inner, result, _ = _run_retry(streaming, side)
+    assert (result, inner.call_count) == ("DONE", 3)

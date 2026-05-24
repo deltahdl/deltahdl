@@ -1,16 +1,16 @@
 """Shared GitHub issue utilities."""
 
 import json
-import random
 import re
 import subprocess
 import sys
-import time
 from typing import Any
 
-
-_MAX_ATTEMPTS = 10
-_rng = random.Random()
+from lib.python.retry import (
+    DEFAULT_MAX_ATTEMPTS,
+    contains_transient_marker,
+    sleep_before_retry,
+)
 
 
 _EOF_WORD_RE = re.compile(r"\beof\b")
@@ -37,10 +37,9 @@ def _is_transient(returncode: int, stderr: str) -> bool:
     """
     if returncode == 0:
         return False
+    if contains_transient_marker(stderr, _TRANSIENT_SUBSTRINGS):
+        return True
     lower = stderr.lower()
-    for needle in _TRANSIENT_SUBSTRINGS:
-        if needle in lower:
-            return True
     if _EOF_WORD_RE.search(lower):
         return True
     if _HTTP_5XX_RE.search(lower):
@@ -54,8 +53,8 @@ def _run_gh(
     """Run a ``gh`` command with bounded exponential-backoff retries.
 
     Transient transport failures (see :func:`_is_transient`) are retried
-    up to ``_MAX_ATTEMPTS`` total attempts with delays
-    ``[1, 2, 4, ..., 256]`` seconds (full jitter via ``_rng.uniform``).
+    up to ``DEFAULT_MAX_ATTEMPTS`` total attempts with full-jitter
+    exponential backoff (see :func:`lib.python.retry.sleep_before_retry`).
     Permanent failures and successes return immediately. The returned
     ``CompletedProcess`` lets the caller keep its existing returncode
     inspection and ``sys.exit(1)`` branch.
@@ -63,10 +62,10 @@ def _run_gh(
     last = subprocess.run(
         cmd, input=stdin_text, capture_output=True, text=True, check=False,
     )
-    for attempt in range(_MAX_ATTEMPTS - 1):
+    for attempt in range(DEFAULT_MAX_ATTEMPTS - 1):
         if not _is_transient(last.returncode, last.stderr):
             return last
-        time.sleep(_rng.uniform(0, 2 ** attempt))
+        sleep_before_retry(attempt)
         last = subprocess.run(
             cmd, input=stdin_text, capture_output=True, text=True, check=False,
         )

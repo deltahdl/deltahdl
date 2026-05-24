@@ -431,6 +431,29 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
+  test-lib-retry:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-scripts-test-lib-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-lib-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/python/retry/unit/ -v
+          --cov=lib.python.retry
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
   test-lib-run-tests-common:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -580,6 +603,7 @@ jobs:
       - test-lib-github
       - test-lib-lrm
       - test-lib-lrm-subclause-dependencies
+      - test-lib-retry
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5

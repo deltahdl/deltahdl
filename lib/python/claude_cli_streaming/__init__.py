@@ -35,6 +35,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, NoReturn
 
+from lib.python.retry import (
+    DEFAULT_MAX_ATTEMPTS,
+    contains_transient_marker,
+    sleep_before_retry,
+)
+
 
 _TOOL_ARG_KEYS = (
     "file_path", "path", "command", "pattern", "url", "query",
@@ -44,9 +50,30 @@ _MAX_ARG_LEN = 80
 
 _CONTENT_FILTER_MARKER = "blocked by content filtering"
 
+# Substrings that mark a transient transport failure on the API socket.
+# Node/undici phrasing — distinct from the gh CLI's transport errors — so
+# the list lives here rather than in the shared retry module. Matched only
+# against a non-zero-exit run, never against normative model output (which
+# legitimately discusses "EOF"/"5xx"), so substring matching is safe here.
+_TRANSIENT_NETWORK_MARKERS = (
+    "socket connection was closed",
+    "socket hang up",
+    "fetch failed",
+    "connection reset",
+    "econnreset",
+    "etimedout",
+    "enotfound",
+)
+
 MAX_CONTENT_FILTER_RETRIES = 2
 
 MAX_MISSING_RESULT_RETRIES = 1
+
+# Re-run the same invocation as-is on a transient socket drop. A drop can
+# happen before any server-side session exists, so --continue has no safe
+# precondition; a fresh re-run does. DEFAULT_MAX_ATTEMPTS total attempts =
+# initial + MAX_NETWORK_RETRIES, matching the gh wrapper's budget.
+MAX_NETWORK_RETRIES = DEFAULT_MAX_ATTEMPTS - 1
 
 COPYRIGHT_REASON = (
     "The IEEE 1800-2023 LRM is copyrighted; paraphrase rather than"
@@ -68,6 +95,19 @@ MISSING_RESULT_RETRY_PROMPT = (
 
 class ContentFilterError(Exception):
     """Raised when the Claude CLI output is blocked by content filtering."""
+
+
+class TransientNetworkError(Exception):
+    """Raised when the CLI exits non-zero on a transient socket/network drop.
+
+    Recoverable: the retry wrapper re-runs the same invocation after
+    full-jitter backoff. Carries the CLI's ``stderr`` for the eventual
+    loud-fatal message once the attempt budget is exhausted.
+    """
+
+    def __init__(self, stderr: str) -> None:
+        self.stderr = stderr
+        super().__init__("transient network failure")
 
 
 class MissingResultEventError(Exception):
@@ -572,6 +612,7 @@ class _StreamOutcome:
     result_text: str | None = None
     error_message: str | None = None
     content_filter_seen: bool = False
+    transient_network_seen: bool = False
     rate_limit_seen: bool = False
     rate_limit_synthetic: str | None = None
 
@@ -595,6 +636,8 @@ def _consume_events(
             continue
         if _CONTENT_FILTER_MARKER in line:
             outcome.content_filter_seen = True
+        if contains_transient_marker(line, _TRANSIENT_NETWORK_MARKERS):
+            outcome.transient_network_seen = True
         try:
             event = json.loads(line)
         except json.JSONDecodeError:
@@ -641,8 +684,11 @@ def run_claude_streaming(
     result event (a CLI-side flake we can recover from with
     ``--continue``); the exception carries the captured ``session_id``
     and a description of the last event seen so the wrapper can warn /
-    loud-fatal informatively. Loud-fatal on every other failure
-    (non-zero exit or a non-content-filter error result event).
+    loud-fatal informatively. Raises ``TransientNetworkError`` when a
+    non-zero exit carries a transient socket/network marker (on a streamed
+    line or in stderr) so the wrapper can re-run the same invocation after
+    backoff. Loud-fatal on every other
+    failure (non-zero exit or a non-content-filter error result event).
     """
     with subprocess.Popen(
         cmd,
@@ -671,6 +717,11 @@ def run_claude_streaming(
         raise ContentFilterError(
             stderr or outcome.error_message or "blocked by content filtering",
         )
+    transient = outcome.transient_network_seen or contains_transient_marker(
+        stderr, _TRANSIENT_NETWORK_MARKERS,
+    )
+    if return_code != 0 and transient:
+        raise TransientNetworkError(stderr or "transient network failure")
     if return_code != 0:
         exit_with_error(
             f"Claude CLI exited with code {return_code}", stderr,
@@ -695,8 +746,14 @@ def run_claude_streaming_with_retry(
 ) -> str:
     """Wrap ``run_claude_streaming`` in a recoverable-error retry loop.
 
-    Two recoverable failure modes are absorbed; everything else
+    Three recoverable failure modes are absorbed; everything else
     propagates / is loud-fatal in the inner call.
+
+    ``TransientNetworkError``: a transient socket/network drop. Re-runs
+    the *same* invocation (``next_cmd``/``next_prompt`` unchanged) after
+    full-jitter exponential backoff — a drop can happen before any
+    server-side session exists, so ``--continue`` has no safe precondition.
+    Up to ``MAX_NETWORK_RETRIES`` retries; loud-fatal afterward.
 
     ``ContentFilterError``: retry with ``CONTENT_FILTER_RETRY_PROMPT``
     using ``retry_cmd`` (which must include ``--continue`` so it
@@ -727,6 +784,7 @@ def run_claude_streaming_with_retry(
     next_cmd, next_prompt = cmd, prompt
     filter_attempts = 0
     missing_result_attempts = 0
+    network_attempts = 0
     while True:
         try:
             return run_claude_streaming(next_cmd, next_prompt, env=env)
@@ -783,3 +841,17 @@ def run_claude_streaming_with_retry(
                 file=sys.stderr,
             )
             next_cmd, next_prompt = retry_cmd, MISSING_RESULT_RETRY_PROMPT
+        except TransientNetworkError as exc:
+            network_attempts += 1
+            if network_attempts > MAX_NETWORK_RETRIES:
+                exit_with_error(
+                    f"{role} hit transient network errors after"
+                    f" {MAX_NETWORK_RETRIES + 1} attempts",
+                    exc.stderr,
+                )
+            print(
+                f"WARNING: {role} transient network error (attempt"
+                f" {network_attempts}); re-running after backoff.",
+                file=sys.stderr,
+            )
+            sleep_before_retry(network_attempts - 1)

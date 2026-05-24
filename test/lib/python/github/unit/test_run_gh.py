@@ -11,7 +11,8 @@ from typing import Any
 
 import pytest
 
-from lib.python.github import _is_transient, _rng, _run_gh
+from lib.python.github import _is_transient, _run_gh
+from lib.python.retry import _rng
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +228,7 @@ def test_run_gh_exhausts_retries_returning_failure_returncode(
 def test_run_gh_exhausts_retries_with_ten_calls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Persistent transient failure produces exactly _MAX_ATTEMPTS calls."""
+    """Persistent transient failure produces exactly DEFAULT_MAX_ATTEMPTS calls."""
     _stub_sleep(monkeypatch)
     _pin_jitter(monkeypatch)
     calls = _stub_run(
