@@ -117,6 +117,26 @@ SampledValue SampleSingleVariableExpression(SampledValue var_sample);
 
 SampledValue SampleConstCastExpression(uint64_t argument_current_value);
 
+SampledValue SampleProceduralAssertionArgument(uint64_t current_value);
+
+SampledValue ProceduralArgumentValueAfterMature(SampledValue captured,
+                                                 uint64_t later_underlying_value);
+
+enum class ProceduralExecutionEffect : uint8_t {
+  kActivation = 0,
+  kCompletion = 1,
+};
+
+bool ProceduralExecutionAffects(ProceduralExecutionEffect effect,
+                                 bool already_matured);
+
+SampledValue SampleProceduralAssertionActionBlockArgument(uint64_t current_value);
+
+bool ActionBlockMayModifyArgument();
+
+uint64_t ReadProceduralConditionalGuard(uint64_t current_value,
+                                         uint64_t sampled_value);
+
 SampledValue SampledValueOfTriggered(bool current_returned);
 SampledValue SampledValueOfMatched(bool current_returned);
 

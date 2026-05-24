@@ -175,6 +175,34 @@ SampledValue SampleConstCastExpression(uint64_t argument_current_value) {
   return SampledValue{argument_current_value, SampleMode::kCurrent};
 }
 
+SampledValue SampleProceduralAssertionArgument(uint64_t current_value) {
+  return SampledValue{current_value, SampleMode::kCurrent};
+}
+
+SampledValue ProceduralArgumentValueAfterMature(
+    SampledValue captured, uint64_t /*later_underlying_value*/) {
+  return captured;
+}
+
+bool ProceduralExecutionAffects(ProceduralExecutionEffect effect,
+                                 bool already_matured) {
+  if (!already_matured) return true;
+  return effect == ProceduralExecutionEffect::kActivation;
+}
+
+SampledValue SampleProceduralAssertionActionBlockArgument(uint64_t current_value) {
+  return SampleProceduralAssertionArgument(current_value);
+}
+
+bool ActionBlockMayModifyArgument() {
+  return false;
+}
+
+uint64_t ReadProceduralConditionalGuard(uint64_t current_value,
+                                         uint64_t /*sampled_value*/) {
+  return current_value;
+}
+
 SampledValue SampledValueOfTriggered(bool current_returned) {
 
   return SampledValue{current_returned ? 1u : 0u, SampleMode::kCurrent};
