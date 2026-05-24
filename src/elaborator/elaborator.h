@@ -302,6 +302,8 @@ class Elaborator {
 
   void ValidateFunctionBody(const ModuleItem* item);
 
+  void ValidateFunctionArgDefaultsScope(const ModuleItem* item);
+
   void ValidateAutomaticVarProcWrites(const ModuleDecl* decl);
 
   // §12.8 — break/continue must be inside a loop and may not target a loop

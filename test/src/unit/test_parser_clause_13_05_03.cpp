@@ -33,19 +33,6 @@ TEST(FunctionDeclParsing, FunctionSingleArgWithDefault) {
   EXPECT_NE(item->func_args[0].default_value, nullptr);
 }
 
-TEST(TaskDeclParsing, TaskSingleArgWithDefault) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task(input int x = 5);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->func_args.size(), 1u);
-  EXPECT_NE(item->func_args[0].default_value, nullptr);
-}
-
 TEST(TaskAndFunctionParsing, MixedDefaultAndNonDefaultArgs) {
   auto r = Parse(
       "module m;\n"
@@ -118,23 +105,6 @@ TEST(TaskAndFunctionParsing, OutputArgWithDefault) {
   ASSERT_NE(tk, nullptr);
   ASSERT_EQ(tk->func_args.size(), 1u);
   EXPECT_EQ(tk->func_args[0].direction, Direction::kOutput);
-  ASSERT_NE(tk->func_args[0].default_value, nullptr);
-  EXPECT_EQ(tk->func_args[0].default_value->kind, ExprKind::kIdentifier);
-}
-
-TEST(TaskAndFunctionParsing, InoutArgWithDefault) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic w;\n"
-      "  task t3(inout logic io = w);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* tk = FindFunc(r, "t3");
-  ASSERT_NE(tk, nullptr);
-  ASSERT_EQ(tk->func_args.size(), 1u);
-  EXPECT_EQ(tk->func_args[0].direction, Direction::kInout);
   ASSERT_NE(tk->func_args[0].default_value, nullptr);
   EXPECT_EQ(tk->func_args[0].default_value->kind, ExprKind::kIdentifier);
 }

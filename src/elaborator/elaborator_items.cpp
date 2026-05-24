@@ -700,6 +700,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
                     "method declarations inside a non-interface class scope");
       }
       ValidateFunctionBody(item);
+      ValidateFunctionArgDefaultsScope(item);
       mod->function_decls.push_back(item);
       break;
     case ModuleItemKind::kGateInst:

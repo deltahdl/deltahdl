@@ -86,4 +86,29 @@ TEST(DefaultArgumentElaboration, DefaultOnNonAnsiDeclError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(DefaultArgumentElaboration, DefaultRefsDeclaringScopeOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, w;\n"
+      "  task t1(output logic o = a);\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DefaultArgumentElaboration, DefaultRefsUndeclaredNameError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, w;\n"
+      "  task t2(output logic o = b);\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }

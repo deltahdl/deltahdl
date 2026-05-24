@@ -1896,6 +1896,79 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
   }
 }
 
+namespace {
+
+void CollectIdentLeaves(const Expr* e, std::vector<const Expr*>& out) {
+  if (!e) return;
+  switch (e->kind) {
+    case ExprKind::kIdentifier:
+      if (!e->text.empty() && e->text.front() != '$') out.push_back(e);
+      return;
+    case ExprKind::kCall:
+    case ExprKind::kSystemCall:
+      for (auto* a : e->args) CollectIdentLeaves(a, out);
+      return;
+    case ExprKind::kMemberAccess:
+      CollectIdentLeaves(e->lhs, out);
+      return;
+    case ExprKind::kTypeRef:
+      return;
+    default:
+      break;
+  }
+  CollectIdentLeaves(e->lhs, out);
+  CollectIdentLeaves(e->rhs, out);
+  CollectIdentLeaves(e->base, out);
+  CollectIdentLeaves(e->index, out);
+  CollectIdentLeaves(e->index_end, out);
+  CollectIdentLeaves(e->condition, out);
+  CollectIdentLeaves(e->true_expr, out);
+  CollectIdentLeaves(e->false_expr, out);
+  CollectIdentLeaves(e->repeat_count, out);
+  CollectIdentLeaves(e->with_expr, out);
+  for (auto* a : e->args) CollectIdentLeaves(a, out);
+  for (auto* el : e->elements) CollectIdentLeaves(el, out);
+}
+
+}
+
+void Elaborator::ValidateFunctionArgDefaultsScope(const ModuleItem* item) {
+  if (!item) return;
+  if (!item->is_ansi_ports) return;
+  if (!item->method_class.empty()) return;
+  std::unordered_set<std::string_view> prior_args;
+  for (const auto& arg : item->func_args) {
+    if (arg.default_value) {
+      std::vector<const Expr*> idents;
+      CollectIdentLeaves(arg.default_value, idents);
+      for (const auto* e : idents) {
+        auto name = e->text;
+        if (name.empty()) continue;
+        if (prior_args.count(name)) continue;
+        if (declared_names_.count(name)) continue;
+        if (ansi_port_names_.count(name)) continue;
+        if (non_ansi_complete_ports_.count(name)) continue;
+        if (non_ansi_partial_ports_.count(name)) continue;
+        if (const_names_.count(name)) continue;
+        if (enum_member_names_.count(name)) continue;
+        if (specparam_names_.count(name)) continue;
+        if (class_names_.count(name)) continue;
+        if (class_var_names_.count(name)) continue;
+        if (task_names_.count(name)) continue;
+        if (func_decls_.count(name)) continue;
+        if (interface_inst_types_.count(name)) continue;
+        if (checker_inst_names_.count(name)) continue;
+        diag_.Error(e->range.start,
+                    std::format("default value for '{}' references '{}' "
+                                "which is not declared in the subroutine's "
+                                "declaring scope",
+                                arg.name, name));
+      }
+    }
+    if (!arg.name.empty()) prior_args.insert(arg.name);
+  }
+}
+
 static void CheckAutoVarWritesInProc(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
     DiagEngine& diag) {

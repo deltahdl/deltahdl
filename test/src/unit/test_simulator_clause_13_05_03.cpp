@@ -147,6 +147,35 @@ TEST(DefaultArgumentSim, TaskOutputArgWriteback) {
   EXPECT_EQ(av->value.ToUint64(), 42u);
 }
 
+TEST(DefaultArgumentSim, DefaultReevaluatedEachCall) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] base;\n"
+      "  logic [7:0] r1, r2;\n"
+      "  function logic [7:0] read(input logic [7:0] x = base);\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    base = 8'd10;\n"
+      "    r1 = read();\n"
+      "    base = 8'd20;\n"
+      "    r2 = read();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r1 = f.ctx.FindVariable("r1");
+  auto* r2 = f.ctx.FindVariable("r2");
+  ASSERT_NE(r1, nullptr);
+  ASSERT_NE(r2, nullptr);
+  EXPECT_EQ(r1->value.ToUint64(), 10u);
+  EXPECT_EQ(r2->value.ToUint64(), 20u);
+}
+
 TEST(DefaultArgumentSim, EmptyPlaceholderUsesDefault) {
   FuncFixture f;
 
