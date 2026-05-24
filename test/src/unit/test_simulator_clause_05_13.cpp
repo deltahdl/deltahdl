@@ -156,6 +156,38 @@ TEST(BuiltinMethodSim, StringLen) {
   EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 5u);
 }
 
+TEST(BuiltinMethodSim, DynArraySizeNoParens) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] dyn [] = '{8'h11, 8'h22, 8'h33};\n"
+      "  logic [31:0] s;\n"
+      "  initial s = dyn.size;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 3u);
+}
+
+TEST(BuiltinMethodSim, StringLenNoParens) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string s = \"world\";\n"
+      "  logic [31:0] n;\n"
+      "  initial n = s.len;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 5u);
+}
+
 TEST(BuiltinMethodSim, EnumNum) {
   SimFixture f;
   auto* design = ElaborateSrc(

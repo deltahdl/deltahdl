@@ -5,14 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(BuiltinMethodParsing, MethodCallNoParens) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int q[$];\n"
-              "  initial x = q.size;\n"
-              "endmodule\n"));
-}
-
 TEST(BuiltinMethodParsing, ChainedAccess) {
   auto r = Parse(
       "module m;\n"
@@ -148,6 +140,33 @@ TEST(BuiltinMethodParsing, MethodNoParensInBinaryExpr) {
               "  int arr [0:3];\n"
               "  int r;\n"
               "  initial r = arr.size + 1;\n"
+              "endmodule\n"));
+}
+
+TEST(BuiltinMethodParsing, DynArraySizeNoParens) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int dyn [];\n"
+              "  int s;\n"
+              "  initial s = dyn.size;\n"
+              "endmodule\n"));
+}
+
+TEST(BuiltinMethodParsing, AssocNumNoParens) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int assoc [string];\n"
+              "  int n;\n"
+              "  initial n = assoc.num;\n"
+              "endmodule\n"));
+}
+
+TEST(BuiltinMethodParsing, StringLenNoParens) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string s;\n"
+              "  int n;\n"
+              "  initial n = s.len;\n"
               "endmodule\n"));
 }
 

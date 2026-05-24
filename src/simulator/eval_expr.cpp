@@ -10,6 +10,7 @@
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
@@ -206,6 +207,7 @@ static bool TryCollectionAccess(std::string_view base, std::string_view field,
     out = MakeLogic4VecVal(arena, 1, 0);
     return true;
   }
+  if (TryEvalStringProperty(base, field, ctx, arena, out)) return true;
   return false;
 }
 

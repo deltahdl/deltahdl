@@ -79,4 +79,31 @@ TEST(BuiltinMethodElaboration, MethodNoParensInExpressionOk) {
              "endmodule\n"));
 }
 
+TEST(BuiltinMethodElaboration, DynArraySizeNoParensElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int dyn [];\n"
+             "  int sz;\n"
+             "  initial sz = dyn.size;\n"
+             "endmodule\n"));
+}
+
+TEST(BuiltinMethodElaboration, AssocNumNoParensElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int assoc [string];\n"
+             "  int n;\n"
+             "  initial n = assoc.num;\n"
+             "endmodule\n"));
+}
+
+TEST(BuiltinMethodElaboration, StringLenNoParensElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  string s;\n"
+             "  int n;\n"
+             "  initial n = s.len;\n"
+             "endmodule\n"));
+}
+
 }

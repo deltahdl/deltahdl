@@ -61,4 +61,13 @@ TEST(BuiltinMethodLexing, MethodWithMultipleArgTokens) {
   EXPECT_EQ(tokens[7].kind, TokenKind::kRParen);
 }
 
+TEST(BuiltinMethodLexing, DollarPrefixIsSystemIdentifier) {
+  auto tokens = Lex("arr.$size");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kDot);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[2].text, "$size");
+}
+
 }

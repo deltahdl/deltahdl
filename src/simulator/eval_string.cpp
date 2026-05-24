@@ -353,4 +353,14 @@ bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return DispatchMutatingMethod(parts.method_name, args, out);
 }
 
+bool TryEvalStringProperty(std::string_view var_name, std::string_view prop,
+                           SimContext& ctx, Arena& arena, Logic4Vec& out) {
+  if (!ctx.IsStringVariable(var_name)) return false;
+  if (prop != "len") return false;
+  auto* var = ctx.FindVariable(var_name);
+  std::string str = var ? Logic4VecToString(var->value) : "";
+  out = StringLen(str, arena);
+  return true;
+}
+
 }
