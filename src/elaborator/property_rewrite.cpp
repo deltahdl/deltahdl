@@ -68,4 +68,33 @@ bool PropertyRegistry::IsAcceptableAsTopLevelConcurrent(
   return fp.legal && fp.remaining_instances == 0;
 }
 
+bool PropertyRegistry::HasCyclicSequenceDependency(
+    const ModuleItem* decl) const {
+  if (decl == nullptr) return false;
+  if (decl->kind != ModuleItemKind::kSequenceDecl) return false;
+
+  // Three-color DFS: `path` marks nodes on the current descent — re-visiting
+  // one means there is a back-edge, which is exactly §16.8's cycle.
+  std::unordered_set<const ModuleItem*> path;
+  std::unordered_set<const ModuleItem*> done;
+
+  auto dfs = [&](auto& self, const ModuleItem* node) -> bool {
+    if (!path.insert(node).second) return true;
+    for (auto ref : node->prop_instance_refs) {
+      auto it = by_name_.find(ref);
+      if (it == by_name_.end()) continue;
+      const ModuleItem* next = it->second;
+      // Only sequence-to-sequence edges count for §16.8's cycle rule.
+      if (next->kind != ModuleItemKind::kSequenceDecl) continue;
+      if (done.count(next) != 0) continue;
+      if (self(self, next)) return true;
+    }
+    path.erase(node);
+    done.insert(node);
+    return false;
+  };
+
+  return dfs(dfs, decl);
+}
+
 }  // namespace delta

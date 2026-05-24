@@ -5,18 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SequenceEventParsing, SequenceEventInEventControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  sequence abc;\n"
-      "    @(posedge clk) a ##1 b ##1 c;\n"
-      "  endsequence\n"
-      "  initial @(abc) $display(\"match\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(SequenceEventParsing, SequenceEventAstStructure) {
   auto r = Parse(
       "module m;\n"

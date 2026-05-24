@@ -34,16 +34,17 @@ TEST(SequenceEventElaboration, SequenceEventWithIffGuardElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SequenceEventElaboration, MultipleProcessesWaitOnSequence) {
+TEST(SequenceEventElaboration, SequenceEventArgumentResolvesToInstance) {
+  // §9.4.2.4: the event_expression uses a sequence_instance whose argument is
+  // a non-automatic signal from the enclosing scope.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  logic clk, a, b, c;\n"
-      "  sequence abc;\n"
-      "    @(posedge clk) a ##1 b ##1 c;\n"
+      "  logic clk, x, y;\n"
+      "  sequence s(a, b);\n"
+      "    @(posedge clk) a ##1 b;\n"
       "  endsequence\n"
-      "  initial @(abc) $display(\"process 1\");\n"
-      "  initial @(abc) $display(\"process 2\");\n"
+      "  initial @(s(x, y)) $display(\"done\");\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

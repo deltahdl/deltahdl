@@ -781,6 +781,15 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kSequenceDecl:
       sequence_names_.insert(item->name);
       mod->sequence_decls.push_back(item);
+      // §16.8: a cyclic dependency among named sequences is an error.
+      // PropertyRegistry has all sequence decls registered before any item
+      // is elaborated (see ElaborateModule), so this DFS sees the full
+      // graph regardless of declaration order.
+      if (property_registry_.HasCyclicSequenceDependency(item)) {
+        diag_.Error(item->loc,
+                    "cyclic dependency among named sequences involving \"" +
+                        std::string(item->name) + "\" (§16.8)");
+      }
       ValidateClockingBlock(item);
       break;
     case ModuleItemKind::kDefparam:

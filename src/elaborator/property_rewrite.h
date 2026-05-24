@@ -38,6 +38,12 @@ class PropertyRegistry {
   // property of a concurrent assertion.
   static bool IsAcceptableAsTopLevelConcurrent(const FlattenedProperty& fp);
 
+  // §16.8: it is an error if a cyclic dependency among named sequences
+  // results from their instantiations. Returns true iff `decl` lies on a
+  // cycle in the directed graph whose edges are sequence-to-sequence
+  // instance references (including self-recursion).
+  bool HasCyclicSequenceDependency(const ModuleItem* decl) const;
+
  private:
   std::unordered_map<std::string_view, const ModuleItem*> by_name_;
 };

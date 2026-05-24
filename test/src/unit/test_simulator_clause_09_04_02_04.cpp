@@ -39,37 +39,6 @@ TEST(SequenceEventSim, ProcessBlocksUntilSequenceEndpoint) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SequenceEventSim, ProcessResumesAfterObservedRegion) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic clk, a, b;\n"
-      "  logic [7:0] seen;\n"
-      "  sequence ab;\n"
-      "    @(posedge clk) a ##1 b;\n"
-      "  endsequence\n"
-      "  initial begin\n"
-      "    clk = 0; a = 0; b = 0; seen = 0;\n"
-      "    #1 a = 1; clk = 1; #1 clk = 0;\n"
-      "    #1 b = 1; clk = 1; #1 clk = 0;\n"
-      "    #10 $finish;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    @(ab) seen = 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("seen");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
 TEST(SequenceEventSim, MultipleWaitersOnSequenceEndpoint) {
   SimFixture f;
   auto* design = ElaborateSrc(

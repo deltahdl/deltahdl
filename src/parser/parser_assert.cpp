@@ -380,6 +380,83 @@ ModuleItem* Parser::ParsePropertyDecl() {
   return item;
 }
 
+namespace {
+
+// §16.7: parse a plain decimal token like "5" into its integer value. Sized
+// or based literals ("5'd10", "3'b101") return false; the caller leaves
+// validation to downstream stages that have full constant-folding.
+bool TryParsePlainDecimal(std::string_view text, uint64_t& out) {
+  if (text.empty()) return false;
+  uint64_t v = 0;
+  for (char c : text) {
+    if (c < '0' || c > '9') return false;
+    if (v > (UINT64_MAX - 9) / 10) return false;
+    v = v * 10 + static_cast<uint64_t>(c - '0');
+  }
+  out = v;
+  return true;
+}
+
+}  // namespace
+
+void Parser::ValidateLiteralCycleDelayRange(SourceLoc range_loc) {
+  // §16.7: only the literal `##[ [-]INTLIT : [-]INTLIT ]` form is checked
+  // here. Symbolic bounds need full constant evaluation and are deferred to
+  // later stages. The five-to-seven token window is peeked under SavePos so
+  // the body loop still sees every token afterwards.
+  if (!Check(TokenKind::kLBracket)) return;
+  auto saved = lexer_.SavePos();
+  Consume();  // [
+  bool lo_negative = false;
+  if (Check(TokenKind::kMinus)) {
+    lo_negative = true;
+    Consume();
+  }
+  if (!Check(TokenKind::kIntLiteral)) {
+    lexer_.RestorePos(saved);
+    return;
+  }
+  Token lo = Consume();
+  if (!Check(TokenKind::kColon)) {
+    lexer_.RestorePos(saved);
+    return;
+  }
+  Consume();  // :
+  bool hi_negative = false;
+  if (Check(TokenKind::kMinus)) {
+    hi_negative = true;
+    Consume();
+  }
+  if (!Check(TokenKind::kIntLiteral)) {
+    lexer_.RestorePos(saved);
+    return;
+  }
+  Token hi = Consume();
+  if (!Check(TokenKind::kRBracket)) {
+    lexer_.RestorePos(saved);
+    return;
+  }
+  lexer_.RestorePos(saved);
+
+  uint64_t lo_mag = 0;
+  uint64_t hi_mag = 0;
+  if (!TryParsePlainDecimal(lo.text, lo_mag)) return;
+  if (!TryParsePlainDecimal(hi.text, hi_mag)) return;
+
+  // §16.7 S2: a literal lower or upper bound below zero is illegal.
+  if (lo_negative || hi_negative) {
+    diag_.Error(range_loc,
+                "cycle-delay range bounds cannot be negative (§16.7)");
+    return;
+  }
+  // §16.7 S6: the upper bound must be at least the lower bound.
+  if (hi_mag < lo_mag) {
+    diag_.Error(range_loc,
+                "cycle-delay range upper bound must be at least the lower "
+                "bound (§16.7)");
+  }
+}
+
 ModuleItem* Parser::ParseSequenceDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kSequenceDecl;
@@ -387,13 +464,40 @@ ModuleItem* Parser::ParseSequenceDecl() {
   Expect(TokenKind::kKwSequence);
   item->name = Expect(TokenKind::kIdentifier).text;
 
+  // §16.8 sequence_port_list: harvest formal_port_identifier names so the
+  // elaborator can flatten instances and run cycle detection. The body of
+  // each port_item is best-effort skipped — a typed formal may be preceded by
+  // direction (local input/inout/output), an attribute_instance, and a type;
+  // the identifier we want is the last identifier-like token before the
+  // separator (',' '=' ')').
   if (Match(TokenKind::kLParen)) {
     int depth = 1;
+    bool expect_formal_name = true;
     while (depth > 0 && !AtEnd()) {
-      if (Match(TokenKind::kLParen)) {
+      if (Check(TokenKind::kLParen)) {
+        Consume();
         ++depth;
-      } else if (Match(TokenKind::kRParen)) {
+      } else if (Check(TokenKind::kRParen)) {
+        Consume();
         --depth;
+        if (depth == 0) break;
+      } else if (depth == 1 && Check(TokenKind::kComma)) {
+        Consume();
+        expect_formal_name = true;
+      } else if (depth == 1 && Check(TokenKind::kEq)) {
+        // default actual argument follows; skip until the next port boundary.
+        Consume();
+        expect_formal_name = false;
+      } else if (depth == 1 && expect_formal_name &&
+                 Check(TokenKind::kIdentifier)) {
+        auto name_tok = Consume();
+        // Walk past any subsequent identifiers/type tokens until we hit the
+        // separator; the rightmost identifier is the formal_port_identifier.
+        while (Check(TokenKind::kIdentifier)) {
+          name_tok = Consume();
+        }
+        item->prop_formals.push_back(name_tok.text);
+        expect_formal_name = false;
       } else {
         Consume();
       }
@@ -402,7 +506,21 @@ ModuleItem* Parser::ParseSequenceDecl() {
 
   Expect(TokenKind::kSemicolon);
 
+  // §16.8 cyclic-dependency rule: a sequence_instance reference may be
+  // bare or parenthesized, so capture every identifier in the body. The
+  // elaborator filters non-sequence names via PropertyRegistry::Find.
   while (!Check(TokenKind::kKwEndsequence) && !AtEnd()) {
+    if (Check(TokenKind::kHashHash)) {
+      auto delay_loc = CurrentLoc();
+      Consume();
+      ValidateLiteralCycleDelayRange(delay_loc);
+      continue;
+    }
+    if (Check(TokenKind::kIdentifier)) {
+      auto tok = Consume();
+      item->prop_instance_refs.push_back(tok.text);
+      continue;
+    }
     Consume();
   }
   Expect(TokenKind::kKwEndsequence);
