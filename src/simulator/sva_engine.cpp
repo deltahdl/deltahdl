@@ -234,6 +234,56 @@ bool IsClockingBlockInputSamplingValid(ClockingInputSkew skew) {
   return skew == ClockingInputSkew::kStep1;
 }
 
+bool InterpretAssertionExprAsBoolean(uint64_t aval, uint64_t bval) {
+  // §16.6: x and z bits make the expression false; an all-zero known value
+  // is also false. Otherwise the expression is true. The bval rail carries
+  // the unknown mask, so any non-zero bval forces a false interpretation.
+  if (bval != 0) return false;
+  return aval != 0;
+}
+
+SampledArrayElement SampleArrayElementForAssertion(uint64_t element_value) {
+  return SampledArrayElement{element_value, true};
+}
+
+SampledArrayElement ArrayElementAfterArrayMutation(
+    SampledArrayElement sampled) {
+  // §16.6: the sampled copy remains live for the duration of the assertion
+  // expression evaluation regardless of mutations to the source container.
+  return sampled;
+}
+
+bool SampledArrayElementStillReadable(const SampledArrayElement& sampled) {
+  return sampled.live;
+}
+
+bool BooleanExprUsesSampledValues(BooleanExprPlace place) {
+  switch (place) {
+    case BooleanExprPlace::kSequenceOrPropertyExpr:
+      return true;
+    case BooleanExprPlace::kClockingEvent:
+    case BooleanExprPlace::kDisableCondition:
+      return false;
+  }
+  return false;
+}
+
+bool DisableConditionUsesCurrentValues() {
+  return true;
+}
+
+bool DisableConditionAllowsTriggeredMethod() {
+  return true;
+}
+
+bool DisableConditionAllowsMatchedMethod() {
+  return false;
+}
+
+bool DisableConditionAllowsLocalVariableReference() {
+  return false;
+}
+
 void ProceduralAssertionQueue::Enqueue(PendingProceduralAssertion pending) {
 
   pending.matured = false;

@@ -146,6 +146,44 @@ SampledValue SampleRecursiveExpression(
 
 SampledValue DefaultSampledValueOfVariableOrNet(uint64_t type_default);
 
+// §16.6: a concurrent-assertion Boolean expression's result is interpreted
+// the same way as the condition of a procedural `if`. With aval/bval dual
+// rails, any unknown bit (bval != 0) makes the value false; otherwise the
+// value is true iff aval is non-zero.
+bool InterpretAssertionExprAsBoolean(uint64_t aval, uint64_t bval);
+
+// §16.6: an element of a dynamic array, queue, or associative array that has
+// been sampled for assertion expression evaluation must keep being readable
+// until the evaluation completes, even if the array is later mutated. The
+// `live` flag stays true across simulated mutation to model that lifetime.
+struct SampledArrayElement {
+  uint64_t value = 0;
+  bool live = true;
+};
+SampledArrayElement SampleArrayElementForAssertion(uint64_t element_value);
+SampledArrayElement ArrayElementAfterArrayMutation(SampledArrayElement sampled);
+bool SampledArrayElementStillReadable(const SampledArrayElement& sampled);
+
+// §16.6: where a Boolean expression can occur inside a concurrent assertion.
+// The sampled-vs-current evaluation rule branches on this context: only
+// sequence/property expressions use sampled values; clocking-event expressions
+// are explicitly excepted (they follow §16.5), and disable-condition
+// expressions are evaluated with current values.
+enum class BooleanExprPlace : uint8_t {
+  kSequenceOrPropertyExpr = 0,
+  kClockingEvent = 1,
+  kDisableCondition = 2,
+};
+bool BooleanExprUsesSampledValues(BooleanExprPlace place);
+
+// §16.6: disable-condition specifics. The condition is evaluated against
+// current values; `triggered` is callable from it, but `matched` and local
+// variables are not.
+bool DisableConditionUsesCurrentValues();
+bool DisableConditionAllowsTriggeredMethod();
+bool DisableConditionAllowsMatchedMethod();
+bool DisableConditionAllowsLocalVariableReference();
+
 enum class ClockingInputSkew : uint8_t {
   kStep1 = 0,
   kOther = 1,
