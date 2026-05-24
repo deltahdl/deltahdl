@@ -84,7 +84,8 @@ TEST(PortDeclParsing, OutputDeclWithDefault) {
 }
 
 TEST(PortDeclParsing, InterfacePortBareIdentifier) {
-  // interface_port_declaration: interface_identifier list_of_interface_identifiers
+  // interface_port_declaration: interface_identifier
+  // list_of_interface_identifiers
   auto r = Parse(
       "interface bus_if; logic clk; endinterface\n"
       "module m(bus_if b); endmodule");
@@ -214,4 +215,4 @@ TEST(PortDeclParsing, MixedDirectionAnsi) {
   EXPECT_EQ(r.cu->modules[0]->ports[3].direction, Direction::kRef);
 }
 
-}
+}  // namespace
