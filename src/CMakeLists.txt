@@ -43,6 +43,7 @@ add_library(deltahdl_lib STATIC
     elaborator/sequence_repetition.cpp
     elaborator/typed_sequence_formal.cpp
     elaborator/rewrite_item.cpp
+    elaborator/annex_f_notation.cpp
     elaborator/elaborator_defparam.cpp
     elaborator/elaborator_gates.cpp
     elaborator/elaborator_validate.cpp
