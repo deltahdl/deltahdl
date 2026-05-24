@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(FormalSyntaxParsing, SystemFunctionCall) {
+TEST(SubroutineCallExprParsing, SystemFunctionCall) {
   auto r = Parse(
       "module m; initial begin $display(\"v=%0d\", x); $finish; end "
       "endmodule\n");
@@ -13,26 +13,12 @@ TEST(FormalSyntaxParsing, SystemFunctionCall) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(FormalSyntaxParsing, FunctionCallExpr) {
+TEST(SubroutineCallExprParsing, FunctionCallExpr) {
   auto r = Parse("module m; initial x = func(a, b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* stmt = FirstInitialStmt(r);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
-}
-
-TEST(SubroutineCallExprParsing, TfCallNoArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foo(); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-  EXPECT_EQ(expr->callee, "foo");
-  EXPECT_TRUE(expr->args.empty());
 }
 
 TEST(SubroutineCallExprParsing, SystemTfCallMultipleExprArgs) {
@@ -185,14 +171,6 @@ TEST(SubroutineCallSyntaxParsing, VoidFunctionCallAsStatement) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kCall);
 }
 
-TEST(SubroutineCallSyntaxParsing, VoidFunctionCalledAsStatement) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function void log(int v); $display(\"%0d\", v); endfunction\n"
-              "  initial log(42);\n"
-              "endmodule\n"));
-}
-
 TEST(SubroutineCallSyntaxParsing, CallWithEmptyParens) {
   auto r = Parse(
       "module m;\n"
@@ -206,18 +184,6 @@ TEST(SubroutineCallSyntaxParsing, CallWithEmptyParens) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
   EXPECT_EQ(expr->callee, "foo");
   EXPECT_TRUE(expr->args.empty());
-}
-
-TEST(SubroutineCallSyntaxParsing, VoidCastExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  function int foo(); return 1; endfunction\n"
-      "  initial void'(foo());\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
 TEST(SubroutineCallSyntaxParsing, SubroutineCallAsStatement) {
@@ -454,6 +420,152 @@ TEST(SubroutineCallExprParsing, FunctionCallInBinaryExpr) {
   ASSERT_NE(stmt->rhs->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->lhs->kind, ExprKind::kCall);
   EXPECT_EQ(stmt->rhs->rhs->kind, ExprKind::kCall);
+}
+
+TEST(SubroutineCallExprParsing, ArrayMethodNameAnd) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial x = q.and;\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, ArrayMethodNameOr) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial x = q.or;\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, ArrayMethodNameXor) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial x = q.xor;\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, ArrayManipulationCallWithExpression) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial x = q.sum() with (item > 0);\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, RandomizeWithNullArg) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  initial begin obj.randomize(null); end\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, RandomizeWithVariableIdentifierList) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  initial begin obj.randomize(a, b, c); end\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, RandomizeWithIdentifierListInParensAndBlock) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  initial begin obj.randomize() with (a, b) { a < b; }; end\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, RandomizeWithEmptyParensAndBlock) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  initial begin obj.randomize() with () { x > 0; }; end\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, ScopeRandomizeWithStdPrefix) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  int a, b;\n"
+      "  initial begin std::randomize(a, b); end\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, SystemTfCallWithClockingEvent) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  logic clk;\n"
+      "  int a;\n"
+      "  initial $display(a, @clk);\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, ConstantFunctionCallInParameter) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int f(int a); return a + 1; endfunction\n"
+      "  parameter P = f(3);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SubroutineCallExprParsing, TfCallPackageScopedIdentifier) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  initial begin pkg::do_it(); end\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, TfCallWithAttributeInstance) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  initial begin foo (* annotated *) (1); end\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, MethodCallBodyWithAttributeInstance) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  initial begin obj.method (* annotated *) (1); end\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, ArrayManipulationCallWithArgList) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial x = q.sum(1);\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, ArrayManipulationCallWithAttributeInstance) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial x = q.unique (* annotated *) ();\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, RandomizeCallWithAttributeInstance) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  initial begin obj.randomize (* annotated *) (); end\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, RandomizeCallSingleVariableIdentifier) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  initial begin obj.randomize(a); end\n"
+      "endmodule\n"));
+}
+
+TEST(SubroutineCallExprParsing, SystemTfCallDataTypeAndExpression) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  int x;\n"
+      "  initial x = $bits(logic [7:0], 1);\n"
+      "endmodule\n"));
 }
 
 }

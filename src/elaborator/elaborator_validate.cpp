@@ -2449,12 +2449,102 @@ static void WalkStmtForCallArgs(
     WalkStmtForCallArgs(ci.body, func_decls, net_names, diag);
 }
 
+// A scope randomize is a randomize_call that is not a method on a class
+// object — see §A.8.2's randomize_call production and its footnote 43. The
+// parser leaves `randomize` as a plain identifier, so we detect the scope
+// form syntactically: either a bare callee with no member-access prefix, or
+// a callee reached through the `std::` package scope. The kCall's `callee`
+// field carries the simple-identifier text only, so we inspect `lhs` to
+// distinguish the bare and `std::` forms from a class-method `obj.randomize`.
+static bool IsScopeRandomizeCall(const Expr* expr) {
+  if (!expr || expr->kind != ExprKind::kCall) return false;
+  const Expr* lhs = expr->lhs;
+  if (!lhs) return false;
+  if (lhs->kind == ExprKind::kIdentifier && lhs->text == "randomize") {
+    return true;
+  }
+  if (lhs->kind == ExprKind::kMemberAccess && lhs->rhs &&
+      lhs->rhs->kind == ExprKind::kIdentifier &&
+      lhs->rhs->text == "randomize" && lhs->lhs &&
+      lhs->lhs->kind == ExprKind::kIdentifier && lhs->lhs->text == "std") {
+    return true;
+  }
+  return false;
+}
+
+// Footnote 43 (§A.8.2): in a scope randomize_call, `null` is not a legal
+// argument and the with-clause's parenthesized identifier_list is also
+// illegal. Walks the expression tree and reports each offending site. The
+// parenthesized-form check uses the `with_has_parens` AST flag set by the
+// parser regardless of whether the parenthesized list happened to be empty
+// or non-empty.
+static void CheckScopeRandomizeRulesInExpr(const Expr* expr,
+                                           DiagEngine& diag) {
+  if (!expr) return;
+  if (IsScopeRandomizeCall(expr)) {
+    for (const auto* arg : expr->args) {
+      if (arg && arg->kind == ExprKind::kIdentifier && arg->text == "null") {
+        diag.Error(arg->range.start,
+                   "'null' is not a legal argument to a scope randomize call");
+      }
+    }
+    if (expr->with_has_parens) {
+      diag.Error(expr->range.start,
+                 "scope randomize call cannot use a parenthesized identifier "
+                 "list after 'with'");
+    }
+  }
+  CheckScopeRandomizeRulesInExpr(expr->lhs, diag);
+  CheckScopeRandomizeRulesInExpr(expr->rhs, diag);
+  CheckScopeRandomizeRulesInExpr(expr->condition, diag);
+  CheckScopeRandomizeRulesInExpr(expr->true_expr, diag);
+  CheckScopeRandomizeRulesInExpr(expr->false_expr, diag);
+  CheckScopeRandomizeRulesInExpr(expr->base, diag);
+  CheckScopeRandomizeRulesInExpr(expr->index, diag);
+  CheckScopeRandomizeRulesInExpr(expr->index_end, diag);
+  for (const auto* a : expr->args) CheckScopeRandomizeRulesInExpr(a, diag);
+  for (const auto* e : expr->elements)
+    CheckScopeRandomizeRulesInExpr(e, diag);
+}
+
+static void WalkStmtForScopeRandomize(const Stmt* s, DiagEngine& diag) {
+  if (!s) return;
+  CheckScopeRandomizeRulesInExpr(s->expr, diag);
+  CheckScopeRandomizeRulesInExpr(s->lhs, diag);
+  CheckScopeRandomizeRulesInExpr(s->rhs, diag);
+  CheckScopeRandomizeRulesInExpr(s->condition, diag);
+  CheckScopeRandomizeRulesInExpr(s->for_cond, diag);
+  for (const auto* sub : s->stmts) WalkStmtForScopeRandomize(sub, diag);
+  WalkStmtForScopeRandomize(s->then_branch, diag);
+  WalkStmtForScopeRandomize(s->else_branch, diag);
+  WalkStmtForScopeRandomize(s->body, diag);
+  for (const auto* fi : s->for_inits) WalkStmtForScopeRandomize(fi, diag);
+  WalkStmtForScopeRandomize(s->for_body, diag);
+  for (const auto* fs : s->for_steps) WalkStmtForScopeRandomize(fs, diag);
+  for (const auto& ci : s->case_items)
+    WalkStmtForScopeRandomize(ci.body, diag);
+}
+
 void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
 
   std::unordered_map<std::string_view, const ModuleItem*> all_decls =
       func_decls_;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl) all_decls[item->name] = item;
+  }
+  for (const auto* item : decl->items) {
+    bool is_proc_block = item->kind == ModuleItemKind::kInitialBlock ||
+                         item->kind == ModuleItemKind::kAlwaysBlock ||
+                         item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                         item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                         item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                         item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc_block) WalkStmtForScopeRandomize(item->body, diag_);
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl) {
+      for (const auto* s : item->func_body_stmts)
+        WalkStmtForScopeRandomize(s, diag_);
+    }
   }
 
   std::unordered_set<std::string_view> non_singular_vars;

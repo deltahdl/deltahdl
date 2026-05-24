@@ -775,7 +775,16 @@ Expr* Parser::ParseWithClause(Expr* expr) {
     return expr;
   }
   Expect(TokenKind::kLParen);
-  expr->with_expr = ParseExpr();
+  expr->with_has_parens = true;
+  if (!Check(TokenKind::kRParen)) {
+    expr->with_expr = ParseExpr();
+    // A.8.2 randomize_call's with-clause allows an identifier_list inside
+    // the parentheses; array_manipulation_call's with-clause carries a
+    // single expression. Tolerate either by consuming further entries.
+    while (Match(TokenKind::kComma)) {
+      ParseExpr();
+    }
+  }
   Expect(TokenKind::kRParen);
 
   if (Check(TokenKind::kLBrace)) {

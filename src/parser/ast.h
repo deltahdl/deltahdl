@@ -75,6 +75,7 @@ struct Expr {
   bool has_param_spec = false;
 
   Expr* with_expr = nullptr;
+  bool with_has_parens = false;
 
   std::vector<Expr*> elements;
   Expr* repeat_count = nullptr;
