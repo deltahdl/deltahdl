@@ -25,20 +25,6 @@ const RtlirModule* PreprocessAndElaborate(SynthFixture& f,
   return design->top_modules[0];
 }
 
-TEST(CompilerDirectiveSynthesis, MacroWidthReachesSynthesizer) {
-  SynthFixture f;
-  const auto* mod = PreprocessAndElaborate(
-      f,
-      "`define WIDTH 8\n"
-      "module m(input logic [`WIDTH-1:0] a, b, output logic [`WIDTH-1:0] c);\n"
-      "  assign c = a + b;\n"
-      "endmodule\n");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  EXPECT_NE(aig, nullptr);
-}
-
 TEST(CompilerDirectiveSynthesis, DirectivePersistsToSynthesizedModule) {
   SynthFixture f;
   const auto* mod = PreprocessAndElaborate(

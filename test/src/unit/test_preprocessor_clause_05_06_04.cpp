@@ -33,13 +33,6 @@ TEST(CompilerDirectivePreprocessor, NoGraveAccentNoDirective) {
   EXPECT_NE(result.find("define X 42"), std::string::npos);
 }
 
-TEST(CompilerDirectivePreprocessor, DirectiveTakesEffectImmediately) {
-  PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessFile("a.sv", "`default_nettype none\n", f, pp);
-  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
-}
-
 TEST(CompilerDirectivePreprocessor, DirectivePersistsAcrossSameCu) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -85,6 +78,21 @@ TEST(CompilerDirectivePreprocessor, MacroDefinedInOneCuInvisibleInOther) {
   EXPECT_FALSE(f2.diag.HasErrors());
   EXPECT_EQ(result.find("leaked"), std::string::npos);
   EXPECT_NE(result.find("isolated"), std::string::npos);
+}
+
+TEST(CompilerDirectivePreprocessor, DefineAffectsOnlySubsequentReads) {
+  PreprocFixture f;
+  std::string src =
+      std::string("\x60") + "ifdef X\nEARLY_BRANCH\n" + "\x60" +
+      "else\nEARLY_ELSE\n" + "\x60" + "endif\n" + "\x60" + "define X 1\n" +
+      "\x60" + "ifdef X\nLATE_BRANCH\n" + "\x60" + "else\nLATE_ELSE\n" +
+      "\x60" + "endif\n";
+  auto result = Preprocess(src, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result.find("EARLY_BRANCH"), std::string::npos);
+  EXPECT_NE(result.find("EARLY_ELSE"), std::string::npos);
+  EXPECT_NE(result.find("LATE_BRANCH"), std::string::npos);
+  EXPECT_EQ(result.find("LATE_ELSE"), std::string::npos);
 }
 
 TEST(CompilerDirectivePreprocessor, ConcurrentCusIndependent) {

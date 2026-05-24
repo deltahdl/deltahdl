@@ -48,25 +48,4 @@ TEST(CompilerDirectiveElaboration, MacroFromOneElabInvisibleInAnother) {
   EXPECT_TRUE(f2.has_errors);
 }
 
-TEST(CompilerDirectiveElaboration, DirectiveTakesEffectBeforeParamResolve) {
-  ElabFixture f;
-  auto* design = ElaborateWithPreprocessor(
-      "`define VAL 7\n"
-      "module m;\n"
-      "  parameter P = `VAL;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  bool found = false;
-  for (const auto& p : mod->params) {
-    if (p.name == "P") {
-      EXPECT_EQ(p.resolved_value, 7);
-      found = true;
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 }
