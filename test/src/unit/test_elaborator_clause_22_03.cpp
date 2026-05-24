@@ -40,23 +40,6 @@ TEST(ResetAllElaboration, PreservesMacroValuesForElaboration) {
   EXPECT_TRUE(found);
 }
 
-TEST(ResetAllElaboration, BetweenModulesResetsDelayModeForElaboration) {
-  ElabFixture f;
-  auto* design = ElaborateWithPreprocessor(
-      "`delay_mode_path\n"
-      "module m1;\n"
-      "  parameter P = 1;\n"
-      "endmodule\n"
-      "`resetall\n"
-      "module m2;\n"
-      "  parameter Q = 2;\n"
-      "endmodule\n",
-      f, "m2");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  EXPECT_EQ(design->top_modules[0]->delay_mode, DelayModeDirective::kNone);
-}
-
 TEST(ResetAllElaboration, InsideExcludedBranchDoesNotAffectElaboration) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(

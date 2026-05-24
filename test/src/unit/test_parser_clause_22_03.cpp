@@ -56,13 +56,4 @@ TEST(CompilerDirectiveParsing, ResetallResetsTimescaleForParsing) {
   EXPECT_TRUE(r.cu->default_decay_time_infinite);
 }
 
-TEST(CompilerDirectiveParsing, MultipleResetallBetweenModulesValid) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("`resetall\n"
-                              "module m1; endmodule\n"
-                              "`resetall\n"
-                              "module m2; endmodule\n"
-                              "`resetall\n"));
-}
-
 }

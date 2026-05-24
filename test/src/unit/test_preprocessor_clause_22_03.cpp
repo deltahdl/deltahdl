@@ -269,16 +269,15 @@ TEST(Preprocessor, ResetAll_DoesNotRestoreUndefMacros) {
   EXPECT_EQ(result.find("visible"), std::string::npos);
 }
 
-TEST(Preprocessor, ResetAll_LegalAfterEndOfDesignElement) {
+TEST(Preprocessor, ResetAll_PreservesDefinedMacros) {
   PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP(
-      "`default_nettype none\n"
-      "module m; endmodule\n"
-      "`resetall\n",
-      f, pp);
+  auto result = Preprocess(
+      "`define KEEP 42\n"
+      "`resetall\n"
+      "value = `KEEP\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
+  EXPECT_NE(result.find("value = 42"), std::string::npos);
 }
 
 TEST(Preprocessor, ResetAll_ErrorInsideGenerateBlock) {

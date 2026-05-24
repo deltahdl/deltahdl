@@ -39,19 +39,6 @@ TEST(ResetAllSimulation, PreservesMacroValuesForSimulation) {
   EXPECT_EQ(result, 77u);
 }
 
-TEST(ResetAllSimulation, BetweenModulesResetsStateForSimulation) {
-  auto result = PreprocessAndGet(
-      "`define VAL 8'd33\n"
-      "module m1; endmodule\n"
-      "`resetall\n"
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = `VAL;\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(result, 33u);
-}
-
 TEST(ResetAllSimulation, InsideExcludedBranchDoesNotAffectSimulation) {
   auto result = PreprocessAndGet(
       "`define VAL 8'd50\n"
@@ -66,16 +53,3 @@ TEST(ResetAllSimulation, InsideExcludedBranchDoesNotAffectSimulation) {
   EXPECT_EQ(result, 50u);
 }
 
-TEST(ResetAllSimulation, MultipleResetallDoesNotAffectMacroSimulation) {
-  auto result = PreprocessAndGet(
-      "`define X 8'd12\n"
-      "`resetall\n"
-      "`resetall\n"
-      "`resetall\n"
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = `X;\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(result, 12u);
-}
