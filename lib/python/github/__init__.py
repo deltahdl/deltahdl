@@ -1,10 +1,76 @@
 """Shared GitHub issue utilities."""
 
 import json
+import random
 import re
 import subprocess
 import sys
+import time
 from typing import Any
+
+
+_MAX_ATTEMPTS = 10
+_rng = random.Random()
+
+
+_EOF_WORD_RE = re.compile(r"\beof\b")
+_HTTP_5XX_RE = re.compile(r"\bhttp 5\d\d\b")
+_TRANSIENT_SUBSTRINGS = (
+    "i/o timeout",
+    "dial tcp",
+    "connection refused",
+    "connection reset",
+    "secondary rate limit",
+    "bad gateway",
+    "service unavailable",
+    "gateway timeout",
+    "temporary failure in name resolution",
+)
+
+
+def _is_transient(returncode: int, stderr: str) -> bool:
+    """Classify a ``gh`` failure as a transport-layer transient error.
+
+    Returns ``True`` only for errors worth retrying (network timeouts,
+    5xx, secondary rate limits, DNS flakes). Logic errors (4xx, auth,
+    validation) return ``False`` so the caller fails fast.
+    """
+    if returncode == 0:
+        return False
+    lower = stderr.lower()
+    for needle in _TRANSIENT_SUBSTRINGS:
+        if needle in lower:
+            return True
+    if _EOF_WORD_RE.search(lower):
+        return True
+    if _HTTP_5XX_RE.search(lower):
+        return True
+    return False
+
+
+def _run_gh(
+    cmd: list[str], *, stdin_text: str | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run a ``gh`` command with bounded exponential-backoff retries.
+
+    Transient transport failures (see :func:`_is_transient`) are retried
+    up to ``_MAX_ATTEMPTS`` total attempts with delays
+    ``[1, 2, 4, ..., 256]`` seconds (full jitter via ``_rng.uniform``).
+    Permanent failures and successes return immediately. The returned
+    ``CompletedProcess`` lets the caller keep its existing returncode
+    inspection and ``sys.exit(1)`` branch.
+    """
+    last = subprocess.run(
+        cmd, input=stdin_text, capture_output=True, text=True, check=False,
+    )
+    for attempt in range(_MAX_ATTEMPTS - 1):
+        if not _is_transient(last.returncode, last.stderr):
+            return last
+        time.sleep(_rng.uniform(0, 2 ** attempt))
+        last = subprocess.run(
+            cmd, input=stdin_text, capture_output=True, text=True, check=False,
+        )
+    return last
 
 
 def format_subclause_label(subclause: str) -> str:
@@ -100,12 +166,9 @@ def _gh_api_jq(
     the raw stdout — callers strip if their field is a single-line
     scalar.
     """
-    result = subprocess.run(
+    result = _run_gh(
         ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
          "--jq", jq],
-        capture_output=True,
-        text=True,
-        check=False,
     )
     if result.returncode != 0:
         print(f"ERROR: Failed to fetch {label} for issue #{issue}:"
@@ -153,13 +216,10 @@ def find_issue_by_title(
     organization: str, repo: str, title: str,
 ) -> int | None:
     """Find an open issue by exact title. Returns number or None."""
-    result = subprocess.run(
+    result = _run_gh(
         ["gh", "issue", "list", "--repo", f"{organization}/{repo}",
          "--search", f'"{title}" in:title', "--state", "open",
          "--json", "number,title", "--limit", "10"],
-        capture_output=True,
-        text=True,
-        check=False,
     )
     if result.returncode != 0:
         return None
@@ -180,13 +240,10 @@ def create_issue(
     if labels is not None:
         data["labels"] = labels
     payload = json.dumps(data)
-    result = subprocess.run(
+    result = _run_gh(
         ["gh", "api", f"repos/{organization}/{repo}/issues",
          "-X", "POST", "--input", "-"],
-        input=payload,
-        capture_output=True,
-        text=True,
-        check=False,
+        stdin_text=payload,
     )
     if result.returncode != 0:
         print(f"ERROR: Failed to create issue:"
@@ -203,13 +260,10 @@ def add_labels(
     """Add labels to a GitHub issue using ``gh api``."""
     print(f"Adding labels to issue #{issue} on {organization}/{repo}...")
     payload = json.dumps({"labels": labels})
-    result = subprocess.run(
+    result = _run_gh(
         ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}/labels",
          "-X", "POST", "--input", "-"],
-        input=payload,
-        capture_output=True,
-        text=True,
-        check=False,
+        stdin_text=payload,
     )
     if result.returncode != 0:
         print(f"ERROR: Failed to add labels to issue #{issue}:"
@@ -223,13 +277,10 @@ def update_issue_body(
     """Update the body of a GitHub issue using ``gh api``."""
     print(f"Updating issue #{issue} on {organization}/{repo}...")
     payload = json.dumps({"body": body})
-    result = subprocess.run(
+    result = _run_gh(
         ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
          "-X", "PATCH", "--input", "-"],
-        input=payload,
-        capture_output=True,
-        text=True,
-        check=False,
+        stdin_text=payload,
     )
     if result.returncode != 0:
         print(f"ERROR: Failed to update issue #{issue}:"
@@ -242,12 +293,9 @@ def close_issue(
 ) -> None:
     """Close a GitHub issue using ``gh api``."""
     print(f"Closing issue #{issue} because {reason}...")
-    result = subprocess.run(
+    result = _run_gh(
         ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
          "-X", "PATCH", "-f", "state=closed"],
-        capture_output=True,
-        text=True,
-        check=False,
     )
     if result.returncode != 0:
         print(f"ERROR: Failed to close issue #{issue}:"
@@ -259,11 +307,8 @@ def close_issue(
 def delete_issue(issue: int) -> None:
     """Delete a GitHub issue using ``gh issue delete``."""
     print(f"Deleting issue #{issue}...")
-    result = subprocess.run(
+    result = _run_gh(
         ["gh", "issue", "delete", str(issue), "--yes"],
-        capture_output=True,
-        text=True,
-        check=False,
     )
     if result.returncode != 0:
         print(f"ERROR: Failed to delete issue #{issue}:"
@@ -377,7 +422,7 @@ def _list_issues_for(subclause: str) -> list[dict[str, Any]]:
     and silently opens a duplicate. Raise the limit well above any
     realistic per-clause result count.
     """
-    completed = subprocess.run(
+    completed = _run_gh(
         [
             "gh", "issue", "list",
             "--state", "all",
@@ -385,7 +430,6 @@ def _list_issues_for(subclause: str) -> list[dict[str, Any]]:
             "--json", "number,title,state",
             "--limit", "1000",
         ],
-        capture_output=True, text=True, check=False,
     )
     if completed.returncode != 0:
         print(completed.stderr, file=sys.stderr)
@@ -403,7 +447,7 @@ def _label_create_args(labels: list[str]) -> list[str]:
 
 def _create_new_issue(subclause: str, labels: list[str]) -> int:
     """Create a fresh issue for *subclause* and return its number."""
-    completed = subprocess.run(
+    completed = _run_gh(
         [
             "gh", "issue", "create",
             "--title", issue_title_for(subclause),
@@ -413,7 +457,6 @@ def _create_new_issue(subclause: str, labels: list[str]) -> int:
                 " pipeline (#1265)."
             ),
         ],
-        capture_output=True, text=True, check=False,
     )
     if completed.returncode != 0:
         print(completed.stderr, file=sys.stderr)
@@ -428,12 +471,11 @@ def _apply_labels(number: int, labels: list[str]) -> None:
     idempotent, so this is safe to call on issues that already carry
     any of the labels.
     """
-    subprocess.run(
+    _run_gh(
         [
             "gh", "issue", "edit", str(number),
             "--add-label", ",".join(labels),
         ],
-        check=False,
     )
 
 
@@ -471,20 +513,18 @@ def find_or_create_issue(
     matches.sort(key=lambda entry: int(entry["number"]))
     oldest, *duplicates = matches
     for dup_entry in duplicates:
-        subprocess.run(
+        _run_gh(
             [
                 "gh", "issue", "delete",
                 str(int(dup_entry["number"])), "--yes",
             ],
-            check=False,
         )
 
     number = int(oldest["number"])
     canonical = issue_title_for(subclause)
     if oldest.get("title") != canonical:
-        subprocess.run(
+        _run_gh(
             ["gh", "issue", "edit", str(number), "--title", canonical],
-            check=False,
         )
     state = oldest.get("state", "OPEN").upper()
     _apply_labels(number, labels)
