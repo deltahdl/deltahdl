@@ -8,24 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(PassByValueSim, PassByValueIsolation) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x, y;\n"
-      "  function logic [7:0] modify_local(input logic [7:0] v);\n"
-      "    v = v + 8'd10;\n"
-      "    return v;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    x = 8'd5;\n"
-      "    y = modify_local(x);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"x", 5u}, {"y", 15u}});
-}
-
 TEST(PassByValueSim, DefaultMechanismWithoutDirectionQualifier) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -100,6 +82,41 @@ TEST(PassByValueSim, MultipleArgsCopiedIndependently) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"a", 3u}, {"b", 7u}, {"result", 10u}});
+}
+
+TEST(PassByValueSim, RecursiveAutomaticUsesPerActivationStackCopy) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int result;\n"
+      "  function automatic int sum_down(int n);\n"
+      "    if (n == 0) return 0;\n"
+      "    return n + sum_down(n - 1);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    result = sum_down(4);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"result", 10u}});
+}
+
+TEST(PassByValueSim, SameSourceBoundToTwoFormalsCopiesIndependently) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x, result;\n"
+      "  function int scale_first_minus_second(int a, int b);\n"
+      "    a = a * 10;\n"
+      "    return a - b;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = 7;\n"
+      "    result = scale_first_minus_second(x, x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 7u}, {"result", 63u}});
 }
 
 }
