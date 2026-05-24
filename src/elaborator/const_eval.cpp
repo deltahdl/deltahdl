@@ -452,7 +452,7 @@ std::optional<double> ConstEvalReal(const Expr* expr) {
   return ConstEvalReal(expr, kEmptyScope);
 }
 
-static bool IsConstantSysFunc(std::string_view name) {
+bool IsConstantSysFunc(std::string_view name) {
   static const std::unordered_set<std::string_view> kConstSysFuncs = {
       "$clog2",
       "$bits",

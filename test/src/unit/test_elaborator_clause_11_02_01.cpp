@@ -122,4 +122,67 @@ TEST(ConstEvalReal, DivisionByZeroReturnsNullopt) {
   EXPECT_FALSE(val.has_value());
 }
 
+// §11.2.1 exposes the constant-system-function whitelist so §13.4.3 can apply
+// the same admissibility rule when validating the body of a constant function.
+// Spot-check one entry from each family the LRM lists: math, conversion,
+// bit-vector, timescale, $sformatf. Non-pure sys funcs (e.g. $time) must be
+// rejected.
+TEST(ConstantSysFuncWhitelist, MathFunctionAdmitted) {
+  EXPECT_TRUE(IsConstantSysFunc("$clog2"));
+  EXPECT_TRUE(IsConstantSysFunc("$sqrt"));
+}
+
+TEST(ConstantSysFuncWhitelist, ConversionFunctionAdmitted) {
+  EXPECT_TRUE(IsConstantSysFunc("$signed"));
+  EXPECT_TRUE(IsConstantSysFunc("$itor"));
+}
+
+TEST(ConstantSysFuncWhitelist, BitVectorFunctionAdmitted) {
+  EXPECT_TRUE(IsConstantSysFunc("$countones"));
+  EXPECT_TRUE(IsConstantSysFunc("$onehot"));
+}
+
+TEST(ConstantSysFuncWhitelist, TimescaleFunctionAdmitted) {
+  EXPECT_TRUE(IsConstantSysFunc("$timescale"));
+  EXPECT_TRUE(IsConstantSysFunc("$timeprecision"));
+}
+
+TEST(ConstantSysFuncWhitelist, SformatfAdmitted) {
+  EXPECT_TRUE(IsConstantSysFunc("$sformatf"));
+}
+
+TEST(ConstantSysFuncWhitelist, ImpureFunctionRejected) {
+  EXPECT_FALSE(IsConstantSysFunc("$time"));
+  EXPECT_FALSE(IsConstantSysFunc("$display"));
+  EXPECT_FALSE(IsConstantSysFunc("$random"));
+}
+
+// §11.2.1: constant bit-selects and part-selects of parameters are listed
+// among the legal operands of a constant expression. Make sure the
+// elaborator accepts a parameter whose value is computed from a bit-select
+// of another parameter.
+TEST(ConstantExpressionElaboration, ConstantBitSelectOfParameterElaborates) {
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  parameter logic [7:0] BASE = 8'b1010_1100;\n"
+      "  parameter logic       BIT  = BASE[5];\n"
+      "endmodule\n"));
+}
+
+TEST(ConstantExpressionElaboration, ConstantPartSelectOfParameterElaborates) {
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  parameter logic [7:0] BASE  = 8'b1010_1100;\n"
+      "  parameter logic [3:0] NIBBLE = BASE[7:4];\n"
+      "endmodule\n"));
+}
+
+// §11.2.1: a built-in method call is constant when used as the initialiser
+// of a parameter — observe that path through const_eval.
+TEST(ConstantExpressionElaboration, ConstantBuiltinMethodTypeQueryElaborates) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("v.bits", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
 }

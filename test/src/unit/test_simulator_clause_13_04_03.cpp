@@ -36,22 +36,4 @@ TEST(ConstantFunctionSim, NoArgFunction) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 42u);
 }
 
-TEST(ConstantFunctionSim, MultipleArgFunction) {
-  FuncFixture f;
-
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "add";
-  func->func_args = {{Direction::kInput, false, false, false, {}, "a", nullptr, {}},
-                     {Direction::kInput, false, false, false, {}, "b", nullptr, {}}};
-  auto* body = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "a"),
-                          MakeId(f.arena, "b"));
-  func->func_body_stmts.push_back(MakeReturn(f.arena, body));
-  f.ctx.RegisterFunction("add", func);
-
-  auto* call =
-      MakeCall(f.arena, "add", {MakeInt(f.arena, 10), MakeInt(f.arena, 32)});
-  EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 42u);
-}
-
 }

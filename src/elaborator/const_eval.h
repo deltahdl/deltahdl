@@ -21,6 +21,11 @@ std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope);
 
 bool IsConstantExpr(const Expr* expr, const ScopeMap& scope = {});
 
+// Shared with §13.4.3: the whitelist of system functions admissible inside a
+// constant_expression (§11.2.1) is the same set that a constant function may
+// invoke per §13.4.3 constraint (g).
+bool IsConstantSysFunc(std::string_view name);
+
 std::string LongestStaticPrefix(const Expr* expr, const ScopeMap& scope = {});
 
 }

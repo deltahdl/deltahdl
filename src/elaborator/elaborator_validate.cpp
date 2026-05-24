@@ -2216,8 +2216,251 @@ static bool BodyContainsNonblocking(const Stmt* s) {
   return false;
 }
 
-static bool ValidateConstantFunction(const ModuleItem* func, SourceLoc loc,
-                                     DiagEngine& diag) {
+// §13.4.3 (c): a constant function may not contain anything that schedules
+// an event to fire after the function has returned — that covers every
+// timing-control / waiting / event-trigger statement, not just nonblocking
+// assignments.
+static bool BodyContainsEventScheduling(const Stmt* s) {
+  if (!s) return false;
+  switch (s->kind) {
+    case StmtKind::kDelay:
+    case StmtKind::kCycleDelay:
+    case StmtKind::kEventControl:
+    case StmtKind::kTimingControl:
+    case StmtKind::kWait:
+    case StmtKind::kWaitFork:
+    case StmtKind::kWaitOrder:
+    case StmtKind::kEventTrigger:
+    case StmtKind::kNbEventTrigger:
+    case StmtKind::kExpect:
+      return true;
+    default:
+      break;
+  }
+  for (auto* sub : s->stmts)
+    if (BodyContainsEventScheduling(sub)) return true;
+  if (BodyContainsEventScheduling(s->then_branch)) return true;
+  if (BodyContainsEventScheduling(s->else_branch)) return true;
+  if (BodyContainsEventScheduling(s->body)) return true;
+  if (BodyContainsEventScheduling(s->for_body)) return true;
+  for (auto& ci : s->case_items)
+    if (BodyContainsEventScheduling(ci.body)) return true;
+  return false;
+}
+
+static void CollectLocalDeclNames(const Stmt* s,
+                                  std::unordered_set<std::string_view>& out) {
+  if (!s) return;
+  if (s->kind == StmtKind::kVarDecl || s->kind == StmtKind::kBlockItemDecl) {
+    if (!s->var_name.empty()) out.insert(s->var_name);
+  }
+  for (auto* sub : s->stmts) CollectLocalDeclNames(sub, out);
+  CollectLocalDeclNames(s->then_branch, out);
+  CollectLocalDeclNames(s->else_branch, out);
+  CollectLocalDeclNames(s->body, out);
+  CollectLocalDeclNames(s->for_body, out);
+  for (auto* init : s->for_inits) CollectLocalDeclNames(init, out);
+  for (auto& ci : s->case_items) CollectLocalDeclNames(ci.body, out);
+  for (auto* fs : s->fork_stmts) CollectLocalDeclNames(fs, out);
+}
+
+// §13.4.3 (e) — true when the expr is a `.`-separated path that reaches
+// outside the function's own scope (any kMemberAccess whose leftmost LHS is
+// not a name the function declared, that isn't a built-in method call).
+static const Expr* LeftmostIdentifier(const Expr* e) {
+  while (e && e->kind == ExprKind::kMemberAccess) e = e->lhs;
+  return e;
+}
+
+static bool IsBuiltinMethodOnLocal(
+    const Expr* call,
+    const std::unordered_set<std::string_view>& local_names) {
+  if (!call || call->kind != ExprKind::kCall) return false;
+  if (!call->lhs || call->lhs->kind != ExprKind::kMemberAccess) return false;
+  const Expr* root = LeftmostIdentifier(call->lhs);
+  if (!root || root->kind != ExprKind::kIdentifier) return false;
+  return local_names.count(root->text) > 0;
+}
+
+struct ConstFuncBodyCheck {
+  std::string_view func_name;
+  const std::unordered_set<std::string_view>& param_names;
+  const std::unordered_set<std::string_view>& function_names;
+  const std::unordered_set<std::string_view>& local_names;
+  const std::unordered_map<std::string_view, const ModuleItem*>* func_decls;
+  std::unordered_set<std::string_view>* visited;
+  DiagEngine& diag;
+  SourceLoc loc;
+  bool failed = false;
+};
+
+static bool ValidateConstantFunction(
+    const ModuleItem* func, SourceLoc loc,
+    const std::unordered_set<std::string_view>& param_names,
+    const std::unordered_set<std::string_view>& function_names,
+    const std::unordered_map<std::string_view, const ModuleItem*>* func_decls,
+    std::unordered_set<std::string_view>* visited, DiagEngine& diag);
+
+static void WalkConstFuncExpr(const Expr* e, ConstFuncBodyCheck& chk);
+
+static void WalkConstFuncExprChildren(const Expr* e,
+                                      ConstFuncBodyCheck& chk) {
+  WalkConstFuncExpr(e->lhs, chk);
+  WalkConstFuncExpr(e->rhs, chk);
+  WalkConstFuncExpr(e->condition, chk);
+  WalkConstFuncExpr(e->true_expr, chk);
+  WalkConstFuncExpr(e->false_expr, chk);
+  WalkConstFuncExpr(e->base, chk);
+  WalkConstFuncExpr(e->index, chk);
+  WalkConstFuncExpr(e->index_end, chk);
+  WalkConstFuncExpr(e->repeat_count, chk);
+  for (auto* a : e->args) WalkConstFuncExpr(a, chk);
+  for (auto* el : e->elements) WalkConstFuncExpr(el, chk);
+}
+
+static void WalkConstFuncExpr(const Expr* e, ConstFuncBodyCheck& chk) {
+  if (!e || chk.failed) return;
+  switch (e->kind) {
+    case ExprKind::kIdentifier: {
+      // §13.4.3 (h)
+      if (e->text == chk.func_name) return;
+      if (chk.local_names.count(e->text)) return;
+      if (chk.param_names.count(e->text)) return;
+      if (chk.function_names.count(e->text)) return;
+      chk.diag.Error(
+          chk.loc,
+          std::format(
+              "constant function '{}' references identifier '{}' that is not "
+              "a parameter, function name, or local declaration",
+              chk.func_name, e->text));
+      chk.failed = true;
+      return;
+    }
+    case ExprKind::kMemberAccess: {
+      // §13.4.3 (e) — `.` paths from a non-local root mean a hierarchical
+      // reach outside the function.
+      const Expr* root = LeftmostIdentifier(e);
+      if (root && root->kind == ExprKind::kIdentifier &&
+          !chk.local_names.count(root->text) &&
+          !chk.param_names.count(root->text)) {
+        chk.diag.Error(
+            chk.loc,
+            std::format(
+                "constant function '{}' shall not contain hierarchical "
+                "references",
+                chk.func_name));
+        chk.failed = true;
+        return;
+      }
+      WalkConstFuncExprChildren(e, chk);
+      return;
+    }
+    case ExprKind::kSystemCall: {
+      // §13.4.3 (g) — only the §11.2.1 constant-system-function whitelist is
+      // legal inside a constant function body. The single carve-out is the
+      // elaboration severity tasks (§20.10.1), which are statements, not
+      // expressions, so they are handled when the simulator evaluates the
+      // function body.
+      if (!IsConstantSysFunc(e->callee)) {
+        chk.diag.Error(
+            chk.loc,
+            std::format(
+                "constant function '{}' calls non-constant system function "
+                "'{}'",
+                chk.func_name, e->callee));
+        chk.failed = true;
+        return;
+      }
+      WalkConstFuncExprChildren(e, chk);
+      return;
+    }
+    case ExprKind::kCall: {
+      // §13.4.3 (f) — built-in methods invoked on a local variable are the
+      // explicit exception in the LRM; otherwise the callee must be a known
+      // function so that the recursive constant-function check applies.
+      if (IsBuiltinMethodOnLocal(e, chk.local_names)) {
+        for (auto* a : e->args) WalkConstFuncExpr(a, chk);
+        return;
+      }
+      if (!e->callee.empty() && !chk.function_names.count(e->callee) &&
+          e->callee != chk.func_name) {
+        chk.diag.Error(
+            chk.loc,
+            std::format(
+                "constant function '{}' invokes '{}' which is not a constant "
+                "function",
+                chk.func_name, e->callee));
+        chk.failed = true;
+        return;
+      }
+      // §13.4.3 (f) — the nested callee must itself satisfy the
+      // constant-function constraints. Recurse into its body, guarding
+      // against direct or mutual recursion by tracking visited names.
+      if (!e->callee.empty() && chk.func_decls && chk.visited &&
+          e->callee != chk.func_name &&
+          !chk.visited->count(e->callee)) {
+        auto it = chk.func_decls->find(e->callee);
+        if (it != chk.func_decls->end()) {
+          if (!ValidateConstantFunction(it->second, chk.loc, chk.param_names,
+                                        chk.function_names, chk.func_decls,
+                                        chk.visited, chk.diag)) {
+            chk.failed = true;
+            return;
+          }
+        }
+      }
+      WalkConstFuncExprChildren(e, chk);
+      return;
+    }
+    default:
+      WalkConstFuncExprChildren(e, chk);
+      return;
+  }
+}
+
+static void WalkConstFuncStmt(const Stmt* s, ConstFuncBodyCheck& chk) {
+  if (!s || chk.failed) return;
+  WalkConstFuncExpr(s->condition, chk);
+  WalkConstFuncExpr(s->lhs, chk);
+  WalkConstFuncExpr(s->rhs, chk);
+  // §13.4.3: system task calls within a constant function are ignored at
+  // evaluation time rather than rejected at validation time. A bare
+  // statement-form system call is therefore not subjected to the §11.2.1
+  // sys-func whitelist; only its arguments are walked for identifier-scope
+  // and hierarchical-reference checks.
+  if (s->kind == StmtKind::kExprStmt && s->expr &&
+      s->expr->kind == ExprKind::kSystemCall) {
+    for (auto* a : s->expr->args) WalkConstFuncExpr(a, chk);
+  } else {
+    WalkConstFuncExpr(s->expr, chk);
+  }
+  WalkConstFuncExpr(s->delay, chk);
+  WalkConstFuncExpr(s->for_cond, chk);
+  WalkConstFuncExpr(s->repeat_event_count, chk);
+  WalkConstFuncExpr(s->assert_expr, chk);
+  WalkConstFuncExpr(s->var_init, chk);
+  for (auto* sub : s->stmts) WalkConstFuncStmt(sub, chk);
+  WalkConstFuncStmt(s->then_branch, chk);
+  WalkConstFuncStmt(s->else_branch, chk);
+  WalkConstFuncStmt(s->body, chk);
+  WalkConstFuncStmt(s->for_body, chk);
+  for (auto* init : s->for_inits) WalkConstFuncStmt(init, chk);
+  for (auto* step : s->for_steps) WalkConstFuncStmt(step, chk);
+  for (auto& ci : s->case_items) {
+    for (auto* pat : ci.patterns) WalkConstFuncExpr(pat, chk);
+    WalkConstFuncStmt(ci.body, chk);
+  }
+}
+
+static bool ValidateConstantFunction(
+    const ModuleItem* func, SourceLoc loc,
+    const std::unordered_set<std::string_view>& param_names,
+    const std::unordered_set<std::string_view>& function_names,
+    const std::unordered_map<std::string_view, const ModuleItem*>* func_decls,
+    std::unordered_set<std::string_view>* visited, DiagEngine& diag) {
+  if (visited && !func->name.empty()) {
+    if (!visited->insert(func->name).second) return true;
+  }
   for (const auto& arg : func->func_args) {
     if (arg.direction == Direction::kOutput ||
         arg.direction == Direction::kInout ||
@@ -2229,6 +2472,17 @@ static bool ValidateConstantFunction(const ModuleItem* func, SourceLoc loc,
                              arg.direction == Direction::kOutput  ? "output"
                              : arg.direction == Direction::kInout ? "inout"
                                                                   : "ref"));
+      return false;
+    }
+    // §13.4.3 (k) — a default argument value, if supplied, must itself be a
+    // constant expression per §11.2.1.
+    if (arg.default_value && !IsConstantExpr(arg.default_value)) {
+      diag.Error(
+          loc,
+          std::format(
+              "constant function '{}' default value for argument '{}' is not "
+              "a constant expression",
+              func->name, arg.name));
       return false;
     }
   }
@@ -2247,70 +2501,136 @@ static bool ValidateConstantFunction(const ModuleItem* func, SourceLoc loc,
               func->name));
       return false;
     }
-  }
-  return true;
-}
-
-static void ValidateConstantFuncCallsInExpr(
-    const Expr* expr, SourceLoc loc,
-    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
-    DiagEngine& diag) {
-  if (!expr) return;
-  if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
-    auto it = func_decls.find(expr->callee);
-    if (it != func_decls.end()) {
-      ValidateConstantFunction(it->second, loc, diag);
+    if (BodyContainsEventScheduling(s)) {
+      diag.Error(
+          loc,
+          std::format(
+              "constant function '{}' shall not contain statements that "
+              "schedule events to execute after it returns",
+              func->name));
+      return false;
     }
   }
-  ValidateConstantFuncCallsInExpr(expr->lhs, loc, func_decls, diag);
-  ValidateConstantFuncCallsInExpr(expr->rhs, loc, func_decls, diag);
-  ValidateConstantFuncCallsInExpr(expr->condition, loc, func_decls, diag);
-  ValidateConstantFuncCallsInExpr(expr->true_expr, loc, func_decls, diag);
-  ValidateConstantFuncCallsInExpr(expr->false_expr, loc, func_decls, diag);
-  for (auto* arg : expr->args)
-    ValidateConstantFuncCallsInExpr(arg, loc, func_decls, diag);
+
+  std::unordered_set<std::string_view> local_names;
+  for (const auto& arg : func->func_args)
+    if (!arg.name.empty()) local_names.insert(arg.name);
+  if (!func->name.empty()) local_names.insert(func->name);
+  for (auto* s : func->func_body_stmts) CollectLocalDeclNames(s, local_names);
+
+  ConstFuncBodyCheck chk{func->name,    param_names, function_names,
+                         local_names,   func_decls,  visited,
+                         diag,          loc,         /*failed=*/false};
+  for (auto* s : func->func_body_stmts) WalkConstFuncStmt(s, chk);
+  return !chk.failed;
+}
+
+struct ConstFuncCallCtx {
+  const std::unordered_map<std::string_view, const ModuleItem*>& func_decls;
+  const std::unordered_set<std::string_view>& param_names;
+  const std::unordered_set<std::string_view>& function_names;
+  const std::unordered_set<std::string_view>& dpi_import_names;
+  DiagEngine& diag;
+};
+
+static void ValidateConstantFuncCallsInExpr(const Expr* expr, SourceLoc loc,
+                                            const ConstFuncCallCtx& ctx) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
+    // §13.4.3 (b) — DPI imports cannot be constant functions, so any
+    // attempt to invoke one in a constant context is rejected here.
+    if (ctx.dpi_import_names.count(expr->callee)) {
+      ctx.diag.Error(
+          loc,
+          std::format(
+              "DPI import '{}' shall not be used as a constant function",
+              expr->callee));
+    } else {
+      auto it = ctx.func_decls.find(expr->callee);
+      if (it != ctx.func_decls.end()) {
+        std::unordered_set<std::string_view> visited;
+        ValidateConstantFunction(it->second, loc, ctx.param_names,
+                                 ctx.function_names, &ctx.func_decls, &visited,
+                                 ctx.diag);
+        // §13.4.3: the arguments to a constant function call must all be
+        // constant expressions per §11.2.1. The scope is empty here — the
+        // call's arguments must be self-contained constants from the outer
+        // (constant) context.
+        ScopeMap arg_scope;
+        for (auto p : ctx.param_names) arg_scope[p] = 0;
+        for (auto* a : expr->args) {
+          if (a && !IsConstantExpr(a, arg_scope)) {
+            ctx.diag.Error(
+                loc,
+                std::format(
+                    "constant function call '{}' has a non-constant argument",
+                    expr->callee));
+            break;
+          }
+        }
+      }
+    }
+  }
+  ValidateConstantFuncCallsInExpr(expr->lhs, loc, ctx);
+  ValidateConstantFuncCallsInExpr(expr->rhs, loc, ctx);
+  ValidateConstantFuncCallsInExpr(expr->condition, loc, ctx);
+  ValidateConstantFuncCallsInExpr(expr->true_expr, loc, ctx);
+  ValidateConstantFuncCallsInExpr(expr->false_expr, loc, ctx);
+  for (auto* arg : expr->args) ValidateConstantFuncCallsInExpr(arg, loc, ctx);
   for (auto* elem : expr->elements)
-    ValidateConstantFuncCallsInExpr(elem, loc, func_decls, diag);
+    ValidateConstantFuncCallsInExpr(elem, loc, ctx);
 }
 
 static void ValidateConstFuncCallsInItems(
-    const std::vector<ModuleItem*>& items,
-    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
-    DiagEngine& diag) {
+    const std::vector<ModuleItem*>& items, const ConstFuncCallCtx& ctx) {
   for (const auto* item : items) {
     if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
-      ValidateConstantFuncCallsInExpr(item->init_expr, item->loc, func_decls,
-                                      diag);
+      ValidateConstantFuncCallsInExpr(item->init_expr, item->loc, ctx);
       continue;
     }
     if (item->kind == ModuleItemKind::kGenerateIf ||
         item->kind == ModuleItemKind::kGenerateCase ||
         item->kind == ModuleItemKind::kGenerateFor) {
       if (item->gen_cond) {
-        ValidateConstantFuncCallsInExpr(item->gen_cond, item->loc, func_decls,
-                                        diag);
+        ValidateConstantFuncCallsInExpr(item->gen_cond, item->loc, ctx);
       }
-      ValidateConstFuncCallsInItems(item->gen_body, func_decls, diag);
+      ValidateConstFuncCallsInItems(item->gen_body, ctx);
       if (item->gen_else) {
-        ValidateConstFuncCallsInItems(item->gen_else->gen_body, func_decls,
-                                      diag);
+        ValidateConstFuncCallsInItems(item->gen_else->gen_body, ctx);
       }
       for (const auto& ci : item->gen_case_items) {
-        ValidateConstFuncCallsInItems(ci.body, func_decls, diag);
+        ValidateConstFuncCallsInItems(ci.body, ctx);
       }
     }
   }
 }
 
 void Elaborator::ValidateConstantFunctionCalls(const ModuleDecl* decl) {
+  std::unordered_set<std::string_view> param_names;
+  for (const auto& [pname, _] : decl->params) param_names.insert(pname);
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kParamDecl && !item->name.empty())
+      param_names.insert(item->name);
+  }
+
+  std::unordered_set<std::string_view> function_names;
+  for (const auto& [fname, _] : func_decls_) function_names.insert(fname);
+
+  std::unordered_set<std::string_view> dpi_import_names;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kDpiImport && !item->name.empty())
+      dpi_import_names.insert(item->name);
+  }
+
+  ConstFuncCallCtx ctx{func_decls_,       param_names, function_names,
+                       dpi_import_names,  diag_};
 
   for (const auto& [name, default_expr] : decl->params) {
     if (default_expr) {
-      ValidateConstantFuncCallsInExpr(default_expr, decl->range.start,
-                                      func_decls_, diag_);
+      ValidateConstantFuncCallsInExpr(default_expr, decl->range.start, ctx);
     }
   }
-  ValidateConstFuncCallsInItems(decl->items, func_decls_, diag_);
+  ValidateConstFuncCallsInItems(decl->items, ctx);
 }
 
 // §13.4.4
