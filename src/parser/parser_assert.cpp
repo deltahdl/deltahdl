@@ -23,6 +23,32 @@ static void SkipBalancedPropertySpec(Lexer& lexer) {
   }
 }
 
+// §16.6/§16.10: a built-in scalar/integral/string type keyword that may head
+// the var_data_type of an assertion_variable_declaration. User-defined type
+// aliases also satisfy the grammar, but the parser's best-effort harvest only
+// needs to recognise the built-in cases.
+static bool IsBuiltinTypeKwForLocalVar(TokenKind k) {
+  switch (k) {
+    case TokenKind::kKwReg:
+    case TokenKind::kKwLogic:
+    case TokenKind::kKwBit:
+    case TokenKind::kKwByte:
+    case TokenKind::kKwShortint:
+    case TokenKind::kKwInt:
+    case TokenKind::kKwLongint:
+    case TokenKind::kKwInteger:
+    case TokenKind::kKwReal:
+    case TokenKind::kKwShortreal:
+    case TokenKind::kKwRealtime:
+    case TokenKind::kKwTime:
+    case TokenKind::kKwString:
+    case TokenKind::kKwChandle:
+      return true;
+    default:
+      return false;
+  }
+}
+
 Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = kind;
@@ -357,7 +383,18 @@ ModuleItem* Parser::ParsePropertyDecl() {
 
   Expect(TokenKind::kSemicolon);
 
+  // §16.10: assertion_variable_declarations may appear at the head of a
+  // property body, just as in a sequence body. Harvest them before the
+  // body skip loop falls through to its existing instance-reference scan.
+  bool in_decl_prefix = true;
   while (!Check(TokenKind::kKwEndproperty) && !AtEnd()) {
+    if (in_decl_prefix &&
+        IsBuiltinTypeKwForLocalVar(CurrentToken().kind)) {
+      HarvestAssertionVariableDecl(item);
+      continue;
+    }
+    in_decl_prefix = false;
+
     if (Check(TokenKind::kKwDisable)) {
       Consume();
       if (Check(TokenKind::kKwIff)) {
@@ -457,6 +494,62 @@ void Parser::ValidateLiteralCycleDelayRange(SourceLoc range_loc) {
   }
 }
 
+void Parser::HarvestAssertionVariableDecl(ModuleItem* item) {
+  // §16.10 Syntax 16-13: assertion_variable_declaration ::= var_data_type
+  // list_of_variable_decl_assignments ; — consume the data-type prefix
+  // (one keyword plus any packed dimensions or signing token) and then walk
+  // the comma-separated list of <identifier> [ = <expression> ] entries
+  // until the closing semicolon. Each identifier names a distinct local
+  // variable in the sequence/property body.
+  Consume();  // var_data_type's leading type keyword.
+  while (Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned)) {
+    Consume();
+  }
+  while (Check(TokenKind::kLBracket)) {
+    int b_depth = 1;
+    Consume();
+    while (b_depth > 0 && !AtEnd()) {
+      if (Check(TokenKind::kLBracket)) ++b_depth;
+      else if (Check(TokenKind::kRBracket)) --b_depth;
+      Consume();
+    }
+  }
+  while (!Check(TokenKind::kSemicolon) && !AtEnd()) {
+    if (Check(TokenKind::kIdentifier)) {
+      auto tok = Consume();
+      item->prop_seq_assert_vars.push_back(tok.text);
+      if (Check(TokenKind::kEq)) {
+        Consume();
+        int e_depth = 0;
+        while (!AtEnd()) {
+          if (Check(TokenKind::kLParen) ||
+              Check(TokenKind::kLBracket) ||
+              Check(TokenKind::kLBrace)) {
+            ++e_depth;
+            Consume();
+          } else if (Check(TokenKind::kRParen) ||
+                     Check(TokenKind::kRBracket) ||
+                     Check(TokenKind::kRBrace)) {
+            if (e_depth == 0) break;
+            --e_depth;
+            Consume();
+          } else if (e_depth == 0 &&
+                     (Check(TokenKind::kComma) ||
+                      Check(TokenKind::kSemicolon))) {
+            break;
+          } else {
+            Consume();
+          }
+        }
+      }
+      if (Check(TokenKind::kComma)) Consume();
+    } else {
+      Consume();
+    }
+  }
+  if (Check(TokenKind::kSemicolon)) Consume();
+}
+
 ModuleItem* Parser::ParseSequenceDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kSequenceDecl;
@@ -465,27 +558,120 @@ ModuleItem* Parser::ParseSequenceDecl() {
   item->name = Expect(TokenKind::kIdentifier).text;
 
   // §16.8 sequence_port_list: harvest formal_port_identifier names so the
-  // elaborator can flatten instances and run cycle detection. The body of
-  // each port_item is best-effort skipped — a typed formal may be preceded by
-  // direction (local input/inout/output), an attribute_instance, and a type;
-  // the identifier we want is the last identifier-like token before the
-  // separator (',' '=' ')').
+  // elaborator can flatten instances and run cycle detection.
+  //
+  // §16.8.2 local variable formal arguments: a port item may begin with the
+  // keyword `local`, optionally followed by one of the directions `input`,
+  // `inout`, or `output`. Two well-formedness rules are checked here:
+  //   (a) a direction without a preceding `local` is illegal in a sequence
+  //       port list;
+  //   (b) a default actual argument is illegal for a local formal of
+  //       direction `inout` or `output`.
+  // For each local-marked formal we also record its (possibly inferred)
+  // direction so later stages can apply the §16.10 local-variable rules.
   if (Match(TokenKind::kLParen)) {
     int depth = 1;
     bool expect_formal_name = true;
+
+    bool item_saw_local = false;
+    // §16.8.2 distinguishes "local was set by a keyword in this port item"
+    // from "local was carried over via the inheritance rule." Only the
+    // explicit-here case triggers the explicit-type-required check.
+    bool item_local_explicit_here = false;
+    // §16.8.2: a local formal must have its type specified explicitly in
+    // the same port item. We mark `explicit type seen` when we consume a
+    // built-in type keyword or when the formal-name harvest finds more than
+    // one identifier in the chain (the first is a type alias).
+    bool item_saw_explicit_type = false;
+    Direction item_dir = Direction::kInput;
+    bool item_saw_eq = false;
+    SourceLoc item_start = CurrentLoc();
+
+    auto finalize_port_item = [&]() {
+      if (item_saw_local) {
+        if (item_local_explicit_here && !item_saw_explicit_type) {
+          diag_.Error(item_start,
+                      "a local variable formal argument requires an explicit "
+                      "type in its own port item (§16.8.2)");
+        }
+        if (item_saw_eq &&
+            (item_dir == Direction::kInout || item_dir == Direction::kOutput)) {
+          diag_.Error(item_start,
+                      "default actual argument is illegal for a local "
+                      "variable formal argument of direction inout or "
+                      "output (§16.8.2)");
+        }
+        item->prop_seq_local_lvar_directions.push_back(item_dir);
+      }
+    };
+
+    // §16.8.2 carry-through: a port item that supplies only an identifier
+    // inherits the `local` designation, direction, and type of the nearest
+    // preceding port item that declared them explicitly. A port item that
+    // begins with `local`, a direction keyword, or a built-in type keyword
+    // is a fresh starter and breaks the carry.
+    auto reset_after_comma = [&]() {
+      bool next_is_fresh_starter =
+          Check(TokenKind::kKwLocal) ||
+          Check(TokenKind::kKwInput) ||
+          Check(TokenKind::kKwOutput) ||
+          Check(TokenKind::kKwInout) ||
+          IsBuiltinTypeKwForLocalVar(CurrentToken().kind);
+      if (next_is_fresh_starter) {
+        item_saw_local = false;
+        item_dir = Direction::kInput;
+      }
+      // Else: carry item_saw_local and item_dir from the previous port item.
+      // Per-port-item flags never carry: a carried port item neither sees
+      // `local` explicitly here nor declares its own type.
+      item_local_explicit_here = false;
+      item_saw_explicit_type = false;
+      item_saw_eq = false;
+      expect_formal_name = true;
+    };
+
     while (depth > 0 && !AtEnd()) {
       if (Check(TokenKind::kLParen)) {
         Consume();
         ++depth;
       } else if (Check(TokenKind::kRParen)) {
+        if (depth == 1) finalize_port_item();
         Consume();
         --depth;
         if (depth == 0) break;
       } else if (depth == 1 && Check(TokenKind::kComma)) {
+        finalize_port_item();
         Consume();
-        expect_formal_name = true;
+        item_start = CurrentLoc();
+        reset_after_comma();
+      } else if (depth == 1 && Check(TokenKind::kKwLocal)) {
+        if (!item_saw_local) item_start = CurrentLoc();
+        item_saw_local = true;
+        item_local_explicit_here = true;
+        Consume();
+      } else if (depth == 1 &&
+                 (Check(TokenKind::kKwInput) ||
+                  Check(TokenKind::kKwOutput) ||
+                  Check(TokenKind::kKwInout))) {
+        auto dir_tok = Consume();
+        if (!item_saw_local) {
+          diag_.Error(dir_tok.loc,
+                      "sequence port direction requires the 'local' keyword "
+                      "(§16.8.2)");
+        }
+        if (dir_tok.kind == TokenKind::kKwInput) {
+          item_dir = Direction::kInput;
+        } else if (dir_tok.kind == TokenKind::kKwOutput) {
+          item_dir = Direction::kOutput;
+        } else {
+          item_dir = Direction::kInout;
+        }
+      } else if (depth == 1 &&
+                 IsBuiltinTypeKwForLocalVar(CurrentToken().kind)) {
+        Consume();
+        item_saw_explicit_type = true;
       } else if (depth == 1 && Check(TokenKind::kEq)) {
-        // default actual argument follows; skip until the next port boundary.
+        item_saw_eq = true;
         Consume();
         expect_formal_name = false;
       } else if (depth == 1 && expect_formal_name &&
@@ -493,8 +679,12 @@ ModuleItem* Parser::ParseSequenceDecl() {
         auto name_tok = Consume();
         // Walk past any subsequent identifiers/type tokens until we hit the
         // separator; the rightmost identifier is the formal_port_identifier.
+        // §16.8.2: a chain of more than one identifier means the leading
+        // identifier(s) supply a (user-defined) type alias, satisfying the
+        // explicit-type requirement.
         while (Check(TokenKind::kIdentifier)) {
           name_tok = Consume();
+          item_saw_explicit_type = true;
         }
         item->prop_formals.push_back(name_tok.text);
         expect_formal_name = false;
@@ -506,10 +696,19 @@ ModuleItem* Parser::ParseSequenceDecl() {
 
   Expect(TokenKind::kSemicolon);
 
-  // §16.8 cyclic-dependency rule: a sequence_instance reference may be
-  // bare or parenthesized, so capture every identifier in the body. The
-  // elaborator filters non-sequence names via PropertyRegistry::Find.
+  // §16.10: assertion_variable_declarations precede the sequence_expr in the
+  // body. We harvest them while still at the head of the body; once we see a
+  // token that does not start a declaration we fall through to the existing
+  // sequence_instance reference scan used for the §16.8 cycle rule.
+  bool in_decl_prefix = true;
   while (!Check(TokenKind::kKwEndsequence) && !AtEnd()) {
+    if (in_decl_prefix &&
+        IsBuiltinTypeKwForLocalVar(CurrentToken().kind)) {
+      HarvestAssertionVariableDecl(item);
+      continue;
+    }
+    in_decl_prefix = false;
+
     if (Check(TokenKind::kHashHash)) {
       auto delay_loc = CurrentLoc();
       Consume();

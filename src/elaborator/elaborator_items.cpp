@@ -791,6 +791,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
                     "cyclic dependency among named sequences involving \"" +
                         std::string(item->name) + "\" (§16.8)");
       }
+      // §16.10: a name that is already a formal argument of the sequence
+      // declaration may not be redeclared as a body-scope local variable.
+      ValidateNoFormalShadowedByBodyLocal(item);
       ValidateClockingBlock(item);
       break;
     case ModuleItemKind::kDefparam:
@@ -818,6 +821,10 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
                     "property \"" + std::string(item->name) +
                         "\" nests disable iff clauses (§16.12)");
       }
+      // §16.10: same formal-vs-body shadow rule applies to a property
+      // declaration: a formal-argument name cannot be redeclared as a
+      // body-scope local variable.
+      ValidateNoFormalShadowedByBodyLocal(item);
       ValidateClockingBlock(item);
       break;
     }

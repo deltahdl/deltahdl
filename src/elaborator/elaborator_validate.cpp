@@ -3305,6 +3305,26 @@ void Elaborator::ValidateClockingBlock(ModuleItem* item) {
   }
 }
 
+void Elaborator::ValidateNoFormalShadowedByBodyLocal(ModuleItem* item) {
+  // §16.10: a formal-argument identifier cannot be redeclared in the body of
+  // the same sequence/property declaration as an assertion_variable_declaration.
+  // The two name lists are harvested by the parser; the elaborator only has
+  // to flag any overlap.
+  if (item->prop_formals.empty() || item->prop_seq_assert_vars.empty()) {
+    return;
+  }
+  std::unordered_set<std::string_view> formal_set(
+      item->prop_formals.begin(), item->prop_formals.end());
+  for (auto body_var : item->prop_seq_assert_vars) {
+    if (formal_set.count(body_var) != 0) {
+      diag_.Error(item->loc,
+                  "local variable \"" + std::string(body_var) +
+                      "\" is a formal argument and cannot be redeclared "
+                      "in the body (§16.10)");
+    }
+  }
+}
+
 void Elaborator::CheckClockvarAccessExpr(const Expr* e, bool is_lvalue) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess && e->lhs &&

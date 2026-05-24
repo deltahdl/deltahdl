@@ -652,6 +652,17 @@ struct ModuleItem {
   int prop_disable_iff_count = 0;
   std::vector<std::string_view> prop_instance_refs;
 
+  // §16.8.2: per-formal direction when the formal is designated as a local
+  // variable argument. Length matches the number of local-marked formals in
+  // declaration order; non-local formals are not represented here.
+  std::vector<Direction> prop_seq_local_lvar_directions;
+
+  // §16.10: identifiers introduced by assertion_variable_declaration items in
+  // the body of a sequence or property declaration. Each entry is one local
+  // variable declared in the body (a single declaration with N comma-
+  // separated names produces N entries).
+  std::vector<std::string_view> prop_seq_assert_vars;
+
   std::vector<EventExpr> clocking_event;
   std::vector<ClockingSignalDecl> clocking_signals;
   bool is_default_clocking = false;

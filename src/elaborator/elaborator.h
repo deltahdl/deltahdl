@@ -383,6 +383,11 @@ class Elaborator {
 
   void ValidateClockingBlock(ModuleItem* item);
 
+  // §16.10: a formal-argument name of a sequence/property declaration cannot
+  // also be declared as a body-scope local variable in an
+  // assertion_variable_declaration. Diagnoses the redeclaration on `item`.
+  void ValidateNoFormalShadowedByBodyLocal(ModuleItem* item);
+
   void ValidateClockvarAccess(const ModuleDecl* decl);
   void ValidateCycleDelayDefaultClocking(const ModuleDecl* decl);
   void ValidateDuplicateDefaultClocking(const ModuleDecl* decl);
