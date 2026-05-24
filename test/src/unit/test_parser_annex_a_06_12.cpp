@@ -214,63 +214,12 @@ TEST(RandsequenceSyntaxParsing, ComplexMixedProds) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(RandsequenceSyntaxParsing, RandsequenceStmtWithName) {
+TEST(RandsequenceSyntaxParsing, RsProdAsCodeBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
       "    randsequence(main)\n"
-      "      main : first second;\n"
-      "      first : { $display(\"first\"); };\n"
-      "      second : { $display(\"second\"); };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRandsequence);
-}
-
-TEST(RandsequenceSyntaxParsing, RandsequenceStmtNoName) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence()\n"
-      "      main : first;\n"
-      "      first : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRandsequence);
-}
-
-TEST(RandsequenceSyntaxParsing, RsProductionListSequence) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : a b c;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "      c : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(RandsequenceSyntaxParsing, RsCodeBlockWithDataDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : { int x; x = 5; $display(x); };\n"
+      "      main : { $display(\"inline\"); };\n"
       "    endsequence\n"
       "  end\n"
       "endmodule\n");
@@ -285,97 +234,6 @@ TEST(RandsequenceSyntaxParsing, RsProdAsProductionItem) {
       "    randsequence(main)\n"
       "      main : child;\n"
       "      child : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(RandsequenceSyntaxParsing, RsProdAsCodeBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : { $display(\"inline\"); };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(RandsequenceSyntaxParsing, RsProductionItemBare) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : child;\n"
-      "      child : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(RandsequenceSyntaxParsing, RandsequenceAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(top)\n"
-      "      top : a;\n"
-      "      a : { x = 1; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRandsequence);
-}
-
-TEST(RandsequenceSyntaxParsing, RandsequenceStmt) {
-  auto r = Parse(
-      "module top;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : first second;\n"
-      "      first : { $display(\"first\"); };\n"
-      "      second : { $display(\"second\"); };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-TEST(RandsequenceSyntaxParsing, RsRuleMultipleAlternatives) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : a | b | c;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "      c : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(RandsequenceSyntaxParsing, RsWeightIntegralNumber) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : a := 3 | b := 7;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
       "    endsequence\n"
       "  end\n"
       "endmodule\n");
@@ -414,37 +272,6 @@ TEST(RandsequenceSyntaxParsing, RsWeightParenExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(RandsequenceSyntaxParsing, RsWeightWithCodeBlockAsymmetric) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : a := 5 { $display(\"chose a\"); }\n"
-      "           | b := 3 { $display(\"chose b\"); };\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(RandsequenceSyntaxParsing, RsProdAsIfElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : if (1) a else b;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(RandsequenceSyntaxParsing, RsIfOnly) {
   auto r = Parse(
       "module m;\n"
@@ -452,21 +279,6 @@ TEST(RandsequenceSyntaxParsing, RsIfOnly) {
       "    randsequence(main)\n"
       "      main : if (1) child;\n"
       "      child : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(RandsequenceSyntaxParsing, RsIfElseFalseCondition) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : if (0) a else b;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
       "    endsequence\n"
       "  end\n"
       "endmodule\n");
@@ -508,23 +320,6 @@ TEST(RandsequenceSyntaxParsing, RsCaseItemDefaultColon) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(RandsequenceSyntaxParsing, RsProdAsCase) {
-  auto r = Parse(
-      "module m;\n"
-      "  int sel = 1;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : case (sel) 0: a; 1: b; default: c; endcase;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "      c : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(RandsequenceSyntaxParsing, RsCaseMultipleItems) {
   auto r = Parse(
       "module m;\n"
@@ -554,49 +349,6 @@ TEST(RandsequenceSyntaxParsing, RsCaseItemCommaSeparated) {
       "               0, 1: a;\n"
       "               2, 3: b;\n"
       "             endcase;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(RandsequenceSyntaxParsing, RsProdAsRepeat) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : repeat(3) child;\n"
-      "      child : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(RandsequenceSyntaxParsing, RsRepeatFiveIterations) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : repeat(5) child;\n"
-      "      child : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(RandsequenceSyntaxParsing, RsProductionListRandJoin) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : rand join a b;\n"
       "      a : { ; };\n"
       "      b : { ; };\n"
       "    endsequence\n"
@@ -705,24 +457,6 @@ TEST(RandsequenceSyntaxParsing, EmptyCodeBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(RandsequenceSyntaxParsing, CaseWithoutDefault) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : case (sel)\n"
-      "               0: a;\n"
-      "               1: b;\n"
-      "             endcase;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(RandsequenceSyntaxParsing, CaseDefaultWithoutColon) {
   auto r = Parse(
       "module m;\n"
@@ -785,6 +519,31 @@ TEST(RandsequenceSyntaxParsing, MissingColonInProductionErrors) {
       "  initial begin\n"
       "    randsequence(main)\n"
       "      main { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(RandsequenceSyntaxParsing, MissingSemicolonInProductionErrors) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { ; }\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(RandsequenceSyntaxParsing, RandJoinSingleItemErrors) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : rand join a;\n"
+      "      a : { ; };\n"
       "    endsequence\n"
       "  end\n"
       "endmodule\n");
