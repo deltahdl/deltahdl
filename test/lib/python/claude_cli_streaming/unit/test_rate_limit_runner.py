@@ -191,22 +191,16 @@ def test_run_claude_streaming_429_repeated_events_capture_first_synthetic(
 def test_run_claude_streaming_429_does_not_raise_missing_result(
     streaming: ModuleType,
 ) -> None:
-    """A 429 path raises RateLimitError, not MissingResultEventError.
+    """A bare synthetic 429 (no result event) raises RateLimitError.
 
     Regression test for the misdiagnosis the user hit: the synthetic
-    assistant 429 has no terminal result event, so without this guard
-    the runner would raise MissingResultEventError and the retry wrapper
-    would burn its budget against an unchanged failure mode.
+    assistant 429 has no terminal result event. ``pytest.raises``
+    would fail loudly if the runner raised ``MissingResultEventError``
+    instead — which it did before this fix, sending the retry wrapper
+    on a budget-burn against an unchanged failure mode.
     """
-    try:
+    with pytest.raises(streaming.RateLimitError):
         run_with_stubbed_popen(streaming, [_SYNTHETIC_429_ASSISTANT_LINE])
-    except streaming.MissingResultEventError as exc:
-        raise AssertionError(
-            "MissingResultEventError must not be raised",
-        ) from exc
-    except streaming.RateLimitError:
-        return
-    raise AssertionError("expected RateLimitError")
 
 
 # --- run_claude_streaming: replay captured failing oracle session -----------
