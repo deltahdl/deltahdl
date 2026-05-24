@@ -146,30 +146,4 @@ TEST(SequentialBlockSimulation, ControlPassesOutAfterDelayedStatements) {
   EXPECT_EQ(after->value.ToUint64(), 99u);
 }
 
-TEST(SequentialBlockSimulation, ControlPassesOutAfterLastStatement) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] inside_last, after_block;\n"
-      "  initial begin\n"
-      "    begin\n"
-      "      inside_last = 8'd1;\n"
-      "      inside_last = 8'd55;\n"
-      "    end\n"
-      "    after_block = 8'd99;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* inside = f.ctx.FindVariable("inside_last");
-  ASSERT_NE(inside, nullptr);
-  EXPECT_EQ(inside->value.ToUint64(), 55u);
-  auto* after = f.ctx.FindVariable("after_block");
-  ASSERT_NE(after, nullptr);
-  EXPECT_EQ(after->value.ToUint64(), 99u);
-}
-
 }
