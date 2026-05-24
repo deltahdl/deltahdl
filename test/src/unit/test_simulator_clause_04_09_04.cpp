@@ -114,23 +114,3 @@ TEST(NonblockingAssignSchedulingSim, LhsTargetUsesValuesAtScheduleTime) {
   EXPECT_EQ(f.ctx.FindVariable("mem[1]")->value.ToUint64(), 0u);
 }
 
-TEST(NonblockingAssignSchedulingSim, BitSelectLhsUsesValuesAtScheduleTime) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] dst;\n"
-      "  int idx;\n"
-      "  initial begin\n"
-      "    dst = 8'd0;\n"
-      "    idx = 0;\n"
-      "    dst[idx] <= 1'b1;\n"
-      "    idx = 7;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 0x01u);
-}

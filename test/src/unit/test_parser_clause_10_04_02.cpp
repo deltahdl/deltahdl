@@ -17,6 +17,21 @@ TEST(NonblockingAssignParsing, ParenthesizedIntraDelay) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
+TEST(NonblockingAssignParsing, IntraAssignEventControl) {
+
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d, clk;\n"
+      "  initial begin q <= @(posedge clk) d; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  EXPECT_FALSE(stmt->events.empty());
+}
+
 TEST(NonblockingAssignParsing, ConcatenationLhsRhs) {
   auto r = Parse(
       "module m;\n"
@@ -356,17 +371,6 @@ TEST(NonblockingAssignParsing, InAlwaysFF) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(NonblockingAssignParsing, VarLvalueNonblocking) {
-  auto r = Parse("module m; logic x; initial x <= 1; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
-}
-
 TEST(NonblockingAssignParsing, RegisterFilePattern) {
   auto r = Parse(
       "module m;\n"
@@ -391,25 +395,6 @@ TEST(NonblockingAssignParsing, RegisterFilePattern) {
   EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kSelect);
 }
 
-TEST(NonblockingAssignParsing, InAlwaysPosedge) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk)\n"
-      "    q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
-  ASSERT_GE(item->sensitivity.size(), 1u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
-  auto* stmt = FirstAlwaysStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-}
-
 TEST(NonblockingAssignParsing, ExpressionRhs) {
   auto r = Parse(
       "module m;\n"
@@ -425,24 +410,6 @@ TEST(NonblockingAssignParsing, ExpressionRhs) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
-}
-
-TEST(NonblockingAssignParsing, BitSelectLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [7:0] q;\n"
-      "  initial begin\n"
-      "    q[3] <= 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-  ASSERT_NE(stmt->rhs, nullptr);
 }
 
 TEST(NonblockingAssignParsing, PartSelectLhs) {

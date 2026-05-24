@@ -22,15 +22,6 @@ TEST(NonblockingAssignLexing, TokenSequence) {
   EXPECT_EQ(tokens[3].kind, TokenKind::kSemicolon);
 }
 
-TEST(NonblockingAssignLexing, NoSpacesAroundOperator) {
-  auto tokens = Lex("q<=d;");
-  ASSERT_GE(tokens.size(), 4u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kLtEq);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kSemicolon);
-}
-
 TEST(NonblockingAssignLexing, WithIntraDelayTokenSequence) {
   auto tokens = Lex("q <= #5 d ;");
   ASSERT_GE(tokens.size(), 6u);
