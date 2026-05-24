@@ -261,4 +261,21 @@ TEST(FunctionReturnSim, FunctionNameAssignRespectsReturnWidth) {
   LowerRunAndCheck(f, design, {{"x", 15u}});
 }
 
+TEST(FunctionReturnSim, SystemFunctionAsImplicitVariableInExpression) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = $unsigned(32'd42) + 32'd1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 43u);
+}
+
 }

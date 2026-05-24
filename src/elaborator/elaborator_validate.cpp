@@ -2746,6 +2746,23 @@ static void WalkStmtForCallArgs(
   if (s->kind == StmtKind::kExprStmt && s->expr &&
       s->expr->kind == ExprKind::kCall) {
     for (auto* a : s->expr->args) CheckVoidCallInExpr(a, func_decls, diag);
+
+    // §13.4.1: calling a nonvoid function as if it had no return value is
+    // legal but shall issue a warning. A void'(...) cast wraps the call in a
+    // kCast at the top of the expression statement and so does not reach
+    // this branch, which is how the cast form suppresses the warning.
+    auto fit = func_decls.find(s->expr->callee);
+    if (fit != func_decls.end()) {
+      const auto* func = fit->second;
+      if (func->kind == ModuleItemKind::kFunctionDecl &&
+          func->return_type.kind != DataTypeKind::kVoid) {
+        diag.Warning(
+            s->expr->range.start,
+            std::format("return value of nonvoid function '{}' is discarded; "
+                        "cast to void to silence this warning",
+                        s->expr->callee));
+      }
+    }
   } else {
     CheckVoidCallInExpr(s->expr, func_decls, diag);
   }

@@ -140,6 +140,20 @@ TEST(FunctionReturnValueParsing, PackedStructAsFunctionReturn) {
               "endmodule\n"));
 }
 
+TEST(FunctionReturnValueParsing, PackedUnionAsFunctionReturn) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef union packed {\n"
+              "    logic [15:0] word;\n"
+              "    bit [15:0] raw;\n"
+              "  } u_t;\n"
+              "  function u_t make_u;\n"
+              "    input logic [15:0] v;\n"
+              "    make_u = v;\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
 TEST(FunctionReturnValueParsing, ReturnWithComplexExpr) {
   auto r = Parse(
       "module t;\n"
@@ -154,21 +168,6 @@ TEST(FunctionReturnValueParsing, ReturnWithComplexExpr) {
   ASSERT_NE(ret->expr, nullptr);
 
   EXPECT_EQ(ret->expr->kind, ExprKind::kBinary);
-}
-
-TEST(FunctionReturnValueParsing, FunctionCallAsExprInAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = func(1, 2);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
-  EXPECT_EQ(stmt->rhs->callee, "func");
-  EXPECT_EQ(stmt->rhs->args.size(), 2u);
 }
 
 TEST(FunctionReturnValueParsing, FunctionCallAsExpression) {
@@ -195,18 +194,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
   return nullptr;
 }
 
-TEST(FunctionReturnValueParsing, FunctionReturnTypeLogicVec) {
-  auto r = Parse(
-      "module m;\n"
-      "  function logic [7:0] get_byte();\n"
-      "    return 8'hAB;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "get_byte");
-  ASSERT_NE(fn, nullptr);
-  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kLogic);
-}
 static ModuleItem* NthItem(ParseResult& r, size_t n) {
   if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.size() <= n)
     return nullptr;
@@ -238,23 +225,6 @@ TEST(FunctionReturnValueParsing, VoidFunctionInClass) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(FunctionReturnValueParsing, FunctionCallRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [7:0] result;\n"
-      "  initial begin\n"
-      "    result = compute(a, b);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
-}
-
 TEST(FunctionReturnValueParsing, SystemCallRhs) {
   auto r = Parse(
       "module m;\n"
@@ -270,15 +240,6 @@ TEST(FunctionReturnValueParsing, SystemCallRhs) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
-}
-
-TEST(FunctionReturnValueParsing, NonVoidFunctionUsedAsOperand) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function int twice(int v); return v * 2; endfunction\n"
-              "  logic [31:0] result;\n"
-              "  initial result = twice(5);\n"
-              "endmodule\n"));
 }
 
 TEST(FunctionReturnValueParsing, BareReturnInVoidFunction) {

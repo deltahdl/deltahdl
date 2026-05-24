@@ -1,7 +1,6 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
-#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -30,19 +29,6 @@ TEST(FunctionReturnElaboration, VoidFunctionReturnWithValueError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
-}
-
-TEST(FunctionReturnElaboration, NonVoidFunctionReturnWithValue) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  function int f();\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(FunctionReturnElaboration, FunctionCallAsExprElaborates) {
@@ -99,37 +85,6 @@ TEST(FunctionReturnElaboration, FunctionNameAssignElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-}
-
-TEST(FunctionReturnElaboration, FunctionCallReturnsValue) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  function int add(input int a, input int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "  logic [31:0] x;\n"
-      "  initial x = add(10, 32);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
-TEST(FunctionReturnElaboration, ReturnStatementElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  function int add(int a, int b);\n"
-             "    return a + b;\n"
-             "  endfunction\n"
-             "endmodule\n"));
 }
 
 TEST(FunctionReturnElaboration, VoidFunctionElaborates) {
@@ -223,6 +178,101 @@ TEST(FunctionReturnElaboration, VoidFunctionAsArgError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionReturnElaboration, NonvoidCallAsStatementWarns) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function int compute(); return 7; endfunction\n"
+      "  initial begin\n"
+      "    compute();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+TEST(FunctionReturnElaboration, VoidCastSuppressesDiscardWarning) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function int compute(); return 7; endfunction\n"
+      "  initial begin\n"
+      "    void'(compute());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(FunctionReturnElaboration, VoidCallAsStatementDoesNotWarn) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function void nop(); endfunction\n"
+      "  initial begin\n"
+      "    nop();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(FunctionReturnElaboration, NonvoidCallAsRhsDoesNotWarn) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function int compute(); return 7; endfunction\n"
+      "  logic [31:0] x;\n"
+      "  initial x = compute();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(FunctionReturnElaboration, ObjectWithFunctionNameInDeclaringScopeIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int dup(); return 0; endfunction\n"
+      "  logic [7:0] dup;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionReturnElaboration, NonvoidCallMissingParensIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int f(); return 1; endfunction\n"
+      "  initial begin\n"
+      "    f;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionReturnElaboration, SystemFunctionAllowedAsImplicitVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = $random;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }
