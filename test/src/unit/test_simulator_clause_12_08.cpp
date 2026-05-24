@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(TimingControlSim, JumpBreakExitsLoop) {
+TEST(JumpStatementSim, JumpBreakExitsLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -29,30 +29,7 @@ TEST(TimingControlSim, JumpBreakExitsLoop) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(TimingControlSim, JumpContinueSkipsIteration) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    for (int i = 0; i < 5; i++) begin\n"
-      "      if (i == 2) continue;\n"
-      "      x = x + 8'd1;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 4u);
-}
-
-TEST(TimingControlSim, JumpReturnVoidFunction) {
+TEST(JumpStatementSim, JumpReturnVoidFunction) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -297,7 +274,7 @@ TEST(LoopStatementSim, NestedLoopInnerBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(TimingControlSim, JumpReturnWithValue) {
+TEST(JumpStatementSim, JumpReturnWithValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -319,7 +296,7 @@ TEST(TimingControlSim, JumpReturnWithValue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(TimingControlSim, JumpReturnEarlyFromFunction) {
+TEST(JumpStatementSim, JumpReturnEarlyFromFunction) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -340,6 +317,87 @@ TEST(TimingControlSim, JumpReturnEarlyFromFunction) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
+TEST(LoopStatementSim, ContinueRunsForLoopStep) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, step_count;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    step_count = 8'd0;\n"
+      "    for (int i = 0; i < 4; step_count = step_count + 8'd1,"
+      " i = i + 1) begin\n"
+      "      if (i == 1) continue;\n"
+      "      x = x + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* step = f.ctx.FindVariable("step_count");
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(step, nullptr);
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(step->value.ToUint64(), 4u);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
+}
+
+TEST(LoopStatementSim, ForeachBreakExitsLoop) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] arr [5];\n"
+      "  logic [7:0] cnt;\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) arr[i] = 8'd0;\n"
+      "    cnt = 8'd0;\n"
+      "    foreach (arr[i]) begin\n"
+      "      cnt = cnt + 8'd1;\n"
+      "      if (cnt == 8'd2) break;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("cnt");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+TEST(LoopStatementSim, ForeachContinueSkipsCurrentIteration) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] arr [4];\n"
+      "  logic [7:0] sum;\n"
+      "  initial begin\n"
+      "    arr[0] = 8'd1;\n"
+      "    arr[1] = 8'd2;\n"
+      "    arr[2] = 8'd3;\n"
+      "    arr[3] = 8'd4;\n"
+      "    sum = 8'd0;\n"
+      "    foreach (arr[i]) begin\n"
+      "      if (i[7:0] == 8'd2) continue;\n"
+      "      sum = sum + arr[i];\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("sum");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
 TEST(LoopStatementSim, NestedLoopInnerContinue) {

@@ -1940,6 +1940,181 @@ void Elaborator::ValidateAutomaticVarProcWrites(const ModuleDecl* decl) {
   }
 }
 
+namespace {
+
+// Walks one statement subtree enforcing §12.8 rules for break, continue, and
+// return. `loop_depth` counts loops reachable from this point without
+// crossing a fork-join boundary; `fork_depth` counts enclosing fork-joins.
+// `in_subroutine` is true when the walk originated in a function or task body.
+void CheckJumpRules(const Stmt* s, int loop_depth, int fork_depth,
+                    bool in_subroutine, DiagEngine& diag) {
+  if (!s) return;
+
+  switch (s->kind) {
+    case StmtKind::kBreak:
+      if (loop_depth == 0) {
+        if (fork_depth > 0) {
+          diag.Error(s->range.start,
+                     "break inside fork-join cannot exit a loop outside the "
+                     "fork-join block");
+        } else {
+          diag.Error(s->range.start, "break statement is not inside a loop");
+        }
+      }
+      return;
+    case StmtKind::kContinue:
+      if (loop_depth == 0) {
+        if (fork_depth > 0) {
+          diag.Error(s->range.start,
+                     "continue inside fork-join cannot affect a loop outside "
+                     "the fork-join block");
+        } else {
+          diag.Error(s->range.start,
+                     "continue statement is not inside a loop");
+        }
+      }
+      return;
+    case StmtKind::kReturn:
+      if (!in_subroutine) {
+        diag.Error(s->range.start,
+                   "return statement is only allowed inside a subroutine");
+      }
+      return;
+    default:
+      break;
+  }
+
+  if (s->kind == StmtKind::kFor || s->kind == StmtKind::kForeach ||
+      s->kind == StmtKind::kWhile || s->kind == StmtKind::kForever ||
+      s->kind == StmtKind::kRepeat || s->kind == StmtKind::kDoWhile) {
+    int next_loop = loop_depth + 1;
+    CheckJumpRules(s->body, next_loop, fork_depth, in_subroutine, diag);
+    CheckJumpRules(s->for_body, next_loop, fork_depth, in_subroutine, diag);
+    for (auto* init : s->for_inits)
+      CheckJumpRules(init, loop_depth, fork_depth, in_subroutine, diag);
+    for (auto* step : s->for_steps)
+      CheckJumpRules(step, loop_depth, fork_depth, in_subroutine, diag);
+    return;
+  }
+
+  if (s->kind == StmtKind::kFork) {
+    for (auto* sub : s->fork_stmts)
+      CheckJumpRules(sub, 0, fork_depth + 1, in_subroutine, diag);
+    return;
+  }
+
+  for (auto* sub : s->stmts)
+    CheckJumpRules(sub, loop_depth, fork_depth, in_subroutine, diag);
+  CheckJumpRules(s->then_branch, loop_depth, fork_depth, in_subroutine, diag);
+  CheckJumpRules(s->else_branch, loop_depth, fork_depth, in_subroutine, diag);
+  for (auto& ci : s->case_items)
+    CheckJumpRules(ci.body, loop_depth, fork_depth, in_subroutine, diag);
+  for (auto& ri : s->randcase_items)
+    CheckJumpRules(ri.second, loop_depth, fork_depth, in_subroutine, diag);
+  CheckJumpRules(s->assert_pass_stmt, loop_depth, fork_depth, in_subroutine,
+                 diag);
+  CheckJumpRules(s->assert_fail_stmt, loop_depth, fork_depth, in_subroutine,
+                 diag);
+}
+
+// Map literal expression kinds whose type is obvious from the syntax alone
+// to the corresponding DataTypeKind. Returns kImplicit when no narrow
+// classification is possible without full expression type inference.
+DataTypeKind ObviousLiteralKind(const Expr* e) {
+  if (!e) return DataTypeKind::kImplicit;
+  switch (e->kind) {
+    case ExprKind::kStringLiteral:
+      return DataTypeKind::kString;
+    case ExprKind::kRealLiteral:
+      return DataTypeKind::kReal;
+    case ExprKind::kIntegerLiteral:
+      return DataTypeKind::kInt;
+    case ExprKind::kTimeLiteral:
+      return DataTypeKind::kTime;
+    default:
+      return DataTypeKind::kImplicit;
+  }
+}
+
+// In a value-returning function, a return statement shall carry an
+// expression of the correct type. The void-with-expression case is
+// reported elsewhere; the type check here catches narrow but clearly
+// wrong mismatches (string-vs-integral, real-vs-string, etc.).
+void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
+                                   const DataType& return_type,
+                                   DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kReturn) {
+    if (s->expr == nullptr) {
+      diag.Error(s->range.start,
+                 std::format("return statement in non-void function '{}' "
+                             "shall have an expression",
+                             func_name));
+      return;
+    }
+    DataTypeKind expr_kind = ObviousLiteralKind(s->expr);
+    if (expr_kind != DataTypeKind::kImplicit) {
+      DataType expr_type;
+      expr_type.kind = expr_kind;
+      if (!IsAssignmentCompatible(return_type, expr_type)) {
+        diag.Error(s->range.start,
+                   std::format("return expression in function '{}' is not "
+                               "assignment-compatible with the function's "
+                               "return type",
+                               func_name));
+      }
+    }
+    return;
+  }
+  for (auto* sub : s->stmts)
+    CheckValueReturningFuncReturn(sub, func_name, return_type, diag);
+  for (auto* sub : s->fork_stmts)
+    CheckValueReturningFuncReturn(sub, func_name, return_type, diag);
+  CheckValueReturningFuncReturn(s->then_branch, func_name, return_type, diag);
+  CheckValueReturningFuncReturn(s->else_branch, func_name, return_type, diag);
+  CheckValueReturningFuncReturn(s->body, func_name, return_type, diag);
+  CheckValueReturningFuncReturn(s->for_body, func_name, return_type, diag);
+  for (auto& ci : s->case_items)
+    CheckValueReturningFuncReturn(ci.body, func_name, return_type, diag);
+  for (auto& ri : s->randcase_items)
+    CheckValueReturningFuncReturn(ri.second, func_name, return_type, diag);
+  CheckValueReturningFuncReturn(s->assert_pass_stmt, func_name, return_type,
+                                diag);
+  CheckValueReturningFuncReturn(s->assert_fail_stmt, func_name, return_type,
+                                diag);
+}
+
+}  // namespace
+
+void Elaborator::ValidateJumpStatements(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock ||
+                   item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock;
+    if (is_proc && item->body) {
+      CheckJumpRules(item->body, 0, 0, /*in_subroutine=*/false, diag_);
+      continue;
+    }
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl) {
+      bool is_value_returning = false;
+      if (item->kind == ModuleItemKind::kFunctionDecl) {
+        is_value_returning = (item->return_type.kind != DataTypeKind::kVoid);
+      }
+      for (auto* s : item->func_body_stmts) {
+        CheckJumpRules(s, 0, 0, /*in_subroutine=*/true, diag_);
+        if (is_value_returning) {
+          CheckValueReturningFuncReturn(s, item->name, item->return_type,
+                                        diag_);
+        }
+      }
+    }
+  }
+}
+
 static bool BodyContainsFork(const Stmt* s) {
   if (!s) return false;
   if (s->kind == StmtKind::kFork) return true;

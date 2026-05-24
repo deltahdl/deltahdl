@@ -304,6 +304,11 @@ class Elaborator {
 
   void ValidateAutomaticVarProcWrites(const ModuleDecl* decl);
 
+  // §12.8 — break/continue must be inside a loop and may not target a loop
+  // outside their enclosing fork-join; return must be inside a subroutine and
+  // a value-returning function shall return an expression.
+  void ValidateJumpStatements(const ModuleDecl* decl);
+
   void ValidateConstantFunctionCalls(const ModuleDecl* decl);
 
   // §13.4.4

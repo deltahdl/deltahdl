@@ -134,19 +134,18 @@ TEST(JumpStatementSyntaxParsing, ReturnVoid) {
   EXPECT_EQ(ret->expr, nullptr);
 }
 
-TEST(JumpStatementSyntaxParsing, BreakStatementParses) {
+TEST(JumpStatementSyntaxParsing, ReturnWithExpressionBnf) {
   auto r = Parse(
       "module t;\n"
-      "  initial begin\n"
-      "    forever begin\n"
-      "      if (done) break;\n"
-      "    end\n"
-      "  end\n"
+      "  function int square(int v);\n"
+      "    return v * v;\n"
+      "  endfunction\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kForever);
+  auto* ret = FindReturnStmt(r);
+  ASSERT_NE(ret, nullptr);
+  EXPECT_EQ(ret->kind, StmtKind::kReturn);
+  ASSERT_NE(ret->expr, nullptr);
 }
 
 TEST(JumpStatementSyntaxParsing, BreakStatementInBody) {
@@ -166,25 +165,6 @@ TEST(JumpStatementSyntaxParsing, BreakStatementInBody) {
   EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
   ASSERT_NE(if_stmt->then_branch, nullptr);
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBreak);
-}
-
-TEST(JumpStatementSyntaxParsing, ContinueStatementParses) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i = i + 1) begin\n"
-      "      if (i == 5) continue;\n"
-      "      x = i;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  auto* body = stmt->for_body;
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
 }
 
 TEST(JumpStatementSyntaxParsing, ContinueStatementInBody) {
