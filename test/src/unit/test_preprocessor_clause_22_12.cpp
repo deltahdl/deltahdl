@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <filesystem>
+#include <fstream>
+
 #include "fixture_preprocessor.h"
 
 using namespace delta;
@@ -171,15 +174,6 @@ TEST(Preprocessor, Line_AffectsUnderscoreFileMacro) {
   EXPECT_NE(out.find("overridden.sv"), std::string::npos);
 }
 
-TEST(Preprocessor, Line_IncrementAfterDirective) {
-  PreprocFixture f;
-
-  auto out = Preprocess("`line 10 \"f.sv\" 0\nfirst\n`__LINE__\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-
-  EXPECT_NE(out.find("11"), std::string::npos);
-}
-
 TEST(Preprocessor, Line_InsideModule_NoError) {
   PreprocFixture f;
   Preprocess("module m;\n`line 5 \"inner.sv\" 0\nendmodule\n", f);
@@ -264,4 +258,66 @@ TEST(Preprocessor, Line_FileOverridePersistsAcrossLines) {
       f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(out.find("persistent.sv"), std::string::npos);
+}
+
+TEST(Preprocessor, Line_NaturalCountingStartsAtOne) {
+  PreprocFixture f;
+  auto out = Preprocess("`__LINE__\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("1"), std::string::npos);
+}
+
+TEST(Preprocessor, Line_NaturalCountingIncrements) {
+  PreprocFixture f;
+  auto out = Preprocess("a\nb\n`__LINE__\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("3"), std::string::npos);
+}
+
+TEST(Preprocessor, Line_IncludeSavesAndRestores) {
+  std::string tmp_dir = "/tmp/deltahdl_test_22_12_save";
+  std::string inc_path = tmp_dir + "/stub.svh";
+  std::filesystem::create_directories(tmp_dir);
+  {
+    std::ofstream ofs(inc_path);
+    ofs << "// included\n";
+  }
+
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.include_dirs.push_back(tmp_dir);
+  auto result = Preprocess(
+      "`__LINE__\n"
+      "`include \"stub.svh\"\n"
+      "`__LINE__\n",
+      f, cfg);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("1"), std::string::npos);
+  EXPECT_NE(result.find("3"), std::string::npos);
+
+  std::remove(inc_path.c_str());
+  std::filesystem::remove_all(tmp_dir);
+}
+
+TEST(Preprocessor, Line_LibrarySearchUnaffectedByOverride) {
+  std::string tmp_dir = "/tmp/deltahdl_test_22_12_lib";
+  std::string inc_path = tmp_dir + "/real.svh";
+  std::filesystem::create_directories(tmp_dir);
+  {
+    std::ofstream ofs(inc_path);
+    ofs << "wire from_real_file;\n";
+  }
+
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.include_dirs.push_back(tmp_dir);
+  auto result = Preprocess(
+      "`line 100 \"phantom_path_that_does_not_exist.sv\" 0\n"
+      "`include \"real.svh\"\n",
+      f, cfg);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("from_real_file"), std::string::npos);
+
+  std::remove(inc_path.c_str());
+  std::filesystem::remove_all(tmp_dir);
 }
