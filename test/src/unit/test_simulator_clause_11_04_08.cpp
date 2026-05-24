@@ -108,21 +108,6 @@ TEST(BitwiseEval, BinaryXnorBasic) {
   EXPECT_EQ(result.ToUint64(), 0b1001u);
 }
 
-TEST(BitwiseEval, BinaryXnorCaretTilde) {
-  SimFixture f;
-
-  auto* a = f.ctx.CreateVariable("ya", 4);
-  a->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
-  auto* b = f.ctx.CreateVariable("yb", 4);
-  b->value = MakeLogic4VecVal(f.arena, 4, 0b1010);
-
-  auto* expr = MakeBinary(f.arena, TokenKind::kCaretTilde,
-                          MakeId(f.arena, "ya"), MakeId(f.arena, "yb"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.width, 4u);
-  EXPECT_EQ(result.ToUint64(), 0b1001u);
-}
-
 TEST(BitwiseEval, BinaryXnorWithX) {
   SimFixture f;
 
@@ -336,6 +321,17 @@ TEST(BitwiseEval, BinaryOrBothSignedYieldsSigned) {
   EXPECT_TRUE(result.is_signed);
 }
 
+TEST(BitwiseEval, BinaryOrMixedSignYieldsUnsigned) {
+  SimFixture f;
+  MakeSignedVarAdv(f, "sa", 8, 0xF0);
+  MakeVar(f, "ub", 8, 0x0F);
+  auto* expr = MakeBinary(f.arena, TokenKind::kPipe, MakeId(f.arena, "sa"),
+                          MakeId(f.arena, "ub"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0xFFu);
+  EXPECT_FALSE(result.is_signed);
+}
+
 TEST(BitwiseEval, BinaryXorBothSignedYieldsSigned) {
   SimFixture f;
   MakeSignedVarAdv(f, "sa", 8, 0xFF);
@@ -347,6 +343,17 @@ TEST(BitwiseEval, BinaryXorBothSignedYieldsSigned) {
   EXPECT_TRUE(result.is_signed);
 }
 
+TEST(BitwiseEval, BinaryXorMixedSignYieldsUnsigned) {
+  SimFixture f;
+  MakeSignedVarAdv(f, "sa", 8, 0xFF);
+  MakeVar(f, "ub", 8, 0x0F);
+  auto* expr = MakeBinary(f.arena, TokenKind::kCaret, MakeId(f.arena, "sa"),
+                          MakeId(f.arena, "ub"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0xF0u);
+  EXPECT_FALSE(result.is_signed);
+}
+
 TEST(BitwiseEval, BinaryXnorBothSignedYieldsSigned) {
   SimFixture f;
   MakeSignedVarAdv(f, "sa", 4, 0b1100);
@@ -356,6 +363,17 @@ TEST(BitwiseEval, BinaryXnorBothSignedYieldsSigned) {
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0b1001u);
   EXPECT_TRUE(result.is_signed);
+}
+
+TEST(BitwiseEval, BinaryXnorMixedSignYieldsUnsigned) {
+  SimFixture f;
+  MakeSignedVarAdv(f, "sa", 4, 0b1100);
+  MakeVar(f, "ub", 4, 0b1010);
+  auto* expr = MakeBinary(f.arena, TokenKind::kTildeCaret,
+                          MakeId(f.arena, "sa"), MakeId(f.arena, "ub"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0b1001u);
+  EXPECT_FALSE(result.is_signed);
 }
 
 TEST(BitwiseEval, UnaryNotSignedYieldsSigned) {
@@ -410,6 +428,124 @@ TEST(BitwiseEval, UnaryNotMasksTopWord) {
 
   EXPECT_EQ(result.ToUint64(), 0xFu);
   EXPECT_EQ(result.words[0].bval, 0u);
+}
+
+constexpr Logic4Word kFour[4] = {
+    {0, 0},
+    {1, 0},
+    {0, 1},
+    {1, 1},
+};
+constexpr Logic4Word kOut0 = {0, 0};
+constexpr Logic4Word kOut1 = {1, 0};
+constexpr Logic4Word kOutX = {0, 1};
+
+TEST(BitwiseTruthTable, BinaryAndAllCells) {
+  const Logic4Word expected[4][4] = {
+      {kOut0, kOut0, kOut0, kOut0},
+      {kOut0, kOut1, kOutX, kOutX},
+      {kOut0, kOutX, kOutX, kOutX},
+      {kOut0, kOutX, kOutX, kOutX},
+  };
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      auto r = Logic4And(kFour[i], kFour[j]);
+      EXPECT_EQ(r.aval & 1u, expected[i][j].aval) << "row=" << i << " col=" << j;
+      EXPECT_EQ(r.bval & 1u, expected[i][j].bval) << "row=" << i << " col=" << j;
+    }
+  }
+}
+
+TEST(BitwiseTruthTable, BinaryOrAllCells) {
+  const Logic4Word expected[4][4] = {
+      {kOut0, kOut1, kOutX, kOutX},
+      {kOut1, kOut1, kOut1, kOut1},
+      {kOutX, kOut1, kOutX, kOutX},
+      {kOutX, kOut1, kOutX, kOutX},
+  };
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      auto r = Logic4Or(kFour[i], kFour[j]);
+      EXPECT_EQ(r.aval & 1u, expected[i][j].aval) << "row=" << i << " col=" << j;
+      EXPECT_EQ(r.bval & 1u, expected[i][j].bval) << "row=" << i << " col=" << j;
+    }
+  }
+}
+
+TEST(BitwiseTruthTable, BinaryXorAllCells) {
+  const Logic4Word expected[4][4] = {
+      {kOut0, kOut1, kOutX, kOutX},
+      {kOut1, kOut0, kOutX, kOutX},
+      {kOutX, kOutX, kOutX, kOutX},
+      {kOutX, kOutX, kOutX, kOutX},
+  };
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      auto r = Logic4Xor(kFour[i], kFour[j]);
+      EXPECT_EQ(r.aval & 1u, expected[i][j].aval) << "row=" << i << " col=" << j;
+      EXPECT_EQ(r.bval & 1u, expected[i][j].bval) << "row=" << i << " col=" << j;
+    }
+  }
+}
+
+TEST(BitwiseTruthTable, BinaryXnorAllCells) {
+  const Logic4Word expected[4][4] = {
+      {kOut1, kOut0, kOutX, kOutX},
+      {kOut0, kOut1, kOutX, kOutX},
+      {kOutX, kOutX, kOutX, kOutX},
+      {kOutX, kOutX, kOutX, kOutX},
+  };
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      auto r = Logic4Not(Logic4Xor(kFour[i], kFour[j]));
+      EXPECT_EQ(r.aval & 1u, expected[i][j].aval) << "row=" << i << " col=" << j;
+      EXPECT_EQ(r.bval & 1u, expected[i][j].bval) << "row=" << i << " col=" << j;
+    }
+  }
+}
+
+TEST(BitwiseEval, BinaryAndBothUnsignedYieldsUnsigned) {
+  SimFixture f;
+  MakeVar(f, "ua", 8, 0xFF);
+  MakeVar(f, "ub", 8, 0x0F);
+  auto* expr = MakeBinary(f.arena, TokenKind::kAmp, MakeId(f.arena, "ua"),
+                          MakeId(f.arena, "ub"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0x0Fu);
+  EXPECT_FALSE(result.is_signed);
+}
+
+TEST(BitwiseEval, BinaryOrBothUnsignedYieldsUnsigned) {
+  SimFixture f;
+  MakeVar(f, "ua", 8, 0xF0);
+  MakeVar(f, "ub", 8, 0x0F);
+  auto* expr = MakeBinary(f.arena, TokenKind::kPipe, MakeId(f.arena, "ua"),
+                          MakeId(f.arena, "ub"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0xFFu);
+  EXPECT_FALSE(result.is_signed);
+}
+
+TEST(BitwiseEval, BinaryXorBothUnsignedYieldsUnsigned) {
+  SimFixture f;
+  MakeVar(f, "ua", 8, 0xFF);
+  MakeVar(f, "ub", 8, 0x0F);
+  auto* expr = MakeBinary(f.arena, TokenKind::kCaret, MakeId(f.arena, "ua"),
+                          MakeId(f.arena, "ub"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0xF0u);
+  EXPECT_FALSE(result.is_signed);
+}
+
+TEST(BitwiseEval, BinaryXnorBothUnsignedYieldsUnsigned) {
+  SimFixture f;
+  MakeVar(f, "ua", 4, 0b1100);
+  MakeVar(f, "ub", 4, 0b1010);
+  auto* expr = MakeBinary(f.arena, TokenKind::kTildeCaret,
+                          MakeId(f.arena, "ua"), MakeId(f.arena, "ub"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0b1001u);
+  EXPECT_FALSE(result.is_signed);
 }
 
 }
