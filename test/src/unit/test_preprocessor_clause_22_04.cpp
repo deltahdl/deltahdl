@@ -341,12 +341,6 @@ TEST(Preprocessor, Include_DoubleQuote_FallsBackToIncludeDirs) {
   EXPECT_NE(result.find("wire fallback;"), std::string::npos);
 }
 
-TEST(Preprocessor, Include_AngleBracket_NoIncludeDirs_Error) {
-  PreprocFixture f;
-  Preprocess("`include <missing.svh>\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(Preprocessor, Include_SubdirectoryRelativePath) {
   IncludeTestDir tmp;
   fs::create_directories(tmp.dir / "parts");
@@ -471,6 +465,28 @@ TEST(Preprocessor, Include_MultipleSequentialIncludes) {
   EXPECT_NE(result.find("wire a;"), std::string::npos);
   EXPECT_NE(result.find("wire b;"), std::string::npos);
   EXPECT_NE(result.find("wire c;"), std::string::npos);
+}
+
+TEST(Preprocessor, Include_UnquotedFilename_Rejected) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("bare.svh", "wire bare;\n");
+  PreprocConfig cfg;
+  cfg.include_dirs.push_back(tmp.dir.string());
+
+  PreprocFixture f;
+  Preprocess("`include bare.svh\n", f, std::move(cfg));
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Include_AbsolutePath_Missing_DoesNotFallBack) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("decoy.svh", "wire decoy;\n");
+  PreprocConfig cfg;
+  cfg.include_dirs.push_back(tmp.dir.string());
+
+  PreprocFixture f;
+  Preprocess("`include \"/decoy.svh\"\n", f, std::move(cfg));
+  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(Preprocessor, Include_BothFormsInSameFile) {

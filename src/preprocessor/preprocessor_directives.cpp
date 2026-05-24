@@ -209,6 +209,7 @@ std::string Preprocessor::ResolveInclude(std::string_view filename,
     std::string path{filename};
     std::ifstream ifs(path);
     if (ifs.good()) return path;
+    return "";
   }
 
   if (!src_dir.empty()) {

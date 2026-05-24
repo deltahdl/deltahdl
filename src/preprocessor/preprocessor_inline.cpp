@@ -689,6 +689,13 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
     return;
   }
 
+  if (fn.front() != '"' && fn.front() != '<') {
+    diag_.Error(
+        loc,
+        "`include filename must be enclosed in double quotes or angle brackets");
+    return;
+  }
+
   std::string_view after_close;
   StripIncludeQuotes(fn, after_close);
   ValidateIncludeTrailing(after_close, diag_, loc);
