@@ -109,6 +109,110 @@ TEST(ParallelBlockSimulation, ForkWithBeginEndSingleProcess) {
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}});
 }
 
+TEST(ParallelBlockSimulation, DelaysRelativeToBlockEntry) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic [7:0] snap_a, snap_b;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #5 a = 8'd1;\n"
+      "      #10 b = 8'd2;\n"
+      "    join\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #6 snap_a = a;\n"
+      "    #6 snap_b = b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"snap_a", 1u}, {"snap_b", 2u}, {"a", 1u}, {"b", 2u}});
+}
+
+TEST(ParallelBlockSimulation, BlockItemDeclInitVisibleToSpawnedProcess) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      automatic int k = 8'd5;\n"
+      "      result = k[7:0];\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"result", 5u}});
+}
+
+TEST(ParallelBlockSimulation, JoinNoneChildDelayedUntilParentBlocks) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] signal;\n"
+      "  logic [7:0] capture;\n"
+      "  initial begin\n"
+      "    signal = 8'd0;\n"
+      "    fork\n"
+      "      capture = signal;\n"
+      "    join_none\n"
+      "    signal = 8'd42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"capture", 42u}, {"signal", 42u}});
+}
+
+TEST(ParallelBlockSimulation, JoinBlocksParentUntilAllChildrenFinish) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] post_join;\n"
+      "  logic [7:0] snap_mid;\n"
+      "  logic [7:0] snap_after;\n"
+      "  initial begin\n"
+      "    post_join = 8'd0;\n"
+      "    fork\n"
+      "      #5 ;\n"
+      "      #20 ;\n"
+      "    join\n"
+      "    post_join = 8'd7;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #10 snap_mid = post_join;\n"
+      "    #15 snap_after = post_join;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design,
+      {{"snap_mid", 0u}, {"snap_after", 7u}, {"post_join", 7u}});
+}
+
+TEST(ParallelBlockSimulation, JoinAnyResumesParentOnFirstFinish) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] post_join;\n"
+      "  logic [7:0] snap_early;\n"
+      "  initial begin\n"
+      "    post_join = 8'd0;\n"
+      "    fork\n"
+      "      #5 ;\n"
+      "      #100 ;\n"
+      "    join_any\n"
+      "    post_join = 8'd9;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #10 snap_early = post_join;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"snap_early", 9u}, {"post_join", 9u}});
+}
+
 TEST(ParallelBlockSimulation, ForkJoinNoneAllChildrenComplete) {
   SimFixture f;
   auto* design = ElaborateSrc(

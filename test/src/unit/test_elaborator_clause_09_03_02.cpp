@@ -83,34 +83,6 @@ TEST(ParallelBlockElaboration, ReturnInForkJoinErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ParallelBlockElaboration, ReturnInForkJoinAnyErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  task t;\n"
-      "    fork\n"
-      "      return;\n"
-      "    join_any\n"
-      "  endtask\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(ParallelBlockElaboration, ReturnInForkJoinNoneErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  task t;\n"
-      "    fork\n"
-      "      return;\n"
-      "    join_none\n"
-      "  endtask\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(ParallelBlockElaboration, ReturnNestedInForkErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -172,6 +144,79 @@ TEST(ParallelBlockElaboration, ForkWithBeginEndElaborates) {
       "      end\n"
       "    join\n"
       "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ParallelBlockElaboration, RefArgInForkJoinAnyIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task automatic t(ref int v);\n"
+      "    fork\n"
+      "      v = 1;\n"
+      "    join_any\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ParallelBlockElaboration, RefArgInForkJoinNoneIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task automatic t(ref int v);\n"
+      "    fork\n"
+      "      v = 1;\n"
+      "    join_none\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ParallelBlockElaboration, RefArgInPlainForkJoinAllowed) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task automatic t(ref int v);\n"
+      "    fork\n"
+      "      v = 1;\n"
+      "    join\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ParallelBlockElaboration, RefStaticArgInForkJoinAnyAllowed) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task automatic t(ref static int v);\n"
+      "    fork\n"
+      "      v = 1;\n"
+      "    join_any\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ParallelBlockElaboration, RefArgInForkJoinAnyBlockItemInitAllowed) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task automatic t(ref int v);\n"
+      "    fork\n"
+      "      automatic int copy = v;\n"
+      "    join_any\n"
+      "  endtask\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

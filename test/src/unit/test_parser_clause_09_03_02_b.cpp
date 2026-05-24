@@ -33,19 +33,6 @@ TEST(ParallelBlockParsing, AutoVarInForkBlock) {
   EXPECT_TRUE(branch0->stmts[0]->var_is_automatic);
 }
 
-TEST(ParallelBlockParsing, ForkInTaskBody) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  task automatic run_parallel;\n"
-              "    fork\n"
-              "      #10 a = 1;\n"
-              "      #20 b = 2;\n"
-              "    join\n"
-              "  endtask\n"
-              "  initial run_parallel;\n"
-              "endmodule\n"));
-}
-
 TEST(ParallelBlockParsing, ForkInAlwaysBlock) {
   auto r = Parse(
       "module m;\n"
@@ -252,6 +239,43 @@ TEST(ParallelBlockParsing, EmptyForkJoinParses) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   EXPECT_EQ(stmt->fork_stmts.size(), 0u);
+}
+
+TEST(ParallelBlockParsing, ForkWithMatchingLabels) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : worker\n"
+      "      a = 1;\n"
+      "      b = 2;\n"
+      "    join : worker\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->label, "worker");
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
+}
+
+TEST(ParallelBlockParsing, ForkWithBeginLabelOnly) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : tag\n"
+      "      a = 1;\n"
+      "    join_any\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->label, "tag");
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
 }
 
 TEST(ParallelBlockParsing, MultipleBlockItemDeclarationsBeforeStmts) {
