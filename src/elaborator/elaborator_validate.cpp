@@ -2723,6 +2723,22 @@ static void WalkStmtForCallArgs(
                    std::format("cannot omit parentheses in call to nonvoid "
                                "function '{}'",
                                s->expr->text));
+      } else {
+        // §13.5.5: parentheses may be omitted only when the subroutine has
+        // no formal arguments, or when every formal has a default value.
+        bool all_have_defaults = true;
+        for (const auto& arg : func->func_args) {
+          if (!arg.default_value) {
+            all_have_defaults = false;
+            break;
+          }
+        }
+        if (!all_have_defaults) {
+          diag.Error(s->expr->range.start,
+                     std::format("cannot omit parentheses in call to '{}': "
+                                 "not all formal arguments have defaults",
+                                 s->expr->text));
+        }
       }
     }
   }

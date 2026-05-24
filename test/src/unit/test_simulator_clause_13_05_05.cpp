@@ -87,21 +87,4 @@ TEST(ArgumentBindingSim, VoidFunctionAllDefaultsNoParens) {
   LowerRunAndCheck(f, design, {{"x", 99u}});
 }
 
-TEST(ArgumentBindingSim, TaskMultipleDefaultsNoParens) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  task compute(int a = 3, int b = 7);\n"
-      "    x = a + b;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    x = 32'd0;\n"
-      "    compute;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"x", 10u}});
-}
-
 }

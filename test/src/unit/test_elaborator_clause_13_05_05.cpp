@@ -45,6 +45,18 @@ TEST(SubroutineCallElaborationSyntax, NonvoidFunctionWithoutParensError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(SubroutineCallElaborationSyntax,
+     NonvoidFunctionAllDefaultsWithoutParensIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int get_val(int v = 1); return v; endfunction\n"
+      "  initial get_val;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(SubroutineCallElaborationSyntax, TaskAllDefaultsWithoutParensElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -108,12 +120,58 @@ TEST(SubroutineCallElaborationSyntax,
 }
 
 TEST(SubroutineCallElaborationSyntax,
-     NonvoidClassMethodSelfReferenceIsImplicitVariable) {
+     TaskWithRequiredArgWithoutParensIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  task set_x(int v);\n"
+      "    x = v;\n"
+      "  endtask\n"
+      "  initial set_x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(SubroutineCallElaborationSyntax,
+     VoidFunctionWithRequiredArgWithoutParensIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  function void set_x(int v);\n"
+      "    x = v;\n"
+      "  endfunction\n"
+      "  initial set_x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(SubroutineCallElaborationSyntax,
+     TaskWithMixedDefaultAndRequiredArgsWithoutParensIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  task compute(int a = 1, int b);\n"
+      "    x = a + b;\n"
+      "  endtask\n"
+      "  initial compute;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(SubroutineCallElaborationSyntax,
+     NonvoidClassMethodBareNameIsNotARecursiveCall) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "class C;\n"
       "  function int foo();\n"
-      "    foo = 7;\n"
+      "    foo = 3;\n"
+      "    foo;\n"
       "    return foo;\n"
       "  endfunction\n"
       "endclass\n"
