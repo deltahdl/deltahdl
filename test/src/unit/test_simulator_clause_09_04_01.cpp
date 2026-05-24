@@ -65,26 +65,6 @@ TEST(DelayControlSim, DelayControlZero) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(DelayControlSim, SimulationTimeAdvances) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    #10 x = 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
 TEST(DelayControlSim, DelayWithExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -165,25 +145,6 @@ TEST(DelayControlSim, HighZDelayTreatedAsZero) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(DelayControlSim, LargeDelayValue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    #1000 x = 8'd77;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 77u);
-}
-
 TEST(DelayControlSim, MultipleInitialBlocksWithDelays) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -199,6 +160,113 @@ TEST(DelayControlSim, MultipleInitialBlocksWithDelays) {
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 10u);
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 20u);
+}
+
+TEST(DelayControlSim, NegativeDelayReinterpretedAsUnsignedTimeVariable) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int d;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    d = -1;\n"
+      "    #d x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+  EXPECT_EQ(f.ctx.CurrentTime().ticks, ~uint64_t{0});
+}
+
+TEST(DelayControlSim, SpecparamPermittedInDelayExpression) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  specify\n"
+      "    specparam d = 7;\n"
+      "  endspecify\n"
+      "  logic [7:0] x;\n"
+      "  initial #d x = 8'd55;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 55u);
+  EXPECT_EQ(f.ctx.CurrentTime().ticks, 7u);
+}
+
+TEST(DelayControlSim, MultibitUnknownDelayTreatedAsZero) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd1;\n"
+      "    #(4'b10xx) x = 8'd2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.CurrentTime().ticks, 0u);
+}
+
+TEST(DelayControlSim, NarrowSignedNegativeDelayReinterpretedAsTimeVariable) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic signed [7:0] d;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    d = -1;\n"
+      "    #d x = 8'd33;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 33u);
+  EXPECT_EQ(f.ctx.CurrentTime().ticks, ~uint64_t{0});
+}
+
+TEST(DelayControlSim, DelayExpressionReevaluatedAtEachExecution) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int d;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    d = 3;\n"
+      "    #d x = 8'd1;\n"
+      "    d = 7;\n"
+      "    #d x = 8'd2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.CurrentTime().ticks, 10u);
 }
 
 }

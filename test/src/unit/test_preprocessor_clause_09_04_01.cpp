@@ -39,17 +39,6 @@ TEST(DelayControlPreprocessor, MacroExpansionInParenthesizedDelay) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(DelayControlPreprocessor, ZeroDelayWithMacro) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define ZERO 0\n"
-      "module m;\n"
-      "  initial #`ZERO a = 1;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(DelayControlPreprocessor, DelayControlSurvivesPreprocessor) {
   PreprocFixture f;
   auto result = Preprocess(

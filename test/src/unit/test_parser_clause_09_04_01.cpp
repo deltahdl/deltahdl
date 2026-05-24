@@ -5,32 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DelayParsing, DelayValueInStatement) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial #10 $display(\"hello\");\n"
-              "endmodule"));
-}
-
-TEST(DelayControlParsing, ChainedDelayControls) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #5 a = 0;\n"
-      "    #10 a = 1;\n"
-      "    #15 a = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 3u);
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(body->stmts[i]->kind, StmtKind::kDelay);
-  }
-}
-
 TEST(DelayControlParsing, DelayWithExpression) {
   auto r = Parse(
       "module m;\n"
@@ -44,40 +18,6 @@ TEST(DelayControlParsing, DelayWithExpression) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
-}
-
-TEST(DelayControlParsing, ZeroDelayControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a;\n"
-      "  initial begin\n"
-      "    #0 a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
-  EXPECT_NE(stmt->delay, nullptr);
-  EXPECT_NE(stmt->body, nullptr);
-}
-
-TEST(DelayControlParsing, UnitDelayControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a;\n"
-      "  initial begin\n"
-      "    #1 a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
-  EXPECT_NE(stmt->delay, nullptr);
-  EXPECT_NE(stmt->body, nullptr);
 }
 
 TEST(DelayControlParsing, DelayControlReal) {

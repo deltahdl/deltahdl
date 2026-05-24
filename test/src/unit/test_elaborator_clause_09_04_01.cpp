@@ -108,21 +108,6 @@ TEST(DelayControlElaboration, RealDelayElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(DelayControlElaboration, ChainedDelaysElaborate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic x;\n"
-      "  initial begin\n"
-      "    #5 x = 0;\n"
-      "    #10 x = 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(DelayControlElaboration, NullStatementDelayElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

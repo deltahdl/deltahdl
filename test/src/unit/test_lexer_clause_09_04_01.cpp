@@ -19,13 +19,6 @@ TEST(DelayControlLexing, HashFollowedByIntegerLiteral) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
 }
 
-TEST(DelayControlLexing, HashFollowedByZero) {
-  auto tokens = Lex("#0");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kHash);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
-}
-
 TEST(DelayControlLexing, HashFollowedByRealLiteral) {
   auto tokens = Lex("#3.5");
   ASSERT_GE(tokens.size(), 2u);

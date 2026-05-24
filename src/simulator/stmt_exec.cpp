@@ -790,13 +790,20 @@ static ExecTask ExecCycleDelay(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
+static uint64_t DelayTicksFromValue(const Logic4Vec& val) {
+  if (!val.IsKnown()) return 0;
+  uint64_t raw = val.ToUint64();
+  if (val.is_signed && val.width > 0 && val.width < 64) {
+    int64_t signed_val = SignExtend(raw, val.width);
+    if (signed_val < 0) return static_cast<uint64_t>(signed_val);
+  }
+  return raw;
+}
+
 static ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   uint64_t ticks = 0;
   if (stmt->delay) {
-    auto val = EvalExpr(stmt->delay, ctx, arena);
-    if (val.IsKnown()) {
-      ticks = val.ToUint64();
-    }
+    ticks = DelayTicksFromValue(EvalExpr(stmt->delay, ctx, arena));
   }
   co_await DelayAwaiter{ctx, ticks};
   if (stmt->body) {
