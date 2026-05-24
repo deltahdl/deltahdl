@@ -29,6 +29,9 @@ import shlex
 import subprocess
 import sys
 import tempfile
+from collections.abc import Iterable
+from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -91,6 +94,43 @@ class MissingResultEventError(Exception):
         sid = session_id or "unknown"
         super().__init__(
             f"session_id={sid}, last_event={last_event}",
+        )
+
+
+class RateLimitError(Exception):
+    """Raised when the Claude CLI surfaces a rate-limit 429.
+
+    Non-recoverable from inside the streaming runner — the cap resets
+    on the API's clock, not ours, so retrying in-process would just
+    consume the retry budget against an unchanged failure mode. The
+    wrapper translates this into a loud-fatal that names the rate-limit
+    type, the reset time in the local zone, and the org's overage
+    posture so the operator knows when to re-run.
+
+    The structured ``rate_limit_info`` payload (originally emitted by
+    the CLI's ``rate_limit_event``) is unpacked into named attributes
+    so callers can read individual fields without re-walking the dict;
+    missing sub-keys flatten to ``None``.
+    """
+
+    def __init__(
+        self, *,
+        rate_limit_info: dict[str, Any] | None,
+        synthetic_text: str | None,
+        stderr: str,
+    ) -> None:
+        info = rate_limit_info or {}
+        self.rate_limit_type: str | None = info.get("rateLimitType")
+        self.resets_at: int | None = info.get("resetsAt")
+        self.overage_status: str | None = info.get("overageStatus")
+        self.overage_disabled_reason: str | None = (
+            info.get("overageDisabledReason")
+        )
+        self.synthetic_text = synthetic_text
+        self.stderr = stderr
+        super().__init__(
+            f"rate_limit_type={self.rate_limit_type or 'unknown'},"
+            f" resets_at={self.resets_at}",
         )
 
 
@@ -226,6 +266,7 @@ class _StreamDiagnostic:
         self.session_id: str | None = None
         self.last_event: str = "(no events)"
         self.last_tool_name: str | None = None
+        self.rate_limit_info: dict[str, Any] | None = None
 
     def observe_event(self, event: dict[str, Any]) -> None:
         """Update the diagnostic state from a decoded event."""
@@ -235,12 +276,33 @@ class _StreamDiagnostic:
             extract_tool_name(event) or self.last_tool_name
         )
         self.last_event = describe_event(event, self.last_tool_name)
+        info = extract_rate_limit_info(event)
+        if info is not None:
+            self.rate_limit_info = info
 
     def to_missing_result_error(self, stderr: str) -> "MissingResultEventError":
         """Build a MissingResultEventError carrying the captured state."""
         return MissingResultEventError(
             session_id=self.session_id,
             last_event=self.last_event,
+            stderr=stderr,
+        )
+
+    def to_rate_limit_error(
+        self, *, synthetic_text: str | None, stderr: str,
+    ) -> "RateLimitError":
+        """Build a RateLimitError carrying the captured rate-limit fields.
+
+        ``rate_limit_info`` may be ``None`` when no ``rate_limit_event``
+        arrived before the 429 — CLI 2.1.143 emitted the synthetic
+        assistant message without a preceding rate_limit_event, so the
+        loud-fatal must still surface gracefully when the structured
+        payload is unavailable. ``RateLimitError`` flattens ``None`` into
+        per-attribute ``None`` defaults.
+        """
+        return RateLimitError(
+            rate_limit_info=self.rate_limit_info,
+            synthetic_text=synthetic_text,
             stderr=stderr,
         )
 
@@ -327,6 +389,98 @@ def extract_error_result(event: dict[str, Any]) -> str | None:
     return f"subtype={subtype}"
 
 
+def is_rate_limit_event_error(event: dict[str, Any]) -> bool:
+    """Return True when *event* is the synthetic assistant 429.
+
+    Rate-limit 429s surface on a single ``assistant`` event whose
+    top-level fields carry ``apiErrorStatus=429`` and ``error="rate_limit"``;
+    no terminal ``result`` event follows on this code path, so detecting
+    the failure here is the only way to avoid the misleading
+    missing-result retry that the wrapper would otherwise enter.
+    """
+    return (
+        event.get("type") == "assistant"
+        and event.get("apiErrorStatus") == 429
+        and event.get("error") == "rate_limit"
+    )
+
+
+def extract_rate_limit_info(event: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the ``rate_limit_info`` dict from a ``rate_limit_event``, else None.
+
+    The CLI emits ``rate_limit_event`` records during the session with
+    the org's current cap state (``rateLimitType``, ``resetsAt``,
+    ``overageStatus``, ``overageDisabledReason``). Capturing the most
+    recent one lets the loud-fatal name a real reset time rather than
+    a stand-in placeholder.
+    """
+    if event.get("type") != "rate_limit_event":
+        return None
+    info = event.get("rate_limit_info")
+    return info if isinstance(info, dict) else None
+
+
+def extract_synthetic_text(event: dict[str, Any]) -> str | None:
+    """Return the first text block in an assistant *event*, else None.
+
+    Quoted verbatim in the loud-fatal so future debuggers see exactly
+    what the CLI printed, even when (as on CLI 2.1.143) the text was
+    a misleading fabrication.
+    """
+    message = event.get("message")
+    if not isinstance(message, dict):
+        return None
+    blocks = message.get("content")
+    if not isinstance(blocks, list):
+        return None
+    for block in blocks:
+        if isinstance(block, dict) and block.get("type") == "text":
+            text = block.get("text")
+            if isinstance(text, str):
+                return text
+    return None
+
+
+def is_rate_limit_result_event(event: dict[str, Any]) -> bool:
+    """Return True when *event* is an error ``result`` event with HTTP 429.
+
+    Belt-and-braces alongside ``is_rate_limit_event_error``: if a future
+    CLI version routes the 429 through the ``result`` event path instead
+    of synthesising an assistant message, this helper catches it without
+    requiring a coordinated runner change.
+    """
+    return (
+        event.get("type") == "result"
+        and bool(event.get("is_error"))
+        and event.get("api_error_status") == 429
+    )
+
+
+def format_resets_at(resets_at: int | None, now: datetime) -> str:
+    """Return a human-readable reset time + delta from *now*.
+
+    Renders ``resets_at`` (unix epoch seconds) in the local timezone with
+    a ``(in HhMm)`` delta tail computed against *now*. *now* is injected
+    rather than captured from ``datetime.now()`` so the loud-fatal
+    timestamp is deterministic in tests and so a caller probing for a
+    relative delta can pin both ends. Returns ``"unknown"`` when
+    ``resets_at`` is ``None`` (no rate_limit_event arrived before the
+    failure).
+    """
+    if resets_at is None:
+        return "unknown"
+    reset_local = datetime.fromtimestamp(resets_at).astimezone()
+    clock = reset_local.strftime("%Y-%m-%d %H:%M %Z")
+    delta_seconds = max(0, resets_at - int(now.timestamp()))
+    hours, remainder = divmod(delta_seconds, 3600)
+    minutes = remainder // 60
+    if hours:
+        delta = f"{hours}h{minutes:02d}m"
+    else:
+        delta = f"{minutes}m"
+    return f"{clock} (in {delta})"
+
+
 def exit_with_error(message: str, stderr: str) -> NoReturn:
     """Print *message* and *stderr* to stderr and exit with code 1."""
     print(
@@ -405,6 +559,68 @@ def build_streaming_cmd(
     return cmd
 
 
+@dataclass
+class _StreamOutcome:
+    """Mutable per-event state accumulated by ``_consume_events``.
+
+    Bundled so ``run_claude_streaming`` reads one structured outcome
+    instead of juggling five separate locals — keeps the main function
+    under pylint's locals-and-branches caps without adding inline
+    directives.
+    """
+
+    result_text: str | None = None
+    error_message: str | None = None
+    content_filter_seen: bool = False
+    rate_limit_seen: bool = False
+    rate_limit_synthetic: str | None = None
+
+
+def _consume_events(
+    stdout: Iterable[str], diag: "_StreamDiagnostic",
+) -> _StreamOutcome:
+    """Decode JSON events from *stdout*, print them, and capture outcome state.
+
+    Rate-limit detection takes precedence over the error-result and
+    result-extraction branches — once seen, later events for the same
+    failure are skipped without overwriting the first synthetic text.
+    The diagnostic is mutated in place so the caller can build either a
+    ``MissingResultEventError`` or a ``RateLimitError`` from it after the
+    loop returns.
+    """
+    outcome = _StreamOutcome()
+    for raw in stdout:
+        line = raw.strip()
+        if not line:
+            continue
+        if _CONTENT_FILTER_MARKER in line:
+            outcome.content_filter_seen = True
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        diag.observe_event(event)
+        print_event(event)
+        if (
+            is_rate_limit_event_error(event)
+            or is_rate_limit_result_event(event)
+        ):
+            if not outcome.rate_limit_seen:
+                outcome.rate_limit_synthetic = extract_synthetic_text(event)
+                outcome.rate_limit_seen = True
+            continue
+        err = extract_error_result(event)
+        if err is not None:
+            if _CONTENT_FILTER_MARKER in err:
+                outcome.content_filter_seen = True
+            outcome.error_message = err
+            continue
+        extracted = extract_result(event)
+        if extracted is not None:
+            outcome.result_text = extracted
+    return outcome
+
+
 def run_claude_streaming(
     cmd: list[str], prompt: str, *, env: dict[str, str],
 ) -> str:
@@ -414,16 +630,19 @@ def run_claude_streaming(
     ``--verbose``. Returns the final ``.result`` text from the
     terminal ``result`` event.
 
-    Raises ``ContentFilterError`` when content filtering is detected
-    (in raw stdout, in the errors body of an ``is_error`` result event,
-    or in stderr after a non-zero exit) so the caller can retry with the
-    recovery prompt. Raises ``MissingResultEventError`` when the CLI
-    exits 0 with no terminal result event (a CLI-side flake we can
-    recover from with ``--continue``); the exception carries the
-    captured ``session_id`` and a description of the last event seen
-    so the wrapper can warn / loud-fatal informatively. Loud-fatal on
-    every other failure (non-zero exit or a non-content-filter error
-    result event).
+    Raises ``RateLimitError`` when a rate-limit 429 is detected — the
+    cap resets on the API's clock so this is non-recoverable from
+    inside the runner; the wrapper translates it into a loud-fatal
+    naming the reset time. Raises ``ContentFilterError`` when content
+    filtering is detected (in raw stdout, in the errors body of an
+    ``is_error`` result event, or in stderr after a non-zero exit) so
+    the caller can retry with the recovery prompt. Raises
+    ``MissingResultEventError`` when the CLI exits 0 with no terminal
+    result event (a CLI-side flake we can recover from with
+    ``--continue``); the exception carries the captured ``session_id``
+    and a description of the last event seen so the wrapper can warn /
+    loud-fatal informatively. Loud-fatal on every other failure
+    (non-zero exit or a non-content-filter error result event).
     """
     with subprocess.Popen(
         cmd,
@@ -439,56 +658,31 @@ def run_claude_streaming(
         assert proc.stderr is not None
         proc.stdin.write(prompt)
         proc.stdin.close()
-
-        result_text: str | None = None
-        error_message: str | None = None
-        content_filter_seen = False
         diag = _StreamDiagnostic()
-        for raw in proc.stdout:
-            line = raw.strip()
-            if not line:
-                continue
-            if _CONTENT_FILTER_MARKER in line:
-                content_filter_seen = True
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            diag.observe_event(event)
-            print_event(event)
-            err = extract_error_result(event)
-            if err is not None:
-                if _CONTENT_FILTER_MARKER in err:
-                    content_filter_seen = True
-                error_message = err
-                continue
-            extracted = extract_result(event)
-            if extracted is not None:
-                result_text = extracted
-
+        outcome = _consume_events(proc.stdout, diag)
         stderr = proc.stderr.read()
         return_code = proc.wait()
 
-    if _CONTENT_FILTER_MARKER in stderr or content_filter_seen:
-        raise ContentFilterError(
-            stderr or error_message or "blocked by content filtering",
+    if outcome.rate_limit_seen:
+        raise diag.to_rate_limit_error(
+            synthetic_text=outcome.rate_limit_synthetic, stderr=stderr,
         )
-
+    if _CONTENT_FILTER_MARKER in stderr or outcome.content_filter_seen:
+        raise ContentFilterError(
+            stderr or outcome.error_message or "blocked by content filtering",
+        )
     if return_code != 0:
         exit_with_error(
             f"Claude CLI exited with code {return_code}", stderr,
         )
-
-    if error_message is not None:
+    if outcome.error_message is not None:
         exit_with_error(
-            f"Claude CLI emitted an error result event: {error_message}",
+            f"Claude CLI emitted an error result event: {outcome.error_message}",
             stderr,
         )
-
-    if result_text is None:
+    if outcome.result_text is None:
         raise diag.to_missing_result_error(stderr)
-
-    return result_text
+    return outcome.result_text
 
 
 def run_claude_streaming_with_retry(
@@ -522,6 +716,13 @@ def run_claude_streaming_with_retry(
     interleaved failure pattern doesn't double-charge a single budget.
     *role* is the human-readable label ("Step", "Oracle", …) used in
     warning and error messages.
+
+    ``RateLimitError`` is non-recoverable: the cap resets on the API's
+    clock, so an in-process retry would just burn the budget against an
+    unchanged failure mode. Translates to ``exit_with_error`` with the
+    rate-limit type, the local-zone reset time, the org's overage
+    posture, the CLI's synthetic text quoted verbatim, and a restart
+    hint — the caller's idempotent re-run is the recovery path.
     """
     next_cmd, next_prompt = cmd, prompt
     filter_attempts = 0
@@ -529,6 +730,23 @@ def run_claude_streaming_with_retry(
     while True:
         try:
             return run_claude_streaming(next_cmd, next_prompt, env=env)
+        except RateLimitError as exc:
+            reset_str = format_resets_at(exc.resets_at, datetime.now())
+            overage = (
+                f"{exc.overage_status or 'unknown'}"
+                f" ({exc.overage_disabled_reason or 'unknown'})"
+            )
+            quoted = exc.synthetic_text or "(no synthetic text)"
+            exit_with_error(
+                f"{role} hit rate limit; not retrying.\n"
+                f"  type={exc.rate_limit_type or 'unknown'},"
+                f" resets at {reset_str}\n"
+                f"  overage={overage}\n"
+                f'  CLI message: "{quoted}"\n'
+                "  Re-run the command after the reset;"
+                " closed issues will be skipped.",
+                exc.stderr,
+            )
         except ContentFilterError as exc:
             filter_attempts += 1
             if filter_attempts > MAX_CONTENT_FILTER_RETRIES:

@@ -1,0 +1,2 @@
+{"type":"system","subtype":"init","session_id":"sid-replay-failing-oracle"}
+{"type":"assistant","apiErrorStatus":429,"error":"rate_limit","isApiErrorMessage":true,"message":{"model":"<synthetic>","role":"assistant","stop_reason":"stop_sequence","content":[{"type":"text","text":"Usage credits are required for long context requests."}]}}
