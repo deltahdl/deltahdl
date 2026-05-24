@@ -421,7 +421,13 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
 
 void Parser::ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,
                                const std::vector<Attribute>& attrs) {
+  SourceLoc lifetime_loc = CurrentLoc();
   bool is_automatic = Match(TokenKind::kKwAutomatic);
+  if (is_automatic) {
+    diag_.Error(lifetime_loc,
+                "'automatic' is not allowed in a data_declaration outside "
+                "a procedural context");
+  }
   bool is_static = !is_automatic && Match(TokenKind::kKwStatic);
   bool is_rand = Match(TokenKind::kKwRand);
 

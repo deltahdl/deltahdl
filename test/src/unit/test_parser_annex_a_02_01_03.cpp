@@ -4,14 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(TypeDeclParsing, DataDeclTypeDeclaration) {
-  auto r = Parse("module m; typedef int my_int_t; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
-}
-
 TEST(TypeDeclParsing, DataDeclBasicVariable) {
   auto r = Parse("module m; logic [7:0] data; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -506,6 +498,69 @@ TEST(TypeDeclParsing, ErrorExportMissingSemicolon) {
 TEST(TypeDeclParsing, ErrorNettypeMissingSemicolon) {
   auto r = Parse("module m; nettype real foo endmodule");
   EXPECT_TRUE(r.has_errors);
+}
+
+TEST(TypeDeclParsing, ErrorAutomaticAtModuleScope) {
+  auto r = Parse("module m; automatic int x; endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(TypeDeclParsing, ErrorImplicitDataTypeWithLifetimeAtModuleScope) {
+  auto r = Parse("module m; static x = 1; endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(TypeDeclParsing, ErrorImplicitDataTypeWithoutVarInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    static x = 1;\n"
+      "  end\n"
+      "endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(TypeDeclParsing, ErrorImportInsideClassScope) {
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "class c;\n"
+      "  import pkg::*;\n"
+      "endclass");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(TypeDeclParsing, ErrorChargeStrengthOnNonTriregNet) {
+  auto r = Parse("module m; wire (small) bus; endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(TypeDeclParsing, NetDeclNettypeIdentifierWithDelayControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  nettype real my_real;\n"
+      "  my_real #5 x;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(TypeDeclParsing, NetDeclInterconnectWithUnpackedDim) {
+  auto r = Parse("module m; interconnect bus[10]; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_interconnect);
+  EXPECT_GE(item->unpacked_dims.size(), 1u);
+}
+
+TEST(TypeDeclParsing, ForwardTypedefWithoutKeyword) {
+  auto r = Parse("module m; typedef incomplete_t; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(item->name, "incomplete_t");
 }
 
 }

@@ -420,7 +420,9 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
   Expr* nd1 = nullptr;
   Expr* nd2 = nullptr;
   Expr* nd3 = nullptr;
-  if (dtype.is_net) ParseGateDelay(nd1, nd2, nd3);
+  bool nettype_named = dtype.kind == DataTypeKind::kNamed &&
+                       known_nettypes_.count(dtype.type_name) != 0;
+  if (dtype.is_net || nettype_named) ParseGateDelay(nd1, nd2, nd3);
   do {
     auto* item = arena_.Create<ModuleItem>();
     item->kind =

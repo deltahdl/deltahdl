@@ -232,4 +232,25 @@ TEST(TypeDeclElaboration, ErrorRedeclarationDetected) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(TypeDeclElaboration, ErrorVectoredOrScalaredWithoutPackedDim) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  wire vectored w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(TypeDeclElaboration, TriregChargeStrengthAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  trireg (large) cap;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }

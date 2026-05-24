@@ -361,6 +361,7 @@ class Parser {
   Arena& arena_;
   DiagEngine& diag_;
   std::unordered_set<std::string_view> known_types_;
+  std::unordered_set<std::string_view> known_nettypes_;
   std::unordered_set<std::string_view> known_udps_;
   ModuleDecl* current_module_ = nullptr;
   PackageDecl* current_package_ = nullptr;

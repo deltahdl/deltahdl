@@ -293,6 +293,7 @@ ModuleItem* Parser::ParseNettypeDecl() {
     }
   }
   known_types_.insert(item->name);
+  known_nettypes_.insert(item->name);
   Expect(TokenKind::kSemicolon);
   return item;
 }
