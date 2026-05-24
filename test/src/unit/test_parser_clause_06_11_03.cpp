@@ -6,32 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SignedAndUnsigned, DataTypeIntegerAtom) {
-  auto r = Parse("module m; int unsigned x; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
-  EXPECT_FALSE(item->data_type.is_signed);
-}
-
-TEST(SignedAndUnsigned, SigningUnsigned) {
-  auto r = Parse("module m; integer unsigned x; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_FALSE(r.cu->modules[0]->items[0]->data_type.is_signed);
-}
-
-TEST(SignedAndUnsigned, DataTypeIntegerVector) {
-  auto r = Parse("module m; logic signed [7:0] a; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  EXPECT_TRUE(item->data_type.is_signed);
-  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
-}
-
 TEST(SignedAndUnsigned, LogicSignedWithPackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -189,32 +163,6 @@ TEST(SignedAndUnsigned, IntSignedDecl) {
   EXPECT_TRUE(item->data_type.is_signed);
 }
 
-TEST(SignedAndUnsigned, LogicSignedDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic signed [7:0] sv;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  EXPECT_TRUE(item->data_type.is_signed);
-}
-
-TEST(SignedAndUnsigned, RegUnsignedDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg unsigned [3:0] ru;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
-  EXPECT_FALSE(item->data_type.is_signed);
-}
-
 TEST(SignedAndUnsigned, IntUnsignedFunctionReturnType) {
   auto r = Parse(
       "class C;\n"
@@ -326,18 +274,6 @@ TEST(SignedAndUnsigned, IntDefaultSigned) {
   EXPECT_TRUE(item->data_type.is_signed) << "int is signed by default";
 }
 
-TEST(SignedAndUnsigned, IntExplicitUnsigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  int unsigned x;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
-  EXPECT_FALSE(item->data_type.is_signed) << "int unsigned is unsigned";
-}
-
 TEST(SignedAndUnsigned, ByteDefaultSigned) {
   auto r = Parse(
       "module t;\n"
@@ -432,18 +368,6 @@ TEST(SignedAndUnsigned, RegDefaultUnsigned) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
   EXPECT_FALSE(item->data_type.is_signed) << "reg is unsigned by default";
-}
-
-TEST(SignedAndUnsigned, SignedVector) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic signed [7:0] sv;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  EXPECT_TRUE(item->data_type.is_signed);
 }
 
 TEST(SignedAndUnsigned, UnsignedVector) {

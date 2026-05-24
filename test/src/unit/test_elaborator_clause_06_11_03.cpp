@@ -136,27 +136,6 @@ TEST(SignedAndUnsigned, UnsignedOverrideOnDefaultSigned) {
   EXPECT_FALSE(mod->variables[4].is_signed) << "integer unsigned";
 }
 
-TEST(SignedAndUnsigned, IntDefaultSignedVsUnsignedOverride) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int s;\n"
-      "  int unsigned u;\n"
-      "  initial begin s = 0; u = 0; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* vs = f.ctx.FindVariable("s");
-  auto* vu = f.ctx.FindVariable("u");
-  ASSERT_NE(vs, nullptr);
-  ASSERT_NE(vu, nullptr);
-  EXPECT_TRUE(vs->is_signed) << "int defaults to signed";
-  EXPECT_FALSE(vu->is_signed) << "int unsigned is unsigned";
-}
-
 TEST(SignedAndUnsigned, ArraysOfUnsignedTypesDefaultUnsigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
