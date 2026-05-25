@@ -1031,6 +1031,11 @@ struct ConfigRule {
   std::string_view use_cell;
   bool use_config = false;
   std::vector<std::pair<std::string_view, Expr*>> use_params;
+  // Set when the use clause carries an empty override list "#()", which resets
+  // every parameter of the bound cell to its module default (§33.4.3). This is
+  // distinct from a use clause with no override list at all, where use_params
+  // is likewise empty but no reset is intended.
+  bool use_param_reset_all = false;
 };
 
 struct ConfigDecl {

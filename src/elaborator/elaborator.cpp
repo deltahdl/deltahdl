@@ -1196,6 +1196,28 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
   in_config_elaboration_ = true;
   RunPreElaborationValidations();
 
+  // A config localparam is restricted to a literal value (§33.4.3), so it can
+  // be evaluated once here and made available to parameter-override
+  // expressions that reference it.
+  for (const auto& [name, expr] : cfg->local_params) {
+    if (!expr) continue;
+    if (auto val = ConstEvalInt(expr, config_localparam_scope_)) {
+      config_localparam_scope_[name] = *val;
+    }
+  }
+
+  // Record the parameter overrides each instance clause carries so they can be
+  // applied as the matching instance is elaborated (§33.4.3).
+  for (auto* rule : cfg->rules) {
+    if (rule->kind != ConfigRuleKind::kInstance) continue;
+    if (rule->use_params.empty() && !rule->use_param_reset_all) continue;
+    ConfigParamOverride ov;
+    ov.inst_path.assign(rule->inst_path.data(), rule->inst_path.size());
+    ov.reset_all = rule->use_param_reset_all;
+    ov.params = rule->use_params;
+    instance_param_overrides_.push_back(std::move(ov));
+  }
+
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kDefault) continue;
     library_order_.clear();

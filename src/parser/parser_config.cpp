@@ -66,14 +66,27 @@ void Parser::ParseUseClause(ConfigRule* rule) {
 
   if (Match(TokenKind::kHash)) {
     Expect(TokenKind::kLParen);
-    do {
-      Expect(TokenKind::kDot);
-      auto pname = ExpectIdentifier().text;
-      Expect(TokenKind::kLParen);
-      auto* val = ParseExpr();
-      Expect(TokenKind::kRParen);
-      rule->use_params.emplace_back(pname, val);
-    } while (Match(TokenKind::kComma));
+    // An empty override list (#()) resets every parameter of the cell to its
+    // module default; within a list, an override whose parentheses are empty
+    // (.p()) resets that single parameter to its default. Only named
+    // (.name(...)) notation is permitted here -- positional overrides are not
+    // valid in a configuration.
+    if (Check(TokenKind::kRParen)) {
+      rule->use_param_reset_all = true;
+    }
+    if (!Check(TokenKind::kRParen)) {
+      do {
+        Expect(TokenKind::kDot);
+        auto pname = ExpectIdentifier().text;
+        Expect(TokenKind::kLParen);
+        Expr* val = nullptr;
+        if (!Check(TokenKind::kRParen)) {
+          val = ParseExpr();
+        }
+        Expect(TokenKind::kRParen);
+        rule->use_params.emplace_back(pname, val);
+      } while (Match(TokenKind::kComma));
+    }
     Expect(TokenKind::kRParen);
   }
 

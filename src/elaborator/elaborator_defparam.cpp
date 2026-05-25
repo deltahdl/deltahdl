@@ -109,6 +109,13 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
         applied_defparams_.insert(key);
         continue;
       }
+      if (param->config_locked) {
+        // A configuration's parameter override takes precedence over a defparam
+        // targeting the same parameter (§33.4.3); leave the config value in
+        // place and treat this defparam as resolved against it.
+        applied_defparams_.insert(key);
+        continue;
+      }
       if (RhsContainsHierarchicalRef(val_expr)) {
         diag_.Error(item->loc,
                     "defparam right-hand side may only reference parameters "

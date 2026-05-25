@@ -147,6 +147,10 @@ struct RtlirParamDecl {
   bool from_override = false;
   bool is_unbounded = false;
   bool is_type_param = false;
+  // Set when a configuration's parameter override fixed this value (§33.4.3).
+  // Such a value takes precedence over a defparam targeting the same parameter,
+  // so defparam application skips a parameter already locked by a config.
+  bool config_locked = false;
 
   uint32_t decl_width = 0;
   bool decl_is_signed = false;

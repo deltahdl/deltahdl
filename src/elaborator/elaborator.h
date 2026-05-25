@@ -538,6 +538,32 @@ class Elaborator {
   std::vector<std::tuple<std::string, std::string, std::string>>
       instance_use_overrides_;
 
+  // A configuration's parameter overrides for one instance path (§33.4.3).
+  // reset_all marks an empty "#()" list that returns every parameter to its
+  // module default; within params, a null expression returns that single
+  // parameter to its default while a present expression supplies a new value.
+  struct ConfigParamOverride {
+    std::string inst_path;
+    bool reset_all = false;
+    std::vector<std::pair<std::string_view, Expr*>> params;
+  };
+  std::vector<ConfigParamOverride> instance_param_overrides_;
+
+  // Literal values of the localparams declared in the configuration being
+  // elaborated, used to evaluate parameter-override expressions (§33.4.3).
+  ScopeMap config_localparam_scope_;
+
+  // Applies any configuration parameter overrides registered for the instance
+  // currently being elaborated (named by current_inst_path_) on top of the
+  // overrides written at the instantiation, recording which parameters end up
+  // fixed by the configuration. Config overrides win over the instantiation's
+  // own values, and an empty override returns a parameter to its module
+  // default (§33.4.3).
+  void ApplyConfigParamOverrides(const ModuleDecl* child_decl,
+                                 ParamList& child_params,
+                                 const ScopeMap& parent_scope,
+                                 std::vector<std::string_view>& locked);
+
   std::string current_inst_path_;
   // Library of the cell currently being elaborated; the parent cell's library
   // while its child instances are resolved (§33.4.1.5, §33.4.1.6).

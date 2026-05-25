@@ -1487,6 +1487,57 @@ static uint32_t EvalInstDimSize(const Expr* left, const Expr* right) {
   return 0;
 }
 
+void Elaborator::ApplyConfigParamOverrides(
+    const ModuleDecl* child_decl, ParamList& child_params,
+    const ScopeMap& parent_scope, std::vector<std::string_view>& locked) {
+  if (instance_param_overrides_.empty() || current_inst_path_.empty()) return;
+
+  // Parameter identifiers resolve in the instance's parent scope, augmented
+  // with the configuration's own localparams (§33.4.3).
+  ScopeMap scope = parent_scope;
+  for (const auto& [name, val] : config_localparam_scope_) {
+    scope[name] = val;
+  }
+
+  auto drop = [&](std::string_view pname) {
+    ParamList kept;
+    kept.reserve(child_params.size());
+    for (const auto& e : child_params) {
+      if (e.first != pname) kept.push_back(e);
+    }
+    child_params.swap(kept);
+  };
+
+  for (const auto& ov : instance_param_overrides_) {
+    if (ov.inst_path != current_inst_path_) continue;
+
+    if (ov.reset_all) {
+      // "#()" returns every parameter to its module default: discard the
+      // instantiation's overrides and let the configuration own each one.
+      child_params.clear();
+      for (const auto& [dname, dexpr] : child_decl->params) {
+        (void)dexpr;
+        if (child_decl->localparam_port_names.count(dname) > 0) continue;
+        if (child_decl->type_param_names.count(dname) > 0) continue;
+        locked.push_back(dname);
+      }
+    }
+
+    for (const auto& [pname, pexpr] : ov.params) {
+      // Replace any value the instantiation supplied; a present expression sets
+      // a new value while a null one ("(.p())") leaves the parameter at its
+      // module default. Either way the configuration now owns the parameter.
+      drop(pname);
+      if (pexpr) {
+        if (auto val = ConstEvalInt(pexpr, scope)) {
+          child_params.push_back({pname, *val});
+        }
+      }
+      locked.push_back(pname);
+    }
+  }
+}
+
 void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
 
   if (!item->inst_name.empty() &&
@@ -1567,8 +1618,28 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
       if (val) child_params.push_back({pname, *val});
     }
   }
+
+  // A configuration may override (or reset) this instance's parameters on top
+  // of whatever the instantiation specified (§33.4.3).
+  std::vector<std::string_view> config_locked;
+  ApplyConfigParamOverrides(child_decl, child_params, parent_scope,
+                            config_locked);
+
   inst.resolved = ElaborateModule(child_decl, child_params);
   nested_module_decls_ = std::move(saved_nested);
+
+  // Mark parameters the configuration fixed so a later defparam cannot change
+  // them: a config override takes precedence over defparam (§33.4.3).
+  if (inst.resolved) {
+    for (auto pname : config_locked) {
+      for (auto& p : inst.resolved->params) {
+        if (p.name == pname) {
+          p.config_locked = true;
+          break;
+        }
+      }
+    }
+  }
   BindPorts(inst, item, mod);
 
   std::vector<uint32_t> inst_dim_sizes;
