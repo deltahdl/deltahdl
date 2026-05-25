@@ -41,7 +41,13 @@ void VpiContext::Attach(SimContext& sim_ctx) {
 VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
   if (!data) return nullptr;
   systfs_.push_back(*data);
-  return nullptr;
+
+  // §38.37 Returns row: registration produces a handle to the callback
+  // object standing in for this system task or system function.
+  auto* systf_obj = AllocObject();
+  systf_obj->type = kVpiCallback;
+  systf_obj->index = static_cast<int>(systfs_.size() - 1);
+  return systf_obj;
 }
 
 VpiHandle VpiContext::HandleByName(const char* name, VpiHandle ) {
