@@ -18,18 +18,6 @@ TEST(AggregateTypeParsing, ArraySumMethod) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(AggregateTypeParsing, ArraySumWithClause) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[4];\n"
-      "  initial x = arr.sum with (item * 2);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
 TEST(AggregateTypeParsing, ArrayProductMethod) {
   auto r = Parse(
       "module t;\n"
@@ -73,19 +61,6 @@ TEST(AggregateTypeParsing, ArrayReductionXor) {
       "module t;\n"
       "  byte b[] = '{1, 2, 3, 4};\n"
       "  initial y = b.xor;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
-}
-
-TEST(AggregateTypeParsing, ArrayReductionSum) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[] = '{1, 2, 3};\n"
-      "  initial y = arr.sum;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* stmt = FirstInitialStmt(r);

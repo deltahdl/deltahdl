@@ -165,6 +165,15 @@ TEST(ArrayReduction, OrEmptyArray) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
+TEST(ArrayReduction, AndEmptyArray) {
+  SimFixture f;
+  MakeDynArray(f, "arr", {});
+  Logic4Vec out;
+  bool ok = TryEvalArrayProperty("arr", "and", f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 0u);
+}
+
 TEST(ArrayReduction, SumReturnWidthMatchesElementType) {
   SimFixture f;
   MakeDynArrayW(f, "arr", {1, 2, 3}, 8);
@@ -246,6 +255,25 @@ TEST(ArrayReduction, SumWithClauseTransformsValues) {
   EXPECT_EQ(out.ToUint64(), 50u);
 }
 
+// §7.12.3: when a with clause is present, the result takes the width of the
+// with expression, not the element width. Here the element is a single bit but
+// the with expression is 32 bits wide, so summing four ones must yield a
+// 32-bit 4 rather than overflowing a 1-bit result.
+TEST(ArrayReduction, WithClauseResultWidthMatchesExprWidth) {
+  SimFixture f;
+  MakeDynArrayW(f, "bits", {1, 1, 1, 1}, 1);
+
+  auto* with_expr = MakeBinary(f.arena, TokenKind::kPlus,
+                               MakeId(f.arena, "item"), MakeInt(f.arena, 0));
+  auto* call = MakeMethodCall(f.arena, "bits", "sum", {});
+  call->with_expr = with_expr;
+  Logic4Vec out;
+  bool ok = TryEvalArrayMethodCall(call, f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.width, 32u);
+  EXPECT_EQ(out.ToUint64(), 4u);
+}
+
 TEST(ArrayReduction, XorWithClauseTransformsValues) {
   SimFixture f;
   MakeDynArrayW(f, "b", {1, 2, 3, 4}, 8);
@@ -258,6 +286,54 @@ TEST(ArrayReduction, XorWithClauseTransformsValues) {
   bool ok = TryEvalArrayMethodCall(call, f.ctx, f.arena, out);
   ASSERT_TRUE(ok);
   EXPECT_EQ(out.ToUint64(), 12u);
+}
+
+// §7.12.3: the with expression supplies the values reduced by product().
+// Multiplying (item+1) over {1,2,3,4} reduces {2,3,4,5} to 120.
+TEST(ArrayReduction, ProductWithClauseTransformsValues) {
+  SimFixture f;
+  MakeDynArrayW(f, "b", {1, 2, 3, 4}, 8);
+
+  auto* with_expr = MakeBinary(f.arena, TokenKind::kPlus,
+                               MakeId(f.arena, "item"), MakeInt(f.arena, 1));
+  auto* call = MakeMethodCall(f.arena, "b", "product", {});
+  call->with_expr = with_expr;
+  Logic4Vec out;
+  bool ok = TryEvalArrayMethodCall(call, f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 120u);
+}
+
+// §7.12.3: the with expression supplies the values reduced by and().
+// ANDing (item+1) over {6,3} reduces 7 & 4 to 4.
+TEST(ArrayReduction, AndWithClauseTransformsValues) {
+  SimFixture f;
+  MakeDynArrayW(f, "b", {6, 3}, 8);
+
+  auto* with_expr = MakeBinary(f.arena, TokenKind::kPlus,
+                               MakeId(f.arena, "item"), MakeInt(f.arena, 1));
+  auto* call = MakeMethodCall(f.arena, "b", "and", {});
+  call->with_expr = with_expr;
+  Logic4Vec out;
+  bool ok = TryEvalArrayMethodCall(call, f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 4u);
+}
+
+// §7.12.3: the with expression supplies the values reduced by or().
+// ORing (item+8) over {1,2,4} reduces 9 | 10 | 12 to 15.
+TEST(ArrayReduction, OrWithClauseTransformsValues) {
+  SimFixture f;
+  MakeDynArrayW(f, "b", {1, 2, 4}, 8);
+
+  auto* with_expr = MakeBinary(f.arena, TokenKind::kPlus,
+                               MakeId(f.arena, "item"), MakeInt(f.arena, 8));
+  auto* call = MakeMethodCall(f.arena, "b", "or", {});
+  call->with_expr = with_expr;
+  Logic4Vec out;
+  bool ok = TryEvalArrayMethodCall(call, f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 15u);
 }
 
 TEST(ArrayReduction, SumIntegration) {
