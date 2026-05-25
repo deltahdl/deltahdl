@@ -37,21 +37,6 @@ TEST(ExternModuleElaboration, ExternDeclarationDoesNotDuplicatePorts) {
   EXPECT_FALSE(top->assigns.empty());
 }
 
-TEST(ExternModuleElaboration, WildcardPortsResolvedFromExtern) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "extern module m(input logic a, output logic b);\n"
-      "module m(.*);\n"
-      "  assign b = a;\n"
-      "endmodule\n",
-      f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* top = design->top_modules[0];
-  ASSERT_EQ(top->ports.size(), 2u);
-  EXPECT_FALSE(top->assigns.empty());
-}
-
 TEST(ExternModuleElaboration, WildcardPortsResolveDirections) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -148,6 +133,105 @@ TEST(ExternModuleElaboration, ParamCountMismatchErrors) {
       "endmodule\n",
       f, "m");
   EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ExternModuleElaboration, PortDirectionMismatchErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module m(input logic a, output logic b);\n"
+      "module m(output logic a, output logic b);\n"
+      "  assign b = 1'b0;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ExternModuleElaboration, PortTypeMismatchErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module m(input logic a, output logic b);\n"
+      "module m(input integer a, output logic b);\n"
+      "  assign b = 1'b0;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ExternModuleElaboration, NonAnsiExternPortsSkipTypeCheck) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "extern module m(a, b);\n"
+      "module m(input logic a, output logic b);\n"
+      "  assign b = a;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ExternModuleElaboration, ParamNameMismatchErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module m #(parameter W = 8)\n"
+      "  (input logic a, output logic b);\n"
+      "module m #(parameter N = 8)\n"
+      "  (input logic a, output logic b);\n"
+      "  assign b = a;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ExternModuleElaboration, MatchingParamNamesNoError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "extern module m #(parameter W = 8)\n"
+      "  (input logic a, output logic b);\n"
+      "module m #(parameter W = 8)\n"
+      "  (input logic a, output logic b);\n"
+      "  assign b = a;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ExternModuleElaboration, PortSignednessMismatchErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module m(input logic signed [3:0] a, output logic b);\n"
+      "module m(input logic [3:0] a, output logic b);\n"
+      "  assign b = a[0];\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ExternModuleElaboration, ParamKindMismatchErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module m #(parameter type TP = logic)\n"
+      "  (input logic a, output logic b);\n"
+      "module m #(parameter TP = 1)\n"
+      "  (input logic a, output logic b);\n"
+      "  assign b = a;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ExternModuleElaboration, MatchingTypeParamNoError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "extern module m #(parameter type TP = logic)\n"
+      "  (input logic a, output logic b);\n"
+      "module m #(parameter type TP = logic)\n"
+      "  (input logic a, output logic b);\n"
+      "  assign b = a;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }

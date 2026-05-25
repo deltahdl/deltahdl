@@ -1414,6 +1414,16 @@ ModuleItem* Elaborator::FindCuScopeItem(std::string_view name) const {
   return nullptr;
 }
 
+// Two port data types correspond for extern-declaration matching when they
+// share a base kind, signedness, and (for named types) the same type name.
+// Packed/unpacked dimension sizes are parameter-dependent expressions that are
+// not yet evaluated here, so only the dimension-independent attributes that the
+// parser records are compared.
+static bool ExternPortTypesEquivalent(const DataType& a, const DataType& b) {
+  return a.kind == b.kind && a.is_signed == b.is_signed &&
+         a.type_name == b.type_name;
+}
+
 void Elaborator::ResolveExternModules() {
   for (auto* mod : unit_->modules) {
     if (mod->is_extern) continue;
@@ -1446,13 +1456,35 @@ void Elaborator::ResolveExternModules() {
       continue;
     }
     for (size_t i = 0; i < mod->ports.size(); ++i) {
-      if (!mod->ports[i].name.empty() && !extern_decl->ports[i].name.empty() &&
-          mod->ports[i].name != extern_decl->ports[i].name) {
+      const PortDecl& ep = extern_decl->ports[i];
+      const PortDecl& mp = mod->ports[i];
+      if (!mp.name.empty() && !ep.name.empty() && mp.name != ep.name) {
         diag_.Error(mod->range.start,
                     std::format("module '{}' port '{}' at position {} does not "
                                 "match extern declaration port '{}'",
-                                mod->name, mod->ports[i].name, i,
-                                extern_decl->ports[i].name));
+                                mod->name, mp.name, i, ep.name));
+        break;
+      }
+      // §23.5 requires the extern declaration to match the actual module in the
+      // equivalent types of corresponding ports. Direction and data type are
+      // only compared when the extern header states them: a non-ANSI extern
+      // port list supplies names and positions alone and leaves the type to the
+      // actual definition, so an unspecified side is treated as a match.
+      if (ep.direction != Direction::kNone && mp.direction != Direction::kNone &&
+          ep.direction != mp.direction) {
+        diag_.Error(mp.loc,
+                    std::format("module '{}' port '{}' direction does not match "
+                                "extern declaration",
+                                mod->name, mp.name));
+        break;
+      }
+      if (ep.data_type.kind != DataTypeKind::kImplicit &&
+          mp.data_type.kind != DataTypeKind::kImplicit &&
+          !ExternPortTypesEquivalent(ep.data_type, mp.data_type)) {
+        diag_.Error(mp.loc,
+                    std::format("module '{}' port '{}' type does not match "
+                                "extern declaration",
+                                mod->name, mp.name));
         break;
       }
     }
@@ -1463,6 +1495,34 @@ void Elaborator::ResolveExternModules() {
                       "extern declaration ({})",
                       mod->name, mod->params.size(),
                       extern_decl->params.size()));
+    } else {
+      // The parameter lists must also correspond by name and position.
+      for (size_t i = 0; i < mod->params.size(); ++i) {
+        std::string_view mp_name = mod->params[i].first;
+        std::string_view ep_name = extern_decl->params[i].first;
+        if (!mp_name.empty() && !ep_name.empty() && mp_name != ep_name) {
+          diag_.Error(mod->range.start,
+                      std::format("module '{}' parameter '{}' at position {} "
+                                  "does not match extern declaration "
+                                  "parameter '{}'",
+                                  mod->name, mp_name, i, ep_name));
+          break;
+        }
+        // §23.5 also calls for equivalent parameter types. A type parameter and
+        // a value parameter at the same position are not equivalent, so the
+        // two declarations must agree on whether each entry is a type
+        // parameter.
+        bool mp_is_type = mod->type_param_names.count(mp_name) != 0;
+        bool ep_is_type = extern_decl->type_param_names.count(ep_name) != 0;
+        if (mp_is_type != ep_is_type) {
+          diag_.Error(mod->range.start,
+                      std::format("module '{}' parameter '{}' at position {} "
+                                  "does not match the parameter kind of the "
+                                  "extern declaration",
+                                  mod->name, mp_name, i));
+          break;
+        }
+      }
     }
   }
 }
