@@ -122,6 +122,13 @@ PropertyResult EvalPropertyOr(PropertyResult a, PropertyResult b) {
   return PropertyResult::kFail;
 }
 
+PropertyResult EvalPropertyIfElse(bool cond, PropertyResult then_result,
+                                  bool has_else, PropertyResult else_result) {
+  if (cond) return then_result;
+  if (has_else) return else_result;
+  return PropertyResult::kVacuousPass;
+}
+
 PropertyResult EvalWithDisableIff(bool disable_cond, PropertyResult inner) {
   if (disable_cond) return PropertyResult::kVacuousPass;
   return inner;

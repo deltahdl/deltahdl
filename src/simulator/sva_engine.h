@@ -75,6 +75,13 @@ PropertyResult EvalImplication(bool antecedent, bool consequent,
 PropertyResult EvalPropertyNot(PropertyResult inner);
 PropertyResult EvalPropertyAnd(PropertyResult a, PropertyResult b);
 PropertyResult EvalPropertyOr(PropertyResult a, PropertyResult b);
+
+// §16.12.6: an if-else property is governed by the guard expression. When the
+// guard holds, the overall result is that of the then-branch. The single-branch
+// form (no else) holds vacuously when the guard is false, since there is nothing
+// to check; the two-branch form routes a false guard to the else-branch instead.
+PropertyResult EvalPropertyIfElse(bool cond, PropertyResult then_result,
+                                  bool has_else, PropertyResult else_result);
 PropertyResult EvalWithDisableIff(bool disable_cond, PropertyResult inner);
 PropertyResult ResolveNonOverlapping(bool consequent_matched);
 
