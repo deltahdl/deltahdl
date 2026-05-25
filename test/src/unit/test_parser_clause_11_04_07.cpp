@@ -123,6 +123,34 @@ TEST(OperatorParsing, EquivalenceRightAssociative) {
   EXPECT_EQ(rhs->rhs->op, TokenKind::kLtDashGt);
 }
 
+TEST(OperatorParsing, ImplicationBelowConditional) {
+  // Implication has lower precedence than the conditional operator, so the
+  // conditional expression binds tighter and becomes the right-hand operand
+  // of `->`.
+  auto r = Parse("module m; initial x = a -> b ? c : d; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kArrow);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->kind, ExprKind::kTernary);
+}
+
+TEST(OperatorParsing, EquivalenceBelowConditional) {
+  // Equivalence shares implication's precedence and is likewise lower than the
+  // conditional operator, so the conditional expression forms the right-hand
+  // operand of `<->`.
+  auto r = Parse("module m; initial x = a <-> b ? c : d; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kLtDashGt);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->kind, ExprKind::kTernary);
+}
+
 TEST(OperatorParsing, EquivalenceSameLevelAsImplication) {
   auto r = Parse("module m; initial x = a -> b <-> c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

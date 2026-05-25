@@ -204,6 +204,34 @@ TEST(EvalOpXZ, ImplicationUnknownFalse) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
+TEST(EvalOpXZ, ImplicationFalseUnknown) {
+  // A false antecedent makes the implication true regardless of the
+  // consequent, so the result is a known 1 even when the consequent is x.
+  SimFixture f;
+
+  MakeVar4(f, "ifu1", 1, 0, 0);
+  MakeVar4(f, "ifu2", 1, 0, 1);
+  auto* expr = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "ifu1"),
+                          MakeId(f.arena, "ifu2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_EQ(result.words[0].bval, 0u);
+}
+
+TEST(EvalOpXZ, EquivalenceResultIsOneBit) {
+  // The equivalence of two multibit operands reduces to a single-bit logical
+  // result; both operands here are nonzero, so they compare equal.
+  SimFixture f;
+
+  MakeVar4(f, "erw1", 4, 0b1010, 0);
+  MakeVar4(f, "erw2", 4, 0b0001, 0);
+  auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt, MakeId(f.arena, "erw1"),
+                          MakeId(f.arena, "erw2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 TEST(EvalOpXZ, EquivalenceSameValue) {
   SimFixture f;
 
@@ -392,6 +420,64 @@ TEST(OperatorSim, ShortCircuitImplicationSkipsRhs) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
   EXPECT_EQ(var->value.words[0].bval, 0u);
+}
+
+TEST(OperatorSim, ShortCircuitAlwaysEvaluatesFirstOperand) {
+  // Short-circuit evaluation still requires the first operand to be evaluated.
+  // The first operand here has a side effect that must take place; the second
+  // operand forces the && result to false without undoing that side effect.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a, y;\n"
+      "  initial begin\n"
+      "    a = 0;\n"
+      "    y = ((a = a + 1) && 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* a = f.ctx.FindVariable("a");
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 1u);
+  EXPECT_EQ(y->value.ToUint64(), 0u);
+}
+
+TEST(OperatorSim, EquivalenceEvaluatesEachOperandOnce) {
+  // The equivalence operator is defined in terms of two implications, but the
+  // LRM requires each operand to be evaluated exactly once rather than once per
+  // implication. Each operand here increments its own counter as a side effect;
+  // a correct evaluation leaves both counters at 1.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a, b, y;\n"
+      "  initial begin\n"
+      "    a = 0;\n"
+      "    b = 0;\n"
+      "    y = ((a = a + 1) <-> (b = b + 1));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 1u);
+  EXPECT_EQ(b->value.ToUint64(), 1u);
+  // Both operands are nonzero, so the operands compare equal and y is true.
+  EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, UnaryLogicalNot) {
