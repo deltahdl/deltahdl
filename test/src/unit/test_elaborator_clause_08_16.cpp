@@ -22,25 +22,6 @@ TEST(ClassCastElaboration, SubclassToSuperclassAssignOk) {
              "endmodule\n"));
 }
 
-TEST(ClassCastElaboration, CastSuperToSubclassOk) {
-  EXPECT_TRUE(
-      ElabOk("class Base;\n"
-             "  int x;\n"
-             "endclass\n"
-             "class Derived extends Base;\n"
-             "  int y;\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    Base b;\n"
-             "    Derived d;\n"
-             "    d = new;\n"
-             "    b = d;\n"
-             "    $cast(d, b);\n"
-             "  end\n"
-             "endmodule\n"));
-}
-
 TEST(ClassCastElaboration, CastAsFunctionOk) {
   EXPECT_TRUE(
       ElabOk("class Base; int x; endclass\n"

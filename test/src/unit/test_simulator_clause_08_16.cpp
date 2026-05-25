@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ClassSim, CastSubclassToSuperclassAlwaysLegal) {
-  SimFixture f;
-  auto* base = MakeClassType(f, "Packet", {"i"});
-  auto* derived = MakeClassType(f, "LinkedPacket", {"j"});
-  derived->parent = base;
-
-  auto [handle, obj] = MakeObj(f, derived);
-  EXPECT_TRUE(obj->type->IsA(base));
-}
-
 TEST(ClassSim, CastSuperclassToSubclassIllegal) {
   SimFixture f;
   auto* base = MakeClassType(f, "Base", {});
@@ -84,6 +74,25 @@ TEST(ClassSim, E2eCastFunctionReturnsOneOnSuccess) {
       "endmodule\n", "result"), 1u);
 }
 
+TEST(ClassSim, E2eCastAssignmentCompatibleDirectionSucceeds) {
+  // Success case 1: the source and destination are assignment compatible, i.e.
+  // the destination type is the same as or a superclass of the source
+  // expression's type. Casting a derived handle into a base-typed destination
+  // is that direction, so the cast succeeds and returns 1.
+  EXPECT_EQ(RunAndGet(
+      "class Base; int x; endclass\n"
+      "class Derived extends Base; int y; endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    Base b;\n"
+      "    Derived d;\n"
+      "    d = new;\n"
+      "    result = $cast(b, d);\n"
+      "  end\n"
+      "endmodule\n", "result"), 1u);
+}
+
 TEST(ClassSim, E2eCastFunctionReturnsZeroOnFailure) {
   EXPECT_EQ(RunAndGet(
       "class Base; endclass\n"
@@ -143,6 +152,29 @@ TEST(ClassSim, E2eCastNullAssignsNull) {
       "    d = new;\n"
       "    $cast(d, null);\n"
       "    result = (d == null);\n"
+      "  end\n"
+      "endmodule\n", "result"), 1u);
+}
+
+TEST(ClassSim, E2eSuccessfulCastWritesDestinationHandle) {
+  // A successful cast does more than report success: it performs the
+  // assignment, so afterwards the destination handle references the very
+  // object the source pointed at. Here the base handle b points at a Derived
+  // object, the downcast into d2 succeeds, and d2 then refers to the same
+  // object as the original derived handle d.
+  EXPECT_EQ(RunAndGet(
+      "class Base; int x; endclass\n"
+      "class Derived extends Base; int y; endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    Base b;\n"
+      "    Derived d;\n"
+      "    Derived d2;\n"
+      "    d = new;\n"
+      "    b = d;\n"
+      "    $cast(d2, b);\n"
+      "    result = (d2 == d);\n"
       "  end\n"
       "endmodule\n", "result"), 1u);
 }
