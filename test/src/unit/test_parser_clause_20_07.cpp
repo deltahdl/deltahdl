@@ -59,38 +59,12 @@ TEST(UtilitySystemTaskParsing, ArrayRightFunction) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(UtilitySystemTaskParsing, ArraySizeFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] arr [16];\n"
-      "  initial begin\n"
-      "    int x;\n"
-      "    x = $size(arr);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(UtilitySystemTaskParsing, ArrayHighLowFunctions) {
   auto r = Parse(
       "module m;\n"
       "  logic [15:0] mem [0:255];\n"
       "  initial begin\n"
       "    $display(\"high=%0d low=%0d\", $high(mem), $low(mem));\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(UtilitySystemTaskParsing, ArrayDimensionsFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [3:0][7:0] data;\n"
-      "  initial begin\n"
-      "    int d;\n"
-      "    d = $dimensions(data);\n"
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -130,6 +104,47 @@ TEST(UtilitySystemTaskParsing, ArrayUnpackedDimensionsFunction) {
       "  initial begin\n"
       "    int d;\n"
       "    d = $unpacked_dimensions(arr);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// array_dimensions_function ( data_type ): the first argument may be a data
+// type rather than an array expression.
+TEST(UtilitySystemTaskParsing, ArrayDimensionsOfDataType) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int d;\n"
+      "    d = $dimensions(logic [3:0]);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// array_dimension_function ( data_type ): a single-name data type as argument.
+TEST(UtilitySystemTaskParsing, ArrayLeftOfDataType) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "    x = $left(byte);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// array_dimension_function ( data_type , dimension_expression ): a data type
+// argument paired with an explicit dimension expression.
+TEST(UtilitySystemTaskParsing, ArraySizeOfDataTypeWithDimArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "    x = $size(logic [3:0], 1);\n"
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
