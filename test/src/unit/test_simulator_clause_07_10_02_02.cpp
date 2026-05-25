@@ -63,6 +63,22 @@ TEST(QueueMethods, InsertOutOfRangeIsNoop) {
   EXPECT_EQ(q->elements.size(), 2u);
 }
 
+// The largest in-range index equals the queue size and appends at the end
+// (covered by InsertAtEnd). One position beyond that is the smallest index that
+// exceeds the current size and must leave the queue unchanged. Probing this
+// exact boundary guards against an off-by-one that a far-out-of-range index
+// would not expose.
+TEST(QueueMethods, InsertJustPastEndIsNoop) {
+  SimFixture f;
+  auto* q = MakeQueue(f, "q", {10, 20});
+  auto* call = MakeMethodCall(f.arena, "q", "insert",
+                              {MakeInt(f.arena, 3), MakeInt(f.arena, 99)});
+  TryExecQueueMethodStmt(call, f.ctx, f.arena);
+  ASSERT_EQ(q->elements.size(), 2u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+}
+
 TEST(QueueMethods, InsertWithXzIndexIsNoop) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20});
