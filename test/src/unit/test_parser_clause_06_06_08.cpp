@@ -5,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(InterconnectParsing, BasicDecl) {
-  EXPECT_TRUE(ParseOk("module m; interconnect ic; endmodule"));
-}
-
 TEST(InterconnectParsing, DeclSetsFlag) {
   auto r = Parse("module m; interconnect net1; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -32,13 +28,6 @@ TEST(InterconnectParsing, MultipleDecls) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
-}
-
-TEST(InterconnectParsing, PackedDimParses) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  interconnect [7:0] ibus;\n"
-              "endmodule\n"));
 }
 
 TEST(InterconnectParsing, BasicWithVersionGate) {

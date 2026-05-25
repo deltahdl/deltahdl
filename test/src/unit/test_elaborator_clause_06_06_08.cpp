@@ -138,6 +138,32 @@ TEST(InterconnectElaboration, ReleaseIsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+TEST(InterconnectElaboration, ProceduralContinuousAssignIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  interconnect sig;\n"
+      "  initial begin\n"
+      "    assign sig = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(InterconnectElaboration, DeassignIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  interconnect sig;\n"
+      "  initial begin\n"
+      "    deassign sig;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 TEST(InterconnectElaboration, NetAliasWithInterconnectOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -175,6 +201,48 @@ TEST(InterconnectElaboration, ContAssignRhsUsingInterconnectIsError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// An interconnect net stays valid even when its connections resolve to
+// dissimilar net types. The dissimilar-net-type diagnostic that fires for
+// ordinary nets is suppressed once an interconnect net is involved, so a
+// connection that mixes wire and wand resolutions is accepted.
+TEST(InterconnectElaboration, ResolvesToDissimilarNetTypesWildcard) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module drv_wire(output wire o);\n"
+      "  assign o = 1'b1;\n"
+      "endmodule\n"
+      "module drv_wand(output wand o);\n"
+      "  assign o = 1'b0;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  interconnect o;\n"
+      "  drv_wire u0(.*);\n"
+      "  drv_wand u1(.*);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(InterconnectElaboration, ResolvesToDissimilarNetTypesNamedShorthand) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module drv_wire(output wire o);\n"
+      "  assign o = 1'b1;\n"
+      "endmodule\n"
+      "module drv_wand(output wand o);\n"
+      "  assign o = 1'b0;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  interconnect o;\n"
+      "  drv_wire u0(.o);\n"
+      "  drv_wand u1(.o);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }
