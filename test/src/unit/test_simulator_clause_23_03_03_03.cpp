@@ -48,6 +48,29 @@ TEST(PortConnectionRulesForNetsSimulation,
 }
 
 TEST(PortConnectionRulesForNetsSimulation,
+     InputNetPortConnectedToExpressionReceivesComputedValue) {
+  // An input net port accepts any expression, not just a bare signal; the
+  // simulator evaluates the connection expression and drives the port with
+  // its computed value.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input wire [7:0] a, output logic [7:0] b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] drv = 8'h40;\n"
+      "  logic [7:0] result;\n"
+      "  child u(.a(drv + 8'd2), .b(result));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x42u);
+}
+
+TEST(PortConnectionRulesForNetsSimulation,
      OutputNetPortDrivesParentVariable) {
   SimFixture f;
   auto* design = ElaborateSrc(
