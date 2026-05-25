@@ -144,6 +144,7 @@ class Parser {
   RsProductionItem ParseRsProductionItem();
   RsCaseItem ParseRsCaseItem();
   void ParseCovergroupDecl(std::vector<ModuleItem*>& items);
+  void ParseCovergroupFormalList();
   void ParseBlockEventExpression();
   void SkipCovergroupItem();
 

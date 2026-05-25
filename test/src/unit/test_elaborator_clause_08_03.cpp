@@ -13,6 +13,17 @@ TEST(ClassSyntaxElaboration, FinalOnPureConstraintError) {
              "endmodule\n"));
 }
 
+// LRM 8.3 (footnote 8): the final specifier is illegal on a pure virtual
+// method, the method counterpart of the pure-constraint rule above.
+TEST(ClassSyntaxElaboration, FinalOnPureVirtualMethodError) {
+  EXPECT_FALSE(
+      ElabOk("virtual class Base;\n"
+             "  pure virtual function :final void foo();\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 TEST(ClassSyntaxElaboration, DynamicOverrideInInterfaceClassError) {
   EXPECT_FALSE(
       ElabOk("interface class IC;\n"

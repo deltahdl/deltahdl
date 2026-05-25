@@ -17,6 +17,9 @@ enum class CoverBinKind : uint8_t {
   kWildcard,
   kIllegal,
   kIgnore,
+  // A default bin catches every sampled value that does not fall within any
+  // other defined bin of its coverpoint (see LRM 19.5).
+  kDefault,
 };
 
 struct CoverBin {
@@ -36,6 +39,9 @@ struct CoverPoint {
   int64_t auto_bin_min = 0;
   int64_t auto_bin_max = 0;
   uint32_t auto_bin_count = 64;
+  // Trailing window of recently sampled values, used to recognize value
+  // transition sequences for transition bins.
+  std::vector<int64_t> sample_history;
 };
 
 struct CrossBin {

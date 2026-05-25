@@ -1,5 +1,6 @@
 #include "simulator/coverage.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -114,11 +115,61 @@ CrossCover* CoverageDB::AddCross(CoverGroup* group, CrossCover cross) {
 
 void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
   if (cp->has_iff_guard && !cp->iff_guard_value) return;
+  // A value "lies within a defined bin" if it matches any non-default bin,
+  // including illegal and ignore bins. The default bin catches only what the
+  // defined bins miss (LRM 19.5).
+  bool matched_defined = false;
   for (auto& bin : cp->bins) {
+    if (bin.kind == CoverBinKind::kDefault) continue;
+    if (!MatchesBin(bin, value)) continue;
+    matched_defined = true;
     if (bin.kind == CoverBinKind::kIllegal) continue;
     if (bin.kind == CoverBinKind::kIgnore) continue;
-    if (MatchesBin(bin, value)) {
-      ++bin.hit_count;
+    ++bin.hit_count;
+  }
+  if (!matched_defined) {
+    for (auto& bin : cp->bins) {
+      if (bin.kind == CoverBinKind::kDefault) ++bin.hit_count;
+    }
+  }
+
+  // Transition bins count whenever the most recent samples complete one of
+  // their value-transition sequences (LRM 19.5).
+  size_t max_seq = 0;
+  bool any_transition = false;
+  for (const auto& bin : cp->bins) {
+    if (bin.kind != CoverBinKind::kTransition) continue;
+    any_transition = true;
+    for (const auto& seq : bin.transitions) {
+      if (seq.size() > max_seq) max_seq = seq.size();
+    }
+  }
+  if (!any_transition) return;
+
+  cp->sample_history.push_back(value);
+  if (max_seq > 0 && cp->sample_history.size() > max_seq) {
+    size_t excess = cp->sample_history.size() - max_seq;
+    cp->sample_history.erase(
+        cp->sample_history.begin(),
+        cp->sample_history.begin() + static_cast<std::ptrdiff_t>(excess));
+  }
+
+  for (auto& bin : cp->bins) {
+    if (bin.kind != CoverBinKind::kTransition) continue;
+    for (const auto& seq : bin.transitions) {
+      if (seq.empty() || cp->sample_history.size() < seq.size()) continue;
+      size_t off = cp->sample_history.size() - seq.size();
+      bool match = true;
+      for (size_t i = 0; i < seq.size(); ++i) {
+        if (cp->sample_history[off + i] != seq[i]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) {
+        ++bin.hit_count;
+        break;
+      }
     }
   }
 }
@@ -157,6 +208,9 @@ double CoverageDB::GetPointCoverage(const CoverPoint* cp) {
   for (const auto& bin : cp->bins) {
     if (bin.kind == CoverBinKind::kIllegal) continue;
     if (bin.kind == CoverBinKind::kIgnore) continue;
+    // Coverage shall not account for values captured by default bins (LRM
+    // 19.5).
+    if (bin.kind == CoverBinKind::kDefault) continue;
     ++total;
     if (bin.hit_count >= bin.at_least) ++covered;
   }

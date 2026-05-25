@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DataReadApiParsing, CovergroupWithCoverpoint) {
+TEST(CovergroupParsing, CovergroupWithCoverpoint) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic [2:0] addr;
@@ -36,6 +36,135 @@ TEST_F(VerifyParseTest, CovergroupEndLabel) {
     endmodule
   )");
   ASSERT_EQ(unit->modules.size(), 1u);
+}
+
+// LRM 19.3: a coverage_event may be a block event expression introduced with
+// @@, naming a begin/end of a hierarchical block, task, function, or method.
+TEST(CovergroupParsing, CovergroupWithBlockEvent) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      covergroup cg @@(begin top.worker);
+        coverpoint x;
+      endgroup
+    endmodule
+  )"));
+}
+
+// LRM 19.3: a coverage_event may be a sample() method with customized
+// arguments via "with function sample".
+TEST(CovergroupParsing, CovergroupWithFunctionSample) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      covergroup cg with function sample(int v);
+        coverpoint v;
+      endgroup
+    endmodule
+  )"));
+}
+
+// LRM 19.3: a covergroup can be defined in a class. This is the construct
+// shared with LRM 8.3, where class_item admits a covergroup_declaration.
+TEST(CovergroupParsing, CovergroupDefinedInClass) {
+  EXPECT_TRUE(ParseOk(R"(
+    class C;
+      logic [2:0] addr;
+      covergroup cg @(addr);
+        coverpoint addr;
+      endgroup
+    endclass
+  )"));
+}
+
+// LRM 19.3: the coverage_event is optional; with no event specified the
+// covergroup relies on a default sample() method, so the header may end right
+// after the covergroup name.
+TEST(CovergroupParsing, CovergroupWithNoCoverageEvent) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      covergroup cg;
+        coverpoint x;
+      endgroup
+    endmodule
+  )"));
+}
+
+// LRM 19.3 (footnote 29): the extends form of a covergroup is written inside a
+// class.
+TEST(CovergroupParsing, CovergroupExtendsInClass) {
+  EXPECT_TRUE(ParseOk(R"(
+    class C;
+      covergroup cg extends base_cg;
+        coverpoint x;
+      endgroup
+    endclass
+  )"));
+}
+
+// LRM 19.3: a covergroup can be defined in a package.
+TEST(CovergroupParsing, CovergroupInPackage) {
+  EXPECT_TRUE(ParseOk(R"(
+    package p;
+      covergroup cg @(posedge clk);
+        coverpoint x;
+      endgroup
+    endpackage
+  )"));
+}
+
+// LRM 19.3: a covergroup can be defined in a program.
+TEST(CovergroupParsing, CovergroupInProgram) {
+  EXPECT_TRUE(ParseOk(R"(
+    program prog;
+      covergroup cg @(posedge clk);
+        coverpoint x;
+      endgroup
+    endprogram
+  )"));
+}
+
+// LRM 19.3: a covergroup may declare an optional list of formal arguments.
+TEST(CovergroupParsing, CovergroupWithFormalArguments) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      covergroup cg (ref int x, input int c) @(posedge clk);
+        coverpoint x;
+      endgroup
+    endmodule
+  )"));
+}
+
+// LRM 19.3: a covergroup specification can include coverage options.
+TEST(CovergroupParsing, CovergroupWithCoverageOption) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      covergroup cg @(posedge clk);
+        option.per_instance = 1;
+        coverpoint x;
+      endgroup
+    endmodule
+  )"));
+}
+
+// LRM 19.3: an output formal argument is illegal for a covergroup.
+TEST(CovergroupParsing, OutputFormalArgumentRejected) {
+  EXPECT_FALSE(ParseOk(R"(
+    module m;
+      covergroup cg (output int x) @(posedge clk);
+        coverpoint x;
+      endgroup
+    endmodule
+  )"));
+}
+
+// LRM 19.3: an inout formal argument is illegal for a covergroup.
+TEST(CovergroupParsing, InoutFormalArgumentRejected) {
+  EXPECT_FALSE(ParseOk(R"(
+    module m;
+      covergroup cg (inout int x) @(posedge clk);
+        coverpoint x;
+      endgroup
+    endmodule
+  )"));
 }
 
 }

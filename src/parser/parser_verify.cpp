@@ -319,6 +319,27 @@ void Parser::ParseBlockEventExpression() {
   } while (Match(TokenKind::kKwOr));
 }
 
+void Parser::ParseCovergroupFormalList() {
+  // Skip across the covergroup's optional formal-argument list, which follows
+  // the same balanced-parenthesis shape as a tf_port_list. While scanning,
+  // reject any formal declared with output or inout direction, which is not
+  // permitted for a covergroup formal (LRM 19.3).
+  int depth = 1;
+  while (depth > 0 && !AtEnd()) {
+    if (Check(TokenKind::kLParen)) {
+      ++depth;
+    } else if (Check(TokenKind::kRParen)) {
+      --depth;
+    } else if (Check(TokenKind::kKwOutput) || Check(TokenKind::kKwInout)) {
+      diag_.Error(CurrentLoc(),
+                  "a covergroup formal argument cannot be declared 'output' "
+                  "or 'inout'");
+    }
+    if (depth > 0) Consume();
+  }
+  if (Check(TokenKind::kRParen)) Consume();
+}
+
 void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kCovergroupDecl;
@@ -334,7 +355,7 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
 
   if (Check(TokenKind::kLParen)) {
     Consume();
-    SkipParenContents(lexer_);
+    ParseCovergroupFormalList();
   }
 
   if (Match(TokenKind::kAt)) {

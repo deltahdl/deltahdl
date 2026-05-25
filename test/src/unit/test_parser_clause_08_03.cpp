@@ -666,15 +666,22 @@ TEST(ClassSyntaxParsing, ClassWithTypedef) {
   EXPECT_EQ(r.cu->classes[0]->name, "test_cls");
 }
 
-TEST(ClassSyntaxParsing, ClassCovergroup) {
+// LRM 8.3: class_item admits a covergroup_declaration (the construct defined
+// in LRM 19.3). A covergroup member is recorded with the covergroup kind.
+TEST(ClassSyntaxParsing, ClassCovergroupMemberKind) {
   auto r = Parse(
       "class C;\n"
       "  covergroup cg @(posedge clk);\n"
       "    coverpoint x;\n"
       "  endgroup\n"
       "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  bool has_covergroup = false;
+  for (auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kCovergroup) has_covergroup = true;
+  }
+  EXPECT_TRUE(has_covergroup);
 }
 
 TEST(ClassSyntaxParsing, ErrorDuplicateStatic) {
@@ -705,6 +712,26 @@ TEST(ClassSyntaxParsing, ErrorDuplicateRandc) {
   auto r = Parse(
       "class C;\n"
       "  randc randc bit [2:0] x;\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// LRM 8.3 (footnote 10): only one of local or protected may qualify a member.
+TEST(ClassSyntaxParsing, ErrorLocalAndProtected) {
+  auto r = Parse(
+      "class C;\n"
+      "  local protected int x;\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// LRM 8.3 (footnote 9): the default keyword may appear at most once in a class
+// constructor argument list.
+TEST(ClassSyntaxParsing, ErrorDuplicateDefaultConstructorArg) {
+  auto r = Parse(
+      "class C;\n"
+      "  function new(default, default);\n"
+      "  endfunction\n"
       "endclass\n");
   EXPECT_TRUE(r.has_errors);
 }
