@@ -24,4 +24,14 @@ std::shared_ptr<const SequenceExpr> RewriteSequenceUnderClock(
 std::shared_ptr<const SequenceExpr> RewriteClockedSequence(
     const SequenceExpr& sequence);
 
+// §F.5.1 places a precondition on the clock rewrite: "it is required that the
+// conditions in event controls not be dependent upon any local variables." The
+// rewrite of §F.5.1.1 pushes each @( c ) event condition c down onto the
+// Booleans of the sequence, so the reduction is only well defined when no such
+// condition reads a local variable of the sequence. This returns true iff every
+// clock event in `sequence` is independent of the local variable names the
+// sequence declares or samples, and false as soon as one event condition names
+// such a variable.
+bool ClockEventsAreLocalVariableIndependent(const SequenceExpr& sequence);
+
 }  // namespace delta
