@@ -35,4 +35,68 @@ TEST(StringIndexAssocArrayElaboration, VectorElementType) {
   EXPECT_EQ(v.width, 8u);
 }
 
+// §7.8.2: a string literal index of any length is a valid index.
+TEST(StringIndexAssocArrayElaboration, StringLiteralIndexNoError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  initial aa[\"key\"] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §7.8.2: a string-typed variable is a valid index.
+TEST(StringIndexAssocArrayElaboration, StringVariableIndexNoError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  string s;\n"
+      "  initial aa[s] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §7.8.2: indexing with a non-string literal is a different type and shall be
+// reported as a type check error.
+TEST(StringIndexAssocArrayElaboration, IntegerLiteralIndexIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  initial aa[7] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §7.8.2: indexing with a variable of a non-string type is a type check error.
+TEST(StringIndexAssocArrayElaboration, IntegerVariableIndexIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  int i;\n"
+      "  initial aa[i] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §7.8.2: string literals of any length are valid indices, so the
+// zero-length empty string literal is accepted without a type check error.
+TEST(StringIndexAssocArrayElaboration, EmptyStringLiteralIndexNoError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  initial aa[\"\"] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }

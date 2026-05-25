@@ -5,14 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(StringIndexAssocArraySimulation, WriteAndRead) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
-  aa->str_data["hello"] = MakeLogic4VecVal(f.arena, 32, 42);
-
-  EXPECT_EQ(aa->str_data["hello"].ToUint64(), 42u);
-}
-
 TEST(StringIndexAssocArraySimulation, EmptyStringIndex) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
@@ -37,26 +29,24 @@ TEST(StringIndexAssocArraySimulation, LexicographicOrdering) {
   EXPECT_EQ(it->first, "cherry");
 }
 
-TEST(StringIndexAssocArraySimulation, MultipleKeys) {
+// §7.8.2: lexicographic ordering edge cases. The empty string is the least
+// key, and a prefix sorts before its extension ("a" before "ab").
+TEST(StringIndexAssocArraySimulation, OrderingWithEmptyAndPrefixKeys) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
-  aa->str_data["x"] = MakeLogic4VecVal(f.arena, 32, 10);
-  aa->str_data["y"] = MakeLogic4VecVal(f.arena, 32, 20);
-  aa->str_data["z"] = MakeLogic4VecVal(f.arena, 32, 30);
+  aa->str_data["ab"] = MakeLogic4VecVal(f.arena, 32, 2);
+  aa->str_data[""] = MakeLogic4VecVal(f.arena, 32, 0);
+  aa->str_data["b"] = MakeLogic4VecVal(f.arena, 32, 3);
+  aa->str_data["a"] = MakeLogic4VecVal(f.arena, 32, 1);
 
-  EXPECT_EQ(aa->Size(), 3u);
-  EXPECT_EQ(aa->str_data["x"].ToUint64(), 10u);
-  EXPECT_EQ(aa->str_data["y"].ToUint64(), 20u);
-  EXPECT_EQ(aa->str_data["z"].ToUint64(), 30u);
-}
-
-TEST(StringIndexAssocArraySimulation, OverwriteKey) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
-  aa->str_data["key"] = MakeLogic4VecVal(f.arena, 32, 100);
-  aa->str_data["key"] = MakeLogic4VecVal(f.arena, 32, 200);
-
-  EXPECT_EQ(aa->str_data["key"].ToUint64(), 200u);
+  auto it = aa->str_data.begin();
+  EXPECT_EQ(it->first, "");
+  ++it;
+  EXPECT_EQ(it->first, "a");
+  ++it;
+  EXPECT_EQ(it->first, "ab");
+  ++it;
+  EXPECT_EQ(it->first, "b");
 }
 
 TEST(StringIndexAssocArraySimulation, EndToEndWriteRead) {
@@ -117,6 +107,27 @@ TEST(StringIndexAssocArraySimulation, EndToEndOverwrite) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 999u);
+}
+
+// §7.8.2: the empty string is a valid index. Assign to and read back the ""
+// key through the full lowering and evaluation path.
+TEST(StringIndexAssocArraySimulation, EndToEndEmptyStringIndex) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[\"\"] = 7;\n"
+      "    result = aa[\"\"];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 7u);
 }
 
 }

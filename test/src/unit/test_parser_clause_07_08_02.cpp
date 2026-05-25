@@ -14,28 +14,6 @@ TEST(StringIndexAssocArrayParsing, VarDeclAssignmentAssocArray) {
   EXPECT_EQ(item->name, "aa");
 }
 
-TEST(StringIndexAssocArrayParsing, AssocDimBuiltinType) {
-  auto r = Parse("module m; int aa [string]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->unpacked_dims.size(), 1u);
-  ASSERT_NE(item->unpacked_dims[0], nullptr);
-  EXPECT_EQ(item->unpacked_dims[0]->text, "string");
-}
-TEST(StringIndexAssocArrayParsing, AssocArrayStringIndex) {
-  auto r = Parse(
-      "module t;\n"
-      "  int scores[string];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "scores");
-  ASSERT_EQ(item->unpacked_dims.size(), 1u);
-  ASSERT_NE(item->unpacked_dims[0], nullptr);
-}
-
 TEST(StringIndexAssocArrayParsing, AssocArrayStringIndex_DimExpr) {
   auto r = Parse(
       "module t;\n"
@@ -47,17 +25,6 @@ TEST(StringIndexAssocArrayParsing, AssocArrayStringIndex_DimExpr) {
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
   EXPECT_EQ(item->unpacked_dims[0]->kind, ExprKind::kIdentifier);
   EXPECT_EQ(item->unpacked_dims[0]->text, "string");
-}
-
-TEST(StringIndexAssocArrayParsing, AssociativeArrayTypedIndex) {
-  auto r = Parse(
-      "module t;\n"
-      "  int aa[string];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "aa");
 }
 
 }

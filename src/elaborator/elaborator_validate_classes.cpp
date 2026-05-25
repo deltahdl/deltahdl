@@ -638,6 +638,104 @@ void Elaborator::ValidateClassIndexSelect(const ModuleDecl* decl) {
   }
 }
 
+// §7.8.2: an associative array declared with a string index may only be
+// indexed by a string or a string literal of any length. Any other index
+// expression type is a type check error. An empty string literal is a string
+// literal and therefore valid.
+static void CheckStringIndexSelectExpr(
+    const Expr* e,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    const TypeMap& var_types, DiagEngine& diag) {
+  if (!e) return;
+  // Plain element selects only; a slice on an associative array is reported
+  // separately, so skip it here to avoid a second diagnostic on one site.
+  if (e->kind == ExprKind::kSelect && e->base && e->index &&
+      e->base->kind == ExprKind::kIdentifier && !IsSliceSelect(e)) {
+    auto it = var_array_info.find(e->base->text);
+    if (it != var_array_info.end() && it->second.is_assoc &&
+        it->second.assoc_index_type == "string") {
+      const Expr* idx = e->index;
+      bool illegal = false;
+      if (idx->kind == ExprKind::kStringLiteral) {
+        // A string literal of any length, including "", is a valid index.
+      } else if (IsLiteralExpr(idx->kind)) {
+        // Any other literal (integer, real, time, unbased-unsized) is a
+        // different type.
+        illegal = true;
+      } else if (idx->kind == ExprKind::kIdentifier) {
+        auto vt = var_types.find(idx->text);
+        if (vt != var_types.end() && vt->second != DataTypeKind::kString) {
+          illegal = true;
+        }
+      }
+      if (illegal) {
+        diag.Error(
+            e->range.start,
+            std::format("string-indexed associative array '{}' shall be "
+                        "indexed by a string or string literal",
+                        e->base->text));
+      }
+    }
+  }
+  CheckStringIndexSelectExpr(e->lhs, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(e->rhs, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(e->base, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(e->index, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(e->condition, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(e->true_expr, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(e->false_expr, var_array_info, var_types, diag);
+  for (const auto* elem : e->elements) {
+    CheckStringIndexSelectExpr(elem, var_array_info, var_types, diag);
+  }
+}
+
+static void WalkStmtsForStringIndexSelect(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    const TypeMap& var_types, DiagEngine& diag) {
+  if (!s) return;
+  CheckStringIndexSelectExpr(s->lhs, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(s->rhs, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(s->expr, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(s->condition, var_array_info, var_types, diag);
+  for (auto* sub : s->stmts)
+    WalkStmtsForStringIndexSelect(sub, var_array_info, var_types, diag);
+  WalkStmtsForStringIndexSelect(s->then_branch, var_array_info, var_types, diag);
+  WalkStmtsForStringIndexSelect(s->else_branch, var_array_info, var_types, diag);
+  WalkStmtsForStringIndexSelect(s->body, var_array_info, var_types, diag);
+  WalkStmtsForStringIndexSelect(s->for_body, var_array_info, var_types, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForStringIndexSelect(ci.body, var_array_info, var_types, diag);
+}
+
+void Elaborator::ValidateStringIndexSelect(const ModuleDecl* decl) {
+  bool has_string_index = false;
+  for (const auto& entry : var_array_info_) {
+    const auto& info = entry.second;
+    if (info.is_assoc && info.assoc_index_type == "string") {
+      has_string_index = true;
+      break;
+    }
+  }
+  if (!has_string_index) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckStringIndexSelectExpr(item->assign_lhs, var_array_info_, var_types_,
+                                 diag_);
+      CheckStringIndexSelectExpr(item->assign_rhs, var_array_info_, var_types_,
+                                 diag_);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForStringIndexSelect(item->body, var_array_info_, var_types_,
+                                    diag_);
+    }
+  }
+}
+
 static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds) {
   if (dtype.kind == DataTypeKind::kNamed) {
     auto it = tds.find(dtype.type_name);
