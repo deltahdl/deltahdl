@@ -2255,7 +2255,191 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
                                 diag);
 }
 
+// §12.7.3 — the leftmost identifier reached by descending an lvalue through
+// index selects, member accesses, and increment/decrement operators. Names
+// the object an assignment ultimately writes.
+static std::string_view LvalueRootName(const Expr* e) {
+  while (e) {
+    switch (e->kind) {
+      case ExprKind::kIdentifier:
+        return e->text;
+      case ExprKind::kSelect:
+        e = e->base;
+        break;
+      case ExprKind::kMemberAccess:
+        e = e->lhs;
+        break;
+      case ExprKind::kUnary:
+      case ExprKind::kPostfixUnary:
+        e = e->lhs ? e->lhs : e->base;
+        break;
+      default:
+        return {};
+    }
+  }
+  return {};
+}
+
+// §12.7.3 — the identifier naming the array a foreach iterates over. For a
+// hierarchical designator (a.b.arr) this is the trailing member name.
+static std::string_view ForeachArrayName(const Expr* e) {
+  if (!e) return {};
+  if (e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kMemberAccess)
+    return e->text;
+  return {};
+}
+
+static bool IsIncDecExpr(const Expr* e) {
+  if (!e) return false;
+  if (e->kind != ExprKind::kUnary && e->kind != ExprKind::kPostfixUnary)
+    return false;
+  return e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus;
+}
+
+// §12.7.3 — foreach loop variables are read-only. Reports every statement in
+// the loop body that assigns to (or increments/decrements) one of `vars`.
+static void CheckForeachVarsReadOnly(
+    const Stmt* s, const std::unordered_set<std::string_view>& vars,
+    DiagEngine& diag) {
+  if (!s) return;
+  const Expr* target = nullptr;
+  switch (s->kind) {
+    case StmtKind::kBlockingAssign:
+    case StmtKind::kNonblockingAssign:
+      target = s->lhs;
+      break;
+    case StmtKind::kExprStmt:
+      if (IsIncDecExpr(s->expr)) target = s->expr;
+      break;
+    default:
+      break;
+  }
+  if (target) {
+    auto root = LvalueRootName(target);
+    if (!root.empty() && vars.count(root)) {
+      diag.Error(s->range.start,
+                 std::format("foreach loop variable '{}' is read-only and "
+                             "cannot be assigned",
+                             root));
+    }
+  }
+  for (auto* sub : s->stmts) CheckForeachVarsReadOnly(sub, vars, diag);
+  CheckForeachVarsReadOnly(s->then_branch, vars, diag);
+  CheckForeachVarsReadOnly(s->else_branch, vars, diag);
+  CheckForeachVarsReadOnly(s->body, vars, diag);
+  CheckForeachVarsReadOnly(s->for_body, vars, diag);
+  for (auto* sub : s->for_inits) CheckForeachVarsReadOnly(sub, vars, diag);
+  for (auto* sub : s->for_steps) CheckForeachVarsReadOnly(sub, vars, diag);
+  for (auto* sub : s->fork_stmts) CheckForeachVarsReadOnly(sub, vars, diag);
+  for (auto& ci : s->case_items)
+    CheckForeachVarsReadOnly(ci.body, vars, diag);
+}
+
+static bool IsIntegralVectorKind(DataTypeKind k) {
+  switch (k) {
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+    case DataTypeKind::kBit:
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kInteger:
+    case DataTypeKind::kTime:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §12.7.3 — the number of dimensions a foreach can address on an
+// integral/vector array declaration: its packed dimensions plus its unpacked
+// dimensions, all of which are visible directly on the declaration.
+static int ForeachDimCount(const ModuleItem* decl) {
+  int packed = (decl->data_type.packed_dim_left != nullptr ? 1 : 0) +
+               static_cast<int>(decl->data_type.extra_packed_dims.size());
+  int unpacked = static_cast<int>(decl->unpacked_dims.size());
+  return packed + unpacked;
+}
+
+// §12.7.3 — applies the foreach-loop semantic rules to every foreach statement
+// reachable from `s`.
+static void CheckForeachInStmt(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& arrays,
+    DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kForeach) {
+    std::string_view arr_name = ForeachArrayName(s->expr);
+
+    std::unordered_set<std::string_view> named_vars;
+    for (auto v : s->foreach_vars) {
+      if (v.empty()) continue;
+      named_vars.insert(v);
+      // A loop variable shall not reuse the array's identifier.
+      if (!arr_name.empty() && v == arr_name) {
+        diag.Error(s->range.start,
+                   std::format("foreach loop variable '{}' may not have the "
+                               "same name as the array it iterates over",
+                               v));
+      }
+    }
+
+    if (!named_vars.empty())
+      CheckForeachVarsReadOnly(s->body, named_vars, diag);
+
+    // The loop-variable count may not exceed the array's dimensionality. Only
+    // checked for module-level integral/vector arrays whose dimension count is
+    // fully determined by the declaration (typedef'd or aggregate types may
+    // contribute hidden packed dimensions, so they are left alone).
+    auto it = arrays.find(arr_name);
+    if (it != arrays.end() &&
+        IsIntegralVectorKind(it->second->data_type.kind)) {
+      int dims = ForeachDimCount(it->second);
+      if (static_cast<int>(s->foreach_vars.size()) > dims) {
+        diag.Error(
+            s->range.start,
+            std::format("foreach lists {} loop variables but array '{}' has "
+                        "only {} dimension(s)",
+                        s->foreach_vars.size(), arr_name, dims));
+      }
+    }
+  }
+  for (auto* sub : s->stmts) CheckForeachInStmt(sub, arrays, diag);
+  CheckForeachInStmt(s->then_branch, arrays, diag);
+  CheckForeachInStmt(s->else_branch, arrays, diag);
+  CheckForeachInStmt(s->body, arrays, diag);
+  CheckForeachInStmt(s->for_body, arrays, diag);
+  for (auto* sub : s->for_inits) CheckForeachInStmt(sub, arrays, diag);
+  for (auto* sub : s->for_steps) CheckForeachInStmt(sub, arrays, diag);
+  for (auto* sub : s->fork_stmts) CheckForeachInStmt(sub, arrays, diag);
+  for (auto& ci : s->case_items) CheckForeachInStmt(ci.body, arrays, diag);
+}
+
 }  // namespace
+
+void Elaborator::ValidateForeachLoops(const ModuleDecl* decl) {
+  std::unordered_map<std::string_view, const ModuleItem*> arrays;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kVarDecl && !item->name.empty())
+      arrays.emplace(item->name, item);
+  }
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock ||
+                   item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock;
+    if (is_proc && item->body) {
+      CheckForeachInStmt(item->body, arrays, diag_);
+    } else if (item->kind == ModuleItemKind::kFunctionDecl ||
+               item->kind == ModuleItemKind::kTaskDecl) {
+      for (auto* s : item->func_body_stmts)
+        CheckForeachInStmt(s, arrays, diag_);
+    }
+  }
+}
 
 void Elaborator::ValidateJumpStatements(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {

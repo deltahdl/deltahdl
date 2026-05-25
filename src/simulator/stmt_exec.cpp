@@ -722,6 +722,10 @@ static uint32_t GetArraySize(const Stmt* stmt, SimContext& ctx) {
   if (info) return info->size;
   auto* var = ctx.FindVariable(name);
   if (!var) return 0;
+  // §12.7.3: a string is treated as a dynamic array of bytes, so the loop runs
+  // once per character. The value packs eight bits per character, so the
+  // character count is the bit width divided by eight.
+  if (ctx.IsStringVariable(name)) return var->value.width / 8;
   return var->value.width;
 }
 
@@ -750,6 +754,12 @@ static ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     iter_name = stmt->foreach_vars[0];
   }
 
+  // §12.7.3: the loop variable steps through the array's declared index range,
+  // not a fixed zero base. A descending dimension counts down from its high
+  // index. Variables, packed vectors, and strings carry no array-info entry
+  // and keep the natural zero-based ordering.
+  const ArrayInfo* info = arr_name.empty() ? nullptr : ctx.FindArrayInfo(arr_name);
+
   ctx.PushScope();
   Variable* iter_var = nullptr;
   if (!iter_name.empty()) {
@@ -758,7 +768,11 @@ static ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
   for (uint32_t i = 0; i < size && !ctx.StopRequested(); ++i) {
     if (iter_var) {
-      iter_var->value = MakeLogic4VecVal(arena, 32, i);
+      uint32_t index = i;
+      if (info) {
+        index = info->is_descending ? (info->lo + size - 1 - i) : (info->lo + i);
+      }
+      iter_var->value = MakeLogic4VecVal(arena, 32, index);
     }
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;

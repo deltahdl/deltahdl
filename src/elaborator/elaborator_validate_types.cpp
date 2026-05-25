@@ -27,6 +27,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateArrayQueryOnDynamicType(decl);
   ValidateAutomaticVarProcWrites(decl);
   ValidateJumpStatements(decl);
+  ValidateForeachLoops(decl);
   ValidateContAssignConstSelect(decl);
   ValidateSpecparamInParams(decl);
   ValidateEnumAssignments(decl);

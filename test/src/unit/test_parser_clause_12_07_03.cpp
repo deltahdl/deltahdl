@@ -69,20 +69,6 @@ TEST(LoopSyntaxParsing, ForeachWithBlock) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-TEST(LoopSyntaxParsing, ForeachDisplayCallBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foreach (arr[i]) $display(arr[i]); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
-  EXPECT_NE(stmt->expr, nullptr);
-  EXPECT_NE(stmt->body, nullptr);
-}
-
 TEST(LoopSyntaxParsing, ForeachSingleVar) {
   auto r = Parse(
       "module m;\n"
@@ -136,23 +122,6 @@ TEST(LoopSyntaxParsing, ForeachHierarchicalArray) {
   EXPECT_EQ(stmt->kind, StmtKind::kForeach);
   EXPECT_NE(stmt->expr, nullptr);
   EXPECT_EQ(stmt->expr->kind, ExprKind::kMemberAccess);
-}
-
-TEST(LoopSyntaxParsing, ForeachBlockBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    foreach (arr[i]) begin\n"
-      "      x = arr[i];\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
-  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
 TEST(LoopSyntaxParsing, ForeachThreeDimVars) {

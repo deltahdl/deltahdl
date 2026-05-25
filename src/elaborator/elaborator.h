@@ -314,6 +314,10 @@ class Elaborator {
   // a value-returning function shall return an expression.
   void ValidateJumpStatements(const ModuleDecl* decl);
 
+  // §12.7.3 — foreach loop variables may not outnumber the array's
+  // dimensions, are read-only, and may not reuse the array's identifier.
+  void ValidateForeachLoops(const ModuleDecl* decl);
+
   void ValidateConstantFunctionCalls(const ModuleDecl* decl);
 
   // §13.4.4

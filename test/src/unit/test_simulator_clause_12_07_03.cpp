@@ -171,6 +171,44 @@ TEST(StmtExec, ForeachIteratorVariableAccessible) {
   EXPECT_EQ(last->value.ToUint64(), 4u);
 }
 
+// §12.7.3 — the foreach-loop opens an implicit scope and its loop variable has
+// automatic lifetime local to that scope: during the loop the loop variable
+// shadows an outer variable of the same name, and the outer variable is left
+// untouched once the loop ends.
+TEST(StmtExec, ForeachLoopVarIsLocalToScope) {
+  StmtFixture f;
+  auto* arr = f.ctx.CreateVariable("scoped_arr", 4);
+  arr->value = MakeLogic4VecVal(f.arena, 4, 0);
+
+  // An outer variable that happens to share the loop variable's name.
+  auto* outer_i = f.ctx.CreateVariable("i", 32);
+  outer_i->value = MakeLogic4VecVal(f.arena, 32, 99);
+
+  // Records whatever "i" resolves to inside the loop body.
+  auto* seen = f.ctx.CreateVariable("seen", 32);
+  seen->value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  auto* body = f.arena.Create<Stmt>();
+  body->kind = StmtKind::kBlockingAssign;
+  body->lhs = MakeId(f.arena, "seen");
+  body->rhs = MakeId(f.arena, "i");
+
+  auto* stmt = f.arena.Create<Stmt>();
+  stmt->kind = StmtKind::kForeach;
+  stmt->expr = MakeId(f.arena, "scoped_arr");
+  stmt->foreach_vars.push_back("i");
+  stmt->body = body;
+
+  RunStmt(stmt, f.ctx, f.arena);
+
+  // Inside the loop "i" was the local loop variable (last index 3), not 99.
+  EXPECT_EQ(seen->value.ToUint64(), 3u);
+  // The outer "i" survives the loop unchanged: the loop variable was local.
+  auto* after = f.ctx.FindVariable("i");
+  ASSERT_NE(after, nullptr);
+  EXPECT_EQ(after->value.ToUint64(), 99u);
+}
+
 TEST(StmtExec, ForeachContinueSkipsIteration) {
   StmtFixture f;
   auto* arr = f.ctx.CreateVariable("carr", 4);
@@ -375,6 +413,58 @@ TEST(LoopStatementSim, ForeachWriteArrayElements) {
   EXPECT_EQ(a0->value.ToUint64(), 10u);
   EXPECT_EQ(a1->value.ToUint64(), 11u);
   EXPECT_EQ(a2->value.ToUint64(), 12u);
+}
+
+// §12.7.3 — the loop variable takes the array's declared index values, so a
+// non-zero base is honored: the writes land in data[1], data[2], data[3].
+TEST(LoopStatementSim, ForeachUsesDeclaredIndexBase) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] data [1:3];\n"
+      "  initial begin\n"
+      "    foreach (data[i]) data[i] = i[7:0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* d1 = f.ctx.FindVariable("data[1]");
+  auto* d2 = f.ctx.FindVariable("data[2]");
+  auto* d3 = f.ctx.FindVariable("data[3]");
+  ASSERT_NE(d1, nullptr);
+  ASSERT_NE(d2, nullptr);
+  ASSERT_NE(d3, nullptr);
+  EXPECT_EQ(d1->value.ToUint64(), 1u);
+  EXPECT_EQ(d2->value.ToUint64(), 2u);
+  EXPECT_EQ(d3->value.ToUint64(), 3u);
+}
+
+// §12.7.3 — a string is iterated as a dynamic array of bytes: the loop runs
+// once per character, so the counter reaches the character count (3), not the
+// bit width (24).
+TEST(LoopStatementSim, ForeachOverStringIteratesPerCharacter) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  string s;\n"
+      "  logic [7:0] cnt;\n"
+      "  initial begin\n"
+      "    s = \"abc\";\n"
+      "    cnt = 8'd0;\n"
+      "    foreach (s[i]) cnt = cnt + 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("cnt");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
 }
