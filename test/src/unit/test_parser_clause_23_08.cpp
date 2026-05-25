@@ -5,15 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(UpwardNameReferenceParsing, UpwardReferenceToVariable) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    x = parent.v;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(UpwardNameReferenceParsing, UpwardReferenceToNet) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

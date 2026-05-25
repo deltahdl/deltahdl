@@ -77,6 +77,17 @@ TEST(UpwardNameReferenceElaboration, UpwardNamedBlockReferenceResolves) {
              "endmodule\n"));
 }
 
+TEST(UpwardNameReferenceElaboration, UpwardPortReferenceResolves) {
+  EXPECT_TRUE(
+      ElabOk("module child;\n"
+             "  integer x;\n"
+             "  initial x = parent.p;\n"
+             "endmodule\n"
+             "module parent(input logic p);\n"
+             "  child c1();\n"
+             "endmodule\n"));
+}
+
 TEST(UpwardNameReferenceElaboration, CanonicalFourModuleExampleElaborates) {
   EXPECT_TRUE(
       ElabOk("module c;\n"
