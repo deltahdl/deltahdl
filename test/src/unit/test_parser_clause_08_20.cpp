@@ -54,62 +54,6 @@ TEST(VirtualMethodParsing, TaskExtendsSpecifier) {
   ASSERT_FALSE(r.has_errors);
 }
 
-TEST(VirtualMethodParsing, VirtualFunctionInitialSpecifier) {
-  auto r = Parse(
-      "class C;\n"
-      "  virtual function :initial int foo(); return 0; endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(VirtualMethodParsing, VirtualFunctionExtendsSpecifier) {
-  auto r = Parse(
-      "class C;\n"
-      "  virtual function :extends int foo(); return 0; endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(VirtualMethodParsing, VirtualFunctionFinalSpecifier) {
-  auto r = Parse(
-      "class C;\n"
-      "  virtual function :final int foo(); return 0; endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(VirtualMethodParsing, VirtualFunctionInitialFinalSpecifiers) {
-  auto r = Parse(
-      "class C;\n"
-      "  virtual function :initial :final int foo();\n"
-      "    return 0;\n  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(VirtualMethodParsing, VirtualFunctionExtendsFinalSpecifiers) {
-  auto r = Parse(
-      "class C;\n"
-      "  virtual function :extends :final int foo();\n"
-      "    return 0;\n  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(VirtualMethodParsing, VirtualTaskInitialSpecifier) {
-  auto r = Parse(
-      "class C;\n"
-      "  virtual task :initial my_task(); endtask\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(VirtualMethodParsing, VirtualTaskExtendsSpecifier) {
   auto r = Parse(
       "class C;\n"

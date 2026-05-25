@@ -2,6 +2,7 @@
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
+#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
@@ -198,6 +199,34 @@ TEST(ClassSim, FinalMethodInVTable) {
   EXPECT_EQ(type->FindVTableIndex("locked"), 0);
   auto [handle, obj] = MakeObj(f, type);
   EXPECT_EQ(obj->ResolveVirtualMethod("locked"), method);
+}
+
+// 8.20: the 'virtual' qualifier is optional in a derived override; a method
+// that overrides an inherited virtual method stays virtual, so dispatch
+// through a base-typed handle reaches the derived body even though the
+// override omits the keyword.
+TEST(ClassSim, ImplicitOverrideWithoutVirtualKeywordDispatches) {
+  EXPECT_EQ(RunAndGet(
+      "class Base;\n"
+      "  virtual function int compute();\n"
+      "    compute = 1;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function int compute();\n"
+      "    compute = 2;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    Base b;\n"
+      "    Derived d;\n"
+      "    d = new;\n"
+      "    b = d;\n"
+      "    result = b.compute();\n"
+      "  end\n"
+      "endmodule\n", "result"), 2u);
 }
 
 }

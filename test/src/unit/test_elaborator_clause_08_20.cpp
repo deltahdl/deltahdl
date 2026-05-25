@@ -102,6 +102,21 @@ TEST(VirtualMethodElaboration, ExtendsFinalOk) {
              "endmodule\n"));
 }
 
+// 8.20: the ':extends' specifier implies the method is virtual, so the
+// 'virtual' keyword is optional when overriding a virtual base method.
+TEST(VirtualMethodElaboration, ExtendsWithoutVirtualKeywordOk) {
+  EXPECT_TRUE(
+      ElabOk("class Base;\n"
+             "  virtual function void f2(); endfunction\n"
+             "endclass\n"
+             "class A extends Base;\n"
+             "  function :extends void f2(); endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  A a;\n"
+             "endmodule\n"));
+}
+
 TEST(VirtualMethodElaboration, FinalOnPureVirtualFunctionError) {
   EXPECT_FALSE(
       ElabOk("virtual class Base;\n"
@@ -253,6 +268,38 @@ TEST(VirtualMethodElaboration, OverrideCovariantReturnTypeOk) {
              "endclass\n"
              "class D extends C;\n"
              "  virtual function D self(); return null; endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  D d;\n"
+             "endmodule\n"));
+}
+
+// 8.20: an override shall match the prototype's argument list, so a differing
+// argument count is rejected.
+TEST(VirtualMethodElaboration, OverrideMismatchedArgCountError) {
+  EXPECT_FALSE(
+      ElabOk("class Base;\n"
+             "  virtual function void foo(int a); endfunction\n"
+             "endclass\n"
+             "class D extends Base;\n"
+             "  virtual function void foo(int a, int b); endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  D d;\n"
+             "endmodule\n"));
+}
+
+// 8.20: a virtual function return type that is a class type must be the same
+// type or one derived from the prototype's; an unrelated class is rejected.
+TEST(VirtualMethodElaboration, OverrideNonCovariantReturnTypeError) {
+  EXPECT_FALSE(
+      ElabOk("class C; endclass\n"
+             "class U; endclass\n"
+             "class Base;\n"
+             "  virtual function C make(); return null; endfunction\n"
+             "endclass\n"
+             "class D extends Base;\n"
+             "  virtual function U make(); return null; endfunction\n"
              "endclass\n"
              "module m;\n"
              "  D d;\n"

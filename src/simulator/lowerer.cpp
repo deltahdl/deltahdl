@@ -682,8 +682,15 @@ static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
   for (auto* member : cls->members) {
     if (member->kind != ClassMemberKind::kMethod || !member->method) continue;
 
+    // A method that redeclares an inherited virtual entry overrides it and
+    // stays virtual even when the 'virtual' keyword is omitted (8.20). A
+    // ':initial' method is excluded: it explicitly does not act as a virtual
+    // override, so it never updates an inherited slot.
+    bool overrides_inherited_virtual =
+        !member->method->is_method_initial &&
+        info->FindVTableIndex(member->method->name) >= 0;
     if (!member->is_virtual && !member->is_pure_virtual &&
-        !(member->method && member->method->is_method_extends))
+        !member->method->is_method_extends && !overrides_inherited_virtual)
       continue;
     AddOrUpdateVTableEntry(info, member);
   }

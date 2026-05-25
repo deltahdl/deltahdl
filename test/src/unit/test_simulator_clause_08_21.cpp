@@ -139,6 +139,28 @@ TEST(AbstractClassSimulation, ConcreteSubclassOfAbstractBaseConstructed) {
       "endmodule\n", "result"), 42u);
 }
 
+// 8.21: an object of an abstract class shall not be constructed directly.
+// Constructing the abstract base with 'new' is a runtime error even though
+// the declaration of the handle elaborates cleanly.
+TEST(AbstractClassSimulation, ConstructAbstractClassDirectlyError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "virtual class Base;\n"
+      "  pure virtual function int compute();\n"
+      "endclass\n"
+      "module t;\n"
+      "  Base b;\n"
+      "  initial b = new;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 TEST(AbstractClassSimulation, EmptyBodyVirtualMethodIsCallable) {
   EXPECT_EQ(RunAndGet(
       "class Base;\n"
