@@ -99,6 +99,13 @@ SpecKind ClassifySpec(std::string_view spec) {
   return has_wild ? SpecKind::kWildcardFilename : SpecKind::kExplicitFilename;
 }
 
+std::string CellKey(std::string_view library, std::string_view name) {
+  std::string key(library);
+  key.push_back('\0');
+  key.append(name);
+  return key;
+}
+
 bool GlobMatchSegments(const std::vector<std::string_view>& pat_segs,
                        size_t pi,
                        const std::vector<std::string_view>& path_segs,
@@ -181,6 +188,39 @@ std::string_view LibraryMap::LibraryForFile(std::string_view path) const {
   if (!found_any) return "work";
   if (ambiguous) return std::string_view{};
   return chosen;
+}
+
+void LibraryMap::WriteCell(std::string_view library, std::string_view name,
+                           bool is_module, SourceLoc loc, DiagEngine& diag) {
+  std::string key = CellKey(library, name);
+  auto it = cells_.find(key);
+  if (it != cells_.end()) {
+    // Two modules of the same name written to one library in a single
+    // invocation are almost certainly a mistake rather than a recompile.
+    if (is_module && it->second.is_module &&
+        it->second.from_current_invocation) {
+      diag.Warning(loc, "module '" + std::string(name) +
+                            "' is written to library '" + std::string(library) +
+                            "' more than once in this invocation");
+    }
+    // The last cell encountered wins.
+    it->second = LibraryCell{std::string(library), std::string(name), is_module,
+                             loc, true};
+    return;
+  }
+  cells_.emplace(std::move(key),
+                 LibraryCell{std::string(library), std::string(name), is_module,
+                             loc, true});
+}
+
+const LibraryCell* LibraryMap::CellInLibrary(std::string_view library,
+                                             std::string_view name) const {
+  auto it = cells_.find(CellKey(library, name));
+  return it == cells_.end() ? nullptr : &it->second;
+}
+
+void LibraryMap::BeginNewInvocation() {
+  for (auto& [key, cell] : cells_) cell.from_current_invocation = false;
 }
 
 std::vector<std::string_view> LibraryMap::LibraryDeclarationOrder() const {
