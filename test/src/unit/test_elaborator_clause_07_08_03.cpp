@@ -97,4 +97,90 @@ TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_NotStringIndex) {
   EXPECT_TRUE(found);
 }
 
+TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_LiteralIndexIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  class Foo;\n"
+      "    int id;\n"
+      "  endclass\n"
+      "  int data[Foo];\n"
+      "  initial data[7] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(ClassIndexAssocArrayElaboration,
+     AssocArrayClassIndex_WrongClassHandleIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  class Foo;\n"
+      "    int id;\n"
+      "  endclass\n"
+      "  class Bar;\n"
+      "    int x;\n"
+      "  endclass\n"
+      "  Bar b;\n"
+      "  int data[Foo];\n"
+      "  initial data[b] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(ClassIndexAssocArrayElaboration,
+     AssocArrayClassIndex_MatchingHandleNoError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  class Foo;\n"
+      "    int id;\n"
+      "  endclass\n"
+      "  Foo k;\n"
+      "  int data[Foo];\n"
+      "  initial data[k] = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_NullIndexNoError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  class Foo;\n"
+      "    int id;\n"
+      "  endclass\n"
+      "  int data[Foo];\n"
+      "  initial data[null] = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// A handle of a class derived from the index class is an accepted index.
+TEST(ClassIndexAssocArrayElaboration,
+     AssocArrayClassIndex_DerivedHandleNoError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  class Base;\n"
+      "    int id;\n"
+      "  endclass\n"
+      "  class Derived extends Base;\n"
+      "    int extra;\n"
+      "  endclass\n"
+      "  Derived d;\n"
+      "  int data[Base];\n"
+      "  initial data[d] = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }

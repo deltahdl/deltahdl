@@ -449,6 +449,138 @@ void Elaborator::ValidateAssocWildcardTraversal(const ModuleDecl* decl) {
   }
 }
 
+static bool IsClassDerivedFrom(std::string_view a, std::string_view b,
+                               const CompilationUnit* unit);
+
+static bool IsLiteralExpr(ExprKind kind) {
+  return kind == ExprKind::kIntegerLiteral ||
+         kind == ExprKind::kRealLiteral || kind == ExprKind::kTimeLiteral ||
+         kind == ExprKind::kStringLiteral ||
+         kind == ExprKind::kUnbasedUnsizedLiteral;
+}
+
+// §7.8.3: an associative array declared with a class index may only be
+// indexed by an object of that class or a class derived from it; a null
+// handle is also valid. Any other index expression is a type error.
+static void CheckClassIndexSelectExpr(
+    const Expr* e,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    const std::unordered_map<std::string_view, std::string_view>&
+        class_var_types,
+    const std::unordered_set<std::string_view>& class_names,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kSelect && e->base && e->index &&
+      e->base->kind == ExprKind::kIdentifier) {
+    auto it = var_array_info.find(e->base->text);
+    if (it != var_array_info.end() && it->second.is_assoc &&
+        class_names.count(it->second.assoc_index_type) > 0) {
+      const Expr* idx = e->index;
+      auto index_class = it->second.assoc_index_type;
+      bool is_null =
+          idx->kind == ExprKind::kIdentifier && idx->text == "null";
+      bool illegal = false;
+      if (!is_null) {
+        if (IsLiteralExpr(idx->kind)) {
+          illegal = true;
+        } else if (idx->kind == ExprKind::kIdentifier) {
+          auto vt = class_var_types.find(idx->text);
+          if (vt != class_var_types.end() &&
+              !IsClassDerivedFrom(vt->second, index_class, unit)) {
+            illegal = true;
+          }
+        }
+      }
+      if (illegal) {
+        diag.Error(
+            e->range.start,
+            std::format("class-indexed associative array '{}' shall be "
+                        "indexed by an object of class '{}' or a derived class",
+                        e->base->text, index_class));
+      }
+    }
+  }
+  CheckClassIndexSelectExpr(e->lhs, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(e->rhs, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(e->base, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(e->index, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(e->condition, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(e->true_expr, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(e->false_expr, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  for (const auto* elem : e->elements) {
+    CheckClassIndexSelectExpr(elem, var_array_info, class_var_types,
+                              class_names, unit, diag);
+  }
+}
+
+static void WalkStmtsForClassIndexSelect(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    const std::unordered_map<std::string_view, std::string_view>&
+        class_var_types,
+    const std::unordered_set<std::string_view>& class_names,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  if (!s) return;
+  CheckClassIndexSelectExpr(s->lhs, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(s->rhs, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(s->expr, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(s->condition, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  for (auto* sub : s->stmts)
+    WalkStmtsForClassIndexSelect(sub, var_array_info, class_var_types,
+                                 class_names, unit, diag);
+  WalkStmtsForClassIndexSelect(s->then_branch, var_array_info, class_var_types,
+                               class_names, unit, diag);
+  WalkStmtsForClassIndexSelect(s->else_branch, var_array_info, class_var_types,
+                               class_names, unit, diag);
+  WalkStmtsForClassIndexSelect(s->body, var_array_info, class_var_types,
+                               class_names, unit, diag);
+  WalkStmtsForClassIndexSelect(s->for_body, var_array_info, class_var_types,
+                               class_names, unit, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForClassIndexSelect(ci.body, var_array_info, class_var_types,
+                                 class_names, unit, diag);
+}
+
+void Elaborator::ValidateClassIndexSelect(const ModuleDecl* decl) {
+  bool has_class_index = false;
+  for (const auto& entry : var_array_info_) {
+    const auto& info = entry.second;
+    if (info.is_assoc && class_names_.count(info.assoc_index_type) > 0) {
+      has_class_index = true;
+      break;
+    }
+  }
+  if (!has_class_index) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckClassIndexSelectExpr(item->assign_lhs, var_array_info_,
+                                class_var_types_, class_names_, unit_, diag_);
+      CheckClassIndexSelectExpr(item->assign_rhs, var_array_info_,
+                                class_var_types_, class_names_, unit_, diag_);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForClassIndexSelect(item->body, var_array_info_,
+                                   class_var_types_, class_names_, unit_,
+                                   diag_);
+    }
+  }
+}
+
 static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds) {
   if (dtype.kind == DataTypeKind::kNamed) {
     auto it = tds.find(dtype.type_name);

@@ -4,18 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ClassIndexAssocArrayParsing, AssocArrayClassIndex) {
-  auto r = Parse(
-      "module t;\n"
-      "  class Foo;\n"
-      "    int id;\n"
-      "  endclass\n"
-      "  int data[Foo];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ClassIndexAssocArrayParsing, AssocArrayClassIndex_DimExpr) {
   auto r = Parse(
       "module t;\n"

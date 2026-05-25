@@ -252,6 +252,8 @@ class Elaborator {
 
   void ValidateAssocWildcardTraversal(const ModuleDecl* decl);
 
+  void ValidateClassIndexSelect(const ModuleDecl* decl);
+
   void ValidateAssocIndexType(const ModuleItem* item);
 
   void TrackVarArrayInfo(const ModuleItem* item, const RtlirVariable& var);
