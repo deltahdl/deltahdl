@@ -185,6 +185,24 @@ TEST(InterconnectPortConnectionElaboration,
 }
 
 TEST(InterconnectPortConnectionElaboration,
+     PositionalBothInterconnectIllegalAtEndOfElaboration) {
+  // Same end-of-elaboration illegality as the named case, reached through a
+  // positional port connection: when both the internal port and the external
+  // connection are interconnect, the merged simulated net would still be an
+  // interconnect net, which is not permitted.
+  ElabFixture f;
+  ElaborateSrc(
+      "module child(inout interconnect a);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  interconnect ic;\n"
+      "  child u(ic);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(InterconnectPortConnectionElaboration,
      PositionalConnectionWithExternalInterconnectNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
