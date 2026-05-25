@@ -77,4 +77,38 @@ TEST(ArrayMethodCallParsing, PropertyAccessAfterWithClause) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §7.12: the with clause carries an expression enclosed in parentheses (as
+// opposed to randomize's brace-delimited constraint set). The parser records
+// the parenthesized form so later stages can tell the two apart.
+TEST(ArrayMethodCallParsing, WithClauseUsesParentheses) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  int result[$];\n"
+      "  initial result = arr.find with (item > 3);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_NE(rhs->with_expr, nullptr);
+  EXPECT_TRUE(rhs->with_has_parens);
+}
+
+// §7.12: when no with clause is present, a property or range select instead
+// follows the array method call itself. This is the complement of
+// PropertyAccessAfterWithClause and exercises the no-with branch.
+TEST(ArrayMethodCallParsing, PropertyAccessWithoutWithClause) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[8];\n"
+      "  int n;\n"
+      "  initial n = arr.unique().size();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }
