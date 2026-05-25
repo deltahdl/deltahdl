@@ -87,6 +87,27 @@ TEST(BlockNameParsing, NamedForkBlock) {
   EXPECT_EQ(stmt->label, "workers");
 }
 
+TEST(BlockNameParsing, NamedForkWithBareJoinOmittingEndLabel) {
+  // The matching name after the closing keyword is optional, so a named
+  // parallel block may be closed with a bare join and parse cleanly.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : workers\n"
+      "      a = 1;\n"
+      "      b = 2;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->label, "workers");
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
+}
+
 TEST(BlockNameParsing, NamedForkMismatchedEndLabelError) {
   auto r = Parse(
       "module m;\n"
