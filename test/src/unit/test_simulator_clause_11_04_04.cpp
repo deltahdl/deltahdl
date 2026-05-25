@@ -247,4 +247,19 @@ TEST(RelationalSignedness, UnsignedHighValueNotLessThan) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
+// A single unsigned operand forces the whole comparison to be unsigned, so a
+// negative signed operand is read as its large unsigned bit pattern. Here the
+// signed value 0xFF (-1 if signed) and the unsigned value 0x01 must compare as
+// 255 < 1, which is false; a stray signed interpretation would wrongly yield 1.
+TEST(RelationalSignedness, MixedSignedUnsignedUsesUnsigned) {
+  SimFixture f;
+  MakeSignedVarAdv(f, "sm", 8, 0xFF);
+  MakeVar(f, "um", 8, 0x01);
+  auto* expr = MakeBinary(f.arena, TokenKind::kLt, MakeId(f.arena, "sm"),
+                          MakeId(f.arena, "um"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
 }
