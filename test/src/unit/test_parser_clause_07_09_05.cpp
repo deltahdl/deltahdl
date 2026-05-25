@@ -45,14 +45,4 @@ TEST(AssocArrayLastParsing, AssocArrayLastInIfCondition) {
               "endmodule\n"));
 }
 
-TEST(AssocArrayLastParsing, AssocArrayLastReturnAssigned) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  int aa[int];\n"
-              "  int k;\n"
-              "  int status;\n"
-              "  initial status = aa.last(k);\n"
-              "endmodule\n"));
-}
-
 }

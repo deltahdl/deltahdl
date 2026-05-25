@@ -61,6 +61,29 @@ TEST(AssocArrayLast, LastStringKeyReturnsLast) {
   EXPECT_EQ(out.ToUint64(), 1u);
 }
 
+// §7.9.5 — for a string-keyed array, last() must select the lexicographically
+// greatest key, not merely some key. Observed by checking that the assigned
+// index changes once a new greatest key is added: a bug that returned the
+// smallest key would leave the assigned index unchanged.
+TEST(AssocArrayLast, LastStringKeyTracksGreatestKey) {
+  SimFixture f;
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
+  aa->str_data["apple"] = MakeLogic4VecVal(f.arena, 32, 1);
+  aa->str_data["banana"] = MakeLogic4VecVal(f.arena, 32, 2);
+  auto* ref = f.ctx.CreateVariable("s", 48);
+  ref->value = MakeLogic4VecVal(f.arena, 48, 0);
+  Logic4Vec out{};
+  auto* call = MkAssocCall(f.arena, "aa", "last", "s");
+  ASSERT_TRUE(TryEvalAssocMethodCall(call, f.ctx, f.arena, out));
+  ASSERT_EQ(out.ToUint64(), 1u);
+  uint64_t greatest_before = ref->value.ToUint64();
+  // Add a key that is now the greatest; last() must follow it.
+  aa->str_data["cherry"] = MakeLogic4VecVal(f.arena, 32, 3);
+  ASSERT_TRUE(TryEvalAssocMethodCall(call, f.ctx, f.arena, out));
+  ASSERT_EQ(out.ToUint64(), 1u);
+  EXPECT_NE(ref->value.ToUint64(), greatest_before);
+}
+
 TEST(AssocArrayLast, LastStringKeyEmptyReturnsZero) {
   SimFixture f;
   f.ctx.CreateAssocArray("aa", 32, true);
