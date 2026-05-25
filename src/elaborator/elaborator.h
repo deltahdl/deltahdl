@@ -371,6 +371,14 @@ class Elaborator {
 
   void ValidateForwardClassTypedefs();
 
+  // 18.4: random variable type rules for rand/randc class properties.
+  void ValidateRandomVariableTypes();
+  void ValidateOneClassRandomVariables(const ClassDecl* cls);
+
+  // 18.5: constraint block names shall be unique within a class.
+  void ValidateConstraintBlockNames();
+  void ValidateOneClassConstraintNames(const ClassDecl* cls);
+
   void ValidateForwardTypedefsInScope(const ModuleDecl* decl);
 
   void ValidateForwardTypedefScopePrefix(const ModuleDecl* decl);

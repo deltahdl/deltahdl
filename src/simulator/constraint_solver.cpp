@@ -59,6 +59,36 @@ const std::unordered_map<std::string, int64_t>& ConstraintSolver::GetValues()
 }
 
 int64_t ConstraintSolver::GenerateRandValue(RandVariable& var) {
+  // 18.3: a random variable of enum type must take one of the enum's named
+  // constants. The 18.4 exception (an enum member of a packed struct/union)
+  // clears apply_enum_restriction, in which case the named set is ignored and
+  // the value is drawn from the full declared range below.
+  if (!var.enum_values.empty() && var.apply_enum_restriction) {
+    if (var.qualifier == RandQualifier::kRandc) {
+      if (var.randc_history.size() >= var.enum_values.size()) {
+        var.randc_history.clear();
+      }
+      for (int attempt = 0; attempt < 1000; ++attempt) {
+        std::uniform_int_distribution<size_t> pick(0, var.enum_values.size() - 1);
+        int64_t val = var.enum_values[pick(rng_)];
+        if (var.randc_history.find(val) == var.randc_history.end()) {
+          var.randc_history.insert(val);
+          return val;
+        }
+      }
+      for (int64_t v : var.enum_values) {
+        if (var.randc_history.find(v) == var.randc_history.end()) {
+          var.randc_history.insert(v);
+          return v;
+        }
+      }
+      var.randc_history.clear();
+      var.randc_history.insert(var.enum_values.front());
+      return var.enum_values.front();
+    }
+    std::uniform_int_distribution<size_t> pick(0, var.enum_values.size() - 1);
+    return var.enum_values[pick(rng_)];
+  }
   if (var.qualifier == RandQualifier::kRandc) {
     int64_t range_size = var.max_val - var.min_val + 1;
 

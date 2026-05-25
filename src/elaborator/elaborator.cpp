@@ -1095,6 +1095,10 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateInterfaceClassRules();
 
+  ValidateRandomVariableTypes();
+
+  ValidateConstraintBlockNames();
+
   ValidateForwardClassTypedefs();
 
   ValidateTimescaleConsistency();

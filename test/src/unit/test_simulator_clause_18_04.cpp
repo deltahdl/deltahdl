@@ -62,6 +62,51 @@ TEST(Constraint, RandcCyclic) {
   EXPECT_EQ(seen.size(), 4u);
 }
 
+// 18.4: an enum member of a packed structure or packed untagged union that is
+// declared rand is exempt from the 18.3 enum-domain restriction. With the
+// exception in effect the solver may pick a value outside the named-constant
+// set, drawing from the full declared range instead.
+TEST(Constraint, EnumMemberExceptionLiftsRestriction) {
+  ConstraintSolver solver(5);
+  RandVariable v;
+  v.name = "m";
+  v.min_val = 0;
+  v.max_val = 15;
+  v.enum_values = {1, 4, 9};
+  v.apply_enum_restriction = false;
+  solver.AddVariable(v);
+
+  std::unordered_set<int64_t> seen;
+  bool saw_non_named = false;
+  for (int i = 0; i < 100; ++i) {
+    ASSERT_TRUE(solver.Solve());
+    int64_t val = solver.GetValue("m");
+    EXPECT_GE(val, 0);
+    EXPECT_LE(val, 15);
+    seen.insert(val);
+    if (val != 1 && val != 4 && val != 9) saw_non_named = true;
+  }
+  EXPECT_TRUE(saw_non_named);
+}
+
+// With the restriction in effect (the default) the same variable is confined
+// to the named-constant set, confirming the 18.4 flag is what relaxes 18.3.
+TEST(Constraint, EnumRestrictionConfinesByDefault) {
+  ConstraintSolver solver(5);
+  RandVariable v;
+  v.name = "m";
+  v.min_val = 0;
+  v.max_val = 15;
+  v.enum_values = {1, 4, 9};
+  solver.AddVariable(v);
+
+  for (int i = 0; i < 100; ++i) {
+    ASSERT_TRUE(solver.Solve());
+    int64_t val = solver.GetValue("m");
+    EXPECT_TRUE(val == 1 || val == 4 || val == 9);
+  }
+}
+
 TEST(Constraint, RandcCycleResets) {
   ConstraintSolver solver(123);
   RandVariable v;

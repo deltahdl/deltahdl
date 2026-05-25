@@ -100,6 +100,7 @@ class Parser {
   void ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
                                const ClassMember* first, const DataType& dtype);
   ClassMember* ParseConstraintStub(ClassMember* member);
+  void CheckConstraintExprToken(const Token& tok);
 
   bool IsAtGateKeyword();
   void ParseGateInst(std::vector<ModuleItem*>& items);

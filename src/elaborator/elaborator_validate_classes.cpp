@@ -2251,4 +2251,87 @@ void Elaborator::ValidateForwardClassTypedefs() {
   }
 }
 
+// 18.4: a real variable shall not be declared randc. The randc cyclic
+// semantics are defined only over an integral declared range, so a real
+// property may carry rand but never randc.
+static bool IsRealDataType(DataTypeKind kind) {
+  return kind == DataTypeKind::kReal || kind == DataTypeKind::kShortreal ||
+         kind == DataTypeKind::kRealtime;
+}
+
+void Elaborator::ValidateOneClassRandomVariables(const ClassDecl* cls) {
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kProperty) continue;
+    const DataType& dt = m->data_type;
+
+    // A real variable shall not be declared randc.
+    if (m->is_randc && IsRealDataType(dt.kind)) {
+      diag_.Error(m->loc,
+                  std::format("real variable '{}' shall not be declared randc",
+                              m->name));
+    }
+
+    // An object handle may be declared rand but never randc: randomization
+    // solves the referenced object's variables and never reassigns the handle
+    // itself, so there is no cyclic value sequence for randc to permute.
+    if (m->is_randc && dt.kind == DataTypeKind::kNamed &&
+        FindClassDecl(dt.type_name, unit_) != nullptr) {
+      diag_.Error(m->loc,
+                  std::format("object handle '{}' shall not be declared randc",
+                              m->name));
+    }
+
+    if (m->is_rand || m->is_randc) {
+      // Resolve the declared type through any typedef chain so that a union
+      // hidden behind a named type is still examined.
+      const DataType* resolved = &dt;
+      for (int hops = 0; hops < 8 && resolved->kind == DataTypeKind::kNamed;
+           ++hops) {
+        auto it = typedefs_.find(resolved->type_name);
+        if (it == typedefs_.end()) break;
+        resolved = &it->second;
+      }
+      // Only a packed untagged union may be randomized: it is treated as an
+      // integral value. An unpacked union has no single integral image, and a
+      // packed tagged union carries a tag that randomization cannot honor.
+      if (resolved->kind == DataTypeKind::kUnion) {
+        if (!resolved->is_packed) {
+          diag_.Error(m->loc,
+                      std::format("unpacked union '{}' shall not be declared "
+                                  "rand or randc",
+                                  m->name));
+        } else if (resolved->is_tagged) {
+          diag_.Error(m->loc,
+                      std::format("packed tagged union '{}' shall not be "
+                                  "declared rand or randc",
+                                  m->name));
+        }
+      }
+    }
+  }
+}
+
+void Elaborator::ValidateRandomVariableTypes() {
+  for (const auto* cls : unit_->classes) ValidateOneClassRandomVariables(cls);
+}
+
+// 18.5: constraint block names shall be unique within a class.
+void Elaborator::ValidateOneClassConstraintNames(const ClassDecl* cls) {
+  std::unordered_set<std::string_view> seen;
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kConstraint) continue;
+    if (m->name.empty()) continue;
+    if (!seen.insert(m->name).second) {
+      diag_.Error(m->loc,
+                  std::format("constraint block name '{}' is not unique "
+                              "within class '{}'",
+                              m->name, cls->name));
+    }
+  }
+}
+
+void Elaborator::ValidateConstraintBlockNames() {
+  for (const auto* cls : unit_->classes) ValidateOneClassConstraintNames(cls);
+}
+
 }

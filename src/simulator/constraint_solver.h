@@ -73,6 +73,17 @@ struct RandVariable {
   uint32_t width = 32;
   bool enabled = true;
 
+  // 18.3: for an active random variable of enum type, the solver shall select
+  // a value only from the set of named constants of that enum. When non-empty,
+  // enum_values is that named-constant set and confines the chosen value.
+  std::vector<int64_t> enum_values;
+
+  // 18.4: an enum member of a packed structure or packed untagged union that
+  // is declared rand is exempt from the 18.3 enum-domain restriction. Clearing
+  // this flag keeps the enum_values set for reference but lets the solver draw
+  // from the full declared range.
+  bool apply_enum_restriction = true;
+
   std::unordered_set<int64_t> randc_history;
 };
 

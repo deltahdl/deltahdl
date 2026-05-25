@@ -521,10 +521,50 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
     } else if (Match(TokenKind::kRBrace)) {
       --depth;
     } else {
+      CheckConstraintExprToken(CurrentToken());
       Consume();
     }
   }
   return member;
+}
+
+// Constraint expressions are declarative: 18.3 forbids 4-state values (x or z)
+// and 4-state equality operators (=== and !==) inside a constraint, and 18.5
+// forbids operators with side effects (++ and --). Both subclauses constrain
+// the same constraint_expression construct, so the checks share one scan of
+// the constraint block body.
+static bool LiteralHasFourStateDigit(std::string_view text) {
+  for (char c : text) {
+    if (c == 'x' || c == 'X' || c == 'z' || c == 'Z') return true;
+  }
+  return false;
+}
+
+void Parser::CheckConstraintExprToken(const Token& tok) {
+  switch (tok.kind) {
+    case TokenKind::kEqEqEq:
+    case TokenKind::kBangEqEq:
+      // 18.3: 4-state operators are illegal in a constraint.
+      diag_.Error(tok.loc,
+                  "4-state equality operator is not allowed in a constraint");
+      break;
+    case TokenKind::kPlusPlus:
+    case TokenKind::kMinusMinus:
+      // 18.5: operators with side effects are not allowed in a constraint.
+      diag_.Error(tok.loc,
+                  "operator with side effects is not allowed in a constraint");
+      break;
+    case TokenKind::kIntLiteral:
+    case TokenKind::kUnbasedUnsizedLiteral:
+      // 18.3: 4-state values (x or z) are illegal in a constraint.
+      if (LiteralHasFourStateDigit(tok.text)) {
+        diag_.Error(tok.loc,
+                    "4-state value is not allowed in a constraint");
+      }
+      break;
+    default:
+      break;
+  }
 }
 
 }
