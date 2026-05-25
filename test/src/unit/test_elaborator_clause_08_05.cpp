@@ -124,4 +124,36 @@ TEST(ObjectPropertyElaboration, TypeParamAccessViaHandleIsIllegal) {
              "endmodule\n"));
 }
 
+// Reading a parameter value through an instance handle does not yield a
+// constant expression, so it cannot serve as the width of an indexed
+// part-select.
+TEST(ObjectPropertyElaboration, InstanceParamAccessIsNotConstant) {
+  EXPECT_FALSE(
+      ElabOk("class vector #(parameter width = 7);\n"
+             "  bit [width:0] data;\n"
+             "endclass\n"
+             "module m;\n"
+             "  logic [31:0] bus;\n"
+             "  logic [31:0] slice;\n"
+             "  initial begin\n"
+             "    vector #(3) v;\n"
+             "    v = new;\n"
+             "    slice = bus[0 +: v.width];\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// The same part-select with a literal constant width is legal, isolating the
+// rejection above to the non-constant instance-qualified access.
+TEST(ObjectPropertyElaboration, ConstantPartSelectWidthOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [31:0] bus;\n"
+             "  logic [3:0] slice;\n"
+             "  initial begin\n"
+             "    slice = bus[0 +: 4];\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }

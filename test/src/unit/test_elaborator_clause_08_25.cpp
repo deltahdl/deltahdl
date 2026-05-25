@@ -211,4 +211,30 @@ TEST(ParameterizedClassElaboration, TypedefChainedSpecializationOk) {
              "endmodule\n"));
 }
 
+// A parameterized class whose value parameter has no default has no default
+// specialization, so using its unadorned name as a type is illegal (the LRM's
+// "D obj;" example).
+TEST(ParameterizedClassElaboration, NoDefaultSpecializationUnadornedIsError) {
+  EXPECT_FALSE(
+      ElabOk("class D #(int p);\n"
+             "  int data;\n"
+             "endclass\n"
+             "module m;\n"
+             "  D obj;\n"
+             "endmodule\n"));
+}
+
+// The same class supplied with an explicit parameter has a concrete
+// specialization and elaborates, confirming the rejection above is specific to
+// the missing default specialization rather than to the class itself.
+TEST(ParameterizedClassElaboration, ExplicitOverrideForNoDefaultClassOk) {
+  EXPECT_TRUE(
+      ElabOk("class D #(int p);\n"
+             "  int data;\n"
+             "endclass\n"
+             "module m;\n"
+             "  D #(4) obj;\n"
+             "endmodule\n"));
+}
+
 }
