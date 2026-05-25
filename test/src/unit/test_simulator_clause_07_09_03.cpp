@@ -86,6 +86,24 @@ TEST(AssocMethods, ExistsOnEmptyArrayReturnsFalse) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
+TEST(AssocMethods, ExistsReturnsIntWidthResult) {
+  // §7.9.3: the exists() method is declared to return int, so its result
+  // value is produced as a 32-bit quantity regardless of the array's key type.
+  SimFixture f;
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
+  aa->int_data[7] = MakeLogic4VecVal(f.arena, 32, 5);
+
+  Logic4Vec present{};
+  auto* call_present = MkAssocCallInt(f.arena, "aa", "exists", 7);
+  ASSERT_TRUE(TryEvalAssocMethodCall(call_present, f.ctx, f.arena, present));
+  EXPECT_EQ(present.width, 32u);
+
+  Logic4Vec absent{};
+  auto* call_absent = MkAssocCallInt(f.arena, "aa", "exists", 8);
+  ASSERT_TRUE(TryEvalAssocMethodCall(call_absent, f.ctx, f.arena, absent));
+  EXPECT_EQ(absent.width, 32u);
+}
+
 TEST(AssocMethods, ExistsAfterDeleteReturnsFalse) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
