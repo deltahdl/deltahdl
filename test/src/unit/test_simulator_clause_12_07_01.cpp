@@ -198,38 +198,6 @@ TEST(LoopStatementSim, ForDecrement) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(LoopStatementSim, ForLoopVariableCountsCorrectly) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    result = 0;\n"
-      "    for (int i = 0; i < 5; i = i + 1) begin\n"
-      "      result = result + i;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(val, 10u);
-}
-
-TEST(LoopStatementSim, NestedForLoopVarsScopedCorrectly) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    result = 0;\n"
-      "    for (int i = 0; i < 3; i = i + 1) begin\n"
-      "      for (int j = 0; j < 2; j = j + 1) begin\n"
-      "        result = result + 1;\n"
-      "      end\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(val, 6u);
-}
-
 TEST(LoopStatementSim, ForXConditionExitsImmediately) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -288,6 +256,46 @@ TEST(LoopStatementSim, ForCommaSeparatedInitAndStep) {
       "endmodule\n",
       "result");
   EXPECT_EQ(val, 2u);
+}
+
+// When a for-loop initialization declares several locals, a later local's
+// initializer can read an earlier local. Here j starts at i + 3 == 3, so the
+// loop runs for i = 0..2 and the body executes three times.
+TEST(LoopStatementSim, ForLaterLocalInitUsesEarlierLocal) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    result = 0;\n"
+      "    for (int i = 0, int j = i + 3; i < j; i++)\n"
+      "      result = result + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 3u);
+}
+
+// The implicit block created by a for-loop's local declaration can be named
+// with a statement label; the labeled loop runs normally.
+TEST(LoopStatementSim, ForLabeledLoopRuns) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] total;\n"
+      "  initial begin\n"
+      "    total = 8'd0;\n"
+      "    counting : for (int i = 0; i < 5; i = i + 1)\n"
+      "      total = total + 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("total");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
 }

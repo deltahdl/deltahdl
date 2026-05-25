@@ -68,6 +68,34 @@ TEST(LoopSyntaxParsing, ForEmptyStep) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// A for-loop step may be a function/subroutine call, not only an assignment
+// or an increment/decrement expression.
+TEST(LoopSyntaxParsing, ForFunctionCallStep) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void next(); endfunction\n"
+      "  integer i;\n"
+      "  initial begin\n"
+      "    for (i = 0; i < 5; next())\n"
+      "      ;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(LoopSyntaxParsing, ForMixedLocalAndNonLocalInitIsIllegal) {
+  auto r = Parse(
+      "module m;\n"
+      "  integer x;\n"
+      "  initial begin\n"
+      "    for (x = 0, int y = 0; y < 5; y++)\n"
+      "      x = y;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 TEST(LoopSyntaxParsing, ForAllComponentsEmpty) {
   auto r = Parse(
       "module m;\n"

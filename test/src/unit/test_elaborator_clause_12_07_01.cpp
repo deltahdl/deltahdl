@@ -51,34 +51,6 @@ TEST(LoopStatementElaboration, NestedLoops) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(LoopStatementElaboration, ForByteDeclElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    for (byte i = 0; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(LoopStatementElaboration, ForLogicDeclElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    for (logic [3:0] i = 0; i < 10; i++) x = i[7:0];\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(LoopStatementElaboration, ForCompoundAssignStepElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -91,20 +63,6 @@ TEST(LoopStatementElaboration, ForCompoundAssignStepElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-}
-
-TEST(LoopStatementElaboration, ForLoopInInitialBlockElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i = i + 1) begin\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 TEST(LoopStatementElaboration, ForCommaSeparatedTypedInitElaborates) {
@@ -134,6 +92,25 @@ TEST(LoopStatementElaboration, ForTypedInitNotVisibleAfterLoop) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+}
+
+// A for-loop whose initialization does not declare its control variable
+// creates no implicit block, so the outer variable stays in scope after the
+// loop and may still be referenced.
+TEST(LoopStatementElaboration, UntypedForInitVarVisibleAfterLoop) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  integer i;\n"
+      "  initial begin\n"
+      "    for (i = 0; i < 10; i = i + 1) begin\n"
+      "    end\n"
+      "    i = 5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }

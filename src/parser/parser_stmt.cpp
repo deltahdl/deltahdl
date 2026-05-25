@@ -512,8 +512,20 @@ Stmt* Parser::ParseForStmt() {
   } else {
 
     do {
-      stmt->for_init_types.emplace_back();
-      stmt->for_inits.push_back(ParseAssignmentOrExprNoSemi());
+      if (Check(TokenKind::kKwVar) || IsDataTypeKeyword(CurrentToken().kind)) {
+        // The first control variable was a plain assignment, so a later item
+        // attempting a local declaration mixes declared and non-declared
+        // control variables, which is not allowed.
+        diag_.Error(CurrentLoc(),
+                    "for-loop initialization shall declare either all or none "
+                    "of its control variables locally");
+        Match(TokenKind::kKwVar);
+        stmt->for_init_types.push_back(ParseDataType());
+        stmt->for_inits.push_back(ParseAssignmentOrExprNoSemi());
+      } else {
+        stmt->for_init_types.emplace_back();
+        stmt->for_inits.push_back(ParseAssignmentOrExprNoSemi());
+      }
     } while (Match(TokenKind::kComma));
     Expect(TokenKind::kSemicolon);
   }
