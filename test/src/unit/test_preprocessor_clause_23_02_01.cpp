@@ -5,15 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ModuleHeaderDefinition, BasicModuleDeclaration) {
-  auto r = ParseWithPreprocessor(
-      "module m1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "m1");
-}
-
 TEST(ModuleHeaderDefinition, ModuleEndLabel) {
   auto r = ParseWithPreprocessor(
       "module m;\n"

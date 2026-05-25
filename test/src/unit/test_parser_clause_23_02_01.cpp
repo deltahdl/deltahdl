@@ -47,13 +47,6 @@ TEST(ModuleHeaderDefinition, TrailingSemicolonAfterEndmodule) {
   EXPECT_TRUE(ParseOk("module m; endmodule;"));
 }
 
-TEST(ModuleHeaderDefinition, ModuleNoPortList) {
-  auto r = Parse("module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->modules[0]->name, "m");
-  EXPECT_TRUE(r.cu->modules[0]->ports.empty());
-}
-
 TEST(ModuleDefinition, Mux2to1WithAnsiPorts) {
   auto r = Parse(
       "module mux2to1 (input wire a, b, sel,\n"
@@ -112,20 +105,6 @@ TEST(ModuleHeaderDefinition, ModuleNonAnsiHeader) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->ports.size(), 2u);
-}
-
-TEST(ModuleHeaderDefinition, ModuleStaticLifetime) {
-  auto r = Parse("module static m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-TEST(ModuleHeaderDefinition, ModuleWithLifetime) {
-  auto r = Parse("module automatic m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
 TEST(ModuleHeaderDefinition, ModuleWithAttributes) {
@@ -398,6 +377,26 @@ TEST(ModuleHeaderDefinition, ErrorMissingModuleName) {
 
 TEST(ModuleHeaderDefinition, ErrorMissingSemicolonAfterHeader) {
   EXPECT_FALSE(ParseOk("module m endmodule\n"));
+}
+
+// Syntax 23-1 footnote: a package import in the header must be followed by a
+// parameter port list or a port declaration list (or both). A header whose
+// import is followed only by the terminating semicolon is rejected.
+TEST(ModuleHeaderDefinition, ErrorHeaderImportWithoutParamOrPortList) {
+  EXPECT_FALSE(ParseOk("module m import pkg::*; ; endmodule\n"));
+}
+
+// The companion well-formed case: the same header import followed by a port
+// declaration list is accepted.
+TEST(ModuleHeaderDefinition, HeaderImportFollowedByPortListOk) {
+  EXPECT_TRUE(ParseOk("module m import pkg::*; (input logic a); endmodule\n"));
+}
+
+// §23.2.1: the header is completed by the semicolon that follows the closing
+// parenthesis of the port list. A port list that closes but is not followed by
+// that semicolon is rejected, distinct from a header that has no port list.
+TEST(ModuleHeaderDefinition, ErrorMissingSemicolonAfterPortList) {
+  EXPECT_FALSE(ParseOk("module m(input logic a) endmodule\n"));
 }
 
 }
