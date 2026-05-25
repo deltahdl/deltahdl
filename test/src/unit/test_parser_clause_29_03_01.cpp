@@ -98,6 +98,14 @@ TEST(UdpDeclGrammar, UdpWithDuplicateOutputsRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(UdpDeclGrammar, UdpDuplicateOutputInAnsiHeaderRejected) {
+  auto r = Parse(
+      "primitive p(output a, output b, input c);\n"
+      "  table 0 0 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 TEST(UdpDeclGrammar, UdpInoutPortInAnsiHeaderRejected) {
   auto r = Parse(
       "primitive p(output o, inout io);\n"
@@ -142,12 +150,29 @@ TEST(UdpDeclGrammar, UdpVectorOutputInNonAnsiDeclRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(UdpDeclGrammar, UdpVectorInputInNonAnsiDeclRejected) {
+  auto r = Parse(
+      "primitive p(o, a);\n"
+      "  output o;\n"
+      "  input [3:0] a;\n"
+      "  table 0 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 TEST(UdpDeclGrammar, UdpOutputNotFirstInNonAnsiPortListRejected) {
   auto r = Parse(
       "primitive p(a, q);\n"
       "  input a;\n"
       "  output q;\n"
       "  table 0 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(UdpDeclGrammar, UdpHeaderWithoutStateTableRejected) {
+  auto r = Parse(
+      "primitive p(output o, input a);\n"
       "endprimitive\n");
   EXPECT_TRUE(r.has_errors);
 }

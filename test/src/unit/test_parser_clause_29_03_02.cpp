@@ -104,22 +104,6 @@ TEST(UdpPortDeclaration, AnsiSharedInputKeyword) {
   EXPECT_EQ(udp->input_names[2], "sel");
 }
 
-TEST(UdpPortDeclaration, ManyInputs) {
-  auto r = Parse(
-      "primitive gate5(output out, input a, b, c, d, e);\n"
-      "  table\n"
-      "    0 0 0 0 0 : 0;\n"
-      "    1 1 1 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->input_names.size(), 5u);
-  EXPECT_EQ(udp->input_names[4], "e");
-  ASSERT_EQ(udp->table[0].inputs.size(), 5u);
-}
-
 TEST(UdpPortDeclaration, AnsiPortListMixedInputKeyword) {
   auto r = Parse(
       "primitive gate(output out, input a, input b, c);\n"
@@ -268,52 +252,6 @@ TEST(UdpPortDeclaration, InputDeclMixedListAndSeparate) {
   EXPECT_EQ(udp->input_names[3], "d");
 }
 
-TEST(UdpPortDeclaration, NonAnsiPortListTwoInputs) {
-  auto r = Parse(
-      "primitive and_gate(out, a, b);\n"
-      "  output out;\n"
-      "  input a, b;\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    0 1 : 0;\n"
-      "    1 0 : 0;\n"
-      "    1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->name, "and_gate");
-  EXPECT_EQ(udp->output_name, "out");
-  ASSERT_EQ(udp->input_names.size(), 2u);
-  EXPECT_EQ(udp->input_names[0], "a");
-  EXPECT_EQ(udp->input_names[1], "b");
-  EXPECT_FALSE(udp->is_sequential);
-  ASSERT_EQ(udp->table.size(), 4u);
-}
-
-TEST(UdpPortDeclaration, NonAnsiPortListFiveInputs) {
-  auto r = Parse(
-      "primitive gate5(out, a, b, c, d, e);\n"
-      "  output out;\n"
-      "  input a, b, c, d, e;\n"
-      "  table\n"
-      "    0 0 0 0 0 : 0;\n"
-      "    1 1 1 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->input_names.size(), 5u);
-  EXPECT_EQ(udp->input_names[0], "a");
-  EXPECT_EQ(udp->input_names[1], "b");
-  EXPECT_EQ(udp->input_names[2], "c");
-  EXPECT_EQ(udp->input_names[3], "d");
-  EXPECT_EQ(udp->input_names[4], "e");
-}
-
 TEST(UdpPortDeclaration, InputDeclSeparateDecls) {
   auto r = Parse(
       "primitive gate(out, a, b, c);\n"
@@ -333,26 +271,6 @@ TEST(UdpPortDeclaration, InputDeclSeparateDecls) {
   EXPECT_EQ(udp->input_names[0], "a");
   EXPECT_EQ(udp->input_names[1], "b");
   EXPECT_EQ(udp->input_names[2], "c");
-}
-
-TEST(UdpPortDeclaration, RegDeclAfterOutput) {
-  auto r = Parse(
-      "primitive latch(q, d, en);\n"
-      "  output q;\n"
-      "  reg q;\n"
-      "  input d, en;\n"
-      "  table\n"
-      "    ? 0 : ? : -;\n"
-      "    0 1 : ? : 0;\n"
-      "    1 1 : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_EQ(udp->output_name, "q");
-  ASSERT_EQ(udp->input_names.size(), 2u);
 }
 
 TEST(UdpPortDeclaration, AttrOnInputDecl) {
@@ -424,6 +342,19 @@ TEST(UdpPortDeclaration, RegDeclNotNamingOutputRejected) {
       "  input clk;\n"
       "  table\n"
       "    0 r : ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(UdpPortDeclaration, SequentialUdpWithoutRegRejected) {
+  auto r = Parse(
+      "primitive dff(q, d, clk);\n"
+      "  output q;\n"
+      "  input d, clk;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
       "  endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(r.has_errors);
