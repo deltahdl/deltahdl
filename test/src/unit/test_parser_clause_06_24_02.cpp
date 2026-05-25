@@ -43,6 +43,9 @@ TEST(DynamicCastParsing, DynamicCastCall) {
   ASSERT_NE(stmt->expr, nullptr);
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
   EXPECT_EQ(stmt->expr->callee, "$cast");
+  // §6.24.2 signature: $cast takes a destination variable and a source
+  // expression.
+  EXPECT_EQ(stmt->expr->args.size(), 2u);
 }
 
 TEST(DynamicCastParsing, DynamicCastInCondition) {

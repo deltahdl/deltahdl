@@ -1304,6 +1304,20 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   auto* expr = stmt->expr;
 
+  // $cast invoked as a task: the evaluation performs the assignment when the
+  // cast is valid and leaves the destination untouched otherwise. Unlike the
+  // function form (which simply reports 0), the task form signals an invalid
+  // assignment with a run-time error.
+  if (expr && expr->kind == ExprKind::kSystemCall && expr->callee == "$cast") {
+    auto result = EvalExpr(expr, ctx, arena);
+    if (result.ToUint64() == 0) {
+      ctx.GetDiag().Error(expr->loc,
+                          "$cast task could not assign the source expression "
+                          "to the destination; assignment is invalid");
+    }
+    co_return StmtResult::kDone;
+  }
+
   {
     MethodCallParts parts;
     if (ExtractMethodCallParts(expr, parts) &&
