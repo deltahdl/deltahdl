@@ -35,15 +35,6 @@ TEST(LocalparamParsing, ClassWithLocalparam) {
   EXPECT_EQ(r.cu->classes[0]->name, "my_cls");
 }
 
-TEST(LocalparamParsing, LocalparamAssignment) {
-  auto r = Parse("module m; localparam int LP = 42; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
-  EXPECT_EQ(item->name, "LP");
-}
-
 TEST(LocalparamParsing, LocalparamInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -59,13 +50,6 @@ TEST(LocalparamParsing, LocalparamInBlock) {
   ASSERT_GE(body->stmts.size(), 1u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(body->stmts[0]->var_name, "X");
-}
-
-TEST(LocalparamParsing, BasicLocalparamParses) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  localparam int DEPTH = 16;\n"
-              "endmodule\n"));
 }
 
 TEST(LocalparamParsing, LocalparamInHeaderPort) {
@@ -173,6 +157,26 @@ TEST(LocalparamParsing, LocalparamSignedType) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   EXPECT_TRUE(item->is_localparam);
+}
+
+// §6.20.4: in a parameter_port_list every declaration appearing between a
+// localparam keyword and the next parameter keyword is a local parameter;
+// any other declaration is a nonlocal parameter. The localparam grouping is
+// sticky, so a keywordless declaration inherits the preceding group.
+TEST(LocalparamParsing, PortListLocalparamGroupingIsSticky) {
+  auto r = Parse(
+      "module m #(parameter int A = 1, localparam int B = 2,\n"
+      "           int C = 3, parameter int D = 4)\n"
+      "  ();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->params.size(), 4u);
+  EXPECT_EQ(mod->localparam_port_names.count("A"), 0u);
+  EXPECT_EQ(mod->localparam_port_names.count("B"), 1u);
+  EXPECT_EQ(mod->localparam_port_names.count("C"), 1u);
+  EXPECT_EQ(mod->localparam_port_names.count("D"), 0u);
 }
 
 }

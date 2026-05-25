@@ -112,21 +112,6 @@ TEST(ParameterPortListParsing, EmptyParameterPortListParses) {
   EXPECT_EQ(r.cu->modules[0]->params.size(), 0u);
 }
 
-TEST(ParameterDeclarations, ParameterAndLocalparam) {
-  auto r = Parse(
-      "module m;\n"
-      "  parameter int WIDTH = 8;\n"
-      "  localparam int DEPTH = 4;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int param_count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kParamDecl) param_count++;
-  }
-  EXPECT_EQ(param_count, 2);
-}
-
 TEST(ParameterDeclarations, ClassBodyParameterPromotedToLocalparam) {
   auto r = Parse(
       "class c;\n"
@@ -329,6 +314,123 @@ TEST(DeclarationAssignmentParsing, BodyTypeAssignmentRequiresDefault) {
       "  parameter type T;\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
+}
+
+TEST(DeclarationAssignmentParsing, BodyForwardTypeParameterParses) {
+  auto r = Parse("module m; parameter type enum ET = int; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->name, "ET");
+  EXPECT_EQ(item->forward_type_kind, DataTypeKind::kEnum);
+}
+
+TEST(ParameterPortListParsing, ForwardTypeParameterPortVariants) {
+  auto r = Parse(
+      "module m #(parameter type enum ET, type struct ST, type union UT,\n"
+      "           type class CT, type interface class IT)();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->params.size(), 5u);
+  for (const char* n : {"ET", "ST", "UT", "CT", "IT"}) {
+    EXPECT_EQ(mod->type_param_names.count(n), 1u);
+  }
+}
+
+// local_parameter_declaration ::= localparam type_parameter_declaration
+TEST(DeclarationListParsing, LocalparamTypeParameterDeclaration) {
+  auto r = Parse("module m; localparam type T = int; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->name, "T");
+  EXPECT_TRUE(item->is_localparam);
+}
+
+// list_of_type_assignments ::= type_assignment { , type_assignment }
+TEST(DeclarationListParsing, ListOfTypeAssignmentsMultiple) {
+  auto r = Parse("module m; parameter type T = int, U = logic; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kParamDecl &&
+        (item->name == "T" || item->name == "U"))
+      count++;
+  }
+  EXPECT_EQ(count, 2);
+}
+
+// param_assignment ::= parameter_identifier { variable_dimension }
+//                      [ = constant_param_expression ]
+TEST(DeclarationAssignmentParsing, ParamAssignmentWithVariableDimension) {
+  auto r = Parse("module m; localparam int arr [0:2] = '{1, 2, 3}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->name, "arr");
+  EXPECT_GE(item->unpacked_dims.size(), 1u);
+}
+
+// specparam_declaration ::= specparam [ packed_dimension ]
+//                           list_of_specparam_assignments ;
+// list_of_specparam_assignments ::= specparam_assignment { , specparam_assignment }
+// specparam_assignment ::= specparam_identifier = constant_mintypmax_expression
+TEST(DeclarationListParsing, SpecparamDeclarationWithPackedDimAndList) {
+  auto r = Parse("module m; specparam [3:0] d1 = 5, d2 = 10; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int specparam_count = 0;
+  ModuleItem* first = nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kSpecparam) {
+      if (!first) first = item;
+      specparam_count++;
+    }
+  }
+  EXPECT_EQ(specparam_count, 2);
+  ASSERT_NE(first, nullptr);
+  EXPECT_NE(first->data_type.packed_dim_left, nullptr);
+  EXPECT_NE(first->init_expr, nullptr);
+}
+
+// parameter_port_declaration ::= data_type list_of_param_assignments — a port
+// parameter may omit its own type and inherit an implicit type, a later
+// parameter may depend on an earlier one, and a value parameter may be typed
+// by a preceding type parameter. Mirrors the multi-parameter port-list example
+// in the clause text.
+TEST(ParameterPortListParsing, ImplicitTypeAndTypeParameterPorts) {
+  auto r = Parse(
+      "module mc #(int N = 5, M = N * 16, type T = int, T x = 0)();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->params.size(), 4u);
+  EXPECT_EQ(mod->params[0].first, "N");
+  EXPECT_EQ(mod->params[1].first, "M");
+  EXPECT_EQ(mod->params[2].first, "T");
+  EXPECT_EQ(mod->params[3].first, "x");
+  EXPECT_EQ(mod->type_param_names.count("T"), 1u);
+  // The implicit-typed parameter still carries a dependent default expression.
+  EXPECT_NE(mod->params[1].second, nullptr);
+}
+
+// Footnote to the parameter declaration syntax: omitting the default type of a
+// localparam type parameter is only illegal inside a parameter_port_list, so
+// the same declaration is legal once a default is supplied.
+TEST(ParameterPortListParsing, LocalparamTypePortWithDefaultParses) {
+  auto r = Parse("module m #(localparam type T = int)(); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  EXPECT_EQ(mod->type_param_names.count("T"), 1u);
+  EXPECT_EQ(mod->localparam_port_names.count("T"), 1u);
 }
 
 }

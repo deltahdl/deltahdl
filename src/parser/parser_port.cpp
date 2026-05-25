@@ -210,6 +210,15 @@ void Parser::ParseParamPortDecl(
   }
 
   if (Match(TokenKind::kKwType)) {
+    // A type_parameter_declaration may carry an optional forward_type keyword
+    // (enum, struct, union, class, or interface class) before the identifier
+    // to restrict the kinds of type the parameter accepts.
+    if (Match(TokenKind::kKwInterface)) {
+      Expect(TokenKind::kKwClass);
+    } else if (Check(TokenKind::kKwEnum) || Check(TokenKind::kKwStruct) ||
+               Check(TokenKind::kKwUnion) || Check(TokenKind::kKwClass)) {
+      Consume();
+    }
     auto name = Expect(TokenKind::kIdentifier);
     bool has_default = false;
     if (Match(TokenKind::kEq)) {
