@@ -37,6 +37,41 @@ TEST(SubroutineCallExprParsing, ListOfArgsPositionalOnly) {
   EXPECT_TRUE(expr->arg_names.empty());
 }
 
+TEST(SubroutineCallExprParsing, ListOfArgsEmptyPlaceholders) {
+  // list_of_arguments permits omitted (empty) positional elements; the parser
+  // must record a null entry for each so later argument positions stay aligned.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin foo(1, , 3); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+  ASSERT_EQ(expr->args.size(), 3u);
+  EXPECT_NE(expr->args[0], nullptr);
+  EXPECT_EQ(expr->args[1], nullptr);
+  EXPECT_NE(expr->args[2], nullptr);
+  EXPECT_TRUE(expr->arg_names.empty());
+}
+
+TEST(SubroutineCallExprParsing, ListOfArgsLeadingEmptyPlaceholder) {
+  // A leading empty element is also a valid positional placeholder.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin foo(, 5); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+  ASSERT_EQ(expr->args.size(), 2u);
+  EXPECT_EQ(expr->args[0], nullptr);
+  EXPECT_NE(expr->args[1], nullptr);
+}
+
 TEST(SubroutineCallExprParsing, ExprAsFunctionArgument) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

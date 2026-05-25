@@ -163,6 +163,22 @@ TEST(SubroutineCallElaboration, OutputArgSelectOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(SubroutineCallElaboration, VoidFunctionAsOperandError) {
+  // Only a nonvoid function call may appear as an operand within an
+  // expression; using a void function call as an operand is illegal.
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  function void set_x;\n"
+      "    x = 8'd1;\n"
+      "  endfunction\n"
+      "  initial x = set_x() + 8'd1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(SubroutineCallElaboration, OutputArgBinaryExprError) {
   ElabFixture f;
   ElaborateSrc(

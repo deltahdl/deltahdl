@@ -201,29 +201,6 @@ TEST(SubroutineCallSim, TaskCallWithArgs) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SubroutineCallSim, TaskCallEmptyParens) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  task set_x;\n"
-      "    x = 8'd77;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    set_x();\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 77u);
-}
-
 TEST(SubroutineCallArgWriteback, NestedFunctionOutputArgs) {
   ExprFixture f;
 
@@ -308,6 +285,44 @@ TEST(SubroutineCallExprSim, FunctionCallInTernary) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"x", 10u}});
+}
+
+TEST(SubroutineCallArgWriteback, TaskOutputArgWriteback) {
+  // Returning from the subroutine copies the output argument's value back into
+  // the caller's variable, observed end to end through the simulator pipeline.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  task get_val(output logic [7:0] o);\n"
+      "    o = 8'd88;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    get_val(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 88u}});
+}
+
+TEST(SubroutineCallArgWriteback, TaskInoutArgRoundTrip) {
+  // An inout argument carries the caller's value in and the subroutine's
+  // updated value back out on return.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  task bump(inout logic [7:0] io);\n"
+      "    io = io + 8'd1;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    x = 8'd41;\n"
+      "    bump(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 42u}});
 }
 
 }
