@@ -2976,14 +2976,30 @@ void Elaborator::ApplyBindDirectives(RtlirModule* top) {
     for (auto* bd : p->bind_directives) binds.push_back(bd);
   if (binds.empty()) return;
   std::unordered_set<RtlirModule*> visited;
+  std::unordered_set<BindDirective*> applied;
   WalkForBind(top, std::string(top->name), binds, false,
-              visited);
+              visited, applied);
+
+  // §23.11: the bind_target_scope shall be a module or an interface, and a
+  // bind_target_instance shall be an instance of a module or an interface. A
+  // target naming a known scope is honored designwide even when that scope is
+  // never instantiated, but a target that resolves to neither a known scope
+  // nor any instance in the hierarchy denotes nothing bindable and is an error.
+  for (auto* bd : binds) {
+    if (applied.count(bd)) continue;
+    if (IsBindTargetScope(bd->target, unit_)) continue;
+    diag_.Error(bd->loc,
+                std::format("bind target '{}' is neither a module or interface "
+                            "scope nor an instance",
+                            bd->target));
+  }
 }
 
 void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
                              const std::vector<BindDirective*>& binds,
                              bool under_bind,
-                             std::unordered_set<RtlirModule*>& visited) {
+                             std::unordered_set<RtlirModule*>& visited,
+                             std::unordered_set<BindDirective*>& applied) {
   if (!mod) return;
   if (!visited.insert(mod).second) return;
 
@@ -3009,6 +3025,9 @@ void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
       if (hier_path == bd->target) applies = true;
     }
     if (!applies) continue;
+    // The target resolved to a real scope or instance, so it is bindable even
+    // if elaboration of the instantiation later reports a different error.
+    applied.insert(bd);
     if (under_bind) {
       diag_.Error(bd->loc,
                   "bind target shall not be a scope created by a bind");
@@ -3025,7 +3044,8 @@ void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
     std::string child_path = hier_path;
     child_path.push_back('.');
     child_path.append(c.inst_name.data(), c.inst_name.size());
-    WalkForBind(c.resolved, child_path, binds, child_under_bind, visited);
+    WalkForBind(c.resolved, child_path, binds, child_under_bind, visited,
+                applied);
   }
 }
 

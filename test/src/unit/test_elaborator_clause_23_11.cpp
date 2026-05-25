@@ -123,6 +123,84 @@ TEST(BindDirective, InterfaceTargetWithProgramInstantiationIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// Footnote 4 also governs the second bind form: when the bind_target_instance
+// resolves to an interface instance, the bind_instantiation must still be an
+// interface or checker instantiation, so binding a module there is an error.
+TEST(BindDirective, SecondFormInterfaceInstanceRejectsModuleInstantiation) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module mod; endmodule\n"
+      "interface ifc; endinterface\n"
+      "module top;\n"
+      "  ifc i();\n"
+      "endmodule\n"
+      "bind top.i mod m();\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
+}
+
+// bind_instantiation may be a program_instantiation: a program bound into a
+// module becomes part of that module, mirroring the standard's fpu example.
+TEST(BindDirective, ProgramInstantiationBoundIntoModule) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "program probe_prog; endprogram\n"
+      "module cpu; endmodule\n"
+      "module top; cpu c(); endmodule\n"
+      "bind cpu probe_prog pp();\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto it = design->all_modules.find("cpu");
+  ASSERT_NE(it, design->all_modules.end());
+  bool found = false;
+  for (const auto& ch : it->second->children) {
+    if (ch.inst_name == "pp" && ch.module_name == "probe_prog") found = true;
+  }
+  EXPECT_TRUE(found);
+}
+
+// bind_instantiation may be an interface_instantiation bound into a module
+// scope, as in the standard's interface-into-cr_unit example.
+TEST(BindDirective, InterfaceInstantiationBoundIntoModule) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface probe_if; endinterface\n"
+      "module cpu; endmodule\n"
+      "module top; cpu c(); endmodule\n"
+      "bind cpu probe_if pi();\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto it = design->all_modules.find("cpu");
+  ASSERT_NE(it, design->all_modules.end());
+  bool found = false;
+  for (const auto& ch : it->second->children) {
+    if (ch.inst_name == "pi" && ch.module_name == "probe_if") found = true;
+  }
+  EXPECT_TRUE(found);
+}
+
+// bind_instantiation may be a checker_instantiation bound into a module scope.
+TEST(BindDirective, CheckerInstantiationBoundIntoModule) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "checker probe_chk; endchecker\n"
+      "module cpu; endmodule\n"
+      "module top; cpu c(); endmodule\n"
+      "bind cpu probe_chk pc();\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto it = design->all_modules.find("cpu");
+  ASSERT_NE(it, design->all_modules.end());
+  bool found = false;
+  for (const auto& ch : it->second->children) {
+    if (ch.inst_name == "pc" && ch.module_name == "probe_chk") found = true;
+  }
+  EXPECT_TRUE(found);
+}
+
 TEST(BindDirective, BoundInstanceActualsResolveInTargetScope) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -230,6 +308,31 @@ TEST(BindDirective, BindUnderAnotherBindInstantiationIsError) {
       "module top; cpu c(); endmodule\n"
       "bind cpu probe p();\n"
       "bind top.c.p inner i();\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
+}
+
+// A bind_target_scope must name a module or interface; a bare target naming
+// neither a known scope nor any instance denotes nothing bindable.
+TEST(BindDirective, UnknownTargetScopeIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module probe; endmodule\n"
+      "module top; endmodule\n"
+      "bind nonexistent_scope probe p();\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
+}
+
+// A bind_target_instance must resolve to an instance; a hierarchical path that
+// matches no instance in the design is an error.
+TEST(BindDirective, SecondFormUnknownInstancePathIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module probe; endmodule\n"
+      "module cpu; endmodule\n"
+      "module top; cpu c(); endmodule\n"
+      "bind top.nonexistent probe p();\n",
       f, "top");
   EXPECT_TRUE(f.has_errors);
 }

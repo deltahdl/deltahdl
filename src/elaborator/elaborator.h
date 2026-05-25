@@ -514,7 +514,8 @@ class Elaborator {
   void WalkForBind(RtlirModule* mod, const std::string& hier_path,
                    const std::vector<BindDirective*>& binds,
                    bool under_bind,
-                   std::unordered_set<RtlirModule*>& visited);
+                   std::unordered_set<RtlirModule*>& visited,
+                   std::unordered_set<BindDirective*>& applied);
   void ApplyBindInstance(BindDirective* bd, RtlirModule* target);
 
   void ValidateModportExportConflicts(RtlirModule* top);
