@@ -121,10 +121,26 @@ static Logic4Vec EvalDeferredPrint(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-static Logic4Vec EvalVcdSysCall(SimContext& ctx, Arena& arena,
+static std::string ResolveDumpFileName(const Expr* expr, SimContext& ctx,
+                                       Arena& arena) {
+  if (expr->args.empty()) return "dump.vcd";
+  const Expr* arg = expr->args[0];
+  if (arg->kind == ExprKind::kStringLiteral) {
+    auto text = arg->text;
+    if (text.size() >= 2 && text.front() == '"') {
+      return std::string(text.substr(1, text.size() - 2));
+    }
+    return std::string(text);
+  }
+  return FormatValueAsString(EvalExpr(arg, ctx, arena));
+}
+
+static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 std::string_view name) {
   auto* vcd = ctx.GetVcdWriter();
-  if (name == "$dumpvars" || name == "$dumpall") {
+  if (name == "$dumpfile") {
+    ctx.SetDumpFileName(ResolveDumpFileName(expr, ctx, arena));
+  } else if (name == "$dumpvars" || name == "$dumpall") {
     if (vcd) vcd->DumpAllValues();
   } else if (name == "$dumpoff") {
     if (vcd) vcd->SetEnabled(false);
@@ -221,7 +237,7 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
     std::cerr << "stacktrace not available\n";
     return MakeLogic4VecVal(arena, 1, 0);
   }
-  if (name.starts_with("$dump")) return EvalVcdSysCall(ctx, arena, name);
+  if (name.starts_with("$dump")) return EvalVcdSysCall(expr, ctx, arena, name);
   if (IsMathSysCall(name)) return EvalMathSysCall(expr, ctx, arena, name);
   if (IsUtilitySysCall(name)) return EvalUtilitySysCall(expr, ctx, arena, name);
   if (IsIOSysCall(name)) return EvalIOSysCall(expr, ctx, arena, name);

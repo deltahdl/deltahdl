@@ -206,6 +206,9 @@ class SimContext {
   void SetVcdWriter(VcdWriter* vcd) { vcd_writer_ = vcd; }
   VcdWriter* GetVcdWriter() { return vcd_writer_; }
 
+  void SetDumpFileName(std::string name) { dump_file_name_ = std::move(name); }
+  const std::string& GetDumpFileName() const { return dump_file_name_; }
+
   void SetDpiContext(DpiContext* dpi) { dpi_context_ = dpi; }
   DpiContext* GetDpiContext() { return dpi_context_; }
 
@@ -395,6 +398,7 @@ class SimContext {
   std::unordered_map<std::string, std::vector<Process*>> sensitivity_map_;
   static const std::vector<Process*> kEmptyProcessList;
   VcdWriter* vcd_writer_ = nullptr;
+  std::string dump_file_name_ = "dump.vcd";
   DpiContext* dpi_context_ = nullptr;
   Process* current_process_ = nullptr;
   bool stop_requested_ = false;

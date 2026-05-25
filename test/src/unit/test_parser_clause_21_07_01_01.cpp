@@ -18,4 +18,13 @@ TEST(IoSystemTaskParsing, DumpfileDefaultName) {
               "endmodule\n"));
 }
 
+// The filename slot is a general expression, so a non-literal argument
+// such as an identifier must parse, not only a string literal.
+TEST(IoSystemTaskParsing, DumpfileExpressionArgument) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $dumpfile(name);\n"
+              "endmodule\n"));
+}
+
 }
