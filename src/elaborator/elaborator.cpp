@@ -240,6 +240,38 @@ void Elaborator::ValidateConfigCellClauses() {
   }
 }
 
+void Elaborator::ValidateConfigPackageBinding() {
+  // §33.4: a configuration's rules may redirect the binding of module,
+  // primitive, interface, and program instances, but the binding of a package
+  // is fixed and a config may not change it. A package is not instantiated, so
+  // any clause that names a package — whether the cell selected for
+  // reconfiguration or the cell an instance is bound to — is rejected.
+  std::unordered_set<std::string_view> package_names;
+  for (auto* pkg : unit_->packages) package_names.insert(pkg->name);
+  if (package_names.empty()) return;
+
+  for (auto* cfg : unit_->configs) {
+    for (auto* rule : cfg->rules) {
+      if (rule->kind == ConfigRuleKind::kCell &&
+          package_names.contains(rule->cell_name)) {
+        diag_.Error(
+            cfg->range.start,
+            std::format("config '{}' cell clause selects package '{}'; a "
+                        "configuration cannot change the binding of a package",
+                        cfg->name, rule->cell_name));
+      }
+      if (!rule->use_cell.empty() && package_names.contains(rule->use_cell)) {
+        diag_.Error(
+            cfg->range.start,
+            std::format("config '{}' use clause binds an instance to package "
+                        "'{}'; a configuration cannot change the binding of a "
+                        "package",
+                        cfg->name, rule->use_cell));
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateConfigHierarchicalRules() {
   for (auto* cfg : unit_->configs) {
 
@@ -1066,6 +1098,8 @@ void Elaborator::RunPreElaborationValidations() {
   ValidateConfigInstanceClauses();
 
   ValidateConfigCellClauses();
+
+  ValidateConfigPackageBinding();
 
   ValidateConfigHierarchicalRules();
 

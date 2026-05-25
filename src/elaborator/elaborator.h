@@ -55,6 +55,8 @@ class Elaborator {
 
   void ValidateConfigCellClauses();
 
+  void ValidateConfigPackageBinding();
+
   void ValidateConfigHierarchicalRules();
 
   void ValidateConfigLocalparams();
