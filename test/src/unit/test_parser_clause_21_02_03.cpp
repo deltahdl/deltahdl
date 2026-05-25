@@ -33,10 +33,12 @@ TEST(SchedulingSemanticsParsing, MonitorSystemCall) {
   EXPECT_EQ(stmt->expr->callee, "$monitor");
 }
 
-TEST(IoSystemTaskParsing, MonitorBasicCall) {
+// §21.2.3 (Syntax 21-3): the parenthesized argument list is optional, so a
+// bare $monitor with no arguments is a well-formed statement.
+TEST(IoSystemTaskParsing, MonitorCallWithoutArguments) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
-              "  initial $monitor(\"a=%b b=%b\", a, b);\n"
+              "  initial $monitor;\n"
               "endmodule\n"));
 }
 

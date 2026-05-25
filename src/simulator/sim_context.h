@@ -397,6 +397,38 @@ class SimContext {
     deferred_arg_snapshots_.erase(arg);
   }
 
+  // §21.2.3 continuous monitoring. Only one $monitor display list can be
+  // active at a time; recording a new one bumps the generation so that
+  // watchers left behind by a superseded list deactivate themselves.
+  void SetActiveMonitor(const Expr* call) {
+    active_monitor_ = call;
+    ++monitor_generation_;
+  }
+  const Expr* ActiveMonitor() const { return active_monitor_; }
+  uint64_t MonitorGeneration() const { return monitor_generation_; }
+
+  // The monitor flag is toggled by $monitoron/$monitoroff and is on by
+  // default at the start of simulation.
+  void SetMonitorEnabled(bool on) { monitor_enabled_ = on; }
+  bool MonitorEnabled() const { return monitor_enabled_; }
+
+  // At most one monitor display is produced per time step even when several
+  // watched signals change together; this flag coalesces them.
+  bool MonitorDisplayPending() const { return monitor_display_pending_; }
+  void SetMonitorDisplayPending(bool pending) {
+    monitor_display_pending_ = pending;
+  }
+
+  // The value a watched signal held when its change was last observed, so a
+  // write that does not alter the value is not treated as a change.
+  const Logic4Vec* MonitorLastValue(Variable* var) const {
+    auto it = monitor_last_values_.find(var);
+    return it == monitor_last_values_.end() ? nullptr : &it->second;
+  }
+  void SetMonitorLastValue(Variable* var, const Logic4Vec& value) {
+    monitor_last_values_[var] = value;
+  }
+
  private:
   Scheduler& scheduler_;
   Arena& arena_;
@@ -424,6 +456,13 @@ class SimContext {
   bool stop_requested_ = false;
 
   std::unordered_map<const Expr*, Logic4Vec> deferred_arg_snapshots_;
+
+  const Expr* active_monitor_ = nullptr;
+  uint64_t monitor_generation_ = 0;
+  bool monitor_enabled_ = true;
+  bool monitor_display_pending_ = false;
+  std::unordered_map<Variable*, Logic4Vec> monitor_last_values_;
+
   uint32_t pending_program_initials_ = 0;
 
   std::unordered_map<uint32_t, std::vector<Process*>> program_initials_by_block_;

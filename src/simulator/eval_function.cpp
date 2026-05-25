@@ -149,6 +149,117 @@ static Logic4Vec EvalDeferredPrint(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// The four monitor task names listed in Syntax 21-3. They differ only in the
+// default radix used for unformatted expression arguments; that radix is
+// applied by the shared display machinery, so all four monitor identically.
+static bool IsMonitorTask(std::string_view name) {
+  return name == "$monitor" || name == "$monitorb" || name == "$monitoro" ||
+         name == "$monitorh";
+}
+
+// Gathers the simple signal names referenced anywhere in a monitor argument.
+// $time, $stime, and $realtime are system calls rather than identifiers, so
+// they are never collected and their advance does not trigger the monitor.
+static void CollectMonitorSignals(const Expr* e,
+                                  std::vector<std::string_view>& out) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kIdentifier) {
+    out.push_back(e->text);
+    return;
+  }
+  CollectMonitorSignals(e->lhs, out);
+  CollectMonitorSignals(e->rhs, out);
+  CollectMonitorSignals(e->condition, out);
+  CollectMonitorSignals(e->true_expr, out);
+  CollectMonitorSignals(e->false_expr, out);
+  CollectMonitorSignals(e->base, out);
+  CollectMonitorSignals(e->index, out);
+  CollectMonitorSignals(e->index_end, out);
+  for (auto* a : e->args) CollectMonitorSignals(a, out);
+  for (auto* el : e->elements) CollectMonitorSignals(el, out);
+}
+
+static Logic4Vec CloneLogic4Vec(const Logic4Vec& v, Arena& arena) {
+  Logic4Vec copy = MakeLogic4Vec(arena, v.width);
+  copy.is_signed = v.is_signed;
+  uint32_t n = std::min(copy.nwords, v.nwords);
+  for (uint32_t i = 0; i < n; ++i) copy.words[i] = v.words[i];
+  return copy;
+}
+
+static bool SameBits(const Logic4Vec& a, const Logic4Vec& b) {
+  if (a.nwords != b.nwords) return false;
+  for (uint32_t i = 0; i < a.nwords; ++i) {
+    if (a.words[i].aval != b.words[i].aval ||
+        a.words[i].bval != b.words[i].bval)
+      return false;
+  }
+  return true;
+}
+
+// Queues the active monitor's display into the postponed region of the current
+// time step, coalescing so that simultaneous changes produce a single line.
+static void ScheduleMonitorDisplay(SimContext& ctx, Arena& arena) {
+  if (ctx.MonitorDisplayPending()) return;
+  ctx.SetMonitorDisplayPending(true);
+  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+  event->callback = [&ctx, &arena]() {
+    ctx.SetMonitorDisplayPending(false);
+    const Expr* monitor = ctx.ActiveMonitor();
+    if (monitor == nullptr || !ctx.MonitorEnabled()) return;
+    ExecDisplayWrite(monitor, ctx, arena);
+    std::cout << "\n";
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kPostponed,
+                                   event);
+}
+
+// Installs a persistent watcher that redisplays the active monitor whenever the
+// signal takes on a new value. The captured generation deactivates the watcher
+// once a later $monitor has replaced the display list.
+static void AddMonitorWatcher(Variable* var, SimContext& ctx, Arena& arena,
+                              uint64_t generation) {
+  var->AddWatcher([var, &ctx, &arena, generation]() -> bool {
+    if (generation != ctx.MonitorGeneration()) return true;  // superseded
+    const Logic4Vec* last = ctx.MonitorLastValue(var);
+    if (last != nullptr && SameBits(*last, var->value)) return false;
+    ctx.SetMonitorLastValue(var, CloneLogic4Vec(var->value, arena));
+    if (ctx.MonitorEnabled()) ScheduleMonitorDisplay(ctx, arena);
+    return false;
+  });
+}
+
+static Logic4Vec EvalMonitor(const Expr* expr, SimContext& ctx, Arena& arena) {
+  // A fresh $monitor call becomes the one active display list and supersedes
+  // any earlier one.
+  ctx.SetActiveMonitor(expr);
+  std::vector<std::string_view> names;
+  for (auto* arg : expr->args) CollectMonitorSignals(arg, names);
+  uint64_t generation = ctx.MonitorGeneration();
+  for (auto name : names) {
+    Variable* var = ctx.FindVariable(name);
+    if (var == nullptr) continue;
+    ctx.SetMonitorLastValue(var, CloneLogic4Vec(var->value, arena));
+    AddMonitorWatcher(var, ctx, arena, generation);
+  }
+  // The initial values are displayed at the end of the current time step.
+  if (ctx.MonitorEnabled()) ScheduleMonitorDisplay(ctx, arena);
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
+static Logic4Vec EvalMonitorFlag(SimContext& ctx, Arena& arena,
+                                 std::string_view name) {
+  if (name == "$monitoroff") {
+    ctx.SetMonitorEnabled(false);
+  } else {  // $monitoron
+    ctx.SetMonitorEnabled(true);
+    // Turning the flag on produces a display immediately, regardless of
+    // whether a watched value has changed.
+    ScheduleMonitorDisplay(ctx, arena);
+  }
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
 static std::string ResolveDumpFileName(const Expr* expr, SimContext& ctx,
                                        Arena& arena) {
   if (expr->args.empty()) return "dump.vcd";
@@ -321,8 +432,7 @@ static bool IsIOSysCall(std::string_view n) {
 }
 
 static bool IsNoOpSysCall(std::string_view n) {
-  return n == "$monitoron" || n == "$monitoroff" || n == "$printtimescale" ||
-         n == "$timeformat";
+  return n == "$printtimescale" || n == "$timeformat";
 }
 
 static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
@@ -333,8 +443,12 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
   if (name == "$timeunit" || name == "$timeprecision") {
     return EvalTimescaleQuery(expr, ctx, arena, name);
   }
-  if (name == "$strobe" || name == "$monitor") {
+  if (name == "$strobe") {
     return EvalDeferredPrint(expr, ctx, arena);
+  }
+  if (IsMonitorTask(name)) return EvalMonitor(expr, ctx, arena);
+  if (name == "$monitoron" || name == "$monitoroff") {
+    return EvalMonitorFlag(ctx, arena, name);
   }
   if (IsNoOpSysCall(name)) return MakeLogic4VecVal(arena, 1, 0);
   if (name == "$system") return EvalSystemCommand(expr, arena);
