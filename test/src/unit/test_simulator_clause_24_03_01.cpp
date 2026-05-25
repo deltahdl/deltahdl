@@ -181,6 +181,60 @@ TEST(ProgramSchedulingSim, MultipleProgramInitialsEachRunInReactive) {
   EXPECT_EQ(b->value.ToUint64(), 200u);
 }
 
+// A subroutine declared outside the program (here in the enclosing module)
+// inherits the reactive scheduling region of the program thread that calls it.
+// The task's blocking write therefore lands in the Reactive region, after the
+// design's NBA region has committed, so the program-driven value wins.
+TEST(ProgramSchedulingSim, ModuleTaskCalledFromProgramRunsBlockingInReactive) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [7:0] v;\n"
+      "  task set_v;\n"
+      "    v = 8'd99;\n"
+      "  endtask\n"
+      "  initial v <= 8'd10;\n"
+      "  program p;\n"
+      "    initial set_v();\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* v = f.ctx.FindVariable("v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 99u);
+}
+
+// The same inheritance applies to nonblocking assignments: an NBA executed
+// inside a module-declared subroutine that is called from a program thread is
+// scheduled in the Re-NBA region, which runs after the design NBA region, so
+// the subroutine reads the design's already-committed value.
+TEST(ProgramSchedulingSim, ModuleTaskCalledFromProgramSchedulesNbaInReactive) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  task do_nba;\n"
+      "    b <= a;\n"
+      "  endtask\n"
+      "  initial a <= 8'd10;\n"
+      "  program p;\n"
+      "    initial do_nba();\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 10u);
+  EXPECT_EQ(b->value.ToUint64(), 10u);
+}
+
 TEST(ProgramSchedulingSim, ConcurrentAssertionInProgramRunsWithoutCrash) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -204,6 +258,35 @@ TEST(ProgramSchedulingSim, ConcurrentAssertionInProgramRunsWithoutCrash) {
   LowerAndRun(design, f);
   EXPECT_TRUE(f.ctx.StopRequested());
   EXPECT_EQ(f.ctx.AssertionFailCount(), 0);
+}
+
+// Concurrent assertions keep their invariant scheduling inside a program: they
+// are still sampled and evaluated in the Observed region rather than skipped
+// because the code lives in program scope. With the same structure as the
+// passing case but a predicate that does not hold, the assertion must actually
+// fire, proving production evaluates it instead of silently ignoring it.
+TEST(ProgramSchedulingSim, ConcurrentAssertionInProgramStillEvaluatesAndFails) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic clk;\n"
+      "  logic [7:0] x;\n"
+      "  program p;\n"
+      "    initial begin\n"
+      "      x = 8'd1;\n"
+      "      #5 ;\n"
+      "    end\n"
+      "    initial begin\n"
+      "      clk = 1'b0;\n"
+      "      #1 clk = 1'b1;\n"
+      "    end\n"
+      "    assert property (@(posedge clk) x == 8'd2);\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.AssertionFailCount(), 1);
 }
 
 }
