@@ -478,6 +478,32 @@ void Lowerer::LowerDynArrayInit(const RtlirVariable& var) {
   auto* q = ctx_.FindQueue(var.name);
   if (!q) return;
 
+  // §7.5.1: a dynamic array declaration may use the new[] constructor as its
+  // declaration-assignment right-hand side. Size the array, default-initialize
+  // its elements, then copy from the optional initialization array.
+  if (var.init_expr->kind == ExprKind::kCall && var.init_expr->text == "new" &&
+      !var.init_expr->args.empty()) {
+    auto sz_val = EvalExpr(var.init_expr->args[0], ctx_, arena_);
+    int64_t sz = SignExtend(sz_val.ToUint64(), sz_val.width);
+    if (sz < 0) {
+      ctx_.GetDiag().Error({}, "dynamic array new[] size is negative");
+      return;
+    }
+    q->elements.assign(static_cast<size_t>(sz),
+                       MakeLogic4VecVal(arena_, q->elem_width, 0));
+    if (var.init_expr->args.size() >= 2) {
+      auto* init_expr = var.init_expr->args[1];
+      if (init_expr && init_expr->kind == ExprKind::kIdentifier) {
+        if (auto* src = ctx_.FindQueue(init_expr->text)) {
+          size_t copy_len = std::min(q->elements.size(), src->elements.size());
+          for (size_t i = 0; i < copy_len; ++i) q->elements[i] = src->elements[i];
+        }
+      }
+    }
+    q->AssignFreshIds();
+    return;
+  }
+
   if (var.init_expr->kind != ExprKind::kAssignmentPattern &&
       var.init_expr->kind != ExprKind::kConcatenation)
     return;

@@ -37,30 +37,4 @@ TEST(DynamicArrayNewParsing, BlockingAssignment_DynamicArrayNewWithInit) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(DynamicArrayNewParsing, DynamicArrayNew) {
-  auto r = Parse(
-      "module t;\n"
-      "  int dyn[];\n"
-      "  initial dyn = new[10];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
-TEST(DynamicArrayNewParsing, DynamicArrayNewWithInit) {
-  auto r = Parse(
-      "module t;\n"
-      "  int dyn[];\n"
-      "  int src[];\n"
-      "  initial dyn = new[20](src);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-}
-
 }
