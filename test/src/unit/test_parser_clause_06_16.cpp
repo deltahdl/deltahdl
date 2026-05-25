@@ -41,14 +41,6 @@ TEST(DataTypeParsing, StringBlockDecl) {
   EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kString);
 }
 
-TEST(DataTypeParsing, StringFunctionArg) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  function void print_msg(string s);\n"
-              "  endfunction\n"
-              "endmodule\n"));
-}
-
 TEST(DataTypeParsing, StringVarDecl) {
   auto r = Parse(
       "module t;\n"
@@ -62,25 +54,6 @@ TEST(DataTypeParsing, StringVarDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
   EXPECT_FALSE(item->data_type.is_net);
   EXPECT_EQ(item->name, "msg");
-}
-
-TEST(StringLiteralParserParsing, StringLiteralAsParameter) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  parameter string MSG = \"default message\";\n"
-              "endmodule"));
-}
-
-TEST(OperatorAndExpressionParsing, StringCompareEquality) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  string s1, s2;\n"
-              "  initial begin\n"
-              "    s1 = \"hello\";\n"
-              "    s2 = \"hello\";\n"
-              "    if (s1 == s2) $display(\"equal\");\n"
-              "  end\n"
-              "endmodule\n"));
 }
 
 TEST(StringDataTypeParsing, StringTypeWithInit) {

@@ -345,4 +345,83 @@ TEST(StringDataType, StringLiteralImplicitlyConvertedInEquality) {
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }
 
+// §6.16, Table 6-9: a string replication with a zero multiplier produces
+// the empty string, so it contributes nothing to an enclosing string
+// concatenation.
+TEST(StringDataType, ZeroMultiplierStringReplicationIsEmpty) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string s;\n"
+      "  initial s = {\"x\", {0{\"ab\"}}, \"y\"};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* s = f.ctx.FindVariable("s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(VecToStr(s->value), "xy");
+}
+
+// §6.16: a string literal assigned to an integral variable whose width
+// equals the literal width is stored unchanged.
+TEST(StringDataType, StringLiteralToExactWidthIntegral) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  byte c;\n"
+      "  initial c = \"A\";\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->value.ToUint64() & 0xFFu, 0x41u);
+}
+
+// §6.16: assigning a narrower string literal to a wider integral variable
+// right justifies it and zero-fills on the left.
+TEST(StringDataType, StringLiteralToWiderIntegralZeroFillsLeft) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  bit [10:0] b;\n"
+      "  initial b = \"A\";\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->value.width, 11u);
+  EXPECT_EQ(b->value.ToUint64(), 0x41u);
+}
+
+// §6.16: assigning a wider string literal to a narrower integral variable
+// right justifies it and truncates on the left (dropping the leading
+// characters, not the trailing ones).
+TEST(StringDataType, StringLiteralToNarrowerIntegralTruncatesLeft) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  bit [31:0] h;\n"
+      "  initial h = \"hello\";\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* h = f.ctx.FindVariable("h");
+  ASSERT_NE(h, nullptr);
+  EXPECT_EQ(VecToStr(h->value), "ello");
+}
+
 }
