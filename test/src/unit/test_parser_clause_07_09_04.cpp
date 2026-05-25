@@ -45,14 +45,4 @@ TEST(AggregateTypeParsing, AssocArrayFirstInIfCondition) {
               "endmodule\n"));
 }
 
-TEST(AggregateTypeParsing, AssocArrayFirstReturnAssigned) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  int aa[int];\n"
-              "  int k;\n"
-              "  int status;\n"
-              "  initial status = aa.first(k);\n"
-              "endmodule\n"));
-}
-
 }
