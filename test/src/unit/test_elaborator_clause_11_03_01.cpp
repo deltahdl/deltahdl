@@ -484,4 +484,32 @@ TEST(RealOps, RealArrayElementAccessIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// The XNOR bitwise operator also spells as ^~, which is integral-only just like
+// its ~^ form, so applying it to real operands must be rejected.
+TEST(RealOps, BitwiseXnorCaretTildeOnRealIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real a, b;\n"
+      "  real c;\n"
+      "  initial c = a ^~ b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// The ^~ spelling of the reduction XNOR operator is likewise integral-only and
+// is not permitted on a real operand.
+TEST(RealOps, ReductionXnorCaretTildeOnRealIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real a;\n"
+      "  logic c;\n"
+      "  initial c = ^~a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }
