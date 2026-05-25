@@ -110,6 +110,20 @@ TEST(IoDisplayWriteSim, SingleCommaIsTwoSpaces) {
   EXPECT_EQ(out, "  ");
 }
 
+// N5: the commas that delimit an empty argument may carry surrounding white
+// space. That white space belongs to no argument, so a padded comma still
+// denotes exactly one empty argument and emits exactly one space -- here the
+// single gap between "x" and "y" rather than several.
+TEST(IoDisplayWriteSim, WhitespacePaddedEmptyArgIsSingleSpace) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write(\"x\" , , \"y\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "x y");
+}
+
 // N2: arguments are rendered in the order they appear in the argument list.
 // Two adjacent string literals exercise ordering without invoking any format
 // specifier: the first literal must precede the second in the output.
@@ -181,6 +195,34 @@ TEST(IoDisplayWriteSim, WriteRadixVariantOmitsNewline) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "hi");
+}
+
+// N4b: %m is one of the three specifiers (with %l and %%) that do not draw a
+// corresponding expression argument from the list. Invoked with no expression
+// argument at all, the call still succeeds and the specifier is consumed --
+// nothing of the literal "%m" survives into the output.
+TEST(IoDisplayWriteSim, HierarchicalSpecifierConsumesNoArgument) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write(\"%m\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(out.empty());
+  EXPECT_EQ(out.find('%'), std::string::npos);
+}
+
+// N4b: %l likewise needs no corresponding expression argument; supplied with an
+// empty argument list it is still substituted rather than echoed literally.
+TEST(IoDisplayWriteSim, LibrarySpecifierConsumesNoArgument) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write(\"%l\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(out.empty());
+  EXPECT_EQ(out.find('%'), std::string::npos);
 }
 
 }  // namespace
