@@ -103,4 +103,55 @@ TEST(LexicalConventionLexing, StringWithEscapeSequences) {
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
 }
 
+// A double backslash immediately before a newline is the escape for a single
+// backslash, so the newline is preserved as a literal rather than swallowed as
+// a line continuation.
+TEST(LexicalConventionLexing, DoubleBackslashBeforeNewlineIsNotContinuation) {
+  EXPECT_EQ(InterpretStringEscapes("\\\\\n"), "\\\n");
+}
+
+// Because the double backslash binds first, a line continuation that survives a
+// trailing backslash needs a third backslash: \\\<newline> yields one
+// backslash with the newline consumed as the continuation.
+TEST(LexicalConventionLexing, LineContinuationRequiresThirdBackslash) {
+  EXPECT_EQ(InterpretStringEscapes("\\\\\\\n"), "\\");
+}
+
+// Triple-quoted literals accept unescaped " and newline characters, but the
+// escape sequences for those characters remain valid inside them too.
+TEST(LexicalConventionLexing, TripleQuotedEscapeSequencesSupported) {
+  auto r = LexOne(R"("""a\nb\"c""")");
+  ASSERT_EQ(r.token.kind, TokenKind::kStringLiteral);
+  std::string body = std::string(r.token.text).substr(3, r.token.text.size() - 6);
+  EXPECT_EQ(InterpretStringEscapes(body), "a\nb\"c");
+}
+
+// An x or z (which are legal digits in numeric literals) is never accepted as a
+// digit of an octal escape, so it ends the octal run and stands as its own
+// character instead.
+TEST(LexicalConventionLexing, OctalEscapeExcludesXAndZDigits) {
+  EXPECT_EQ(InterpretStringEscapes(R"(\1x)"), std::string("\x01") + "x");
+  EXPECT_EQ(InterpretStringEscapes(R"(\1z)"), std::string("\x01") + "z");
+}
+
+// Likewise, an x or z is never accepted as a digit of a hex escape; it ends the
+// hex run and remains a literal character.
+TEST(LexicalConventionLexing, HexEscapeExcludesXAndZDigits) {
+  EXPECT_EQ(InterpretStringEscapes(R"(\x1x)"), std::string("\x01") + "x");
+  EXPECT_EQ(InterpretStringEscapes(R"(\x1z)"), std::string("\x01") + "z");
+}
+
+// A hex escape consumes at most two hex digits, so a third hex digit stands as
+// its own character: \x411 is the byte 0x41 followed by a literal '1'.
+TEST(LexicalConventionLexing, HexConsumesAtMostTwoDigits) {
+  EXPECT_EQ(InterpretStringEscapes(R"(\x411)"), "A1");
+}
+
+// An octal escape consumes at most three digits even when the following
+// character is itself an octal digit, which is how the ambiguity of a short
+// octal run is resolved: \1011 is the byte 0101 ('A') then a literal '1'.
+TEST(LexicalConventionLexing, OctalConsumesAtMostThreeDigits) {
+  EXPECT_EQ(InterpretStringEscapes(R"(\1011)"), "A1");
+}
+
 }
