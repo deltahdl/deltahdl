@@ -348,6 +348,9 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
       continue;
     if (Match(TokenKind::kKwExtern)) {
       proto = true;
+      // 18.5.1: 'extern constraint name;' is the explicit prototype form. The
+      // flag is only meaningful for constraint members.
+      m->is_constraint_extern = true;
       continue;
     }
     break;
@@ -512,7 +515,12 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   }
   member->name = Expect(TokenKind::kIdentifier).text;
 
-  if (Match(TokenKind::kSemicolon)) return member;
+  // 18.5.1: a constraint with no block is a prototype, completed elsewhere by
+  // an external constraint block.
+  if (Match(TokenKind::kSemicolon)) {
+    member->is_constraint_prototype = true;
+    return member;
+  }
   Expect(TokenKind::kLBrace);
   int depth = 1;
   while (depth > 0 && !AtEnd()) {

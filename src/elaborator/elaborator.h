@@ -398,6 +398,10 @@ class Elaborator {
   void ValidateConstraintBlockNames();
   void ValidateOneClassConstraintNames(const ClassDecl* cls);
 
+  // 18.5.1: external constraint blocks complete constraint prototypes.
+  void ValidateExternalConstraints();
+  void ValidateOneClassExternalConstraints(const ClassDecl* cls);
+
   void ValidateForwardTypedefsInScope(const ModuleDecl* decl);
 
   void ValidateForwardTypedefScopePrefix(const ModuleDecl* decl);

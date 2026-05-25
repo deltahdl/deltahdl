@@ -777,6 +777,12 @@ struct ClassMember {
   bool is_constraint_extends = false;
   bool is_constraint_final = false;
 
+  // 18.5.1: a constraint declared without a body is a constraint prototype that
+  // is completed by an external constraint block. The explicit prototype form
+  // uses the 'extern' keyword; the implicit form omits it.
+  bool is_constraint_prototype = false;
+  bool is_constraint_extern = false;
+
   DataType data_type;
   std::string_view name;
   std::vector<Expr*> unpacked_dims;
@@ -1047,6 +1053,16 @@ struct ConfigDecl {
   std::string_view library;
 };
 
+// 18.5.1: an external constraint block completes a constraint prototype using
+// the class scope resolution operator (constraint ClassName::name { ... }). The
+// block is declared outside the class, so its placement and pairing with a
+// prototype are validated during elaboration.
+struct ExternalConstraintBlock {
+  std::string_view class_name;
+  std::string_view constraint_name;
+  SourceLoc loc;
+};
+
 struct CompilationUnit {
   std::vector<ModuleDecl*> modules;
   std::vector<PackageDecl*> packages;
@@ -1060,6 +1076,7 @@ struct CompilationUnit {
   std::vector<IncludeStmt*> lib_includes;
   std::vector<BindDirective*> bind_directives;
   std::vector<ModuleItem*> cu_items;
+  std::vector<ExternalConstraintBlock> external_constraints;
   NetType default_nettype = NetType::kWire;
   NetType unconnected_drive = NetType::kWire;
 

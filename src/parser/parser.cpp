@@ -252,6 +252,11 @@ BindDirective* Parser::ParseBindDirective() {
 }
 
 void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
+  // 18.5.1: external constraint block, declared outside its enclosing class
+  // with the class scope resolution operator. Record the class/name pair and
+  // its location so elaboration can pair it with a prototype and check its
+  // placement.
+  SourceLoc loc = CurrentLoc();
   Match(TokenKind::kKwStatic);
   Expect(TokenKind::kKwConstraint);
 
@@ -260,9 +265,9 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
         Match(TokenKind::kKwFinal);
   }
   if (Match(TokenKind::kColon)) Match(TokenKind::kKwFinal);
-  ExpectIdentifier();
+  std::string_view class_name = ExpectIdentifier().text;
   Expect(TokenKind::kColonColon);
-  ExpectIdentifier();
+  std::string_view constraint_name = ExpectIdentifier().text;
   Expect(TokenKind::kLBrace);
   int depth = 1;
   while (depth > 0 && !AtEnd()) {
@@ -274,7 +279,7 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
       Consume();
     }
   }
-  (void)unit;
+  unit->external_constraints.push_back({class_name, constraint_name, loc});
 }
 
 bool Parser::TryParseSecondaryTopLevel(CompilationUnit* unit) {

@@ -2706,4 +2706,80 @@ void Elaborator::ValidateConstraintBlockNames() {
   for (const auto* cls : unit_->classes) ValidateOneClassConstraintNames(cls);
 }
 
+// True when location 'a' lies strictly before location 'b' within one file.
+// Locations in different files are treated as unordered (returns false).
+static bool LocStrictlyBefore(const SourceLoc& a, const SourceLoc& b) {
+  if (a.file_id != b.file_id) return false;
+  if (a.line != b.line) return a.line < b.line;
+  return a.column < b.column;
+}
+
+// 18.5.1: an external constraint block completes a constraint prototype.
+//   - The explicit prototype form ('extern constraint name;') shall have a
+//     corresponding external constraint block.
+//   - An implicit prototype ('constraint name;') with no external block is
+//     treated as an empty constraint (no effect on randomization); this is
+//     legal.
+//   - No prototype may be completed by more than one external block.
+void Elaborator::ValidateOneClassExternalConstraints(const ClassDecl* cls) {
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kConstraint) continue;
+    if (!m->is_constraint_prototype) continue;
+    // Pure constraints are obligations governed by 18.5.2, not completed by an
+    // external block, so they are outside the scope of this check.
+    if (m->is_pure_virtual) continue;
+
+    int matches = 0;
+    for (const auto& ext : unit_->external_constraints) {
+      if (ext.class_name == cls->name && ext.constraint_name == m->name) {
+        ++matches;
+      }
+    }
+
+    if (matches == 0) {
+      if (m->is_constraint_extern) {
+        diag_.Error(m->loc,
+                    std::format("explicit constraint prototype '{}' in class "
+                                "'{}' has no external constraint block",
+                                m->name, cls->name));
+      }
+      // Implicit prototype with no external block: empty constraint, legal.
+    } else if (matches > 1) {
+      diag_.Error(m->loc,
+                  std::format("constraint prototype '{}' in class '{}' is "
+                              "completed by more than one external constraint "
+                              "block",
+                              m->name, cls->name));
+    }
+  }
+}
+
+void Elaborator::ValidateExternalConstraints() {
+  for (const auto* cls : unit_->classes) {
+    ValidateOneClassExternalConstraints(cls);
+  }
+
+  // 18.5.1: an external constraint block shall appear in the same scope as its
+  // class declaration and after that class declaration. The block and the
+  // top-level class share a scope here; flag a block that precedes the end of
+  // its class declaration.
+  for (const auto& ext : unit_->external_constraints) {
+    const ClassDecl* target = nullptr;
+    for (const auto* cls : unit_->classes) {
+      if (cls->name == ext.class_name) {
+        target = cls;
+        break;
+      }
+    }
+    if (target == nullptr) continue;
+    if (!LocStrictlyBefore(target->range.end, ext.loc)) {
+      diag_.Error(ext.loc,
+                  std::format("external constraint block '{}::{}' shall appear "
+                              "after the declaration of class '{}'",
+                              ext.class_name, ext.constraint_name,
+                              ext.class_name));
+    }
+  }
+}
+
 }

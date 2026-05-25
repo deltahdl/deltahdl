@@ -1109,6 +1109,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateConstraintBlockNames();
 
+  ValidateExternalConstraints();
+
   ValidateForwardClassTypedefs();
 
   ValidateTimescaleConsistency();
