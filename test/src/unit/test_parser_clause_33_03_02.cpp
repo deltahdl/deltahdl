@@ -25,6 +25,10 @@ struct TempLibMapDir {
           ("delta_libmap_" + std::to_string(::getpid()) + "_" +
            std::to_string(seq));
     fs::create_directories(dir);
+    // The loader canonicalizes the map file's directory when anchoring relative
+    // paths, so canonicalize here too (e.g. macOS resolves /var -> /private/var)
+    // to keep the paths we assert on aligned with the loader's view.
+    dir = fs::weakly_canonical(dir);
   }
 
   ~TempLibMapDir() {
@@ -54,7 +58,7 @@ TEST(LibraryMapInclude, IncludeMergesReferencedFile) {
   tmp.Write("sub.map", "library subLib *.sv;\n");
   auto top = tmp.Write("top.map",
                        "library topLib *.v;\n"
-                       "include \"sub.map\";\n");
+                       "include sub.map;\n");
   LibraryMap m;
   ASSERT_TRUE(m.LoadMapFile(top));
   EXPECT_EQ(m.LibraryForFile((tmp.dir / "x.v").string()), "topLib");
@@ -66,7 +70,7 @@ TEST(LibraryMapInclude, RelativeIncludePathAnchorsToContainingFile) {
   auto sub_dir = tmp.dir / "subdir";
   fs::create_directories(sub_dir);
   tmp.Write("subdir/sub.map", "library subLib *.sv;\n");
-  auto top = tmp.Write("top.map", "include \"subdir/sub.map\";\n");
+  auto top = tmp.Write("top.map", "include subdir/sub.map;\n");
   LibraryMap m;
   ASSERT_TRUE(m.LoadMapFile(top));
   EXPECT_EQ(m.LibraryForFile((sub_dir / "x.sv").string()), "subLib");
@@ -77,7 +81,7 @@ TEST(LibraryMapInclude, RelativeLibrarySpecAnchorsToContainingFile) {
   auto a_dir = tmp.dir / "a";
   fs::create_directories(a_dir);
   tmp.Write("a/sub.map", "library inner *.v;\n");
-  auto top = tmp.Write("top.map", "include \"a/sub.map\";\n");
+  auto top = tmp.Write("top.map", "include a/sub.map;\n");
   LibraryMap m;
   ASSERT_TRUE(m.LoadMapFile(top));
 
@@ -90,10 +94,10 @@ TEST(LibraryMapInclude, NestedIncludesAccumulateAllDeclarations) {
   TempLibMapDir tmp;
   tmp.Write("c.map", "library cLib *.cv;\n");
   tmp.Write("b.map",
-            "include \"c.map\";\n"
+            "include c.map;\n"
             "library bLib *.bv;\n");
   auto top = tmp.Write("a.map",
-                       "include \"b.map\";\n"
+                       "include b.map;\n"
                        "library aLib *.av;\n");
   LibraryMap m;
   ASSERT_TRUE(m.LoadMapFile(top));
@@ -104,8 +108,8 @@ TEST(LibraryMapInclude, NestedIncludesAccumulateAllDeclarations) {
 
 TEST(LibraryMapInclude, CycleIsDetectedAndReported) {
   TempLibMapDir tmp;
-  tmp.Write("a.map", "include \"b.map\";\n");
-  auto top = tmp.Write("b.map", "include \"a.map\";\n");
+  tmp.Write("a.map", "include b.map;\n");
+  auto top = tmp.Write("b.map", "include a.map;\n");
   LibraryMap m;
   std::vector<std::string> errors;
   EXPECT_FALSE(m.LoadMapFile(top, &errors));
@@ -114,11 +118,41 @@ TEST(LibraryMapInclude, CycleIsDetectedAndReported) {
 
 TEST(LibraryMapInclude, MissingIncludeIsReported) {
   TempLibMapDir tmp;
-  auto top = tmp.Write("top.map", "include \"nonexistent.map\";\n");
+  auto top = tmp.Write("top.map", "include nonexistent.map;\n");
   LibraryMap m;
   std::vector<std::string> errors;
   EXPECT_FALSE(m.LoadMapFile(top, &errors));
   EXPECT_FALSE(errors.empty());
+}
+
+// A relative include path is resolved against the map file that physically
+// contains it, at every level of nesting -- not against the root map's
+// directory. Here the second-level map lives in a subdirectory and pulls in a
+// sibling by a bare relative name; that name only resolves if anchoring tracks
+// the immediate containing file.
+TEST(LibraryMapInclude, NestedRelativeIncludeAnchorsToImmediateContainingFile) {
+  TempLibMapDir tmp;
+  auto sub_dir = tmp.dir / "sub";
+  fs::create_directories(sub_dir);
+  tmp.Write("sub/b.map", "library deep *.dv;\n");
+  tmp.Write("sub/a.map", "include b.map;\n");
+  auto top = tmp.Write("top.map", "include sub/a.map;\n");
+  LibraryMap m;
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((sub_dir / "x.dv").string()), "deep");
+}
+
+// An absolute include path is honored as given; the containing-file anchoring
+// rule applies only to relative paths.
+TEST(LibraryMapInclude, AbsoluteIncludePathIsHonoredAsGiven) {
+  TempLibMapDir tmp;
+  auto away_dir = tmp.dir / "elsewhere";
+  fs::create_directories(away_dir);
+  auto away = tmp.Write("elsewhere/abs.map", "library absLib *.av;\n");
+  auto top = tmp.Write("top.map", "include " + away.string() + ";\n");
+  LibraryMap m;
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((away_dir / "x.av").string()), "absLib");
 }
 
 }
