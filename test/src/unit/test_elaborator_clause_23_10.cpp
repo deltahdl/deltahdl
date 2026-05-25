@@ -89,6 +89,26 @@ TEST(ParameterOverride, TypedUnrangedConvertsOverrideToDeclarationType) {
   EXPECT_EQ(u0->params[0].resolved_value, 1);
 }
 
+TEST(ParameterOverride, SignedUnrangedAdoptsOverrideRange) {
+  // §23.10: a value parameter with a (signed) type specification but no range
+  // specification takes its range from the final override value. The override
+  // is therefore not truncated to any declared width, and the parameter stays
+  // signed, so a negative override survives intact.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter signed P = 0)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u0();\n"
+      "  defparam u0.P = -5;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* u0 = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u0, nullptr);
+  EXPECT_EQ(u0->params[0].resolved_value, -5);
+}
+
 TEST(ParameterOverride, SignedRangedKeepsDeclarationRangeAndSignedness) {
   ElabFixture f;
   auto* design = ElaborateSrc(
