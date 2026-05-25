@@ -31,4 +31,111 @@ TEST(DeclarationRangeParsing, WildcardNotStringIndex) {
   EXPECT_FALSE(v.is_string_index);
 }
 
+// §7.8.1 — a wildcard-indexed associative array may not be used in a foreach
+// loop.
+TEST(WildcardIndexType, ForeachOnWildcardIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  initial foreach (aa[i]) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// Contrast: a foreach over a non-wildcard array elaborates cleanly, confirming
+// the prohibition is specific to the wildcard index type.
+TEST(WildcardIndexType, ForeachOnFixedArrayIsAllowed) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int arr[4];\n"
+      "  initial foreach (arr[i]) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §7.8.1 — an array-locator method that returns index values (find_index) is
+// not allowed on a wildcard-indexed associative array.
+TEST(WildcardIndexType, FindIndexOnWildcardIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  int idx[$];\n"
+      "  initial idx = aa.find_index with (item > 0);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §7.8.1 — find_first_index also returns indices and is rejected on a wildcard
+// associative array.
+TEST(WildcardIndexType, FindFirstIndexOnWildcardIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  int idx[$];\n"
+      "  initial idx = aa.find_first_index with (item > 0);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §7.8.1 — likewise find_last_index is rejected on a wildcard associative
+// array.
+TEST(WildcardIndexType, FindLastIndexOnWildcardIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  int idx[$];\n"
+      "  initial idx = aa.find_last_index with (item > 0);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §7.8.1 — a nonintegral index value is illegal; a real-literal index on a
+// wildcard array is rejected.
+TEST(WildcardIndexType, NonintegralIndexIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  initial aa[1.5] = 0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §7.8.1 — the nonintegral prohibition also covers a real-typed variable used
+// as the index, not just a real literal.
+TEST(WildcardIndexType, RealVariableIndexIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  real r;\n"
+      "  initial aa[r] = 0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// Contrast: an integral index on the same wildcard array elaborates cleanly.
+TEST(WildcardIndexType, IntegralIndexIsAllowed) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  initial aa[3] = 0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }

@@ -29,15 +29,4 @@ TEST(AggregateTypeParsing, AssocArrayWildcard) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(AggregateTypeParsing, AssociativeArrayWildcardIndex) {
-  auto r = Parse(
-      "module t;\n"
-      "  int aa[*];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "aa");
-}
-
 }

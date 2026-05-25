@@ -23,6 +23,13 @@ bool HasUnknownBits(const Logic4Vec& v);
 Logic4Vec MakeAllX(Arena& arena, uint32_t width);
 int64_t SignExtend(uint64_t val, uint32_t width);
 
+// §7.8.1 — canonicalize an integral associative-array index into its map key.
+// A wildcard index ([*]) is self-determined and treated as unsigned: leading
+// zeros are dropped and the minimal numeric value is used, so equal values of
+// differing widths collapse to one entry. A typed integral index instead
+// follows the signedness of its index type via sign extension.
+int64_t AssocIntKey(const Logic4Vec& val, bool is_wildcard, uint32_t index_width);
+
 Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena);
 
 Logic4Vec EvalUtilitySysCall(const Expr* expr, SimContext& ctx, Arena& arena,

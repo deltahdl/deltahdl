@@ -475,6 +475,15 @@ int64_t SignExtend(uint64_t val, uint32_t width) {
   uint64_t mask = uint64_t{1} << (width - 1);
   return static_cast<int64_t>((val ^ mask) - mask);
 }
+
+int64_t AssocIntKey(const Logic4Vec& val, bool is_wildcard,
+                    uint32_t index_width) {
+  // A wildcard index keeps its self-determined, unsigned value; only a typed
+  // integral index is sign-extended to its declared width.
+  if (is_wildcard) return static_cast<int64_t>(val.ToUint64());
+  return SignExtend(val.ToUint64(), index_width);
+}
+
 static uint64_t EvalRelationalOp(TokenKind op, uint64_t lv, uint64_t rv) {
   switch (op) {
     case TokenKind::kLt:

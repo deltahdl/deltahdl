@@ -383,50 +383,104 @@ static bool IsTraversalMethod(std::string_view name) {
   return name == "first" || name == "last" || name == "next" || name == "prev";
 }
 
+// §7.8.1 — array manipulation methods (§7.12) that yield an index value or an
+// array of index values. A wildcard-indexed associative array may not be used
+// with these, since its keys have no stable index domain to return.
+static bool IsIndexReturningMethod(std::string_view name) {
+  return name == "find_index" || name == "find_first_index" ||
+         name == "find_last_index";
+}
+
+// §7.8.1 — true when `idx` is a nonintegral index expression for a wildcard
+// associative array: a real literal, or an identifier of a real/shortreal/
+// realtime variable. (A string literal is not nonintegral here; it is cast to
+// an equivalent-width bit vector.)
+static bool IsNonintegralIndex(const Expr* idx, const TypeMap& var_types) {
+  if (!idx) return false;
+  if (idx->kind == ExprKind::kRealLiteral) return true;
+  if (idx->kind == ExprKind::kIdentifier) {
+    auto it = var_types.find(idx->text);
+    return it != var_types.end() && IsRealType(it->second);
+  }
+  return false;
+}
+
 static void CheckWildcardTraversalExpr(
     const Expr* e,
     const std::unordered_set<std::string_view>& wildcard_names,
-    DiagEngine& diag) {
+    const TypeMap& var_types, DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kCall && e->base &&
       e->base->kind == ExprKind::kIdentifier &&
-      IsTraversalMethod(e->callee) &&
-      wildcard_names.count(e->base->text)) {
+      IsTraversalMethod(e->callee) && wildcard_names.count(e->base->text)) {
     diag.Error(e->range.start,
                std::format("'{}' is not allowed on wildcard associative "
                            "array '{}'",
                            e->callee, e->base->text));
   }
-  CheckWildcardTraversalExpr(e->lhs, wildcard_names, diag);
-  CheckWildcardTraversalExpr(e->rhs, wildcard_names, diag);
-  CheckWildcardTraversalExpr(e->base, wildcard_names, diag);
-  CheckWildcardTraversalExpr(e->index, wildcard_names, diag);
-  CheckWildcardTraversalExpr(e->index_end, wildcard_names, diag);
-  CheckWildcardTraversalExpr(e->condition, wildcard_names, diag);
-  CheckWildcardTraversalExpr(e->true_expr, wildcard_names, diag);
-  CheckWildcardTraversalExpr(e->false_expr, wildcard_names, diag);
+  // §7.8.1 — an array-locator method (e.g. `aa.find_index with (...)`) parses
+  // as a member access whose receiver is the array and whose member is the
+  // method name. Reject the index-returning locators on a wildcard array.
+  if (e->kind == ExprKind::kMemberAccess && e->lhs &&
+      e->lhs->kind == ExprKind::kIdentifier && e->rhs &&
+      IsIndexReturningMethod(e->rhs->text) &&
+      wildcard_names.count(e->lhs->text)) {
+    diag.Error(e->range.start,
+               std::format("'{}' is not allowed on wildcard associative "
+                           "array '{}'",
+                           e->rhs->text, e->lhs->text));
+  }
+  // §7.8.1 — a wildcard index must be integral; a real (nonintegral) value used
+  // to index the array is illegal.
+  if (e->kind == ExprKind::kSelect && e->base &&
+      e->base->kind == ExprKind::kIdentifier &&
+      IsNonintegralIndex(e->index, var_types) &&
+      wildcard_names.count(e->base->text)) {
+    diag.Error(e->index->range.start,
+               std::format("nonintegral index is not allowed on wildcard "
+                           "associative array '{}'",
+                           e->base->text));
+  }
+  CheckWildcardTraversalExpr(e->lhs, wildcard_names, var_types, diag);
+  CheckWildcardTraversalExpr(e->rhs, wildcard_names, var_types, diag);
+  CheckWildcardTraversalExpr(e->base, wildcard_names, var_types, diag);
+  CheckWildcardTraversalExpr(e->index, wildcard_names, var_types, diag);
+  CheckWildcardTraversalExpr(e->index_end, wildcard_names, var_types, diag);
+  CheckWildcardTraversalExpr(e->condition, wildcard_names, var_types, diag);
+  CheckWildcardTraversalExpr(e->true_expr, wildcard_names, var_types, diag);
+  CheckWildcardTraversalExpr(e->false_expr, wildcard_names, var_types, diag);
   for (const auto* elem : e->elements) {
-    CheckWildcardTraversalExpr(elem, wildcard_names, diag);
+    CheckWildcardTraversalExpr(elem, wildcard_names, var_types, diag);
   }
 }
 
 static void WalkStmtsForWildcardTraversal(
     const Stmt* s,
     const std::unordered_set<std::string_view>& wildcard_names,
-    DiagEngine& diag) {
+    const TypeMap& var_types, DiagEngine& diag) {
   if (!s) return;
-  CheckWildcardTraversalExpr(s->lhs, wildcard_names, diag);
-  CheckWildcardTraversalExpr(s->rhs, wildcard_names, diag);
-  CheckWildcardTraversalExpr(s->expr, wildcard_names, diag);
-  CheckWildcardTraversalExpr(s->condition, wildcard_names, diag);
+  // §7.8.1 — a wildcard-indexed associative array may not drive a foreach loop.
+  if (s->kind == StmtKind::kForeach && s->expr &&
+      (s->expr->kind == ExprKind::kIdentifier ||
+       s->expr->kind == ExprKind::kMemberAccess) &&
+      wildcard_names.count(s->expr->text)) {
+    diag.Error(s->range.start,
+               std::format("wildcard associative array '{}' may not be used in "
+                           "a foreach loop",
+                           s->expr->text));
+  }
+  CheckWildcardTraversalExpr(s->lhs, wildcard_names, var_types, diag);
+  CheckWildcardTraversalExpr(s->rhs, wildcard_names, var_types, diag);
+  CheckWildcardTraversalExpr(s->expr, wildcard_names, var_types, diag);
+  CheckWildcardTraversalExpr(s->condition, wildcard_names, var_types, diag);
   for (auto* sub : s->stmts)
-    WalkStmtsForWildcardTraversal(sub, wildcard_names, diag);
-  WalkStmtsForWildcardTraversal(s->then_branch, wildcard_names, diag);
-  WalkStmtsForWildcardTraversal(s->else_branch, wildcard_names, diag);
-  WalkStmtsForWildcardTraversal(s->body, wildcard_names, diag);
-  WalkStmtsForWildcardTraversal(s->for_body, wildcard_names, diag);
+    WalkStmtsForWildcardTraversal(sub, wildcard_names, var_types, diag);
+  WalkStmtsForWildcardTraversal(s->then_branch, wildcard_names, var_types, diag);
+  WalkStmtsForWildcardTraversal(s->else_branch, wildcard_names, var_types, diag);
+  WalkStmtsForWildcardTraversal(s->body, wildcard_names, var_types, diag);
+  WalkStmtsForWildcardTraversal(s->for_body, wildcard_names, var_types, diag);
   for (auto& ci : s->case_items)
-    WalkStmtsForWildcardTraversal(ci.body, wildcard_names, diag);
+    WalkStmtsForWildcardTraversal(ci.body, wildcard_names, var_types, diag);
 }
 
 void Elaborator::ValidateAssocWildcardTraversal(const ModuleDecl* decl) {
@@ -438,13 +492,16 @@ void Elaborator::ValidateAssocWildcardTraversal(const ModuleDecl* decl) {
   if (wildcard_names.empty()) return;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
-      CheckWildcardTraversalExpr(item->assign_lhs, wildcard_names, diag_);
-      CheckWildcardTraversalExpr(item->assign_rhs, wildcard_names, diag_);
+      CheckWildcardTraversalExpr(item->assign_lhs, wildcard_names, var_types_,
+                                 diag_);
+      CheckWildcardTraversalExpr(item->assign_rhs, wildcard_names, var_types_,
+                                 diag_);
     }
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kInitialBlock;
     if (is_proc && item->body) {
-      WalkStmtsForWildcardTraversal(item->body, wildcard_names, diag_);
+      WalkStmtsForWildcardTraversal(item->body, wildcard_names, var_types_,
+                                    diag_);
     }
   }
 }

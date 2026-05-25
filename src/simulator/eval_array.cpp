@@ -727,12 +727,12 @@ static std::string EvalStrKey(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 static int64_t EvalIntKey(const Expr* expr, SimContext& ctx, Arena& arena,
-                          uint32_t index_width = 64) {
+                          uint32_t index_width = 64, bool is_wildcard = false) {
   auto val = EvalExpr(expr, ctx, arena);
   if (HasUnknownBits(val)) {
     ctx.GetDiag().Warning({}, "associative array index contains x/z");
   }
-  return SignExtend(val.ToUint64(), index_width);
+  return AssocIntKey(val, is_wildcard, index_width);
 }
 
 static bool AssocExists(AssocArrayObject* aa, const Expr* expr, SimContext& ctx,
@@ -742,7 +742,10 @@ static bool AssocExists(AssocArrayObject* aa, const Expr* expr, SimContext& ctx,
   if (aa->is_string_key) {
     found = aa->str_data.count(EvalStrKey(expr->args[0], ctx, arena)) ? 1 : 0;
   } else {
-    found = aa->int_data.count(EvalIntKey(expr->args[0], ctx, arena, aa->index_width)) ? 1 : 0;
+    found = aa->int_data.count(EvalIntKey(expr->args[0], ctx, arena,
+                                          aa->index_width, aa->is_wildcard))
+                ? 1
+                : 0;
   }
   out = MakeLogic4VecVal(arena, 32, found);
   return true;
@@ -894,7 +897,8 @@ static bool ExecAssocDelete(AssocArrayObject* aa, const Expr* expr,
   if (aa->is_string_key) {
     aa->str_data.erase(EvalStrKey(expr->args[0], ctx, arena));
   } else {
-    aa->int_data.erase(EvalIntKey(expr->args[0], ctx, arena, aa->index_width));
+    aa->int_data.erase(
+        EvalIntKey(expr->args[0], ctx, arena, aa->index_width, aa->is_wildcard));
   }
   return true;
 }
