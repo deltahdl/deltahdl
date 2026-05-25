@@ -49,27 +49,6 @@ TEST(FinalProcedureParsing, ProgramWithFinalBlock) {
   ASSERT_EQ(r.cu->programs[0]->items.size(), 1u);
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
 }
-TEST(FinalProcedureParsing, BeginEndWithMultipleStatements) {
-  auto r = Parse(
-      "module m;\n"
-      "  final begin\n"
-      "    $display(\"sim done\");\n"
-      "    $display(\"cycles: %0d\", cnt);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kFinalBlock) {
-      found = true;
-      ASSERT_NE(item->body, nullptr);
-      EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-      EXPECT_GE(item->body->stmts.size(), 2u);
-    }
-  }
-  EXPECT_TRUE(found);
-}
 
 TEST(FinalProcedureParsing, SingleStatement) {
   auto r = Parse(
@@ -95,33 +74,6 @@ TEST(FinalProcedureParsing, BeginEndHasBody) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFinalBlock);
   ASSERT_NE(item->body, nullptr);
-}
-
-TEST(FinalProcedureParsing, FinalBlockSingleStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  final $display(\"done\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  bool found = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kFinalBlock) {
-      found = true;
-      ASSERT_NE(item->body, nullptr);
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
-TEST(FinalProcedureParsing, DisplayCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  final $display(\"done\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
 }
 
 TEST(FinalProcedureParsing, FinalWithIfStatement) {
