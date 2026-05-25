@@ -205,6 +205,12 @@ class VpiContext {
     return callbacks_;
   }
 
+  // §36.9.1: the registration of system tasks shall occur prior to elaboration
+  // or the resolution of references. Marking elaboration as started closes the
+  // window in which RegisterSystf will accept new registrations.
+  void MarkElaborationStarted() { elaboration_started_ = true; }
+  bool ElaborationStarted() const { return elaboration_started_; }
+
   bool StopRequested() const { return stop_requested_; }
   bool FinishRequested() const { return finish_requested_; }
 
@@ -219,6 +225,7 @@ class VpiContext {
   std::unordered_map<std::string_view, VpiObject*> object_map_;
   std::vector<VpiObject*> all_objects_;
   Scheduler* scheduler_ = nullptr;
+  bool elaboration_started_ = false;
   bool stop_requested_ = false;
   bool finish_requested_ = false;
   VpiErrorInfo last_error_ = {};

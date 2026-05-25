@@ -40,6 +40,28 @@ void VpiContext::Attach(SimContext& sim_ctx) {
 
 VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
   if (!data) return nullptr;
+
+  // §36.9.1: a user-defined system task or system function name shall begin
+  // with a dollar sign. Refuse to register a name that omits the leading '$'.
+  if (data->tfname == nullptr || data->tfname[0] != '$') {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "system task or function name must begin with '$'";
+    return nullptr;
+  }
+
+  // §36.9.1: the registration of system tasks shall occur prior to elaboration
+  // or the resolution of references. Once elaboration has begun the window has
+  // closed, so reject the registration.
+  if (elaboration_started_) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "system task or function registration must precede elaboration";
+    return nullptr;
+  }
+
   systfs_.push_back(*data);
 
   // §38.37 Returns row: registration produces a handle to the callback
