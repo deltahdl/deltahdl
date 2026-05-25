@@ -152,10 +152,20 @@ void Elaborator::ValidateConfigDesignStatements() {
   std::unordered_set<std::string_view> config_names;
   for (auto* cfg : unit_->configs) config_names.insert(cfg->name);
 
+  // A design cell is allowed to share its name with a config; when a cell of
+  // that name also exists, the design statement denotes the cell rather than
+  // the like-named config. A name that resolves only to a config is therefore
+  // the case that must be rejected as a design target.
+  std::unordered_set<std::string_view> cell_names;
+  for (auto* m : unit_->modules) cell_names.insert(m->name);
+  for (auto* u : unit_->udps) cell_names.insert(u->name);
+  for (auto* i : unit_->interfaces) cell_names.insert(i->name);
+  for (auto* p : unit_->programs) cell_names.insert(p->name);
+
   for (auto* cfg : unit_->configs) {
     for (auto& [lib, cell] : cfg->design_cells) {
 
-      if (config_names.contains(cell)) {
+      if (config_names.contains(cell) && !cell_names.contains(cell)) {
         diag_.Error(
             cfg->range.start,
             std::format("config '{}' design statement names configuration "
