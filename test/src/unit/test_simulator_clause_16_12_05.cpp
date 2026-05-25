@@ -47,4 +47,27 @@ TEST(PropertyConjunction, BothOperandsVacuous) {
       PropertyResult::kPass);
 }
 
+// Edge case: a failure on one side dominates a vacuous hold on the other.
+// The vacuous operand counts as holding, but the conjunction still needs both
+// sides to hold, so the failing side forces an overall failure.
+TEST(PropertyConjunction, FailDominatesVacuousLeft) {
+  EXPECT_EQ(
+      EvalPropertyAnd(PropertyResult::kFail, PropertyResult::kVacuousPass),
+      PropertyResult::kFail);
+}
+
+TEST(PropertyConjunction, FailDominatesVacuousRight) {
+  EXPECT_EQ(
+      EvalPropertyAnd(PropertyResult::kVacuousPass, PropertyResult::kFail),
+      PropertyResult::kFail);
+}
+
+// A vacuous hold conjoined with a genuine pass still holds, mirroring the
+// pass-with-vacuous case from the other operand order.
+TEST(PropertyConjunction, VacuousWithPassHolds) {
+  EXPECT_EQ(
+      EvalPropertyAnd(PropertyResult::kVacuousPass, PropertyResult::kPass),
+      PropertyResult::kPass);
+}
+
 }
