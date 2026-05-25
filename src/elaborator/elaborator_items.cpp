@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <format>
 #include <optional>
@@ -681,6 +682,14 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
     if (val) {
       pd.resolved_value = *val;
       pd.is_resolved = true;
+    } else if (!is_type && ParamExpectsIntegerValue(pd, item->data_type)) {
+      // §6.20.2: the real-to-integer conversion of §6.12.1 applies to
+      // parameters, so an integer-typed parameter initialized from a real
+      // constant rounds to the nearest integer (ties away from zero).
+      if (auto rval = ConstEvalReal(item->init_expr, scope)) {
+        pd.resolved_value = std::llround(*rval);
+        pd.is_resolved = true;
+      }
     }
   }
   mod->params.push_back(pd);

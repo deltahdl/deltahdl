@@ -1,6 +1,7 @@
 #include "elaborator/elaborator.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <format>
 #include <functional>
@@ -1681,6 +1682,7 @@ void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype) {
   pd.has_decl_range = dtype.packed_dim_left != nullptr;
   pd.has_decl_type = dtype.kind != DataTypeKind::kImplicit || dtype.is_signed;
   pd.decl_is_signed = dtype.is_signed;
+  pd.decl_type_implicit = dtype.kind == DataTypeKind::kImplicit;
   if (pd.has_decl_range || pd.has_decl_type) {
     pd.decl_width = EvalTypeWidth(dtype);
   }
@@ -1692,13 +1694,30 @@ void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype,
   pd.has_decl_range = dtype.packed_dim_left != nullptr;
   pd.has_decl_type = dtype.kind != DataTypeKind::kImplicit || dtype.is_signed;
   pd.decl_is_signed = dtype.is_signed;
+  pd.decl_type_implicit = dtype.kind == DataTypeKind::kImplicit;
   if (pd.has_decl_range || pd.has_decl_type) {
     pd.decl_width = EvalTypeWidth(dtype, typedefs, scope);
   }
 }
 
+bool ParamExpectsIntegerValue(const RtlirParamDecl& pd, const DataType& dtype) {
+  // §6.20.2: a value parameter is in an integer context — and so subject to the
+  // real-to-integer conversion of §6.12.1 — when it carries a packed range or
+  // an explicit non-real data type. A bare (untyped) parameter or one declared
+  // real takes a real value instead and is not converted here.
+  return pd.has_decl_range || (pd.has_decl_type && !IsRealType(dtype.kind));
+}
+
 int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd) {
-  if (!pd.has_decl_type && !pd.has_decl_range) return value;
+  // §6.20.2: a parameter declared with an explicit range, or with an explicit
+  // (non-implicit) data type, keeps the sign and range of its declaration; a
+  // value override does not change them, so the incoming value is coerced into
+  // the declared width. A parameter with no range and only an implicit type
+  // (including a bare `signed`) instead takes its range from the final value
+  // assigned, so the override value passes through unchanged.
+  bool has_fixed_width =
+      pd.has_decl_range || (pd.has_decl_type && !pd.decl_type_implicit);
+  if (!has_fixed_width) return value;
   uint32_t w = pd.decl_width;
   if (w == 0 || w >= 64) return value;
   uint64_t mask = (uint64_t{1} << w) - 1;
@@ -1798,8 +1817,19 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
         pd.is_unbounded = true;
       } else {
         auto val = ConstEvalInt(pval, scope);
-        pd.resolved_value = val.value_or(0);
-        pd.is_resolved = val.has_value();
+        if (val) {
+          pd.resolved_value = *val;
+          pd.is_resolved = true;
+        } else if (!pd.is_type_param && i < decl->param_types.size() &&
+                   ParamExpectsIntegerValue(pd, decl->param_types[i])) {
+          // §6.20.2: an integer-typed parameter set from a real constant is
+          // converted to an integer per §6.12.1 (round to nearest, ties away
+          // from zero).
+          if (auto rval = ConstEvalReal(pval, scope)) {
+            pd.resolved_value = std::llround(*rval);
+            pd.is_resolved = true;
+          }
+        }
       }
     }
 

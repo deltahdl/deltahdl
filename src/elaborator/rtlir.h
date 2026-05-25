@@ -156,6 +156,11 @@ struct RtlirParamDecl {
   bool decl_is_signed = false;
   bool has_decl_type = false;
   bool has_decl_range = false;
+  // True when the declared data type is implicit (e.g. a bare `signed` or no
+  // type keyword at all). Such a parameter, when it carries no range, takes its
+  // range from the final value assigned to it rather than from a fixed declared
+  // width (§6.20.2).
+  bool decl_type_implicit = false;
 };
 
 struct RtlirPortBinding {

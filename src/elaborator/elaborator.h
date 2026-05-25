@@ -725,6 +725,8 @@ void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype,
 
 int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd);
 
+bool ParamExpectsIntegerValue(const RtlirParamDecl& pd, const DataType& dtype);
+
 std::string_view ExprIdent(const Expr* e);
 const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit);
