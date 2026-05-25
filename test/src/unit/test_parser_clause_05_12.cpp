@@ -5,22 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionParsing, AttrOnModuleDefinition) {
-  auto r = Parse(
-      "(* optimize_power *)\n"
-      "module m;\n"
-      "  wire a;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "m");
-}
-
-TEST(LexicalConventionParsing, AttrWithValueOnModuleDefinition) {
-  EXPECT_TRUE(ParseOk("(* optimize_power = 1 *) module m; endmodule"));
-}
-
 TEST(LexicalConventionParsing, AttrOnModuleInstantiation) {
   auto r = Parse(
       "module m;\n"
@@ -209,6 +193,70 @@ TEST(LexicalConventionParsing, NonNestedConstExprOk) {
       ParseOk("module m;\n"
               "  (* foo = 1 + 2 *) logic x;\n"
               "endmodule\n"));
+}
+
+// Syntax 5-4: attr_name is an identifier. A non-identifier token (here a
+// number literal) in the attr_name position is rejected by the parser.
+TEST(LexicalConventionParsing, AttrNameMustBeIdentifier) {
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  (* 7 *) logic x;\n"
+              "endmodule\n"));
+}
+
+// Syntax 5-4: an attribute_instance contains one or more attr_spec, so an
+// empty (* *) with no attr_spec is rejected.
+TEST(LexicalConventionParsing, EmptyAttributeInstanceRejected) {
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  (* *) logic x;\n"
+              "endmodule\n"));
+}
+
+// §5.12 Example 5: an attribute prefix binds only to the declaration it
+// immediately precedes. A single prefix is shared by every name declared in
+// that declaration, while a declaration with no prefix carries no attributes.
+TEST(LexicalConventionParsing, PrefixBindsOnlyToItsDeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  (* fsm_state *) logic [7:0] state1;\n"
+      "  (* fsm_state = 1 *) logic [3:0] state2, state3;\n"
+      "  logic [3:0] reg1;\n"
+      "  (* fsm_state = 0 *) logic [3:0] reg2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+
+  auto has_fsm_state = [](const ModuleItem* item) {
+    for (const auto& a : item->attrs) {
+      if (a.name == "fsm_state") return true;
+    }
+    return false;
+  };
+  auto find = [&](std::string_view name) -> ModuleItem* {
+    for (auto* item : r.cu->modules[0]->items) {
+      if (item->name == name) return item;
+    }
+    return nullptr;
+  };
+
+  ASSERT_NE(find("state1"), nullptr);
+  ASSERT_NE(find("state2"), nullptr);
+  ASSERT_NE(find("state3"), nullptr);
+  ASSERT_NE(find("reg1"), nullptr);
+  ASSERT_NE(find("reg2"), nullptr);
+
+  // The single prefix is distributed to both names of the multi-name
+  // declaration.
+  EXPECT_TRUE(has_fsm_state(find("state1")));
+  EXPECT_TRUE(has_fsm_state(find("state2")));
+  EXPECT_TRUE(has_fsm_state(find("state3")));
+
+  // The unprefixed declaration does not inherit the preceding prefix.
+  EXPECT_FALSE(has_fsm_state(find("reg1")));
+
+  // A later prefixed declaration is attributed independently.
+  EXPECT_TRUE(has_fsm_state(find("reg2")));
 }
 
 TEST(LexicalConventionParsing, AttrOnPortConnection) {

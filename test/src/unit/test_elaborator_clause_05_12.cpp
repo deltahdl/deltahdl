@@ -133,6 +133,36 @@ TEST(LexicalConventionElaboration, DuplicateAttrAcrossInstances) {
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
+// The "last value wins" / duplicate rule is scoped to a single language
+// element. The same attribute name on two distinct declarations is independent:
+// each keeps its own value and no duplicate warning is produced.
+TEST(LexicalConventionElaboration, SameNameDifferentElementsIndependent) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  (* depth = 4 *) logic [7:0] a;\n"
+      "  (* depth = 9 *) logic [7:0] b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  const RtlirVariable* va = nullptr;
+  const RtlirVariable* vb = nullptr;
+  for (auto& v : mod->variables) {
+    if (v.name == "a") va = &v;
+    if (v.name == "b") vb = &v;
+  }
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  ASSERT_FALSE(va->attrs.empty());
+  ASSERT_FALSE(vb->attrs.empty());
+  ASSERT_NE(va->attrs[0].resolved_value, std::nullopt);
+  ASSERT_NE(vb->attrs[0].resolved_value, std::nullopt);
+  EXPECT_EQ(va->attrs[0].resolved_value.value_or(INT64_MIN), 4);
+  EXPECT_EQ(vb->attrs[0].resolved_value.value_or(INT64_MIN), 9);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
 TEST(LexicalConventionElaboration, AttrOnVarDecl) {
   ElabFixture f;
   auto* design = ElaborateSrc(
