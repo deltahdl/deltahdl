@@ -59,6 +59,10 @@ TEST(LibraryMapCellTagging, TagsAllCellKinds) {
   prog.decl_kind = ModuleDeclKind::kProgram;
   cu.programs.push_back(&prog);
 
+  ModuleDecl chk;
+  chk.decl_kind = ModuleDeclKind::kChecker;
+  cu.checkers.push_back(&chk);
+
   UdpDecl udp;
   cu.udps.push_back(&udp);
 
@@ -73,6 +77,7 @@ TEST(LibraryMapCellTagging, TagsAllCellKinds) {
   EXPECT_EQ(mod.library, "L");
   EXPECT_EQ(ifc.library, "L");
   EXPECT_EQ(prog.library, "L");
+  EXPECT_EQ(chk.library, "L");
   EXPECT_EQ(udp.library, "L");
   EXPECT_EQ(pkg.library, "L");
   EXPECT_EQ(cfg.library, "L");
