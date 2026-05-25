@@ -57,6 +57,19 @@ TEST(ClassImplementsInterface, ConcreteMethodSatisfiesPureVirtual) {
              "endmodule\n"));
 }
 
+TEST(ClassImplementsInterface, NonVirtualMethodDoesNotImplement) {
+  EXPECT_FALSE(
+      ElabOk("interface class IC;\n"
+             "  pure virtual function void foo();\n"
+             "endclass\n"
+             "class C implements IC;\n"
+             "  function void foo();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 TEST(InterfaceClassImplements, MissingPureVirtualImplementation) {
   EXPECT_FALSE(
       ElabOk("interface class IC;\n"
@@ -86,11 +99,65 @@ TEST(InterfaceClassImplements, AllPureVirtualMethodsImplemented) {
              "endmodule\n"));
 }
 
+TEST(InterfaceClassImplements, MultipleInterfacesAllMethodsImplemented) {
+  EXPECT_TRUE(
+      ElabOk("interface class IA;\n"
+             "  pure virtual function void funcA();\n"
+             "endclass\n"
+             "interface class IB;\n"
+             "  pure virtual function void funcB();\n"
+             "endclass\n"
+             "class C implements IA, IB;\n"
+             "  virtual function void funcA();\n"
+             "  endfunction\n"
+             "  virtual function void funcB();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+TEST(InterfaceClassImplements, MultipleInterfacesMissingOneMethodError) {
+  EXPECT_FALSE(
+      ElabOk("interface class IA;\n"
+             "  pure virtual function void funcA();\n"
+             "endclass\n"
+             "interface class IB;\n"
+             "  pure virtual function void funcB();\n"
+             "endclass\n"
+             "class C implements IA, IB;\n"
+             "  virtual function void funcA();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 TEST(InterfaceClassAllowedContent, ParameterDeclarationOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
              "  parameter int WIDTH = 8;\n"
              "  pure virtual function void foo();\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+TEST(InterfaceClassAllowedContent, ConstraintBlockError) {
+  EXPECT_FALSE(
+      ElabOk("interface class IC;\n"
+             "  pure virtual function void foo();\n"
+             "  constraint c { }\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+TEST(InterfaceClassAllowedContent, CovergroupError) {
+  EXPECT_FALSE(
+      ElabOk("interface class IC;\n"
+             "  pure virtual function void foo();\n"
+             "  covergroup cg; endgroup\n"
              "endclass\n"
              "module m;\n"
              "endmodule\n"));
