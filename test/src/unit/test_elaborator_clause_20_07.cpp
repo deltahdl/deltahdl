@@ -1,3 +1,4 @@
+#include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 
 using namespace delta;
@@ -64,6 +65,35 @@ TEST(ArrayQueryConstExpr, SizeWithDimensionExprIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$size(arr, 2)", f);
   EXPECT_TRUE(IsConstantExpr(e));
+}
+
+// §20.7: applying an array query function directly to a dynamically sized type
+// identifier (here a queue typedef) is an elaboration error, because a dynamic
+// dimension has no extent outside of an object instance.
+TEST(ArrayQueryOnType, QueryOnQueueTypedefIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef byte qt[$];\n"
+      "  int n;\n"
+      "  initial n = $size(qt);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §20.7: the same query on a fixed-size type identifier is legal, confirming
+// the rule rejects only dynamically sized type identifiers.
+TEST(ArrayQueryOnType, QueryOnFixedTypedefIsLegal) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef logic [3:0] ft;\n"
+      "  int n;\n"
+      "  initial n = $size(ft);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }

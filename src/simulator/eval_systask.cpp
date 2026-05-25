@@ -283,21 +283,28 @@ Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // Width of the packed element dimension (the [n-1:0] of an integer type).
   uint32_t elem_width = 32;
   bool is_real = false;
+  bool is_string = false;
   if (assoc) {
     elem_width = assoc->elem_width;
   } else if (queue) {
     elem_width = queue->elem_width;
   } else if (arr) {
     elem_width = arr->elem_width;
+  } else if (arg0 && arg0->kind == ExprKind::kIdentifier &&
+             ctx.IsStringVariable(arg0->text)) {
+    // §20.7: a string is a nonarray type that is equivalent to a simple bit
+    // vector, so it always contributes exactly one packed dimension regardless
+    // of how many characters it currently holds.
+    is_string = true;
   } else if (arg0) {
     auto val = EvalExpr(arg0, ctx, arena);
     elem_width = val.width;
     is_real = val.is_real;
   }
 
-  // A simple bit-vector type contributes one packed dimension; a real (or any
-  // other nonvector) type contributes none.
-  uint32_t packed_dims = (elem_width > 0 && !is_real) ? 1 : 0;
+  // A simple bit-vector type (string included) contributes one packed
+  // dimension; a real (or any other nonvector) type contributes none.
+  uint32_t packed_dims = (is_string || (elem_width > 0 && !is_real)) ? 1 : 0;
   uint32_t unpacked_dims = has_unpacked ? 1 : 0;
   uint32_t total_dims = packed_dims + unpacked_dims;
 

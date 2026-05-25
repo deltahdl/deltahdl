@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SysTask, DimensionsReturnsOne) {
-  SysTaskFixture f;
-  auto* expr = MkSysCall(f.arena, "$dimensions", {MkInt(f.arena, 0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
 TEST(SysTask, LeftReturnsUpperBound) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$left", {MkInt(f.arena, 0)});
@@ -28,30 +21,9 @@ TEST(SysTask, RightReturnsZero) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(SysTask, SizeReturnsWidth) {
-  SysTaskFixture f;
-  auto* expr = MkSysCall(f.arena, "$size", {MkInt(f.arena, 0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_GE(result.ToUint64(), 1u);
-}
-
 TEST(SysTask, LowReturnsZero) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$low", {MkInt(f.arena, 0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-TEST(SysTask, HighReturnsUpperBound) {
-  SysTaskFixture f;
-  auto* expr = MkSysCall(f.arena, "$high", {MkInt(f.arena, 0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_GE(result.ToUint64(), 0u);
-}
-
-TEST(SysTask, UnpackedDimensionsReturnsZero) {
-  SysTaskFixture f;
-  auto* expr = MkSysCall(f.arena, "$unpacked_dimensions", {MkInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
@@ -227,6 +199,15 @@ TEST(SysTask, EmptyAssocLowReturnsUnknown) {
   EXPECT_FALSE(EvalExpr(expr, f.ctx, f.arena).IsKnown());
 }
 
+// §20.7: $high of an associative array with no allocated elements is likewise
+// 'x (no largest allocated index exists to report).
+TEST(SysTask, EmptyAssocHighReturnsUnknown) {
+  SysTaskFixture f;
+  f.ctx.CreateAssocArray("a", 32, /*is_string_key=*/false, /*index_width=*/8);
+  auto* expr = MkSysCall(f.arena, "$high", {MkId(f.arena, "a")});
+  EXPECT_FALSE(EvalExpr(expr, f.ctx, f.arena).IsKnown());
+}
+
 // §20.7: an out-of-range dimension index yields 'x.
 TEST(SysTask, DimensionOutOfRangeReturnsUnknown) {
   SysTaskFixture f;
@@ -243,6 +224,48 @@ TEST(SysTask, PackedIncrementReturnsOne) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$increment", {MkInt(f.arena, 0)});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);
+}
+
+// §20.7: for a packed dimension $left is the index of the most significant
+// element. A 32-bit integral value is treated as packed [31:0], so $left is 31;
+// $high equals $left because $increment is 1, and $size spans the full width.
+TEST(SysTask, PackedLeftIsMostSignificantIndex) {
+  SysTaskFixture f;
+  EXPECT_EQ(
+      EvalExpr(MkSysCall(f.arena, "$left", {MkInt(f.arena, 0)}), f.ctx, f.arena)
+          .ToUint64(),
+      31u);
+  EXPECT_EQ(
+      EvalExpr(MkSysCall(f.arena, "$high", {MkInt(f.arena, 0)}), f.ctx, f.arena)
+          .ToUint64(),
+      31u);
+  EXPECT_EQ(
+      EvalExpr(MkSysCall(f.arena, "$size", {MkInt(f.arena, 0)}), f.ctx, f.arena)
+          .ToUint64(),
+      32u);
+}
+
+// §20.7: for a fixed-size dimension declared in ascending order (e.g. [0:7]),
+// $left is the left bound (0) and $right is the right bound (7). Because
+// $left < $right, $increment is -1, and $low/$high mirror $left/$right.
+TEST(SysTask, FixedSizeAscendingDimensionBounds) {
+  SysTaskFixture f;
+  ArrayInfo info;
+  info.lo = 0;
+  info.size = 8;
+  info.elem_width = 4;
+  f.ctx.RegisterArray("arr", info);
+  f.ctx.CreateVariable("arr", 4);
+  auto q = [&](const char* fn) {
+    return static_cast<int32_t>(
+        EvalExpr(MkSysCall(f.arena, fn, {MkId(f.arena, "arr")}), f.ctx, f.arena)
+            .ToUint64());
+  };
+  EXPECT_EQ(q("$left"), 0);
+  EXPECT_EQ(q("$right"), 7);
+  EXPECT_EQ(q("$low"), 0);
+  EXPECT_EQ(q("$high"), 7);
+  EXPECT_EQ(q("$increment"), -1);
 }
 
 // §20.7: $low/$high track $left/$right under the dimension's increment. For a
@@ -323,6 +346,26 @@ TEST(SysTask, DefaultDimensionIsOne) {
   EXPECT_EQ(EvalExpr(without_dim, f.ctx, f.arena).ToUint64(),
             EvalExpr(with_dim1, f.ctx, f.arena).ToUint64());
   EXPECT_EQ(EvalExpr(without_dim, f.ctx, f.arena).ToUint64(), 8u);
+}
+
+// §20.7: a string is a nonarray type that is equivalent to a simple bit
+// vector, so $dimensions returns 1 even when the string currently holds no
+// characters (its bit-vector width does not drive the dimension count).
+TEST(SysTask, DimensionsOfStringReturnsOne) {
+  SysTaskFixture f;
+  f.ctx.CreateVariable("s", 0);
+  f.ctx.RegisterStringVariable("s");
+  auto* expr = MkSysCall(f.arena, "$dimensions", {MkId(f.arena, "s")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);
+}
+
+// §20.7: a string has no unpacked dimensions, so $unpacked_dimensions is 0.
+TEST(SysTask, UnpackedDimensionsOfStringReturnsZero) {
+  SysTaskFixture f;
+  f.ctx.CreateVariable("s", 0);
+  f.ctx.RegisterStringVariable("s");
+  auto* expr = MkSysCall(f.arena, "$unpacked_dimensions", {MkId(f.arena, "s")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 0u);
 }
 
 // §20.7: a dynamic array dimension behaves like a queue dimension — $left is 0,

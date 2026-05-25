@@ -1474,6 +1474,104 @@ void Elaborator::ValidateDynamicArrayNba(const ModuleDecl* decl) {
   }
 }
 
+namespace {
+
+bool IsArrayQueryFunc(std::string_view callee) {
+  return callee == "$left" || callee == "$right" || callee == "$low" ||
+         callee == "$high" || callee == "$increment" || callee == "$size" ||
+         callee == "$dimensions" || callee == "$unpacked_dimensions";
+}
+
+// §20.7 treats a typedef as dynamically sized when one of its unpacked
+// dimensions is a dynamic array ([], parsed as a null dimension), a queue
+// ([$], a "$" identifier dimension), or a wildcard associative array ([*]).
+bool TypedefHasDynamicDim(const std::vector<Expr*>& dims) {
+  for (const auto* d : dims) {
+    if (d == nullptr) return true;
+    if (d->kind == ExprKind::kIdentifier && (d->text == "$" || d->text == "*"))
+      return true;
+  }
+  return false;
+}
+
+void CheckArrayQueryOnDynamicTypeExpr(
+    const Expr* e, const std::unordered_set<std::string_view>& dyn_types,
+    DiagEngine& diag) {
+  if (!e) return;
+  // A bare identifier first argument that names a dynamically sized typedef is
+  // the type identifier itself, not an object of that type; querying it has no
+  // defined extent.
+  if (e->kind == ExprKind::kSystemCall && IsArrayQueryFunc(e->callee) &&
+      !e->args.empty() && e->args[0] &&
+      e->args[0]->kind == ExprKind::kIdentifier &&
+      dyn_types.count(e->args[0]->text) != 0) {
+    diag.Error(e->range.start,
+               std::format("array query function '{}' cannot be applied "
+                           "directly to dynamically sized type '{}'",
+                           e->callee, e->args[0]->text));
+  }
+  CheckArrayQueryOnDynamicTypeExpr(e->lhs, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeExpr(e->rhs, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeExpr(e->condition, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeExpr(e->true_expr, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeExpr(e->false_expr, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeExpr(e->base, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeExpr(e->index, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeExpr(e->index_end, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeExpr(e->repeat_count, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeExpr(e->with_expr, dyn_types, diag);
+  for (auto* a : e->args) CheckArrayQueryOnDynamicTypeExpr(a, dyn_types, diag);
+  for (auto* el : e->elements)
+    CheckArrayQueryOnDynamicTypeExpr(el, dyn_types, diag);
+}
+
+void CheckArrayQueryOnDynamicTypeStmt(
+    const Stmt* s, const std::unordered_set<std::string_view>& dyn_types,
+    DiagEngine& diag) {
+  if (!s) return;
+  CheckArrayQueryOnDynamicTypeExpr(s->condition, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeExpr(s->lhs, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeExpr(s->rhs, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeExpr(s->expr, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeExpr(s->delay, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeExpr(s->var_init, dyn_types, diag);
+  for (auto* sub : s->stmts)
+    CheckArrayQueryOnDynamicTypeStmt(sub, dyn_types, diag);
+  for (auto* sub : s->fork_stmts)
+    CheckArrayQueryOnDynamicTypeStmt(sub, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeStmt(s->then_branch, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeStmt(s->else_branch, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeStmt(s->body, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeStmt(s->for_body, dyn_types, diag);
+  for (auto* init : s->for_inits)
+    CheckArrayQueryOnDynamicTypeStmt(init, dyn_types, diag);
+  for (auto& ci : s->case_items)
+    CheckArrayQueryOnDynamicTypeStmt(ci.body, dyn_types, diag);
+}
+
+}  // namespace
+
+void Elaborator::ValidateArrayQueryOnDynamicType(const ModuleDecl* decl) {
+  // §20.7: the array query functions may not be used directly on a dynamically
+  // sized type identifier. Collect such typedef names, then reject any direct
+  // query on one.
+  std::unordered_set<std::string_view> dyn_types;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kTypedef &&
+        TypedefHasDynamicDim(item->unpacked_dims)) {
+      dyn_types.insert(item->name);
+    }
+  }
+  if (dyn_types.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->body)
+      CheckArrayQueryOnDynamicTypeStmt(item->body, dyn_types, diag_);
+    for (auto* s : item->func_body_stmts)
+      CheckArrayQueryOnDynamicTypeStmt(s, dyn_types, diag_);
+    CheckArrayQueryOnDynamicTypeExpr(item->init_expr, dyn_types, diag_);
+  }
+}
+
 static bool IsConstantBitSelect(const Expr* e) {
   if (e->is_part_select_plus || e->is_part_select_minus) return false;
   if (e->index && e->index_end) return true;
