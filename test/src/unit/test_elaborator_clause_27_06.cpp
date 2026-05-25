@@ -117,4 +117,31 @@ TEST(GenerateBlockNaming, CollisionResolvedByLeadingZero) {
   EXPECT_EQ(second->name, "genblk02");
 }
 
+// §27.6: leading zeros keep being prepended until the generated name no
+// longer clashes. When both genblk2 and genblk02 are already taken, the
+// second construct must fall through to genblk002.
+TEST(GenerateBlockNaming, RepeatedCollisionAddsMoreLeadingZeros) {
+  auto r = RunElaboration(
+      "module top;\n"
+      "  parameter genblk2 = 0;\n"
+      "  parameter genblk02 = 0;\n"
+      "  if (1) begin\n"
+      "    logic a;\n"
+      "  end\n"
+      "  if (1) begin\n"
+      "    logic b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  auto* m = r.cu->modules[0];
+  ModuleItem* second = nullptr;
+  int gen_seen = 0;
+  for (auto* it : m->items) {
+    if (it->kind != ModuleItemKind::kGenerateIf) continue;
+    if (gen_seen++ == 1) second = it;
+  }
+  ASSERT_NE(second, nullptr);
+  EXPECT_EQ(second->name, "genblk002");
+}
+
 }
