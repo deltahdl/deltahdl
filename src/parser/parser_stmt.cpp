@@ -65,7 +65,7 @@ Stmt* Parser::ParseStmt() {
     Consume();
   }
 
-  Stmt* stmt = ParseStmtBody();
+  Stmt* stmt = ParseStmtBody(prefix_label);
   if (stmt != nullptr) {
     if (!prefix_label.empty() && stmt->label.empty()) {
       stmt->label = prefix_label;
@@ -90,10 +90,10 @@ Stmt* Parser::ParseStmt() {
   return stmt;
 }
 
-Stmt* Parser::ParseStmtBody() {
+Stmt* Parser::ParseStmtBody(std::string_view prefix_label) {
   switch (CurrentToken().kind) {
     case TokenKind::kKwBegin:
-      return ParseBlockStmt();
+      return ParseBlockStmt(prefix_label);
     case TokenKind::kKwIf:
       return ParseIfStmt();
     case TokenKind::kKwCase:
@@ -111,7 +111,7 @@ Stmt* Parser::ParseStmtBody() {
     case TokenKind::kKwRepeat:
       return ParseRepeatStmt();
     case TokenKind::kKwFork:
-      return ParseForkStmt();
+      return ParseForkStmt(prefix_label);
     case TokenKind::kKwDo:
       return ParseDoWhileStmt();
     case TokenKind::kKwBreak:
@@ -373,7 +373,7 @@ void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
   ParseBlockDataDecl(stmts, attrs);
 }
 
-Stmt* Parser::ParseBlockStmt() {
+Stmt* Parser::ParseBlockStmt(std::string_view prefix_label) {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kBlock;
   stmt->range.start = CurrentLoc();
@@ -394,15 +394,19 @@ Stmt* Parser::ParseBlockStmt() {
   }
   Expect(TokenKind::kKwEnd);
 
+  // A label preceding begin is equivalent to a block name, so the matching
+  // name after end may be either the inline name or that prefix label.
+  std::string_view block_name =
+      stmt->label.empty() ? prefix_label : stmt->label;
   if (Match(TokenKind::kColon)) {
     auto end_id = ExpectIdentifier();
-    if (stmt->label.empty()) {
+    if (block_name.empty()) {
       diag_.Error(end_id.loc, "end label '" + std::string(end_id.text) +
                                   "' specified for unnamed block");
-    } else if (end_id.text != stmt->label) {
+    } else if (end_id.text != block_name) {
       diag_.Error(end_id.loc, "end label '" + std::string(end_id.text) +
                                   "' does not match block name '" +
-                                  std::string(stmt->label) + "'");
+                                  std::string(block_name) + "'");
     }
   }
   stmt->range.end = CurrentLoc();
@@ -562,7 +566,7 @@ Stmt* Parser::ParseRepeatStmt() {
   return stmt;
 }
 
-Stmt* Parser::ParseForkStmt() {
+Stmt* Parser::ParseForkStmt(std::string_view prefix_label) {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kFork;
   stmt->range.start = CurrentLoc();
@@ -584,15 +588,19 @@ Stmt* Parser::ParseForkStmt() {
   stmt->join_kind = CurrentToken().kind;
   Consume();
 
+  // A label preceding fork is equivalent to a block name, so the matching
+  // name after join/join_any/join_none may be the inline name or that label.
+  std::string_view block_name =
+      stmt->label.empty() ? prefix_label : stmt->label;
   if (Match(TokenKind::kColon)) {
     auto end_id = ExpectIdentifier();
-    if (stmt->label.empty()) {
+    if (block_name.empty()) {
       diag_.Error(end_id.loc, "end label '" + std::string(end_id.text) +
                                   "' specified for unnamed block");
-    } else if (end_id.text != stmt->label) {
+    } else if (end_id.text != block_name) {
       diag_.Error(end_id.loc, "end label '" + std::string(end_id.text) +
                                   "' does not match block name '" +
-                                  std::string(stmt->label) + "'");
+                                  std::string(block_name) + "'");
     }
   }
   return stmt;

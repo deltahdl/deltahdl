@@ -152,4 +152,20 @@ TEST(StatementLabelSimulation, LabeledBeginBlockWithLocalVar) {
   EXPECT_EQ(val, 21u);
 }
 
+TEST(StatementLabelSimulation, LabeledForkJoinExecutes) {
+  // Labeling a fork-join block creates its named scope without disturbing
+  // execution: the parent blocks on join and the spawned assignment lands.
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    work: fork\n"
+      "      result = 55;\n"
+      "    join : work\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 55u);
+}
+
 }

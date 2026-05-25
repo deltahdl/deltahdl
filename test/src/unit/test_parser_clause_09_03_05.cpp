@@ -20,36 +20,6 @@ TEST(StatementLabelParsing, FunctionStatementWithLabel) {
   EXPECT_EQ(func->func_body_stmts[0]->label, "step1");
 }
 
-TEST(StatementLabelParsing, StatementLabelOnBeginBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial\n"
-      "    name: begin\n"
-      "      a = 1;\n"
-      "    end: name\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_EQ(item->body->label, "name");
-}
-TEST(StatementLabelParsing, StatementLabelOnForkBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial\n"
-      "    name: fork\n"
-      "      a = 1;\n"
-      "    join: name\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->label, "name");
-}
-
 TEST(StatementLabelParsing, StatementLabelOnWhile) {
   auto r = Parse(
       "module m;\n"
@@ -128,19 +98,6 @@ TEST(StatementLabelParsing, ForkWithStatementLabel) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   EXPECT_EQ(stmt->label, "labelB");
-}
-
-TEST(StatementLabelParsing, StatementLabelOnForLoop) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    loop: for (int i = 0; i < 10; i++) a = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
 }
 
 TEST(StatementLabelParsing, StatementLabelOnBlockingAssignment) {
@@ -306,6 +263,55 @@ TEST(StatementLabelParsing, StatementLabelOnWait) {
   EXPECT_EQ(stmt->label, "hold");
 }
 
+TEST(StatementLabelParsing, StatementLabelOnDelayControl) {
+  // A label may precede a delay-control statement, a procedural statement
+  // reached through a parse path distinct from the assignment forms.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait5: #5 a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
+  EXPECT_EQ(stmt->label, "wait5");
+}
+
+TEST(StatementLabelParsing, StatementLabelOnEventControl) {
+  // A label may precede an event-control statement.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    sync: @(posedge clk) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  EXPECT_EQ(stmt->label, "sync");
+}
+
+TEST(StatementLabelParsing, StatementLabelOnEventTrigger) {
+  // A label may precede an event-trigger statement.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fire: -> done;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
+  EXPECT_EQ(stmt->label, "fire");
+}
+
 TEST(StatementLabelParsing, StatementLabelOnForLoopStoresLabel) {
   auto r = Parse(
       "module m;\n"
@@ -371,6 +377,64 @@ TEST(StatementLabelParsing, LabelAndBlockNameOnForkIsError) {
       "      a = 1;\n"
       "    join\n"
       "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(StatementLabelParsing, PrefixLabelMatchesEndLabelOnBegin) {
+  // A label before begin is equivalent to a block name, so a matching name
+  // may follow end without being treated as a label on an unnamed block.
+  auto r = Parse(
+      "module m;\n"
+      "  initial\n"
+      "    name: begin\n"
+      "      a = 1;\n"
+      "    end : name\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlock);
+  EXPECT_EQ(stmt->label, "name");
+}
+
+TEST(StatementLabelParsing, PrefixLabelMatchesJoinLabelOnFork) {
+  // The same equivalence holds for fork ... join with a matching name.
+  auto r = Parse(
+      "module m;\n"
+      "  initial\n"
+      "    name: fork\n"
+      "      a = 1;\n"
+      "    join : name\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->label, "name");
+}
+
+TEST(StatementLabelParsing, LabelBeforeEndIsError) {
+  // A label binds to a statement, and end is not a statement, so a label
+  // immediately before the closing end is rejected.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    tail: end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(StatementLabelParsing, LabelBeforeJoinIsError) {
+  // The same holds for the fork-join terminators.
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    a = 1;\n"
+      "    tail: join\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }

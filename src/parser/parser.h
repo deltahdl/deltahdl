@@ -237,8 +237,8 @@ class Parser {
 
   Stmt* ParseStmt();
   std::string_view TryParseStmtLabel();
-  Stmt* ParseStmtBody();
-  Stmt* ParseBlockStmt();
+  Stmt* ParseStmtBody(std::string_view prefix_label = {});
+  Stmt* ParseBlockStmt(std::string_view prefix_label = {});
   Stmt* ParseIfStmt();
   Stmt* ParseCaseStmt(TokenKind case_kind);
   CaseItem ParseCaseItem(bool inside = false);
@@ -246,7 +246,7 @@ class Parser {
   Stmt* ParseWhileStmt();
   Stmt* ParseForeverStmt();
   Stmt* ParseRepeatStmt();
-  Stmt* ParseForkStmt();
+  Stmt* ParseForkStmt(std::string_view prefix_label = {});
   Stmt* ParseDoWhileStmt();
   Stmt* ParseForeachStmt();
   Expr* ParseForeachArrayId();
