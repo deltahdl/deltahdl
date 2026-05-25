@@ -82,4 +82,126 @@ TEST(TypeParameterElab, TypeParamLogicVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
+// §6.20.3: a data type parameter can only be set to a data type. Giving a
+// `parameter type` an ordinary value expression as its default must be an
+// error.
+TEST(TypeParameterElab, TypeParamSetToValueIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter type T = 5;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §6.20.3: a type parameter restricted with a leading basic data type keyword
+// must be assigned a conforming type. An `enum`-restricted type parameter
+// bound to a non-enum type does not conform and must be rejected.
+TEST(TypeParameterElab, RestrictedEnumTypeParamMismatchIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter type enum E = int;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §6.20.3: when the assigned type does conform to the restriction keyword the
+// declaration is legal. An `enum`-restricted type parameter bound to an enum
+// typedef conforms and must elaborate without error.
+TEST(TypeParameterElab, RestrictedEnumTypeParamConformsOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef enum {A, B} my_enum_t;\n"
+      "  parameter type enum E = my_enum_t;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §6.20.3: a type parameter used as a class scope resolution prefix (here in a
+// typedef declaration, an allowed context) shall resolve to a class. A type
+// parameter bound to a non-class type does not, so it must be rejected.
+TEST(TypeParameterElab, TypeParamScopePrefixNotAClassIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter type T = int;\n"
+      "  typedef T::inner my_t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §6.20.3: a type parameter may resolve to a class type, but using it as the
+// prefix of the class scope resolution operator is restricted to typedef
+// declarations, the type operator, and type parameter assignments. Here the
+// type parameter prefixes '::' inside an ordinary expression, which is not one
+// of the permitted contexts, so elaboration must report an error.
+TEST(TypeParameterElab, TypeParamScopePrefixInExpressionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  static int val = 7;\n"
+      "endclass\n"
+      "module m;\n"
+      "  parameter type T = C;\n"
+      "  int x;\n"
+      "  initial x = T::val;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §6.20.3: overriding a type parameter with a defparam statement is illegal.
+// The child's T is a parameter-port type parameter, so the hierarchical
+// defparam targeting it must be rejected.
+TEST(TypeParameterElab, DefparamCannotOverrideTypeParam) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child #(parameter type T = int)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u0();\n"
+      "  defparam u0.T = 16;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §6.20.3: the scope-resolution restriction also covers a type parameter that
+// is declared in the parameter port list (not just the module body) and that
+// appears as a '::' prefix inside a continuous assignment. This exercises the
+// port-list collection and continuous-assign paths of the elaborator check.
+TEST(TypeParameterElab, PortTypeParamScopePrefixInContAssignIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m #(parameter type T = int) ();\n"
+      "  wire w;\n"
+      "  assign w = T::n;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §6.20.3: the restriction is specific to a type parameter prefix. A type
+// parameter used as an ordinary data type, and a genuine class name used as a
+// scope resolution prefix, are both legal and must elaborate cleanly.
+TEST(TypeParameterElab, TypeParamAsTypeWithClassScopeOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  static int count = 5;\n"
+             "endclass\n"
+             "module m;\n"
+             "  parameter type T = int;\n"
+             "  T data;\n"
+             "  int x;\n"
+             "  initial x = C::count;\n"
+             "endmodule\n"));
+}
+
 }

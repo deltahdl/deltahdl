@@ -612,6 +612,52 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
 
   bool is_type = item->data_type.kind == DataTypeKind::kVoid &&
                  item->typedef_type.kind != DataTypeKind::kImplicit;
+
+  // §6.20.3: a data type parameter (parameter type) can only be set to a data
+  // type. The parser marks a type parameter with a void data type; if such a
+  // parameter received an ordinary value expression instead of a type, it has
+  // been set to a non-type and must be rejected.
+  if (item->data_type.kind == DataTypeKind::kVoid &&
+      item->typedef_type.kind == DataTypeKind::kImplicit &&
+      item->init_expr != nullptr) {
+    diag_.Error(item->loc,
+                std::format("type parameter '{}' can only be set to a data "
+                            "type, not a value expression",
+                            item->name));
+  }
+
+  // §6.20.3: a type parameter declared with a leading enum, struct, or union
+  // keyword restricts its valid types; assigning a type that does not conform
+  // to that basic data type is an error. Resolve the assigned type through any
+  // typedef chain and flag only a definite kind mismatch, leaving an
+  // unresolved named type alone.
+  if (is_type && (item->forward_type_kind == DataTypeKind::kEnum ||
+                  item->forward_type_kind == DataTypeKind::kStruct ||
+                  item->forward_type_kind == DataTypeKind::kUnion)) {
+    const DataType* resolved = &item->typedef_type;
+    for (int hops = 0; hops < 8 && resolved->kind == DataTypeKind::kNamed;
+         ++hops) {
+      auto td = typedefs_.find(resolved->type_name);
+      if (td == typedefs_.end()) break;
+      resolved = &td->second;
+    }
+    if (resolved->kind != DataTypeKind::kNamed &&
+        resolved->kind != item->forward_type_kind) {
+      static const auto basic_name = [](DataTypeKind k) -> std::string_view {
+        switch (k) {
+          case DataTypeKind::kEnum:   return "enum";
+          case DataTypeKind::kStruct: return "struct";
+          case DataTypeKind::kUnion:  return "union";
+          default:                    return "type";
+        }
+      };
+      diag_.Error(item->loc,
+                  std::format("type parameter '{}' is assigned a type that does "
+                              "not conform to the required {} kind",
+                              item->name, basic_name(item->forward_type_kind)));
+    }
+  }
+
   if (is_type) {
     typedefs_[item->name] = item->typedef_type;
   }

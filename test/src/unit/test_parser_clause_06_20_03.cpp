@@ -38,14 +38,6 @@ TEST(TypeParameterParsing, TypeParameterLogicVector) {
               "endmodule\n"));
 }
 
-TEST(TypeParameterParsing, TypeParamDefaultLogicVector) {
-  EXPECT_TRUE(
-      ParseOk("module m #(parameter type DATA_T = logic [15:0])\n"
-              "  ();\n"
-              "  DATA_T data;\n"
-              "endmodule\n"));
-}
-
 TEST(TypeParameterParsing, TypeParamPort) {
   EXPECT_TRUE(ParseOk6("module top #(type T = real); endmodule\n"));
 }

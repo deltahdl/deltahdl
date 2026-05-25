@@ -63,6 +63,8 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateArrayArgTypes(decl);
   ValidateLocalProtectedAccess(decl);
   ValidateParameterizedScopeResolution(decl);
+  ValidateTypeParamScopeUsage(decl);
+  ValidateTypeParamScopePrefixResolvesToClass(decl);
   ValidateStaticMethodBodies(decl);
   ValidateClassMethodBodies(decl);
   ValidateThisUsage(decl);

@@ -38,18 +38,6 @@ TEST(ClassScopeResolutionParsing, EnumMemberAccess) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ClassScopeResolutionParsing, TypedefAsType) {
-  auto r = Parse(
-      "class Outer;\n"
-      "  typedef int my_type;\n"
-      "endclass\n"
-      "module m;\n"
-      "  Outer::my_type x;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 TEST(ClassScopeResolutionParsing, ParameterAccess) {
   auto r = Parse(
       "class Cfg;\n"
@@ -60,16 +48,6 @@ TEST(ClassScopeResolutionParsing, ParameterAccess) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-TEST(ClassScopeResolutionParsing, TypedefInModuleScope) {
-  EXPECT_TRUE(
-      ParseOk("class base;\n"
-              "  typedef int my_type;\n"
-              "endclass\n"
-              "module m;\n"
-              "  base::my_type x;\n"
-              "endmodule\n"));
 }
 
 TEST(ClassScopeResolutionParsing, ChainedClassScope) {

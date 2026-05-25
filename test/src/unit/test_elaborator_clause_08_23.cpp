@@ -131,4 +131,57 @@ TEST(ClassScopeResolutionElaboration, NestedClassAsTypeOk) {
              "endmodule\n"));
 }
 
+// §8.23: while a type parameter may resolve to a class type, use of the class
+// scope resolution operator to select something through such a prefix is
+// restricted to typedef declarations, the type operator, and type parameter
+// assignments. A type parameter prefixing '::' in an expression is outside the
+// permitted contexts and must be reported. This is the same restriction stated
+// by §6.20.3 and enforced by the shared elaborator check.
+TEST(ClassScopeResolutionElaboration, TypeParamScopePrefixRestricted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  static int val = 7;\n"
+      "endclass\n"
+      "module m;\n"
+      "  parameter type T = C;\n"
+      "  int x;\n"
+      "  initial x = T::val;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §8.23: the same restriction holds when the type parameter comes from the
+// parameter port list and the '::' prefix appears inside a procedural always
+// block (here on the right side of a nonblocking assignment), confirming the
+// restriction is enforced across these contexts rather than only in an initial
+// block with a body-declared type parameter.
+TEST(ClassScopeResolutionElaboration, PortTypeParamScopePrefixInAlwaysBlockIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m #(parameter type T = int) ();\n"
+      "  logic clk;\n"
+      "  logic q;\n"
+      "  always @(posedge clk) q <= T::n;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §8.23: an ordinary class type name remains a valid scope resolution prefix in
+// an expression; the restriction applies only to a type parameter prefix.
+TEST(ClassScopeResolutionElaboration, ClassNamePrefixInExpressionOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  static int val = 7;\n"
+             "endclass\n"
+             "module m;\n"
+             "  parameter type T = int;\n"
+             "  T data;\n"
+             "  int x;\n"
+             "  initial x = C::val;\n"
+             "endmodule\n"));
+}
+
 }

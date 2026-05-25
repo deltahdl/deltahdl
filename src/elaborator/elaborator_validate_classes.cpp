@@ -2592,6 +2592,128 @@ void Elaborator::ValidateParameterizedScopeResolution(const ModuleDecl* decl) {
   }
 }
 
+// §6.20.3 and §8.23 both state the same restriction: while a type parameter
+// may resolve to a class type, using it as the prefix of the class scope
+// resolution operator '::' is restricted to typedef declarations, the type
+// operator, and type parameter assignments. Those three contexts are parsed as
+// data types (carrying a scope_name), never as expressions, so a type
+// parameter that surfaces as the prefix of a member-access expression is always
+// outside the permitted set. Both subclauses agree on this rule; enforcing it
+// from one place keeps them consistent.
+static void CheckTypeParamScopeExpr(
+    const Expr* e,
+    const std::unordered_set<std::string_view>& type_params,
+    DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kMemberAccess && e->lhs && e->rhs &&
+      e->lhs->kind == ExprKind::kIdentifier &&
+      type_params.count(e->lhs->text)) {
+    diag.Error(e->lhs->range.start,
+               std::format("type parameter '{}' may prefix the class scope "
+                           "resolution operator only within a typedef "
+                           "declaration, the type operator, or a type "
+                           "parameter assignment",
+                           e->lhs->text));
+  }
+  CheckTypeParamScopeExpr(e->lhs, type_params, diag);
+  CheckTypeParamScopeExpr(e->rhs, type_params, diag);
+  CheckTypeParamScopeExpr(e->base, type_params, diag);
+  CheckTypeParamScopeExpr(e->index, type_params, diag);
+  CheckTypeParamScopeExpr(e->condition, type_params, diag);
+  CheckTypeParamScopeExpr(e->true_expr, type_params, diag);
+  CheckTypeParamScopeExpr(e->false_expr, type_params, diag);
+  for (const auto* arg : e->args)
+    CheckTypeParamScopeExpr(arg, type_params, diag);
+}
+
+static void WalkStmtsForTypeParamScope(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& type_params,
+    DiagEngine& diag) {
+  if (!s) return;
+  CheckTypeParamScopeExpr(s->lhs, type_params, diag);
+  CheckTypeParamScopeExpr(s->rhs, type_params, diag);
+  CheckTypeParamScopeExpr(s->expr, type_params, diag);
+  CheckTypeParamScopeExpr(s->condition, type_params, diag);
+  for (auto* sub : s->stmts) WalkStmtsForTypeParamScope(sub, type_params, diag);
+  WalkStmtsForTypeParamScope(s->then_branch, type_params, diag);
+  WalkStmtsForTypeParamScope(s->else_branch, type_params, diag);
+  WalkStmtsForTypeParamScope(s->body, type_params, diag);
+  WalkStmtsForTypeParamScope(s->for_body, type_params, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForTypeParamScope(ci.body, type_params, diag);
+}
+
+void Elaborator::ValidateTypeParamScopeUsage(const ModuleDecl* decl) {
+  // Type parameters come from the parameter port list (recorded by the parser)
+  // and from body declarations, where a `parameter type`/`localparam type`
+  // item is carried as a parameter declaration whose data type is void.
+  std::unordered_set<std::string_view> type_params = decl->type_param_names;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kParamDecl &&
+        item->data_type.kind == DataTypeKind::kVoid) {
+      type_params.insert(item->name);
+    }
+  }
+  if (type_params.empty()) return;
+
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckTypeParamScopeExpr(item->assign_lhs, type_params, diag_);
+      CheckTypeParamScopeExpr(item->assign_rhs, type_params, diag_);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForTypeParamScope(item->body, type_params, diag_);
+    }
+  }
+}
+
+void Elaborator::ValidateTypeParamScopePrefixResolvesToClass(
+    const ModuleDecl* decl) {
+  // §6.20.3: a type parameter may prefix the class scope resolution operator in
+  // an allowed context (such as a typedef declaration) only when it resolves to
+  // a class type; it shall be an error if the prefix does not resolve to a
+  // class. Collect each body type parameter and the type it is bound to.
+  std::unordered_map<std::string_view, const DataType*> type_param_bound;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kParamDecl &&
+        item->data_type.kind == DataTypeKind::kVoid &&
+        item->typedef_type.kind != DataTypeKind::kImplicit) {
+      type_param_bound[item->name] = &item->typedef_type;
+    }
+  }
+  if (type_param_bound.empty()) return;
+
+  // Returns true when the bound type is definitely not a class. A built-in or
+  // otherwise non-named type can never be a class; a named type is left alone
+  // (it may name a class, possibly one declared elsewhere) to avoid false
+  // positives.
+  auto definitely_not_a_class = [&](const DataType* bound) -> bool {
+    return bound->kind != DataTypeKind::kNamed;
+  };
+
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kTypedef) continue;
+    if (item->typedef_type.kind != DataTypeKind::kNamed) continue;
+    auto scope = item->typedef_type.scope_name;
+    if (scope.empty()) continue;
+    auto it = type_param_bound.find(scope);
+    if (it == type_param_bound.end()) continue;
+    if (definitely_not_a_class(it->second)) {
+      diag_.Error(item->loc,
+                  std::format("type parameter '{}' used as a class scope "
+                              "resolution prefix does not resolve to a class",
+                              scope));
+    }
+  }
+}
+
 void Elaborator::ValidateForwardClassTypedefs() {
   for (const auto* item : unit_->cu_items) {
     if (item->kind != ModuleItemKind::kTypedef) continue;
