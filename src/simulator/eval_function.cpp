@@ -58,22 +58,50 @@ static std::string BuildFormatP(const Expr* arg, SimContext& ctx) {
   return "'{" + std::string(tag) + ":" + std::to_string(val) + "}";
 }
 
+// The eight display and write system tasks named in Syntax 21-1. The b/o/h
+// suffixed forms differ from the plain ones only in the default radix used for
+// unformatted expression arguments; that radix is applied elsewhere.
+static bool IsDisplayOrWriteTask(std::string_view name) {
+  return name == "$display" || name == "$displayb" || name == "$displayo" ||
+         name == "$displayh" || name == "$write" || name == "$writeb" ||
+         name == "$writeo" || name == "$writeh";
+}
+
 static void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
-  std::string fmt;
-  std::vector<Logic4Vec> arg_vals;
-  std::vector<std::string> p_fmts;
-  for (size_t i = 0; i < expr->args.size(); ++i) {
-    auto val = EvalExpr(expr->args[i], ctx, arena);
-    if (i == 0 && expr->args[i]->kind == ExprKind::kStringLiteral) {
-      fmt = ExtractFormatString(expr->args[i]);
-    } else {
-      arg_vals.push_back(val);
-      p_fmts.push_back(BuildFormatP(expr->args[i], ctx));
+  // The arguments are processed in the order they appear. A string literal
+  // acts as a format template whose specifiers are filled by the expression
+  // arguments that immediately follow it. An omitted argument -- a leading,
+  // trailing, or doubled comma in the call -- carries no expression and is
+  // rendered as a single space.
+  std::string output;
+  const size_t n = expr->args.size();
+  for (size_t i = 0; i < n; ++i) {
+    const Expr* arg = expr->args[i];
+    if (arg == nullptr) {
+      output += ' ';
+      continue;
     }
+    if (arg->kind == ExprKind::kStringLiteral) {
+      std::string fmt = ExtractFormatString(arg);
+      std::vector<Logic4Vec> arg_vals;
+      std::vector<std::string> p_fmts;
+      while (i + 1 < n && expr->args[i + 1] != nullptr &&
+             expr->args[i + 1]->kind != ExprKind::kStringLiteral) {
+        const Expr* val_arg = expr->args[++i];
+        arg_vals.push_back(EvalExpr(val_arg, ctx, arena));
+        p_fmts.push_back(BuildFormatP(val_arg, ctx));
+      }
+      output += FormatDisplay(fmt, arg_vals, p_fmts);
+      continue;
+    }
+    // A bare expression with no governing format string is evaluated for its
+    // side effects; its default-radix rendering is defined separately.
+    EvalExpr(arg, ctx, arena);
   }
-  std::string output = fmt.empty() ? "" : FormatDisplay(fmt, arg_vals, p_fmts);
   std::cout << output;
-  if (expr->callee == "$display") std::cout << "\n";
+  // The display family ($display, $displayb, $displayo, $displayh) terminates
+  // its output with a newline; the write family does not.
+  if (expr->callee.starts_with("$display")) std::cout << "\n";
 }
 
 void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,
@@ -297,7 +325,7 @@ static Logic4Vec EvalSeveritySysCall(const Expr* expr, SimContext& ctx,
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto name = expr->callee;
 
-  if (name == "$display" || name == "$write") {
+  if (IsDisplayOrWriteTask(name)) {
     ExecDisplayWrite(expr, ctx, arena);
     return MakeLogic4VecVal(arena, 1, 0);
   }

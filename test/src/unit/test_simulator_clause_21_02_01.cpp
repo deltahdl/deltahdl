@@ -1,0 +1,186 @@
+#include <sstream>
+
+#include "fixture_simulator.h"
+
+using namespace delta;
+
+namespace {
+
+// Runs a single-module source through elaboration and simulation while
+// capturing everything the run writes to stdout.
+std::string RunCapture(const std::string& src, SimFixture& f) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  auto* design = ElaborateSrc(src, f);
+  if (design != nullptr) {
+    LowerAndRun(design, f);
+  }
+  std::cout.rdbuf(old_buf);
+  return captured.str();
+}
+
+// N1: $display appends a trailing newline to its output.
+TEST(IoDisplayWriteSim, DisplayAppendsNewline) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $display(\"hi\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "hi\n");
+}
+
+// N1: $write emits the same text but without a trailing newline.
+TEST(IoDisplayWriteSim, WriteOmitsNewline) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write(\"hi\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "hi");
+}
+
+// N6: $display invoked with no arguments prints just a newline.
+TEST(IoDisplayWriteSim, DisplayNoArgsPrintsNewline) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $display;\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "\n");
+}
+
+// N6: $write invoked with no arguments prints nothing at all.
+TEST(IoDisplayWriteSim, WriteNoArgsPrintsNothing) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write;\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "");
+}
+
+// N5: a trailing empty argument (a comma with nothing after it) renders as a
+// single space.
+TEST(IoDisplayWriteSim, TrailingEmptyArgIsSpace) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write(\"a\", );\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "a ");
+}
+
+// N5: a leading empty argument renders as a single space (and must not crash).
+TEST(IoDisplayWriteSim, LeadingEmptyArgIsSpace) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write(,\"d\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, " d");
+}
+
+// N5: an empty argument between two literals renders as one space; this is the
+// LRM's worked example reproduced for $write.
+TEST(IoDisplayWriteSim, DoubledCommaIsSpace) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write(\"b\",,\"c\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "b c");
+}
+
+// N5: a single comma between the parentheses is two empty arguments, so it
+// renders as two spaces.
+TEST(IoDisplayWriteSim, SingleCommaIsTwoSpaces) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write(,);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "  ");
+}
+
+// N2: arguments are rendered in the order they appear in the argument list.
+// Two adjacent string literals exercise ordering without invoking any format
+// specifier: the first literal must precede the second in the output.
+TEST(IoDisplayWriteSim, ArgumentsRenderInListOrder) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write(\"foo\", \"bar\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "foobar");
+}
+
+// N4c: a doubled percent sign in a string literal is rendered as one literal
+// percent sign and consumes no expression argument.
+TEST(IoDisplayWriteSim, DoubledPercentRendersOnePercent) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write(\"50%% done\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "50% done");
+}
+
+// N6 edge: a no-argument $display written with empty parentheses still prints
+// just a newline, identically to the parenthesis-free form.
+TEST(IoDisplayWriteSim, DisplayEmptyParensPrintsNewline) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $display();\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "\n");
+}
+
+// N6 edge: a no-argument $write written with empty parentheses prints nothing,
+// just as the parenthesis-free form does.
+TEST(IoDisplayWriteSim, WriteEmptyParensPrintsNothing) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write();\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "");
+}
+
+// N1/B2: a radix-suffixed display task ($displayh here) is part of the display
+// family, so it terminates its output with a newline.
+TEST(IoDisplayWriteSim, DisplayRadixVariantAppendsNewline) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $displayh(\"hi\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "hi\n");
+}
+
+// N1/B2: a radix-suffixed write task ($writeb here) is part of the write
+// family, so it emits its output with no trailing newline.
+TEST(IoDisplayWriteSim, WriteRadixVariantOmitsNewline) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $writeb(\"hi\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "hi");
+}
+
+}  // namespace

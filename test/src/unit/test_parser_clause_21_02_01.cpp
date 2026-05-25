@@ -14,7 +14,7 @@ TEST(IoSystemTaskParsing, DisplayInAlwaysBlock) {
               "endmodule\n"));
 }
 
-TEST(SchedulingSemanticsParsing, DisplaySystemCall) {
+TEST(IoSystemTaskParsing, DisplaySystemCall) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -31,7 +31,7 @@ TEST(SchedulingSemanticsParsing, DisplaySystemCall) {
   EXPECT_EQ(stmt->expr->callee, "$display");
 }
 
-TEST(OperatorAndExpressionParsing, SystemCallEmptyArgs) {
+TEST(IoSystemTaskParsing, SystemCallEmptyArgs) {
   auto r = Parse(
       "module t;\n"
       "  initial $display(5,,2,,3);\n"
@@ -40,7 +40,7 @@ TEST(OperatorAndExpressionParsing, SystemCallEmptyArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(OperatorAndExpressionParsing, SystemCallLeadingEmptyArg) {
+TEST(IoSystemTaskParsing, SystemCallLeadingEmptyArg) {
   auto r = Parse(
       "module t;\n"
       "  initial $display(,\"hello\");\n"
@@ -61,13 +61,6 @@ TEST(IoSystemTaskParsing, DisplayParsesAsSystemCall) {
   auto* item = mod->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kInitialBlock);
   ASSERT_NE(item->body, nullptr);
-}
-
-TEST(IoSystemTaskParsing, DisplayBasicCall) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $display(\"hello\");\n"
-              "endmodule\n"));
 }
 
 TEST(IoSystemTaskParsing, DisplayNoArgs) {
