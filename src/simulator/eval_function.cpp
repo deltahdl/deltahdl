@@ -234,6 +234,50 @@ static Logic4Vec EvalTimeSysCall(SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 64, ctx.CurrentTime().ticks);
 }
 
+// Extract the design-element name an argument to $timeunit/$timeprecision
+// refers to. Bare $root/$unit are modeled by the parser as argument-less
+// system calls; an ordinary hierarchical reference is an identifier.
+static std::string_view TimescaleArgName(const Expr* arg) {
+  if (arg->kind == ExprKind::kSystemCall) return arg->callee;
+  if (arg->kind == ExprKind::kIdentifier) {
+    return arg->scope_prefix.empty() ? arg->text : arg->scope_prefix;
+  }
+  return {};
+}
+
+// §20.4.1: $timeunit and $timeprecision return the time unit or precision of a
+// design element, encoded as the base-10 order from Table 20-2 (an integer in
+// the range 2 to -15). With no argument the current scope is reported; an
+// argument names the design element, $unit names the compilation unit, and
+// $root yields the simulation time unit for both functions (see 3.14.3).
+static Logic4Vec EvalTimescaleQuery(const Expr* expr, SimContext& ctx,
+                                    Arena& arena, std::string_view name) {
+  bool want_precision = (name == "$timeprecision");
+  const TimeScale* scale = &ctx.CurrentTimeScale();
+  bool use_sim_time_unit = false;
+  if (!expr->args.empty() && expr->args[0] != nullptr) {
+    std::string_view target = TimescaleArgName(expr->args[0]);
+    if (target == "$root") {
+      use_sim_time_unit = true;
+    } else if (target == "$unit") {
+      scale = &ctx.CompUnitTimeScale();
+    } else if (const TimeScale* found = ctx.FindScopeTimeScale(target)) {
+      scale = found;
+    }
+  }
+  int order;
+  if (use_sim_time_unit) {
+    order = static_cast<int>(ctx.StepTimeUnit());
+  } else if (want_precision) {
+    order = EffectiveTimeOrder(scale->precision, scale->prec_magnitude);
+  } else {
+    order = EffectiveTimeOrder(scale->unit, scale->magnitude);
+  }
+  auto result = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(order));
+  result.is_signed = true;
+  return result;
+}
+
 static Logic4Vec EvalSystemCommand(const Expr* expr, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
   auto text = expr->args[0]->text;
@@ -285,6 +329,9 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::string_view name) {
   if (name == "$time" || name == "$stime" || name == "$realtime") {
     return EvalTimeSysCall(ctx, arena, name);
+  }
+  if (name == "$timeunit" || name == "$timeprecision") {
+    return EvalTimescaleQuery(expr, ctx, arena, name);
   }
   if (name == "$strobe" || name == "$monitor") {
     return EvalDeferredPrint(expr, ctx, arena);

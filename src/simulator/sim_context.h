@@ -152,6 +152,26 @@ class SimContext {
   TimeUnit GlobalPrecision() const { return global_precision_; }
   TimeUnit StepTimeUnit() const { return global_precision_; }
 
+  // Timescale of the design element that is the current scope, reported by
+  // $timeunit/$timeprecision when no argument is supplied (see 20.4.1).
+  void SetCurrentTimeScale(const TimeScale& ts) { current_timescale_ = ts; }
+  const TimeScale& CurrentTimeScale() const { return current_timescale_; }
+
+  // Timescale of the compilation unit, reported when the $unit argument is
+  // passed to $timeunit/$timeprecision.
+  void SetCompUnitTimeScale(const TimeScale& ts) { compunit_timescale_ = ts; }
+  const TimeScale& CompUnitTimeScale() const { return compunit_timescale_; }
+
+  // Timescale of a named design element, reported when that element is passed
+  // as the argument to $timeunit/$timeprecision.
+  void SetScopeTimeScale(std::string_view name, const TimeScale& ts) {
+    scope_timescales_[std::string(name)] = ts;
+  }
+  const TimeScale* FindScopeTimeScale(std::string_view name) const {
+    auto it = scope_timescales_.find(std::string(name));
+    return it == scope_timescales_.end() ? nullptr : &it->second;
+  }
+
   void RegisterFinalProcess(Process* proc);
   void RunFinalBlocks();
 
@@ -409,6 +429,9 @@ class SimContext {
   std::unordered_map<uint32_t, std::vector<Process*>> program_initials_by_block_;
   DelayMode delay_mode_ = DelayMode::kTyp;
   TimeUnit global_precision_ = TimeUnit::kNs;
+  TimeScale current_timescale_;
+  TimeScale compunit_timescale_;
+  std::unordered_map<std::string, TimeScale> scope_timescales_;
   std::vector<std::string> plus_args_;
   std::unordered_map<int, FILE*> file_descriptors_;
   int next_fd_ = 3;
