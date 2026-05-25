@@ -1,26 +1,8 @@
 #include "fixture_parser.h"
-#include "simulator/udp_eval.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(UdpStateTable, UnspecifiedInputCombinationDefaultsToX) {
-  auto r = Parse(
-      "primitive partial(output out, input a, input b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-
-  UdpEvalState state(*udp);
-  EXPECT_EQ(state.Evaluate({'0', '1'}), 'x');
-  EXPECT_EQ(state.Evaluate({'1', '0'}), 'x');
-}
 
 TEST(UdpStateTable, MissingTableKeywordRejected) {
   auto r = Parse(
@@ -72,6 +54,31 @@ TEST(UdpStateTable, InputFieldOrderFollowsHeaderPortList) {
   EXPECT_EQ(udp->table[0].inputs[0], '0');
   EXPECT_EQ(udp->table[0].inputs[1], '1');
   EXPECT_EQ(udp->table[0].inputs[2], '0');
+}
+
+TEST(UdpStateTable, InputFieldOrderIgnoresPortDeclarationOrder) {
+  // §29.3.4: a row's input fields follow the header port-list order, which is
+  // independent of the order the input ports are declared. Here the port list
+  // is (q, a, b, c) but the declarations appear as c, b, a; the table fields
+  // must still bind to a, b, c.
+  auto r = Parse(
+      "primitive gate(q, a, b, c);\n"
+      "  output q;\n"
+      "  input c;\n"
+      "  input b;\n"
+      "  input a;\n"
+      "  table\n"
+      "    0 1 0 : 0;\n"
+      "    1 0 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  ASSERT_EQ(udp->input_names.size(), 3u);
+  EXPECT_EQ(udp->input_names[0], "a");
+  EXPECT_EQ(udp->input_names[1], "b");
+  EXPECT_EQ(udp->input_names[2], "c");
 }
 
 TEST(UdpStateTable, CombinationalRowHasInputsAndOutputOnly) {
@@ -166,6 +173,29 @@ TEST(UdpStateTable, SequentialDuplicateInputsWithDifferentOutputsRejected) {
       "  endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(r.has_errors);
+}
+
+TEST(UdpStateTable, RowWithTwoInputTransitionsRejected) {
+  // §29.3.4 permits at most one input transition per row; the LRM gives
+  // "(01) (10) 0 : 0 : 1 ;" as an illegal example because two fields change.
+  auto r = Parse(
+      "primitive seq(output reg q, input a, input b, input c);\n"
+      "  table\n"
+      "    (01) (10) 0 : 0 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(UdpStateTable, RowWithSingleInputTransitionAccepted) {
+  auto r = Parse(
+      "primitive seq(output reg q, input a, input b, input c);\n"
+      "  table\n"
+      "    (01) 0 0 : 0 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(UdpStateTable, IdenticalDuplicateRowsNotFlagged) {

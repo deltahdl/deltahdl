@@ -29,4 +29,13 @@ TEST(UdpStateTable, CombinationalExplicitAllXRowProducesX) {
   EXPECT_EQ(state.Evaluate({'x', 'x'}), 'x');
 }
 
+TEST(UdpStateTable, UnspecifiedInputCombinationDefaultsToX) {
+  // §29.3.4: combinations not explicitly listed in the table resolve to a
+  // default output of x. Only "0 0" and "1 1" are specified here.
+  auto decl = MakeCombinational({{'0', '0'}, {'1', '1'}}, {'0', '1'});
+  UdpEvalState state(decl);
+  EXPECT_EQ(state.Evaluate({'0', '1'}), 'x');
+  EXPECT_EQ(state.Evaluate({'1', '0'}), 'x');
+}
+
 }
