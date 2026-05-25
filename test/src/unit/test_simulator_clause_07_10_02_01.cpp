@@ -39,16 +39,6 @@ TEST(QueueSizeSimulation, ReturnsThirtyTwoBitInt) {
   EXPECT_EQ(out.width, 32u);
 }
 
-TEST(QueueSizeSimulation, SingleElementReturnsOne) {
-  SimFixture f;
-  MakeQueue(f, "q", {42});
-  Logic4Vec out{};
-  auto* call = MakeMethodCall(f.arena, "q", "size", {});
-  bool ok = TryEvalQueueMethodCall(call, f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 1u);
-}
-
 TEST(QueueSizeSimulation, PropertyAccessReturnsCount) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
@@ -106,6 +96,27 @@ TEST(QueueSizeSimulation, SizeInForLoopCondition) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("total")->value.ToUint64(), 60u);
+}
+
+// size() is a live query: each call must report the queue's current element
+// count, so growing and shrinking the queue between calls changes the result,
+// including dropping back to zero once the queue is emptied by removal.
+TEST(QueueSizeSimulation, SizeTracksLiveCount) {
+  SimFixture f;
+  auto* q = MakeQueue(f, "q", {10, 20});
+  Logic4Vec out{};
+  auto* call = MakeMethodCall(f.arena, "q", "size", {});
+
+  ASSERT_TRUE(TryEvalQueueMethodCall(call, f.ctx, f.arena, out));
+  EXPECT_EQ(out.ToUint64(), 2u);
+
+  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 30));
+  ASSERT_TRUE(TryEvalQueueMethodCall(call, f.ctx, f.arena, out));
+  EXPECT_EQ(out.ToUint64(), 3u);
+
+  q->elements.clear();
+  ASSERT_TRUE(TryEvalQueueMethodCall(call, f.ctx, f.arena, out));
+  EXPECT_EQ(out.ToUint64(), 0u);
 }
 
 }
