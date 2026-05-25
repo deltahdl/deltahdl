@@ -97,6 +97,10 @@ struct RtlirVariable {
   bool is_string_index = false;
   bool is_wildcard_index = false;
   bool is_class_index = false;
+  // Signedness of an integral associative-array index type. Determines whether
+  // an index expression is sign- or zero-extended to the index width and the
+  // resulting key ordering (§7.8.4). Built-in integral index types are signed.
+  bool is_index_signed = true;
   uint32_t assoc_index_width = 32;
   std::string_view assoc_index_class_name;
   std::string_view class_type_name;

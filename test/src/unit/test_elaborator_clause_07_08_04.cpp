@@ -91,4 +91,92 @@ TEST(IntegralIndexAssocArrayElaboration, NotStringIndex) {
   EXPECT_FALSE(v.is_wildcard_index);
 }
 
+// §7.8.4: ordering and casting follow the signedness of the index type. The
+// built-in integral index types are signed.
+TEST(IntegralIndexAssocArrayElaboration, BuiltinIntIndexIsSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto& v = design->top_modules[0]->variables[0];
+  EXPECT_TRUE(v.is_assoc);
+  EXPECT_TRUE(v.is_index_signed);
+}
+
+// §7.8.4: a typedef'd unsigned index type (bit without `signed`) orders
+// unsigned, so its index is recorded as unsigned.
+TEST(IntegralIndexAssocArrayElaboration, UnsignedTypedefIndex) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef bit [4:1] UNibble;\n"
+      "  int map[UNibble];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto& v = design->top_modules[0]->variables[0];
+  EXPECT_TRUE(v.is_assoc);
+  EXPECT_EQ(v.assoc_index_width, 4u);
+  EXPECT_FALSE(v.is_index_signed);
+}
+
+// §7.8.4: a typedef'd signed index type orders signed.
+TEST(IntegralIndexAssocArrayElaboration, SignedTypedefIndex) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef bit signed [4:1] SNibble;\n"
+      "  int map[SNibble];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto& v = design->top_modules[0]->variables[0];
+  EXPECT_TRUE(v.is_assoc);
+  EXPECT_EQ(v.assoc_index_width, 4u);
+  EXPECT_TRUE(v.is_index_signed);
+}
+
+// §7.8.4: an implicit cast from a real expression to an integral index type is
+// illegal. (A procedural index select; the continuous-assign real-select check
+// does not cover procedural bodies.)
+TEST(IntegralIndexAssocArrayElaboration, RealIndexExprIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "  real r;\n"
+      "  initial map[r] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §7.8.4: the prohibition on an implicit cast covers shortreal as well as real.
+TEST(IntegralIndexAssocArrayElaboration, ShortrealIndexExprIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "  shortreal s;\n"
+      "  initial map[s] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §7.8.4: an integral index expression is legal and casts cleanly.
+TEST(IntegralIndexAssocArrayElaboration, IntegerIndexExprLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "  initial map[5] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }

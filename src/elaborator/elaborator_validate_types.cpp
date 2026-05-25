@@ -37,6 +37,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateAssocWildcardTraversal(decl);
   ValidateClassIndexSelect(decl);
   ValidateStringIndexSelect(decl);
+  ValidateIntegralIndexSelect(decl);
   ValidateAssocConcatTarget(decl);
   ValidateAssocOperandInExpr(decl);
   ValidateArrayPatternElemType(decl);

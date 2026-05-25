@@ -524,7 +524,8 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
       ctx.GetDiag().Warning({}, "associative array index contains x/z");
       return true;
     }
-    auto key = AssocIntKey(key_val, aa->is_wildcard, aa->index_width);
+    auto key = AssocIntKey(key_val, aa->is_wildcard, aa->index_width,
+                           aa->is_index_signed);
     aa->int_data[key] = rhs_val;
   }
   return true;

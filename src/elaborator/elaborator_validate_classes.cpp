@@ -736,6 +736,91 @@ void Elaborator::ValidateStringIndexSelect(const ModuleDecl* decl) {
   }
 }
 
+// §7.8.4: indexing an integral-index associative array casts the index
+// expression to the index type, but an implicit cast from a real or shortreal
+// expression is illegal. Flag any element select on such an array whose index
+// is a nonintegral (real) expression.
+static void CheckIntegralIndexSelectExpr(
+    const Expr* e,
+    const std::unordered_set<std::string_view>& integral_names,
+    const TypeMap& var_types, DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kSelect && e->base && e->index &&
+      e->base->kind == ExprKind::kIdentifier && !IsSliceSelect(e) &&
+      integral_names.count(e->base->text) &&
+      IsNonintegralIndex(e->index, var_types)) {
+    diag.Error(e->index->range.start,
+               std::format("real or shortreal index is not allowed on "
+                           "integral-indexed associative array '{}'",
+                           e->base->text));
+  }
+  CheckIntegralIndexSelectExpr(e->lhs, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(e->rhs, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(e->base, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(e->index, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(e->condition, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(e->true_expr, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(e->false_expr, integral_names, var_types, diag);
+  for (const auto* elem : e->elements) {
+    CheckIntegralIndexSelectExpr(elem, integral_names, var_types, diag);
+  }
+}
+
+static void WalkStmtsForIntegralIndexSelect(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& integral_names,
+    const TypeMap& var_types, DiagEngine& diag) {
+  if (!s) return;
+  CheckIntegralIndexSelectExpr(s->lhs, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(s->rhs, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(s->expr, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(s->condition, integral_names, var_types, diag);
+  for (auto* sub : s->stmts)
+    WalkStmtsForIntegralIndexSelect(sub, integral_names, var_types, diag);
+  WalkStmtsForIntegralIndexSelect(s->then_branch, integral_names, var_types,
+                                  diag);
+  WalkStmtsForIntegralIndexSelect(s->else_branch, integral_names, var_types,
+                                  diag);
+  WalkStmtsForIntegralIndexSelect(s->body, integral_names, var_types, diag);
+  WalkStmtsForIntegralIndexSelect(s->for_body, integral_names, var_types, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForIntegralIndexSelect(ci.body, integral_names, var_types, diag);
+}
+
+void Elaborator::ValidateIntegralIndexSelect(const ModuleDecl* decl) {
+  auto is_builtin_integral = [](std::string_view t) {
+    return t == "int" || t == "integer" || t == "byte" || t == "shortint" ||
+           t == "longint";
+  };
+  std::unordered_set<std::string_view> integral_names;
+  for (const auto& [name, info] : var_array_info_) {
+    if (!info.is_assoc) continue;
+    auto t = info.assoc_index_type;
+    if (t == "string" || t == "*" || class_names_.count(t)) continue;
+    bool integral = is_builtin_integral(t);
+    if (!integral) {
+      auto it = typedefs_.find(t);
+      integral = it != typedefs_.end() && IsIntegralType(it->second.kind);
+    }
+    if (integral) integral_names.insert(name);
+  }
+  if (integral_names.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckIntegralIndexSelectExpr(item->assign_lhs, integral_names, var_types_,
+                                   diag_);
+      CheckIntegralIndexSelectExpr(item->assign_rhs, integral_names, var_types_,
+                                   diag_);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForIntegralIndexSelect(item->body, integral_names, var_types_,
+                                      diag_);
+    }
+  }
+}
+
 static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds) {
   if (dtype.kind == DataTypeKind::kNamed) {
     auto it = tds.find(dtype.type_name);

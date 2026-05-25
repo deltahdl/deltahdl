@@ -477,11 +477,17 @@ int64_t SignExtend(uint64_t val, uint32_t width) {
 }
 
 int64_t AssocIntKey(const Logic4Vec& val, bool is_wildcard,
-                    uint32_t index_width) {
-  // A wildcard index keeps its self-determined, unsigned value; only a typed
-  // integral index is sign-extended to its declared width.
+                    uint32_t index_width, bool is_signed) {
+  // A wildcard index keeps its self-determined, unsigned value. A typed
+  // integral index is cast to its declared width per §7.8.4: a signed index
+  // type is sign-extended, an unsigned index type is zero-extended. Because
+  // the key map orders by signed int64, a zero-extended (non-negative) key
+  // yields the unsigned numeric ordering an unsigned index type requires.
   if (is_wildcard) return static_cast<int64_t>(val.ToUint64());
-  return SignExtend(val.ToUint64(), index_width);
+  if (is_signed) return SignExtend(val.ToUint64(), index_width);
+  uint64_t raw = val.ToUint64();
+  if (index_width < 64) raw &= (uint64_t{1} << index_width) - 1;
+  return static_cast<int64_t>(raw);
 }
 
 static uint64_t EvalRelationalOp(TokenKind op, uint64_t lv, uint64_t rv) {

@@ -727,12 +727,13 @@ static std::string EvalStrKey(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 static int64_t EvalIntKey(const Expr* expr, SimContext& ctx, Arena& arena,
-                          uint32_t index_width = 64, bool is_wildcard = false) {
+                          uint32_t index_width = 64, bool is_wildcard = false,
+                          bool is_signed = true) {
   auto val = EvalExpr(expr, ctx, arena);
   if (HasUnknownBits(val)) {
     ctx.GetDiag().Warning({}, "associative array index contains x/z");
   }
-  return AssocIntKey(val, is_wildcard, index_width);
+  return AssocIntKey(val, is_wildcard, index_width, is_signed);
 }
 
 static bool AssocExists(AssocArrayObject* aa, const Expr* expr, SimContext& ctx,
@@ -743,7 +744,8 @@ static bool AssocExists(AssocArrayObject* aa, const Expr* expr, SimContext& ctx,
     found = aa->str_data.count(EvalStrKey(expr->args[0], ctx, arena)) ? 1 : 0;
   } else {
     found = aa->int_data.count(EvalIntKey(expr->args[0], ctx, arena,
-                                          aa->index_width, aa->is_wildcard))
+                                          aa->index_width, aa->is_wildcard,
+                                          aa->is_index_signed))
                 ? 1
                 : 0;
   }
@@ -897,8 +899,8 @@ static bool ExecAssocDelete(AssocArrayObject* aa, const Expr* expr,
   if (aa->is_string_key) {
     aa->str_data.erase(EvalStrKey(expr->args[0], ctx, arena));
   } else {
-    aa->int_data.erase(
-        EvalIntKey(expr->args[0], ctx, arena, aa->index_width, aa->is_wildcard));
+    aa->int_data.erase(EvalIntKey(expr->args[0], ctx, arena, aa->index_width,
+                                  aa->is_wildcard, aa->is_index_signed));
   }
   return true;
 }

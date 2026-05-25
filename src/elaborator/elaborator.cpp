@@ -2269,6 +2269,9 @@ static bool TryParseAssocDim(const Expr* dim, RtlirVariable& var) {
     var.is_string_index = (t == "string");
     var.is_wildcard_index = (t == "*");
     var.assoc_index_width = AssocIndexWidth(t);
+    // The built-in integral index types are signed; a wildcard index keeps an
+    // unsigned, self-determined value (§7.8.4).
+    var.is_index_signed = !var.is_wildcard_index;
     return true;
   }
   return false;
@@ -2303,6 +2306,10 @@ static void ComputeUnpackedDims(
       auto it = typedefs.find(dim->text);
       if (it != typedefs.end()) {
         var.assoc_index_width = EvalTypeWidth(it->second, typedefs);
+        // A typedef'd integral index follows the signedness of its underlying
+        // type, so e.g. `bit signed [4:1]` orders signed and `bit [4:1]`
+        // orders unsigned (§7.8.4).
+        var.is_index_signed = IsSignedType(it->second, typedefs);
       }
     }
     return;

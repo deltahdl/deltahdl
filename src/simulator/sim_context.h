@@ -92,6 +92,10 @@ struct AssocArrayObject {
   bool is_string_key = false;
   bool is_wildcard = false;
   bool is_4state = false;
+  // Signedness of an integral index type: controls whether an index expression
+  // is sign- or zero-extended to the index width before becoming a key, which
+  // in turn fixes the iteration ordering (§7.8.4).
+  bool is_index_signed = true;
   bool has_default = false;
   Logic4Vec default_value;
   uint32_t Size() const;
@@ -271,7 +275,8 @@ class SimContext {
                                      bool is_string_key,
                                      uint32_t index_width = 32,
                                      bool is_wildcard = false,
-                                     bool is_4state = false);
+                                     bool is_4state = false,
+                                     bool is_index_signed = true);
   AssocArrayObject* FindAssocArray(std::string_view name);
 
   void SetVariableTag(std::string_view var_name, std::string_view tag);

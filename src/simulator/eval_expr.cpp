@@ -1225,7 +1225,8 @@ static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
                                   "': index contains x/z");
     return AssocDefault(aa, arena);
   }
-  auto key = AssocIntKey(val, aa->is_wildcard, aa->index_width);
+  auto key =
+      AssocIntKey(val, aa->is_wildcard, aa->index_width, aa->is_index_signed);
   auto it = aa->int_data.find(key);
   if (it != aa->int_data.end()) return it->second;
   WarnAssocMiss(aa, name, ctx);
