@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -86,6 +87,13 @@ class Elaborator {
   void ResolveExternModules();
 
   ModuleDecl* FindModule(std::string_view name) const;
+
+  // Applies a cell selection clause's use expansion to a cell being resolved
+  // (§33.4.1.4, §33.4.1.6). Returns nullopt when no clause applies (resolution
+  // should continue normally); a present value (possibly nullptr) is the bound
+  // cell, where nullptr means the named target does not exist.
+  std::optional<ModuleDecl*> ResolveCellUseOverride(
+      std::string_view name) const;
 
   ModuleDecl* FindModuleInScope(std::string_view name) const;
 
@@ -507,8 +515,22 @@ class Elaborator {
 
   bool library_order_strict_ = false;
 
-  std::unordered_map<std::string, std::pair<std::string, std::string>>
-      cell_clause_use_overrides_;
+  // A cell selection clause paired with a use expansion clause (§33.4.1.4,
+  // §33.4.1.6). src_lib is the library qualifying the selected cell, empty when
+  // the clause is unqualified and so applies to the cell in any library.
+  // use_lib/use_cell name the binding target; an empty use_lib means the
+  // library is inherited from the parent cell.
+  struct CellUseOverride {
+    std::string src_lib;
+    std::string use_lib;
+    std::string use_cell;
+  };
+  std::unordered_map<std::string, CellUseOverride> cell_clause_use_overrides_;
+
+  // A cell selection clause paired with a liblist expansion clause: the named
+  // cell is searched for in this ordered library list (§33.4.1.4, §33.4.1.5).
+  std::unordered_map<std::string, std::vector<std::string>>
+      cell_clause_liblist_overrides_;
 
   std::vector<std::pair<std::string, std::vector<std::string>>>
       instance_liblist_overrides_;
@@ -517,6 +539,12 @@ class Elaborator {
       instance_use_overrides_;
 
   std::string current_inst_path_;
+  // Library of the cell currently being elaborated; the parent cell's library
+  // while its child instances are resolved (§33.4.1.5, §33.4.1.6).
+  std::string current_library_;
+  // True while elaborating from a configuration, so config-specific library
+  // resolution rules apply (§33.4.1.5).
+  bool in_config_elaboration_ = false;
   TypedefMap typedefs_;
   std::unordered_set<std::string_view> cu_scope_names_;
   ScopeMap cu_param_scope_;

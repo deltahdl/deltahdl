@@ -1193,6 +1193,7 @@ void Elaborator::SetLibraryDeclarationOrder(std::vector<std::string> order) {
 }
 
 RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
+  in_config_elaboration_ = true;
   RunPreElaborationValidations();
 
   for (auto* rule : cfg->rules) {
@@ -1208,10 +1209,23 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
 
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kCell) continue;
-    if (!rule->cell_lib.empty()) continue;
-    if (rule->use_lib.empty() || rule->use_cell.empty()) continue;
-    cell_clause_use_overrides_[std::string(rule->cell_name)] = {
-        std::string(rule->use_lib), std::string(rule->use_cell)};
+    // A cell clause carrying a use expansion rebinds a cell. A target cell is
+    // required; the target library may be omitted, in which case it is
+    // inherited from the parent cell (§33.4.1.6). The qualifying library, when
+    // present, scopes which instances the clause applies to (§33.4.1.4).
+    if (!rule->use_cell.empty()) {
+      cell_clause_use_overrides_[std::string(rule->cell_name)] = {
+          std::string(rule->cell_lib), std::string(rule->use_lib),
+          std::string(rule->use_cell)};
+      continue;
+    }
+    // Otherwise the cell clause selects a library list to search for the named
+    // cell (§33.4.1.4 selecting the list of §33.4.1.5).
+    std::vector<std::string> libs;
+    libs.reserve(rule->liblist.size());
+    for (auto lib : rule->liblist) libs.emplace_back(lib);
+    cell_clause_liblist_overrides_[std::string(rule->cell_name)] =
+        std::move(libs);
   }
 
   for (auto* rule : cfg->rules) {
@@ -1394,6 +1408,38 @@ void Elaborator::ResolveExternModules() {
   }
 }
 
+std::optional<ModuleDecl*> Elaborator::ResolveCellUseOverride(
+    std::string_view name) const {
+  auto it = cell_clause_use_overrides_.find(std::string(name));
+  if (it == cell_clause_use_overrides_.end()) return std::nullopt;
+  const auto& ov = it->second;
+
+  // A library-qualified cell clause applies only to the cell as defined in
+  // that library (§33.4.1.4); if no such cell exists the clause matches
+  // nothing and resolution proceeds normally.
+  bool applies = ov.src_lib.empty();
+  if (!applies) {
+    for (auto* mod : unit_->modules) {
+      if (mod->name != name) continue;
+      if (mod->library == ov.src_lib) {
+        applies = true;
+        break;
+      }
+    }
+  }
+  if (!applies) return std::nullopt;
+
+  // An omitted target library is inherited from the parent cell (§33.4.1.6).
+  std::string_view target_lib = ov.use_lib.empty()
+                                    ? std::string_view(current_library_)
+                                    : std::string_view(ov.use_lib);
+  for (auto* mod : unit_->modules) {
+    if (mod->is_extern) continue;
+    if (mod->library == target_lib && mod->name == ov.use_cell) return mod;
+  }
+  return static_cast<ModuleDecl*>(nullptr);
+}
+
 ModuleDecl* Elaborator::FindModule(std::string_view name) const {
 
   if (!current_inst_path_.empty()) {
@@ -1408,17 +1454,8 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
     }
   }
 
-  if (auto it = cell_clause_use_overrides_.find(std::string(name));
-      it != cell_clause_use_overrides_.end()) {
-    const auto& target_lib = it->second.first;
-    const auto& target_cell = it->second.second;
-    for (auto* mod : unit_->modules) {
-      if (mod->is_extern) continue;
-      if (mod->library == target_lib && mod->name == target_cell) {
-        return mod;
-      }
-    }
-    return nullptr;
+  if (auto hit = ResolveCellUseOverride(name); hit.has_value()) {
+    return *hit;
   }
 
   ModuleDecl* extern_decl = nullptr;
@@ -1449,6 +1486,15 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
         override_liblist = &libs;
         best_match_len = rule_path.size();
       }
+    }
+  }
+
+  // Absent an instance-scoped library list, a cell selection clause may name
+  // the library list for this cell (§33.4.1.4, §33.4.1.5).
+  if (override_liblist == nullptr) {
+    if (auto it = cell_clause_liblist_overrides_.find(std::string(name));
+        it != cell_clause_liblist_overrides_.end()) {
+      override_liblist = &it->second;
     }
   }
 
@@ -1484,7 +1530,10 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
     }
   } else {
 
-    if (library_order_strict_ && !candidates.empty()) {
+    // An empty selected library list selects no libraries to filter against;
+    // it is treated below as no list being selected (§33.4.1.5).
+    if (library_order_strict_ && !library_order_.empty() &&
+        !candidates.empty()) {
       std::vector<ModuleDecl*> filtered;
       filtered.reserve(candidates.size());
       for (auto* c : candidates) {
@@ -1500,6 +1549,16 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
       candidates = std::move(filtered);
     }
     if (!candidates.empty()) {
+      // §33.4.1.5: when no library list clause is selected (or the selected
+      // list is empty), the list holds only the parent cell's library, so an
+      // instance binds to the cell defined in its parent's library.
+      bool no_list_selected = !library_order_strict_ || library_order_.empty();
+      if (in_config_elaboration_ && no_list_selected &&
+          !current_library_.empty()) {
+        for (auto* c : candidates) {
+          if (c->library == current_library_) return c;
+        }
+      }
       auto priority = [this](std::string_view lib) -> size_t {
         for (size_t i = 0; i < library_order_.size(); ++i) {
           if (library_order_[i] == lib) return i;
@@ -1634,6 +1693,13 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   mod->name = decl->name;
 
   mod->library = decl->library;
+
+  // While this cell is elaborated it is the parent of any instances it
+  // contains; record its library so child binding can fall back to it
+  // (§33.4.1.5) or inherit it for a library-less use clause (§33.4.1.6). The
+  // previous value is restored before returning.
+  std::string saved_library = std::move(current_library_);
+  current_library_.assign(decl->library.data(), decl->library.size());
   mod->has_param_port_list = decl->has_param_port_list;
   mod->is_program = (decl->decl_kind == ModuleDeclKind::kProgram);
 
@@ -1696,6 +1762,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
 
   AssignGenerateBlockNames(decl);
   ElaborateItems(decl, mod);
+  current_library_ = std::move(saved_library);
   return mod;
 }
 
