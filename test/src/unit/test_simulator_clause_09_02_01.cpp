@@ -139,6 +139,30 @@ TEST(InitialProcedureSimulation, InitialWithDelayCeases) {
   EXPECT_EQ(val, 42u);
 }
 
+TEST(InitialProcedureSimulation, DoesNotRerunWhenReferencedSignalChanges) {
+  // An initial procedure runs a single time and stays finished afterward. Even
+  // when a variable it read is driven again later in the run, the completed
+  // procedure must not be resumed. If it were wrongly resensitized like an
+  // always block, the running total below would advance past its time-zero
+  // value once trig changes at time 5.
+  auto val = RunAndGet(
+      "module m;\n"
+      "  logic [31:0] runs;\n"
+      "  logic [7:0] trig;\n"
+      "  initial begin\n"
+      "    runs = 0;\n"
+      "    trig = 8'd0;\n"
+      "    runs = runs + trig + 1;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #5 trig = 8'd9;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      "runs");
+  EXPECT_EQ(val, 1u);
+}
+
 TEST(InitialProcedureSimulation, NullStatementInitialCompletes) {
   SimFixture f;
   auto* design = ElaborateSrc(
