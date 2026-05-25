@@ -185,6 +185,7 @@ class Parser {
   ConfigRule* ParseConfigRule();
   void ParseLiblistClause(ConfigRule* rule);
   void ParseUseClause(ConfigRule* rule);
+  void ParseNamedParamAssignment(ConfigRule* rule);
 
   ModuleItem* ParseDefparam();
   ModuleItem* ParseTypedef();

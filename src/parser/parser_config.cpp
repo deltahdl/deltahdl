@@ -26,6 +26,21 @@ void Parser::ParseLiblistClause(ConfigRule* rule) {
   }
 }
 
+// Parses one named_parameter_assignment: '.' parameter_identifier
+// '(' [ param_expression ] ')'. The parameter expression is optional, so an
+// empty override '.p()' is accepted.
+void Parser::ParseNamedParamAssignment(ConfigRule* rule) {
+  Expect(TokenKind::kDot);
+  auto pname = ExpectIdentifier().text;
+  Expect(TokenKind::kLParen);
+  Expr* val = nullptr;
+  if (!Check(TokenKind::kRParen)) {
+    val = ParseExpr();
+  }
+  Expect(TokenKind::kRParen);
+  rule->use_params.emplace_back(pname, val);
+}
+
 void Parser::ParseUseClause(ConfigRule* rule) {
   Expect(TokenKind::kKwUse);
   if (CheckIdentifier()) {
@@ -36,6 +51,17 @@ void Parser::ParseUseClause(ConfigRule* rule) {
     } else {
       rule->use_cell = first;
     }
+    // use_clause form: [ library_identifier . ] cell_identifier
+    // { , named_parameter_assignment }
+    while (Match(TokenKind::kComma)) {
+      ParseNamedParamAssignment(rule);
+    }
+  } else if (Check(TokenKind::kDot)) {
+    // use_clause form: named_parameter_assignment
+    // { , named_parameter_assignment }
+    do {
+      ParseNamedParamAssignment(rule);
+    } while (Match(TokenKind::kComma));
   }
 
   if (Match(TokenKind::kHash)) {
