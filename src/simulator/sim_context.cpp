@@ -338,6 +338,8 @@ int32_t SimContext::Random32() { return static_cast<int32_t>(rng_()); }
 
 uint32_t SimContext::Urandom32() { return static_cast<uint32_t>(rng_()); }
 
+void SimContext::SeedUrandom(uint32_t seed) { rng_.seed(seed); }
+
 uint32_t SimContext::UrandomRange(uint32_t min_val, uint32_t max_val) {
   if (min_val > max_val) std::swap(min_val, max_val);
   std::uniform_int_distribution<uint32_t> dist(min_val, max_val);

@@ -240,6 +240,8 @@ class SimContext {
 
   int32_t Random32();
   uint32_t Urandom32();
+  // Reseed the generator so a given seed always replays the same sequence.
+  void SeedUrandom(uint32_t seed);
   uint32_t UrandomRange(uint32_t min_val, uint32_t max_val);
 
   void RegisterRealVariable(std::string_view name);

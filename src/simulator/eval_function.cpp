@@ -25,6 +25,12 @@ static Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
     return MakeLogic4VecVal(arena, 32, ctx.Random32());
   }
   if (name == "$urandom") {
+    // An optional seed (any integral expression) selects the sequence; the
+    // same seed must replay identically.
+    if (!expr->args.empty()) {
+      ctx.SeedUrandom(
+          static_cast<uint32_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64()));
+    }
     return MakeLogic4VecVal(arena, 32, ctx.Urandom32());
   }
   if (name == "$urandom_range") {
