@@ -87,4 +87,31 @@ TEST(NestedModuleSimulation, PortedNestedModuleNotInstantiatedDoesNotRun) {
   EXPECT_EQ(v->value.ToUint64(), 10u);
 }
 
+// §23.4: the outer name space is visible to the inner module, so a nested
+// module may *read* an outer-scope name as well as write one. The outer x is
+// set at time 0; one tick later the nested module reads it and copies it into
+// the outer y. Observing y == 5 proves the inner module resolved x to the
+// enclosing scope's variable.
+TEST(NestedModuleSimulation, OuterScopeVariableReadFromNestedModule) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  logic [7:0] y;\n"
+      "  initial x = 8'd5;\n"
+      "  module inner;\n"
+      "    initial #1 y = x;\n"
+      "  endmodule\n"
+      "  inner i1();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* v = f.ctx.FindVariable("y");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 5u);
+}
+
 }

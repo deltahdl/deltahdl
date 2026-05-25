@@ -221,4 +221,61 @@ TEST(NestedModuleElaboration, MixedPortlessAndPortedNested) {
   EXPECT_EQ(mod->children[0].inst_name, "portless");
 }
 
+// §23.4: a name declared in a local (nested) module hides an outer name of the
+// same kind. A nested module declaration therefore shadows a top-level module
+// sharing its name, so the same identifier can denote different modules in
+// different parts of the design. Here the instance of `sub` inside `m` must
+// bind to the nested `sub` (whose net is local_net), not the top-level `sub`.
+TEST(NestedModuleElaboration, NestedModuleShadowsTopLevelModuleOfSameName) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module sub;\n"
+      "  wire global_net;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  module sub;\n"
+      "    wire local_net;\n"
+      "  endmodule\n"
+      "  sub s1();\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->children.size(), 1u);
+  ASSERT_NE(mod->children[0].resolved, nullptr);
+  bool has_local = false;
+  bool has_global = false;
+  for (const auto& net : mod->children[0].resolved->nets) {
+    if (net.name == "local_net") has_local = true;
+    if (net.name == "global_net") has_global = true;
+  }
+  EXPECT_TRUE(has_local);
+  EXPECT_FALSE(has_global);
+}
+
+// §23.4: the implicit instantiation of a port-less nested module is a real
+// instantiation -- the nested module's body is elaborated, not merely
+// registered. The resolved instance must carry the nested module's contents.
+TEST(NestedModuleElaboration, ImplicitInstanceElaboratesNestedBody) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  module inner;\n"
+      "    wire inner_net;\n"
+      "  endmodule\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->children.size(), 1u);
+  ASSERT_NE(mod->children[0].resolved, nullptr);
+  bool has_inner_net = false;
+  for (const auto& net : mod->children[0].resolved->nets) {
+    if (net.name == "inner_net") has_inner_net = true;
+  }
+  EXPECT_TRUE(has_inner_net);
+}
+
 }

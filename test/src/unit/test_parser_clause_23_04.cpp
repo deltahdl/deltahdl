@@ -146,22 +146,23 @@ TEST(ModuleAndHierarchyParsing, NestedModulePortlessNoPorts) {
   EXPECT_TRUE(nested->ports.empty());
 }
 
-TEST(ModuleAndHierarchyParsing, NestedModulePortlessNotInstantiated) {
-  EXPECT_TRUE(
-      ParseOk("module outer;\n"
-              "  module inner;\n"
-              "    wire w;\n"
-              "  endmodule\n"
-              "endmodule\n"));
-}
-
-TEST(ModuleAndHierarchyParsing, NestedModuleWithPortsNotInstantiated) {
-  EXPECT_TRUE(
-      ParseOk("module outer;\n"
-              "  module inner(input a, output b);\n"
-              "    assign b = a;\n"
-              "  endmodule\n"
-              "endmodule\n"));
+// §23.4: a module declared inside another module may also be explicitly
+// instantiated alongside its declaration (the form shown by the standard's
+// nested flip-flop example). The parser must yield both the nested module
+// declaration item and the instantiation item in the enclosing module's body.
+TEST(ModuleAndHierarchyParsing, NestedModuleDeclaredAndInstantiated) {
+  auto r = Parse(
+      "module outer;\n"
+      "  module inner;\n"
+      "    wire w;\n"
+      "  endmodule\n"
+      "  inner i1();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto& items = r.cu->modules[0]->items;
+  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kNestedModuleDecl));
+  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kModuleInst));
 }
 
 TEST(ModuleAndHierarchyParsing, ErrorNestedModuleMissingEndmodule) {
