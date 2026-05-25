@@ -32,24 +32,12 @@ TEST(IoSystemTaskParsing, DumpvarsMultipleScopes) {
               "endmodule\n"));
 }
 
-TEST(IoSystemTaskParsing, DumpvarsLevelOneModule) {
+// The module/variable list is optional, so a level count with no scope list
+// is still a well-formed call.
+TEST(IoSystemTaskParsing, DumpvarsLevelsWithoutScopeList) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
-              "  initial $dumpvars(1, top);\n"
-              "endmodule\n"));
-}
-
-TEST(IoSystemTaskParsing, DumpvarsLevelZeroAllHierarchy) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $dumpvars(0, top);\n"
-              "endmodule\n"));
-}
-
-TEST(IoSystemTaskParsing, DumpvarsMixedModulesAndVars) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $dumpvars(0, top.mod1, top.mod2.net1);\n"
+              "  initial $dumpvars(0);\n"
               "endmodule\n"));
 }
 

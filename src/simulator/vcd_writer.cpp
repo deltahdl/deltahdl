@@ -126,6 +126,23 @@ void VcdWriter::DumpAllValues() {
   ofs_ << "$end\n";
 }
 
+void VcdWriter::DumpSelectedValues(
+    const std::vector<std::string_view>& names) {
+  if (!ofs_.is_open() || !enabled_) return;
+  ofs_ << "$dumpvars\n";
+  for (const auto& sig : signals_) {
+    bool wanted = false;
+    for (auto name : names) {
+      if (sig.name == name) {
+        wanted = true;
+        break;
+      }
+    }
+    if (wanted) WriteSignalChange(sig);
+  }
+  ofs_ << "$end\n";
+}
+
 void VcdWriter::DumpChangedValues(uint64_t ) {
   if (!ofs_.is_open() || !enabled_) return;
   for (const auto& sig : signals_) {

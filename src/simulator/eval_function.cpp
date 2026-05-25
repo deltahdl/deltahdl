@@ -135,12 +135,42 @@ static std::string ResolveDumpFileName(const Expr* expr, SimContext& ctx,
   return FormatValueAsString(EvalExpr(arg, ctx, arena));
 }
 
+// Reduces a $dumpvars scope argument to the simple name a registered signal
+// carries: a string literal loses its quotes and a hierarchical path keeps
+// only its trailing component (e.g. top.mod2.net1 -> net1).
+static std::string_view DumpvarsScopeName(const Expr* arg) {
+  std::string_view text = arg->text;
+  if (arg->kind == ExprKind::kStringLiteral && text.size() >= 2 &&
+      text.front() == '"') {
+    text = text.substr(1, text.size() - 2);
+  }
+  auto dot = text.rfind('.');
+  if (dot != std::string_view::npos) text = text.substr(dot + 1);
+  return text;
+}
+
 static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 std::string_view name) {
   auto* vcd = ctx.GetVcdWriter();
   if (name == "$dumpfile") {
     ctx.SetDumpFileName(ResolveDumpFileName(expr, ctx, arena));
-  } else if (name == "$dumpvars" || name == "$dumpall") {
+  } else if (name == "$dumpvars") {
+    // With no arguments every variable in the model is dumped. When
+    // arguments are present the first is the level count and the remaining
+    // arguments name the scopes (modules or individual variables) to dump.
+    if (vcd) {
+      std::vector<std::string_view> scopes;
+      for (size_t i = 1; i < expr->args.size(); ++i) {
+        auto scope = DumpvarsScopeName(expr->args[i]);
+        if (!scope.empty()) scopes.push_back(scope);
+      }
+      if (scopes.empty()) {
+        vcd->DumpAllValues();
+      } else {
+        vcd->DumpSelectedValues(scopes);
+      }
+    }
+  } else if (name == "$dumpall") {
     if (vcd) vcd->DumpAllValues();
   } else if (name == "$dumpoff") {
     if (vcd) vcd->SetEnabled(false);

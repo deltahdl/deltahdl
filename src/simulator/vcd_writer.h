@@ -37,6 +37,7 @@ class VcdWriter {
 
   void WriteTimestamp(uint64_t time);
   void DumpAllValues();
+  void DumpSelectedValues(const std::vector<std::string_view>& names);
   void DumpChangedValues(uint64_t prev_time);
 
   void SetEnabled(bool enabled) { enabled_ = enabled; }
