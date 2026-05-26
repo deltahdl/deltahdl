@@ -34,6 +34,7 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator.cpp
     elaborator/elaborator_items.cpp
     elaborator/property_rewrite.cpp
+    elaborator/checker_rewrite.cpp
     elaborator/concurrent_assertion_expr.cpp
     elaborator/property_instantiation.cpp
     elaborator/semantic_leading_clock.cpp
