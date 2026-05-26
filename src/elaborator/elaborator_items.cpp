@@ -1239,6 +1239,27 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
                               parent_kind_word, decl->name));
     }
 
+    // §17.7: a checker body may define variables (the checker variables of
+    // §17.2's checker_or_generate_item_declaration), but defining nets in the
+    // checker body is illegal.
+    if (parent_is_checker && item->kind == ModuleItemKind::kNetDecl) {
+      diag_.Error(item->loc,
+                  std::format("a net cannot be declared inside checker '{}'; "
+                              "only variables may be defined in a checker body",
+                              decl->name));
+    }
+
+    // §17.2: modules, interfaces, and programs shall not be declared inside a
+    // checker. Only further checker declarations are permitted here.
+    if (parent_is_checker && item->kind == ModuleItemKind::kNestedModuleDecl &&
+        item->nested_module_decl &&
+        item->nested_module_decl->decl_kind != ModuleDeclKind::kChecker) {
+      diag_.Error(item->loc,
+                  std::format("a module, interface, or program cannot be "
+                              "declared inside checker '{}'",
+                              decl->name));
+    }
+
     if (item->kind == ModuleItemKind::kNestedModuleDecl &&
         item->nested_module_decl &&
         item->nested_module_decl->decl_kind == ModuleDeclKind::kProgram &&

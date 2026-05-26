@@ -303,7 +303,8 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
   Expect(TokenKind::kSemicolon);
 }
 
-static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev) {
+static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev,
+                                bool is_checker) {
   if (port.is_interface_port) return;
   if (port.data_type.kind == DataTypeKind::kNamed &&
       !port.data_type.modport_name.empty())
@@ -315,8 +316,13 @@ static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev) {
     return;
   }
 
+  // §17.2: when a checker formal argument omits its direction, the direction
+  // of the previous formal is inferred; the first formal defaults to input.
+  // Module-style ports instead default to inout when no prior direction exists.
   if (port.direction == Direction::kNone)
-    port.direction = prev ? prev->direction : Direction::kInout;
+    port.direction =
+        prev ? prev->direction
+             : (is_checker ? Direction::kInput : Direction::kInout);
 
   if (!port.has_explicit_var && !port.data_type.is_net) {
     switch (port.direction) {
@@ -373,8 +379,9 @@ void Parser::ParsePortList(ModuleDecl& mod) {
       }
     }
   }
+  const bool is_checker = mod.decl_kind == ModuleDeclKind::kChecker;
   mod.ports.push_back(ParsePortDecl());
-  ResolvePortDefaults(mod.ports.back(), nullptr);
+  ResolvePortDefaults(mod.ports.back(), nullptr, is_checker);
   while (Match(TokenKind::kComma)) {
     PortDecl prev = mod.ports.back();
 
@@ -395,14 +402,14 @@ void Parser::ParsePortList(ModuleDecl& mod) {
           port.data_type = prev.data_type;
         } else {
 
-          ResolvePortDefaults(port, &prev);
+          ResolvePortDefaults(port, &prev, is_checker);
         }
         mod.ports.push_back(port);
         continue;
       }
     }
     mod.ports.push_back(ParsePortDecl());
-    ResolvePortDefaults(mod.ports.back(), &prev);
+    ResolvePortDefaults(mod.ports.back(), &prev, is_checker);
   }
   Expect(TokenKind::kRParen);
 }

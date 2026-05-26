@@ -15,33 +15,6 @@ TEST_F(CheckerParseTest, EmptyChecker) {
   EXPECT_TRUE(unit->checkers[0]->items.empty());
 }
 
-TEST(FormalSyntaxParsing, CheckerDecl) {
-  auto r = Parse("checker chk; endchecker\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->checkers.size(), 1u);
-  EXPECT_EQ(r.cu->checkers[0]->name, "chk");
-}
-
-TEST_F(VerifyParseTest, BasicChecker) {
-  auto* unit = Parse(R"(
-    checker my_check;
-    endchecker
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_EQ(unit->checkers[0]->name, "my_check");
-  EXPECT_EQ(unit->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
-}
-
-TEST_F(VerifyParseTest, CheckerWithEndLabel) {
-  auto* unit = Parse(R"(
-    checker labeled_check;
-    endchecker : labeled_check
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_EQ(unit->checkers[0]->name, "labeled_check");
-}
-
 TEST_F(VerifyParseTest, CheckerWithPorts) {
   auto* unit = Parse(R"(
     checker port_check(input logic clk, input logic rst);
@@ -50,17 +23,6 @@ TEST_F(VerifyParseTest, CheckerWithPorts) {
   ASSERT_EQ(unit->checkers.size(), 1u);
   EXPECT_EQ(unit->checkers[0]->name, "port_check");
   EXPECT_GE(unit->checkers[0]->ports.size(), 2u);
-}
-
-TEST_F(VerifyParseTest, CheckerWithBody) {
-  auto* unit = Parse(R"(
-    checker body_check;
-      logic a, b;
-      assign a = b;
-    endchecker
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
 TEST_F(VerifyParseTest, MultipleCheckers) {
@@ -96,12 +58,22 @@ TEST(CheckerDeclaration, MissingEndcheckerIsError) {
   EXPECT_FALSE(ParseOk("checker c;"));
 }
 
-TEST(CheckerDeclarations, CheckerKeywordIntroducesChecker) {
-  auto r = Parse("checker chk; endchecker");
+TEST(CheckerDeclaration, EndLabelMismatchIsError) {
+  // §17.2: the optional name following endchecker must match the checker name.
+  auto r = Parse("checker ck; endchecker : other\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(CheckerDeclaration, OutputDirectionFormalParses) {
+  // §17.2: checker_port_direction admits output as well as input.
+  auto r = Parse("checker chk(output bit a, input bit b); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->checkers.size(), 1u);
-  EXPECT_EQ(r.cu->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
+  ASSERT_GE(r.cu->checkers[0]->ports.size(), 2u);
+  EXPECT_EQ(r.cu->checkers[0]->ports[0].direction, Direction::kOutput);
+  EXPECT_EQ(r.cu->checkers[0]->ports[1].direction, Direction::kInput);
 }
 
 TEST(CheckerDeclarations, CheckerContainsDeclarations) {
@@ -112,15 +84,6 @@ TEST(CheckerDeclarations, CheckerContainsDeclarations) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_FALSE(r.cu->checkers[0]->items.empty());
-}
-
-TEST(CheckerDeclaration, EmptyChecker) {
-  auto r = Parse("checker chk; endchecker");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->checkers.size(), 1u);
-  EXPECT_EQ(r.cu->checkers[0]->name, "chk");
-  EXPECT_EQ(r.cu->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
 }
 
 TEST(CheckerDeclaration, WithAssertion) {
@@ -148,13 +111,27 @@ TEST(CheckerDeclaration, WithModelingCode) {
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-TEST(CheckerDeclaration, WithPorts) {
-  auto r = Parse(
-      "checker chk(input logic clk, input logic rst);\n"
-      "endchecker\n");
+TEST(CheckerDeclaration, FirstFormalOmittedDirectionDefaultsToInput) {
+  auto r = Parse("checker chk(logic a, logic b); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
   ASSERT_GE(r.cu->checkers[0]->ports.size(), 2u);
+  // §17.2: the first formal defaults to input when its direction is omitted,
+  // and the following formal inherits that direction.
+  EXPECT_EQ(r.cu->checkers[0]->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(r.cu->checkers[0]->ports[1].direction, Direction::kInput);
+}
+
+TEST(CheckerDeclaration, OmittedDirectionInheritsExplicitOutput) {
+  auto r = Parse("checker chk(output bit a, bit b); endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->ports.size(), 2u);
+  // §17.2: a formal with no explicit direction inherits the previous formal's.
+  EXPECT_EQ(r.cu->checkers[0]->ports[0].direction, Direction::kOutput);
+  EXPECT_EQ(r.cu->checkers[0]->ports[1].direction, Direction::kOutput);
 }
 
 TEST(CheckerDeclaration, WithMixedContents) {
