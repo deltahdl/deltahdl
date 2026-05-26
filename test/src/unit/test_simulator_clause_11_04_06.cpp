@@ -105,20 +105,6 @@ TEST(EvalOpXZ, WildcardEqRhsXWildcardMatch) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(EvalOpXZ, WildcardEqRhsZWildcardMatch) {
-  SimFixture f;
-
-  MakeVar4(f, "a", 4, 0b0111, 0b0000);
-
-  MakeVar4(f, "b", 4, 0b0111, 0b0010);
-
-  auto* expr = MakeBinary(f.arena, TokenKind::kEqEqQuestion,
-                          MakeId(f.arena, "a"), MakeId(f.arena, "b"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.words[0].bval, 0u);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
 TEST(EvalOpXZ, WildcardEqNonWildcardBitsDiffer) {
   SimFixture f;
 
@@ -223,6 +209,57 @@ TEST(OperatorSim, WildcardEqWithXLiteral) {
   auto* var = f.ctx.FindVariable("r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(EvalOpXZ, WildcardEqUnequalWidthExtendsNarrowOperand) {
+  SimFixture f;
+
+  // The wildcard (right) operand is narrower than the left operand. §11.4.6
+  // requires it to be extended the same way as for logical equality, i.e.
+  // zero-extended for unsigned values. The extended high bits are plain zeros,
+  // not wildcards, so a set high bit on the left makes the comparison fail.
+  MakeVar4(f, "wide", 8, 0b00010101, 0b00000000);
+
+  MakeVar4(f, "narrow", 4, 0b0101, 0b0000);
+
+  auto* expr = MakeBinary(f.arena, TokenKind::kEqEqQuestion,
+                          MakeId(f.arena, "wide"), MakeId(f.arena, "narrow"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.words[0].bval, 0u);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(EvalOpXZ, WildcardEqUnequalWidthMatchesAfterExtension) {
+  SimFixture f;
+
+  // With the left operand's high bits clear, the zero-extended narrow operand
+  // matches across the full width and the relation holds.
+  MakeVar4(f, "wide", 8, 0b00000101, 0b00000000);
+
+  MakeVar4(f, "narrow", 4, 0b0101, 0b0000);
+
+  auto* expr = MakeBinary(f.arena, TokenKind::kEqEqQuestion,
+                          MakeId(f.arena, "wide"), MakeId(f.arena, "narrow"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.words[0].bval, 0u);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalOpXZ, WildcardNeqUnequalWidthExtendsNarrowOperand) {
+  SimFixture f;
+
+  // §11.4.6 extends operands of unequal length as for logical inequality. The
+  // narrow right operand is zero-extended, so the left operand's set high bit
+  // makes the operands differ and !=? reports true.
+  MakeVar4(f, "wide", 8, 0b00010101, 0b00000000);
+
+  MakeVar4(f, "narrow", 4, 0b0101, 0b0000);
+
+  auto* expr = MakeBinary(f.arena, TokenKind::kBangEqQuestion,
+                          MakeId(f.arena, "wide"), MakeId(f.arena, "narrow"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.words[0].bval, 0u);
+  EXPECT_EQ(result.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, WildcardNeqWithXLiteral) {

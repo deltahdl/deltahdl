@@ -88,6 +88,36 @@ TEST(OperatorElaboration, WildcardNeqClassHandleWithNull) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(OperatorElaboration, WildcardEqOnInterfaceClassHandles) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  interface class IC;\n"
+      "  endclass\n"
+      "  IC a, b;\n"
+      "  logic eq;\n"
+      "  initial eq = (a ==? b);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(OperatorElaboration, WildcardNeqOnInterfaceClassHandles) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  interface class IC;\n"
+      "  endclass\n"
+      "  IC a, b;\n"
+      "  logic eq;\n"
+      "  initial eq = (a !=? b);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(OperatorElaboration, WildcardEqOnChandle) {
   ElabFixture f;
   auto* design = ElaborateSrc(
