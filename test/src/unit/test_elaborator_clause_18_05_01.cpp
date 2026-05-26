@@ -140,4 +140,24 @@ TEST(ExternalConstraintBlocks, MultipleDistinctPrototypesEachCompletedAccepted) 
              "endmodule\n"));
 }
 
+// 18.5.1: completion is matched per class. An external block that completes a
+// same-named prototype in a different class does not satisfy this class's
+// explicit prototype, so the unmatched explicit prototype is still an error.
+// Here only B::p is provided, leaving A's explicit prototype 'p' without a
+// block despite a constraint of the same name existing for B.
+TEST(ExternalConstraintBlocks, ExplicitPrototypeNotSatisfiedByOtherClassBlock) {
+  EXPECT_FALSE(
+      ElabOk("class A;\n"
+             "  rand int x;\n"
+             "  extern constraint p;\n"
+             "endclass\n"
+             "class B;\n"
+             "  rand int y;\n"
+             "  extern constraint p;\n"
+             "endclass\n"
+             "constraint B::p { y > 0; }\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 }
