@@ -28,6 +28,7 @@ enum class ConstraintKind : uint8_t {
   kLessEqual,
   kGreaterEqual,
   kImplication,
+  kIfElse,
   kForeach,
   kUnique,
   kDist,
@@ -57,6 +58,13 @@ struct ConstraintExpr {
   // set it supplies the truth of the antecedent over the current values and
   // takes precedence over the cond_var == cond_value short form above.
   std::function<bool(const std::unordered_map<std::string, int64_t>&)> cond_fn;
+
+  // 18.5.6: an if-else constraint guards two constraint sets with a condition.
+  // sub_constraints holds the "then" set applied when the condition is true;
+  // else_constraints holds the optional "else" set applied when it is false.
+  // The condition is supplied by cond_fn (any integral or real expression) or
+  // the cond_var == cond_value short form, exactly as for an implication.
+  std::vector<ConstraintExpr> else_constraints;
 
   std::vector<std::string> unique_vars;
 
@@ -133,6 +141,8 @@ class ConstraintSolver {
   bool EvalConstraint(const ConstraintExpr& expr) const;
 
   bool EvalImplication(const ConstraintExpr& expr) const;
+
+  bool EvalIfElse(const ConstraintExpr& expr) const;
 
   bool EvalForeach(const ConstraintExpr& expr) const;
 

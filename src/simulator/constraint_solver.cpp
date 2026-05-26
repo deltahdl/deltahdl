@@ -191,6 +191,8 @@ bool ConstraintSolver::EvalConstraint(const ConstraintExpr& expr) const {
     }
     case ConstraintKind::kImplication:
       return EvalImplication(expr);
+    case ConstraintKind::kIfElse:
+      return EvalIfElse(expr);
     case ConstraintKind::kForeach:
       return EvalForeach(expr);
     case ConstraintKind::kUnique:
@@ -266,6 +268,31 @@ bool ConstraintSolver::EvalImplication(const ConstraintExpr& expr) const {
   }
   if (!antecedent) return true;
   for (const auto& sub : expr.sub_constraints) {
+    if (!EvalConstraint(sub)) return false;
+  }
+  return true;
+}
+
+bool ConstraintSolver::EvalIfElse(const ConstraintExpr& expr) const {
+  // 18.5.6: "if (cond) then_set else else_set" is equivalent to the implication
+  // pair cond -> then_set and !cond -> else_set. When the condition is true,
+  // every constraint in the then set must be satisfied; otherwise every
+  // constraint in the optional else set must be satisfied (an absent else set
+  // imposes nothing). The condition and the guarded sets are interdependent:
+  // because the solver only accepts an assignment for which the whole
+  // expression evaluates true, the chosen branch also constrains the condition.
+  bool cond;
+  if (expr.cond_fn) {
+    // The condition is an arbitrary integral or real expression.
+    cond = expr.cond_fn(values_);
+  } else {
+    // Short form: the condition is the equality cond_var == cond_value.
+    auto it = values_.find(expr.cond_var);
+    if (it == values_.end()) return true;
+    cond = (it->second == expr.cond_value);
+  }
+  const auto& branch = cond ? expr.sub_constraints : expr.else_constraints;
+  for (const auto& sub : branch) {
     if (!EvalConstraint(sub)) return false;
   }
   return true;
