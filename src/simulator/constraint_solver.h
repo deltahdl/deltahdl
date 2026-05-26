@@ -36,9 +36,23 @@ enum class ConstraintKind : uint8_t {
   kCustom,
 };
 
+// 18.5.3: one entry of a distribution's weighted-value set. A plain integral
+// item weights the single 'value'; setting is_range weights the inclusive range
+// [lo, hi] instead. The weight itself is an unsigned magnitude (LRM: the weight
+// expression is interpreted as an unsigned value), with an absent weight
+// defaulting to 1. per_element distinguishes the two range operators: the ':='
+// operator applies the weight to each element of the range, whereas ':/' (and a
+// single value) applies it to the item as a whole. is_default marks the single
+// 'default :/ weight' item, which stands for every domain value not named by
+// any other item.
 struct DistWeight {
   int64_t value = 0;
   uint32_t weight = 1;
+  int64_t lo = 0;
+  int64_t hi = 0;
+  bool is_range = false;
+  bool per_element = false;
+  bool is_default = false;
 };
 
 // 18.5.12: a constraint guard is a predicate expression that gates whether a
@@ -186,7 +200,17 @@ class ConstraintSolver {
 
   int64_t GenerateRandValue(RandVariable& var);
 
-  int64_t DistributionSample(const std::vector<DistWeight>& weights);
+  int64_t DistributionSample(const std::vector<DistWeight>& weights,
+                             int64_t domain_lo, int64_t domain_hi);
+
+  int64_t SampleDefaultValue(const std::vector<DistWeight>& weights,
+                             int64_t domain_lo, int64_t domain_hi);
+
+  int64_t SampleDist(const ConstraintExpr& c);
+
+  // 18.5.3: a dist operation shall not be applied to a randc variable. True if
+  // any enabled constraint block applies a distribution to a randc variable.
+  bool HasDistOnRandc() const;
 
   bool ApplyConstraint(const ConstraintExpr& expr);
 

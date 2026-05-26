@@ -101,6 +101,7 @@ class Parser {
                                const ClassMember* first, const DataType& dtype);
   ClassMember* ParseConstraintStub(ClassMember* member);
   void CheckConstraintExprToken(const Token& tok);
+  void CheckDistSet();
 
   bool IsAtGateKeyword();
   void ParseGateInst(std::vector<ModuleItem*>& items);
@@ -141,6 +142,8 @@ class Parser {
   void ParseRsCodeBlockStmts(std::vector<Stmt*>& stmts);
   bool CheckColonEq();
   bool MatchColonEq();
+  bool CheckColonSlash();
+  bool MatchColonSlash();
   RsProductionItem ParseRsProductionItem();
   RsCaseItem ParseRsCaseItem();
   void ParseCovergroupDecl(std::vector<ModuleItem*>& items);

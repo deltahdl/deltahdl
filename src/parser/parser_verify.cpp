@@ -161,6 +161,30 @@ bool Parser::MatchColonEq() {
   return false;
 }
 
+// 18.5.3: the distribution weight operator ":/" lexes as a colon immediately
+// followed by a slash. CheckColonSlash peeks for that pair without consuming;
+// MatchColonSlash consumes it on a match.
+bool Parser::CheckColonSlash() {
+  if (!Check(TokenKind::kColon)) return false;
+  auto saved = lexer_.SavePos();
+  Consume();
+  bool result = Check(TokenKind::kSlash);
+  lexer_.RestorePos(saved);
+  return result;
+}
+
+bool Parser::MatchColonSlash() {
+  if (!Check(TokenKind::kColon)) return false;
+  auto saved = lexer_.SavePos();
+  Consume();
+  if (Check(TokenKind::kSlash)) {
+    Consume();
+    return true;
+  }
+  lexer_.RestorePos(saved);
+  return false;
+}
+
 void Parser::ParseRsRuleRandJoin(RsRule& rule) {
   auto saved = lexer_.SavePos();
   Consume();

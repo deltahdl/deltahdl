@@ -524,7 +524,12 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   Expect(TokenKind::kLBrace);
   int depth = 1;
   while (depth > 0 && !AtEnd()) {
-    if (Match(TokenKind::kLBrace)) {
+    if (Check(TokenKind::kKwDist)) {
+      // 18.5.3: 'expression dist { dist_list }'. Hand the brace-enclosed
+      // dist_list to a dedicated scan so its default-item rules are enforced.
+      Consume();
+      CheckDistSet();
+    } else if (Match(TokenKind::kLBrace)) {
       ++depth;
     } else if (Match(TokenKind::kRBrace)) {
       --depth;
@@ -534,6 +539,40 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
     }
   }
   return member;
+}
+
+// 18.5.3: scan a dist_list ('{ dist_item { , dist_item } }') and enforce the
+// rules that govern its default specification: it shall use the :/ operator
+// (the := operator or an omitted operator is an error), and a distribution
+// shall contain at most one default specification.
+void Parser::CheckDistSet() {
+  if (!Match(TokenKind::kLBrace)) return;
+  int depth = 1;
+  int default_count = 0;
+  while (depth > 0 && !AtEnd()) {
+    if (Check(TokenKind::kKwDefault)) {
+      Token def = Consume();
+      if (++default_count > 1) {
+        diag_.Error(def.loc,
+                    "a distribution shall contain at most one default "
+                    "specification");
+      }
+      if (CheckColonSlash()) {
+        MatchColonSlash();
+      } else {
+        diag_.Error(def.loc,
+                    "a default distribution specification shall use the :/ "
+                    "operator");
+      }
+    } else if (Match(TokenKind::kLBrace)) {
+      ++depth;
+    } else if (Match(TokenKind::kRBrace)) {
+      --depth;
+    } else {
+      CheckConstraintExprToken(CurrentToken());
+      Consume();
+    }
+  }
 }
 
 // Constraint expressions are declarative: 18.3 forbids 4-state values (x or z)

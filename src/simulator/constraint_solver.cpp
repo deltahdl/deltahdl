@@ -119,21 +119,108 @@ int64_t ConstraintSolver::GenerateRandValue(RandVariable& var) {
   return dist(rng_);
 }
 
+namespace {
+
+// 18.5.3: the stage-1 weight of a distribution item. The ':=' operator on a
+// range assigns the weight to each element, so the range's total weight is the
+// per-element weight times the element count. A single value, or a range or
+// default weighted with ':/', contributes its weight as a whole.
+uint64_t DistItemWeight(const DistWeight& w) {
+  if (w.is_range && w.per_element) {
+    int64_t size = w.hi - w.lo + 1;
+    if (size <= 0) return 0;
+    return static_cast<uint64_t>(w.weight) * static_cast<uint64_t>(size);
+  }
+  return w.weight;
+}
+
+int64_t DistItemRepresentative(const DistWeight& w) {
+  return w.is_range ? w.lo : w.value;
+}
+
+}  // namespace
+
+// 18.5.3: a value covered only by 'default :/ weight' is any domain value not
+// named by another item. Draw uniformly from [domain_lo, domain_hi], rejecting
+// values already covered by a non-default item.
+int64_t ConstraintSolver::SampleDefaultValue(
+    const std::vector<DistWeight>& weights, int64_t domain_lo,
+    int64_t domain_hi) {
+  if (domain_hi < domain_lo) return domain_lo;
+  auto covered = [&weights](int64_t v) {
+    for (const auto& w : weights) {
+      if (w.is_default) continue;
+      if (w.is_range) {
+        if (v >= w.lo && v <= w.hi) return true;
+      } else if (v == w.value) {
+        return true;
+      }
+    }
+    return false;
+  };
+  std::uniform_int_distribution<int64_t> within(domain_lo, domain_hi);
+  for (int attempt = 0; attempt < 1000; ++attempt) {
+    int64_t v = within(rng_);
+    if (!covered(v)) return v;
+  }
+  return domain_lo;
+}
+
+// 18.5.3: select a value from a distribution. Stage 1 chooses an item with
+// probability proportional to its (unsigned) weight; stage 2 resolves the
+// chosen item to a concrete value. Because the per-item probabilities add, a
+// value named by several items accumulates their weights, and a value carrying
+// a zero weight in one item is still reachable through another nonzero item.
+// Only values named by the set (or, with a default item, the rest of the
+// domain) are ever produced.
 int64_t ConstraintSolver::DistributionSample(
-    const std::vector<DistWeight>& weights) {
+    const std::vector<DistWeight>& weights, int64_t domain_lo,
+    int64_t domain_hi) {
   if (weights.empty()) return 0;
   uint64_t total = 0;
-  for (const auto& w : weights) total += w.weight;
-  if (total == 0) return weights[0].value;
+  for (const auto& w : weights) total += DistItemWeight(w);
+  if (total == 0) return DistItemRepresentative(weights.front());
 
-  std::uniform_int_distribution<uint64_t> dist(0, total - 1);
-  uint64_t pick = dist(rng_);
+  std::uniform_int_distribution<uint64_t> select(0, total - 1);
+  uint64_t pick = select(rng_);
   uint64_t accum = 0;
   for (const auto& w : weights) {
-    accum += w.weight;
-    if (pick < accum) return w.value;
+    accum += DistItemWeight(w);
+    if (pick < accum) {
+      if (w.is_default)
+        return SampleDefaultValue(weights, domain_lo, domain_hi);
+      if (w.is_range) {
+        std::uniform_int_distribution<int64_t> within(w.lo, w.hi);
+        return within(rng_);
+      }
+      return w.value;
+    }
   }
-  return weights.back().value;
+  return DistItemRepresentative(weights.back());
+}
+
+// 18.5.3: sample a distribution constraint, bounding a default item by the
+// target variable's declared domain when it is known.
+int64_t ConstraintSolver::SampleDist(const ConstraintExpr& c) {
+  auto it = variables_.find(c.var_name);
+  int64_t lo = it != variables_.end() ? it->second.min_val : 0;
+  int64_t hi = it != variables_.end() ? it->second.max_val : 0xFFFF;
+  return DistributionSample(c.dist_weights, lo, hi);
+}
+
+bool ConstraintSolver::HasDistOnRandc() const {
+  for (const auto& block : blocks_) {
+    if (!block.enabled) continue;
+    for (const auto& c : block.constraints) {
+      if (c.kind != ConstraintKind::kDist) continue;
+      auto it = variables_.find(c.var_name);
+      if (it != variables_.end() &&
+          it->second.qualifier == RandQualifier::kRandc) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 GuardValue GuardAnd(GuardValue a, GuardValue b) {
@@ -295,7 +382,7 @@ bool ConstraintSolver::EvalConstraint(const ConstraintExpr& expr) const {
 
 bool ConstraintSolver::ApplyConstraint(const ConstraintExpr& expr) {
   if (expr.kind == ConstraintKind::kDist) {
-    values_[expr.var_name] = DistributionSample(expr.dist_weights);
+    values_[expr.var_name] = SampleDist(expr);
     return true;
   }
   return EvalConstraint(expr);
@@ -444,6 +531,10 @@ void ConstraintSolver::ApplyDirectConstraints(
 
 bool ConstraintSolver::SolveWith(
     const std::vector<ConstraintExpr>& inline_constraints) {
+  // 18.5.3: a dist operation shall not be applied to a randc variable, so a
+  // distribution targeting one makes randomization fail outright.
+  if (HasDistOnRandc()) return false;
+
   if (pre_randomize_) pre_randomize_();
 
   values_.clear();
@@ -469,7 +560,7 @@ void ConstraintSolver::ApplyDistConstraints() {
     if (!block.enabled) continue;
     for (const auto& c : block.constraints) {
       if (c.kind == ConstraintKind::kDist) {
-        values_[c.var_name] = DistributionSample(c.dist_weights);
+        values_[c.var_name] = SampleDist(c);
       }
     }
   }
