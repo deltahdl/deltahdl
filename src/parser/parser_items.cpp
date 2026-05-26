@@ -348,8 +348,11 @@ std::string_view Parser::TryParseAssertionItemLabel() {
     lexer_.RestorePos(saved);
     return {};
   }
+  // §16.14 Syntax 16-18: every concurrent_assertion_statement alternative —
+  // assert, assume, cover, and restrict — may head a concurrent_assertion_item
+  // and so carry the optional block_identifier name described in §16.14.
   if (!Check(TokenKind::kKwAssert) && !Check(TokenKind::kKwAssume) &&
-      !Check(TokenKind::kKwCover)) {
+      !Check(TokenKind::kKwCover) && !Check(TokenKind::kKwRestrict)) {
     lexer_.RestorePos(saved);
     return {};
   }
