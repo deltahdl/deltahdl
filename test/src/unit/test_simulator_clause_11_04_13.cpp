@@ -1,6 +1,8 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_array.h"
 #include "helpers_eval_op.h"
+#include "helpers_queue.h"
 #include "parser/ast.h"
 #include "simulator/adv_sim.h"
 #include "simulator/evaluation.h"
@@ -348,6 +350,68 @@ TEST(EvalAdv, InsideRelToleranceTruncationMiss) {
   inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 7),
                                        MakeInt(f.arena, 25),
                                        TokenKind::kPlusPercentMinus));
+  auto result = EvalExpr(inside, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+// §11.4.13: a set member naming an unpacked array is traversed down to its
+// singular elements, so {1, 2, q} with q = '{3,4,5} behaves like {1,2,3,4,5}.
+TEST(EvalOp, InsideQueueMemberDescends) {
+  SimFixture f;
+  MakeQueue(f, "q", {3, 4, 5});
+  auto* var = f.ctx.CreateVariable("ex", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, 4);
+  auto* inside = f.arena.Create<Expr>();
+  inside->kind = ExprKind::kInside;
+  inside->lhs = MakeId(f.arena, "ex");
+  inside->elements.push_back(MakeInt(f.arena, 1));
+  inside->elements.push_back(MakeInt(f.arena, 2));
+  inside->elements.push_back(MakeId(f.arena, "q"));
+  auto result = EvalExpr(inside, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalOp, InsideQueueMemberNoMatch) {
+  SimFixture f;
+  MakeQueue(f, "q", {3, 4, 5});
+  auto* var = f.ctx.CreateVariable("ex", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, 9);
+  auto* inside = f.arena.Create<Expr>();
+  inside->kind = ExprKind::kInside;
+  inside->lhs = MakeId(f.arena, "ex");
+  inside->elements.push_back(MakeInt(f.arena, 1));
+  inside->elements.push_back(MakeInt(f.arena, 2));
+  inside->elements.push_back(MakeId(f.arena, "q"));
+  auto result = EvalExpr(inside, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+// A fixed-size unpacked array member descends the same way. MakeArray4 fills
+// arr[0..3] with {10, 20, 30, 40}; only the descent can supply the match.
+TEST(EvalOp, InsideFixedArrayMemberDescends) {
+  SimFixture f;
+  MakeArray4(f, "arr");
+  auto* var = f.ctx.CreateVariable("fv", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 30);
+  auto* inside = f.arena.Create<Expr>();
+  inside->kind = ExprKind::kInside;
+  inside->lhs = MakeId(f.arena, "fv");
+  inside->elements.push_back(MakeInt(f.arena, 5));
+  inside->elements.push_back(MakeId(f.arena, "arr"));
+  auto result = EvalExpr(inside, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalOp, InsideFixedArrayMemberNoMatch) {
+  SimFixture f;
+  MakeArray4(f, "arr");
+  auto* var = f.ctx.CreateVariable("fv", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 25);
+  auto* inside = f.arena.Create<Expr>();
+  inside->kind = ExprKind::kInside;
+  inside->lhs = MakeId(f.arena, "fv");
+  inside->elements.push_back(MakeInt(f.arena, 5));
+  inside->elements.push_back(MakeId(f.arena, "arr"));
   auto result = EvalExpr(inside, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }

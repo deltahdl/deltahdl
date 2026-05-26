@@ -532,9 +532,12 @@ static int InsideMatchRange(Logic4Vec lhs, const Expr* elem, SimContext& ctx,
   return (lv >= lo && lv <= hi) ? 1 : 0;
 }
 
-static int InsideMatchValue(Logic4Vec lhs, const Expr* elem, SimContext& ctx,
-                            Arena& arena) {
-  auto ev = EvalExpr(elem, ctx, arena);
+// Compares the left-hand expression against one singular set member, returning
+// 1 for a match, 0 for a mismatch, and 2 when the comparison is ambiguous (x).
+// Integral members use wildcard equality so an x or z bit on the member side is
+// a do-not-care, while an x or z bit that survives on the left-hand side leaves
+// the comparison ambiguous (§11.4.13, §11.4.6).
+static int CompareInsideValue(const Logic4Vec& lhs, const Logic4Vec& ev) {
   uint64_t rhs_dc = ev.nwords > 0 ? ev.words[0].bval : 0;
   uint64_t lhs_x = lhs.nwords > 0 ? lhs.words[0].bval : 0;
   if (lhs_x & ~rhs_dc) return 2;
@@ -544,12 +547,53 @@ static int InsideMatchValue(Logic4Vec lhs, const Expr* elem, SimContext& ctx,
   return (lhs.ToUint64() == ev.ToUint64()) ? 1 : 0;
 }
 
+static int InsideMatchValue(Logic4Vec lhs, const Expr* elem, SimContext& ctx,
+                            Arena& arena) {
+  return CompareInsideValue(lhs, EvalExpr(elem, ctx, arena));
+}
+
+// §11.4.13: a set member that names an unpacked array is not compared as an
+// aggregate. Instead its elements are traversed down to singular values, so the
+// membership test sees each element as if it had been listed individually.
+// Returns true (filling `out`) when `elem` named an unpacked array, covering
+// both queues/dynamic arrays and fixed-size unpacked arrays.
+static bool CollectUnpackedSetMembers(const Expr* elem, SimContext& ctx,
+                                      std::vector<Logic4Vec>& out) {
+  if (elem->kind != ExprKind::kIdentifier) return false;
+  if (auto* q = ctx.FindQueue(elem->text)) {
+    for (auto& e : q->elements) out.push_back(e);
+    return true;
+  }
+  if (auto* info = ctx.FindArrayInfo(elem->text)) {
+    for (uint32_t i = 0; i < info->size; ++i) {
+      std::string elem_name =
+          std::string(elem->text) + "[" + std::to_string(info->lo + i) + "]";
+      auto* var = ctx.FindVariable(elem_name);
+      out.push_back(var ? var->value
+                        : MakeLogic4Vec(ctx.GetArena(), info->elem_width));
+    }
+    return true;
+  }
+  return false;
+}
+
 Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto lhs = EvalExpr(expr->lhs, ctx, arena);
   bool ambiguous = false;
   for (auto* elem : expr->elements) {
     bool is_range =
         elem->kind == ExprKind::kSelect && elem->index && elem->index_end;
+    if (!is_range) {
+      std::vector<Logic4Vec> members;
+      if (CollectUnpackedSetMembers(elem, ctx, members)) {
+        for (const auto& member : members) {
+          int mr = CompareInsideValue(lhs, member);
+          if (mr == 1) return MakeLogic4VecVal(arena, 1, 1);
+          if (mr == 2) ambiguous = true;
+        }
+        continue;
+      }
+    }
     int r = is_range ? InsideMatchRange(lhs, elem, ctx, arena)
                      : InsideMatchValue(lhs, elem, ctx, arena);
     if (r == 1) return MakeLogic4VecVal(arena, 1, 1);
