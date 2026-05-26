@@ -432,7 +432,7 @@ static void CollectConstraints(const std::vector<ConstraintBlock>& blocks,
 }
 
 bool ConstraintSolver::CheckAllConstraints(
-    const std::vector<ConstraintExpr>& extra) {
+    const std::vector<ConstraintExpr>& extra, bool include_soft) {
   std::vector<const ConstraintExpr*> hard;
   std::vector<const ConstraintExpr*> soft;
   CollectConstraints(blocks_, extra, hard, soft);
@@ -457,6 +457,18 @@ bool ConstraintSolver::CheckAllConstraints(
       }
     }
     if (!EvalConstraint(*c)) return false;
+  }
+  if (include_soft) {
+    // 18.5.13: while the soft constraints are still active, the solver attempts
+    // to satisfy them together with the hard constraints. A soft constraint is
+    // an inner expression_or_dist preceded by soft; enforce that inner relation
+    // here so a candidate assignment must honor it. When this set proves
+    // jointly unsatisfiable the caller drops the soft constraints and retries
+    // with include_soft clear.
+    for (const auto* c : soft) {
+      const ConstraintExpr* inner = c->inner ? c->inner : nullptr;
+      if (inner && !EvalConstraint(*inner)) return false;
+    }
   }
   return true;
 }
@@ -531,7 +543,7 @@ bool ConstraintSolver::EvalUnique(const ConstraintExpr& expr) const {
 bool ConstraintSolver::Solve() { return SolveWith({}); }
 
 void ConstraintSolver::ApplyDirectConstraints(
-    const std::vector<ConstraintExpr>& extra) {
+    const std::vector<ConstraintExpr>& extra, bool include_soft) {
   auto apply = [this](const ConstraintExpr& c) {
     if (c.kind == ConstraintKind::kEqual) {
       values_[c.var_name] = c.lo;
@@ -542,11 +554,23 @@ void ConstraintSolver::ApplyDirectConstraints(
       }
     }
   };
+  // 18.5.13: when the soft constraints are still active, seed their inner
+  // expression_or_dist exactly as a hard constraint so a satisfiable soft
+  // preference is honored. A hard constraint applied afterward takes precedence
+  // and overwrites any conflicting soft seed, leaving the conflicting soft to
+  // be discarded by the include_soft-clear retry.
+  auto seed = [&](const ConstraintExpr& c) {
+    if (include_soft && c.kind == ConstraintKind::kSoft && c.inner) {
+      apply(*c.inner);
+    } else {
+      apply(c);
+    }
+  };
   for (const auto& block : blocks_) {
     if (!block.enabled) continue;
-    for (const auto& c : block.constraints) apply(c);
+    for (const auto& c : block.constraints) seed(c);
   }
-  for (const auto& c : extra) apply(c);
+  for (const auto& c : extra) seed(c);
 }
 
 bool ConstraintSolver::SolveWith(
@@ -559,19 +583,15 @@ bool ConstraintSolver::SolveWith(
 
   if (pre_randomize_) pre_randomize_();
 
-  values_.clear();
-
-  ApplyDistConstraints();
-
-  ApplyDirectConstraints(inline_constraints);
-
-  for (auto& [name, var] : variables_) {
-    if (!var.enabled) continue;
-    if (values_.find(name) != values_.end()) continue;
-    values_[name] = GenerateRandValue(var);
+  // 18.5.13: hard constraints shall always be satisfied or randomization fails.
+  // First try to satisfy them together with the soft constraints. If no such
+  // solution exists, discard the soft constraints — a discarded soft constraint
+  // is treated as if replaced by the value 1 (true): it need not hold and has
+  // no effect on the solution distribution — and solve the remaining hard set.
+  bool solved = SolveIterative(inline_constraints, /*include_soft=*/true);
+  if (!solved && !guard_error_) {
+    solved = SolveIterative(inline_constraints, /*include_soft=*/false);
   }
-
-  bool solved = SolveIterative(inline_constraints);
 
   if (solved && post_randomize_) post_randomize_();
   return solved;
@@ -589,22 +609,21 @@ void ConstraintSolver::ApplyDistConstraints() {
 }
 
 bool ConstraintSolver::SolveIterative(
-    const std::vector<ConstraintExpr>& extra) {
+    const std::vector<ConstraintExpr>& extra, bool include_soft) {
   static constexpr int kMaxAttempts = 500;
   guard_error_ = false;
   for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
-    if (CheckAllConstraints(extra)) return true;
-    // 18.5.12: an ERROR guard fails randomize() outright; do not retry it.
-    if (guard_error_) return false;
-
     values_.clear();
     ApplyDistConstraints();
-    ApplyDirectConstraints(extra);
+    ApplyDirectConstraints(extra, include_soft);
     for (auto& [name, var] : variables_) {
       if (!var.enabled) continue;
       if (values_.find(name) != values_.end()) continue;
       values_[name] = GenerateRandValue(var);
     }
+    if (CheckAllConstraints(extra, include_soft)) return true;
+    // 18.5.12: an ERROR guard fails randomize() outright; do not retry it.
+    if (guard_error_) return false;
   }
   return false;
 }

@@ -222,7 +222,12 @@ class ConstraintSolver {
 
   bool ApplyConstraint(const ConstraintExpr& expr);
 
-  bool CheckAllConstraints(const std::vector<ConstraintExpr>& extra);
+  // 18.5.13: when include_soft is set, the soft constraints are enforced
+  // alongside the hard constraints; when clear, the soft constraints are
+  // discarded (each treated as the value true) and only the hard constraints
+  // are checked.
+  bool CheckAllConstraints(const std::vector<ConstraintExpr>& extra,
+                           bool include_soft);
 
   bool EvalConstraint(const ConstraintExpr& expr) const;
 
@@ -236,9 +241,11 @@ class ConstraintSolver {
 
   void ApplyDistConstraints();
 
-  void ApplyDirectConstraints(const std::vector<ConstraintExpr>& extra);
+  void ApplyDirectConstraints(const std::vector<ConstraintExpr>& extra,
+                              bool include_soft);
 
-  bool SolveIterative(const std::vector<ConstraintExpr>& extra);
+  bool SolveIterative(const std::vector<ConstraintExpr>& extra,
+                      bool include_soft);
 
   std::mt19937 rng_;
   std::unordered_map<std::string, RandVariable> variables_;
