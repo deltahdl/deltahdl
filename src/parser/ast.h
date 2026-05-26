@@ -1061,6 +1061,11 @@ struct ExternalConstraintBlock {
   std::string_view class_name;
   std::string_view constraint_name;
   SourceLoc loc;
+  // 18.5.2: dynamic override specifiers carried on the external constraint
+  // block; they must match those on the completing prototype.
+  bool is_initial = false;
+  bool is_extends = false;
+  bool is_final = false;
 };
 
 struct CompilationUnit {

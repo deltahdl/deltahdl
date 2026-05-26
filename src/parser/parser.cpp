@@ -260,11 +260,21 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
   Match(TokenKind::kKwStatic);
   Expect(TokenKind::kKwConstraint);
 
+  // 18.5.2: capture the dynamic override specifiers so elaboration can check
+  // that they match those on the completing constraint prototype.
+  bool is_initial = false;
+  bool is_extends = false;
+  bool is_final = false;
   if (Match(TokenKind::kColon)) {
-    Match(TokenKind::kKwInitial) || Match(TokenKind::kKwExtends) ||
-        Match(TokenKind::kKwFinal);
+    if (Match(TokenKind::kKwInitial)) {
+      is_initial = true;
+    } else if (Match(TokenKind::kKwExtends)) {
+      is_extends = true;
+    } else if (Match(TokenKind::kKwFinal)) {
+      is_final = true;
+    }
   }
-  if (Match(TokenKind::kColon)) Match(TokenKind::kKwFinal);
+  if (Match(TokenKind::kColon) && Match(TokenKind::kKwFinal)) is_final = true;
   std::string_view class_name = ExpectIdentifier().text;
   Expect(TokenKind::kColonColon);
   std::string_view constraint_name = ExpectIdentifier().text;
@@ -279,7 +289,8 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
       Consume();
     }
   }
-  unit->external_constraints.push_back({class_name, constraint_name, loc});
+  unit->external_constraints.push_back(
+      {class_name, constraint_name, loc, is_initial, is_extends, is_final});
 }
 
 bool Parser::TryParseSecondaryTopLevel(CompilationUnit* unit) {

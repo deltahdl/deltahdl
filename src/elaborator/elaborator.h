@@ -413,6 +413,14 @@ class Elaborator {
   void ValidateExternalConstraints();
   void ValidateOneClassExternalConstraints(const ClassDecl* cls);
 
+  // 18.5.2: constraint inheritance and override specifiers.
+  void ValidateConstraintInheritance();
+  void ValidateOneConstraintOverride(const ClassDecl* cls,
+                                     const ClassMember* m);
+  void ValidateNonAbstractPureConstraints(const ClassDecl* cls);
+  void ValidateConstraintSpecifierParity(const ClassDecl* cls,
+                                         const ClassMember* m);
+
   void ValidateForwardTypedefsInScope(const ModuleDecl* decl);
 
   void ValidateForwardTypedefScopePrefix(const ModuleDecl* decl);

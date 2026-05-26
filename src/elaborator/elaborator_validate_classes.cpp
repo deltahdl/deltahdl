@@ -2876,6 +2876,184 @@ void Elaborator::ValidateOneClassExternalConstraints(const ClassDecl* cls) {
   }
 }
 
+// 18.5.2: walks the superclass chain looking for a constraint of the given
+// name. Returns the nearest such constraint member, or nullptr when no base
+// class declares one. A derived constraint of the same name replaces it.
+static const ClassMember* FindBaseConstraint(const ClassDecl* cls,
+                                             std::string_view name,
+                                             const CompilationUnit* unit) {
+  if (cls->base_class.empty()) return nullptr;
+  for (const auto* c = FindClassDecl(cls->base_class, unit); c;
+       c = c->base_class.empty() ? nullptr
+                                 : FindClassDecl(c->base_class, unit)) {
+    for (const auto* m : c->members) {
+      if (m->kind == ClassMemberKind::kConstraint && m->name == name) {
+        return m;
+      }
+    }
+  }
+  return nullptr;
+}
+
+// 18.5.2: like FindBaseConstraint but only reports a same-named base
+// constraint that was declared with the 'final' specifier, which a subclass
+// is forbidden from replacing.
+static const ClassMember* FindBaseFinalConstraint(const ClassDecl* cls,
+                                                  std::string_view name,
+                                                  const CompilationUnit* unit) {
+  if (cls->base_class.empty()) return nullptr;
+  for (const auto* c = FindClassDecl(cls->base_class, unit); c;
+       c = c->base_class.empty() ? nullptr
+                                 : FindClassDecl(c->base_class, unit)) {
+    for (const auto* m : c->members) {
+      if (m->kind == ClassMemberKind::kConstraint && m->name == name &&
+          m->is_constraint_final) {
+        return m;
+      }
+    }
+  }
+  return nullptr;
+}
+
+// 18.5.2: enforces the dynamic override specifiers on a single constraint.
+//   - ':initial' declares the constraint is not an override, so a same-named
+//     base constraint is an error.
+//   - ':extends' declares the constraint is an override, so the absence of a
+//     same-named base constraint is an error.
+//   - ':initial' and ':extends' are mutually exclusive.
+//   - Replacing a base constraint declared ':final' is an error.
+void Elaborator::ValidateOneConstraintOverride(const ClassDecl* cls,
+                                               const ClassMember* m) {
+  if (m->is_constraint_initial && m->is_constraint_extends) {
+    diag_.Error(m->loc,
+                std::format("constraint '{}' shall not specify both ':initial' "
+                            "and ':extends'",
+                            m->name));
+  }
+
+  const auto* base = FindBaseConstraint(cls, m->name, unit_);
+
+  if (m->is_constraint_initial && base) {
+    diag_.Error(m->loc,
+                std::format("constraint '{}' declared ':initial' overrides a "
+                            "constraint of the same name in a base class",
+                            m->name));
+  }
+  if (m->is_constraint_extends && !base) {
+    diag_.Error(m->loc,
+                std::format("constraint '{}' declared ':extends' does not "
+                            "override a constraint in a base class",
+                            m->name));
+  }
+
+  if (base != nullptr && FindBaseFinalConstraint(cls, m->name, unit_)) {
+    diag_.Error(m->loc,
+                std::format("constraint '{}' replaces a base class constraint "
+                            "declared ':final'",
+                            m->name));
+  }
+}
+
+// 18.5.2: gathers the names of pure constraints inherited by 'cls' that no
+// class on the path down to 'cls' has overridden with a non-pure constraint.
+static void CollectInheritedPureConstraints(
+    const ClassDecl* cls, const CompilationUnit* unit,
+    std::vector<std::string_view>& pure_names) {
+  if (!cls) return;
+  if (!cls->base_class.empty()) {
+    CollectInheritedPureConstraints(FindClassDecl(cls->base_class, unit), unit,
+                                    pure_names);
+  }
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kConstraint) continue;
+    if (m->is_pure_virtual) {
+      pure_names.push_back(m->name);
+    } else {
+      // A non-pure constraint of the same name overrides the obligation.
+      std::erase(pure_names, m->name);
+    }
+  }
+}
+
+// 18.5.2: a non-abstract class shall provide an implementation for every pure
+// constraint it inherits, and a pure constraint shall not be declared in a
+// non-abstract class.
+void Elaborator::ValidateNonAbstractPureConstraints(const ClassDecl* cls) {
+  if (cls->is_virtual) return;
+
+  std::vector<std::string_view> unimpl;
+  if (!cls->base_class.empty()) {
+    CollectInheritedPureConstraints(FindClassDecl(cls->base_class, unit_),
+                                    unit_, unimpl);
+  }
+  // Constraints declared in this class override any inherited obligation of
+  // the same name; only a same-named non-pure constraint discharges it.
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kConstraint && !m->is_pure_virtual) {
+      std::erase(unimpl, m->name);
+    }
+  }
+  for (auto name : unimpl) {
+    diag_.Error(cls->range.start,
+                std::format("non-abstract class '{}' does not implement "
+                            "inherited pure constraint '{}'",
+                            cls->name, name));
+  }
+}
+
+// 18.5.2: a constraint completed by a prototype plus an external constraint
+// block shall carry the same dynamic override specifiers on both the prototype
+// and the external block, or on neither.
+void Elaborator::ValidateConstraintSpecifierParity(const ClassDecl* cls,
+                                                   const ClassMember* m) {
+  for (const auto& ext : unit_->external_constraints) {
+    if (ext.class_name != cls->name || ext.constraint_name != m->name) continue;
+    if (m->is_constraint_initial != ext.is_initial ||
+        m->is_constraint_extends != ext.is_extends ||
+        m->is_constraint_final != ext.is_final) {
+      diag_.Error(
+          ext.loc,
+          std::format("external constraint block '{}::{}' and its prototype "
+                      "disagree on dynamic override specifiers",
+                      cls->name, m->name));
+    }
+  }
+}
+
+void Elaborator::ValidateConstraintInheritance() {
+  for (const auto* cls : unit_->classes) {
+    for (const auto* m : cls->members) {
+      if (m->kind != ClassMemberKind::kConstraint) continue;
+      // 18.5.2: a pure constraint is an obligation and may only appear in an
+      // abstract (virtual) class.
+      if (m->is_pure_virtual && !cls->is_virtual) {
+        diag_.Error(m->loc,
+                    std::format("pure constraint '{}' shall not be declared in "
+                                "non-abstract class '{}'",
+                                m->name, cls->name));
+      }
+      // 18.5.2: a class that declares a pure constraint shall not also complete
+      // a constraint of the same name with an external constraint block.
+      if (m->is_pure_virtual) {
+        for (const auto& ext : unit_->external_constraints) {
+          if (ext.class_name == cls->name && ext.constraint_name == m->name) {
+            diag_.Error(
+                ext.loc,
+                std::format("external constraint block '{}::{}' conflicts with "
+                            "a pure constraint of the same name",
+                            cls->name, m->name));
+            break;
+          }
+        }
+      } else if (m->is_constraint_prototype) {
+        ValidateConstraintSpecifierParity(cls, m);
+      }
+      ValidateOneConstraintOverride(cls, m);
+    }
+    ValidateNonAbstractPureConstraints(cls);
+  }
+}
+
 void Elaborator::ValidateExternalConstraints() {
   for (const auto* cls : unit_->classes) {
     ValidateOneClassExternalConstraints(cls);
