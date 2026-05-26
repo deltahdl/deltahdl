@@ -205,6 +205,15 @@ TEST(ConstraintDist, DistOnRandcVariableFails) {
   EXPECT_TRUE(vals.empty());
 }
 
+// 18.5.3: a dist expression requires that the expression contain at least one
+// rand variable. A distribution applied to a variable with no rand qualifier
+// supplies no rand variable to the expression, so randomization fails.
+TEST(ConstraintDist, DistRequiresRandVariableFails) {
+  auto vals = SampleDist(0, 100, {Single(10, 1), Single(20, 1)}, 1,
+                         RandQualifier::kNone);
+  EXPECT_TRUE(vals.empty());
+}
+
 // 18.5.3 (control): the same distribution applied to a rand variable solves
 // successfully and yields one of the listed values.
 TEST(ConstraintDist, DistOnRandVariableSolves) {
@@ -226,6 +235,17 @@ TEST(ConstraintDist, AbsentWeightDefaultsToOne) {
   int at_200 = Count(vals, 200);
   EXPECT_GT(at_100, at_200 / 2);
   EXPECT_GT(at_200, at_100 / 2);
+}
+
+// 18.5.3: the weight is interpreted as an unsigned value. A weight whose most
+// significant bit is set — a negative number if it were read as a signed
+// quantity — is honoured as a large positive magnitude, so the value carrying
+// it overwhelms a value weighted 1 rather than dropping out of the draw.
+TEST(ConstraintDist, WeightInterpretedAsUnsigned) {
+  auto vals = SampleDist(0, 100, {Single(10, 0x80000000u), Single(20, 1)}, 200);
+  ASSERT_EQ(vals.size(), 200u);
+  EXPECT_GT(Count(vals, 10), 195);
+  EXPECT_LT(Count(vals, 20), 5);
 }
 
 // 18.5.3: both the := and :/ operators assign the specified weight to an

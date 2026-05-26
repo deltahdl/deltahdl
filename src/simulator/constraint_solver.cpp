@@ -223,6 +223,26 @@ bool ConstraintSolver::HasDistOnRandc() const {
   return false;
 }
 
+// 18.5.3: a dist expression requires that it contain at least one rand
+// variable. The distribution names the single variable it constrains, so that
+// target must resolve to an active rand variable; a target the solver does not
+// know, or one declared without the rand qualifier, leaves the distribution
+// with no rand variable to act on.
+bool ConstraintSolver::DistLacksRandVariable() const {
+  for (const auto& block : blocks_) {
+    if (!block.enabled) continue;
+    for (const auto& c : block.constraints) {
+      if (c.kind != ConstraintKind::kDist) continue;
+      auto it = variables_.find(c.var_name);
+      if (it == variables_.end() ||
+          it->second.qualifier == RandQualifier::kNone) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 GuardValue GuardAnd(GuardValue a, GuardValue b) {
   // Figure 18-3 conjunction: a FALSE subexpression forces FALSE; otherwise an
   // ERROR subexpression forces ERROR; otherwise a RANDOM subexpression yields
@@ -531,9 +551,11 @@ void ConstraintSolver::ApplyDirectConstraints(
 
 bool ConstraintSolver::SolveWith(
     const std::vector<ConstraintExpr>& inline_constraints) {
-  // 18.5.3: a dist operation shall not be applied to a randc variable, so a
-  // distribution targeting one makes randomization fail outright.
+  // 18.5.3: a dist operation shall not be applied to a randc variable, and a
+  // dist expression requires at least one rand variable. A distribution that
+  // violates either limitation makes randomization fail outright.
   if (HasDistOnRandc()) return false;
+  if (DistLacksRandVariable()) return false;
 
   if (pre_randomize_) pre_randomize_();
 

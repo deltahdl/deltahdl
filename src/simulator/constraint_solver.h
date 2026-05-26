@@ -212,6 +212,14 @@ class ConstraintSolver {
   // any enabled constraint block applies a distribution to a randc variable.
   bool HasDistOnRandc() const;
 
+  // 18.5.3: a dist expression requires that it contain at least one rand
+  // variable. In the solver model a distribution names the single variable it
+  // constrains, so that variable must be an active rand variable. True if any
+  // enabled distribution targets a variable that supplies no rand variable
+  // (one that is unknown to the solver or declared without the rand
+  // qualifier).
+  bool DistLacksRandVariable() const;
+
   bool ApplyConstraint(const ConstraintExpr& expr);
 
   bool CheckAllConstraints(const std::vector<ConstraintExpr>& extra);
