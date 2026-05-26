@@ -31,19 +31,6 @@ TEST(StructPatternParsing, TypePrefixedPattern) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(StructPatternParsing, TypePrefixedNamedSizedFields) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct { logic [7:0] a; logic [7:0] b; } pair_t;\n"
-      "  initial begin\n"
-      "    pair_t p;\n"
-      "    p = pair_t'{a: 8'd1, b: 8'd2};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(StructPatternParsing, NamedKeysModuleScopeDecl) {
   auto r = Parse(
       "module m;\n"

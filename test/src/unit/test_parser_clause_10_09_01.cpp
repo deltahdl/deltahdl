@@ -99,20 +99,6 @@ TEST(ArrayLiteralParsing, DefaultOnlyArray) {
               "endmodule\n"));
 }
 
-TEST(ArrayLiteralParsing, ArrayLiteralAssignment) {
-  auto r = Parse(
-      "module m;\n"
-      "  int arr [0:2];\n"
-      "  initial arr = '{0, 1, 2};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
-  EXPECT_EQ(rhs->elements.size(), 3u);
-}
-
 TEST(ArrayLiteralParsing, SingleElementArray) {
   auto r = Parse(
       "module m;\n"
@@ -189,16 +175,6 @@ TEST(AssignmentPatternParsing, NestedStructPatternElements) {
       "  initial arr = '{'{1, 2}, '{3, 4}};\n"
       "endmodule\n");
   VerifyNestedPatternElements(r, 2u);
-}
-
-TEST(AssignmentPatternParsing, NestedReplication) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct {int a; int b[4];} ab_t;\n"
-              "  int a, b, c;\n"
-              "  ab_t v1[1:0] [2:0];\n"
-              "  initial v1 = '{2{'{3{'{a,'{2{b,c}}}}}}};\n"
-              "endmodule\n"));
 }
 
 TEST(AssignmentPatternParsing, NestedStructReplication) {

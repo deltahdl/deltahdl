@@ -118,4 +118,15 @@ TEST(ArrayLiteralElaboration, KeyedPatternUncoveredElementError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §10.9.1: an item is evaluated in the assignment context of its element, so a
+// value that fits the element needs no size warning even when the literal's
+// self-determined width differs. A plain integer narrowing into a 1-bit element
+// elaborates cleanly.
+TEST(ArrayLiteralElaboration, BitElementNoSizeWarning) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  bit arr[1:0] = '{1, 1};\n"
+             "endmodule\n"));
+}
+
 }

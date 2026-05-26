@@ -127,6 +127,21 @@ TEST(StructPatternValidation, InvalidMemberName) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §10.9.2: a member name key resolves only against the top-level members of the
+// structure. A name that exists merely inside a substructure is not a valid key
+// and is rejected, rather than reaching into the nested member.
+TEST(StructPatternValidation, SubstructureMemberNotTopLevelKey) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct packed { logic [7:0] inner; } sub_t;\n"
+      "  struct packed { sub_t s; logic [7:0] b; } v = "
+      "'{inner: 8'h01, b: 8'h02};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 TEST(StructPatternValidation, DuplicateKey) {
   ElabFixture f;
   ElaborateSrc(

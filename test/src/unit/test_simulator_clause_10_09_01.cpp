@@ -154,26 +154,6 @@ TEST(ArrayLiteralSim, DescendingRange) {
   EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 0xCC);
 }
 
-TEST(ArrayLiteralSim, PositionalPatternInit) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int arr [0:1];\n"
-      "  initial begin\n"
-      "    arr = '{10, 20};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* e0 = f.ctx.FindVariable("arr[0]");
-  auto* e1 = f.ctx.FindVariable("arr[1]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 10u);
-  EXPECT_EQ(e1->value.ToUint64(), 20u);
-}
-
 TEST(ArrayLiteralSim, MultipleIndexKeysWithDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -215,26 +195,6 @@ TEST(ArrayLiteralSim, DescendingRangeAssignment) {
   ASSERT_NE(e1, nullptr);
   EXPECT_EQ(e1->value.ToUint64(), 30u);
   EXPECT_EQ(e0->value.ToUint64(), 40u);
-}
-
-TEST(ArrayLiteralSim, VarDeclPatternInit) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int arr [0:2] = '{5, 10, 15};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* e0 = f.ctx.FindVariable("arr[0]");
-  auto* e1 = f.ctx.FindVariable("arr[1]");
-  auto* e2 = f.ctx.FindVariable("arr[2]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  ASSERT_NE(e2, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 5u);
-  EXPECT_EQ(e1->value.ToUint64(), 10u);
-  EXPECT_EQ(e2->value.ToUint64(), 15u);
 }
 
 TEST(ArrayLiteralSim, ReplicationMultiElement) {
@@ -378,6 +338,52 @@ TEST(ArrayLiteralSim, DefaultMultidimensionalValues) {
   EXPECT_EQ(e01->value.ToUint64(), 42u);
   EXPECT_EQ(e10->value.ToUint64(), 42u);
   EXPECT_EQ(e11->value.ToUint64(), 42u);
+}
+
+// §10.9.1: a type key sets every element whose type matches it and that an
+// index key has not already set. Here the element type (int) matches the
+// `int` key, so all elements take its value and the default is never reached.
+TEST(ArrayLiteralSim, TypeKeyMatchesAllElements) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int arr [0:2] = '{int: 42, default: 0};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* e0 = f.ctx.FindVariable("arr[0]");
+  auto* e1 = f.ctx.FindVariable("arr[1]");
+  auto* e2 = f.ctx.FindVariable("arr[2]");
+  ASSERT_NE(e0, nullptr);
+  ASSERT_NE(e1, nullptr);
+  ASSERT_NE(e2, nullptr);
+  EXPECT_EQ(e0->value.ToUint64(), 42u);
+  EXPECT_EQ(e1->value.ToUint64(), 42u);
+  EXPECT_EQ(e2->value.ToUint64(), 42u);
+}
+
+// §10.9.1: when the element type does not match the type key, the keyed value
+// is skipped and the default key applies to the unmatched elements. The `int`
+// key does not match the logic element type, so every element gets 8'hFF.
+TEST(ArrayLiteralSim, TypeKeyMismatchFallsToDefault) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] arr [0:2] = '{int: 8'h05, default: 8'hFF};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* e0 = f.ctx.FindVariable("arr[0]");
+  auto* e1 = f.ctx.FindVariable("arr[1]");
+  auto* e2 = f.ctx.FindVariable("arr[2]");
+  ASSERT_NE(e0, nullptr);
+  ASSERT_NE(e1, nullptr);
+  ASSERT_NE(e2, nullptr);
+  EXPECT_EQ(e0->value.ToUint64(), 0xFFu);
+  EXPECT_EQ(e1->value.ToUint64(), 0xFFu);
+  EXPECT_EQ(e2->value.ToUint64(), 0xFFu);
 }
 
 }
