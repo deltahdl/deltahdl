@@ -312,4 +312,108 @@ TEST(ConstraintIfElse, ElseIfChainSelectsMatchingBranch) {
   EXPECT_LE(solver.GetValue("data"), 200);
 }
 
+// 18.5.6: when the condition is true, every constraint in the then set shall be
+// satisfied. Here the surrounding constraints pin the condition true (mode == 1)
+// and pin data to 99, a value the then set's range [10,20] forbids. The
+// condition cannot be made false to escape the then set, so no assignment
+// satisfies the if constraint and the solver shall report failure.
+TEST(ConstraintIfElse, UnsatisfiableThenSetUnderForcedConditionFails) {
+  ConstraintSolver solver(42);
+  RandVariable vmode;
+  vmode.name = "mode";
+  vmode.min_val = 0;
+  vmode.max_val = 1;
+  solver.AddVariable(vmode);
+
+  RandVariable vdata;
+  vdata.name = "data";
+  vdata.min_val = 0;
+  vdata.max_val = 255;
+  solver.AddVariable(vdata);
+
+  ConstraintBlock pin;
+  pin.name = "c_pin";
+  ConstraintExpr pin_mode;
+  pin_mode.kind = ConstraintKind::kEqual;
+  pin_mode.var_name = "mode";
+  pin_mode.lo = 1;
+  pin.constraints.push_back(pin_mode);
+  ConstraintExpr pin_data;
+  pin_data.kind = ConstraintKind::kEqual;
+  pin_data.var_name = "data";
+  pin_data.lo = 99;
+  pin.constraints.push_back(pin_data);
+  solver.AddConstraintBlock(pin);
+
+  ConstraintBlock guard;
+  guard.name = "c_ifelse";
+  ConstraintExpr ife;
+  ife.kind = ConstraintKind::kIfElse;
+  ife.cond_var = "mode";
+  ife.cond_value = 1;
+  ConstraintExpr then_c;
+  then_c.kind = ConstraintKind::kRange;
+  then_c.var_name = "data";
+  then_c.lo = 10;
+  then_c.hi = 20;
+  ife.sub_constraints.push_back(then_c);
+  guard.constraints.push_back(ife);
+  solver.AddConstraintBlock(guard);
+
+  EXPECT_FALSE(solver.Solve());
+}
+
+// 18.5.6: the condition and the guarded sets are interdependent, and the else
+// set takes part in that coupling as well. With data pinned to 99 the then set
+// (data == 99) is satisfiable only when the condition holds, while the else set
+// (data in [10,20]) cannot be satisfied at all. The solver must therefore drive
+// the condition true, choosing mode == 1, so the else set is never imposed.
+TEST(ConstraintIfElse, ElseSetConstrainsConditionTrue) {
+  ConstraintSolver solver(42);
+  RandVariable vmode;
+  vmode.name = "mode";
+  vmode.min_val = 0;
+  vmode.max_val = 1;
+  solver.AddVariable(vmode);
+
+  RandVariable vdata;
+  vdata.name = "data";
+  vdata.min_val = 0;
+  vdata.max_val = 255;
+  solver.AddVariable(vdata);
+
+  ConstraintBlock pin;
+  pin.name = "c_data";
+  ConstraintExpr eq;
+  eq.kind = ConstraintKind::kEqual;
+  eq.var_name = "data";
+  eq.lo = 99;
+  pin.constraints.push_back(eq);
+  solver.AddConstraintBlock(pin);
+
+  ConstraintBlock guard;
+  guard.name = "c_ifelse";
+  ConstraintExpr ife;
+  ife.kind = ConstraintKind::kIfElse;
+  ife.cond_var = "mode";
+  ife.cond_value = 1;
+  ConstraintExpr then_c;
+  then_c.kind = ConstraintKind::kEqual;
+  then_c.var_name = "data";
+  then_c.lo = 99;
+  ife.sub_constraints.push_back(then_c);
+  ConstraintExpr else_c;
+  else_c.kind = ConstraintKind::kRange;
+  else_c.var_name = "data";
+  else_c.lo = 10;
+  else_c.hi = 20;
+  ife.else_constraints.push_back(else_c);
+  guard.constraints.push_back(ife);
+  solver.AddConstraintBlock(guard);
+
+  ASSERT_TRUE(solver.Solve());
+  EXPECT_EQ(solver.GetValue("data"), 99);
+  EXPECT_EQ(solver.GetValue("mode"), 1);
+}
+
 }
