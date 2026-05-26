@@ -286,8 +286,15 @@ static bool HasMatchingEndif(std::string_view line, size_t search_start) {
 }
 
 static size_t FindInlineConditional(std::string_view line) {
+  bool in_string = false;
   for (size_t i = 0; i < line.size(); ++i) {
-    if (line[i] != '`') continue;
+    // A directive sequence sitting inside a string literal is hidden and must
+    // not start an inline conditional expansion (22.6).
+    if (line[i] == '"' && (i == 0 || line[i - 1] != '\\')) {
+      in_string = !in_string;
+      continue;
+    }
+    if (in_string || line[i] != '`') continue;
     auto rest = line.substr(i);
     bool is_ifdef = MatchesDirective(rest, "ifdef");
     bool is_ifndef = MatchesDirective(rest, "ifndef");

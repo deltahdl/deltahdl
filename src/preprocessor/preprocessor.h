@@ -108,6 +108,8 @@ class Preprocessor {
   bool ProcessBlockCommentLine(std::string_view line, uint32_t file_id,
                                uint32_t line_num, int depth,
                                std::string& output);
+  void SkipBlockCommentLine(std::string_view line, uint32_t file_id,
+                            uint32_t line_num, int depth, std::string& output);
   bool RejectInsideDesignElement(std::string_view directive_name,
                                  SourceLoc loc);
   void ResetDirectiveState();

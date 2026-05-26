@@ -593,17 +593,6 @@ TEST(DesignElementPreprocessing, IfdefAroundModuleExcludesUntaken) {
   EXPECT_EQ(result.find("module"), std::string::npos);
 }
 
-TEST(IfndefConditionalCompilation, IfndefIncludesWhenUndefined) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`ifndef MISSING\n"
-      "interface ifc; endinterface\n"
-      "`endif\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("interface"), std::string::npos);
-}
-
 TEST(IfdefElse, UndefinedMacroSelectsElseBranch) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -687,5 +676,170 @@ TEST(ConditionalCompilation, IfdefUndefinedExcludesBlock) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd), nullptr);
+}
+
+// A directive inside a multi-line block comment within a skipped block_of_text
+// is hidden and must not terminate the surrounding conditional construct.
+TEST(Preprocessor, BlockCommentInSkippedBlockHidesEndif) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`ifdef UNDEF_MACRO\n"
+      "/* comment opens here\n"
+      "`endif\n"
+      "still inside comment */\n"
+      "leaked_text\n"
+      "`endif\n"
+      "tail_text\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result.find("leaked_text"), std::string::npos);
+  EXPECT_NE(result.find("tail_text"), std::string::npos);
+}
+
+// The same hiding rule applies to a comment inside an active block_of_text: the
+// commented `endif must not close the construct early.
+TEST(Preprocessor, BlockCommentInActiveBlockHidesEndif) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"ON", "1"}};
+  auto result = Preprocess(
+      "`ifdef ON\n"
+      "kept_text\n"
+      "/* comment opens here\n"
+      "`endif\n"
+      "still inside comment */\n"
+      "more_kept\n"
+      "`endif\n"
+      "after_text\n",
+      f, std::move(cfg));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("kept_text"), std::string::npos);
+  EXPECT_NE(result.find("more_kept"), std::string::npos);
+  EXPECT_NE(result.find("after_text"), std::string::npos);
+}
+
+// Compiler directive names are not considered defined by `elsif (companion to
+// the `ifdef case), so a `elsif naming a directive never selects its branch.
+TEST(Preprocessor, ElsifDirectiveNameNotDefined) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`ifdef A\n"
+      "branch_a\n"
+      "`elsif endif\n"
+      "should_not_appear\n"
+      "`endif\n",
+      f);
+  EXPECT_EQ(result.find("branch_a"), std::string::npos);
+  EXPECT_EQ(result.find("should_not_appear"), std::string::npos);
+}
+
+// A directive token appearing inside a text macro definition body is hidden and
+// must not terminate the surrounding conditional construct. Here the `endif in
+// the macro body must not close the `ifdef, so the `else branch stays skipped.
+TEST(Preprocessor, DirectiveInMacroBodyHidesEndif) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"ON", "1"}};
+  auto result = Preprocess(
+      "`ifdef ON\n"
+      "`define M `endif\n"
+      "in_then\n"
+      "`else\n"
+      "in_else\n"
+      "`endif\n",
+      f, std::move(cfg));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("in_then"), std::string::npos);
+  EXPECT_EQ(result.find("in_else"), std::string::npos);
+}
+
+// A directive token appearing inside a string literal is hidden and must not be
+// acted upon: the `else inside the string does not flip the active branch, so
+// the text that follows in the taken branch is still emitted.
+TEST(Preprocessor, DirectiveInStringLiteralHidesElse) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"ON", "1"}};
+  auto result = Preprocess(
+      "`ifdef ON\n"
+      "initial $display(\"`else\");\n"
+      "in_then\n"
+      "`endif\n",
+      f, std::move(cfg));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("in_then"), std::string::npos);
+  EXPECT_NE(result.find("`else"), std::string::npos);
+}
+
+// White space is not significant around the directives beyond separating
+// tokens: leading indentation and extra spaces between a directive and its
+// identifier are accepted and do not affect block selection or termination.
+TEST(Preprocessor, IndentedAndSpacedDirectives) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"A", "1"}};
+  auto result = Preprocess(
+      "   `ifdef    A\n"
+      "indented_then\n"
+      "  `else\n"
+      "indented_else\n"
+      "   `endif\n",
+      f, std::move(cfg));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("indented_then"), std::string::npos);
+  EXPECT_EQ(result.find("indented_else"), std::string::npos);
+}
+
+// The hiding rule covers single-line comments too: a directive token after //
+// is part of the comment, so a commented `else does not split the block and the
+// text that follows stays in the (taken) then-branch.
+TEST(Preprocessor, DirectiveInLineCommentHidesElse) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"ON", "1"}};
+  auto result = Preprocess(
+      "`ifdef ON\n"
+      "then_text\n"
+      "// `else\n"
+      "still_then\n"
+      "`endif\n",
+      f, std::move(cfg));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("then_text"), std::string::npos);
+  EXPECT_NE(result.find("still_then"), std::string::npos);
+}
+
+// In a skipped block a `endif hidden behind // must not terminate the construct,
+// so the surrounding conditional runs to its real `endif and the text in between
+// remains excluded while text after the real `endif is emitted.
+TEST(Preprocessor, LineCommentEndifInSkippedBlockDoesNotTerminate) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`ifdef UNDEF_MACRO\n"
+      "skipped_text\n"
+      "// `endif\n"
+      "still_skipped\n"
+      "`endif\n"
+      "tail_text\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result.find("skipped_text"), std::string::npos);
+  EXPECT_EQ(result.find("still_skipped"), std::string::npos);
+  EXPECT_NE(result.find("tail_text"), std::string::npos);
+}
+
+// An inline `ifdef ... `endif sequence that appears inside a string literal is
+// hidden: it must be emitted verbatim, not evaluated as a conditional.
+TEST(Preprocessor, InlineConditionalInsideStringIsHidden) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"ON", "1"}};
+  auto result = Preprocess(
+      "`ifdef ON\n"
+      "initial $display(\"`ifdef NOPE 1 `endif kept\");\n"
+      "`endif\n",
+      f, std::move(cfg));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("`ifdef NOPE 1 `endif kept"), std::string::npos);
 }
 

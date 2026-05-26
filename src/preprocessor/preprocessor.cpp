@@ -420,6 +420,25 @@ bool Preprocessor::ProcessBlockCommentLine(std::string_view line,
   return true;
 }
 
+void Preprocessor::SkipBlockCommentLine(std::string_view line, uint32_t file_id,
+                                        uint32_t line_num, int depth,
+                                        std::string& output) {
+  auto close = line.find("*/");
+  if (close != std::string_view::npos) {
+    in_block_comment_ = false;
+    auto remainder = line.substr(close + 2);
+    if (!Trim(remainder).empty()) {
+      // Text after the comment close may be a directive (e.g. `endif) that
+      // must still act on the conditional stack while the block is skipped.
+      if (!ProcessDirective(remainder, file_id, line_num, depth, output) &&
+          !IsActive()) {
+        StripComments(remainder, in_block_comment_);
+      }
+    }
+  }
+  output.push_back('\n');
+}
+
 std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
                                         int depth) {
   if (depth > kMaxIncludeDepth) {
@@ -439,7 +458,11 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     ++line_num;
 
     if (in_block_comment_) {
-      ProcessBlockCommentLine(line, file_id, line_num, depth, output);
+      if (IsActive()) {
+        ProcessBlockCommentLine(line, file_id, line_num, depth, output);
+      } else {
+        SkipBlockCommentLine(line, file_id, line_num, depth, output);
+      }
       pos = eol + 1;
       continue;
     }
@@ -475,6 +498,12 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
         TrackDesignElement(Trim(expanded));
         output.append(expanded);
       }
+    } else if (!handled) {
+      // Inside an ignored block_of_text nothing is emitted, but a block
+      // comment may open on this line. Track that state so a directive that
+      // appears inside the comment on a following line stays hidden and does
+      // not prematurely terminate the surrounding conditional block (22.6).
+      StripComments(line, in_block_comment_);
     }
     output.push_back('\n');
     pos = eol + 1;
