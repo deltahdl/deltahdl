@@ -313,6 +313,13 @@ void ProceduralAssertionQueue::FlushPending() {
   });
 }
 
+void ProceduralAssertionQueue::FlushPendingForInstance(
+    std::string_view instance_name) {
+  std::erase_if(queue_, [&](const PendingProceduralAssertion& p) {
+    return !p.matured && p.instance_name == instance_name;
+  });
+}
+
 uint32_t ProceduralAssertionQueue::Size() const {
   return static_cast<uint32_t>(queue_.size());
 }
@@ -334,6 +341,18 @@ bool IsProceduralAssertionFlushPoint(FlushPointReason reason) {
     case FlushPointReason::kDisableOuterScope:
       return true;
     case FlushPointReason::kNone:
+      return false;
+  }
+  return false;
+}
+
+bool DisableFlushesProceduralAssertions(DisableTarget target) {
+  switch (target) {
+    case DisableTarget::kSpecificAssertion:
+    case DisableTarget::kOutermostScope:
+      return true;
+    case DisableTarget::kNonOutermostScope:
+    case DisableTarget::kTask:
       return false;
   }
   return false;
@@ -654,6 +673,17 @@ void SvaEngine::OnProceduralAssertionFlushPoint(std::string_view process_id,
                                                 FlushPointReason reason) {
   if (!IsProceduralAssertionFlushPoint(reason)) return;
   GetProceduralQueue(process_id).FlushPending();
+}
+
+void SvaEngine::ApplyDisableToProceduralAssertions(
+    std::string_view process_id, DisableTarget target,
+    std::string_view assertion_instance) {
+  if (!DisableFlushesProceduralAssertions(target)) return;
+  if (target == DisableTarget::kSpecificAssertion) {
+    GetProceduralQueue(process_id).FlushPendingForInstance(assertion_instance);
+  } else {
+    GetProceduralQueue(process_id).FlushPending();
+  }
 }
 
 }

@@ -284,6 +284,12 @@ class ProceduralAssertionQueue {
   // are discarded; instances that already matured stay queued so they can
   // still proceed to evaluation.
   void FlushPending();
+
+  // §16.14.6.4: disabling one specific procedural concurrent assertion clears
+  // that assertion's still-pending instances from the queue while leaving every
+  // other assertion's pending instances, and any already-matured instance of
+  // the named assertion, in place.
+  void FlushPendingForInstance(std::string_view instance_name);
   uint32_t Size() const;
   uint32_t MaturedCount() const;
   const std::vector<PendingProceduralAssertion>& Entries() const {
@@ -293,6 +299,22 @@ class ProceduralAssertionQueue {
  private:
   std::vector<PendingProceduralAssertion> queue_;
 };
+
+// §16.14.6.4: a `disable` statement may name several kinds of object; which one
+// it targets decides whether the addressed process's pending procedural
+// concurrent assertion instances are flushed.
+enum class DisableTarget : uint8_t {
+  kSpecificAssertion = 0,
+  kOutermostScope = 1,
+  kNonOutermostScope = 2,
+  kTask = 3,
+};
+
+// §16.14.6.4: disabling a specific procedural concurrent assertion, or the
+// outermost scope of a procedure that has a pending procedural assertion queue,
+// flushes pending procedural assertion instances; disabling a task or a
+// non-outermost scope of a procedure does not.
+bool DisableFlushesProceduralAssertions(DisableTarget target);
 
 bool IsStaticConcurrentAssertion(bool appears_in_procedural_code);
 
@@ -384,6 +406,17 @@ class SvaEngine {
 
   void OnProceduralAssertionFlushPoint(std::string_view process_id,
                                        FlushPointReason reason);
+
+  // §16.14.6.4: apply a `disable` statement's effect on a process's pending
+  // procedural concurrent assertion queue. Disabling the named specific
+  // assertion clears only that assertion's pending instances; disabling the
+  // outermost scope flushes the whole pending queue; disabling a task or a
+  // non-outermost scope leaves the queue untouched. Already-matured attempts
+  // are never affected. The normal disable activities of §9.6.2 happen
+  // elsewhere, in addition to this queue effect.
+  void ApplyDisableToProceduralAssertions(std::string_view process_id,
+                                          DisableTarget target,
+                                          std::string_view assertion_instance);
 
   DeferredReportQueue& GetDeferredReportQueue(std::string_view process_id);
   const DeferredReportQueue* PeekDeferredReportQueue(
