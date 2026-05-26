@@ -245,6 +245,12 @@ class DeferredReportQueue {
   std::vector<PendingDeferredReport> TakeMaturedObserved();
   std::vector<PendingDeferredReport> TakeMaturedFinal();
   void FlushNonMatured();
+
+  // §16.4.4: disabling one specific deferred assertion cancels that
+  // assertion's still-pending reports while leaving every other assertion's
+  // pending reports, and any already-matured report of the named assertion, in
+  // place.
+  void FlushNonMaturedForInstance(std::string_view instance_name);
   uint32_t Size() const;
   uint32_t MaturedCount() const;
   uint32_t NonMaturedCount() const;
@@ -315,6 +321,11 @@ enum class DisableTarget : uint8_t {
 // flushes pending procedural assertion instances; disabling a task or a
 // non-outermost scope of a procedure does not.
 bool DisableFlushesProceduralAssertions(DisableTarget target);
+
+// §16.4.4: disabling a specific deferred assertion, or the outermost scope of a
+// procedure that has an active deferred assertion report queue, clears pending
+// reports; disabling a task or a non-outermost scope of a procedure does not.
+bool DisableFlushesDeferredAssertions(DisableTarget target);
 
 bool IsStaticConcurrentAssertion(bool appears_in_procedural_code);
 
@@ -417,6 +428,17 @@ class SvaEngine {
   void ApplyDisableToProceduralAssertions(std::string_view process_id,
                                           DisableTarget target,
                                           std::string_view assertion_instance);
+
+  // §16.4.4: apply a `disable` statement's effect on a process's deferred
+  // assertion report queue. Disabling the named specific deferred assertion
+  // cancels only that assertion's pending reports; disabling the outermost
+  // scope clears all pending reports on the queue; disabling a task or a
+  // non-outermost scope leaves the queue untouched. Already-matured reports are
+  // never affected. The normal disable activities of §9.6.2 happen elsewhere,
+  // in addition to this queue effect.
+  void ApplyDisableToDeferredAssertions(std::string_view process_id,
+                                        DisableTarget target,
+                                        std::string_view assertion_instance);
 
   DeferredReportQueue& GetDeferredReportQueue(std::string_view process_id);
   const DeferredReportQueue* PeekDeferredReportQueue(

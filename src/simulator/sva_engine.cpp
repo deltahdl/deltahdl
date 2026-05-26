@@ -358,6 +358,18 @@ bool DisableFlushesProceduralAssertions(DisableTarget target) {
   return false;
 }
 
+bool DisableFlushesDeferredAssertions(DisableTarget target) {
+  switch (target) {
+    case DisableTarget::kSpecificAssertion:
+    case DisableTarget::kOutermostScope:
+      return true;
+    case DisableTarget::kNonOutermostScope:
+    case DisableTarget::kTask:
+      return false;
+  }
+  return false;
+}
+
 bool IsStaticConcurrentAssertion(bool appears_in_procedural_code) {
 
   return !appears_in_procedural_code;
@@ -487,6 +499,13 @@ void DeferredReportQueue::FlushNonMatured() {
     if (e.matured) kept.push_back(std::move(e));
   }
   entries_ = std::move(kept);
+}
+
+void DeferredReportQueue::FlushNonMaturedForInstance(
+    std::string_view instance_name) {
+  std::erase_if(entries_, [&](const PendingDeferredReport& e) {
+    return !e.matured && e.da.instance_name == instance_name;
+  });
 }
 
 uint32_t DeferredReportQueue::Size() const {
@@ -683,6 +702,18 @@ void SvaEngine::ApplyDisableToProceduralAssertions(
     GetProceduralQueue(process_id).FlushPendingForInstance(assertion_instance);
   } else {
     GetProceduralQueue(process_id).FlushPending();
+  }
+}
+
+void SvaEngine::ApplyDisableToDeferredAssertions(
+    std::string_view process_id, DisableTarget target,
+    std::string_view assertion_instance) {
+  if (!DisableFlushesDeferredAssertions(target)) return;
+  if (target == DisableTarget::kSpecificAssertion) {
+    GetDeferredReportQueue(process_id).FlushNonMaturedForInstance(
+        assertion_instance);
+  } else {
+    GetDeferredReportQueue(process_id).FlushNonMatured();
   }
 }
 
