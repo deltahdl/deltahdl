@@ -177,6 +177,21 @@ TEST(ReplicationElaboration, ZeroReplicationInsideConcatOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §11.4.12.1: a zero-multiplier replication is only allowed inside a
+// concatenation that has at least one positive-size operand. A concatenation
+// built entirely from zero replications has no such operand and is rejected.
+TEST(ReplicationElaboration, ZeroReplicationConcatAllZeroRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] a, b;\n"
+      "  logic [3:0] result;\n"
+      "  initial result = {{0{a}}, {0{b}}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(ReplicationElaboration, NegativeMultiplierRejected) {
   ElabFixture f;
   ElaborateSrc(

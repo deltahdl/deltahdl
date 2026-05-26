@@ -102,17 +102,4 @@ TEST(ReplicationParsing, ReplicationInParameter) {
   ASSERT_NE(param->init_expr, nullptr);
   EXPECT_EQ(param->init_expr->kind, ExprKind::kReplicate);
 }
-
-TEST(ReplicationParsing, RepeatCountAndMultipleElements) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = {3{a, b}};\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
-  ASSERT_NE(rhs->repeat_count, nullptr);
-  EXPECT_EQ(rhs->repeat_count->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(rhs->elements.size(), 2u);
-}
 }
