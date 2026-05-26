@@ -126,6 +126,24 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
 }
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
+     MultiDimensionalInstanceArrayPortDimensionSizeMismatchErrors) {
+  // The instance-array dimensions match ([8][4]), but the trailing dimension
+  // that must line up with the per-instance unpacked port (declared as [5])
+  // is connected with size 3, so the port-dimension comparison must fail.
+  ElabFixture f;
+  ElaborateSrc(
+      "module child(output o, input i[5]);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic o [8][4];\n"
+      "  logic i [8][4][3];\n"
+      "  child c[8][4](.o(o), .i(i));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      PackedArrayConnectionMatchingBitCountAccepted) {
   EXPECT_TRUE(
       ElabOk("module child(input [7:0] i, output o);\n"
