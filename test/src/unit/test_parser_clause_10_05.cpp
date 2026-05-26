@@ -14,16 +14,6 @@ TEST(DeclarationAssignmentParsing, VarDeclAssignmentWithInit) {
   EXPECT_EQ(item->name, "x");
   EXPECT_NE(item->init_expr, nullptr);
 }
-TEST(VarDeclAssignmentParsing, VariableInitialization) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic v = 1'b1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_NE(item->init_expr, nullptr);
-}
 
 TEST(VarDeclAssignmentParsing, BlockVarDeclWithInit) {
   auto r = Parse(
@@ -69,22 +59,6 @@ TEST(AssignmentParsing, MixedInitInOneStmt) {
   EXPECT_NE(items[0]->init_expr, nullptr);
   EXPECT_EQ(items[1]->init_expr, nullptr);
   EXPECT_NE(items[2]->init_expr, nullptr);
-}
-
-TEST(AssignmentParsing, BlockLocalWithExprInit) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int x = 2 + 3;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* blk = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(blk, nullptr);
-  ASSERT_GE(blk->stmts.size(), 1u);
-  EXPECT_EQ(blk->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_NE(blk->stmts[0]->var_init, nullptr);
 }
 
 }

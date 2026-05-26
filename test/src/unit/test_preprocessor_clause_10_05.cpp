@@ -17,17 +17,6 @@ TEST(AssignmentParsing, VarDeclAssignment) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(AssignmentParsing, VarDeclAssignmentLogic) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  logic [7:0] data = 8'hFF;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_FALSE(mod->items.empty());
-  EXPECT_NE(mod->items[0]->init_expr, nullptr);
-}
-
 TEST(VarDeclAssignmentPreprocessor, BlockVarDeclWithInit) {
   auto r = ParseWithPreprocessor(
       "module m;\n"

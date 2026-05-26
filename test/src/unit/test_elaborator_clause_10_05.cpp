@@ -37,18 +37,6 @@ TEST(VarDeclAssignmentElaboration, InitPreservedAsVariableNotContAssign) {
   EXPECT_TRUE(mod->assigns.empty());
 }
 
-TEST(VarDeclAssignmentElaboration, InitWithProceduralDriverOk) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module t;\n"
-      "  int x = 10;\n"
-      "  initial x = 20;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(VarDeclAssignmentElaboration, MultipleVarsWithInitAllPreserved) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -79,6 +67,41 @@ TEST(VarDeclAssignmentElaboration, StaticClassMemberWithInitElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §10.5 draws the net-vs-variable distinction directly: an identically
+// written `= expr` makes a net a continuously assigned net but makes a
+// variable an initialization. Even when a continuous assignment is present
+// in the module, the variable's initializer must not be swept into the
+// continuous-assignment list; it stays an initializer on the variable.
+TEST(VarDeclAssignmentElaboration, NetVsVariableDeclAssignmentDistinction) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  wire [7:0] w = a & b;\n"
+      "  logic [7:0] v = a & b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+
+  bool var_has_init = false;
+  for (const auto& var : mod->variables) {
+    if (var.name == "v") var_has_init = (var.init_expr != nullptr);
+  }
+  EXPECT_TRUE(var_has_init);
+
+  bool assign_targets_var = false;
+  for (const auto& ca : mod->assigns) {
+    if (ca.lhs && ca.lhs->kind == ExprKind::kIdentifier &&
+        ca.lhs->text == "v") {
+      assign_targets_var = true;
+    }
+  }
+  EXPECT_FALSE(assign_targets_var);
 }
 
 }

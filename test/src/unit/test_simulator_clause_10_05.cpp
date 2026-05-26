@@ -126,22 +126,6 @@ TEST(VariableInitSim, VarInitBeforeAlwaysBlock) {
   EXPECT_EQ(result->value.ToUint64(), 5u);
 }
 
-TEST(VariableInitSim, RuntimeExpressionInitializer) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x = 3 + 4 * 2;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 11u);
-}
-
 TEST(VariableInitSim, VarInitOverwrittenByProceduralAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -188,6 +172,82 @@ TEST(VariableInitSim, StaticClassMemberInitBeforeInitialBlock) {
       "  int result;\n"
       "  initial result = C::val;\n"
       "endmodule\n", "result"), 55u);
+}
+
+// The initial value is placed verbatim, so an initializer carrying x/z bits
+// leaves the variable in an unknown state rather than coercing to 0.
+TEST(VariableInitSim, FourStateInitializerPreservesXZ) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] v = 4'b10xz;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* v = f.ctx.FindVariable("v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_FALSE(v->value.IsKnown());
+}
+
+// A negative initializer is stored as its two's-complement bit pattern in the
+// declared width (here a 32-bit int).
+TEST(VariableInitSim, SignedNegativeInitializer) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x = -5;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 0xFFFFFFFBull);
+}
+
+// The initialization has no duration: with no intervening assignment the
+// value is unchanged when read at a later simulation time.
+TEST(VariableInitSim, InitValuePersistsAcrossTime) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x = 7;\n"
+      "  int snapshot;\n"
+      "  initial #5 snapshot = x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* snap = f.ctx.FindVariable("snapshot");
+  ASSERT_NE(snap, nullptr);
+  EXPECT_EQ(snap->value.ToUint64(), 7u);
+}
+
+// Static initialization completes before any procedure starts, so an
+// always_comb block evaluating at time 0 already sees the initialized value.
+TEST(VariableInitSim, VarInitBeforeAlwaysCombBlock) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a = 8'd9;\n"
+      "  logic [7:0] o;\n"
+      "  always_comb o = a + 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* o = f.ctx.FindVariable("o");
+  ASSERT_NE(o, nullptr);
+  EXPECT_EQ(o->value.ToUint64(), 10u);
 }
 
 }
