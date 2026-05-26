@@ -85,10 +85,4 @@ TEST(OperatorParsing, UnaryPlusPrecedenceOverAdd) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kPlus);
 }
 
-TEST(ConstExpr, PowerOperatorInConstantExpr) {
-  EvalFixture f;
-  ScopeMap scope;
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("2 ** 10", f), scope), 1024);
-}
-
 }

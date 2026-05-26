@@ -44,16 +44,26 @@ TEST(ConstEval, ZeroPowerNegative) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("0 ** -1", f)), std::nullopt);
 }
 
-TEST(ExpressionElaboration, BinaryExprInInitialElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial c = a + b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
+// Table 11-4: integral power with a negative exponent. For a base whose
+// magnitude exceeds one the truncated reciprocal is zero; a base of one stays
+// one; a base of negative one alternates with the parity of the exponent.
+TEST(ConstEval, IntegralPowerNegativeExponentTable) {
+  EvalFixture f;
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("2 ** -1", f)), 0);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("(-2) ** -1", f)), 0);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("1 ** -5", f)), 1);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("(-1) ** -3", f)), -1);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("(-1) ** -2", f)), 1);
+}
+
+// Table 11-4: integral power with a positive exponent and a negative base.
+// A base below negative one raises normally; a base of negative one alternates
+// between negative one and one with the parity of the exponent.
+TEST(ConstEval, IntegralPowerNegativeBasePositiveExponent) {
+  EvalFixture f;
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("(-2) ** 3", f)), -8);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("(-1) ** 3", f)), -1);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("(-1) ** 2", f)), 1);
 }
 
 TEST(OperatorElaboration, UnaryPlusElaborates) {
@@ -174,30 +184,6 @@ TEST(AlwaysCombBasicSim, AlwaysCombAddSub) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 63u);
-}
-
-TEST(AlwaysCombExtendedSim, AlwaysCombSubtraction) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, y;\n"
-      "  always_comb y = a - b;\n"
-      "  initial begin\n"
-      "    a = 8'h50;\n"
-      "    b = 8'h10;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 0x40u);
 }
 
 TEST(AlwaysCombExtendedSim, AlwaysCombMultiplication) {

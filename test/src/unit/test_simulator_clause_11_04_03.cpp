@@ -10,6 +10,25 @@ using namespace delta;
 
 namespace {
 
+// Drives the runtime expression evaluator with two signed integer operands so
+// that the signed arithmetic path in production is exercised, returning the
+// evaluated result. The operands are plain signed variables; the rule under
+// test is applied by EvalExpr, not by this setup.
+Logic4Vec EvalSignedBin(SimFixture& f, TokenKind op, int64_t a, int64_t b,
+                        uint32_t width = 8) {
+  auto* va = f.ctx.CreateVariable("a", width);
+  va->value = MakeLogic4VecVal(f.arena, width, static_cast<uint64_t>(a));
+  va->value.is_signed = true;
+  va->is_signed = true;
+  auto* vb = f.ctx.CreateVariable("b", width);
+  vb->value = MakeLogic4VecVal(f.arena, width, static_cast<uint64_t>(b));
+  vb->value.is_signed = true;
+  vb->is_signed = true;
+  auto* expr =
+      MakeBinary(f.arena, op, MakeId(f.arena, "a"), MakeId(f.arena, "b"));
+  return EvalExpr(expr, f.ctx, f.arena);
+}
+
 TEST(EvalOpXZ, AddWithXPropagatesX) {
   SimFixture f;
 
@@ -413,6 +432,50 @@ TEST(EvalOp, NegativeBaseZeroExponentReturnsOne) {
                           MakeId(f.arena, "ze"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64() & 0xFF, 1u);
+}
+
+// Integer division truncates toward zero, not toward negative infinity, so a
+// negative quotient rounds up to the smaller-magnitude integer.
+TEST(EvalOp, SignedDivisionTruncatesTowardZero) {
+  SimFixture f1;
+  EXPECT_EQ(EvalSignedBin(f1, TokenKind::kSlash, -7, 2).ToUint64() & 0xFFu,
+            static_cast<uint64_t>(-3) & 0xFFu);
+  SimFixture f2;
+  EXPECT_EQ(EvalSignedBin(f2, TokenKind::kSlash, 7, -2).ToUint64() & 0xFFu,
+            static_cast<uint64_t>(-3) & 0xFFu);
+}
+
+// The modulus result carries the sign of the first operand regardless of the
+// sign of the second operand.
+TEST(EvalOp, SignedModulusTakesSignOfFirstOperand) {
+  SimFixture f1;
+  EXPECT_EQ(EvalSignedBin(f1, TokenKind::kPercent, -7, 2).ToUint64() & 0xFFu,
+            static_cast<uint64_t>(-1) & 0xFFu);
+  SimFixture f2;
+  EXPECT_EQ(EvalSignedBin(f2, TokenKind::kPercent, 7, -2).ToUint64() & 0xFFu,
+            1u);
+}
+
+// A zero base raised to a negative power yields an all-unknown result.
+TEST(EvalOp, ZeroToNegativePowerReturnsX) {
+  SimFixture f;
+  auto result = EvalSignedBin(f, TokenKind::kPower, 0, -1);
+  EXPECT_NE(result.words[0].bval, 0u);
+}
+
+// Table 11-4: a negative exponent over a nonzero base truncates the reciprocal
+// to zero unless the base magnitude is one, where the sign follows the parity
+// of the exponent.
+TEST(EvalOp, IntegralPowerNegativeExponentRuntime) {
+  SimFixture f1;
+  EXPECT_EQ(EvalSignedBin(f1, TokenKind::kPower, 2, -1).ToUint64() & 0xFFu, 0u);
+  SimFixture f2;
+  EXPECT_EQ(EvalSignedBin(f2, TokenKind::kPower, 1, -5).ToUint64() & 0xFFu, 1u);
+  SimFixture f3;
+  EXPECT_EQ(EvalSignedBin(f3, TokenKind::kPower, -1, -3).ToUint64() & 0xFFu,
+            static_cast<uint64_t>(-1) & 0xFFu);
+  SimFixture f4;
+  EXPECT_EQ(EvalSignedBin(f4, TokenKind::kPower, -1, -2).ToUint64() & 0xFFu, 1u);
 }
 
 }
