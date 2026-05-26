@@ -146,11 +146,15 @@ static uint32_t ConstLiteralWidth(const Expr* expr) {
 }
 
 static int64_t Clog2(int64_t val) {
-  if (val <= 1) return 0;
+  // The argument is treated as an unsigned value, so reinterpret the bit
+  // pattern as unsigned rather than special-casing negative inputs. An
+  // argument of 0 (or 1) yields 0.
+  uint64_t v = static_cast<uint64_t>(val);
+  if (v <= 1) return 0;
   int64_t result = 0;
-  int64_t v = val - 1;
-  while (v > 0) {
-    v >>= 1;
+  uint64_t shifted = v - 1;
+  while (shifted > 0) {
+    shifted >>= 1;
     ++result;
   }
   return result;
