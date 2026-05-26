@@ -1620,6 +1620,42 @@ void Elaborator::ValidateSpecparamInParams(const ModuleDecl* decl) {
   }
 }
 
+void Elaborator::ValidateSpecparamInDeclRange(const ModuleDecl* decl) {
+  if (specparam_names_.empty()) return;
+
+  // §6.20.5: a specify parameter is reserved for timing/delay values and may
+  // not participate in the range specification of a declaration. Flag any
+  // packed or unpacked dimension expression of a net or variable declaration
+  // that references a specparam.
+  auto check_range = [&](const Expr* range, SourceLoc loc) {
+    if (!range) return;
+    for (const auto& sp : specparam_names_) {
+      if (ExprContainsIdent(range, sp)) {
+        diag_.Error(loc,
+                    std::format("specparam '{}' may not appear in a "
+                                "declaration range specification",
+                                sp));
+        break;
+      }
+    }
+  };
+
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kNetDecl &&
+        item->kind != ModuleItemKind::kVarDecl)
+      continue;
+    check_range(item->data_type.packed_dim_left, item->loc);
+    check_range(item->data_type.packed_dim_right, item->loc);
+    for (const auto& [left, right] : item->data_type.extra_packed_dims) {
+      check_range(left, item->loc);
+      check_range(right, item->loc);
+    }
+    for (const auto* dim : item->unpacked_dims) {
+      check_range(dim, item->loc);
+    }
+  }
+}
+
 static bool ExprContainsHierRef(const Expr* e) {
   if (!e) return false;
   if (e->kind == ExprKind::kMemberAccess) return true;

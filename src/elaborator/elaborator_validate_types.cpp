@@ -30,6 +30,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateForeachLoops(decl);
   ValidateContAssignConstSelect(decl);
   ValidateSpecparamInParams(decl);
+  ValidateSpecparamInDeclRange(decl);
   ValidateEnumAssignments(decl);
   ValidateConstAssignments(decl);
   ValidateArrayAssignments(decl);

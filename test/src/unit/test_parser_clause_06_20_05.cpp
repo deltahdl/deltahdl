@@ -7,39 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SpecparamParsing, SpecparamAssignmentMintypmax) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam tDelay = 1:2:3;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SpecparamParsing, SpecparamAsModuleItem) {
-  auto r = Parse(
-      "module m;\n"
-      "  specparam delay = 10;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecparam);
-}
-
-TEST(SpecparamParsing, SpecparamAssignmentBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam tRise = 10;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST_F(SpecifyParseTest, SpecparamDeclaration) {
   auto* unit = Parse("module m; specparam tRISE = 10; endmodule");
   ASSERT_EQ(unit->modules.size(), 1u);
@@ -107,17 +74,6 @@ TEST(SpecparamParsing, SpecifyBlockWithSpecparam) {
   EXPECT_TRUE(HasSpecifyItemKind(spec, SpecifyItemKind::kPathDecl));
 }
 
-TEST(SpecparamParsing, SpecparamMultipleDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam tRISE = 100, tFALL = 200;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(SpecparamParsing, SpecifyItemSpecparamDecl) {
   auto r = Parse(
       "module m;\n"
@@ -133,15 +89,6 @@ TEST(SpecparamParsing, SpecifyItemSpecparamDecl) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kSpecparam);
 }
 
-TEST(SpecparamParsing, SpecparamBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam tRISE = 100; endspecify\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(SpecparamParsing, SpecparamPackedDim) {
   auto r = Parse(
       "module m;\n"
@@ -149,22 +96,6 @@ TEST(SpecparamParsing, SpecparamPackedDim) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SpecparamParsing, SpecparamMultipleAssignments) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam tRISE = 100, tFALL = 50; endspecify\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SpecparamParsing, SpecparamOutsideSpecify) {
-  auto r = Parse("module m; specparam tPD = 10; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecparam);
 }
 
 TEST(SpecparamParsing, SpecparamMintypmax) {
@@ -188,15 +119,6 @@ TEST(SpecparamParsing, CommaSeparatedSpecparamList) {
   auto r = Parse(
       "module m;\n"
       "  specify specparam tRISE = 100, tFALL = 50, tHOLD = 10; endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SpecparamParsing, SingleSpecparamInSpecifyBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam tRISE = 100; endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

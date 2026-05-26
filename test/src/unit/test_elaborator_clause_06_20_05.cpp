@@ -19,17 +19,6 @@ TEST(SpecparamElaboration, SpecparamReferencedByParameterIsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(SpecparamElaboration, SpecparamInModuleBodySucceeds) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top();\n"
-      "  specparam delay = 50;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(SpecparamElaboration, SpecparamCreatesVariable) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -101,6 +90,92 @@ TEST(SpecparamElaboration, SpecparamOutsideSpecifyCreatesVariable) {
   bool found = false;
   for (auto& v : mod->variables) {
     if (v.name == "tPD") {
+      found = true;
+      EXPECT_NE(v.init_expr, nullptr);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(SpecparamElaboration, AssignmentToSpecparamIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  specparam delay = 50;\n"
+      "  initial delay = 10;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(SpecparamElaboration, NonblockingAssignmentToSpecparamIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  specparam delay = 50;\n"
+      "  initial delay <= 10;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(SpecparamElaboration, SpecparamInDeclarationRangeIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  specparam width = 8;\n"
+      "  logic [width-1:0] data;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(SpecparamElaboration, ParameterInDeclarationRangeSucceeds) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top();\n"
+      "  parameter width = 8;\n"
+      "  logic [width-1:0] data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(SpecparamElaboration, SpecparamRangeWidthFromDeclaration) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  specparam [7:0] tDELAY = 5;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (auto& v : mod->variables) {
+    if (v.name == "tDELAY") {
+      found = true;
+      EXPECT_EQ(v.width, 8u);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(SpecparamElaboration, SpecparamAssignedFromParameterSucceeds) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  parameter P = 7;\n"
+      "  specparam tX = P + 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (auto& v : mod->variables) {
+    if (v.name == "tX") {
       found = true;
       EXPECT_NE(v.init_expr, nullptr);
     }

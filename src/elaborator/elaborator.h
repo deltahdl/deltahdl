@@ -311,6 +311,8 @@ class Elaborator {
 
   void ValidateSpecparamInParams(const ModuleDecl* decl);
 
+  void ValidateSpecparamInDeclRange(const ModuleDecl* decl);
+
   void ValidateValueParams(const ModuleDecl* decl, const RtlirModule* mod);
 
   void CheckAlwaysCombMultiDriver(const ModuleDecl* decl, RtlirModule* mod);
