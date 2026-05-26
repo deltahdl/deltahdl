@@ -248,9 +248,23 @@ bool ConstraintSolver::CheckAllConstraints(
 }
 
 bool ConstraintSolver::EvalImplication(const ConstraintExpr& expr) const {
-  auto it = values_.find(expr.cond_var);
-  if (it == values_.end()) return true;
-  if (it->second != expr.cond_value) return true;
+  // 18.5.5: a -> b is Boolean-equivalent to (!a || b). Evaluate the antecedent
+  // a; when it does not hold the implication imposes nothing, so the consequent
+  // variables are left unconstrained. When a holds, every constraint in the
+  // consequent b must be satisfied. Because the solver only accepts an
+  // assignment for which the whole expression evaluates true, the converse is
+  // enforced as well: if b cannot be satisfied, a must come out false.
+  bool antecedent;
+  if (expr.cond_fn) {
+    // The antecedent is an arbitrary integral/real expression.
+    antecedent = expr.cond_fn(values_);
+  } else {
+    // Short form: the antecedent is the equality cond_var == cond_value.
+    auto it = values_.find(expr.cond_var);
+    if (it == values_.end()) return true;
+    antecedent = (it->second == expr.cond_value);
+  }
+  if (!antecedent) return true;
   for (const auto& sub : expr.sub_constraints) {
     if (!EvalConstraint(sub)) return false;
   }

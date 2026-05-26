@@ -52,6 +52,12 @@ struct ConstraintExpr {
   int64_t cond_value = 0;
   std::vector<ConstraintExpr> sub_constraints;
 
+  // 18.5.5: the antecedent of an implication ("a" in a -> b) may be any
+  // integral or real expression, not only an equality test. When cond_fn is
+  // set it supplies the truth of the antecedent over the current values and
+  // takes precedence over the cond_var == cond_value short form above.
+  std::function<bool(const std::unordered_map<std::string, int64_t>&)> cond_fn;
+
   std::vector<std::string> unique_vars;
 
   ConstraintExpr* inner = nullptr;
