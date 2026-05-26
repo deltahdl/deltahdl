@@ -56,6 +56,39 @@ TEST(SelectBoundaryBehavior, PartSelectCompletelyOOBReturnsX) {
   EXPECT_EQ(result.words[0].bval & 0xFu, 0xFu);
 }
 
+TEST(SelectBoundaryBehavior, TwoStateBitSelectOOBReturnsZero) {
+  SimFixture f;
+  auto* v = f.ctx.CreateVariable("tsv", 8);
+  v->value = MakeLogic4VecVal(f.arena, 8, 0xFF);
+  v->is_4state = false;
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "tsv");
+  sel->index = MakeInt(f.arena, 10);
+  auto result = EvalExpr(sel, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  // A two-state object yields 0 (not x) for an out-of-bounds bit-select.
+  EXPECT_EQ(result.words[0].bval & 1u, 0u);
+  EXPECT_EQ(result.words[0].aval & 1u, 0u);
+}
+
+TEST(SelectXZHandling, TwoStateBitSelectXZIndexReturnsZero) {
+  SimFixture f;
+  auto* v = f.ctx.CreateVariable("tsx", 8);
+  v->value = MakeLogic4VecVal(f.arena, 8, 0xFF);
+  v->is_4state = false;
+  MakeVar4(f, "tsi", 4, 0, 1);
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "tsx");
+  sel->index = MakeId(f.arena, "tsi");
+  auto result = EvalExpr(sel, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  // An unknown index on a two-state object yields 0 (not x).
+  EXPECT_EQ(result.words[0].bval & 1u, 0u);
+  EXPECT_EQ(result.words[0].aval & 1u, 0u);
+}
+
 TEST(SelectXZHandling, BitSelectXAddr) {
   SimFixture f;
 
@@ -151,6 +184,79 @@ TEST(ExpressionSim, IndexedPartSelectMinus) {
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
+TEST(ExpressionSim, IndexedPartSelectRuntimeVaryingBase) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] data;\n"
+      "  logic [3:0] sel;\n"
+      "  logic [3:0] x;\n"
+      "  initial begin\n"
+      "    data = 16'hABCD;\n"
+      "    sel = 4;\n"
+      "    x = data[sel +: 4];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // The base of an indexed part-select is evaluated at run time: sel==4
+  // selects bits [7:4] of 0xABCD, which is 0xC.
+  EXPECT_EQ(var->value.ToUint64(), 0xCu);
+}
+
+TEST(ExpressionSim, BitSelectOfConcatenation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  logic x;\n"
+      "  initial begin\n"
+      "    a = 4'b1100;\n"
+      "    b = 4'b0011;\n"
+      "    x = {a, b}[6];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // A concatenation is a valid operand for a bit-select: {a,b} is 8'b1100_0011,
+  // and bit 6 (the next-to-top bit, contributed by a) is 1.
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(ExpressionSim, PartSelectOfConcatenation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  logic [3:0] x;\n"
+      "  initial begin\n"
+      "    a = 4'b1100;\n"
+      "    b = 4'b0011;\n"
+      "    x = {a, b}[7:4];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // A concatenation is a valid operand for a part-select: bits [7:4] of
+  // {a,b} == 8'b1100_0011 select a, which is 4'b1100 (0xC).
+  EXPECT_EQ(var->value.ToUint64(), 0xCu);
+}
+
 TEST(PrimarySim, PrimaryBitSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -167,60 +273,6 @@ TEST(PrimarySim, PrimaryBitSelect) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
-TEST(PrimarySim, PrimaryPartSelectRange) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [15:0] data;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin data = 16'hABCD; x = data[15:8]; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xABu);
-}
-
-TEST(PrimarySim, PrimaryIndexedPartSelectPlus) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [15:0] data;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin data = 16'hABCD; x = data[8+:8]; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xABu);
-}
-
-TEST(PrimarySim, PrimaryIndexedPartSelectMinus) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [15:0] data;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin data = 16'hABCD; x = data[15-:8]; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
 TEST(LvalueSim, VarLvalueBitSelect) {

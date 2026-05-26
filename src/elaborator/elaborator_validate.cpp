@@ -423,9 +423,16 @@ static void CheckScalarSelect(const Expr* e, const NameSet& scalars,
 static void CheckIndexedPartSelectWidthNode(const Expr* e, DiagEngine& diag) {
   if (!e->index_end) return;
   if (!e->is_part_select_plus && !e->is_part_select_minus) return;
-  if (!ConstEvalInt(e->index_end).has_value())
+  auto width = ConstEvalInt(e->index_end);
+  if (!width.has_value()) {
     diag.Error(e->range.start,
                "indexed part-select width must be a constant expression");
+    return;
+  }
+  // §11.5.1 requires the width of an indexed part-select to be positive.
+  if (*width <= 0)
+    diag.Error(e->range.start,
+               "indexed part-select width must be a positive constant");
 }
 
 static void CheckIndexedPartSelectWidth(const Expr* e, DiagEngine& diag) {
@@ -1603,6 +1610,138 @@ void Elaborator::ValidateContAssignConstSelect(const ModuleDecl* decl) {
                   "continuous assignment left-hand side requires a "
                   "constant select expression");
     }
+  }
+}
+
+namespace {
+
+// Reports whether an expression names any of the given run-time signals
+// (module variables or nets). A part-select bound that does so cannot be a
+// constant expression.
+bool ExprNamesSignal(const Expr* e,
+                     const std::unordered_set<std::string_view>& signals) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kIdentifier) return signals.count(e->text) > 0;
+  if (ExprNamesSignal(e->lhs, signals)) return true;
+  if (ExprNamesSignal(e->rhs, signals)) return true;
+  if (ExprNamesSignal(e->condition, signals)) return true;
+  if (ExprNamesSignal(e->true_expr, signals)) return true;
+  if (ExprNamesSignal(e->false_expr, signals)) return true;
+  if (ExprNamesSignal(e->base, signals)) return true;
+  if (ExprNamesSignal(e->index, signals)) return true;
+  if (ExprNamesSignal(e->index_end, signals)) return true;
+  if (ExprNamesSignal(e->with_expr, signals)) return true;
+  if (ExprNamesSignal(e->repeat_count, signals)) return true;
+  for (const auto* a : e->args)
+    if (ExprNamesSignal(a, signals)) return true;
+  for (const auto* el : e->elements)
+    if (ExprNamesSignal(el, signals)) return true;
+  return false;
+}
+
+struct PartSelectBoundsCtx {
+  const std::unordered_set<std::string_view>& signals;
+  // Packed vectors (no unpacked dimensions) whose declared range folds to a
+  // constant, keyed by name and mapping to (left, right) bounds.
+  const std::unordered_map<std::string_view, std::pair<int64_t, int64_t>>&
+      ranges;
+  DiagEngine& diag;
+};
+
+void CheckPartSelectBoundsExpr(const Expr* e, const PartSelectBoundsCtx& ctx) {
+  if (!e) return;
+  // Only a non-indexed part-select (vect[msb:lsb], not an indexed +:/-: form
+  // and not a plain bit-select) on a simple packed-vector reference falls under
+  // these §11.5.1 rules.
+  if (e->kind == ExprKind::kSelect && e->index && e->index_end &&
+      !e->is_part_select_plus && !e->is_part_select_minus && e->base &&
+      e->base->kind == ExprKind::kIdentifier &&
+      ctx.ranges.count(e->base->text)) {
+    if (ExprNamesSignal(e->index, ctx.signals) ||
+        ExprNamesSignal(e->index_end, ctx.signals)) {
+      ctx.diag.Error(e->range.start,
+                     "non-indexed part-select bounds shall be constant "
+                     "expressions");
+    } else {
+      auto msb = ConstEvalInt(e->index);
+      auto lsb = ConstEvalInt(e->index_end);
+      if (msb && lsb) {
+        const auto& range = ctx.ranges.at(e->base->text);
+        bool descending = range.first >= range.second;
+        // The first index shall name a more significant bit than the second.
+        // For a descending declaration the more significant bit has the larger
+        // index; for an ascending one it has the smaller index. Equal indices
+        // (a one-bit part-select) are permitted.
+        bool reversed = descending ? (*msb < *lsb) : (*msb > *lsb);
+        if (reversed)
+          ctx.diag.Error(e->range.start,
+                         "part-select's first index must address a more "
+                         "significant bit than its second index");
+      }
+    }
+  }
+  CheckPartSelectBoundsExpr(e->lhs, ctx);
+  CheckPartSelectBoundsExpr(e->rhs, ctx);
+  CheckPartSelectBoundsExpr(e->condition, ctx);
+  CheckPartSelectBoundsExpr(e->true_expr, ctx);
+  CheckPartSelectBoundsExpr(e->false_expr, ctx);
+  CheckPartSelectBoundsExpr(e->base, ctx);
+  CheckPartSelectBoundsExpr(e->index, ctx);
+  CheckPartSelectBoundsExpr(e->index_end, ctx);
+  CheckPartSelectBoundsExpr(e->with_expr, ctx);
+  CheckPartSelectBoundsExpr(e->repeat_count, ctx);
+  for (const auto* a : e->args) CheckPartSelectBoundsExpr(a, ctx);
+  for (const auto* el : e->elements) CheckPartSelectBoundsExpr(el, ctx);
+}
+
+void CheckPartSelectBoundsStmt(const Stmt* s, const PartSelectBoundsCtx& ctx) {
+  if (!s) return;
+  CheckPartSelectBoundsExpr(s->lhs, ctx);
+  CheckPartSelectBoundsExpr(s->rhs, ctx);
+  CheckPartSelectBoundsExpr(s->expr, ctx);
+  CheckPartSelectBoundsExpr(s->condition, ctx);
+  for (const auto* c : s->stmts) CheckPartSelectBoundsStmt(c, ctx);
+  CheckPartSelectBoundsStmt(s->then_branch, ctx);
+  CheckPartSelectBoundsStmt(s->else_branch, ctx);
+  CheckPartSelectBoundsStmt(s->body, ctx);
+  for (const auto* fi : s->for_inits) CheckPartSelectBoundsStmt(fi, ctx);
+  CheckPartSelectBoundsStmt(s->for_body, ctx);
+  for (const auto* fs : s->for_steps) CheckPartSelectBoundsStmt(fs, ctx);
+  CheckPartSelectBoundsExpr(s->for_cond, ctx);
+  for (const auto& ci : s->case_items)
+    CheckPartSelectBoundsStmt(ci.body, ctx);
+  for (const auto* fs : s->fork_stmts) CheckPartSelectBoundsStmt(fs, ctx);
+}
+
+}  // namespace
+
+void Elaborator::ValidatePartSelectBounds(const ModuleDecl* decl) {
+  std::unordered_set<std::string_view> signals;
+  std::unordered_map<std::string_view, std::pair<int64_t, int64_t>> ranges;
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kVarDecl &&
+        item->kind != ModuleItemKind::kNetDecl)
+      continue;
+    signals.insert(item->name);
+    // Record a range only for a plain packed vector whose bounds are constant,
+    // so the ordering check never fires on an unpacked array slice or on a
+    // parameterized range it cannot resolve.
+    if (item->unpacked_dims.empty()) {
+      auto left = ConstEvalInt(item->data_type.packed_dim_left);
+      auto right = ConstEvalInt(item->data_type.packed_dim_right);
+      if (left && right) ranges[item->name] = {*left, *right};
+    }
+  }
+  if (ranges.empty()) return;
+
+  PartSelectBoundsCtx ctx{signals, ranges, diag_};
+  for (const auto* item : decl->items) {
+    CheckPartSelectBoundsExpr(item->assign_lhs, ctx);
+    CheckPartSelectBoundsExpr(item->assign_rhs, ctx);
+    CheckPartSelectBoundsExpr(item->init_expr, ctx);
+    CheckPartSelectBoundsStmt(item->body, ctx);
+    for (const auto* s : item->func_body_stmts)
+      CheckPartSelectBoundsStmt(s, ctx);
   }
 }
 

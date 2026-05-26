@@ -302,6 +302,7 @@ class Elaborator {
   void ValidateArrayQueryOnDynamicType(const ModuleDecl* decl);
 
   void ValidateContAssignConstSelect(const ModuleDecl* decl);
+  void ValidatePartSelectBounds(const ModuleDecl* decl);
 
   void ValidateElabSystemTask(const ModuleItem* item);
 

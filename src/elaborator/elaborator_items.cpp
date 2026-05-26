@@ -670,6 +670,14 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   pd.default_value = item->init_expr;
   if (!is_type) {
     PopulateParamTypeInfo(pd, item->data_type);
+    // §11.5.1: a bit-select or part-select of a real parameter is illegal.
+    // A real parameter holds a single scalar value, so record it alongside
+    // scalar variables; any select applied to it is then rejected.
+    DataTypeKind pk = item->data_type.kind;
+    if (pk == DataTypeKind::kReal || pk == DataTypeKind::kShortreal ||
+        pk == DataTypeKind::kRealtime) {
+      scalar_var_names_.insert(item->name);
+    }
   }
 
   if (item->init_expr && item->init_expr->kind == ExprKind::kIdentifier &&

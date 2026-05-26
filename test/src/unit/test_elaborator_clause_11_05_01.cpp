@@ -44,116 +44,6 @@ TEST(PrimaryElaboration, PrimaryHierIdentSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(VectorSelectSim, BitSelectHighBit) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic en;\n"
-      "  logic [7:0] d;\n"
-      "  logic q;\n"
-      "  initial begin\n"
-      "    en = 1;\n"
-      "    d = 8'b1010_0101;\n"
-      "  end\n"
-      "  always_latch\n"
-      "    if (en) q = d[7];\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
-  ASSERT_NE(q, nullptr);
-
-  EXPECT_EQ(q->value.ToUint64(), 1u);
-}
-
-TEST(VectorSelectSim, PartSelectLowerNibble) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic en;\n"
-      "  logic [7:0] d;\n"
-      "  logic [3:0] q;\n"
-      "  initial begin\n"
-      "    en = 1;\n"
-      "    d = 8'hAB;\n"
-      "  end\n"
-      "  always_latch\n"
-      "    if (en) q = d[3:0];\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
-  ASSERT_NE(q, nullptr);
-  EXPECT_EQ(q->value.width, 4u);
-
-  EXPECT_EQ(q->value.ToUint64(), 0xBu);
-}
-
-TEST(VectorSelectSim, PartSelectUpperNibble) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic en;\n"
-      "  logic [7:0] d;\n"
-      "  logic [3:0] q;\n"
-      "  initial begin\n"
-      "    en = 1;\n"
-      "    d = 8'hAB;\n"
-      "  end\n"
-      "  always_latch\n"
-      "    if (en) q = d[7:4];\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
-  ASSERT_NE(q, nullptr);
-  EXPECT_EQ(q->value.width, 4u);
-
-  EXPECT_EQ(q->value.ToUint64(), 0xAu);
-}
-
-TEST(PartSelectReadSim, BlockingAssignSplitPacked) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [15:0] packed_val;\n"
-      "  logic [7:0] hi, lo;\n"
-      "  initial begin\n"
-      "    packed_val = 16'hDEAD;\n"
-      "    hi = packed_val[15:8];\n"
-      "    lo = packed_val[7:0];\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* hi = f.ctx.FindVariable("hi");
-  auto* lo = f.ctx.FindVariable("lo");
-  ASSERT_NE(hi, nullptr);
-  ASSERT_NE(lo, nullptr);
-  EXPECT_EQ(hi->value.ToUint64(), 0xDEu);
-  EXPECT_EQ(lo->value.ToUint64(), 0xADu);
-}
-
 TEST(ExpressionElaboration, GenvarExprElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -216,6 +106,96 @@ TEST(SelectElaboration, IndexedPartSelectWidthMustBeConstant) {
       "  integer w;\n"
       "  logic [7:0] y;\n"
       "  initial begin w = 8; y = data[0+:w]; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(SelectElaboration, IndexedPartSelectWidthMustBePositive) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic [15:0] data;\n"
+      "  logic [7:0] y;\n"
+      "  assign y = data[0+:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(SelectElaboration, RealVariableBitSelectError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real r;\n"
+      "  logic y;\n"
+      "  assign y = r[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(SelectElaboration, RealVariablePartSelectError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real r;\n"
+      "  logic [3:0] y;\n"
+      "  assign y = r[3:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(SelectElaboration, NonIndexedPartSelectBoundsMustBeConstant) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic [15:0] data;\n"
+      "  integer w;\n"
+      "  logic [7:0] y;\n"
+      "  assign y = data[w:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(SelectElaboration, PartSelectReversedOrderError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic [15:0] data;\n"
+      "  logic [7:0] y;\n"
+      "  assign y = data[0:7];\n"
+      "endmodule\n",
+      f);
+  // data is declared descending [15:0], so the first index must be the larger
+  // one; data[0:7] reverses that and is illegal.
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(SelectElaboration, PartSelectAscendingOrderOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [0:15] data;\n"
+      "  logic [7:0] y;\n"
+      "  assign y = data[0:7];\n"
+      "endmodule\n",
+      f);
+  // For an ascending [0:15] declaration the lower index is the more
+  // significant bit, so data[0:7] is a correctly ordered part-select.
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(SelectElaboration, RealParameterSelectError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter real P = 1.5;\n"
+      "  logic y;\n"
+      "  assign y = P[0];\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());

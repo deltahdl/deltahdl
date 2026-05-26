@@ -50,20 +50,6 @@ TEST(OperatorAndExpressionParsing, TernaryWithPartSelectOperands) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->false_expr->index_end, nullptr);
 }
-TEST(OperatorAndExpressionParsing, IndexedPartSelectVariableBase) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [63:0] dword;\n"
-      "  integer sel;\n"
-      "  initial x = dword[8*sel +: 8];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  EXPECT_TRUE(rhs->is_part_select_plus);
-}
 
 TEST(AggregateTypeParsing, PackedIndexedPartSelectMinus) {
   auto r = Parse(

@@ -1114,6 +1114,18 @@ static const ArrayInfo* FindRootArrayInfo(const Expr* expr, SimContext& ctx) {
              : nullptr;
 }
 
+// Reports whether the object a select reads from is four-state. An invalid
+// bit-select address yields x on a four-state object but 0 on a two-state one,
+// so the read result for an out-of-bounds or unknown index depends on this.
+static bool SelectBaseIs4State(const Expr* expr, SimContext& ctx) {
+  const Expr* root = expr->base;
+  while (root && root->kind == ExprKind::kSelect) root = root->base;
+  if (!root || root->kind != ExprKind::kIdentifier) return true;
+  if (auto* info = ctx.FindArrayInfo(root->text)) return info->is_4state;
+  if (auto* var = ctx.FindVariable(root->text)) return var->is_4state;
+  return true;
+}
+
 static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
                                   SimContext& ctx, Arena& arena,
                                   Logic4Vec& out) {
@@ -1324,7 +1336,8 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
           EvalExpr(expr->index_end, ctx, arena).ToUint64());
       return MakeAllX(arena, w > 0 ? w : 1);
     }
-    return MakeAllX(arena, 1);
+    return SelectBaseIs4State(expr, ctx) ? MakeAllX(arena, 1)
+                                         : MakeLogic4VecVal(arena, 1, 0);
   }
   uint64_t idx = idx_val.ToUint64();
   if (TryArrayElementSelect(expr, idx, ctx, arena, result)) return result;
@@ -1345,7 +1358,9 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   if (expr->index_end)
     return EvalPackedPartSelect(expr, base_val, idx, ctx, arena);
-  if (idx >= base_val.width) return MakeAllX(arena, 1);
+  if (idx >= base_val.width)
+    return SelectBaseIs4State(expr, ctx) ? MakeAllX(arena, 1)
+                                         : MakeLogic4VecVal(arena, 1, 0);
   return MakeLogic4VecVal(arena, 1, (base_val.ToUint64() >> idx) & 1);
 }
 
