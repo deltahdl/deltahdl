@@ -136,6 +136,92 @@ int64_t ConstraintSolver::DistributionSample(
   return weights.back().value;
 }
 
+GuardValue GuardAnd(GuardValue a, GuardValue b) {
+  // Figure 18-3 conjunction: a FALSE subexpression forces FALSE; otherwise an
+  // ERROR subexpression forces ERROR; otherwise a RANDOM subexpression yields
+  // RANDOM; with neither present the result is TRUE.
+  if (a == GuardValue::kFalse || b == GuardValue::kFalse)
+    return GuardValue::kFalse;
+  if (a == GuardValue::kError || b == GuardValue::kError)
+    return GuardValue::kError;
+  if (a == GuardValue::kRandom || b == GuardValue::kRandom)
+    return GuardValue::kRandom;
+  return GuardValue::kTrue;
+}
+
+GuardValue GuardOr(GuardValue a, GuardValue b) {
+  // Figure 18-3 disjunction: a TRUE subexpression forces TRUE; otherwise an
+  // ERROR subexpression forces ERROR; otherwise a RANDOM subexpression yields
+  // RANDOM; with neither present the result is FALSE.
+  if (a == GuardValue::kTrue || b == GuardValue::kTrue)
+    return GuardValue::kTrue;
+  if (a == GuardValue::kError || b == GuardValue::kError)
+    return GuardValue::kError;
+  if (a == GuardValue::kRandom || b == GuardValue::kRandom)
+    return GuardValue::kRandom;
+  return GuardValue::kFalse;
+}
+
+GuardValue GuardNot(GuardValue a) {
+  // Figure 18-3 negation: ERROR and RANDOM pass through unchanged; TRUE and
+  // FALSE are swapped.
+  switch (a) {
+    case GuardValue::kFalse:
+      return GuardValue::kTrue;
+    case GuardValue::kTrue:
+      return GuardValue::kFalse;
+    case GuardValue::kError:
+      return GuardValue::kError;
+    case GuardValue::kRandom:
+      return GuardValue::kRandom;
+  }
+  return GuardValue::kError;
+}
+
+GuardOutcome GuardFinalOutcome(GuardValue final_value) {
+  // 18.5.12: the final value of the evaluated predicate determines the outcome.
+  switch (final_value) {
+    case GuardValue::kTrue:
+      return GuardOutcome::kUnconditional;
+    case GuardValue::kFalse:
+      return GuardOutcome::kEliminated;
+    case GuardValue::kError:
+      return GuardOutcome::kError;
+    case GuardValue::kRandom:
+      return GuardOutcome::kConditional;
+  }
+  return GuardOutcome::kError;
+}
+
+GuardValue EvaluateGuard(
+    const GuardPredicate& pred,
+    const std::unordered_map<std::string, int64_t>& values) {
+  // 18.5.12: apply the operators recursively until all subexpressions are
+  // evaluated. A malformed node (a leaf without a function, a negation or a
+  // missing operand) is treated as an evaluation error.
+  switch (pred.op) {
+    case GuardPredicate::Op::kLeaf:
+      return pred.leaf_fn ? pred.leaf_fn(values) : GuardValue::kError;
+    case GuardPredicate::Op::kNot:
+      return pred.operands.empty()
+                 ? GuardValue::kError
+                 : GuardNot(EvaluateGuard(pred.operands.front(), values));
+    case GuardPredicate::Op::kAnd: {
+      GuardValue acc = GuardValue::kTrue;
+      for (const auto& operand : pred.operands)
+        acc = GuardAnd(acc, EvaluateGuard(operand, values));
+      return acc;
+    }
+    case GuardPredicate::Op::kOr: {
+      GuardValue acc = GuardValue::kFalse;
+      for (const auto& operand : pred.operands)
+        acc = GuardOr(acc, EvaluateGuard(operand, values));
+      return acc;
+    }
+  }
+  return GuardValue::kError;
+}
+
 static bool EvalRange(int64_t val, int64_t lo, int64_t hi) {
   return val >= lo && val <= hi;
 }
@@ -244,6 +330,25 @@ bool ConstraintSolver::CheckAllConstraints(
   std::vector<const ConstraintExpr*> soft;
   CollectConstraints(blocks_, extra, hard, soft);
   for (const auto* c : hard) {
+    if (c->has_guard) {
+      // 18.5.12: evaluate the guard before imposing the guarded constraint.
+      // The guard prevents the solver from generating evaluation errors on the
+      // guarded set, sifting away subexpressions that would otherwise error.
+      switch (GuardFinalOutcome(EvaluateGuard(c->guard, values_))) {
+        case GuardOutcome::kError:
+          // An ERROR guard generates an unconditional error; the constraint
+          // fails and no resampling can recover it.
+          guard_error_ = true;
+          return false;
+        case GuardOutcome::kEliminated:
+          // A FALSE guard eliminates the constraint and generates no error.
+          continue;
+        case GuardOutcome::kUnconditional:
+        case GuardOutcome::kConditional:
+          // A TRUE or RANDOM guard lets the guarded constraint be generated.
+          break;
+      }
+    }
     if (!EvalConstraint(*c)) return false;
   }
   return true;
@@ -373,8 +478,11 @@ void ConstraintSolver::ApplyDistConstraints() {
 bool ConstraintSolver::SolveIterative(
     const std::vector<ConstraintExpr>& extra) {
   static constexpr int kMaxAttempts = 500;
+  guard_error_ = false;
   for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
     if (CheckAllConstraints(extra)) return true;
+    // 18.5.12: an ERROR guard fails randomize() outright; do not retry it.
+    if (guard_error_) return false;
 
     values_.clear();
     ApplyDistConstraints();

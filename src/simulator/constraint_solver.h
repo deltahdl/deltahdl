@@ -41,6 +41,52 @@ struct DistWeight {
   uint32_t weight = 1;
 };
 
+// 18.5.12: a constraint guard is a predicate expression that gates whether a
+// constraint is created, rather than a relation the solver must satisfy. Its
+// subexpressions are evaluated in a four-state logic so that one that would
+// otherwise raise an evaluation error (a comparison against a null handle, an
+// out-of-range index) can be sifted away instead of failing randomize().
+enum class GuardValue : uint8_t {
+  kFalse,   // 0: the subexpression evaluates to false
+  kTrue,    // 1: the subexpression evaluates to true
+  kError,   // E: the subexpression causes an evaluation error
+  kRandom,  // R: the subexpression involves as-yet-unsolved random variables
+};
+
+// 18.5.12 / Figure 18-3: combine guard subexpression values under the three
+// logical operators. These reproduce the conjunction, disjunction, and
+// negation truth tables over {FALSE, TRUE, ERROR, RANDOM}.
+GuardValue GuardAnd(GuardValue a, GuardValue b);
+GuardValue GuardOr(GuardValue a, GuardValue b);
+GuardValue GuardNot(GuardValue a);
+
+// 18.5.12: the action that a fully evaluated guard imposes on its guarded set.
+enum class GuardOutcome : uint8_t {
+  kUnconditional,  // final TRUE: the guarded constraint is generated outright
+  kEliminated,     // final FALSE: the guarded constraint is dropped, no error
+  kError,          // final ERROR: an error is generated and randomize() fails
+  kConditional,    // final RANDOM: a conditional constraint is generated
+};
+
+GuardOutcome GuardFinalOutcome(GuardValue final_value);
+
+// 18.5.12: a guard predicate is a tree of subexpressions joined by the logical
+// operators. A leaf reports the four-state value of one atomic subexpression
+// over the current variable values, so it can yield kError (e.g., a null
+// handle comparison) or kRandom (the subexpression depends on a random
+// variable). The operators are applied recursively until every subexpression
+// has been evaluated.
+struct GuardPredicate {
+  enum class Op : uint8_t { kLeaf, kAnd, kOr, kNot } op = Op::kLeaf;
+  std::function<GuardValue(const std::unordered_map<std::string, int64_t>&)>
+      leaf_fn;
+  std::vector<GuardPredicate> operands;
+};
+
+GuardValue EvaluateGuard(
+    const GuardPredicate& pred,
+    const std::unordered_map<std::string, int64_t>& values);
+
 struct ConstraintExpr {
   ConstraintKind kind = ConstraintKind::kRange;
   std::string var_name;
@@ -71,6 +117,14 @@ struct ConstraintExpr {
   ConstraintExpr* inner = nullptr;
 
   std::function<bool(const std::unordered_map<std::string, int64_t>&)> eval_fn;
+
+  // 18.5.12: an optional constraint guard. When has_guard is set, the guard is
+  // evaluated before this constraint is imposed: a FALSE guard eliminates the
+  // constraint with no error, an ERROR guard makes randomize() fail, and a
+  // TRUE or RANDOM guard lets the constraint be generated (unconditionally or
+  // conditionally). Both implication (->) and if...else may serve as guards.
+  bool has_guard = false;
+  GuardPredicate guard;
 };
 
 struct ConstraintBlock {
@@ -160,6 +214,10 @@ class ConstraintSolver {
   std::unordered_map<std::string, int64_t> values_;
   RandomizeCallback pre_randomize_;
   RandomizeCallback post_randomize_;
+
+  // 18.5.12: set when a guard evaluates to ERROR. An ERROR guard generates an
+  // unconditional error, so the solve fails outright and is not retried.
+  bool guard_error_ = false;
 };
 
 }
