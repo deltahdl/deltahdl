@@ -254,6 +254,16 @@ class DeferredReportQueue {
   std::vector<PendingDeferredReport> entries_;
 };
 
+// §16.14.6.2: a process reaches a procedural assertion flush point when it
+// resumes after suspending at an event control or wait, when an always_comb or
+// always_latch process re-runs due to a dependent-signal transition, or when
+// its outermost scope is disabled. Reaching such a point flushes the pending
+// procedural concurrent assertion instances of that process. The flush-point
+// conditions coincide with the deferred case, so the FlushPointReason values
+// are shared; this predicate is the procedural-concurrent-assertion view of
+// that classification.
+bool IsProceduralAssertionFlushPoint(FlushPointReason reason);
+
 struct PendingProceduralAssertion {
   AssertionKind kind = AssertionKind::kAssert;
   std::string instance_name;
@@ -269,6 +279,11 @@ class ProceduralAssertionQueue {
   void MatureAll();
 
   void Flush();
+
+  // §16.14.6.2: at a flush point only the instances that have not yet matured
+  // are discarded; instances that already matured stay queued so they can
+  // still proceed to evaluation.
+  void FlushPending();
   uint32_t Size() const;
   uint32_t MaturedCount() const;
   const std::vector<PendingProceduralAssertion>& Entries() const {
@@ -366,6 +381,9 @@ class SvaEngine {
 
   void OnDeferredFlushPoint(std::string_view process_id,
                             FlushPointReason reason);
+
+  void OnProceduralAssertionFlushPoint(std::string_view process_id,
+                                       FlushPointReason reason);
 
   DeferredReportQueue& GetDeferredReportQueue(std::string_view process_id);
   const DeferredReportQueue* PeekDeferredReportQueue(

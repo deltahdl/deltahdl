@@ -307,6 +307,12 @@ void ProceduralAssertionQueue::Flush() {
   queue_.clear();
 }
 
+void ProceduralAssertionQueue::FlushPending() {
+  std::erase_if(queue_, [](const PendingProceduralAssertion& p) {
+    return !p.matured;
+  });
+}
+
 uint32_t ProceduralAssertionQueue::Size() const {
   return static_cast<uint32_t>(queue_.size());
 }
@@ -317,6 +323,20 @@ uint32_t ProceduralAssertionQueue::MaturedCount() const {
     if (p.matured) ++n;
   }
   return n;
+}
+
+bool IsProceduralAssertionFlushPoint(FlushPointReason reason) {
+  switch (reason) {
+    case FlushPointReason::kEventControlResume:
+    case FlushPointReason::kWaitResume:
+    case FlushPointReason::kAlwaysCombSignalDelta:
+    case FlushPointReason::kAlwaysLatchSignalDelta:
+    case FlushPointReason::kDisableOuterScope:
+      return true;
+    case FlushPointReason::kNone:
+      return false;
+  }
+  return false;
 }
 
 bool IsStaticConcurrentAssertion(bool appears_in_procedural_code) {
@@ -628,6 +648,12 @@ void SvaEngine::OnDeferredFlushPoint(std::string_view process_id,
                                      FlushPointReason reason) {
   if (!IsDeferredFlushPoint(reason)) return;
   GetDeferredReportQueue(process_id).FlushNonMatured();
+}
+
+void SvaEngine::OnProceduralAssertionFlushPoint(std::string_view process_id,
+                                                FlushPointReason reason) {
+  if (!IsProceduralAssertionFlushPoint(reason)) return;
+  GetProceduralQueue(process_id).FlushPending();
 }
 
 }
