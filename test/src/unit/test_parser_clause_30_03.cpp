@@ -16,22 +16,6 @@ TEST(SpecifyBlockDeclParsing, SpecifyBlockEmpty) {
   EXPECT_EQ(spec->specify_items.size(), 0u);
 }
 
-TEST(SpecifyBlockDeclParsing, SpecifyBlockMultipleItems) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = 5;\n"
-      "    (c => d) = 10;\n"
-      "    $setup(data, posedge clk, 3);\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 3u);
-}
-
 TEST(SpecifyBlockDeclParsing, SpecifyBlockCoexistsWithModuleItems) {
   auto r = Parse(
       "module m;\n"
@@ -111,27 +95,6 @@ TEST(SpecifyBlockDeclParsing, TimingCheckMixedWithPaths) {
   EXPECT_EQ(spec->specify_items[2]->kind, SpecifyItemKind::kPathDecl);
 }
 
-TEST_F(SpecifyTest, MixedSpecifyBlockItems) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  specparam tPD = 5;\n"
-      "  (a => b) = 5;\n"
-      "  (a *> c) = (3, 4);\n"
-      "  $setup(data, posedge clk, 10);\n"
-      "  $hold(posedge clk, data, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 5u);
-  EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kSpecparam);
-  EXPECT_EQ(spec->specify_items[1]->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(spec->specify_items[2]->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(spec->specify_items[3]->kind, SpecifyItemKind::kTimingCheck);
-  EXPECT_EQ(spec->specify_items[4]->kind, SpecifyItemKind::kTimingCheck);
-}
-
 TEST(SpecifyBlockDeclParsing, SpecifyBlockSingleItem) {
   auto r = Parse(
       "module m;\n"
@@ -179,6 +142,19 @@ TEST(SpecifyBlockDeclParsing, ErrorUnknownSpecifyItem) {
       "module m;\n"
       "  specify\n"
       "    initial x = 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// A specify_item admits system_timing_check as its only system-call form, so a
+// general system task (here $display) is not a valid specify_item and the
+// parser must reject it.
+TEST(SpecifyBlockDeclParsing, ErrorNonTimingCheckSystemTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    $display(\"hi\");\n"
       "  endspecify\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
