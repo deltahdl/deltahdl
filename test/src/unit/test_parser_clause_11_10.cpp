@@ -23,17 +23,6 @@ TEST(OperatorAndExpressionParsing, StringLiteralWideVector) {
               "endmodule\n"));
 }
 
-TEST(OperatorAndExpressionParsing, MultiCharStringLiteralInExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  bit [8*2:1] s;\n"
-      "  initial s = \"AB\";\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
-}
-
 TEST(OperatorAndExpressionParsing, StringLiteralWithArithmeticOperator) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

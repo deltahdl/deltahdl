@@ -102,11 +102,25 @@ TEST(StringLiteralExpressionsSim, StringLiteralShiftLeft) {
   EXPECT_EQ(val.ToUint64(), 0x82u);
 }
 
-TEST(StringLiteralExpressionsSim, ExactWidthNoPadding) {
+// A multi-character literal taking part in an operation is handled as one
+// numeric value formed from all of its ASCII bytes, not byte-by-byte: "AB"
+// is the 16-bit number 0x4142, so adding one yields 0x4143.
+TEST(StringLiteralExpressionsSim, MultiCharStringLiteralActsAsSingleNumber) {
+  SimFixture f;
+  auto* expr = ParseExprFrom("\"AB\" + 16'd1", f);
+  ASSERT_NE(expr, nullptr);
+  auto val = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(val.ToUint64(), 0x4143u);
+}
+
+// Left zero-padding of an oversized target must extend past a single 64-bit
+// word: a 16-bit literal stored into an 80-bit vector keeps its bytes in the
+// low word and leaves the entire upper word as padding zeros.
+TEST(StringLiteralExpressionsSim, WideVectorPaddingSpansMultipleWords) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  bit [8*2:1] s;\n"
+      "  bit [8*10:1] s;\n"
       "  initial s = \"Hi\";\n"
       "endmodule\n",
       f);
@@ -116,7 +130,10 @@ TEST(StringLiteralExpressionsSim, ExactWidthNoPadding) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("s");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0x4869u);
+  EXPECT_EQ(var->value.width, 80u);
+  ASSERT_GE(var->value.nwords, 2u);
+  EXPECT_EQ(var->value.words[0].aval, 0x4869ULL);
+  EXPECT_EQ(var->value.words[1].aval, 0ULL);
 }
 
 }
