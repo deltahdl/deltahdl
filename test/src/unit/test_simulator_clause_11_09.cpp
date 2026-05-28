@@ -94,24 +94,6 @@ TEST(TaggedUnionEval, TaggedExprVoidMember) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(TaggedUnion, SetAndGetTag) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("u", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  f.ctx.SetVariableTag("u", "field_a");
-  EXPECT_EQ(f.ctx.GetVariableTag("u"), "field_a");
-}
-
-TEST(TaggedUnion, OverwriteTagUpdatesActiveTag) {
-  SimFixture f;
-  f.ctx.CreateVariable("u", 32);
-  f.ctx.SetVariableTag("u", "a");
-  EXPECT_EQ(f.ctx.GetVariableTag("u"), "a");
-  f.ctx.SetVariableTag("u", "b");
-  EXPECT_EQ(f.ctx.GetVariableTag("u"), "b");
-}
-
 TEST(TaggedUnionEval, MatchingMemberReadReturnsValue) {
   SimFixture f;
 

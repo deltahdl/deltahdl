@@ -1,3 +1,4 @@
+#include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "parser/ast.h"
@@ -7,6 +8,56 @@
 using namespace delta;
 
 namespace {
+
+// Register a two-member tagged union type "vint" whose members both alias the
+// full 32-bit storage, mirroring the void/int VInt example.
+StructTypeInfo MakeVIntInfo() {
+  StructTypeInfo uinfo;
+  uinfo.type_name = "vint";
+  uinfo.is_union = true;
+  uinfo.is_packed = true;
+  uinfo.total_width = 32;
+  uinfo.fields.push_back({"Invalid", 0, 32, DataTypeKind::kLogic});
+  uinfo.fields.push_back({"Valid", 0, 32, DataTypeKind::kLogic});
+  return uinfo;
+}
+
+// A member may only be read through the name that matches the active tag, so
+// reading "Valid" while the tag is "Invalid" must not surrender the stored
+// bits as a valid integer; the result carries unknown bits.
+TEST(TaggedUnionReadTypeCheck, ReadMemberMismatchedWithTagIsUnknown) {
+  SimFixture f;
+  f.ctx.RegisterStructType("vint", MakeVIntInfo());
+  MakeVar(f, "u", 32, 7);
+  f.ctx.SetVariableStructType("u", "vint");
+  f.ctx.SetVariableTag("u", "Invalid");
+
+  auto* access = f.arena.Create<Expr>();
+  access->kind = ExprKind::kMemberAccess;
+  access->lhs = MakeId(f.arena, "u");
+  access->rhs = MakeId(f.arena, "Valid");
+  auto result = EvalExpr(access, f.ctx, f.arena);
+
+  ASSERT_NE(result.nwords, 0u);
+  EXPECT_NE(result.words[0].bval, 0u);
+}
+
+// Reading through the name that matches the active tag returns the stored
+// value unchanged.
+TEST(TaggedUnionReadTypeCheck, ReadMemberMatchingTagReturnsValue) {
+  SimFixture f;
+  f.ctx.RegisterStructType("vint", MakeVIntInfo());
+  MakeVar(f, "u", 32, 7);
+  f.ctx.SetVariableStructType("u", "vint");
+  f.ctx.SetVariableTag("u", "Valid");
+
+  auto* access = f.arena.Create<Expr>();
+  access->kind = ExprKind::kMemberAccess;
+  access->lhs = MakeId(f.arena, "u");
+  access->rhs = MakeId(f.arena, "Valid");
+  auto result = EvalExpr(access, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 7u);
+}
 
 TEST(TaggedUnionSimulation, ChangeTag) {
   SimFixture f;

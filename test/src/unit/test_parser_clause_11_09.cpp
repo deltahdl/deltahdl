@@ -22,4 +22,33 @@ TEST(FormalSyntaxParsing, ChainedMemberAccess) {
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
 }
 
+// tagged_union_expression ::= tagged member_identifier [ primary ]. The
+// keyword introduces a kTagged node whose member identifier is the tag name
+// and whose optional primary is the member value.
+TEST(TaggedUnionExprParsing, TaggedWithMemberValue) {
+  auto r = Parse("module m; initial x = tagged Valid (23 + 34); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTagged);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->text, "Valid");
+  EXPECT_NE(rhs->lhs, nullptr);
+}
+
+// For a void member the member value primary is omitted, so the kTagged node
+// carries only the member identifier and no value subexpression.
+TEST(TaggedUnionExprParsing, TaggedVoidMemberOmitsValue) {
+  auto r = Parse("module m; initial x = tagged Invalid; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTagged);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->text, "Invalid");
+  EXPECT_EQ(rhs->lhs, nullptr);
+}
+
 }

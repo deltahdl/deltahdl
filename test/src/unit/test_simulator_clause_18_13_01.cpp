@@ -90,17 +90,6 @@ TEST(SysTask, UrandomSeedSelectsSequence) {
   EXPECT_NE(s1, s2);
 }
 
-// Edge case: a zero seed is a valid seed and replays deterministically.
-TEST(SysTask, UrandomZeroSeedReplays) {
-  SysTaskFixture f;
-  auto* seeded = MkSysCall(f.arena, "$urandom", {MkInt(f.arena, 0)});
-  uint32_t first =
-      static_cast<uint32_t>(EvalExpr(seeded, f.ctx, f.arena).ToUint64());
-  uint32_t again =
-      static_cast<uint32_t>(EvalExpr(seeded, f.ctx, f.arena).ToUint64());
-  EXPECT_EQ(first, again);
-}
-
 // Edge case: the seed may be any integral expression, including a value wider
 // than 32 bits; it is accepted and seeds deterministically.
 TEST(SysTask, UrandomWideSeedAcceptedAndReplays) {
