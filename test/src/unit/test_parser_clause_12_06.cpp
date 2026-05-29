@@ -105,6 +105,19 @@ TEST(CaseMatchesSyntaxParsing, CaseInsideAndMatchesMutualExclusion) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §12.6 BNF: the `[ pattern ]` after `tagged member_identifier` is optional,
+// and §12.6 prose notes that the nested pattern is omitted for void members.
+TEST(CaseMatchesSyntaxParsing, TaggedVoidMemberOmitsNestedPattern) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (e matches tagged Invalid) x = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 TEST(CaseMatchesSyntaxParsing, CaseMatchesEmptyNoItems) {
   auto r = Parse(
       "module m;\n"

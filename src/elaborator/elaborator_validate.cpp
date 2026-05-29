@@ -1384,6 +1384,91 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
   }
 }
 
+// §12.6: "A constant expression pattern shall be of integral type." Real and
+// string literals are the constant expressions that are not integral.
+static bool IsNonIntegralConstantPattern(const Expr* e) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kRealLiteral) return true;
+  if (e->kind == ExprKind::kStringLiteral) return true;
+  return false;
+}
+
+static void CheckMatchesPattern(const Expr* pat, DiagEngine& diag) {
+  if (!pat) return;
+  // A `pattern &&& filter_expression` (§12.6.1) wraps the actual pattern on the
+  // left; the filter on the right is an ordinary expression, not a pattern.
+  const Expr* p = pat;
+  if (p->kind == ExprKind::kBinary && p->op == TokenKind::kAmpAmpAmp) {
+    p = p->lhs;
+  }
+  if (IsNonIntegralConstantPattern(p)) {
+    diag.Error(p->range.start,
+               "constant expression pattern shall be of integral type");
+  }
+}
+
+static void WalkExprForMatchesOp(const Expr* e, DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kBinary && e->op == TokenKind::kKwMatches) {
+    CheckMatchesPattern(e->rhs, diag);
+  }
+  WalkExprForMatchesOp(e->lhs, diag);
+  WalkExprForMatchesOp(e->rhs, diag);
+  WalkExprForMatchesOp(e->condition, diag);
+  WalkExprForMatchesOp(e->true_expr, diag);
+  WalkExprForMatchesOp(e->false_expr, diag);
+  WalkExprForMatchesOp(e->base, diag);
+  WalkExprForMatchesOp(e->index, diag);
+  WalkExprForMatchesOp(e->index_end, diag);
+  for (auto* a : e->args) WalkExprForMatchesOp(a, diag);
+  for (auto* x : e->elements) WalkExprForMatchesOp(x, diag);
+}
+
+static void WalkStmtForMatchesPattern(const Stmt* s, DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kCase && s->case_matches) {
+    for (const auto& ci : s->case_items) {
+      if (ci.is_default) continue;
+      for (const auto* pat : ci.patterns) {
+        CheckMatchesPattern(pat, diag);
+        WalkExprForMatchesOp(pat, diag);
+      }
+    }
+  }
+  if (s->condition) WalkExprForMatchesOp(s->condition, diag);
+  if (s->expr) WalkExprForMatchesOp(s->expr, diag);
+  if (s->lhs) WalkExprForMatchesOp(s->lhs, diag);
+  if (s->rhs) WalkExprForMatchesOp(s->rhs, diag);
+  if (s->for_cond) WalkExprForMatchesOp(s->for_cond, diag);
+  for (auto* sub : s->stmts) WalkStmtForMatchesPattern(sub, diag);
+  for (auto* sub : s->fork_stmts) WalkStmtForMatchesPattern(sub, diag);
+  WalkStmtForMatchesPattern(s->then_branch, diag);
+  WalkStmtForMatchesPattern(s->else_branch, diag);
+  WalkStmtForMatchesPattern(s->body, diag);
+  WalkStmtForMatchesPattern(s->for_body, diag);
+  for (auto& ci : s->case_items) WalkStmtForMatchesPattern(ci.body, diag);
+  for (auto& ri : s->randcase_items)
+    WalkStmtForMatchesPattern(ri.second, diag);
+}
+
+void Elaborator::ValidateMatchesPatternIntegral(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock ||
+        item->kind == ModuleItemKind::kFinalBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      if (item->body) WalkStmtForMatchesPattern(item->body, diag_);
+    }
+    if (item->kind == ModuleItemKind::kTaskDecl ||
+        item->kind == ModuleItemKind::kFunctionDecl) {
+      for (auto* s : item->func_body_stmts)
+        WalkStmtForMatchesPattern(s, diag_);
+    }
+  }
+}
+
 void Elaborator::ValidateMixedAssignments() {
   for (const auto& [name, loc] : cont_assign_targets_) {
     if (proc_assign_targets_.find(name) != proc_assign_targets_.end()) {

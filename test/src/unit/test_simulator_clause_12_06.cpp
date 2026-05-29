@@ -75,6 +75,28 @@ TEST(Matches, ResultAlwaysDetermined) {
   EXPECT_EQ(result.width, 1u);
 }
 
+// §12.6: even when the pattern contains x or z bits, the 1-bit result must be
+// 0 or 1 — never x or z.
+TEST(Matches, ResultDeterminedWhenPatternHasXZ) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("pv", 4);
+  var->value = MakeLogic4VecVal(f.arena, 4, 0b1010);
+  auto* expr = ParseExprFrom("pv matches 4'b1x1z", f);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_TRUE(result.IsKnown());
+  EXPECT_EQ(result.width, 1u);
+}
+
+// §12.6: result is 1-bit even when both the value and the pattern carry x/z.
+TEST(Matches, ResultDeterminedWhenValueAndPatternHaveXZ) {
+  SimFixture f;
+  MakeVar4(f, "vp", 4, 0b1010, 0b0101);
+  auto* expr = ParseExprFrom("vp matches 4'b1x1z", f);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_TRUE(result.IsKnown());
+  EXPECT_EQ(result.width, 1u);
+}
+
 TEST(Matches, TripleAmpTrue) {
   SimFixture f;
   auto* expr = ParseExprFrom("1 &&& 1", f);

@@ -297,6 +297,9 @@ class Elaborator {
 
   void ValidateMixedAssignments();
 
+  // §12.6: a constant expression pattern shall be of integral type.
+  void ValidateMatchesPatternIntegral(const ModuleDecl* decl);
+
   void ValidateProceduralNetAssign();
   void ValidateDynamicArrayNba(const ModuleDecl* decl);
   void ValidateArrayQueryOnDynamicType(const ModuleDecl* decl);
