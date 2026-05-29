@@ -48,18 +48,24 @@ TEST(IoSystemTaskParsing, SformatfInExpression) {
               "endmodule\n"));
 }
 
-TEST(IoSystemTaskParsing, SformatfMultipleArgs) {
+// §21.3.3 N1: the BNF for string_output_tasks marks the comma-prefixed
+// list_of_arguments as optional. A call carrying only the output variable
+// must still parse.
+TEST(IoSystemTaskParsing, SwriteOutputVarOnly) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  string s;\n"
-              "  initial s = $sformatf(\"a=%0d b=%0h\", 10, 20);\n"
+              "  initial $swrite(s);\n"
               "endmodule\n"));
 }
 
-TEST(IoSystemTaskParsing, SformatfUsedAsArgument) {
+// §21.3.3 N4: $sformatf's list_of_arguments is similarly optional in the BNF,
+// so a call providing just the format string must parse on its own.
+TEST(IoSystemTaskParsing, SformatfFormatOnly) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
-              "  initial $display(\"%s\", $sformatf(\"nested %d\", 7));\n"
+              "  string s;\n"
+              "  initial s = $sformatf(\"plain text\");\n"
               "endmodule\n"));
 }
 

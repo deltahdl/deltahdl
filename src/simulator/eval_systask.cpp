@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
@@ -159,15 +160,146 @@ static Logic4Vec EvalTypename(const Expr* expr, SimContext& ctx, Arena& arena) {
   return StringToLogic4Vec(arena, "logic");
 }
 
+// §21.3.3: the format argument may be a string literal or an expression whose
+// content is interpreted as the formatting string. Literal forms are taken
+// verbatim from the token text; non-literal forms have their packed-byte value
+// decoded back into a std::string here.
+static std::string ResolveFormatArg(const Expr* arg, SimContext& ctx,
+                                    Arena& arena);
+
+// §21.3.3: counts %-introduced specifiers that consume an argument value,
+// excluding %% literals and %m/%l self-supplied specifiers.
+static size_t CountConsumingSpecifiers(const std::string& fmt) {
+  size_t n = 0;
+  for (size_t i = 0; i + 1 < fmt.size(); ++i) {
+    if (fmt[i] != '%') continue;
+    char c = fmt[i + 1];
+    if (c == '%') {
+      ++i;
+      continue;
+    }
+    size_t j = i + 1;
+    while (j < fmt.size() && fmt[j] >= '0' && fmt[j] <= '9') ++j;
+    if (j >= fmt.size()) break;
+    char spec = fmt[j];
+    if (spec >= 'A' && spec <= 'Z') spec = static_cast<char>(spec - 'A' + 'a');
+    if (spec != 'm' && spec != 'l') ++n;
+    i = j;
+  }
+  return n;
+}
+
+// §21.3.3 N14: when the supplied argument count does not match the number of
+// consuming format specifiers, the application shall issue a warning and
+// continue execution.
+static void WarnIfArgCountMismatch(SimContext& ctx, std::string_view task_name,
+                                   const std::string& fmt, size_t supplied) {
+  size_t required = CountConsumingSpecifiers(fmt);
+  if (supplied == required) return;
+  std::string msg = std::string(task_name) +
+                    ": format-specifier count (" + std::to_string(required) +
+                    ") does not match supplied argument count (" +
+                    std::to_string(supplied) + ")";
+  ctx.GetDiag().Warning({}, std::move(msg));
+}
+
 static Logic4Vec EvalSformatf(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return StringToLogic4Vec(arena, "");
-  std::string fmt = ExtractFormatString(expr->args[0]);
+  // §21.3.3 N10: accept a string literal or any integral / byte-array /
+  // string-typed expression as the format argument.
+  std::string fmt = ResolveFormatArg(expr->args[0], ctx, arena);
   std::vector<Logic4Vec> arg_vals;
   for (size_t i = 1; i < expr->args.size(); ++i) {
     arg_vals.push_back(EvalExpr(expr->args[i], ctx, arena));
   }
+  WarnIfArgCountMismatch(ctx, "$sformatf", fmt, arg_vals.size());
   std::string result = FormatDisplay(fmt, arg_vals);
   return StringToLogic4Vec(arena, result);
+}
+
+// §21.3.3: shared output-string builder used by $swrite{,b,h,o} and $sformat.
+// `args` are the unevaluated argument expressions following the output
+// variable; `default_radix` is the format-specifier letter applied to any
+// bare expression argument when no embedded format string drives it.
+static std::string BuildStringTaskOutput(const std::vector<Expr*>& args,
+                                         char default_radix, SimContext& ctx,
+                                         Arena& arena) {
+  std::string out;
+  for (size_t i = 0; i < args.size(); ++i) {
+    const Expr* a = args[i];
+    if (a == nullptr) {
+      out += ' ';
+      continue;
+    }
+    if (a->kind == ExprKind::kStringLiteral) {
+      std::string fmt = ExtractFormatString(a);
+      std::vector<Logic4Vec> vals;
+      while (i + 1 < args.size() && args[i + 1] != nullptr &&
+             args[i + 1]->kind != ExprKind::kStringLiteral) {
+        vals.push_back(EvalExpr(args[++i], ctx, arena));
+      }
+      out += FormatDisplay(fmt, vals);
+      continue;
+    }
+    auto val = EvalExpr(a, ctx, arena);
+    char spec = val.is_string ? 's' : default_radix;
+    char fmt_buf[3] = {'%', spec, 0};
+    out += FormatDisplay(fmt_buf, {val});
+  }
+  return out;
+}
+
+// §21.3.3 N6: $swrite/$swriteb/$swriteh/$swriteo take an output variable as
+// the first argument and write the formatted result into it under string-
+// literal assignment-to-variable rules. The b/h/o suffix selects the default
+// radix for bare expression arguments per §21.3.2.
+static Logic4Vec EvalSwriteFamily(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, std::string_view name) {
+  if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
+  Variable* dst = nullptr;
+  if (expr->args[0] && expr->args[0]->kind == ExprKind::kIdentifier) {
+    dst = ctx.FindVariable(expr->args[0]->text);
+  }
+
+  // The suffix character ('\0' / b / h / o) becomes the default radix letter
+  // for bare expression arguments. Without a suffix, decimal is the default.
+  char default_radix = 'd';
+  if (name.size() >= 1) {
+    char back = name.back();
+    if (back == 'b' || back == 'h' || back == 'o') default_radix = back;
+  }
+
+  std::vector<Expr*> rest(expr->args.begin() + 1, expr->args.end());
+  std::string output =
+      BuildStringTaskOutput(rest, default_radix, ctx, arena);
+  if (dst) {
+    // §5.9 / §21.3.3 N7: writing via StringToLogic4Vec packs the leftmost
+    // character at the high byte position, giving left-bound to right-bound
+    // ordering across the destination's bits.
+    dst->value = StringToLogic4Vec(arena, output);
+  }
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
+// §21.3.3 N9: $sformat always interprets its second argument, and only its
+// second argument, as the format string; following arguments fill its
+// specifiers in order and are never re-interpreted as format strings.
+static Logic4Vec EvalSformatTask(const Expr* expr, SimContext& ctx,
+                                 Arena& arena) {
+  if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 1, 0);
+  Variable* dst = nullptr;
+  if (expr->args[0] && expr->args[0]->kind == ExprKind::kIdentifier) {
+    dst = ctx.FindVariable(expr->args[0]->text);
+  }
+  std::string fmt = ResolveFormatArg(expr->args[1], ctx, arena);
+  std::vector<Logic4Vec> vals;
+  for (size_t i = 2; i < expr->args.size(); ++i) {
+    vals.push_back(EvalExpr(expr->args[i], ctx, arena));
+  }
+  WarnIfArgCountMismatch(ctx, "$sformat", fmt, vals.size());
+  std::string out = FormatDisplay(fmt, vals);
+  if (dst) dst->value = StringToLogic4Vec(arena, out);
+  return MakeLogic4VecVal(arena, 1, 0);
 }
 
 static Logic4Vec EvalItor(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -764,6 +896,16 @@ static std::string EvalStringArg(const Expr* arg, SimContext& ctx,
   return result;
 }
 
+// §21.3.3 N10: a format argument may be supplied as a string literal or as
+// any expression whose packed-byte value encodes the formatting string.
+static std::string ResolveFormatArg(const Expr* arg, SimContext& ctx,
+                                    Arena& arena) {
+  if (arg && arg->kind == ExprKind::kStringLiteral) {
+    return ExtractFormatString(arg);
+  }
+  return EvalStringArg(arg, ctx, arena);
+}
+
 static Logic4Vec EvalSscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 32, 0);
   std::string input = EvalStringArg(expr->args[0], ctx, arena);
@@ -804,6 +946,14 @@ Logic4Vec EvalIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$writememh") return EvalWritemem(expr, ctx, arena, true);
   if (name == "$writememb") return EvalWritemem(expr, ctx, arena, false);
   if (name == "$sscanf") return EvalSscanf(expr, ctx, arena);
+  // §21.3.3: the $swrite family and $sformat target a variable rather than a
+  // file descriptor but otherwise mirror their $fwrite / $fdisplay
+  // counterparts.
+  if (name == "$swrite" || name == "$swriteb" || name == "$swriteh" ||
+      name == "$swriteo") {
+    return EvalSwriteFamily(expr, ctx, arena, name);
+  }
+  if (name == "$sformat") return EvalSformatTask(expr, ctx, arena);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

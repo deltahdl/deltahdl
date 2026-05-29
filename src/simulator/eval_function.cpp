@@ -461,6 +461,12 @@ static bool IsIOSysCall(std::string_view n) {
       n == "$sscanf") {
     return true;
   }
+  // §21.3.3: the variable-targeted output tasks share the IO syscall path
+  // with their $fwrite / $fdisplay counterparts.
+  if (n == "$swrite" || n == "$swriteb" || n == "$swriteh" || n == "$swriteo" ||
+      n == "$sformat") {
+    return true;
+  }
   // §21.3.2 file-output tasks: $fdisplay, $fwrite, $fstrobe, $fmonitor and
   // their b/h/o radix variants.
   for (auto base : {"$fdisplay", "$fwrite", "$fstrobe", "$fmonitor"}) {
