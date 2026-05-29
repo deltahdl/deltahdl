@@ -222,6 +222,29 @@ class AssertionApi {
   void SetAction(std::string_view name, AssertionAction action);
   AssertionAction GetAction(std::string_view name) const;
 
+  // §39.5.1 assertion system control via vpi_control(). The constant selects the
+  // system-wide operation; an empty scope models a null scope handle, meaning
+  // the control applies to all assertions regardless of scope. Returns true when
+  // the control is applied, false when it is rejected (the system is locked, or
+  // has ended and permits no further actions) or the constant is unrecognized.
+  bool SysControl(int control, std::string_view scope = {});
+
+  bool LastControlGlobal() const { return last_control_global_; }
+  bool AssertionsStarted() const { return started_; }
+  bool SysLocked() const { return locked_; }
+  bool SysEnded() const { return ended_; }
+  bool PassActionEnabled() const {
+    return vacuous_action_enabled_ && nonvacuous_action_enabled_;
+  }
+  bool FailActionEnabled() const { return fail_action_enabled_; }
+  bool VacuousActionEnabled() const { return vacuous_action_enabled_; }
+  bool NonvacuousActionEnabled() const { return nonvacuous_action_enabled_; }
+  uint32_t AttemptsInProgress() const { return attempts_in_progress_; }
+
+  // Records that an assertion attempt has begun, so that controls which discard
+  // attempts in progress have observable state to act on.
+  void NoteAttemptStarted() { ++attempts_in_progress_; }
+
  private:
   struct CbEntry {
     int reason = 0;
@@ -231,6 +254,17 @@ class AssertionApi {
   std::vector<CbEntry> callbacks_;
   std::unordered_map<std::string, AssertionSeverity> severity_map_;
   std::unordered_map<std::string, AssertionAction> action_map_;
+
+  // §39.5.1 system-wide control state. Defaults reflect the initial system
+  // state: assertions running, unlocked, not ended, all actions enabled.
+  bool started_ = true;
+  bool locked_ = false;
+  bool ended_ = false;
+  bool fail_action_enabled_ = true;
+  bool vacuous_action_enabled_ = true;
+  bool nonvacuous_action_enabled_ = true;
+  uint32_t attempts_in_progress_ = 0;
+  bool last_control_global_ = false;
 };
 
 enum class CoverageControl : uint8_t {

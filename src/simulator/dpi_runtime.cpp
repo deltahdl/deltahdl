@@ -1,10 +1,13 @@
 #include "simulator/dpi_runtime.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include "simulator/sv_vpi_user.h"
 
 namespace delta {
 
@@ -249,6 +252,84 @@ AssertionAction AssertionApi::GetAction(std::string_view name) const {
   auto it = action_map_.find(std::string(name));
   if (it == action_map_.end()) return AssertionAction::kNone;
   return it->second;
+}
+
+bool AssertionApi::SysControl(int control, std::string_view scope) {
+  // Once the system has ended, no further assertion-related actions are
+  // permitted.
+  if (ended_) return false;
+  // While locked, the status of the assertions cannot be changed; only an
+  // unlock control may proceed.
+  if (locked_ && control != vpiAssertionSysUnlock) return false;
+
+  // An empty (null) scope means the control applies to all assertions
+  // regardless of scope.
+  last_control_global_ = scope.empty();
+
+  switch (control) {
+    case vpiAssertionSysReset:
+      // Discard attempts in progress and restore the system to its initial
+      // state. Step success/failure callbacks are removed; all others remain.
+      attempts_in_progress_ = 0;
+      started_ = true;
+      fail_action_enabled_ = true;
+      vacuous_action_enabled_ = true;
+      nonvacuous_action_enabled_ = true;
+      std::erase_if(callbacks_, [](const CbEntry& e) {
+        return e.reason == cbAssertionStepSuccess ||
+               e.reason == cbAssertionStepFailure;
+      });
+      return true;
+    case vpiAssertionSysOff:
+      // Disable further starts; attempts already executing are not affected.
+      started_ = false;
+      return true;
+    case vpiAssertionSysKill:
+      // Discard attempts in progress and disable further starts.
+      attempts_in_progress_ = 0;
+      started_ = false;
+      return true;
+    case vpiAssertionSysLock:
+      locked_ = true;
+      return true;
+    case vpiAssertionSysUnlock:
+      locked_ = false;
+      return true;
+    case vpiAssertionSysOn:
+      // Restart the system so attempts resume on all assertions.
+      started_ = true;
+      return true;
+    case vpiAssertionSysEnd:
+      // Discard attempts, disable further starts, remove all installed
+      // callbacks, and permit no further actions.
+      attempts_in_progress_ = 0;
+      started_ = false;
+      ended_ = true;
+      callbacks_.clear();
+      return true;
+    case vpiAssertionSysDisablePassAction:
+      vacuous_action_enabled_ = false;
+      nonvacuous_action_enabled_ = false;
+      return true;
+    case vpiAssertionSysEnablePassAction:
+      vacuous_action_enabled_ = true;
+      nonvacuous_action_enabled_ = true;
+      return true;
+    case vpiAssertionSysDisableFailAction:
+      fail_action_enabled_ = false;
+      return true;
+    case vpiAssertionSysEnableFailAction:
+      fail_action_enabled_ = true;
+      return true;
+    case vpiAssertionSysDisableVacuousAction:
+      vacuous_action_enabled_ = false;
+      return true;
+    case vpiAssertionSysEnableNonvacuousAction:
+      nonvacuous_action_enabled_ = true;
+      return true;
+    default:
+      return false;
+  }
 }
 
 void CoverageApi::SetControl(CoverageControl ctrl) { control_ = ctrl; }

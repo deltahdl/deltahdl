@@ -242,6 +242,14 @@ using PLI_BYTE8 = char;
 #define vpiAssertionSysEnd 632
 #define vpiAssertionSysReset 633
 
+/* §39.5.1 assertion-system action-control constants */
+#define vpiAssertionSysDisablePassAction 653
+#define vpiAssertionSysEnablePassAction 654
+#define vpiAssertionSysDisableFailAction 655
+#define vpiAssertionSysEnableFailAction 656
+#define vpiAssertionSysDisableVacuousAction 657
+#define vpiAssertionSysEnableNonvacuousAction 658
+
 typedef struct t_vpi_assertion_step_info {
   PLI_INT32 matched_expression_count;
   vpiHandle* matched_exprs;
