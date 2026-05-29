@@ -42,19 +42,6 @@ TEST(SubroutineCallExprParsing, RandomizeCallWithConstraintBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConstrainedRandomParsing, RandomizeWithInlineConstraint) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  function void test();\n"
-      "    this.randomize() with { x > 0; x < 100; };\n"
-      "  endfunction\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 TEST(ConstrainedRandomParsing, RandomizeWithIdListAndConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -63,6 +50,38 @@ TEST(ConstrainedRandomParsing, RandomizeWithIdListAndConstraint) {
       "    this.randomize() with (x) { x > 0; x < y; };\n"
       "  endfunction\n"
       "endclass\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
+// 18.7 identifier_list ::= identifier { , identifier }: the parenthesized list
+// after 'with' on an object randomize may name more than one variable.
+TEST(ConstrainedRandomParsing, RandomizeWithMultiIdentifierList) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x, y, z;\n"
+      "  function void test();\n"
+      "    this.randomize() with (x, y) { x < y; y < z; };\n"
+      "  endfunction\n"
+      "endclass\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
+// 18.7 inline_constraint_declaration admits 'null' as the random-variable
+// argument of an object randomize (the `variable_identifier_list | null`
+// alternative), here combined with an inline constraint block.
+TEST(ConstrainedRandomParsing, RandomizeNullArgumentWithBlock) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "endclass\n"
+      "function void F();\n"
+      "  C obj;\n"
+      "  obj.randomize(null) with { x > 0; };\n"
+      "endfunction\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
