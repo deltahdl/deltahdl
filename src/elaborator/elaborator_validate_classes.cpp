@@ -994,6 +994,69 @@ static void CheckInterfaceHandleRandConstraintMode(
                          method_name, var_name));
 }
 
+// 18.9: the constraint named in a constraint_mode() call shall be a constraint
+// block that exists in the object's class hierarchy; naming one that does not
+// exist is a compile-time error. This applies only to the named form
+// obj.constraint_id.constraint_mode(...). The check resolves the object handle
+// to its class type; when the type cannot be resolved it stays silent, so the
+// error is reported only when the absence of the block is certain.
+static void CheckNamedConstraintModeExists(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, std::string_view>& var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  if (!s) return;
+
+  const Expr* call = nullptr;
+  if (s->kind == StmtKind::kExprStmt && s->expr) {
+    call = s->expr;
+  } else if ((s->kind == StmtKind::kBlockingAssign ||
+              s->kind == StmtKind::kNonblockingAssign) &&
+             s->rhs) {
+    call = s->rhs;
+  }
+  if (call && call->kind == ExprKind::kCast && call->lhs) call = call->lhs;
+  if (!call || call->kind != ExprKind::kCall) return;
+
+  // callee must be <object>.<constraint_id>.constraint_mode
+  const Expr* callee = call->lhs;
+  if (!callee || callee->kind != ExprKind::kMemberAccess) return;
+  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier) return;
+  if (callee->rhs->text != "constraint_mode") return;
+
+  // The named form prefixes the method with object.constraint_id, so the
+  // receiver of constraint_mode is itself a member access whose left side is a
+  // plain object handle and whose right side is the constraint name.
+  const Expr* prefix = callee->lhs;
+  if (!prefix || prefix->kind != ExprKind::kMemberAccess) return;
+  if (!prefix->lhs || prefix->lhs->kind != ExprKind::kIdentifier) return;
+  if (!prefix->rhs || prefix->rhs->kind != ExprKind::kIdentifier) return;
+
+  auto obj_name = prefix->lhs->text;
+  auto constraint_name = prefix->rhs->text;
+
+  auto it = var_types.find(obj_name);
+  if (it == var_types.end()) return;
+  const auto* cls = FindClassDecl(it->second, unit);
+  if (!cls || cls->is_interface) return;
+
+  // Walk the class and its base classes for a constraint block of that name.
+  for (const auto* c = cls; c;
+       c = c->base_class.empty() ? nullptr
+                                 : FindClassDecl(c->base_class, unit)) {
+    for (const auto* m : c->members) {
+      if (m->kind == ClassMemberKind::kConstraint &&
+          m->name == constraint_name) {
+        return;
+      }
+    }
+  }
+
+  diag.Error(prefix->rhs->range.start,
+             std::format("constraint '{}' does not exist in the hierarchy of "
+                         "class '{}'",
+                         constraint_name, it->second));
+}
+
 void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
   if (!s) return;
 
@@ -1061,6 +1124,8 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
   }
 
   CheckInterfaceHandleRandConstraintMode(s, class_var_types_, unit_, diag_);
+
+  CheckNamedConstraintModeExists(s, class_var_types_, unit_, diag_);
 
   CheckClassHandleExpr(s->rhs, class_var_names_, class_var_types_, unit_,
                        diag_);
@@ -2848,6 +2913,13 @@ void Elaborator::ValidateOneClassBuiltinMethods(const ClassDecl* cls) {
     if (m->name == "rand_mode") {
       diag_.Error(m->loc,
                   "'rand_mode' is a built-in method and cannot be overridden");
+    }
+    // 18.9: constraint_mode() is likewise a built-in method that a class may
+    // not redefine.
+    if (m->name == "constraint_mode") {
+      diag_.Error(
+          m->loc,
+          "'constraint_mode' is a built-in method and cannot be overridden");
     }
   }
 }
