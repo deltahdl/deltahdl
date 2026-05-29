@@ -97,6 +97,36 @@ TEST(DpiGlobalNameParsing, ExportEscapedGlobalNameOfKeywordIsRecorded) {
   EXPECT_EQ(item->name, "sv_local");
 }
 
+// §35.4: a global name may start with either a letter or an underscore.
+// The letter-start case is observed by the explicit-global-name tests
+// above; here the underscore-start case takes the other half of that rule
+// and walks the linkage-name path with characters that exercise both kinds
+// of continuation (alphanumerics and underscores).
+TEST(DpiGlobalNameParsing, ImportGlobalNameStartingWithUnderscoreAccepted) {
+  auto r = Parse(R"(
+    module m;
+      import "DPI-C" _legal_42 = function void sv_local();
+    endmodule
+  )");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->dpi_c_name, "_legal_42");
+}
+
+// §35.4: after the first character a global name may contain only
+// alphanumerics and underscores. A '$' is legal in a SystemVerilog
+// identifier but not in a C identifier, so it must be rejected when
+// supplied as the linkage name.
+TEST(DpiGlobalNameParsing, ImportGlobalNameWithDollarRejected) {
+  auto r = Parse(R"(
+    module m;
+      import "DPI-C" foo$bar = function void sv_local();
+    endmodule
+  )");
+  EXPECT_TRUE(r.has_errors);
+}
+
 // §35.4: "After this stripping, the linkage identifier so formed shall comply
 // with the normal rules for C identifier construction." A name whose first
 // character is a digit fails the C rule even though escaping made it lexable
