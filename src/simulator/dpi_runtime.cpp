@@ -332,6 +332,200 @@ bool AssertionApi::SysControl(int control, std::string_view scope) {
   }
 }
 
+bool AssertionApi::IsAssertionStatementHandle(int vpi_type) {
+  // Assert/assume/cover statements (immediate or concurrent) are the only
+  // handles these per-assertion controls accept. Sequence and property
+  // instances are not valid targets.
+  switch (vpi_type) {
+    case vpiAssert:
+    case vpiAssume:
+    case vpiCover:
+    case vpiImmediateAssert:
+    case vpiImmediateAssume:
+    case vpiImmediateCover:
+      return true;
+    default:
+      return false;
+  }
+}
+
+AssertionApi::AssertionControlState& AssertionApi::StateFor(
+    std::string_view assertion) {
+  return assertion_state_[std::string(assertion)];
+}
+
+const AssertionApi::AssertionControlState* AssertionApi::FindState(
+    std::string_view assertion) const {
+  auto it = assertion_state_.find(std::string(assertion));
+  return it == assertion_state_.end() ? nullptr : &it->second;
+}
+
+bool AssertionApi::Control(int control, std::string_view assertion) {
+  // The second argument shall be a valid assertion handle.
+  if (assertion.empty()) return false;
+  AssertionControlState& s = StateFor(assertion);
+  // While locked, the status of the assertion cannot be changed without first
+  // unlocking it.
+  if (s.locked && control != vpiAssertionUnlock) return false;
+
+  switch (control) {
+    case vpiAssertionReset:
+      // Discard all attempts in progress for this assertion (which also clears
+      // their per-attempt stepping) and restore it to its initial state.
+      s.attempts.clear();
+      s.enabled = true;
+      s.fail_action_enabled = true;
+      s.vacuous_action_enabled = true;
+      s.nonvacuous_action_enabled = true;
+      return true;
+    case vpiAssertionLock:
+      s.locked = true;
+      return true;
+    case vpiAssertionUnlock:
+      s.locked = false;
+      return true;
+    case vpiAssertionDisable:
+      // Disable the starting of new attempts; existing attempts are unaffected.
+      s.enabled = false;
+      return true;
+    case vpiAssertionEnable:
+      s.enabled = true;
+      return true;
+    case vpiAssertionDisablePassAction:
+      // Pass action covers both vacuous and nonvacuous success.
+      s.vacuous_action_enabled = false;
+      s.nonvacuous_action_enabled = false;
+      return true;
+    case vpiAssertionEnablePassAction:
+      s.vacuous_action_enabled = true;
+      s.nonvacuous_action_enabled = true;
+      return true;
+    case vpiAssertionDisableFailAction:
+      s.fail_action_enabled = false;
+      return true;
+    case vpiAssertionEnableFailAction:
+      s.fail_action_enabled = true;
+      return true;
+    case vpiAssertionDisableVacuousAction:
+      s.vacuous_action_enabled = false;
+      return true;
+    case vpiAssertionEnableNonvacuousAction:
+      s.nonvacuous_action_enabled = true;
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool AssertionApi::ControlAttempt(int control, std::string_view assertion,
+                                  uint64_t attempt_start_time) {
+  if (assertion.empty()) return false;
+  AssertionControlState& s = StateFor(assertion);
+  if (s.locked && control != vpiAssertionUnlock) return false;
+
+  switch (control) {
+    case vpiAssertionKill:
+      // Discard the given attempt (identified by its start time); the assertion
+      // stays enabled and no state used by it (e.g., past() sampling) is reset.
+      s.attempts.erase(attempt_start_time);
+      return true;
+    case vpiAssertionDisableStep: {
+      // Disable step callbacks for the given attempt; no effect (idempotent)
+      // when that attempt is not stepping or has no entry.
+      auto it = s.attempts.find(attempt_start_time);
+      if (it != s.attempts.end()) it->second.step_enabled = false;
+      return true;
+    }
+    default:
+      return false;
+  }
+}
+
+bool AssertionApi::ControlStep(int control, std::string_view assertion,
+                               uint64_t attempt_start_time, int step_control) {
+  if (assertion.empty()) return false;
+  // The fourth argument shall be a step control constant.
+  if (step_control != vpiAssertionClockSteps) return false;
+  AssertionControlState& s = StateFor(assertion);
+  if (s.locked && control != vpiAssertionUnlock) return false;
+
+  switch (control) {
+    case vpiAssertionEnableStep: {
+      // Enable step callbacks for the given assertion attempt; stepping is
+      // disabled by default for every attempt. The stepping mode can only be
+      // set before the attempt has started: once it is in progress its mode is
+      // frozen, so a later enable is accepted but has no effect.
+      AttemptControlState& att = s.attempts[attempt_start_time];
+      if (!att.started) att.step_enabled = true;
+      return true;
+    }
+    default:
+      return false;
+  }
+}
+
+bool AssertionApi::AssertionEnabled(std::string_view assertion) const {
+  const AssertionControlState* s = FindState(assertion);
+  return s ? s->enabled : true;
+}
+
+bool AssertionApi::AssertionLocked(std::string_view assertion) const {
+  const AssertionControlState* s = FindState(assertion);
+  return s ? s->locked : false;
+}
+
+bool AssertionApi::AssertionPassActionEnabled(std::string_view assertion) const {
+  const AssertionControlState* s = FindState(assertion);
+  if (!s) return true;
+  return s->vacuous_action_enabled && s->nonvacuous_action_enabled;
+}
+
+bool AssertionApi::AssertionFailActionEnabled(std::string_view assertion) const {
+  const AssertionControlState* s = FindState(assertion);
+  return s ? s->fail_action_enabled : true;
+}
+
+bool AssertionApi::AssertionVacuousActionEnabled(
+    std::string_view assertion) const {
+  const AssertionControlState* s = FindState(assertion);
+  return s ? s->vacuous_action_enabled : true;
+}
+
+bool AssertionApi::AssertionNonvacuousActionEnabled(
+    std::string_view assertion) const {
+  const AssertionControlState* s = FindState(assertion);
+  return s ? s->nonvacuous_action_enabled : true;
+}
+
+bool AssertionApi::AssertionStepEnabled(std::string_view assertion,
+                                        uint64_t attempt_start_time) const {
+  const AssertionControlState* s = FindState(assertion);
+  if (!s) return false;
+  auto it = s->attempts.find(attempt_start_time);
+  return it != s->attempts.end() && it->second.step_enabled;
+}
+
+uint32_t AssertionApi::AssertionAttemptsInProgress(
+    std::string_view assertion) const {
+  const AssertionControlState* s = FindState(assertion);
+  if (!s) return 0;
+  // Only attempts that have actually started count as in progress; an entry may
+  // exist solely to hold a pre-start stepping configuration.
+  uint32_t count = 0;
+  for (const auto& [time, att] : s->attempts) {
+    if (att.started) ++count;
+  }
+  return count;
+}
+
+void AssertionApi::NoteAssertionAttemptStarted(std::string_view assertion,
+                                               uint64_t attempt_start_time) {
+  if (assertion.empty()) return;
+  // Mark the attempt started, preserving any stepping enabled for it ahead of
+  // time. A brand-new entry has stepping disabled by default.
+  StateFor(assertion).attempts[attempt_start_time].started = true;
+}
+
 void CoverageApi::SetControl(CoverageControl ctrl) { control_ = ctrl; }
 CoverageControl CoverageApi::GetControl() const { return control_; }
 

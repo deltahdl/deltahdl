@@ -229,6 +229,48 @@ class AssertionApi {
   // has ended and permits no further actions) or the constant is unrecognized.
   bool SysControl(int control, std::string_view scope = {});
 
+  // §39.5.2 per-assertion control via vpi_control(). These controls target a
+  // single assertion statement, identified here by its name (modeling the
+  // assertion handle that is the second argument). Only assertion statement
+  // handles are valid; sequence and property instances are not, which callers
+  // screen with IsAssertionStatementHandle().
+  static bool IsAssertionStatementHandle(int vpi_type);
+
+  // Controls whose only argument is the assertion handle: reset, lock, unlock,
+  // enable/disable, and the pass/fail/vacuous action toggles. Returns true when
+  // applied, false for an empty (invalid) handle, a locked assertion (except
+  // unlock), or an unrecognized control.
+  bool Control(int control, std::string_view assertion);
+
+  // Controls whose arguments are the assertion handle and an attempt start time:
+  // kill (discards the given attempt) and disable step.
+  bool ControlAttempt(int control, std::string_view assertion,
+                      uint64_t attempt_start_time);
+
+  // Enable-step control: assertion handle, attempt start time, and a step
+  // control constant. The fourth argument shall be a valid step control
+  // constant (vpiAssertionClockSteps); otherwise the control is rejected.
+  bool ControlStep(int control, std::string_view assertion,
+                   uint64_t attempt_start_time, int step_control);
+
+  bool AssertionEnabled(std::string_view assertion) const;
+  bool AssertionLocked(std::string_view assertion) const;
+  bool AssertionPassActionEnabled(std::string_view assertion) const;
+  bool AssertionFailActionEnabled(std::string_view assertion) const;
+  bool AssertionVacuousActionEnabled(std::string_view assertion) const;
+  bool AssertionNonvacuousActionEnabled(std::string_view assertion) const;
+  // Stepping is per attempt: the attempt is identified by its start time, the
+  // same value supplied as the third argument to the step controls.
+  bool AssertionStepEnabled(std::string_view assertion,
+                            uint64_t attempt_start_time) const;
+  uint32_t AssertionAttemptsInProgress(std::string_view assertion) const;
+
+  // Records that an attempt for the named assertion, identified by its start
+  // time, has begun, so controls that target a specific attempt have observable
+  // state to act on.
+  void NoteAssertionAttemptStarted(std::string_view assertion,
+                                   uint64_t attempt_start_time);
+
   bool LastControlGlobal() const { return last_control_global_; }
   bool AssertionsStarted() const { return started_; }
   bool SysLocked() const { return locked_; }
@@ -265,6 +307,27 @@ class AssertionApi {
   bool nonvacuous_action_enabled_ = true;
   uint32_t attempts_in_progress_ = 0;
   bool last_control_global_ = false;
+
+  // §39.5.2 per-assertion control state. Defaults reflect each assertion's
+  // initial state: enabled, unlocked, all actions enabled. Attempts are keyed by
+  // their start time; stepping is disabled by default per attempt. An entry may
+  // exist before its attempt has started (stepping configured ahead of time);
+  // once started, its stepping mode is frozen.
+  struct AttemptControlState {
+    bool started = false;
+    bool step_enabled = false;
+  };
+  struct AssertionControlState {
+    bool enabled = true;
+    bool locked = false;
+    bool fail_action_enabled = true;
+    bool vacuous_action_enabled = true;
+    bool nonvacuous_action_enabled = true;
+    std::unordered_map<uint64_t, AttemptControlState> attempts;
+  };
+  std::unordered_map<std::string, AssertionControlState> assertion_state_;
+  AssertionControlState& StateFor(std::string_view assertion);
+  const AssertionControlState* FindState(std::string_view assertion) const;
 };
 
 enum class CoverageControl : uint8_t {

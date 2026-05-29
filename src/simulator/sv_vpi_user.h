@@ -242,6 +242,14 @@ using PLI_BYTE8 = char;
 #define vpiAssertionSysEnd 632
 #define vpiAssertionSysReset 633
 
+/* §39.5.2 per-assertion action-control constants */
+#define vpiAssertionDisablePassAction 647
+#define vpiAssertionEnablePassAction 648
+#define vpiAssertionDisableFailAction 649
+#define vpiAssertionEnableFailAction 650
+#define vpiAssertionDisableVacuousAction 651
+#define vpiAssertionEnableNonvacuousAction 652
+
 /* §39.5.1 assertion-system action-control constants */
 #define vpiAssertionSysDisablePassAction 653
 #define vpiAssertionSysEnablePassAction 654
