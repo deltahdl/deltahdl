@@ -147,8 +147,8 @@ add_unit_test(test_elaborator_clause_06_22_04)
 add_unit_test(test_elaborator_clause_06_22_05)
 add_unit_test(test_elaborator_clause_06_23)
 add_unit_test(test_elaborator_clause_06_24_01)
-
-
+add_unit_test(test_elaborator_clause_06_24_02)
+add_unit_test(test_elaborator_clause_06_24_03)
 add_unit_test(test_elaborator_clause_06_25)
 add_unit_test(test_elaborator_clause_07_02)
 add_unit_test(test_elaborator_clause_07_02_01)

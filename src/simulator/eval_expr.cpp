@@ -399,21 +399,59 @@ static double ExtractDouble(const Logic4Vec& vec) {
   return d;
 }
 
+// §6.24.3: packs the elements of a bit-stream source into a single packed
+// value. The first element (index 0 of a fixed unpacked, dynamic, or queue
+// array) takes the most significant bit positions of the result. The aval
+// and bval (4-state mask) are propagated independently so a source carrying
+// any X or Z bit yields a 4-state packed value.
 static Logic4Vec PackArrayBitStream(std::string_view name,
                                     const ArrayInfo& info, SimContext& ctx,
                                     Arena& arena) {
-  uint32_t total_bits = info.size * info.elem_width;
-  uint64_t packed = 0;
-  for (uint32_t i = 0; i < info.size; ++i) {
-    uint32_t idx = info.lo + i;
-    auto elem_name = std::string(name) + "[" + std::to_string(idx) + "]";
-    auto* elem = ctx.FindVariable(elem_name);
-    if (!elem) continue;
-    uint64_t ev = elem->value.ToUint64();
-    uint32_t shift = total_bits - (i + 1) * info.elem_width;
-    packed |= (ev & ((uint64_t{1} << info.elem_width) - 1)) << shift;
+  uint32_t elem_count = info.size;
+  if (info.is_queue) {
+    if (auto* q = ctx.FindQueue(name)) {
+      elem_count = static_cast<uint32_t>(q->elements.size());
+    }
   }
-  return MakeLogic4VecVal(arena, total_bits, packed);
+  uint32_t total_bits = elem_count * info.elem_width;
+  uint64_t packed_a = 0;
+  uint64_t packed_b = 0;
+  uint32_t elem_mask =
+      info.elem_width >= 64 ? ~uint32_t{0} : (uint32_t{1} << info.elem_width) - 1;
+  auto append_elem = [&](uint64_t aval, uint64_t bval, uint32_t i) {
+    uint32_t shift = total_bits - (i + 1) * info.elem_width;
+    packed_a |= (aval & elem_mask) << shift;
+    packed_b |= (bval & elem_mask) << shift;
+  };
+  if (info.is_queue) {
+    auto* q = ctx.FindQueue(name);
+    if (q) {
+      for (uint32_t i = 0; i < elem_count; ++i) {
+        const auto& v = q->elements[i];
+        uint64_t aval = v.nwords > 0 ? v.words[0].aval : 0;
+        uint64_t bval = v.nwords > 0 ? v.words[0].bval : 0;
+        append_elem(aval, bval, i);
+      }
+    }
+  } else {
+    for (uint32_t i = 0; i < elem_count; ++i) {
+      uint32_t idx = info.lo + i;
+      auto elem_name = std::string(name) + "[" + std::to_string(idx) + "]";
+      auto* elem = ctx.FindVariable(elem_name);
+      if (!elem) continue;
+      uint64_t aval = elem->value.nwords > 0 ? elem->value.words[0].aval : 0;
+      uint64_t bval = elem->value.nwords > 0 ? elem->value.words[0].bval : 0;
+      append_elem(aval, bval, i);
+    }
+  }
+  auto vec = MakeLogic4Vec(arena, total_bits);
+  if (vec.nwords > 0) {
+    uint64_t width_mask =
+        total_bits >= 64 ? ~uint64_t{0} : (uint64_t{1} << total_bits) - 1;
+    vec.words[0].aval = packed_a & width_mask;
+    vec.words[0].bval = packed_b & width_mask;
+  }
+  return vec;
 }
 
 static Logic4Vec CastRealConversion(const Logic4Vec& inner,
@@ -447,12 +485,24 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   if (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier) {
     auto* arr_info = ctx.FindArrayInfo(expr->lhs->text);
-    if (arr_info && arr_info->size > 0) {
+    bool source_present =
+        arr_info && (arr_info->size > 0 || arr_info->is_queue ||
+                     arr_info->is_dynamic);
+    if (source_present) {
       auto inner = PackArrayBitStream(expr->lhs->text, *arr_info, ctx, arena);
       uint32_t target_width = ResolveCastWidth(expr->text, ctx);
-      uint64_t val = inner.ToUint64();
-      if (target_width < 64) val &= (uint64_t{1} << target_width) - 1;
-      return MakeLogic4VecVal(arena, target_width, val);
+      // §6.24.3: width-mask the packed bit-stream into the destination, but
+      // carry forward both halves of the 4-state encoding so any X/Z in the
+      // source propagates into the result.
+      auto result = MakeLogic4Vec(arena, target_width);
+      if (result.nwords > 0 && inner.nwords > 0) {
+        uint64_t width_mask = target_width >= 64
+                                  ? ~uint64_t{0}
+                                  : (uint64_t{1} << target_width) - 1;
+        result.words[0].aval = inner.words[0].aval & width_mask;
+        result.words[0].bval = inner.words[0].bval & width_mask;
+      }
+      return result;
     }
   }
   auto inner = EvalExpr(expr->lhs, ctx, arena);

@@ -529,6 +529,14 @@ class Elaborator {
   void WalkExprForStreamingContext(const Expr* expr, bool is_valid_context);
   void WalkStmtsForStreamingContext(const Stmt* s);
 
+  // §6.24.3: enforces the destination/source/size constraints on a bit-stream
+  // cast. Walks every expression in a module and rejects illegal forms before
+  // the simulator ever sees them.
+  void ValidateBitStreamCast(const ModuleDecl* decl);
+  void WalkExprForBitStreamCast(const Expr* expr);
+  void WalkStmtsForBitStreamCast(const Stmt* s);
+  void CheckBitStreamCastExpr(const Expr* expr);
+
   void ValidateScopeRules(const ModuleDecl* decl);
 
   void ValidateHierRefIntoChecker(const ModuleDecl* decl);
@@ -621,6 +629,16 @@ class Elaborator {
   // resolution rules apply (§33.4.1.5).
   bool in_config_elaboration_ = false;
   TypedefMap typedefs_;
+  // §6.24.3: names of typedefs whose unpacked dimensions designate an
+  // associative array. A bit-stream cast must reject any such typedef as a
+  // destination type.
+  std::unordered_set<std::string_view> assoc_typedef_names_;
+  // §6.24.3: total bit width of a typedef whose unpacked dimensions are all
+  // fixed-size (no dynamic, queue, or associative dims). Used to detect
+  // fixed-size mismatch when the destination of a bit-stream cast is an
+  // unpacked-array typedef.
+  std::unordered_map<std::string_view, uint32_t>
+      fixed_unpacked_typedef_widths_;
   std::unordered_set<std::string_view> cu_scope_names_;
   ScopeMap cu_param_scope_;
 

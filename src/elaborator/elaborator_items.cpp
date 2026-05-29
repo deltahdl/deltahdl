@@ -962,6 +962,56 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
                             item->name, kind_name(it->second)));
   }
   typedefs_[item->name] = item->typedef_type;
+  // §6.24.3: track typedefs whose first unpacked dimension is an associative
+  // index, so the bit-stream cast validator can reject them as destinations.
+  bool first_dim_assoc = false;
+  if (!item->unpacked_dims.empty() && item->unpacked_dims[0] &&
+      item->unpacked_dims[0]->kind == ExprKind::kIdentifier) {
+    auto t = item->unpacked_dims[0]->text;
+    if (t == "string" || t == "int" || t == "integer" || t == "byte" ||
+        t == "shortint" || t == "longint" || t == "*") {
+      assoc_typedef_names_.insert(item->name);
+      first_dim_assoc = true;
+    } else if (typedefs_.count(t) > 0 || class_names_.count(t) > 0) {
+      assoc_typedef_names_.insert(item->name);
+      first_dim_assoc = true;
+    }
+  }
+  // §6.24.3: when every unpacked dimension is a fixed integer size (no
+  // dynamic, queue, or associative dim), the typedef has a known total bit
+  // width that the bit-stream cast validator can compare against a source.
+  if (!item->unpacked_dims.empty() && !first_dim_assoc) {
+    uint32_t elem_width = EvalTypeWidth(item->typedef_type, typedefs_);
+    uint64_t total = elem_width;
+    bool all_fixed = (elem_width > 0);
+    for (auto* dim : item->unpacked_dims) {
+      if (!dim) { all_fixed = false; break; }
+      if (dim->kind == ExprKind::kIdentifier) {
+        auto t = dim->text;
+        if (t == "$" || t == "*" || t == "string" || t == "int" ||
+            t == "integer" || t == "byte" || t == "shortint" ||
+            t == "longint") {
+          all_fixed = false;
+          break;
+        }
+      }
+      if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+        auto lv = ConstEvalInt(dim->lhs);
+        auto rv = ConstEvalInt(dim->rhs);
+        if (!lv || !rv) { all_fixed = false; break; }
+        int64_t span = std::abs(*lv - *rv) + 1;
+        total *= static_cast<uint64_t>(span);
+      } else {
+        auto sv = ConstEvalInt(dim);
+        if (!sv || *sv <= 0) { all_fixed = false; break; }
+        total *= static_cast<uint64_t>(*sv);
+      }
+    }
+    if (all_fixed && total > 0 && total < uint64_t{1} << 32) {
+      fixed_unpacked_typedef_widths_[item->name] =
+          static_cast<uint32_t>(total);
+    }
+  }
   if (item->typedef_type.kind == DataTypeKind::kStruct ||
       item->typedef_type.kind == DataTypeKind::kUnion) {
     ValidatePackedStructDefaults(item->typedef_type, item->loc);

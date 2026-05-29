@@ -1345,6 +1345,154 @@ void Elaborator::ValidateStreamingConcatContext(const ModuleDecl* decl) {
   }
 }
 
+// §6.24.3: a class is illegal as a bit-stream-cast source when it exposes any
+// local or protected member, except when the source handle is the keyword
+// `this` (the current instance retains private access).
+static bool ClassHasHiddenMember(const ClassDecl* cls) {
+  if (!cls) return false;
+  for (const auto* m : cls->members) {
+    if (m && (m->is_local || m->is_protected)) return true;
+  }
+  return false;
+}
+
+static uint32_t CastTargetSimpleWidth(std::string_view t) {
+  if (t == "byte") return 8;
+  if (t == "shortint") return 16;
+  if (t == "int" || t == "integer") return 32;
+  if (t == "longint") return 64;
+  if (t == "bit" || t == "logic" || t == "reg") return 1;
+  return 0;
+}
+
+void Elaborator::CheckBitStreamCastExpr(const Expr* expr) {
+  if (!expr || expr->kind != ExprKind::kCast) return;
+  auto target = expr->text;
+  if (target.empty()) return;
+
+  // §6.24.3: an associative array type shall be illegal as a destination type
+  // for a bit-stream cast.
+  if (assoc_typedef_names_.count(target) > 0) {
+    diag_.Error(expr->range.start,
+                std::format("associative array type '{}' is illegal as a "
+                            "bit-stream cast destination",
+                            target));
+    return;
+  }
+
+  // §6.24.3: a class handle whose class exposes local or protected members
+  // shall be illegal as a source type, except when the handle is the current
+  // instance `this`. The rule applies to a bit-stream cast, i.e., when the
+  // destination is not itself a class type.
+  if (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier &&
+      expr->lhs->text != "this" && class_names_.count(target) == 0) {
+    auto it = class_var_types_.find(expr->lhs->text);
+    if (it != class_var_types_.end()) {
+      const auto* cls = FindClassDecl(it->second, unit_);
+      if (ClassHasHiddenMember(cls)) {
+        diag_.Error(expr->range.start,
+                    std::format("class handle '{}' is illegal as a bit-stream "
+                                "cast source: its class has local or "
+                                "protected members",
+                                expr->lhs->text));
+        return;
+      }
+    }
+  }
+
+  // §6.24.3: when both source and destination are fixed-size types of
+  // different sizes and either is unpacked, the cast generates a compile-time
+  // error. Two paths are checked: the operand is an unpacked-array variable,
+  // or the destination is an unpacked-array typedef. Dynamic-size cases are
+  // left to the simulator since their sizes are not known until runtime.
+  if (!expr->lhs) return;
+
+  auto dst_unpacked_it = fixed_unpacked_typedef_widths_.find(target);
+  if (dst_unpacked_it != fixed_unpacked_typedef_widths_.end()) {
+    uint32_t src_width = InferExprWidth(expr->lhs, typedefs_);
+    if (src_width > 0 && src_width != dst_unpacked_it->second) {
+      diag_.Error(expr->range.start,
+                  std::format("bit-stream cast between fixed-size types of "
+                              "different sizes ({} bits to {} bits) with an "
+                              "unpacked destination is illegal",
+                              src_width, dst_unpacked_it->second));
+      return;
+    }
+  }
+
+  if (expr->lhs->kind != ExprKind::kIdentifier) return;
+  auto src_name = expr->lhs->text;
+  auto var_it = var_array_info_.find(src_name);
+  if (var_it == var_array_info_.end()) return;
+  const auto& info = var_it->second;
+  if (info.is_dynamic || info.is_assoc) return;
+  if (info.unpacked_size == 0 || info.elem_width == 0) return;
+  uint32_t src_width = info.unpacked_size * info.elem_width;
+
+  uint32_t dst_width = CastTargetSimpleWidth(target);
+  if (dst_width == 0) {
+    auto td = typedefs_.find(target);
+    if (td != typedefs_.end()) dst_width = EvalTypeWidth(td->second, typedefs_);
+  }
+  if (dst_width == 0) return;
+  if (src_width == dst_width) return;
+  diag_.Error(expr->range.start,
+              std::format("bit-stream cast between fixed-size types of "
+                          "different sizes ({} bits to {} bits) with an "
+                          "unpacked operand is illegal",
+                          src_width, dst_width));
+}
+
+void Elaborator::WalkExprForBitStreamCast(const Expr* expr) {
+  if (!expr) return;
+  CheckBitStreamCastExpr(expr);
+  WalkExprForBitStreamCast(expr->lhs);
+  WalkExprForBitStreamCast(expr->rhs);
+  WalkExprForBitStreamCast(expr->base);
+  WalkExprForBitStreamCast(expr->index);
+  WalkExprForBitStreamCast(expr->index_end);
+  WalkExprForBitStreamCast(expr->condition);
+  WalkExprForBitStreamCast(expr->true_expr);
+  WalkExprForBitStreamCast(expr->false_expr);
+  for (const auto* elem : expr->elements) WalkExprForBitStreamCast(elem);
+  for (const auto* arg : expr->args) WalkExprForBitStreamCast(arg);
+}
+
+void Elaborator::WalkStmtsForBitStreamCast(const Stmt* s) {
+  if (!s) return;
+  WalkExprForBitStreamCast(s->lhs);
+  WalkExprForBitStreamCast(s->rhs);
+  WalkExprForBitStreamCast(s->expr);
+  WalkExprForBitStreamCast(s->condition);
+  for (auto* sub : s->stmts) WalkStmtsForBitStreamCast(sub);
+  WalkStmtsForBitStreamCast(s->then_branch);
+  WalkStmtsForBitStreamCast(s->else_branch);
+  WalkStmtsForBitStreamCast(s->body);
+  WalkStmtsForBitStreamCast(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForBitStreamCast(ci.body);
+}
+
+void Elaborator::ValidateBitStreamCast(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForBitStreamCast(item->body);
+    }
+    if (item->kind == ModuleItemKind::kContAssign) {
+      WalkExprForBitStreamCast(item->assign_lhs);
+      WalkExprForBitStreamCast(item->assign_rhs);
+    }
+    if (item->kind == ModuleItemKind::kVarDecl) {
+      WalkExprForBitStreamCast(item->init_expr);
+    }
+  }
+}
+
 static std::string_view HierRefLeftmost(const Expr* e) {
   if (e->kind == ExprKind::kIdentifier) return e->text;
   if (e->kind == ExprKind::kMemberAccess && e->lhs)
