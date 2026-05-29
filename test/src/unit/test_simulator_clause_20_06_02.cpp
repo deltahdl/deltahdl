@@ -26,15 +26,6 @@ TEST(PrimarySim, PrimarySystemCallBits) {
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-TEST(UtilitySystemTaskTest, BitsOfVariable) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("wide_var", 64);
-  var->value = MakeLogic4VecVal(f.arena, 64, 0);
-  auto* expr = MakeSysCall(f.arena, "$bits", {MakeId(f.arena, "wide_var")});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 64u);
-}
-
 // §20.6.2: $bits returns a value whose type is integer; the simulator
 // constructs the result as a 32-bit Logic4Vec irrespective of how wide the
 // argument is.
@@ -58,6 +49,19 @@ TEST(UtilitySystemTaskTest, BitsOfCurrentlyEmptyDynamicReturnsZero) {
   auto* expr = MakeSysCall(f.arena, "$bits", {MakeId(f.arena, "empty")});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+// §20.6.2: a 4-state value counts as 1 bit. An 8-bit logic vector whose
+// content has X/Z mixed with 0/1 shall still report a bit-stream size of 8,
+// since the X/Z don't expand the stream.
+TEST(UtilitySystemTaskTest, BitsOf4StateValueCountsOneBitPerPosition) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("mixed", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 0xAA);
+  var->value.words[0].bval = 0x0F;
+  auto* expr = MakeSysCall(f.arena, "$bits", {MakeId(f.arena, "mixed")});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 8u);
 }
 
 // §20.6.2 NC6: the packed struct {logic valid; bit [8:1] data;} has total

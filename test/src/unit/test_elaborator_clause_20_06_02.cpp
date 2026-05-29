@@ -1,8 +1,5 @@
-#include "builders_ast.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
-#include "fixture_simulator.h"
-#include "simulator/evaluation.h"
 
 using namespace delta;
 
@@ -15,24 +12,13 @@ TEST(ConstEval, BitsExpr) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits(16'h0)", f)), 16);
 }
 
-TEST(SubroutineCallExprElaboration, SystemTfCallBitsElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] v;\n"
-      "  logic [31:0] x;\n"
-      "  initial x = $bits(v);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(UtilitySystemTaskTest, BitsOf32BitValue) {
-  SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$bits", {MakeInt(f.arena, 42)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 32u);
+// §20.6.2: the result is fixed by the inner expression's declared width
+// alone; the value content is never actually evaluated. A literal whose
+// digits are entirely x is uninterpretable as a number, yet $bits still
+// returns its declared 12-bit width at elaboration time.
+TEST(ConstEval, BitsLiteralIsResolvedWithoutEvaluatingValue) {
+  EvalFixture f;
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits(12'bxxxxxxxxxxxx)", f)), 12);
 }
 
 // §20.6.2: applying $bits directly to a dynamically sized type identifier
@@ -47,6 +33,20 @@ TEST(BitsCallRestrictions, BitsOnQueueTypedefIsError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+}
+
+// §20.6.2: because $bits folds to an elaboration-time constant for a
+// fixed-size argument, it may appear inside the packed dimension of a data
+// type declaration, and the resulting typedef shall elaborate cleanly.
+TEST(BitsCallRestrictions, BitsResultUsableInDataTypeDeclaration) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef bit [$bits(16'h0):1] MyBits;\n"
+      "  MyBits b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
 }
 
 // §20.6.2: the same query on a fixed-size type identifier is legal.
