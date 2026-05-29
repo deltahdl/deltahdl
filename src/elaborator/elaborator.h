@@ -430,6 +430,11 @@ class Elaborator {
   void ValidateConstraintBlockNames();
   void ValidateOneClassConstraintNames(const ClassDecl* cls);
 
+  // 18.8: rand_mode() is a built-in method and cannot be overridden, so a
+  // class shall not declare a method of that name.
+  void ValidateBuiltinRandomizationMethods();
+  void ValidateOneClassBuiltinMethods(const ClassDecl* cls);
+
   // 18.5.1: external constraint blocks complete constraint prototypes.
   void ValidateExternalConstraints();
   void ValidateOneClassExternalConstraints(const ClassDecl* cls);

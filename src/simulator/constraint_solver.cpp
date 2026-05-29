@@ -31,6 +31,15 @@ bool ConstraintSolver::GetRandMode(std::string_view name) const {
   return (it != variables_.end()) ? it->second.enabled : false;
 }
 
+void ConstraintSolver::SetAllRandMode(bool enabled) {
+  for (auto& [name, var] : variables_) var.enabled = enabled;
+}
+
+void ConstraintSolver::SetValue(std::string_view name, int64_t value) {
+  auto it = variables_.find(std::string(name));
+  if (it != variables_.end()) it->second.value = value;
+}
+
 void ConstraintSolver::SetConstraintMode(std::string_view block_name,
                                          bool enabled) {
   for (auto& block : blocks_) {
@@ -614,6 +623,14 @@ bool ConstraintSolver::SolveIterative(
   guard_error_ = false;
   for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
     values_.clear();
+    // 18.8 / 18.5.8: an inactive variable (rand_mode() OFF) is not one of the
+    // active random variables, so it is not randomized. The solver instead
+    // treats it as a state variable: its current value is seeded as a constant
+    // before solving, so a global constraint relating it to an active variable
+    // is evaluated against that fixed value rather than dropped.
+    for (auto& [name, var] : variables_) {
+      if (!var.enabled) values_[name] = var.value;
+    }
     ApplyDistConstraints();
     ApplyDirectConstraints(extra, include_soft);
     for (auto& [name, var] : variables_) {

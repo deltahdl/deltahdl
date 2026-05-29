@@ -153,7 +153,20 @@ struct RandVariable {
   int64_t min_val = 0;
   int64_t max_val = 0xFFFF;
   uint32_t width = 32;
+
+  // 18.8: a random variable carries an active state that rand_mode() controls
+  // and that is initially ON. 18.5.8: only the active random variables are the
+  // ones randomized; every other variable reference is treated as a state
+  // variable whose current value is used as a constant. 'enabled' is that
+  // active state, shared by both clauses.
   bool enabled = true;
+
+  // 18.8 / 18.5.8: the variable's current value. When the variable is inactive
+  // (rand_mode() OFF) the solver does not draw a fresh value for it; instead it
+  // holds this value as a constant, so a global constraint (18.5.8) that
+  // references the inactive variable from an active variable solved alongside
+  // it sees a fixed operand rather than a random one.
+  int64_t value = 0;
 
   // 18.3: for an active random variable of enum type, the solver shall select
   // a value only from the set of named constants of that enum. When non-empty,
@@ -187,6 +200,16 @@ class ConstraintSolver {
 
   void SetRandMode(std::string_view name, bool enabled);
   bool GetRandMode(std::string_view name) const;
+
+  // 18.8: when rand_mode() names no specific random_variable, the void form
+  // applies to every random variable in the object at once. This sets the
+  // active state of all known variables in a single call.
+  void SetAllRandMode(bool enabled);
+
+  // 18.8 / 18.5.8: record a variable's current value. An inactive variable
+  // keeps this value as a constant while the active variables are randomized,
+  // which is the state-variable treatment that global constraints rely on.
+  void SetValue(std::string_view name, int64_t value);
 
   void SetConstraintMode(std::string_view block_name, bool enabled);
   bool GetConstraintMode(std::string_view block_name) const;

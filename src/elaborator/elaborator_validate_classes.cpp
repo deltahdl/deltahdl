@@ -2839,6 +2839,23 @@ void Elaborator::ValidateConstraintBlockNames() {
   for (const auto* cls : unit_->classes) ValidateOneClassConstraintNames(cls);
 }
 
+// 18.8: rand_mode() is built-in and cannot be overridden. A user class
+// therefore shall not declare a method named rand_mode; doing so is reported
+// as an error rather than silently shadowing the built-in method.
+void Elaborator::ValidateOneClassBuiltinMethods(const ClassDecl* cls) {
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kMethod) continue;
+    if (m->name == "rand_mode") {
+      diag_.Error(m->loc,
+                  "'rand_mode' is a built-in method and cannot be overridden");
+    }
+  }
+}
+
+void Elaborator::ValidateBuiltinRandomizationMethods() {
+  for (const auto* cls : unit_->classes) ValidateOneClassBuiltinMethods(cls);
+}
+
 // True when location 'a' lies strictly before location 'b' within one file.
 // Locations in different files are treated as unordered (returns false).
 static bool LocStrictlyBefore(const SourceLoc& a, const SourceLoc& b) {

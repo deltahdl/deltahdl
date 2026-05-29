@@ -1144,6 +1144,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateConstraintBlockNames();
 
+  ValidateBuiltinRandomizationMethods();
+
   ValidateExternalConstraints();
 
   ValidateConstraintInheritance();
