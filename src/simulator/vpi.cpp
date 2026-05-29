@@ -458,6 +458,13 @@ VpiContext& GetGlobalVpiContext() {
 
 void SetGlobalVpiContext(VpiContext* ctx) { g_vpi_context = ctx; }
 
+void InvokeVlogStartupRoutines(VlogStartupRoutine* routines) {
+  if (!routines) return;
+  for (size_t i = 0; routines[i] != nullptr; ++i) {
+    routines[i]();
+  }
+}
+
 }
 
 vpiHandle vpi_register_systf(s_vpi_systf_data* data) {

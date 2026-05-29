@@ -242,6 +242,18 @@ bool IsOneShotPliCallback(int reason);
 VpiContext& GetGlobalVpiContext();
 void SetGlobalVpiContext(VpiContext* ctx);
 
+// §36.9.1: the intended use model places a reference to a registration
+// routine in the vlog_startup_routines[] array. Each entry is a function that
+// takes no arguments and returns nothing, and the array is conventionally
+// null-terminated.
+using VlogStartupRoutine = void (*)();
+
+// §36.9.1: walking the vlog_startup_routines[] array calls each non-null
+// entry in order, giving each routine its chance to register user-defined
+// system tasks and functions before elaboration begins. Iteration stops at
+// the first null sentinel.
+void InvokeVlogStartupRoutines(VlogStartupRoutine* routines);
+
 }
 
 using vpiHandle = delta::VpiHandle;

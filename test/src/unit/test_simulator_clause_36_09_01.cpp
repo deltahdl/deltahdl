@@ -85,5 +85,78 @@ TEST_F(UserDefinedSystfRegistration, RegistrationAfterElaborationIsRejected) {
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
 }
 
+// §36.9.1: an application defines whether each PLI application is a function
+// (returns a value) or a task. The registration accepts both forms and the
+// stored entry preserves which one was requested, so callers can later treat
+// them as functions or tasks accordingly.
+TEST_F(UserDefinedSystfRegistration, RegistrationDistinguishesFunctionFromTask) {
+  s_vpi_systf_data task = {};
+  task.type = vpiSysTask;
+  task.tfname = "$as_task";
+
+  s_vpi_systf_data func = {};
+  func.type = vpiSysFunc;
+  func.tfname = "$as_func";
+
+  ASSERT_NE(vpi_register_systf(&task), nullptr);
+  ASSERT_NE(vpi_register_systf(&func), nullptr);
+
+  ASSERT_EQ(vpi_ctx_.RegisteredSystfs().size(), 2);
+  EXPECT_EQ(vpi_ctx_.RegisteredSystfs()[0].type, vpiSysTask);
+  EXPECT_EQ(vpi_ctx_.RegisteredSystfs()[1].type, vpiSysFunc);
+}
+
+namespace {
+
+void StartupRoutineRegistersTask() {
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = "$startup_task";
+  vpi_register_systf(&data);
+}
+
+void StartupRoutineRegistersFunc() {
+  s_vpi_systf_data data = {};
+  data.type = vpiSysFunc;
+  data.tfname = "$startup_func";
+  vpi_register_systf(&data);
+}
+
+}  // namespace
+
+// §36.9.1: the intended use model places a reference to a routine inside the
+// vlog_startup_routines[] array, and that routine registers user-defined
+// system tasks and functions when invoked. Walking such an array must call
+// every listed routine so that all registrations happen.
+TEST_F(UserDefinedSystfRegistration, VlogStartupRoutinesArrayInvokesEachRoutine) {
+  VlogStartupRoutine routines[] = {
+      &StartupRoutineRegistersTask,
+      &StartupRoutineRegistersFunc,
+      nullptr,
+  };
+
+  InvokeVlogStartupRoutines(routines);
+
+  ASSERT_EQ(vpi_ctx_.RegisteredSystfs().size(), 2);
+  EXPECT_STREQ(vpi_ctx_.RegisteredSystfs()[0].tfname, "$startup_task");
+  EXPECT_STREQ(vpi_ctx_.RegisteredSystfs()[1].tfname, "$startup_func");
+}
+
+// §36.9.1: a vlog_startup_routines[] array is a conventional null-terminated
+// list. The first null entry marks the end, so iteration must stop there and
+// not call anything that follows it.
+TEST_F(UserDefinedSystfRegistration, VlogStartupRoutinesStopAtNullSentinel) {
+  VlogStartupRoutine routines[] = {
+      &StartupRoutineRegistersTask,
+      nullptr,
+      &StartupRoutineRegistersFunc,
+  };
+
+  InvokeVlogStartupRoutines(routines);
+
+  ASSERT_EQ(vpi_ctx_.RegisteredSystfs().size(), 1);
+  EXPECT_STREQ(vpi_ctx_.RegisteredSystfs()[0].tfname, "$startup_task");
+}
+
 }  // namespace
 }  // namespace delta
