@@ -59,6 +59,52 @@ TEST(DpiGlobalNameElab, ImportExportSameLinkageDifferentVersionStringIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §35.4: when two exports across distinct scopes share one linkage name,
+// the SystemVerilog routines they refer to must have equivalent type
+// signatures. Two functions whose return types disagree fail that
+// requirement and the elaborator rejects the pair.
+TEST(DpiGlobalNameElab,
+     ExportsSharingLinkageWithMismatchedFunctionSignaturesIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      function int sv_a(input int x);
+      endfunction
+      export "DPI-C" link = function sv_a;
+    endmodule
+    module n;
+      function bit sv_b(input int x);
+      endfunction
+      export "DPI-C" link = function sv_b;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §35.4: cross-scope exports sharing a linkage name with equivalent
+// signatures are permitted. Two tasks with matching argument shapes meet
+// the equivalence rule and the elaborator accepts the pair. Tasks also
+// exercise the function-vs-task half of the signature equivalence check.
+TEST(DpiGlobalNameElab,
+     ExportsSharingLinkageWithMatchingTaskSignaturesIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      task sv_t;
+      endtask
+      export "DPI-C" link = task sv_t;
+    endmodule
+    module n;
+      task sv_u;
+      endtask
+      export "DPI-C" link = task sv_u;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
 // §35.4: matching version strings on import + export sharing a c_identifier
 // is the well-formed case. The elaborator must accept it.
 TEST(DpiGlobalNameElab, ImportExportSameLinkageSameVersionStringIsOk) {

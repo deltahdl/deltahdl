@@ -88,6 +88,31 @@ bool DpiSignaturesMatch(const DpiSignatureKey& a, const DpiSignatureKey& b) {
          a.spec_string == b.spec_string && a.args == b.args;
 }
 
+// §35.4: an export declaration borrows its type signature from the
+// SystemVerilog function or task it names. The parts that matter for
+// equivalence — the return type, the function-vs-task distinction, and
+// each formal argument's direction and type kind — are extracted here so
+// that two exports sharing one linkage identifier across scopes can be
+// compared without paying attention to identifiers, default values, or
+// other non-signature details.
+struct DpiExportSignature {
+  DataTypeKind return_type;
+  bool is_task;
+  std::vector<std::pair<Direction, DataTypeKind>> args;
+  bool operator==(const DpiExportSignature&) const = default;
+};
+
+DpiExportSignature BuildDpiExportSignature(const ModuleItem* callable) {
+  DpiExportSignature key;
+  key.return_type = callable->return_type.kind;
+  key.is_task = callable->kind == ModuleItemKind::kTaskDecl;
+  key.args.reserve(callable->func_args.size());
+  for (const auto& arg : callable->func_args) {
+    key.args.emplace_back(arg.direction, arg.data_type.kind);
+  }
+  return key;
+}
+
 }  // namespace
 
 void Elaborator::ValidateDpiDeclarations() {
@@ -153,8 +178,26 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
   // version string — the rule applies to imports and exports alike.
   std::unordered_map<std::string_view, std::string_view> link_version;
 
+  // §35.4: track the SystemVerilog signature each export linkage name was
+  // first observed under. Subsequent exports of the same linkage name across
+  // any scope must agree, since claim 14 requires equivalent type signatures
+  // for cross-scope exports sharing one c_identifier.
+  std::unordered_map<std::string_view, DpiExportSignature> export_signatures;
+
   for (const auto* mod : unit_->modules) {
     if (mod == nullptr) continue;
+
+    // Index this module's SystemVerilog function and task declarations by
+    // name so each export can look up the routine it names and obtain its
+    // signature for the cross-scope equivalence check.
+    std::unordered_map<std::string_view, const ModuleItem*> sv_callables;
+    for (const auto* item : mod->items) {
+      if (item == nullptr) continue;
+      if (item->kind == ModuleItemKind::kFunctionDecl ||
+          item->kind == ModuleItemKind::kTaskDecl) {
+        sv_callables.emplace(item->name, item);
+      }
+    }
 
     // §35.4: multiple export declarations with the same c_identifier in the
     // same scope are forbidden. Each module declaration is one scope, so we
@@ -178,6 +221,22 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
               std::format("DPI export linkage name '{}' already declared in "
                           "this scope",
                           link_name));
+        }
+
+        auto callable_it = sv_callables.find(item->name);
+        if (callable_it != sv_callables.end()) {
+          auto sig = BuildDpiExportSignature(callable_it->second);
+          auto [sig_it, sig_was_new] =
+              export_signatures.emplace(link_name, sig);
+          if (!sig_was_new && !(sig_it->second == sig)) {
+            diag_.Error(
+                item->loc,
+                std::format("DPI export linkage name '{}' was previously "
+                            "declared with a different type signature; "
+                            "exports sharing one linkage name across scopes "
+                            "must have equivalent signatures",
+                            link_name));
+          }
         }
       }
 
