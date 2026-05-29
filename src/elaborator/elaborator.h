@@ -310,6 +310,9 @@ class Elaborator {
 
   void ValidateElabSystemTask(const ModuleItem* item);
 
+  // §35.5.2: pure-only restrictions on imported subroutines.
+  void ValidateDpiImport(const ModuleItem* item);
+
   void ValidateTypenameAsElabConstant(const Expr* init);
 
   void ValidateAlias(const ModuleItem* item, RtlirModule* mod);

@@ -18,6 +18,32 @@
 
 namespace delta {
 
+void Elaborator::ValidateDpiImport(const ModuleItem* item) {
+  // §35.5.2's restrictions apply only to imports declared pure.
+  if (!item->dpi_is_pure) return;
+
+  if (item->dpi_is_task) {
+    diag_.Error(item->loc,
+                "imported task cannot be declared pure (§35.5.2)");
+    return;
+  }
+  if (item->return_type.kind == DataTypeKind::kVoid) {
+    diag_.Error(item->loc,
+                "pure imported function must have a non-void return type "
+                "(§35.5.2)");
+  }
+
+  for (const auto& arg : item->func_args) {
+    if (arg.direction == Direction::kOutput ||
+        arg.direction == Direction::kInout) {
+      diag_.Error(item->loc,
+                  "pure imported function cannot have output or inout "
+                  "arguments (§35.5.2)");
+      break;
+    }
+  }
+}
+
 void Elaborator::ValidateElabSystemTask(const ModuleItem* item) {
   auto* expr = item->init_expr;
   if (!expr || expr->kind != ExprKind::kSystemCall) return;
@@ -902,9 +928,12 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kElabSystemTask:
       ValidateElabSystemTask(item);
       break;
+    case ModuleItemKind::kDpiImport:
+      ValidateDpiImport(item);
+      mod->let_decls.push_back(item);
+      break;
     case ModuleItemKind::kCovergroupDecl:
     case ModuleItemKind::kSpecifyBlock:
-    case ModuleItemKind::kDpiImport:
     case ModuleItemKind::kDpiExport:
     case ModuleItemKind::kLetDecl:
       mod->let_decls.push_back(item);
