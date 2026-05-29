@@ -243,7 +243,18 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
         }
 
         auto callable_it = sv_callables.find(item->name);
-        if (callable_it != sv_callables.end()) {
+        if (callable_it == sv_callables.end()) {
+          // §35.7: an export declaration is allowed only in the scope where
+          // the function being exported is defined. If the scope contains no
+          // SystemVerilog function or task with the named identifier, the
+          // export has nothing to attach to.
+          diag_.Error(
+              item->loc,
+              std::format("DPI export names '{}', which is not a "
+                          "SystemVerilog function or task defined in the "
+                          "enclosing scope (§35.7)",
+                          item->name));
+        } else {
           // §35.7: an exported function adheres to the same restrictions on
           // argument types as imports. The §35.5.4 prohibition on the ref
           // qualifier in a DPI declaration therefore carries through to the
