@@ -33,6 +33,18 @@ TEST(StringFormatTaskTest, SformatfReturnsFormattedString) {
   auto result = EvalExpr(expr, f.ctx, f.arena);
 
   EXPECT_EQ(result.width, 48u);
+
+  std::string formatted;
+  uint32_t nbytes = result.width / 8;
+  for (uint32_t i = nbytes; i > 0; --i) {
+    uint32_t byte_idx = i - 1;
+    uint32_t word = (byte_idx * 8) / 64;
+    uint32_t bit = (byte_idx * 8) % 64;
+    if (word >= result.nwords) continue;
+    auto ch = static_cast<char>((result.words[word].aval >> bit) & 0xFF);
+    if (ch != 0) formatted += ch;
+  }
+  EXPECT_EQ(formatted, "val=42");
 }
 
 // §21.3.3 N5, N6, N16: $swrite writes the formatted output into the variable
@@ -158,6 +170,65 @@ TEST(StringFormatTaskTest, SwriteBareExpressionRendersDecimal) {
                        {MkId(f.arena, "out"), MakeInt(f.arena, 255)}),
            f.ctx, f.arena);
   EXPECT_EQ(ReadString(dest), "255");
+}
+
+// §21.3.3 N10: the same prose that lets $sformatf accept a non-literal format
+// argument applies to $sformat. A string-typed variable supplied as the second
+// argument shall be decoded back into the formatting template.
+TEST(StringFormatTaskTest, SformatFormatArgFromStringVariable) {
+  SimFixture f;
+  auto* dest = f.ctx.CreateVariable("out", 256);
+  auto* fmt_var = f.ctx.CreateVariable("fmt", 56);
+  fmt_var->value = StringToLogic4Vec(f.arena, "n=%0d");
+
+  EvalExpr(MakeSysCall(f.arena, "$sformat",
+                       {MkId(f.arena, "out"), MkId(f.arena, "fmt"),
+                        MakeInt(f.arena, 17)}),
+           f.ctx, f.arena);
+  EXPECT_EQ(ReadString(dest), "n=17");
+}
+
+// §21.3.3 N12: $sformat dispatches each specifier through the same format
+// engine that $display uses (§21.2.1.1). %c, an ASCII-character specifier not
+// otherwise observed by the %d/%s tests, confirms the linkage instead of
+// merely the integer arm.
+TEST(StringFormatTaskTest, SformatSupportsCharacterSpecifier) {
+  SimFixture f;
+  auto* dest = f.ctx.CreateVariable("out", 256);
+  EvalExpr(MakeSysCall(f.arena, "$sformat",
+                       {MkId(f.arena, "out"), MkStr(f.arena, "ch=%c"),
+                        MakeInt(f.arena, 'A')}),
+           f.ctx, f.arena);
+  EXPECT_EQ(ReadString(dest), "ch=A");
+}
+
+// §21.3.3 N13: the remaining arguments are consumed in call order against the
+// specifiers in the format string. A three-specifier call with mixed integer
+// and string positions binds 1, "two", 3 left-to-right.
+TEST(StringFormatTaskTest, SformatConsumesArgsInOrder) {
+  SimFixture f;
+  auto* dest = f.ctx.CreateVariable("out", 256);
+  EvalExpr(MakeSysCall(
+               f.arena, "$sformat",
+               {MkId(f.arena, "out"), MkStr(f.arena, "a=%d, b=%s, c=%d"),
+                MakeInt(f.arena, 1), MkStr(f.arena, "two"),
+                MakeInt(f.arena, 3)}),
+           f.ctx, f.arena);
+  EXPECT_EQ(ReadString(dest), "a=1, b=two, c=3");
+}
+
+// §21.3.3 N14 continuation: after issuing the count-mismatch warning, $sformat
+// shall still continue execution. With more values supplied than the format
+// string consumes, the extra value is dropped and the output variable receives
+// the partially-formatted result rather than being left untouched.
+TEST(StringFormatTaskTest, SformatContinuesAfterCountMismatchWarning) {
+  SimFixture f;
+  auto* dest = f.ctx.CreateVariable("out", 256);
+  EvalExpr(MakeSysCall(f.arena, "$sformat",
+                       {MkId(f.arena, "out"), MkStr(f.arena, "v=%d"),
+                        MakeInt(f.arena, 9), MakeInt(f.arena, 99)}),
+           f.ctx, f.arena);
+  EXPECT_EQ(ReadString(dest), "v=9");
 }
 
 // §21.3.3 N7: the resulting string is packed into the output variable with
