@@ -311,6 +311,17 @@ class SimContext {
   // replays under the chosen seed.
   void SeedObjectRng(ClassObject* obj, uint32_t seed);
 
+  // §18.13.4 get_randstate(): hand back the object's current RNG internal state
+  // as a string. mt19937 fully serializes its state through operator<<, so the
+  // returned value captures the complete generator state -- not merely the
+  // seed -- and reading it does not advance the stream. The string's length and
+  // contents are implementation dependent.
+  std::string GetRandState(ClassObject* obj);
+
+  // §18.13.4 get_randstate(): the same retrieval for the RNG owned by a process
+  // (the state obtained via the process's get_randstate() method).
+  std::string GetRandState(Process* proc);
+
   void RegisterRealVariable(std::string_view name);
   bool IsRealVariable(std::string_view name) const;
 

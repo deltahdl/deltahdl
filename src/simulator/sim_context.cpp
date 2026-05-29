@@ -1,6 +1,7 @@
 #include "simulator/sim_context.h"
 
 #include <algorithm>
+#include <sstream>
 
 #include "common/diagnostic.h"
 #include "simulator/net.h"
@@ -374,6 +375,30 @@ void SimContext::SeedObjectRng(ClassObject* obj, uint32_t seed) {
   obj->rng_seed = seed;
   obj->rng.seed(seed);
   obj->rng_initialized = true;
+}
+
+std::string SimContext::GetRandState(ClassObject* obj) {
+  // §18.13.4: retrieve the object's current RNG internal state. ObjectRng
+  // materializes the stream lazily, so the state reported reflects whatever the
+  // object would next draw from. Streaming the generator out captures its full
+  // state without consuming any value.
+  std::ostringstream os;
+  os << ObjectRng(obj);
+  return os.str();
+}
+
+std::string SimContext::GetRandState(Process* proc) {
+  // §18.13.4: retrieve the current RNG internal state of a process. Mirror the
+  // lazy seeding the active-stream path uses so a process that has not yet drawn
+  // still reports the state keyed by its installed seed rather than a default
+  // generator.
+  if (!proc->rng_initialized) {
+    proc->rng.seed(proc->rng_seed);
+    proc->rng_initialized = true;
+  }
+  std::ostringstream os;
+  os << proc->rng;
+  return os.str();
 }
 
 int32_t SimContext::Random32() { return static_cast<int32_t>(ActiveRng()()); }
