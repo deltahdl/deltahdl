@@ -14,16 +14,6 @@ TEST(PackedUnionValidation, HardPackedUnion_SameWidth_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(PackedUnionValidation, SoftPackedUnion_DifferentWidth_OK) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  union soft { logic [7:0] a; logic [15:0] b; } u;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(PackedUnionValidation, HardPackedUnion_DifferentWidth_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -146,6 +136,80 @@ TEST(PackedUnionValidation, HardPackedThreeMembers_ThirdDiffers_Error) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(PackedUnionValidation, MixedStateMembers_UnionIs4State) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  union packed { logic [7:0] a; bit [7:0] b; } u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto& vars = design->top_modules[0]->variables;
+  ASSERT_FALSE(vars.empty());
+  EXPECT_TRUE(vars[0].is_4state);
+}
+
+TEST(PackedUnionValidation, AllTwoStateMembers_UnionIs2State) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  union packed { bit [7:0] a; bit [7:0] b; } u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto& vars = design->top_modules[0]->variables;
+  ASSERT_FALSE(vars.empty());
+  EXPECT_FALSE(vars[0].is_4state);
+}
+
+TEST(PackedUnionValidation, SoftPackedUnion_WidthIsMaxOfMembers) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  union soft packed { bit [7:0] narrow; bit [23:0] wide; } u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto& vars = design->top_modules[0]->variables;
+  ASSERT_FALSE(vars.empty());
+  EXPECT_EQ(vars[0].width, 24u);
+}
+
+TEST(PackedUnionValidation, SoftPackedUnion_PredefinedIntegralKinds_WidthIsLongest) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  union soft packed { bit [3:0] tiny; int mid; longint widest; } u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto& vars = design->top_modules[0]->variables;
+  ASSERT_FALSE(vars.empty());
+  EXPECT_EQ(vars[0].width, 64u);
+}
+
+TEST(PackedUnionValidation, NestedSoftPackedUnion_WidthRecursesToOuterMax) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  union soft packed {\n"
+      "    bit [3:0] tiny;\n"
+      "    union soft packed { bit [11:0] inner_wide; bit [5:0] inner_narrow; } "
+      "nested;\n"
+      "  } u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto& vars = design->top_modules[0]->variables;
+  ASSERT_FALSE(vars.empty());
+  EXPECT_EQ(vars[0].width, 12u);
 }
 
 }

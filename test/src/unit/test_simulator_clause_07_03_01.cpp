@@ -97,4 +97,74 @@ TEST(PackedUnionSimulation, SoftPackedUnionMSBsUnaffected) {
   EXPECT_EQ(v, 0xFF42u);
 }
 
+TEST(PackedUnionSimulation, SoftPackedUnionNarrowMemberLandsAtLSB) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef union soft packed {\n"
+      "    logic [15:0] wide;\n"
+      "    logic [7:0] narrow;\n"
+      "  } su;\n"
+      "  su u;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    u.wide = 16'h0000;\n"
+      "    u.narrow = 8'hC3;\n"
+      "    result = u.wide;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0x00C3u);
+}
+
+TEST(PackedUnionSimulation, NestedSoftPackedUnion_InnerNarrowWriteLeavesOuterUntouched) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef union soft packed {\n"
+      "    logic [11:0] inner_wide;\n"
+      "    logic [3:0]  inner_narrow;\n"
+      "  } inner_t;\n"
+      "  typedef union soft packed {\n"
+      "    logic [11:0] outer_wide;\n"
+      "    inner_t      nested;\n"
+      "  } outer_t;\n"
+      "  outer_t u;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    u.outer_wide      = 12'hABC;\n"
+      "    u.nested.inner_narrow = 4'h5;\n"
+      "    result = u.outer_wide;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0xAB5u);
+}
+
+TEST(PackedUnionSimulation, WholeUnionAssignment_VisibleThroughMember) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  union packed { logic [7:0] a; logic [7:0] b; } u;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    u = 8'h5A;\n"
+      "    result = u.b;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0x5Au);
+}
+
+TEST(PackedUnionSimulation, PackedUnionSignedQualifier_SignExtendsOnAssign) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  union packed signed { logic [7:0] a; logic [7:0] b; } u;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    u.a = 8'hFF;\n"
+      "    result = u;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0xFFFFFFFFu);
+}
+
 }
