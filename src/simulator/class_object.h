@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <random>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -66,6 +67,17 @@ struct ClassObject {
   const ClassTypeInfo* type = nullptr;
   std::unordered_map<std::string, Logic4Vec> properties;
   uint32_t ref_count = 0;
+
+  // §18.14.1 object stability: every instance owns an independent RNG for its
+  // randomization methods. The allocating context installs rng_seed when the
+  // object is created -- drawn from the creating thread's stream when one is
+  // running, or from the enclosing initialization RNG for objects built by a
+  // static declaration initializer (when no thread is active). The generator
+  // is materialized lazily on first use so two objects created in the same
+  // order from the same starting state always replay the same seeds.
+  uint32_t rng_seed = 0;
+  std::mt19937 rng;
+  bool rng_initialized = false;
 
   Logic4Vec GetProperty(std::string_view name, Arena& arena) const;
 
