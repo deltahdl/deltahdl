@@ -196,6 +196,14 @@ class ConstraintSolver {
 
   bool SolveWith(const std::vector<ConstraintExpr>& inline_constraints);
 
+  // 18.12: a scope randomize invoked with no random-variable arguments behaves
+  // as a checker rather than a generator. It shall not change the value of any
+  // variable; instead every constraint expression — those of the enabled blocks
+  // together with any passed in 'constraints' (the with constraint_block) — is
+  // evaluated against the variables' current values. The call returns false (0)
+  // as soon as one expression is false and true (1) only when all of them hold.
+  bool Check(const std::vector<ConstraintExpr>& constraints = {});
+
   int64_t GetValue(std::string_view name) const;
 
   void SetRandMode(std::string_view name, bool enabled);

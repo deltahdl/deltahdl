@@ -564,6 +564,19 @@ bool ConstraintSolver::EvalUnique(const ConstraintExpr& expr) const {
 
 bool ConstraintSolver::Solve() { return SolveWith({}); }
 
+bool ConstraintSolver::Check(const std::vector<ConstraintExpr>& constraints) {
+  // 18.12: the no-argument scope randomize is a pure checker. Unlike SolveWith,
+  // it never generates a new value for any variable: each variable's current
+  // value is taken as is, and the constraints are only evaluated against those
+  // values. Every constraint expression is evaluated and the call fails the
+  // moment one of them is false, succeeding only when every one holds.
+  guard_error_ = false;
+  for (const auto& [name, var] : variables_) {
+    values_[name] = var.value;
+  }
+  return CheckAllConstraints(constraints, /*include_soft=*/true);
+}
+
 void ConstraintSolver::ApplyDirectConstraints(
     const std::vector<ConstraintExpr>& extra, bool include_soft) {
   auto apply = [this](const ConstraintExpr& c) {
