@@ -210,9 +210,61 @@ static std::optional<int64_t> EvalConstBits(const Expr* expr) {
   return std::nullopt;
 }
 
+// A control_bit text starting with `'` (or sized as N'...) carries x or z if
+// any digit character following the base specifier is x/z/?. Constant integer
+// expressions contain no x or z bits, so x/z control_bits contribute zero.
+static bool ControlBitIsXZ(const Expr* ctrl) {
+  if (!ctrl || ctrl->kind != ExprKind::kIntegerLiteral) return false;
+  auto t = ctrl->text;
+  auto tick = t.find('\'');
+  if (tick == std::string_view::npos) return false;
+  for (size_t i = tick + 1; i < t.size(); ++i) {
+    char c = t[i];
+    if (c == 'x' || c == 'X' || c == 'z' || c == 'Z' || c == '?') return true;
+  }
+  return false;
+}
+
+static int64_t CountonesInWidth(int64_t val, uint32_t width) {
+  uint64_t mask =
+      (width == 0 || width >= 64) ? ~uint64_t{0} : ((uint64_t{1} << width) - 1);
+  return Countones(static_cast<int64_t>(static_cast<uint64_t>(val) & mask));
+}
+
+static std::optional<int64_t> EvalConstCountbits(const Expr* expr,
+                                                 const ScopeMap& scope) {
+  if (expr->args.size() < 2) return std::nullopt;
+  auto val = ConstEvalInt(expr->args[0], scope);
+  if (!val) return std::nullopt;
+  uint32_t width = ConstLiteralWidth(expr->args[0]);
+  bool match0 = false;
+  bool match1 = false;
+  for (size_t i = 1; i < expr->args.size(); ++i) {
+    auto* ctrl = expr->args[i];
+    if (ControlBitIsXZ(ctrl)) continue;
+    auto cb = ConstEvalInt(ctrl, scope);
+    if (!cb) return std::nullopt;
+    // Only the LSB of the control_bit is examined (§20.9). Duplicates collapse
+    // because match0/match1 are idempotent boolean sets.
+    if ((*cb & 1) == 0) {
+      match0 = true;
+    } else {
+      match1 = true;
+    }
+  }
+  int64_t ones = CountonesInWidth(*val, width);
+  int64_t total = (width >= 64) ? 64 : static_cast<int64_t>(width);
+  int64_t zeros = total - ones;
+  int64_t result = 0;
+  if (match1) result += ones;
+  if (match0) result += zeros;
+  return result;
+}
+
 static std::optional<int64_t> EvalConstSysCall(const Expr* expr,
                                                const ScopeMap& scope) {
   if (expr->callee == "$bits") return EvalConstBits(expr);
+  if (expr->callee == "$countbits") return EvalConstCountbits(expr, scope);
   auto arg = EvalFirstArg(expr, scope);
   if (!arg) return std::nullopt;
   if (expr->callee == "$clog2") return Clog2(*arg);
@@ -221,6 +273,9 @@ static std::optional<int64_t> EvalConstSysCall(const Expr* expr,
     return static_cast<int64_t>(Countones(*arg) == 1);
   if (expr->callee == "$onehot0")
     return static_cast<int64_t>(Countones(*arg) <= 1);
+  // A constant-expression argument has no x or z bits by definition, so
+  // $isunknown of a constant expression is always 0.
+  if (expr->callee == "$isunknown") return 0;
   return std::nullopt;
 }
 
@@ -463,6 +518,7 @@ bool IsConstantSysFunc(std::string_view name) {
       "$countones",
       "$onehot",
       "$onehot0",
+      "$isunknown",
       "$isunbounded",
 
       "$timescale",
