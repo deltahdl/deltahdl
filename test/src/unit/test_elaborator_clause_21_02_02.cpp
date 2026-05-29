@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Lowerer, StrobeDoesNotCrash) {
+TEST(IoStrobeElab, StrobeDoesNotCrash) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

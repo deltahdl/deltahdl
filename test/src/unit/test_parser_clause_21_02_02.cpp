@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(SchedulingSemanticsParsing, StrobeSystemCall) {
+TEST(IoSystemTaskParsing, StrobeSystemCall) {
   auto r = Parse(
       "module m;\n"
       "  reg a;\n"
@@ -22,13 +22,6 @@ TEST(SchedulingSemanticsParsing, StrobeSystemCall) {
   EXPECT_EQ(stmt->expr->callee, "$strobe");
 }
 
-TEST(IoSystemTaskParsing, StrobeBasicCall) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $strobe(\"val=%d\", x);\n"
-              "endmodule\n"));
-}
-
 TEST(IoSystemTaskParsing, StrobebHexOctal) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -36,6 +29,21 @@ TEST(IoSystemTaskParsing, StrobebHexOctal) {
               "    $strobeb(a);\n"
               "    $strobeh(a);\n"
               "    $strobeo(a);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// Syntax 21-2 surrounds ( list_of_arguments ) with brackets, marking the
+// argument-list parenthesization as optional. The parser must therefore accept
+// a bare strobe invocation with neither parentheses nor arguments.
+TEST(IoSystemTaskParsing, StrobeNoArgumentListOptional) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    $strobe;\n"
+              "    $strobeb;\n"
+              "    $strobeo;\n"
+              "    $strobeh;\n"
               "  end\n"
               "endmodule\n"));
 }

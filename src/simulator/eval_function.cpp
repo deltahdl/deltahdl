@@ -149,6 +149,14 @@ static Logic4Vec EvalDeferredPrint(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// The four strobed-monitoring task names listed in Syntax 21-2. They differ
+// only in the default radix used for unformatted expression arguments; that
+// radix is applied by the shared display machinery.
+static bool IsStrobeTask(std::string_view name) {
+  return name == "$strobe" || name == "$strobeb" || name == "$strobeo" ||
+         name == "$strobeh";
+}
+
 // The four monitor task names listed in Syntax 21-3. They differ only in the
 // default radix used for unformatted expression arguments; that radix is
 // applied by the shared display machinery, so all four monitor identically.
@@ -457,7 +465,7 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
   if (name == "$timeunit" || name == "$timeprecision") {
     return EvalTimescaleQuery(expr, ctx, arena, name);
   }
-  if (name == "$strobe") {
+  if (IsStrobeTask(name)) {
     return EvalDeferredPrint(expr, ctx, arena);
   }
   if (IsMonitorTask(name)) return EvalMonitor(expr, ctx, arena);
