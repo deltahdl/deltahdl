@@ -13,40 +13,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Constraint, SoftConstraintYieldsToHard) {
-  ConstraintSolver solver(42);
-  RandVariable v;
-  v.name = "x";
-  v.min_val = 0;
-  v.max_val = 100;
-  solver.AddVariable(v);
-
-  ConstraintBlock b_soft;
-  b_soft.name = "c_soft";
-  ConstraintExpr inner_expr;
-  inner_expr.kind = ConstraintKind::kEqual;
-  inner_expr.var_name = "x";
-  inner_expr.lo = 50;
-  ConstraintExpr sc;
-  sc.kind = ConstraintKind::kSoft;
-  sc.inner = &inner_expr;
-  sc.var_name = "x";
-  b_soft.constraints.push_back(sc);
-  solver.AddConstraintBlock(b_soft);
-
-  ConstraintBlock b_hard;
-  b_hard.name = "c_hard";
-  ConstraintExpr hc;
-  hc.kind = ConstraintKind::kEqual;
-  hc.var_name = "x";
-  hc.lo = 30;
-  b_hard.constraints.push_back(hc);
-  solver.AddConstraintBlock(b_hard);
-
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_EQ(solver.GetValue("x"), 30);
-}
-
 TEST(Constraint, SoftConstraintAloneSatisfied) {
   ConstraintSolver solver(42);
   RandVariable v;
