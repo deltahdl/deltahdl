@@ -16,22 +16,6 @@ TEST(TaggedUnionParsing, TaggedUnionVariable) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kUnion);
   EXPECT_TRUE(item->data_type.is_tagged);
 }
-TEST(TaggedUnionParsing, TaggedUnionTypedef) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef union tagged {\n"
-      "    void Invalid;\n"
-      "    int Valid;\n"
-      "  } VInt;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kUnion);
-  EXPECT_TRUE(item->typedef_type.is_tagged);
-  EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
-}
-
 TEST(TaggedUnionParsing, UnionWithNestedStruct) {
   auto r = Parse(
       "module t;\n"

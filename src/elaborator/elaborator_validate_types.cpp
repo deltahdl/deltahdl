@@ -790,6 +790,10 @@ void Elaborator::ValidateChandleInUnion(const DataType& dtype, SourceLoc loc) {
       diag_.Error(loc, "string type can only be used in tagged unions");
       return;
     }
+    if (m.type_kind == DataTypeKind::kEvent) {
+      diag_.Error(loc, "event type can only be used in tagged unions");
+      return;
+    }
   }
 }
 

@@ -188,6 +188,7 @@ struct StructMember {
   Expr* packed_dim_right = nullptr;
   std::vector<std::pair<Expr*, Expr*>> extra_packed_dims;
   std::string_view name;
+  std::string_view type_name;
   Expr* init_expr = nullptr;
   std::vector<Expr*> unpacked_dims;
   std::vector<Attribute> attrs;

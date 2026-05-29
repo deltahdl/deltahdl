@@ -17,6 +17,11 @@ uint32_t EvalTypeWidth(const DataType& dtype);
 
 struct StructMember;
 uint32_t EvalStructMemberWidth(const StructMember& m);
+uint32_t EvalStructMemberWidth(const StructMember& m,
+                               const TypedefMap& typedefs);
+
+uint32_t TaggedUnionTagWidth(const DataType& dtype);
+uint32_t TaggedUnionTagBitOffset(const DataType& dtype);
 
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs);
 

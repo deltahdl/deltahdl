@@ -30,6 +30,8 @@ uint32_t EvalStructMemberWidth(const StructMember& m) {
       return 32;
     case DataTypeKind::kLongint:
       return 64;
+    case DataTypeKind::kVoid:
+      return 0;
     default:
       return 1;
   }
@@ -39,6 +41,23 @@ static uint32_t TagBitWidth(uint32_t num_members) {
   uint32_t bits = 0;
   while ((1u << bits) < num_members) ++bits;
   return bits;
+}
+
+uint32_t EvalStructMemberWidth(const StructMember& m,
+                               const TypedefMap& typedefs) {
+  if (m.packed_dim_left && m.packed_dim_right) {
+    auto left = ConstEvalInt(m.packed_dim_left);
+    auto right = ConstEvalInt(m.packed_dim_right);
+    if (left && right) {
+      auto w = std::abs(*left - *right) + 1;
+      return static_cast<uint32_t>(w);
+    }
+  }
+  if (m.type_kind == DataTypeKind::kNamed && !m.type_name.empty()) {
+    auto it = typedefs.find(m.type_name);
+    if (it != typedefs.end()) return EvalTypeWidth(it->second, typedefs);
+  }
+  return EvalStructMemberWidth(m);
 }
 
 static uint32_t EvalStructOrUnionWidth(const DataType& dtype) {
@@ -58,6 +77,39 @@ static uint32_t EvalStructOrUnionWidth(const DataType& dtype) {
     total += EvalStructMemberWidth(m);
   }
   return total;
+}
+
+static uint32_t EvalStructOrUnionWidth(const DataType& dtype,
+                                       const TypedefMap& typedefs) {
+  if (dtype.struct_members.empty()) return 0;
+  if (dtype.kind == DataTypeKind::kUnion) {
+    uint32_t max_w = 0;
+    for (const auto& m : dtype.struct_members) {
+      max_w = std::max(max_w, EvalStructMemberWidth(m, typedefs));
+    }
+    if (dtype.is_tagged && dtype.is_packed)
+      max_w += TagBitWidth(static_cast<uint32_t>(dtype.struct_members.size()));
+    return max_w;
+  }
+  uint32_t total = 0;
+  for (const auto& m : dtype.struct_members) {
+    total += EvalStructMemberWidth(m, typedefs);
+  }
+  return total;
+}
+
+uint32_t TaggedUnionTagWidth(const DataType& dtype) {
+  if (dtype.kind != DataTypeKind::kUnion) return 0;
+  if (!dtype.is_tagged || !dtype.is_packed) return 0;
+  if (dtype.struct_members.empty()) return 0;
+  return TagBitWidth(static_cast<uint32_t>(dtype.struct_members.size()));
+}
+
+uint32_t TaggedUnionTagBitOffset(const DataType& dtype) {
+  uint32_t tag_w = TaggedUnionTagWidth(dtype);
+  if (tag_w == 0) return 0;
+  uint32_t total = EvalTypeWidth(dtype);
+  return total - tag_w;
 }
 
 static uint32_t EvalRangeWidth(const Expr* left_expr, const Expr* right_expr) {
@@ -171,7 +223,20 @@ static const DataType* ResolveNamed(const DataType& dtype,
 
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs) {
   const auto* resolved = ResolveNamed(dtype, typedefs);
-  return resolved ? EvalTypeWidth(*resolved, typedefs) : EvalTypeWidth(dtype);
+  if (resolved) return EvalTypeWidth(*resolved, typedefs);
+  if (dtype.kind == DataTypeKind::kStruct ||
+      dtype.kind == DataTypeKind::kUnion) {
+    if (dtype.packed_dim_left && dtype.packed_dim_right) {
+      uint32_t w =
+          EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right);
+      for (const auto& [left, right] : dtype.extra_packed_dims) {
+        w *= EvalRangeWidth(left, right);
+      }
+      if (w > 0) return w;
+    }
+    return EvalStructOrUnionWidth(dtype, typedefs);
+  }
+  return EvalTypeWidth(dtype);
 }
 
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,

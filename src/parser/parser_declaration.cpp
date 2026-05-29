@@ -153,6 +153,7 @@ void Parser::ParseStructMembers(DataType& dtype) {
       member.packed_dim_left = member_type.packed_dim_left;
       member.packed_dim_right = member_type.packed_dim_right;
       member.extra_packed_dims = member_type.extra_packed_dims;
+      member.type_name = member_type.type_name;
       member.name = Expect(TokenKind::kIdentifier).text;
       ParseUnpackedDims(member.unpacked_dims);
       if (Match(TokenKind::kEq)) {
