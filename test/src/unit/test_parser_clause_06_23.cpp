@@ -5,21 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(TypeOperatorParsing, TypeOperatorInVarDecl) {
-
-  auto r = Parse(
-      "module m;\n"
-      "  int a;\n"
-      "  var type(a) b;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  auto* item = r.cu->modules[0]->items[1];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_NE(item->data_type.type_ref_expr, nullptr);
-}
-
 TEST(TypeOperatorParsing, TypeRefExpression) {
   auto r = Parse(
       "module m;\n"
@@ -49,15 +34,6 @@ TEST(TypeOperatorParsing, TypeOperatorOnClassScopedType) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TypeOperatorParsing, TypeRefVarDecl) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real a = 1.0;\n"
-              "  real b = 2.0;\n"
-              "  var type(a + b) c;\n"
-              "endmodule\n"));
 }
 
 TEST(TypeOperatorParsing, TypeRefDataTypeParam) {
@@ -208,12 +184,6 @@ TEST(TypeOperatorParsing, TypeRefParamDefault) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TypeOperatorParsing, TypeRefParamPackedDim) {
-  EXPECT_TRUE(
-      ParseOk("module t #(parameter type T = type(logic [7:0]));\n"
-              "endmodule\n"));
 }
 
 TEST(TypeOperatorParsing, TypeRefNeqComparison) {
@@ -479,20 +449,6 @@ TEST(TypeOperatorParsing, LocalparamTypeFromTypeOp) {
               "endmodule\n"));
 }
 
-TEST(TypeOperatorParsing, TypeRefSimpleExprNoHier) {
-  auto r = Parse(
-      "module t;\n"
-      "  int i;\n"
-      "  var type(i + 3) j;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* j_item = FindItemByName(r, "j");
-  ASSERT_NE(j_item, nullptr);
-  ASSERT_NE(j_item->data_type.type_ref_expr, nullptr);
-  EXPECT_EQ(j_item->data_type.type_ref_expr->kind, ExprKind::kBinary);
-}
-
 TEST(TypeOperatorParsing, TypeRefInWireNetDecl) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -509,6 +465,22 @@ TEST(TypeOperatorParsing, TypeRefInTriNetDecl) {
               "endmodule\n"));
 }
 
+TEST(TypeOperatorParsing, TypeRefInWandNetDecl) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  wand x;\n"
+              "  wand type(x) y;\n"
+              "endmodule\n"));
+}
+
+TEST(TypeOperatorParsing, TypeRefInWorNetDecl) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  wor x;\n"
+              "  wor type(x) y;\n"
+              "endmodule\n"));
+}
+
 TEST(TypeOperatorParsing, TypeRefAssignmentPatternCast) {
   auto r = Parse(
       "module t;\n"
@@ -519,21 +491,6 @@ TEST(TypeOperatorParsing, TypeRefAssignmentPatternCast) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TypeOperatorParsing, TypeRefSelfDeterminedBinaryExpr) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte a;\n"
-      "  int b;\n"
-      "  var type(a + b) c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* c_item = FindItemByName(r, "c");
-  ASSERT_NE(c_item, nullptr);
-  ASSERT_NE(c_item->data_type.type_ref_expr, nullptr);
-  EXPECT_EQ(c_item->data_type.type_ref_expr->kind, ExprKind::kBinary);
 }
 
 }

@@ -481,6 +481,17 @@ class Elaborator {
   void CheckAggregateCompareOp(const Expr* expr);
   void WalkStmtsForAggregateCompare(const Stmt* s);
 
+  void ValidateTypeRefComparisons(const ModuleDecl* decl);
+  void WalkExprForTypeRefCompare(const Expr* expr);
+  void CheckTypeRefCompareOp(const Expr* expr);
+  void WalkStmtsForTypeRefCompare(const Stmt* s);
+
+  void ValidateTypeRefArgs(const ModuleDecl* decl);
+  void WalkExprForTypeRefArg(const Expr* expr);
+  void WalkStmtsForTypeRefArg(const Stmt* s);
+  void CheckTypeRefArgInner(const Expr* inner, SourceLoc loc);
+  bool TypeRefArgUsesDynamicElement(const Expr* e) const;
+
   void ValidateTaggedUnionMembers(const ModuleDecl* decl);
   void WalkStmtsForTaggedExpr(const Stmt* s);
   void CheckTaggedExprMember(const Expr* lhs, const Expr* rhs);

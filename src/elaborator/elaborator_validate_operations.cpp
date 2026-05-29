@@ -91,6 +91,177 @@ void Elaborator::ValidateAggregateComparisons(const ModuleDecl* decl) {
   }
 }
 
+// §6.23 — A type reference used in an equality, inequality, case-equality,
+// or case-inequality comparison shall only be compared with another type
+// reference. Reject any such comparison whose other operand is a value
+// expression rather than a kTypeRef node.
+void Elaborator::CheckTypeRefCompareOp(const Expr* expr) {
+  if (!expr->lhs || !expr->rhs) return;
+  bool lhs_is_type = expr->lhs->kind == ExprKind::kTypeRef;
+  bool rhs_is_type = expr->rhs->kind == ExprKind::kTypeRef;
+  if (lhs_is_type == rhs_is_type) return;
+  diag_.Error(expr->range.start,
+              "type reference may be compared only with another type "
+              "reference");
+}
+
+void Elaborator::WalkExprForTypeRefCompare(const Expr* expr) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kBinary &&
+      (expr->op == TokenKind::kEqEq || expr->op == TokenKind::kBangEq ||
+       expr->op == TokenKind::kEqEqEq || expr->op == TokenKind::kBangEqEq)) {
+    CheckTypeRefCompareOp(expr);
+  }
+  WalkExprForTypeRefCompare(expr->lhs);
+  WalkExprForTypeRefCompare(expr->rhs);
+  WalkExprForTypeRefCompare(expr->condition);
+  WalkExprForTypeRefCompare(expr->true_expr);
+  WalkExprForTypeRefCompare(expr->false_expr);
+  for (auto* elem : expr->elements) WalkExprForTypeRefCompare(elem);
+  for (auto* arg : expr->args) WalkExprForTypeRefCompare(arg);
+}
+
+void Elaborator::WalkStmtsForTypeRefCompare(const Stmt* s) {
+  if (!s) return;
+  WalkExprForTypeRefCompare(s->rhs);
+  WalkExprForTypeRefCompare(s->lhs);
+  WalkExprForTypeRefCompare(s->expr);
+  WalkExprForTypeRefCompare(s->condition);
+  WalkExprForTypeRefCompare(s->assert_expr);
+  for (auto* sub : s->stmts) WalkStmtsForTypeRefCompare(sub);
+  WalkStmtsForTypeRefCompare(s->then_branch);
+  WalkStmtsForTypeRefCompare(s->else_branch);
+  WalkStmtsForTypeRefCompare(s->body);
+  WalkStmtsForTypeRefCompare(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForTypeRefCompare(ci.body);
+}
+
+void Elaborator::ValidateTypeRefComparisons(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForTypeRefCompare(item->body);
+    }
+    if (item->kind == ModuleItemKind::kContAssign && item->assign_rhs) {
+      WalkExprForTypeRefCompare(item->assign_rhs);
+    }
+  }
+}
+
+// §6.23 — the expression supplied to the type operator shall not contain a
+// hierarchical reference or a reference to an element of a dynamic object.
+// A member-access subtree is treated as a hierarchical reference; a select
+// whose base names a dynamic array or associative array is treated as a
+// reference to a dynamic-object element.
+static bool TypeRefArgHasMemberAccess(const Expr* e) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kMemberAccess) return true;
+  if (TypeRefArgHasMemberAccess(e->lhs)) return true;
+  if (TypeRefArgHasMemberAccess(e->rhs)) return true;
+  if (TypeRefArgHasMemberAccess(e->base)) return true;
+  if (TypeRefArgHasMemberAccess(e->index)) return true;
+  if (TypeRefArgHasMemberAccess(e->condition)) return true;
+  if (TypeRefArgHasMemberAccess(e->true_expr)) return true;
+  if (TypeRefArgHasMemberAccess(e->false_expr)) return true;
+  for (const auto* elem : e->elements) {
+    if (TypeRefArgHasMemberAccess(elem)) return true;
+  }
+  for (const auto* arg : e->args) {
+    if (TypeRefArgHasMemberAccess(arg)) return true;
+  }
+  return false;
+}
+
+bool Elaborator::TypeRefArgUsesDynamicElement(const Expr* e) const {
+  if (!e) return false;
+  if (e->kind == ExprKind::kSelect && e->base &&
+      e->base->kind == ExprKind::kIdentifier) {
+    auto it = var_array_info_.find(e->base->text);
+    if (it != var_array_info_.end() &&
+        (it->second.is_dynamic || it->second.is_assoc)) {
+      return true;
+    }
+  }
+  if (TypeRefArgUsesDynamicElement(e->lhs)) return true;
+  if (TypeRefArgUsesDynamicElement(e->rhs)) return true;
+  if (TypeRefArgUsesDynamicElement(e->base)) return true;
+  if (TypeRefArgUsesDynamicElement(e->index)) return true;
+  if (TypeRefArgUsesDynamicElement(e->condition)) return true;
+  if (TypeRefArgUsesDynamicElement(e->true_expr)) return true;
+  if (TypeRefArgUsesDynamicElement(e->false_expr)) return true;
+  for (const auto* elem : e->elements) {
+    if (TypeRefArgUsesDynamicElement(elem)) return true;
+  }
+  for (const auto* arg : e->args) {
+    if (TypeRefArgUsesDynamicElement(arg)) return true;
+  }
+  return false;
+}
+
+void Elaborator::CheckTypeRefArgInner(const Expr* inner, SourceLoc loc) {
+  if (!inner) return;
+  if (TypeRefArgHasMemberAccess(inner)) {
+    diag_.Error(loc,
+                "type operator argument shall not contain a hierarchical "
+                "reference");
+    return;
+  }
+  if (TypeRefArgUsesDynamicElement(inner)) {
+    diag_.Error(loc,
+                "type operator argument shall not reference elements of "
+                "dynamic objects");
+  }
+}
+
+void Elaborator::WalkExprForTypeRefArg(const Expr* expr) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kTypeRef) {
+    CheckTypeRefArgInner(expr->lhs, expr->range.start);
+  }
+  WalkExprForTypeRefArg(expr->lhs);
+  WalkExprForTypeRefArg(expr->rhs);
+  WalkExprForTypeRefArg(expr->condition);
+  WalkExprForTypeRefArg(expr->true_expr);
+  WalkExprForTypeRefArg(expr->false_expr);
+  for (auto* elem : expr->elements) WalkExprForTypeRefArg(elem);
+  for (auto* arg : expr->args) WalkExprForTypeRefArg(arg);
+}
+
+void Elaborator::WalkStmtsForTypeRefArg(const Stmt* s) {
+  if (!s) return;
+  WalkExprForTypeRefArg(s->lhs);
+  WalkExprForTypeRefArg(s->rhs);
+  WalkExprForTypeRefArg(s->expr);
+  WalkExprForTypeRefArg(s->condition);
+  WalkExprForTypeRefArg(s->assert_expr);
+  if (s->var_decl_type.type_ref_expr) {
+    CheckTypeRefArgInner(s->var_decl_type.type_ref_expr, s->range.start);
+  }
+  for (auto* sub : s->stmts) WalkStmtsForTypeRefArg(sub);
+  WalkStmtsForTypeRefArg(s->then_branch);
+  WalkStmtsForTypeRefArg(s->else_branch);
+  WalkStmtsForTypeRefArg(s->body);
+  WalkStmtsForTypeRefArg(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForTypeRefArg(ci.body);
+}
+
+void Elaborator::ValidateTypeRefArgs(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->data_type.type_ref_expr) {
+      CheckTypeRefArgInner(item->data_type.type_ref_expr, item->loc);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForTypeRefArg(item->body);
+    }
+    if (item->kind == ModuleItemKind::kContAssign && item->assign_rhs) {
+      WalkExprForTypeRefArg(item->assign_rhs);
+    }
+  }
+}
+
 // After the tagged keyword the BNF allows only a member identifier drawn from
 // the target tagged union type. When the LHS of an assignment resolves to a
 // variable whose typedef is a tagged union, reject a tag name that is not

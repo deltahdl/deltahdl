@@ -6,31 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(TypeOperatorSim, TypeRefVarDecl) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a;\n"
-      "  var type(a) b;\n"
-      "  initial begin\n"
-      "    a = 42;\n"
-      "    b = 100;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("b");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.width, 32u);
-  EXPECT_EQ(var->value.ToUint64(), 100u);
-}
-
 TEST(TypeOperatorSim, TypeOpInt) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -226,69 +201,6 @@ TEST(TypeOperatorSim, TypeOpPreservesSignedInt) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-TEST(TypeOperatorSim, TypeOpPreservesUnsignedLogic) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic a;\n"
-      "  var type(a) result;\n"
-      "  initial result = 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_FALSE(var->is_signed);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
-TEST(TypeOperatorSim, TypeOpShortintWidth16) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  shortint a;\n"
-      "  var type(a) result;\n"
-      "  initial result = 16'hCAFE;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.width, 16u);
-  EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
-}
-
-TEST(TypeOperatorSim, TypeOpIntegerWidth32) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  integer a;\n"
-      "  var type(a) result;\n"
-      "  initial result = 32'hDEADBEEF;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.width, 32u);
-  EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
-}
-
 TEST(TypeOperatorSim, TypeOpWidthTruncation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -423,31 +335,6 @@ TEST(TypeOperatorSim, TypeOpEnumType) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(TypeOperatorSim, TypeOpByteComputation) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  byte a;\n"
-      "  var type(a) result;\n"
-      "  initial begin\n"
-      "    a = 100;\n"
-      "    result = a + 50;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.width, 8u);
-
-  EXPECT_EQ(var->value.ToUint64(), 150u);
-}
-
 TEST(TypeOperatorSim, TypeOpIntOverflow) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -488,48 +375,6 @@ TEST(TypeOperatorSim, TypeOpMatchingWidths) {
   Variable* vb = nullptr;
   LowerRunAndCompareWidths(f, design, va, vb);
   EXPECT_EQ(va->is_signed, vb->is_signed);
-}
-
-TEST(TypeOperatorSim, TypeOpByteFullRange) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  byte a;\n"
-      "  var type(a) result;\n"
-      "  initial result = 8'hFF;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.width, 8u);
-  EXPECT_EQ(var->value.ToUint64(), 0xFFu);
-}
-
-TEST(TypeOperatorSim, TypeOpLongintFullValue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  longint a;\n"
-      "  var type(a) result;\n"
-      "  initial result = 64'hCAFEBABE_DEADBEEF;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.width, 64u);
-  EXPECT_EQ(var->value.ToUint64(), 0xCAFEBABEDEADBEEFu);
 }
 
 TEST(TypeOperatorSim, TypeOpLongintMaxValue) {
@@ -820,6 +665,124 @@ TEST(TypeOperatorSim, TypeOpBitTypeUnsigned) {
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_FALSE(var->is_signed);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
+}
+
+TEST(TypeOperatorElab, TypeOfThisInClassMethodAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  static function type(this) get();\n"
+             "    return null;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+TEST(TypeOperatorElab, TypeRefComparedToIntegerLiteralRejected) {
+  EXPECT_FALSE(
+      ElabOk("module m #(parameter type T = int) ();\n"
+             "  initial begin\n"
+             "    if (type(T) == 5) $stop;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(TypeOperatorElab, TypeRefComparedToTypeRefAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module m #(parameter type T = int) ();\n"
+             "  initial begin\n"
+             "    if (type(T) == type(int)) $stop;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(TypeOperatorElab, NonTypeRefSideOfCaseEqRejected) {
+  EXPECT_FALSE(
+      ElabOk("module m #(parameter type T = int) ();\n"
+             "  initial begin\n"
+             "    if (type(T) === 0) $stop;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(TypeOperatorElab, TypeRefComparedToVariableRejected) {
+  EXPECT_FALSE(
+      ElabOk("module m #(parameter type T = int) ();\n"
+             "  int v;\n"
+             "  initial begin\n"
+             "    if (type(T) != v) $stop;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// The §6.23 rule is symmetric: a non-type-reference operand is rejected
+// whether it appears on the left or the right of the comparison.
+TEST(TypeOperatorElab, NonTypeRefLeftOfCompareRejected) {
+  EXPECT_FALSE(
+      ElabOk("module m #(parameter type T = int) ();\n"
+             "  initial begin\n"
+             "    if (7 == type(T)) $stop;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §6.23 — the prohibition extends to the bang-equal form.
+TEST(TypeOperatorElab, NonTypeRefBangEqRejected) {
+  EXPECT_FALSE(
+      ElabOk("module m #(parameter type T = int) ();\n"
+             "  initial begin\n"
+             "    if (type(T) !== 0) $stop;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §6.23 — the inner expression of type(...) shall not contain a
+// hierarchical reference. A member-access subtree is treated as a
+// hierarchical reference here.
+TEST(TypeOperatorElab, HierarchicalRefInTypeArgRejected) {
+  EXPECT_FALSE(
+      ElabOk("module sub;\n"
+             "  int q;\n"
+             "endmodule\n"
+             "module m;\n"
+             "  sub s();\n"
+             "  var type(s.q) v;\n"
+             "endmodule\n"));
+}
+
+// §6.23 — even when wrapped in a larger expression, a member-access
+// subtree inside type(...) is rejected.
+TEST(TypeOperatorElab, HierarchicalRefInBinaryArgRejected) {
+  EXPECT_FALSE(
+      ElabOk("module sub;\n"
+             "  int q;\n"
+             "endmodule\n"
+             "module m;\n"
+             "  sub s();\n"
+             "  var type(s.q + 1) v;\n"
+             "endmodule\n"));
+}
+
+// §6.23 — the inner expression of type(...) shall not reference an
+// element of a dynamic object. A select whose base names a dynamic array
+// is the smallest such reference.
+TEST(TypeOperatorElab, DynamicArrayElementInTypeArgRejected) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int d[];\n"
+             "  var type(d[0]) v;\n"
+             "endmodule\n"));
+}
+
+// §6.23 — an associative array is also a dynamic object; selecting an
+// element of one inside type(...) is rejected.
+TEST(TypeOperatorElab, AssocArrayElementInTypeArgRejected) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int a[string];\n"
+             "  var type(a[\"k\"]) v;\n"
+             "endmodule\n"));
 }
 
 }

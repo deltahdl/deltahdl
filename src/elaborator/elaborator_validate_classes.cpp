@@ -1099,8 +1099,19 @@ void Elaborator::ValidateClassHandleContAssign(const ModuleItem* item) {
   }
 }
 
+static bool IsLiteralTypeOfThis(const Expr* e) {
+  return e && e->kind == ExprKind::kTypeRef && e->lhs &&
+         e->lhs->kind == ExprKind::kIdentifier && e->lhs->text == "this";
+}
+
 static bool ExprRefsThisOrSuper(const Expr* e) {
   if (!e) return false;
+  // §8.11 lists type(this) as a permitted form alongside non-static class
+  // methods, constraints, and covergroups. The cross-reference in §6.23
+  // names it as a way to obtain the enclosing class type without evaluating
+  // any expression, so the literal form may appear even where a bare 'this'
+  // would otherwise be flagged.
+  if (IsLiteralTypeOfThis(e)) return false;
   if (e->kind == ExprKind::kIdentifier &&
       (e->text == "this" || e->text == "super"))
     return true;

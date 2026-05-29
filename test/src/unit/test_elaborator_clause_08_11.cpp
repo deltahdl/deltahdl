@@ -130,4 +130,70 @@ TEST(ThisElaboration, BareThisInClassMethodOk) {
              "endmodule\n"));
 }
 
+// §8.11 lists type(this) as a permitted form alongside non-static class
+// methods, constraints, inlined constraint methods, and covergroups embedded
+// in classes. Static method bodies otherwise forbid bare 'this', yet the
+// literal type(this) form may still appear there because §6.23 names it as
+// a way to obtain the enclosing class type without evaluating any expression.
+TEST(ThisElaboration, TypeOfThisInStaticMethodBodyAllowed) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  static function int f();\n"
+             "    int b;\n"
+             "    if (type(this) == type(int)) b = 1;\n"
+             "    return b;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+// §8.11 also permits 'this' inside a covergroup embedded within a class.
+// The validator must not flag a reference to 'this' when the enclosing
+// context is a class-member covergroup.
+TEST(ThisElaboration, ThisInClassCovergroupOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  int x;\n"
+             "  covergroup cg;\n"
+             "    coverpoint this.x;\n"
+             "  endgroup\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+// §8.11 also permits 'this' inside a class constraint block. The
+// validator must not flag such a reference when the enclosing context is
+// the body of a constraint declared on a class.
+TEST(ThisElaboration, ThisInClassConstraintBlockOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  rand int x;\n"
+             "  constraint c { this.x > 0; }\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+// The exception is restricted to the literal form type(this). A 'this' that
+// appears as part of a richer expression inside type(...) is still subject
+// to §8.11.
+TEST(ThisElaboration, ThisInsideMemberAccessInsideTypeOpRejected) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  static function int f();\n"
+             "    int b;\n"
+             "    if (type(this.x) == type(int)) b = 1;\n"
+             "    return b;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
 }

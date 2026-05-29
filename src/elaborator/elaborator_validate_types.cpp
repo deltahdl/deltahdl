@@ -54,6 +54,8 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
 
   ValidateDeferredAssertionActions(decl);
   ValidateAggregateComparisons(decl);
+  ValidateTypeRefComparisons(decl);
+  ValidateTypeRefArgs(decl);
   ValidateTaggedUnionMembers(decl);
   ValidateRealOperatorRestrictions(decl);
   ValidateAssignInExprRestrictions(decl);
@@ -568,6 +570,7 @@ static bool InferTypeRefExprSigned(const Expr* expr, const RtlirModule* mod) {
 void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
   if (!item->data_type.type_ref_expr) return;
   auto* ref = item->data_type.type_ref_expr;
+  CheckTypeRefArgInner(ref, item->loc);
   if (ref->kind != ExprKind::kIdentifier) {
 
     uint32_t w = InferTypeRefExprWidth(ref, mod);
