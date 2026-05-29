@@ -98,14 +98,23 @@ static ExecTask ExecRsProdCase(const Stmt* stmt, const RsProd& prod,
 static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
                            SimContext& ctx, Arena& arena) {
   switch (prod.kind) {
-    case RsProdKind::kCodeBlock:
+    case RsProdKind::kCodeBlock: {
+      // 18.17: every code block inside a randsequence is its own anonymous
+      // automatic scope. Variables it declares are recreated on each execution
+      // and do not leak to sibling code blocks or outlive the block, so we
+      // bracket the statements with a fresh automatic scope.
+      ctx.PushScope();
+      StmtResult block_result = StmtResult::kDone;
       for (auto* s : prod.code_stmts) {
         auto result = co_await ExecStmt(s, ctx, arena);
         if (result == StmtResult::kBreak || result == StmtResult::kReturn) {
-          co_return result;
+          block_result = result;
+          break;
         }
       }
-      co_return StmtResult::kDone;
+      ctx.PopScope();
+      co_return block_result;
+    }
     case RsProdKind::kItem:
       co_return co_await ExecRsProduction(stmt, prod.item.name, ctx, arena);
     case RsProdKind::kIf:
@@ -186,7 +195,13 @@ static ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx,
   std::string_view top = stmt->rs_top_production;
   if (top.empty()) top = stmt->rs_productions[0].name;
 
+  // 18.17: the randsequence statement creates an automatic scope enclosing the
+  // generated productions and their code blocks. Production identifiers are
+  // already resolved only within this statement, so the pushed scope provides
+  // the enclosing automatic lifetime for the block.
+  ctx.PushScope();
   auto result = co_await ExecRsProduction(stmt, top, ctx, arena);
+  ctx.PopScope();
 
   (void)result;
   co_return StmtResult::kDone;
