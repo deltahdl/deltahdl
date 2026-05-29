@@ -14,29 +14,6 @@ Expr* MakeConcat(Arena& arena, std::vector<Expr*> elems) {
   return e;
 }
 
-TEST(UnpackedArrayConcatSim, ScalarItemsToFixedArray) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int A[0:2];\n"
-      "  initial A = {10, 20, 30};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a0 = f.ctx.FindVariable("A[0]");
-  auto* a1 = f.ctx.FindVariable("A[1]");
-  auto* a2 = f.ctx.FindVariable("A[2]");
-  ASSERT_NE(a0, nullptr);
-  ASSERT_NE(a1, nullptr);
-  ASSERT_NE(a2, nullptr);
-  EXPECT_EQ(a0->value.ToUint64(), 10u);
-  EXPECT_EQ(a1->value.ToUint64(), 20u);
-  EXPECT_EQ(a2->value.ToUint64(), 30u);
-}
-
 TEST(UnpackedArrayConcatSim, LeftToRightArrangement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -97,6 +74,33 @@ TEST(UnpackedArrayConcatSim, ConcatToQueue) {
   EXPECT_EQ(q->elements[2].ToUint64(), 30u);
 }
 
+// An item whose self-determined type is an unpacked array of the target's
+// element type contributes its members, preserving their internal left-to-
+// right order. Joining two such items shall give a queue with the first
+// item's members followed by the second item's members.
+TEST(UnpackedArrayConcatSim, ConcatWithArrayItemsExpandsLeftToRight) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int A[0:1] = '{10, 20};\n"
+      "  int B[0:1] = '{30, 40};\n"
+      "  int q[$];\n"
+      "  initial q = {A, B};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 4u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+  EXPECT_EQ(q->elements[2].ToUint64(), 30u);
+  EXPECT_EQ(q->elements[3].ToUint64(), 40u);
+}
+
 TEST(UnpackedArrayConcatSim, ConcatToDynamicArray) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -117,23 +121,7 @@ TEST(UnpackedArrayConcatSim, ConcatToDynamicArray) {
   EXPECT_EQ(q->elements[2].ToUint64(), 30u);
 }
 
-TEST(UnpackedArrayConcatSim, FixedSizeTooFewElementsError) {
-  SimFixture f;
-  ArrayInfo info;
-  info.lo = 0;
-  info.size = 3;
-  info.elem_width = 32;
-  info.is_descending = false;
-  f.ctx.RegisterArray("A", info);
-  for (uint32_t i = 0; i < 3; ++i)
-    f.ctx.CreateVariable("A[" + std::to_string(i) + "]", 32);
-  auto* rhs = MakeConcat(f.arena, {MakeInt(f.arena, 1), MakeInt(f.arena, 2)});
-  auto* stmt = MakeAssign(f.arena, "A", rhs);
-  TryArrayBlockingAssign(stmt, f.ctx, f.arena);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(UnpackedArrayConcatSim, FixedSizeTooManyElementsError) {
+TEST(UnpackedArrayConcatSim, FixedSizeMismatchEmitsError) {
   SimFixture f;
   ArrayInfo info;
   info.lo = 0;

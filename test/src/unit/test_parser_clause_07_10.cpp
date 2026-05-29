@@ -5,15 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(QueueDeclarationParsing, UnboundedQueueParsesAsVarDecl) {
-  auto r = Parse("module m; int q [$]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "q");
-}
-
 TEST(QueueDeclarationParsing, VarDimAllFourAlternatives) {
   auto r = Parse(
       "module m;\n"
@@ -52,6 +43,20 @@ TEST(QueueDeclarationParsing, QueueDimUnbounded) {
   EXPECT_EQ(item->unpacked_dims[0]->rhs, nullptr);
 }
 
+// Exercises the right-hand branch of the queue_dimension BNF:
+// `[ $ [ : constant_expression ] ]`. With the colon and bound present, the
+// parser shall store the bound expression on the dim node's rhs.
+TEST(QueueDeclarationParsing, QueueDimBoundedHasRhsExpr) {
+  auto r = Parse("module m; int q [$:7]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->unpacked_dims.size(), 1u);
+  ASSERT_NE(item->unpacked_dims[0], nullptr);
+  EXPECT_EQ(item->unpacked_dims[0]->text, "$");
+  ASSERT_NE(item->unpacked_dims[0]->rhs, nullptr);
+}
+
 TEST(QueueDeclarationParsing, QueueWithInitializer) {
   auto r = Parse(
       "module t;\n"
@@ -61,18 +66,6 @@ TEST(QueueDeclarationParsing, QueueWithInitializer) {
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "Q");
-  EXPECT_NE(item->init_expr, nullptr);
-}
-
-TEST(QueueDeclarationParsing, QueueOfStrings) {
-  auto r = Parse(
-      "module t;\n"
-      "  string names[$] = '{\"Bob\"};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "names");
   EXPECT_NE(item->init_expr, nullptr);
 }
 

@@ -474,6 +474,7 @@ class Elaborator {
   void ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl);
   void WalkStmtsForArrayConcatNesting(const Stmt* s);
   void CheckArrayConcatNestingInAssign(const Stmt* s);
+  void CheckNullItemInArrayConcatAssign(const Stmt* s);
 
   void ValidateAggregateComparisons(const ModuleDecl* decl);
   void WalkExprForAggregateCompare(const Expr* expr);

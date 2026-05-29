@@ -96,4 +96,70 @@ TEST(UnpackedArrayConcatElaboration, DynamicArrayTargetElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// "An unpacked array concatenation may appear as the source expression in an
+// assignment-like context and shall not appear in any other context." A
+// fixed-size unpacked target is one of the three legal slowest-varying
+// dimensions (fixed-size, queue, dynamic). Mixing array and scalar items in
+// the source — the LRM's `{A, 4, 5, A, 6}` shape — must elaborate cleanly.
+TEST(UnpackedArrayConcatElaboration, MixedItemsForFixedSizeTarget) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int A[1:3] = '{1, 2, 3};\n"
+      "  int B[1:9];\n"
+      "  initial B = {A, 4, 5, A, 6};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Items in an unpacked array concatenation must have a self-determined type.
+// A bare brace expression nested inside the outer concatenation has no
+// self-determined type when its width does not match the target element
+// width (and so cannot represent a single element), so the elaborator shall
+// reject the assignment.
+TEST(UnpackedArrayConcatElaboration, NestedBraceItemRejected) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int A3[1:3];\n"
+      "  int A9[1:9];\n"
+      "  initial A9 = {A3, {32'd4, 32'd5, 32'd6, 32'd7, 32'd8, 32'd9}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// The literal `null` is only a legal item when the target's element type is
+// event, class, interface class, chandle, or virtual interface. An int array
+// target does not qualify, so a null item is rejected.
+TEST(UnpackedArrayConcatElaboration, NullItemRejectedForIntElementType) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial q = {1, null, 3};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// A chandle array's element type is explicitly listed by the rule as allowing
+// null items, so an unpacked concatenation containing null shall elaborate
+// without errors.
+TEST(UnpackedArrayConcatElaboration, NullItemAllowedForChandleElementType) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  chandle q[$];\n"
+      "  initial q = {null, null};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }

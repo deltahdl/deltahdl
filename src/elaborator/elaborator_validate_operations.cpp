@@ -659,11 +659,39 @@ void Elaborator::CheckArrayConcatNestingInAssign(const Stmt* s) {
   }
 }
 
+// Element types for which the literal `null` is a legal item in an unpacked
+// array concatenation. Kinds outside this set make a null item illegal.
+// `kNamed` is conservatively treated as legal because the named type could
+// be a class or interface class; the elem-type record does not carry the
+// resolved name, so we err on the permissive side rather than reject a
+// legitimate class array.
+static bool NullItemIsLegalForElemType(DataTypeKind k) {
+  return k == DataTypeKind::kEvent || k == DataTypeKind::kChandle ||
+         k == DataTypeKind::kVirtualInterface || k == DataTypeKind::kNamed;
+}
+
+void Elaborator::CheckNullItemInArrayConcatAssign(const Stmt* s) {
+  if (!s->lhs || !s->rhs) return;
+  if (s->lhs->kind != ExprKind::kIdentifier) return;
+  if (s->rhs->kind != ExprKind::kConcatenation) return;
+  auto it = var_array_info_.find(s->lhs->text);
+  if (it == var_array_info_.end()) return;
+  if (NullItemIsLegalForElemType(it->second.elem_type)) return;
+  for (auto* elem : s->rhs->elements) {
+    if (elem->kind == ExprKind::kIdentifier && elem->text == "null") {
+      diag_.Error(elem->range.start,
+                  "null is not a legal item in an unpacked array "
+                  "concatenation for this target element type");
+    }
+  }
+}
+
 void Elaborator::WalkStmtsForArrayConcatNesting(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
     CheckArrayConcatNestingInAssign(s);
+    CheckNullItemInArrayConcatAssign(s);
   }
   for (auto* sub : s->stmts) WalkStmtsForArrayConcatNesting(sub);
   WalkStmtsForArrayConcatNesting(s->then_branch);
