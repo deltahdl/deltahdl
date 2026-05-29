@@ -35,6 +35,19 @@ void ConstraintSolver::SetAllRandMode(bool enabled) {
   for (auto& [name, var] : variables_) var.enabled = enabled;
 }
 
+void ConstraintSolver::ApplyInlineRandomList(
+    const std::vector<std::string>& names) {
+  // 18.11: the argument list designates the complete set of active random
+  // variables; everything else becomes a state variable. Only the active flag
+  // is touched here — the qualifier (and thus the cyclical mode) is left as it
+  // was declared, so this can neither promote a variable to randc nor demote a
+  // randc variable to noncyclical rand.
+  std::unordered_set<std::string> active(names.begin(), names.end());
+  for (auto& [name, var] : variables_) {
+    var.enabled = active.find(name) != active.end();
+  }
+}
+
 void ConstraintSolver::SetValue(std::string_view name, int64_t value) {
   auto it = variables_.find(std::string(name));
   if (it != variables_.end()) it->second.value = value;

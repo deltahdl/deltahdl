@@ -1581,6 +1581,43 @@ static void CheckMemberAccessVisibility(
   }
 }
 
+// 18.11: naming a property in randomize()'s inline argument list changes that
+// property's random mode. The random mode of a local or protected member may
+// only be changed where the caller can reach that member. When randomize() is
+// invoked through an external class handle, its arguments name members of that
+// handle's class, so the same visibility rule that governs an obj.member access
+// applies to each argument here.
+static void CheckRandomizeArgVisibility(
+    const Expr* e,
+    const std::unordered_map<std::string_view, std::string_view>& var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  const Expr* recv = e->lhs;
+  if (!recv || recv->kind != ExprKind::kMemberAccess || !recv->lhs ||
+      !recv->rhs)
+    return;
+  if (recv->rhs->kind != ExprKind::kIdentifier ||
+      recv->rhs->text != "randomize")
+    return;
+  if (recv->lhs->kind != ExprKind::kIdentifier) return;
+  auto it = var_types.find(recv->lhs->text);
+  if (it == var_types.end()) return;
+  const auto* cls = FindClassDecl(it->second, unit);
+  if (!cls) return;
+  for (const auto* arg : e->args) {
+    if (!arg || arg->kind != ExprKind::kIdentifier) continue;
+    const auto* m = FindMemberInClass(cls, arg->text, unit);
+    if (m && m->is_local) {
+      diag.Error(arg->range.start,
+                 "cannot change random mode of local member from outside "
+                 "its class");
+    } else if (m && m->is_protected) {
+      diag.Error(arg->range.start,
+                 "cannot change random mode of protected member from "
+                 "outside its class hierarchy");
+    }
+  }
+}
+
 static void CheckVisibilityExpr(
     const Expr* e,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
@@ -1588,6 +1625,9 @@ static void CheckVisibilityExpr(
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess && e->lhs && e->rhs) {
     CheckMemberAccessVisibility(e, var_types, unit, diag);
+  }
+  if (e->kind == ExprKind::kCall) {
+    CheckRandomizeArgVisibility(e, var_types, unit, diag);
   }
   CheckVisibilityExpr(e->lhs, var_types, unit, diag);
   CheckVisibilityExpr(e->rhs, var_types, unit, diag);

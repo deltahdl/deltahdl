@@ -206,6 +206,16 @@ class ConstraintSolver {
   // active state of all known variables in a single call.
   void SetAllRandMode(bool enabled);
 
+  // 18.11: apply the inline random variable control list, i.e. the argument
+  // list passed to randomize(). The named variables become the complete set of
+  // active random variables for the call; every other variable known to the
+  // solver is treated as a state variable (made inactive). This is equivalent
+  // to a set of rand_mode() calls that enable the named variables and disable
+  // all the others. The cyclical random mode is never affected: a variable
+  // keeps its rand/randc qualifier, so a noncyclical variable named in the list
+  // is not promoted to cyclical and a randc variable is not demoted.
+  void ApplyInlineRandomList(const std::vector<std::string>& names);
+
   // 18.8 / 18.5.8: record a variable's current value. An inactive variable
   // keeps this value as a constant while the active variables are randomized,
   // which is the state-variable treatment that global constraints rely on.
