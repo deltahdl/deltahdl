@@ -1732,6 +1732,128 @@ void Elaborator::ValidateArrayQueryOnDynamicType(const ModuleDecl* decl) {
   }
 }
 
+namespace {
+
+bool IsBitsCall(const Expr* e) {
+  return e && e->kind == ExprKind::kSystemCall && e->callee == "$bits" &&
+         e->args.size() == 1 && e->args[0];
+}
+
+// §20.6.2: a single argument that is a bare identifier names either the
+// dynamically sized typedef itself (NC12) or an interface-class object (NC13);
+// in either case there is no defined bit-stream size.
+void CheckBitsCallExpr(
+    const Expr* e, const std::unordered_set<std::string_view>& dyn_types,
+    const std::unordered_set<std::string_view>& dyn_funcs,
+    const std::unordered_set<std::string_view>& iface_vars, DiagEngine& diag) {
+  if (!e) return;
+  if (IsBitsCall(e)) {
+    const Expr* a = e->args[0];
+    if (a->kind == ExprKind::kIdentifier) {
+      if (dyn_types.count(a->text) != 0) {
+        diag.Error(e->range.start,
+                   std::format("'$bits' cannot be applied directly to "
+                               "dynamically sized type '{}'",
+                               a->text));
+      }
+      if (iface_vars.count(a->text) != 0) {
+        diag.Error(e->range.start,
+                   std::format("'$bits' shall not be applied to interface "
+                               "class object '{}'",
+                               a->text));
+      }
+    } else if (a->kind == ExprKind::kCall) {
+      std::string_view name = a->callee;
+      if (name.empty() && a->lhs && a->lhs->kind == ExprKind::kIdentifier)
+        name = a->lhs->text;
+      if (!name.empty() && dyn_funcs.count(name) != 0) {
+        diag.Error(e->range.start,
+                   std::format("'$bits' shall not enclose function '{}' "
+                               "whose return type is dynamically sized",
+                               name));
+      }
+    }
+  }
+  CheckBitsCallExpr(e->lhs, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallExpr(e->rhs, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallExpr(e->condition, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallExpr(e->true_expr, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallExpr(e->false_expr, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallExpr(e->base, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallExpr(e->index, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallExpr(e->index_end, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallExpr(e->repeat_count, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallExpr(e->with_expr, dyn_types, dyn_funcs, iface_vars, diag);
+  for (auto* a : e->args)
+    CheckBitsCallExpr(a, dyn_types, dyn_funcs, iface_vars, diag);
+  for (auto* el : e->elements)
+    CheckBitsCallExpr(el, dyn_types, dyn_funcs, iface_vars, diag);
+}
+
+void CheckBitsCallStmt(
+    const Stmt* s, const std::unordered_set<std::string_view>& dyn_types,
+    const std::unordered_set<std::string_view>& dyn_funcs,
+    const std::unordered_set<std::string_view>& iface_vars, DiagEngine& diag) {
+  if (!s) return;
+  CheckBitsCallExpr(s->condition, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallExpr(s->lhs, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallExpr(s->rhs, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallExpr(s->expr, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallExpr(s->delay, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallExpr(s->var_init, dyn_types, dyn_funcs, iface_vars, diag);
+  for (auto* sub : s->stmts)
+    CheckBitsCallStmt(sub, dyn_types, dyn_funcs, iface_vars, diag);
+  for (auto* sub : s->fork_stmts)
+    CheckBitsCallStmt(sub, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallStmt(s->then_branch, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallStmt(s->else_branch, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallStmt(s->body, dyn_types, dyn_funcs, iface_vars, diag);
+  CheckBitsCallStmt(s->for_body, dyn_types, dyn_funcs, iface_vars, diag);
+  for (auto* init : s->for_inits)
+    CheckBitsCallStmt(init, dyn_types, dyn_funcs, iface_vars, diag);
+  for (auto& ci : s->case_items)
+    CheckBitsCallStmt(ci.body, dyn_types, dyn_funcs, iface_vars, diag);
+}
+
+}  // namespace
+
+void Elaborator::ValidateBitsCallRestrictions(const ModuleDecl* decl) {
+  // §20.6.2: $bits cannot be used directly on a dynamically sized type
+  // identifier (NC12), cannot enclose a function whose return type is
+  // dynamically sized (NC9), and cannot be applied to an object whose type is
+  // an interface class (NC13, see §8.26).
+  std::unordered_set<std::string_view> dyn_types;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kTypedef &&
+        TypedefHasDynamicDim(item->unpacked_dims)) {
+      dyn_types.insert(item->name);
+    }
+  }
+  std::unordered_set<std::string_view> dyn_funcs;
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kFunctionDecl) continue;
+    if (item->return_type.kind == DataTypeKind::kNamed &&
+        dyn_types.count(item->return_type.type_name) != 0) {
+      dyn_funcs.insert(item->name);
+    }
+  }
+  std::unordered_set<std::string_view> iface_vars;
+  for (const auto& [vname, cls_name] : class_var_types_) {
+    const auto* cls = FindClassDecl(cls_name, unit_);
+    if (cls && cls->is_interface) iface_vars.insert(vname);
+  }
+  if (dyn_types.empty() && dyn_funcs.empty() && iface_vars.empty()) return;
+
+  for (const auto* item : decl->items) {
+    if (item->body)
+      CheckBitsCallStmt(item->body, dyn_types, dyn_funcs, iface_vars, diag_);
+    for (auto* s : item->func_body_stmts)
+      CheckBitsCallStmt(s, dyn_types, dyn_funcs, iface_vars, diag_);
+    CheckBitsCallExpr(item->init_expr, dyn_types, dyn_funcs, iface_vars,
+                      diag_);
+  }
+}
+
 static bool IsConstantBitSelect(const Expr* e) {
   if (e->is_part_select_plus || e->is_part_select_minus) return false;
   if (e->index && e->index_end) return true;

@@ -35,4 +35,63 @@ TEST(UtilitySystemTaskTest, BitsOf32BitValue) {
   EXPECT_EQ(result.ToUint64(), 32u);
 }
 
+// §20.6.2: applying $bits directly to a dynamically sized type identifier
+// (queue typedef here) has no defined extent and shall be an error.
+TEST(BitsCallRestrictions, BitsOnQueueTypedefIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef byte qt[$];\n"
+      "  int n;\n"
+      "  initial n = $bits(qt);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §20.6.2: the same query on a fixed-size type identifier is legal.
+TEST(BitsCallRestrictions, BitsOnFixedTypedefIsLegal) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef logic [3:0] ft;\n"
+      "  int n;\n"
+      "  initial n = $bits(ft);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §20.6.2: $bits shall not enclose a function whose return type is a
+// dynamically sized data type.
+TEST(BitsCallRestrictions, BitsEnclosingDynamicReturnFuncIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef byte qt[$];\n"
+      "  function qt mkq(); return mkq; endfunction\n"
+      "  int n;\n"
+      "  initial n = $bits(mkq());\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §20.6.2 (with §8.26 satisfied): $bits shall not be applied to an object
+// whose type is an interface class.
+TEST(BitsCallRestrictions, BitsOnInterfaceClassObjectIsError) {
+  ElabFixture f;
+  Elaborate(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  IC h;\n"
+      "  int n;\n"
+      "  initial n = $bits(h);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }

@@ -303,6 +303,7 @@ class Elaborator {
   void ValidateProceduralNetAssign();
   void ValidateDynamicArrayNba(const ModuleDecl* decl);
   void ValidateArrayQueryOnDynamicType(const ModuleDecl* decl);
+  void ValidateBitsCallRestrictions(const ModuleDecl* decl);
 
   void ValidateContAssignConstSelect(const ModuleDecl* decl);
   void ValidatePartSelectBounds(const ModuleDecl* decl);

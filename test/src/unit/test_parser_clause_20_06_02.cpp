@@ -30,4 +30,15 @@ TEST(PrimaryParsing, ConstantPrimaryTypeReference) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §20.6.2 BNF: the size_function alternative that takes a data_type as its
+// sole argument shall be accepted by the parser (NC4, data_type form).
+TEST(SubroutineCallExprParsing, SystemTfCallBitsDataTypeArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  parameter int W = $bits(int);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }
