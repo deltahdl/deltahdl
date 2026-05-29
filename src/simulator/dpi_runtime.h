@@ -89,6 +89,11 @@ struct DpiRtExport {
   // conservative default for code that doesn't yet record scopes).
   std::string scope_name;
   DpiRtCallback impl;
+  // §35.7: every exported SystemVerilog function is a context function. The
+  // flag is documentary at the type level and is normalized to true by
+  // DpiRuntime::RegisterExport so callers that leave it unset still get the
+  // spec-mandated behavior.
+  bool is_context = true;
 };
 
 // §35.5.3: outcome of attempting to call a SystemVerilog export from inside

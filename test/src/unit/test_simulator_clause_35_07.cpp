@@ -46,4 +46,20 @@ TEST(DpiRuntime, CallMissingExportReturnsZero) {
   EXPECT_EQ(result.AsInt(), 0);
 }
 
+// §35.7: every export declaration designates a context function. The runtime
+// records that property unconditionally at registration, so a caller that
+// passes is_context=false still ends up with a context export.
+TEST(DpiRuntime, RegisteredExportIsAlwaysContext) {
+  DpiRuntime rt;
+  DpiRtExport exp;
+  exp.c_name = "c_callback";
+  exp.sv_name = "sv_callback";
+  exp.is_context = false;
+  rt.RegisterExport(exp);
+
+  const auto* stored = rt.FindExport("sv_callback");
+  ASSERT_NE(stored, nullptr);
+  EXPECT_TRUE(stored->is_context);
+}
+
 }

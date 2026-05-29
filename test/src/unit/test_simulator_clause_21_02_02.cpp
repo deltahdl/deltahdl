@@ -18,6 +18,28 @@ std::string RunCapture(const std::string& src, SimFixture& f) {
   return captured.str();
 }
 
+// §21.2.2 (Syntax 21-2): every alternative of strobe_task_name dispatches to
+// the strobed-monitoring path at the simulator stage. Driving all four names
+// from one procedural block confirms each is recognised and each produces its
+// own deferred line — i.e., $strobe-class calls are not coalesced the way
+// $monitor is.
+TEST(IoStrobeSim, AllStrobeTaskNamesDispatchToStrobeMachinery) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] a;\n"
+      "  initial begin\n"
+      "    a = 8'h2a;\n"
+      "    $strobe(\"a=%h\", a);\n"
+      "    $strobeb(\"a=%h\", a);\n"
+      "    $strobeo(\"a=%h\", a);\n"
+      "    $strobeh(\"a=%h\", a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "a=2a\na=2a\na=2a\na=2a\n");
+}
+
 // §21.2.2 (Syntax 21-2): $strobe is one of the recognized strobed-monitoring
 // task names and produces its output exactly once.
 TEST(IoStrobeSim, StrobePrintsArgumentList) {
@@ -77,54 +99,6 @@ TEST(IoStrobeSim, StrobeFiresInPostponedRegion) {
 
   EXPECT_EQ(snapshot_pre_postponed.find("STROBE_MARK"), std::string::npos);
   EXPECT_NE(captured.str().find("STROBE_MARK"), std::string::npos);
-}
-
-// §21.2.2 (Syntax 21-2): $strobeb is one of the four strobe_task_name
-// alternatives and must perform a strobed display.
-TEST(IoStrobeSim, StrobebIsRecognizedAsStrobe) {
-  SimFixture f;
-  std::string out = RunCapture(
-      "module t;\n"
-      "  reg [7:0] a;\n"
-      "  initial begin\n"
-      "    a = 8'h2a;\n"
-      "    $strobeb(\"a=%h\", a);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_EQ(out, "a=2a\n");
-}
-
-// §21.2.2 (Syntax 21-2): $strobeo is one of the four strobe_task_name
-// alternatives and must perform a strobed display.
-TEST(IoStrobeSim, StrobeoIsRecognizedAsStrobe) {
-  SimFixture f;
-  std::string out = RunCapture(
-      "module t;\n"
-      "  reg [7:0] a;\n"
-      "  initial begin\n"
-      "    a = 8'h2a;\n"
-      "    $strobeo(\"a=%h\", a);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_EQ(out, "a=2a\n");
-}
-
-// §21.2.2 (Syntax 21-2): $strobeh is one of the four strobe_task_name
-// alternatives and must perform a strobed display.
-TEST(IoStrobeSim, StrobehIsRecognizedAsStrobe) {
-  SimFixture f;
-  std::string out = RunCapture(
-      "module t;\n"
-      "  reg [7:0] a;\n"
-      "  initial begin\n"
-      "    a = 8'h2a;\n"
-      "    $strobeh(\"a=%h\", a);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_EQ(out, "a=2a\n");
 }
 
 // §21.2.2: $strobe accepts arguments using the same machinery as $display,

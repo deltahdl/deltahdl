@@ -133,4 +133,29 @@ TEST_F(DpiParseTest, ExportFunction) {
   EXPECT_FALSE(items[0]->dpi_is_task);
 }
 
+// §35.7: class member functions cannot be exported. The parser rejects any
+// attempt to place a DPI export declaration inside a class body because the
+// only function it could designate from that scope is a class method.
+TEST(DpiParsing, DpiExportInsideClassBodyIsError) {
+  auto r = Parse(R"(
+    class C;
+      function void f(); endfunction
+      export "DPI-C" function f;
+    endclass
+  )");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §35.7: Syntax 35-2 restricts dpi_spec_string to "DPI-C" or its deprecated
+// "DPI" alias. An export declaration carrying any other string is rejected.
+TEST(DpiParsing, DpiExportRejectsUnknownSpecString) {
+  auto r = Parse(R"(
+    module m;
+      function void sv_func(); endfunction
+      export "DPI-X" function sv_func;
+    endmodule
+  )");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }

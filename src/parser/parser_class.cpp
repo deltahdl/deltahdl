@@ -461,6 +461,18 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
     Match(TokenKind::kSemicolon);
     return;
   }
+  // §35.7: a DPI export declaration must live in the scope where the
+  // function being exported is defined, so an export inside a class body
+  // would have to designate a class member function — explicitly forbidden
+  // by the standard's class-member exclusion.
+  if (Check(TokenKind::kKwExport)) {
+    diag_.Error(CurrentLoc(),
+                "DPI export declaration is not allowed in class scope; "
+                "class member functions cannot be exported (§35.7)");
+    while (!Check(TokenKind::kSemicolon) && !AtEnd()) Consume();
+    Match(TokenKind::kSemicolon);
+    return;
+  }
   auto* member = arena_.Create<ClassMember>();
   member->loc = CurrentLoc();
   bool proto = ParseClassQualifiers(member);

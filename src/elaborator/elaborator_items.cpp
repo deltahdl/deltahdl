@@ -204,6 +204,13 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
     // track the set of export linkage names seen within this module.
     std::unordered_set<std::string_view> export_link_in_scope;
 
+    // §35.7: "Only one export declaration is permitted per SystemVerilog
+    // function." Linkage-name deduplication catches the explicit/implicit
+    // c_identifier overlap from §35.4, but two exports of the same SV
+    // function with distinct c_identifiers would slip past that check.
+    // Tracking SV function names per scope catches that case directly.
+    std::unordered_set<std::string_view> exported_sv_func_in_scope;
+
     for (const auto* item : mod->items) {
       if (item == nullptr) continue;
       if (item->kind != ModuleItemKind::kDpiImport &&
@@ -223,8 +230,35 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
                           link_name));
         }
 
+        // §35.7: at most one export per SystemVerilog function in a scope.
+        auto [_func, func_inserted] =
+            exported_sv_func_in_scope.insert(item->name);
+        if (!func_inserted) {
+          diag_.Error(
+              item->loc,
+              std::format("SystemVerilog function '{}' is already exported in "
+                          "this scope; only one export declaration per "
+                          "function is permitted (§35.7)",
+                          item->name));
+        }
+
         auto callable_it = sv_callables.find(item->name);
         if (callable_it != sv_callables.end()) {
+          // §35.7: an exported function adheres to the same restrictions on
+          // argument types as imports. The §35.5.4 prohibition on the ref
+          // qualifier in a DPI declaration therefore carries through to the
+          // exported routine's formal arguments.
+          for (const auto& arg : callable_it->second->func_args) {
+            if (arg.direction == Direction::kRef) {
+              diag_.Error(
+                  item->loc,
+                  std::format("SystemVerilog function '{}' has a ref argument "
+                              "and therefore cannot be exported (§35.7)",
+                              item->name));
+              break;
+            }
+          }
+
           auto sig = BuildDpiExportSignature(callable_it->second);
           auto [sig_it, sig_was_new] =
               export_signatures.emplace(link_name, sig);

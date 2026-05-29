@@ -85,6 +85,10 @@ uint32_t DpiRuntime::ImportCount() const {
 }
 
 void DpiRuntime::RegisterExport(DpiRtExport exp) {
+  // §35.7: exported SystemVerilog functions are always context functions.
+  // Normalize the flag here so any caller that fails to set it (or sets it
+  // false) still gets a context export.
+  exp.is_context = true;
   export_index_[exp.sv_name] = exports_.size();
   exports_.push_back(std::move(exp));
 }
