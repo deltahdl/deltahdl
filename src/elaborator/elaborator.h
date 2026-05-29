@@ -307,7 +307,7 @@ class Elaborator {
   void ValidateContAssignConstSelect(const ModuleDecl* decl);
   void ValidatePartSelectBounds(const ModuleDecl* decl);
 
-  void ValidateElabSystemTask(const ModuleItem* item);
+  void ValidateElabSystemTask(const ModuleItem* item, const RtlirModule* mod);
 
   // §35.5.2: pure-only restrictions on imported subroutines.
   void ValidateDpiImport(const ModuleItem* item);
@@ -579,6 +579,19 @@ class Elaborator {
   DiagEngine& diag_;
   CompilationUnit* unit_;
   std::string gen_prefix_;
+
+  // §20.10.1: any $fatal or $error elaboration severity task that survives
+  // generate-construct expansion sets this to true. Propagated onto the
+  // resulting RtlirDesign so the simulator can refuse to start.
+  bool elab_simulation_blocked_ = false;
+
+  // §20.10.1: details of the most recent elaboration severity task call.
+  // Propagated onto the RtlirDesign so observers can inspect what was
+  // emitted (severity tag, source location, hierarchical scope, user text).
+  std::string elab_last_severity_;
+  std::string elab_last_severity_msg_;
+  std::string elab_last_severity_scope_;
+  SourceLoc elab_last_severity_loc_;
 
   std::vector<std::string> library_order_;
 

@@ -1217,6 +1217,11 @@ RtlirDesign* Elaborator::ElaborateTops(
 
   design->cu_class_decls.insert(design->cu_class_decls.end(),
                                 unit_->classes.begin(), unit_->classes.end());
+  design->simulation_blocked = elab_simulation_blocked_;
+  design->last_elab_severity = elab_last_severity_;
+  design->last_elab_severity_msg = elab_last_severity_msg_;
+  design->last_elab_severity_scope = elab_last_severity_scope_;
+  design->last_elab_severity_loc = elab_last_severity_loc_;
   return design;
 }
 

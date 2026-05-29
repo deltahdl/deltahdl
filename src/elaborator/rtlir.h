@@ -2,10 +2,12 @@
 
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast.h"
 
@@ -229,6 +231,22 @@ struct RtlirDesign {
   std::vector<PackageDecl*> packages;
 
   std::vector<ClassDecl*> cu_class_decls;
+
+  // §20.10.1: set when a $fatal or $error elaboration severity task is
+  // executed. Simulation shall not be started against a design whose
+  // elaboration tripped one of those severity levels.
+  bool simulation_blocked = false;
+
+  // §20.10.1: details of the most recent elaboration severity task that
+  // executed. last_elab_severity is one of "FATAL", "ERROR", "WARNING",
+  // "INFO"; empty when no task ran. last_elab_severity_loc carries the
+  // file/line of the call (per §22.13's `__FILE__`/`__LINE__` pairing);
+  // last_elab_severity_scope carries the hierarchical scope name; and
+  // last_elab_severity_msg carries the user-defined message body.
+  std::string last_elab_severity;
+  std::string last_elab_severity_msg;
+  std::string last_elab_severity_scope;
+  SourceLoc last_elab_severity_loc;
 };
 
 }

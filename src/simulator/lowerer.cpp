@@ -1222,6 +1222,10 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
 
 void Lowerer::Lower(const RtlirDesign* design) {
   if (!design) return;
+  // §20.10.1: a $fatal or $error elaboration severity task that survived
+  // generate expansion marks the design as not startable. Refuse to lower
+  // any part of it so the scheduler sees an empty event calendar.
+  if (design->simulation_blocked) return;
   design_ = design;
   for (const auto& [name, width] : design->type_widths) {
     ctx_.RegisterTypeWidth(name, width);

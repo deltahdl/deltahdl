@@ -302,17 +302,90 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
   }
 }
 
-void Elaborator::ValidateElabSystemTask(const ModuleItem* item) {
+void Elaborator::ValidateElabSystemTask(const ModuleItem* item,
+                                        const RtlirModule* mod) {
   auto* expr = item->init_expr;
   if (!expr || expr->kind != ExprKind::kSystemCall) return;
-  if (expr->callee != "$fatal") return;
-  if (expr->args.empty()) return;
-  auto* first_arg = expr->args[0];
-  if (first_arg->kind == ExprKind::kIntegerLiteral) {
-    auto val = first_arg->int_val;
-    if (val > 2) {
-      diag_.Error(first_arg->range.start, "finish_number must be 0, 1, or 2");
+
+  auto name = expr->callee;
+  bool is_fatal = name == "$fatal";
+  bool is_error = name == "$error";
+  bool is_warning = name == "$warning";
+  bool is_info = name == "$info";
+  if (!is_fatal && !is_error && !is_warning && !is_info) return;
+
+  size_t arg_start = 0;
+  if (is_fatal && !expr->args.empty()) {
+    auto* first_arg = expr->args[0];
+    if (first_arg->kind == ExprKind::kIntegerLiteral) {
+      auto val = first_arg->int_val;
+      if (val < 0 || val > 2) {
+        diag_.Error(first_arg->range.start,
+                    "finish_number must be 0, 1, or 2");
+      }
+      arg_start = 1;
     }
+  }
+
+  // Per §20.10.1, list_of_arguments may only contain a formatting string and
+  // constant expressions, including constant function calls.
+  ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
+  for (size_t i = arg_start; i < expr->args.size(); ++i) {
+    auto* arg = expr->args[i];
+    if (!arg) continue;
+    if (i == arg_start && arg->kind == ExprKind::kStringLiteral) continue;
+    if (arg->kind == ExprKind::kStringLiteral) continue;
+    if (!IsConstantExpr(arg, scope)) {
+      diag_.Error(arg->range.start,
+                  std::format("argument to {} must be a constant expression "
+                              "(§20.10.1)",
+                              name));
+    }
+  }
+
+  std::string scope_name = mod ? std::string(mod->name) : std::string{};
+  if (!gen_prefix_.empty()) {
+    std::string trimmed = gen_prefix_;
+    while (!trimmed.empty() && trimmed.back() == '_') trimmed.pop_back();
+    if (!trimmed.empty()) {
+      if (!scope_name.empty()) scope_name.push_back('.');
+      scope_name += trimmed;
+    }
+  }
+
+  std::string severity;
+  if (is_fatal) severity = "FATAL";
+  else if (is_error) severity = "ERROR";
+  else if (is_warning) severity = "WARNING";
+  else severity = "INFO";
+
+  std::string user_msg;
+  if (arg_start < expr->args.size() &&
+      expr->args[arg_start]->kind == ExprKind::kStringLiteral) {
+    user_msg = std::string(expr->args[arg_start]->text);
+    if (user_msg.size() >= 2 && user_msg.front() == '"' &&
+        user_msg.back() == '"') {
+      user_msg = user_msg.substr(1, user_msg.size() - 2);
+    }
+  }
+
+  std::string message =
+      scope_name.empty()
+          ? std::format("elaboration {}: {}", severity, user_msg)
+          : std::format("elaboration {} in scope '{}': {}", severity,
+                        scope_name, user_msg);
+
+  // Per §20.10.1, $fatal and $error block simulation; $warning and $info do
+  // not affect the rest of elaboration or simulation. All four shall emit a
+  // tool-specific message that names the call site (file/line carried by
+  // the DiagEngine, scope embedded in the message body).
+  diag_.Warning(item->loc, message);
+  elab_last_severity_ = severity;
+  elab_last_severity_msg_ = user_msg;
+  elab_last_severity_scope_ = scope_name;
+  elab_last_severity_loc_ = item->loc;
+  if (is_fatal || is_error) {
+    elab_simulation_blocked_ = true;
   }
 }
 
@@ -1198,7 +1271,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       ValidateClockingBlock(item);
       break;
     case ModuleItemKind::kElabSystemTask:
-      ValidateElabSystemTask(item);
+      ValidateElabSystemTask(item, mod);
       break;
     case ModuleItemKind::kDpiImport:
       ValidateDpiImport(item);
