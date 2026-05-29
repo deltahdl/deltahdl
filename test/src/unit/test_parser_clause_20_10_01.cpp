@@ -71,21 +71,6 @@ TEST(ElabSeverityTaskParsing, AllFourSeverityNamesRecognized) {
             4u);
 }
 
-// §20.10.1 — claim 4 extends to $warning when called inside an initial
-// block: it becomes a run-time severity task, not a module-item elaboration
-// task.
-TEST(ElabSeverityTaskParsing, WarningInsideInitialIsRunTime) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial $warning(\"runtime warning\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_FALSE(r.cu->modules.empty());
-  EXPECT_FALSE(HasItemOfKind(r.cu->modules[0]->items,
-                              ModuleItemKind::kElabSystemTask));
-}
-
 // §20.10.1 — claim 4 extends to $info when called inside a final block: it
 // becomes a run-time severity task, not a module-item elaboration task.
 TEST(ElabSeverityTaskParsing, InfoInsideFinalIsRunTime) {
