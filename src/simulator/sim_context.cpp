@@ -334,16 +334,46 @@ void SimContext::RunFinalBlocks() {
   }
 }
 
-int32_t SimContext::Random32() { return static_cast<int32_t>(rng_()); }
+std::mt19937& SimContext::ActiveRng() {
+  // §18.14.2 thread stability: when a thread is running, every randomization
+  // draw made from it must come from that thread's own generator so it stays
+  // independent of sibling execution order. The hierarchical seed is
+  // installed once, on first use, by drawing the next value from the parent's
+  // active stream (which is whatever generator the current process inherits).
+  if (current_process_ != nullptr) {
+    if (!current_process_->rng_initialized) {
+      current_process_->rng.seed(current_process_->rng_seed);
+      current_process_->rng_initialized = true;
+    }
+    return current_process_->rng;
+  }
+  return rng_;
+}
 
-uint32_t SimContext::Urandom32() { return static_cast<uint32_t>(rng_()); }
+uint32_t SimContext::DrawSeedForChild() {
+  return static_cast<uint32_t>(ActiveRng()());
+}
 
-void SimContext::SeedUrandom(uint32_t seed) { rng_.seed(seed); }
+int32_t SimContext::Random32() { return static_cast<int32_t>(ActiveRng()()); }
+
+uint32_t SimContext::Urandom32() {
+  return static_cast<uint32_t>(ActiveRng()());
+}
+
+void SimContext::SeedUrandom(uint32_t seed) {
+  if (current_process_ != nullptr) {
+    current_process_->rng_seed = seed;
+    current_process_->rng.seed(seed);
+    current_process_->rng_initialized = true;
+    return;
+  }
+  rng_.seed(seed);
+}
 
 uint32_t SimContext::UrandomRange(uint32_t min_val, uint32_t max_val) {
   if (min_val > max_val) std::swap(min_val, max_val);
   std::uniform_int_distribution<uint32_t> dist(min_val, max_val);
-  return dist(rng_);
+  return dist(ActiveRng());
 }
 
 void SimContext::AddPlusArg(std::string arg) {

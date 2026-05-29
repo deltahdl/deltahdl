@@ -1051,6 +1051,10 @@ static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
       state->join_any ? !state->resumed : (state->remaining == 0);
   if (should_resume && state->parent) {
     state->resumed = true;
+    // §18.14.2: restore the spawning thread as current before the join site
+    // resumes so its subsequent draws come from its own RNG, not from
+    // whichever child happened to run last.
+    if (state->parent_proc) ctx.SetCurrentProcess(state->parent_proc);
     state->parent.resume();
   }
   if (parent_wfs && --parent_wfs->remaining == 0 && parent_wfs->waiter) {
@@ -1090,6 +1094,7 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   state->join_any = (stmt->join_kind == TokenKind::kKwJoinAny);
 
   auto* spawning_proc = ctx.CurrentProcess();
+  state->parent_proc = spawning_proc;
 
   WaitForkState* parent_wfs = nullptr;
   Process* parent_proc = nullptr;
@@ -1109,6 +1114,11 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       p->home_region = spawning_proc->home_region;
       p->program_block_id = spawning_proc->program_block_id;
     }
+    // §18.14.2: a new thread's RNG is initialized with the next random value
+    // drawn from the thread that creates it. Each child therefore receives a
+    // unique seed determined solely by the parent, and the per-child seed
+    // material is settled in fork order rather than execution order.
+    p->rng_seed = ctx.DrawSeedForChild();
     p->coro =
         ForkChildCoroutine(s, ctx, arena, state, parent_wfs, parent_proc)
             .Release();

@@ -290,6 +290,14 @@ class SimContext {
   void SeedUrandom(uint32_t seed);
   uint32_t UrandomRange(uint32_t min_val, uint32_t max_val);
 
+  // Returns the mt19937 stream that the running thread must draw from.
+  // Falls back to the context-wide generator when no thread is current.
+  std::mt19937& ActiveRng();
+
+  // Pulls the next value from the active stream, the seed material a freshly
+  // created child thread inherits per §18.14.2 hierarchical seeding.
+  uint32_t DrawSeedForChild();
+
   void RegisterRealVariable(std::string_view name);
   bool IsRealVariable(std::string_view name) const;
 

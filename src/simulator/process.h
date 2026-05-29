@@ -3,6 +3,7 @@
 #include <coroutine>
 #include <cstdint>
 #include <exception>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -116,6 +117,13 @@ struct Process {
   std::vector<std::coroutine_handle<>> await_waiters;
 
   uint32_t rng_seed = 0;
+
+  // Per §18.14.2 thread stability: each thread carries its own RNG so that
+  // draws made from this thread do not depend on the scheduler's interleaving
+  // with siblings. The owning SimContext seeds rng on creation, lazily marks
+  // rng_initialized true on first use, and may be reset by srandom().
+  std::mt19937 rng;
+  bool rng_initialized = false;
 
   std::vector<std::string> pending_violations;
 

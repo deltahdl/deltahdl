@@ -415,6 +415,11 @@ struct InertialDelayAwaiter {
 struct ForkJoinState {
   uint32_t remaining = 0;
   std::coroutine_handle<> parent;
+  // The thread that issued the fork, captured so the active-process pointer
+  // can be restored when the parent resumes. Without this, the parent would
+  // re-enter with whichever child finished last as the current thread, and
+  // §18.14.2 thread stability of parent-side draws would be broken.
+  Process* parent_proc = nullptr;
   bool join_any = false;
   bool resumed = false;
 };

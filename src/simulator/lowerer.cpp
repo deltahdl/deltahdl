@@ -933,6 +933,11 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
                                 : Region::kActive;
   p->is_reactive = from_program;
   p->inst_prefix = inst_prefix_;
+  // §18.14.1: a static process is seeded with the next value from the
+  // enclosing initialization RNG. Lowering happens before any thread runs, so
+  // the active stream here is the context-wide generator, which embodies the
+  // module's initialization RNG for this test harness.
+  p->rng_seed = ctx_.DrawSeedForChild();
 
   switch (proc.kind) {
     case RtlirProcessKind::kInitial:

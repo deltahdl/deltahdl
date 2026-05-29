@@ -1630,7 +1630,12 @@ static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
 
     if (proc && !expr->args.empty()) {
       auto seed_val = EvalExpr(expr->args[0], ctx, arena);
-      proc->rng_seed = static_cast<uint32_t>(seed_val.ToUint64());
+      auto seed = static_cast<uint32_t>(seed_val.ToUint64());
+      proc->rng_seed = seed;
+      // Reset the per-thread stream now so subsequent draws from this thread
+      // replay the sequence keyed by the requested seed.
+      proc->rng.seed(seed);
+      proc->rng_initialized = true;
     }
     out = MakeLogic4VecVal(arena, 1, 0);
     return true;
