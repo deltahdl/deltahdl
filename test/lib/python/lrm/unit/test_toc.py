@@ -8,6 +8,7 @@ import pytest
 from pypdf import PdfReader
 
 from lib.python.lrm import (
+    direct_numbered_children,
     is_sub_level_parent,
     is_top_level_aggregate,
     load_toc,
@@ -310,3 +311,59 @@ def test_is_sub_level_parent_annex_subclause_with_children_true() -> None:
     """An annex sub-level entry with numbered children is a sub-level parent."""
     toc = {"A.1": (900, 920), "A.1.1": (900, 905)}
     assert is_sub_level_parent("A.1", toc) is True
+
+
+# --- direct_numbered_children -----------------------------------------------
+
+
+def test_direct_numbered_children_returns_immediate_children() -> None:
+    """A chapter's direct numbered children are returned in order."""
+    toc = {
+        "13": (336, 354),
+        "13.1": (336, 336), "13.2": (336, 336), "13.3": (336, 340),
+    }
+    assert direct_numbered_children("13", toc) == ["13.1", "13.2", "13.3"]
+
+
+def test_direct_numbered_children_excludes_grandchildren() -> None:
+    """A grandchild like ``13.3.1`` is excluded from the direct-children list."""
+    toc = {
+        "13": (336, 354),
+        "13.3": (336, 340), "13.3.1": (340, 340), "13.3.2": (340, 340),
+    }
+    assert direct_numbered_children("13", toc) == ["13.3"]
+
+
+def test_direct_numbered_children_excludes_prefix_substring_collision() -> None:
+    """``2`` does not pick up ``20.1`` (substring prefix is not a child)."""
+    toc = {"2": (10, 12), "20": (100, 130), "20.1": (100, 105)}
+    assert direct_numbered_children("2", toc) == []
+
+
+def test_direct_numbered_children_returns_empty_for_singleton() -> None:
+    """A top-level singleton with no numbered subclauses produces an empty list."""
+    toc = {"2": (10, 12), "3": (15, 20)}
+    assert direct_numbered_children("2", toc) == []
+
+
+def test_direct_numbered_children_works_for_annex() -> None:
+    """An annex's direct numbered children are returned just like a chapter's."""
+    toc = {"A": (900, 939), "A.1": (900, 919), "A.2": (920, 939)}
+    assert direct_numbered_children("A", toc) == ["A.1", "A.2"]
+
+
+def test_direct_numbered_children_preserves_toc_order() -> None:
+    """Output preserves the TOC's insertion (document) order."""
+    toc = {
+        "13": (336, 354),
+        "13.3": (336, 340), "13.1": (341, 341), "13.2": (342, 342),
+    }
+    assert direct_numbered_children("13", toc) == ["13.3", "13.1", "13.2"]
+
+
+def test_direct_numbered_children_works_for_sub_level_parent() -> None:
+    """A sub-level parent's direct numbered children are returned in order."""
+    toc = {
+        "13.3": (336, 340), "13.3.1": (340, 340), "13.3.2": (340, 340),
+    }
+    assert direct_numbered_children("13.3", toc) == ["13.3.1", "13.3.2"]

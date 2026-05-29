@@ -7,7 +7,9 @@ import pytest
 
 from lib.python.lrm_subclause_dependencies import (
     ORACLE_DENY_PATTERNS,
+    AggregateRejection,
     build_dependency_prompt,
+    build_parse_retry_prompt,
     compute_subclause_dependencies,
     parse_dependencies,
     run_oracle_call,
@@ -365,14 +367,44 @@ def test_parse_dependencies_picks_last_nonempty_array_when_prose_has_brackets() 
 
 def test_parse_dependencies_rejects_aggregate_chapter_identifier() -> None:
     """An identifier naming an aggregate top-level chapter is rejected."""
-    with pytest.raises(ValueError):
+    with pytest.raises(AggregateRejection):
         parse_dependencies('["8"]', toc=_AGGREGATE_TOC)
+
+
+def test_parse_dependencies_aggregate_chapter_rejection_carries_identifier() -> None:
+    """The aggregate-chapter rejection exposes the rejected identifier."""
+    captured: str | None = None
+    try:
+        parse_dependencies('["8"]', toc=_AGGREGATE_TOC)
+    except AggregateRejection as exc:
+        captured = exc.identifier
+    assert captured == "8"
 
 
 def test_parse_dependencies_rejects_aggregate_annex_identifier() -> None:
     """An identifier naming an aggregate annex is rejected."""
-    with pytest.raises(ValueError):
+    with pytest.raises(AggregateRejection):
         parse_dependencies('["A"]', toc=_AGGREGATE_TOC)
+
+
+def test_parse_dependencies_aggregate_annex_rejection_carries_identifier() -> None:
+    """The aggregate-annex rejection exposes the rejected identifier."""
+    captured: str | None = None
+    try:
+        parse_dependencies('["A"]', toc=_AGGREGATE_TOC)
+    except AggregateRejection as exc:
+        captured = exc.identifier
+    assert captured == "A"
+
+
+def test_parse_dependencies_raises_plain_value_error_for_bad_shape() -> None:
+    """A non-aggregate shape failure stays a plain ValueError, not an AggregateRejection."""
+    captured: ValueError | None = None
+    try:
+        parse_dependencies('["not-a-clause"]', toc=_AGGREGATE_TOC)
+    except ValueError as exc:
+        captured = exc
+    assert not isinstance(captured, AggregateRejection)
 
 
 def test_parse_dependencies_accepts_singleton_chapter() -> None:
@@ -700,3 +732,140 @@ def test_compute_subclause_dependencies_recovers_from_invalid_json() -> None:
     ):
         compute_subclause_dependencies("33.4", "lrm.pdf", model="opus")
     assert mock_run.call_count == 2
+
+
+# --- AggregateRejection -----------------------------------------------------
+
+
+def test_aggregate_rejection_subclass_of_value_error() -> None:
+    """AggregateRejection is a ValueError so existing handlers still catch it."""
+    assert issubclass(AggregateRejection, ValueError)
+
+
+def test_aggregate_rejection_carries_identifier() -> None:
+    """AggregateRejection stores the rejected identifier as ``.identifier``."""
+    exc = AggregateRejection("13", "Dependency entry '13' names an aggregate...")
+    assert exc.identifier == "13"
+
+
+def test_aggregate_rejection_str_returns_message() -> None:
+    """str(AggregateRejection) returns the message, preserving prior callers."""
+    exc = AggregateRejection("13", "the message")
+    assert str(exc) == "the message"
+
+
+# --- build_parse_retry_prompt -----------------------------------------------
+
+
+def test_build_parse_retry_prompt_without_alternatives_quotes_reason() -> None:
+    """With no alternatives, the corrective prompt embeds the rejection reason."""
+    prompt = build_parse_retry_prompt("bad shape '13'")
+    assert "bad shape '13'" in prompt
+
+
+def test_build_parse_retry_prompt_without_alternatives_keeps_baseline_phrase() -> None:
+    """The non-aggregate baseline wording survives the optional-param refactor."""
+    prompt = build_parse_retry_prompt("reason")
+    assert "JSON array" in prompt
+
+
+def test_build_parse_retry_prompt_lists_first_alternative() -> None:
+    """The first supplied alternative identifier appears in the corrective prompt."""
+    prompt = build_parse_retry_prompt(
+        "reason", aggregate="13", alternatives=["13.3", "13.4", "13.5"],
+    )
+    assert "13.3" in prompt
+
+
+def test_build_parse_retry_prompt_lists_middle_alternative() -> None:
+    """A middle supplied alternative identifier appears in the corrective prompt."""
+    prompt = build_parse_retry_prompt(
+        "reason", aggregate="13", alternatives=["13.3", "13.4", "13.5"],
+    )
+    assert "13.4" in prompt
+
+
+def test_build_parse_retry_prompt_lists_last_alternative() -> None:
+    """The last supplied alternative identifier appears in the corrective prompt."""
+    prompt = build_parse_retry_prompt(
+        "reason", aggregate="13", alternatives=["13.3", "13.4", "13.5"],
+    )
+    assert "13.5" in prompt
+
+
+def test_build_parse_retry_prompt_names_rejected_aggregate() -> None:
+    """The aggregate-branch prompt quotes the rejected aggregate identifier."""
+    prompt = build_parse_retry_prompt(
+        "reason", aggregate="13", alternatives=["13.1"],
+    )
+    assert "'13'" in prompt
+
+
+def test_build_parse_retry_prompt_allows_plural_replacement() -> None:
+    """The aggregate-branch prompt invites listing more than one subclause."""
+    prompt = build_parse_retry_prompt(
+        "reason", aggregate="13", alternatives=["13.3", "13.4"],
+    )
+    assert "list all of them" in prompt
+
+
+def test_build_parse_retry_prompt_aggregate_branch_keeps_reason() -> None:
+    """The aggregate-branch prompt also embeds the rejection reason."""
+    prompt = build_parse_retry_prompt(
+        "the reason", aggregate="13", alternatives=["13.1"],
+    )
+    assert "the reason" in prompt
+
+
+# --- compute_subclause_dependencies: aggregate-retry enumeration ------------
+
+
+_ENUM_TOC: dict[str, tuple[int, int]] = {
+    "13": (336, 354),
+    "13.1": (336, 336), "13.2": (336, 336), "13.3": (336, 340),
+    "13.4": (341, 347), "13.5": (348, 352), "13.6": (353, 353),
+    "13.7": (353, 353), "13.8": (353, 354),
+}
+
+
+def _patched_enum_toc() -> Any:
+    """Patch load_toc so the aggregate-retry enumeration uses _ENUM_TOC."""
+    return patch(
+        "lib.python.lrm_subclause_dependencies.load_toc",
+        return_value=_ENUM_TOC,
+    )
+
+
+def test_compute_subclause_dependencies_retry_prompt_enumerates_first_child() -> None:
+    """The aggregate-retry prompt names the first numbered subclause under the aggregate."""
+    with _patched_oracle_sequence('["13"]', "[]") as mock_run, _patched_enum_toc():
+        compute_subclause_dependencies("18.17", "lrm.pdf", model="opus")
+    assert "13.3" in mock_run.call_args_list[1].args[0]
+
+
+def test_compute_subclause_dependencies_retry_prompt_enumerates_other_child() -> None:
+    """The aggregate-retry prompt lists another numbered subclause under the rejected aggregate."""
+    with _patched_oracle_sequence('["13"]', "[]") as mock_run, _patched_enum_toc():
+        compute_subclause_dependencies("18.17", "lrm.pdf", model="opus")
+    assert "13.4" in mock_run.call_args_list[1].args[0]
+
+
+def test_compute_subclause_dependencies_retry_prompt_skips_enumeration_for_bad_json() -> None:
+    """A non-aggregate (bad-JSON) failure does NOT enumerate any TOC children."""
+    with _patched_oracle_sequence("not an array", "[]") as mock_run, patch(
+        "lib.python.lrm_subclause_dependencies.load_toc",
+        return_value=_ENUM_TOC,
+    ):
+        compute_subclause_dependencies("18.17", "lrm.pdf", model="opus")
+    assert "list all of them" not in mock_run.call_args_list[1].args[0]
+
+
+def test_compute_subclause_dependencies_retry_succeeds_after_aggregate_split() -> None:
+    """An aggregate rejection followed by a plural-split answer satisfies the call."""
+    with _patched_oracle_sequence(
+        '["13"]', '["13.3", "13.4"]',
+    ), _patched_enum_toc():
+        deps = compute_subclause_dependencies(
+            "18.17", "lrm.pdf", model="opus",
+        )
+    assert deps == ["13.3", "13.4"]

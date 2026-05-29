@@ -100,6 +100,24 @@ def is_top_level_aggregate(
     return "." not in clause and _has_numbered_subclauses(clause, toc)
 
 
+def direct_numbered_children(
+    clause: str, toc: dict[str, tuple[int, int]],
+) -> list[str]:
+    """Return ``clause``'s direct numbered children from ``toc`` in TOC order.
+
+    A direct child is a TOC entry whose identifier is ``clause.<digits>``
+    with no further dotted tail. The result preserves the TOC's
+    iteration order so callers see entries in document order. Returns
+    ``[]`` when ``clause`` has no numbered children — including when
+    ``clause`` itself is absent from the TOC.
+    """
+    prefix = clause + "."
+    return [
+        other for other in toc
+        if other.startswith(prefix) and "." not in other[len(prefix):]
+    ]
+
+
 def is_sub_level_parent(
     clause: str, toc: dict[str, tuple[int, int]],
 ) -> bool:

@@ -23,10 +23,25 @@ from lib.python.claude_cli_streaming import (
 )
 from lib.python.lrm import (
     build_lrm_read_instruction,
+    direct_numbered_children,
     is_sub_level_parent,
     is_top_level_aggregate,
     load_toc,
 )
+
+
+class AggregateRejection(ValueError):
+    """Raised when the oracle names an aggregate top-level entry.
+
+    Subclasses ``ValueError`` so the existing parse-retry loop still
+    catches it. Carries the rejected identifier so the retry-prompt
+    builder can look up the aggregate's direct numbered children in
+    the TOC and present them to the model as concrete alternatives.
+    """
+
+    def __init__(self, identifier: str, message: str) -> None:
+        super().__init__(message)
+        self.identifier: str = identifier
 
 
 SubclauseDependencies: TypeAlias = list[str]
@@ -195,7 +210,8 @@ def parse_dependencies(
                 " identifier",
             )
         if is_top_level_aggregate(item, toc):
-            raise ValueError(
+            raise AggregateRejection(
+                item,
                 f"Dependency entry '{item}' names an aggregate top-level"
                 " entry; depend on a specific numbered subclause instead",
             )
@@ -206,13 +222,41 @@ def parse_dependencies(
 MAX_PARSE_RETRIES = 2
 
 
-def build_parse_retry_prompt(reason: str) -> str:
+def build_parse_retry_prompt(
+    reason: str, *,
+    aggregate: str | None = None,
+    alternatives: list[str] | None = None,
+) -> str:
     """Return the corrective prompt fed to a continued session after a parse failure.
 
     Embeds the rejection *reason* verbatim so the model sees which
     entry was rejected and why, then restates the array shape so the
     re-emitted answer follows the schema the parser enforces.
+
+    When *aggregate* and *alternatives* are supplied (the
+    aggregate-rejection branch), the prompt names the rejected
+    aggregate, enumerates its direct numbered children from the TOC,
+    and explicitly invites listing more than one — the LRM often
+    grounds a single rule in machinery split across multiple sibling
+    subclauses (e.g. §13.3 Tasks AND §13.4 Functions both supply
+    randsequence's data-passing semantics).
     """
+    if aggregate is not None and alternatives is not None:
+        menu = ", ".join(alternatives)
+        return (
+            f"Your previous JSON array failed validation: {reason}."
+            f" The rejected identifier '{aggregate}' names an aggregate"
+            " chapter that has no rules of its own — its rules live in"
+            f" its numbered subclauses: {menu}. Re-emit the array with"
+            " the specific numbered subclause or subclauses that carry"
+            " the machinery you actually depended on; if more than one"
+            " applies, list all of them (the LRM frequently grounds a"
+            " single rule in multiple sibling subclauses, e.g. both"
+            " task and function machinery). Keep the same JSON array"
+            " shape as the original prompt — digit-or-letter heads with"
+            ' dotted decimal parts (e.g. "13.3", "13.4"). Output an'
+            " empty array [] if no remaining dependency stands."
+        )
     return (
         f"Your previous JSON array failed validation: {reason}."
         " Re-emit a single JSON array of subclause-identifier strings"
@@ -264,7 +308,17 @@ def compute_subclause_dependencies(
                 " retrying with corrective feedback.",
                 file=sys.stderr,
             )
+            if isinstance(exc, AggregateRejection):
+                retry_prompt = build_parse_retry_prompt(
+                    str(exc),
+                    aggregate=exc.identifier,
+                    alternatives=direct_numbered_children(
+                        exc.identifier, toc,
+                    ),
+                )
+            else:
+                retry_prompt = build_parse_retry_prompt(str(exc))
             text = run_oracle_call(
-                build_parse_retry_prompt(str(exc)),
+                retry_prompt,
                 model=model, effort=effort, continue_session=True,
             )
