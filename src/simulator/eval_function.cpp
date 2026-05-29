@@ -67,6 +67,24 @@ static bool IsDisplayOrWriteTask(std::string_view name) {
          name == "$writeo" || name == "$writeh";
 }
 
+// Maps a display- or write-family task name to the specifier letter that
+// renders an unformatted expression argument: $displayb/$writeb use binary,
+// $displayo/$writeo octal, $displayh/$writeh hexadecimal, and the plain
+// $display/$write pair use decimal.
+static char DefaultRadixForDisplayWriteTask(std::string_view callee) {
+  if (callee.empty()) return 'd';
+  switch (callee.back()) {
+    case 'b':
+      return 'b';
+    case 'o':
+      return 'o';
+    case 'h':
+      return 'h';
+    default:
+      return 'd';
+  }
+}
+
 static void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
   // The arguments are processed in the order they appear. A string literal
   // acts as a format template whose specifiers are filled by the expression
@@ -94,9 +112,13 @@ static void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
       output += FormatDisplay(fmt, arg_vals, p_fmts);
       continue;
     }
-    // A bare expression with no governing format string is evaluated for its
-    // side effects; its default-radix rendering is defined separately.
-    EvalExpr(arg, ctx, arena);
+    // A bare expression renders under the task's default radix; a value
+    // carrying string-typed data is always rendered as its character
+    // sequence regardless of the task name.
+    auto val = EvalExpr(arg, ctx, arena);
+    char spec = val.is_string ? 's'
+                              : DefaultRadixForDisplayWriteTask(expr->callee);
+    output += FormatArg(val, spec);
   }
   std::cout << output;
   // The display family ($display, $displayb, $displayo, $displayh) terminates

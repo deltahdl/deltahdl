@@ -92,6 +92,10 @@ std::string FormatTimeUnderTimeformat(const Logic4Vec& val,
 }
 
 std::string FormatArg(const Logic4Vec& val, char spec) {
+  // Table 21-1 and Table 21-2 spell every specifier as "%x or %X", so the
+  // dispatch below works in a single case after this normalization.
+  if (spec >= 'A' && spec <= 'Z') spec = static_cast<char>(spec - 'A' + 'a');
+
   if (val.is_real && spec == 'd') return FormatRealAsInt(val);
 
   uint64_t v = val.ToUint64();
@@ -118,6 +122,8 @@ std::string FormatArg(const Logic4Vec& val, char spec) {
     }
     case 'b':
       return val.ToString();
+    case 'c':
+      return std::string(1, static_cast<char>(v & 0xFF));
     case 't':
       std::snprintf(buf, sizeof(buf), "%llu",
                     static_cast<unsigned long long>(v));
@@ -129,7 +135,14 @@ std::string FormatArg(const Logic4Vec& val, char spec) {
     case 'g':
       return FormatValueAsReal(val, spec);
     default:
-      return val.ToString();
+      // A specifier that does not appear in Table 21-1 or Table 21-2 is a
+      // misuse of the format string. Surface it to stderr so a test or a
+      // user can see what was wrong, and leave the unrecognized pair in the
+      // output stream so the misuse does not silently masquerade as a
+      // valid rendering of the value.
+      std::fprintf(stderr, "[deltahdl] unknown format specifier: %%%c\n",
+                   spec);
+      return std::string("%") + spec;
   }
 }
 
@@ -145,19 +158,6 @@ static void AppendLiteralChar(const std::string& fmt, size_t& i,
 
 static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
                               FormatArgs& args, std::string& out) {
-
-  if (fmt[i + 1] == 'm') {
-    out += "<module>";
-    ++i;
-    return false;
-  }
-
-  if (fmt[i + 1] == 'l' || fmt[i + 1] == 'L') {
-    out += "<library.cell>";
-    ++i;
-    return false;
-  }
-
   if (fmt[i + 1] == '%') {
     out += '%';
     ++i;
@@ -167,6 +167,22 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
   size_t j = i + 1;
   while (j < fmt.size() && (fmt[j] >= '0' && fmt[j] <= '9')) ++j;
   char spec = (j < fmt.size()) ? fmt[j] : 'd';
+
+  // Table 21-1 and Table 21-2 give each specifier in both cases (e.g.
+  // "%m or %M"); collapse to a single case before deciding what to do.
+  if (spec >= 'A' && spec <= 'Z') spec = static_cast<char>(spec - 'A' + 'a');
+
+  if (spec == 'm') {
+    out += "<module>";
+    i = j;
+    return false;
+  }
+
+  if (spec == 'l') {
+    out += "<library.cell>";
+    i = j;
+    return false;
+  }
 
   if (spec == 'p' && args.vi < args.p_fmts.size() &&
       !args.p_fmts[args.vi].empty()) {
