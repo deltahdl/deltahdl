@@ -354,6 +354,28 @@ uint32_t SimContext::DrawSeedForChild() {
   return static_cast<uint32_t>(ActiveRng()());
 }
 
+std::mt19937& SimContext::ObjectRng(ClassObject* obj) {
+  // §18.14.3 object stability: return the object's own stream so its
+  // randomization is independent of every other object and of the context-wide
+  // ($random/$urandom) and per-thread generators. Seed lazily the first time
+  // the stream is touched, from the value installed at allocation time, so a
+  // sequence of draws replays from the same starting state.
+  if (!obj->rng_initialized) {
+    obj->rng.seed(obj->rng_seed);
+    obj->rng_initialized = true;
+  }
+  return obj->rng;
+}
+
+void SimContext::SeedObjectRng(ClassObject* obj, uint32_t seed) {
+  // §18.14.3: srandom() may reseed an object's RNG at any time. Reset both the
+  // recorded seed and the live stream so subsequent draws replay the sequence
+  // keyed by `seed`, regardless of any draws already taken.
+  obj->rng_seed = seed;
+  obj->rng.seed(seed);
+  obj->rng_initialized = true;
+}
+
 int32_t SimContext::Random32() { return static_cast<int32_t>(ActiveRng()()); }
 
 uint32_t SimContext::Urandom32() {

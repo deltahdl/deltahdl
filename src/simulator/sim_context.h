@@ -298,6 +298,19 @@ class SimContext {
   // created child thread inherits per §18.14.2 hierarchical seeding.
   uint32_t DrawSeedForChild();
 
+  // §18.14.3 object stability: hand back the generator that belongs solely to
+  // this instance. Because every object draws from its own stream, the
+  // randomization of one instance is independent of any other instance and of
+  // the $random/$urandom and per-thread generators. The stream is materialized
+  // lazily from the seed installed at allocation (§18.14.1), so the draw
+  // sequence stays reproducible.
+  std::mt19937& ObjectRng(ClassObject* obj);
+
+  // §18.14.3: an instance can be reseeded at any time via srandom(), letting an
+  // object self-seed (typically inside its new method) so its randomization
+  // replays under the chosen seed.
+  void SeedObjectRng(ClassObject* obj, uint32_t seed);
+
   void RegisterRealVariable(std::string_view name);
   bool IsRealVariable(std::string_view name) const;
 
