@@ -21,13 +21,6 @@ TEST(FileAndLineMacroParsing, LineDirectiveInAssignment) {
                               "endmodule\n"));
 }
 
-TEST(FileAndLineMacroParsing, FileDirectiveInStringConcat) {
-  EXPECT_TRUE(ParseWithPreprocessorOk(
-      "module t;\n"
-      "  initial $display(\"source: %s:%0d\", `__FILE__, `__LINE__);\n"
-      "endmodule\n"));
-}
-
 TEST(FileAndLineMacroParsing, FileDirectiveInDisplay) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("module t;\n"
