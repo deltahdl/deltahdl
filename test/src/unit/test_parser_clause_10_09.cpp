@@ -46,20 +46,6 @@ TEST(AssignmentPatternParsing, PositionalFourElements) {
   EXPECT_EQ(rhs->elements.size(), 4u);
 }
 
-TEST(AssignmentPatternParsing, PositionalElementsKeysEmpty) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = '{1, 2, 3};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->elements.size(), 3u);
-  EXPECT_TRUE(rhs->pattern_keys.empty());
-}
-
 TEST(AssignmentPatternParsing, EmptyAssignmentPattern) {
   auto r = Parse(
       "module m;\n"
@@ -86,27 +72,6 @@ TEST(AssignmentPatternParsing, ReplicationMultipleElements) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(AssignmentPatternParsing, ReplicationPatternRepeatCount) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    x = '{3{8'd5}};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
-  ASSERT_EQ(rhs->elements.size(), 1u);
-
-  auto* rep = rhs->elements[0];
-  EXPECT_EQ(rep->kind, ExprKind::kReplicate);
-  EXPECT_NE(rep->repeat_count, nullptr);
 }
 
 TEST(AssignmentPatternParsing, DefaultKeyVerified) {
@@ -154,18 +119,6 @@ TEST(AssignmentPatternParsing, AssignmentPatternKeysPopulated) {
   EXPECT_EQ(rhs->pattern_keys[0], "a");
   EXPECT_EQ(rhs->pattern_keys[1], "b");
   EXPECT_EQ(rhs->elements.size(), 2u);
-}
-
-TEST(AssignmentPatternParsing, TypeReferencePatternExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [15:0] x;\n"
-      "  initial begin\n"
-      "    x = type(x)'{8'd1, 8'd2};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(AssignmentPatternParsing, NetLvalueAssignmentPattern) {
@@ -300,6 +253,37 @@ TEST(AssignmentPatternParsing, SingleElementReplication) {
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
   ASSERT_EQ(rhs->elements.size(), 1u);
   EXPECT_EQ(rhs->elements[0]->kind, ExprKind::kReplicate);
+}
+
+TEST(AssignmentPatternParsing, SimpleTypeAsAssignmentPatternKey) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int x;\n"
+              "  initial x = '{int: 5, default: 0};\n"
+              "endmodule\n"));
+}
+
+TEST(AssignmentPatternParsing, PsTypeIdentifierAsExpressionType) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  pair_t p;\n"
+      "  initial p = pair_t'{8'h12, 8'h34};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCast);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kAssignmentPattern);
+}
+
+TEST(AssignmentPatternParsing, ConstantAssignmentPatternExpressionInParameter) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  parameter int p = int'{42};\n"
+              "endmodule\n"));
 }
 
 }

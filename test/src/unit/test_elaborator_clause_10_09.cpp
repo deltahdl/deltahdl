@@ -106,4 +106,40 @@ TEST(AssignmentPatternElaboration, ErrorNonConstantInConstantPattern) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(AssignmentPatternElaboration, ExpressionUsableOutsideAssignmentSide) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int x;\n"
+      "  initial x = int'{40} + 2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AssignmentPatternElaboration, ErrorTypedLhsPatternNamedKeys) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  pair_t p;\n"
+      "  logic [7:0] x, y;\n"
+      "  initial pair_t'{a: x, b: y} = p;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AssignmentPatternElaboration, ErrorLhsPatternBitCountMismatch) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial '{a, b} = 32'hDEADBEEF;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }

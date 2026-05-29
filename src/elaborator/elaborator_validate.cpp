@@ -1336,6 +1336,74 @@ static void WalkStmtsForLhsPatternKeys(const Stmt* s, DiagEngine& diag) {
   for (auto& ci : s->case_items) WalkStmtsForLhsPatternKeys(ci.body, diag);
 }
 
+// §10.9: a positional assignment pattern on the LHS shall hold the same number
+// of bits as the RHS supplies. Fire only when both sides have statically known
+// widths so that unrelated diagnostics keep their primacy.
+static void CheckLhsPatternWidthSum(const Expr* lhs, const Expr* rhs,
+                                    const RtlirModule* mod,
+                                    const TypedefMap& typedefs,
+                                    DiagEngine& diag) {
+  if (!lhs || !rhs) return;
+  const Expr* pat = lhs;
+  if (pat->kind == ExprKind::kCast && pat->lhs) pat = pat->lhs;
+  if (pat->kind != ExprKind::kAssignmentPattern) return;
+  if (!pat->pattern_keys.empty()) return;
+  if (pat->elements.empty()) return;
+
+  uint32_t sum = 0;
+  for (const auto* elem : pat->elements) {
+    uint32_t w = LookupLhsWidth(elem, mod);
+    if (w == 0) return;
+    sum += w;
+  }
+  uint32_t rhs_w = InferExprWidth(rhs, typedefs);
+  if (rhs_w == 0) return;
+  if (sum == rhs_w) return;
+
+  diag.Error(lhs->range.start,
+             std::format("LHS assignment pattern needs {} bits but RHS "
+                         "supplies {} bits",
+                         sum, rhs_w));
+}
+
+static void WalkStmtsForLhsPatternWidths(const Stmt* s,
+                                         const RtlirModule* mod,
+                                         const TypedefMap& typedefs,
+                                         DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign) {
+    CheckLhsPatternWidthSum(s->lhs, s->rhs, mod, typedefs, diag);
+  }
+  for (auto* sub : s->stmts)
+    WalkStmtsForLhsPatternWidths(sub, mod, typedefs, diag);
+  WalkStmtsForLhsPatternWidths(s->then_branch, mod, typedefs, diag);
+  WalkStmtsForLhsPatternWidths(s->else_branch, mod, typedefs, diag);
+  WalkStmtsForLhsPatternWidths(s->body, mod, typedefs, diag);
+  WalkStmtsForLhsPatternWidths(s->for_body, mod, typedefs, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForLhsPatternWidths(ci.body, mod, typedefs, diag);
+}
+
+void Elaborator::ValidateLhsPatternWidths(const ModuleDecl* decl,
+                                          const RtlirModule* mod) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForLhsPatternWidths(item->body, mod, typedefs_, diag_);
+    }
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckLhsPatternWidthSum(item->assign_lhs, item->assign_rhs, mod,
+                              typedefs_, diag_);
+    }
+  }
+}
+
 void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
   bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                  item->kind == ModuleItemKind::kInitialBlock;

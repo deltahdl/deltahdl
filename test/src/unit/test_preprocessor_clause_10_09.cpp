@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Lexical, AssignmentPattern_Positional) {
+TEST(AssignmentPatternPreprocessing, PositionalAssignmentPattern) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
       "  logic [3:0] a;\n"
@@ -14,7 +14,7 @@ TEST(Lexical, AssignmentPattern_Positional) {
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
 
-TEST(Lexical, AssignmentPattern_Named) {
+TEST(AssignmentPatternPreprocessing, NamedAssignmentPattern) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
       "  initial begin\n"
@@ -25,15 +25,15 @@ TEST(Lexical, AssignmentPattern_Named) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(Lexical, AssignmentPattern_DefaultZero) {
+TEST(AssignmentPatternPreprocessing, MacroExpansionPreservesPattern) {
   auto r = ParseWithPreprocessor(
+      "`define ZEROS '{default: 0}\n"
       "module top;\n"
       "  logic [7:0] a;\n"
-      "  initial a = '{default: 0};\n"
+      "  initial a = `ZEROS;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-
-  ASSERT_EQ(r.cu->modules.size(), 1);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
 }

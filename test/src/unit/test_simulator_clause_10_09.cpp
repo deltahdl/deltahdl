@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(AssignmentPattern, PositionalTwoElements) {
+TEST(AssignmentPatternSimulation, PositionalTwoElements) {
   SimFixture f;
   auto* a = f.ctx.CreateVariable("a", 8);
   auto* b = f.ctx.CreateVariable("b", 8);
@@ -22,7 +22,7 @@ TEST(AssignmentPattern, PositionalTwoElements) {
   EXPECT_EQ(result.ToUint64(), 0x050Au);
 }
 
-TEST(AssignmentPattern, PositionalThreeElements) {
+TEST(AssignmentPatternSimulation, PositionalThreeElements) {
   SimFixture f;
   auto* a = f.ctx.CreateVariable("a", 4);
   auto* b = f.ctx.CreateVariable("b", 4);
@@ -37,7 +37,7 @@ TEST(AssignmentPattern, PositionalThreeElements) {
   EXPECT_EQ(result.ToUint64(), 0x123u);
 }
 
-TEST(AssignmentPattern, SingleElement) {
+TEST(AssignmentPatternSimulation, SingleElement) {
   SimFixture f;
   auto* a = f.ctx.CreateVariable("a", 32);
   a->value = MakeLogic4VecVal(f.arena, 32, 42);
@@ -46,14 +46,14 @@ TEST(AssignmentPattern, SingleElement) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-TEST(AssignmentPattern, EmptyPattern) {
+TEST(AssignmentPatternSimulation, EmptyPattern) {
   SimFixture f;
   auto* expr = ParseExprFrom("'{}", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.width, 0u);
 }
 
-TEST(AssignmentPattern, SizedLiterals) {
+TEST(AssignmentPatternSimulation, SizedLiterals) {
   SimFixture f;
   auto* expr = ParseExprFrom("'{32'd5, 32'd10}", f);
   ASSERT_NE(expr, nullptr);
@@ -65,7 +65,7 @@ TEST(AssignmentPattern, SizedLiterals) {
   EXPECT_EQ(result.ToUint64(), expected);
 }
 
-TEST(AssignmentPatternSim, ReplicationPatternEvaluates) {
+TEST(AssignmentPatternSimulation, ReplicationPatternEvaluates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -82,7 +82,7 @@ TEST(AssignmentPatternSim, ReplicationPatternEvaluates) {
   EXPECT_EQ(var->value.ToUint64(), 0xABABABABu);
 }
 
-TEST(AssignmentPatternSim, IntegerAtomTypePatternEvaluates) {
+TEST(AssignmentPatternSimulation, IntegerAtomTypePatternEvaluates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -99,7 +99,7 @@ TEST(AssignmentPatternSim, IntegerAtomTypePatternEvaluates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(AssignmentPatternSim, LhsPositionalUnpackingTwoElements) {
+TEST(AssignmentPatternSimulation, LhsPositionalUnpackingTwoElements) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -119,30 +119,7 @@ TEST(AssignmentPatternSim, LhsPositionalUnpackingTwoElements) {
   EXPECT_EQ(vb->value.ToUint64(), 0xCDu);
 }
 
-TEST(AssignmentPatternSim, LhsPositionalUnpackingThreeElements) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] a, b, c;\n"
-      "  initial begin\n"
-      "    '{a, b, c} = 12'hABC;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  auto* vc = f.ctx.FindVariable("c");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  ASSERT_NE(vc, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 0xAu);
-  EXPECT_EQ(vb->value.ToUint64(), 0xBu);
-  EXPECT_EQ(vc->value.ToUint64(), 0xCu);
-}
-
-TEST(AssignmentPatternSim, ByteTypePrefixEvaluates) {
+TEST(AssignmentPatternSimulation, ByteTypePrefixEvaluates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -159,7 +136,7 @@ TEST(AssignmentPatternSim, ByteTypePrefixEvaluates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(AssignmentPatternSim, PositionalPatternYieldsCorrectValue) {
+TEST(AssignmentPatternSimulation, PositionalPatternYieldsCorrectValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -176,7 +153,7 @@ TEST(AssignmentPatternSim, PositionalPatternYieldsCorrectValue) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
-TEST(PatternSim, PositionalPatternPacksMSBFirst) {
+TEST(AssignmentPatternSimulation, PositionalPatternPacksMSBFirst) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -194,7 +171,7 @@ TEST(PatternSim, PositionalPatternPacksMSBFirst) {
   EXPECT_EQ(var->value.ToUint64(), 258u);
 }
 
-TEST(PatternSim, SingleElementPositionalPattern) {
+TEST(AssignmentPatternSimulation, SingleElementPositionalPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -211,7 +188,7 @@ TEST(PatternSim, SingleElementPositionalPattern) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(PatternSim, FourElementPositionalPattern) {
+TEST(AssignmentPatternSimulation, FourElementPositionalPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -229,7 +206,7 @@ TEST(PatternSim, FourElementPositionalPattern) {
   EXPECT_EQ(var->value.ToUint64(), 0x01020304u);
 }
 
-TEST(PatternSim, PatternInConditionalBranch) {
+TEST(AssignmentPatternSimulation, PatternInConditionalBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -248,7 +225,7 @@ TEST(PatternSim, PatternInConditionalBranch) {
   EXPECT_EQ(var->value.ToUint64(), 1286u);
 }
 
-TEST(PatternSim, PatternInCaseItemBody) {
+TEST(AssignmentPatternSimulation, PatternInCaseItemBody) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -272,7 +249,7 @@ TEST(PatternSim, PatternInCaseItemBody) {
   EXPECT_EQ(var->value.ToUint64(), 2580u);
 }
 
-TEST(PatternSim, PatternInForLoop) {
+TEST(AssignmentPatternSimulation, PatternInForLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

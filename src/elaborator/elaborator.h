@@ -319,6 +319,9 @@ class Elaborator {
 
   void ValidateValueParams(const ModuleDecl* decl, const RtlirModule* mod);
 
+  void ValidateLhsPatternWidths(const ModuleDecl* decl,
+                                const RtlirModule* mod);
+
   void CheckAlwaysCombMultiDriver(const ModuleDecl* decl, RtlirModule* mod);
 
   void ValidateDisableTargets(const ModuleDecl* decl);
