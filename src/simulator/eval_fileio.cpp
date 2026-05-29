@@ -13,8 +13,8 @@
 
 namespace delta {
 
-static int FdFromArg(const Expr* arg, SimContext& ctx, Arena& arena) {
-  return static_cast<int>(EvalExpr(arg, ctx, arena).ToUint64());
+static uint32_t FdFromArg(const Expr* arg, SimContext& ctx, Arena& arena) {
+  return static_cast<uint32_t>(EvalExpr(arg, ctx, arena).ToUint64());
 }
 
 static Logic4Vec StringToVec(Arena& arena, const std::string& str,
@@ -33,7 +33,7 @@ static Logic4Vec StringToVec(Arena& arena, const std::string& str,
 
 static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
-  int fd = FdFromArg(expr->args[1], ctx, arena);
+  uint32_t fd = FdFromArg(expr->args[1], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
 
@@ -53,7 +53,7 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 static Logic4Vec EvalFgetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
-  int fd = FdFromArg(expr->args[0], ctx, arena);
+  uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
 
@@ -67,7 +67,7 @@ static Logic4Vec EvalFflush(const Expr* expr, SimContext& ctx, Arena& arena) {
     std::fflush(nullptr);
     return MakeLogic4VecVal(arena, 1, 0);
   }
-  int fd = FdFromArg(expr->args[0], ctx, arena);
+  uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
   if (fp) std::fflush(fp);
   return MakeLogic4VecVal(arena, 1, 0);
@@ -75,7 +75,7 @@ static Logic4Vec EvalFflush(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 static Logic4Vec EvalFeof(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 1);
-  int fd = FdFromArg(expr->args[0], ctx, arena);
+  uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
   if (!fp) return MakeLogic4VecVal(arena, 32, 1);
   int result = std::feof(fp);
@@ -84,7 +84,7 @@ static Logic4Vec EvalFeof(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 static Logic4Vec EvalFerror(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
-  int fd = FdFromArg(expr->args[0], ctx, arena);
+  uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
 
@@ -104,7 +104,7 @@ static Logic4Vec EvalFerror(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 static Logic4Vec EvalFseek(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 32, 0);
-  int fd = FdFromArg(expr->args[0], ctx, arena);
+  uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
   if (!fp) return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(-1));
 
@@ -118,7 +118,7 @@ static Logic4Vec EvalFseek(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 static Logic4Vec EvalFtell(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
-  int fd = FdFromArg(expr->args[0], ctx, arena);
+  uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
   if (!fp) return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(-1));
   long pos = std::ftell(fp);
@@ -127,7 +127,7 @@ static Logic4Vec EvalFtell(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 static Logic4Vec EvalRewind(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
-  int fd = FdFromArg(expr->args[0], ctx, arena);
+  uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
   if (fp) std::fseek(fp, 0, SEEK_SET);
   return MakeLogic4VecVal(arena, 32, 0);
@@ -136,7 +136,7 @@ static Logic4Vec EvalRewind(const Expr* expr, SimContext& ctx, Arena& arena) {
 static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
   auto ch = static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
-  int fd = FdFromArg(expr->args[1], ctx, arena);
+  uint32_t fd = FdFromArg(expr->args[1], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
   int result = std::ungetc(ch, fp);
@@ -188,7 +188,7 @@ static bool ScanOneField(const std::string& input, ScanState& state, int base,
 
 static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 32, 0);
-  int fd = FdFromArg(expr->args[0], ctx, arena);
+  uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
 
@@ -217,7 +217,7 @@ static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 static Logic4Vec EvalFread(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
-  int fd = FdFromArg(expr->args[1], ctx, arena);
+  uint32_t fd = FdFromArg(expr->args[1], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
 

@@ -552,27 +552,84 @@ Logic4Vec EvalUtilitySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return EvalConversionSysCall(expr, ctx, arena, name);
 }
 
+static std::string EvalStringArg(const Expr* arg, SimContext& ctx,
+                                 Arena& arena);
+
 static Logic4Vec EvalFopen(const Expr* expr, SimContext& ctx, Arena& arena) {
-  if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
-  std::string filename = ExtractStrArg(expr->args[0]);
-  std::string mode = ExtractStrArg(expr->args[1]);
-  int fd = ctx.OpenFile(filename, mode);
+  if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
+  // §21.3.1 admits a filename / type argument that is a string literal, a
+  // string-typed variable, or an integral value whose bytes encode the
+  // characters; EvalStringArg handles all three forms.
+  std::string filename = EvalStringArg(expr->args[0], ctx, arena);
+  // §21.3.1: omitting the type argument requests a multichannel descriptor;
+  // supplying it requests a single 32-bit file descriptor.
+  if (expr->args.size() < 2) {
+    uint32_t mcd = ctx.OpenMcd(filename);
+    return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(mcd));
+  }
+  std::string mode = EvalStringArg(expr->args[1], ctx, arena);
+  uint32_t fd = ctx.OpenFile(filename, mode);
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(fd));
 }
 
 static Logic4Vec EvalFclose(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
-  int fd = static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
-  ctx.CloseFile(fd);
+  auto descriptor =
+      static_cast<uint32_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+  ctx.CloseFile(descriptor);
   return MakeLogic4VecVal(arena, 1, 0);
+}
+
+// Determines whether a system-task name names a §21.3.2 file-output task and,
+// if so, returns the radix character for any base-specific suffix (b/h/o).
+// Returns '\0' for the default ($fdisplay, $fwrite, $fstrobe, $fmonitor),
+// 'b'/'h'/'o' for the suffixed variants, and '?' if the name is not in the set.
+static char FileOutputSuffix(std::string_view name) {
+  auto match = [&](std::string_view base) -> char {
+    if (name == base) return '\0';
+    if (name.size() == base.size() + 1 && name.substr(0, base.size()) == base) {
+      char c = name.back();
+      if (c == 'b' || c == 'h' || c == 'o') return c;
+    }
+    return '?';
+  };
+  for (auto base : {"$fdisplay", "$fwrite", "$fstrobe", "$fmonitor"}) {
+    char s = match(base);
+    if (s != '?') return s;
+  }
+  return '?';
+}
+
+static bool IsFileOutputTask(std::string_view name) {
+  return FileOutputSuffix(name) != '?';
+}
+
+// Routes formatted output to every FILE* selected by a descriptor argument.
+// An fd has its MSB set and refers to a single open file (or to STDIN/STDOUT/
+// STDERR); an mcd has its MSB clear and may select multiple channels at once
+// by setting their channel bits (§21.3.1, §21.3.2).
+static std::vector<FILE*> ResolveOutputTargets(uint32_t descriptor,
+                                               SimContext& ctx) {
+  if ((descriptor & SimContext::kFdMsb) != 0) {
+    FILE* fp = ctx.GetFileHandle(descriptor);
+    if (fp == nullptr) return {};
+    return {fp};
+  }
+  return ctx.GetMcdFiles(descriptor);
 }
 
 static Logic4Vec EvalFdisplayWrite(const Expr* expr, SimContext& ctx,
                                    Arena& arena, std::string_view name) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
-  int fd = static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
-  FILE* fp = ctx.GetFileHandle(fd);
-  if (!fp) return MakeLogic4VecVal(arena, 1, 0);
+  auto descriptor =
+      static_cast<uint32_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+  auto targets = ResolveOutputTargets(descriptor, ctx);
+  if (targets.empty()) return MakeLogic4VecVal(arena, 1, 0);
+
+  char suffix = FileOutputSuffix(name);
+  bool is_display_family =
+      name.rfind("$fdisplay", 0) == 0 || name.rfind("$fstrobe", 0) == 0 ||
+      name.rfind("$fmonitor", 0) == 0;
 
   std::string fmt;
   std::vector<Logic4Vec> arg_vals;
@@ -584,10 +641,20 @@ static Logic4Vec EvalFdisplayWrite(const Expr* expr, SimContext& ctx,
       arg_vals.push_back(val);
     }
   }
-  std::string output = fmt.empty() ? "" : FormatDisplay(fmt, arg_vals);
-  std::fputs(output.c_str(), fp);
-  if (name == "$fdisplay") std::fputc('\n', fp);
-  std::fflush(fp);
+  std::string output;
+  if (!fmt.empty()) {
+    output = FormatDisplay(fmt, arg_vals);
+  } else if (suffix != '\0') {
+    // §21.3.2 derives b/h/o radix from the task-name suffix when no format
+    // string is supplied.
+    char fmt_buf[3] = {'%', suffix, 0};
+    output = FormatDisplay(fmt_buf, arg_vals);
+  }
+  for (FILE* fp : targets) {
+    std::fputs(output.c_str(), fp);
+    if (is_display_family) std::fputc('\n', fp);
+    std::fflush(fp);
+  }
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
@@ -729,7 +796,7 @@ Logic4Vec EvalIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                         std::string_view name) {
   if (name == "$fopen") return EvalFopen(expr, ctx, arena);
   if (name == "$fclose") return EvalFclose(expr, ctx, arena);
-  if (name == "$fdisplay" || name == "$fwrite") {
+  if (IsFileOutputTask(name)) {
     return EvalFdisplayWrite(expr, ctx, arena, name);
   }
   if (name == "$readmemh") return EvalReadmem(expr, ctx, arena, true);

@@ -426,9 +426,23 @@ static bool IsVerifSysCall(std::string_view n) {
 }
 
 static bool IsIOSysCall(std::string_view n) {
-  return n == "$fopen" || n == "$fclose" || n == "$fwrite" ||
-         n == "$fdisplay" || n == "$readmemh" || n == "$readmemb" ||
-         n == "$writememh" || n == "$writememb" || n == "$sscanf";
+  if (n == "$fopen" || n == "$fclose" || n == "$readmemh" ||
+      n == "$readmemb" || n == "$writememh" || n == "$writememb" ||
+      n == "$sscanf") {
+    return true;
+  }
+  // §21.3.2 file-output tasks: $fdisplay, $fwrite, $fstrobe, $fmonitor and
+  // their b/h/o radix variants.
+  for (auto base : {"$fdisplay", "$fwrite", "$fstrobe", "$fmonitor"}) {
+    if (n == base) return true;
+    std::string_view base_view = base;
+    if (n.size() == base_view.size() + 1 &&
+        n.substr(0, base_view.size()) == base_view) {
+      char c = n.back();
+      if (c == 'b' || c == 'h' || c == 'o') return true;
+    }
+  }
+  return false;
 }
 
 static bool IsNoOpSysCall(std::string_view n) {

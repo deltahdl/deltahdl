@@ -510,26 +510,85 @@ std::string_view SimContext::GetVariableTag(std::string_view var_name) const {
   return it->second;
 }
 
-int SimContext::OpenFile(std::string_view filename, std::string_view mode) {
+void SimContext::EnsureStdioDescriptors() {
+  if (stdio_descriptors_ready_) return;
+  stdio_descriptors_ready_ = true;
+  // STDIN/STDOUT/STDERR are pre-opened by §21.3.1 at the reserved fd values.
+  // Channel 0 of an mcd points at the standard output (§21.3.1, LSB rule).
+  file_descriptors_[kStdinFd] = stdin;
+  file_descriptors_[kStdoutFd] = stdout;
+  file_descriptors_[kStderrFd] = stderr;
+  mcd_channels_[0] = stdout;
+}
+
+uint32_t SimContext::OpenFile(std::string_view filename, std::string_view mode) {
+  EnsureStdioDescriptors();
   std::string fname(filename);
   std::string fmode(mode);
   FILE* fp = std::fopen(fname.c_str(), fmode.c_str());
   if (!fp) return 0;
-  int fd = next_fd_++;
+  // Lowest free slot in 3..0x7FFFFFFF, so $fopen reuses channels closed earlier
+  // (§21.3.1).
+  uint32_t slot = 3;
+  while (file_descriptors_.count(kFdMsb | slot) != 0) ++slot;
+  uint32_t fd = kFdMsb | slot;
   file_descriptors_[fd] = fp;
   return fd;
 }
 
-void SimContext::CloseFile(int fd) {
-  auto it = file_descriptors_.find(fd);
-  if (it == file_descriptors_.end()) return;
-  std::fclose(it->second);
-  file_descriptors_.erase(it);
+uint32_t SimContext::OpenMcd(std::string_view filename) {
+  EnsureStdioDescriptors();
+  // mcd LSB (bit 0) is reserved for stdout; MSB (bit 31) must remain clear.
+  // §21.3.1 limits an implementation to channels 1..30 for output files.
+  for (uint32_t bit = 1; bit < 31; ++bit) {
+    if (mcd_channels_[bit] == nullptr) {
+      std::string fname(filename);
+      FILE* fp = std::fopen(fname.c_str(), "w");
+      if (!fp) return 0;
+      mcd_channels_[bit] = fp;
+      return uint32_t{1} << bit;
+    }
+  }
+  return 0;
 }
 
-FILE* SimContext::GetFileHandle(int fd) {
+void SimContext::CloseFile(uint32_t descriptor) {
+  EnsureStdioDescriptors();
+  if ((descriptor & kFdMsb) != 0) {
+    // STDIN/STDOUT/STDERR are not closable per §21.3.1.
+    if (descriptor == kStdinFd || descriptor == kStdoutFd ||
+        descriptor == kStderrFd) {
+      return;
+    }
+    auto it = file_descriptors_.find(descriptor);
+    if (it == file_descriptors_.end()) return;
+    std::fclose(it->second);
+    file_descriptors_.erase(it);
+    return;
+  }
+  // Multichannel descriptor: every bit set selects a channel to close.
+  for (uint32_t bit = 1; bit < 31; ++bit) {
+    if ((descriptor & (uint32_t{1} << bit)) == 0) continue;
+    if (mcd_channels_[bit] == nullptr) continue;
+    std::fclose(mcd_channels_[bit]);
+    mcd_channels_[bit] = nullptr;
+  }
+}
+
+FILE* SimContext::GetFileHandle(uint32_t fd) {
+  EnsureStdioDescriptors();
   auto it = file_descriptors_.find(fd);
   return (it != file_descriptors_.end()) ? it->second : nullptr;
+}
+
+std::vector<FILE*> SimContext::GetMcdFiles(uint32_t mcd) {
+  EnsureStdioDescriptors();
+  std::vector<FILE*> result;
+  for (uint32_t bit = 0; bit < 31; ++bit) {
+    if ((mcd & (uint32_t{1} << bit)) == 0) continue;
+    if (mcd_channels_[bit] != nullptr) result.push_back(mcd_channels_[bit]);
+  }
+  return result;
 }
 
 SemaphoreObject* SimContext::CreateSemaphore(std::string_view name,

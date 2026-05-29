@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <map>
@@ -316,9 +317,20 @@ class SimContext {
   void AddPlusArg(std::string arg);
   const std::vector<std::string>& GetPlusArgs() const { return plus_args_; }
 
-  int OpenFile(std::string_view filename, std::string_view mode);
-  void CloseFile(int fd);
-  FILE* GetFileHandle(int fd);
+  // Per §21.3.1: when type is supplied, $fopen yields a 32-bit fd whose MSB is
+  // set; when type is omitted, $fopen yields a 32-bit mcd whose MSB is clear
+  // and a single channel bit (1..30) is set. STDIN/STDOUT/STDERR have reserved
+  // fd values 32'h8000_0000/0001/0002.
+  static constexpr uint32_t kFdMsb = 0x80000000u;
+  static constexpr uint32_t kStdinFd = 0x80000000u;
+  static constexpr uint32_t kStdoutFd = 0x80000001u;
+  static constexpr uint32_t kStderrFd = 0x80000002u;
+
+  uint32_t OpenFile(std::string_view filename, std::string_view mode);
+  uint32_t OpenMcd(std::string_view filename);
+  void CloseFile(uint32_t descriptor);
+  FILE* GetFileHandle(uint32_t fd);
+  std::vector<FILE*> GetMcdFiles(uint32_t mcd);
 
   SemaphoreObject* CreateSemaphore(std::string_view name, int32_t keys);
   SemaphoreObject* FindSemaphore(std::string_view name);
@@ -472,8 +484,11 @@ class SimContext {
   TimeScale compunit_timescale_;
   std::unordered_map<std::string, TimeScale> scope_timescales_;
   std::vector<std::string> plus_args_;
-  std::unordered_map<int, FILE*> file_descriptors_;
-  int next_fd_ = 3;
+  std::unordered_map<uint32_t, FILE*> file_descriptors_;
+  // Bit i in mcd_channels_[i] tracks the file opened on channel i (1..30).
+  std::array<FILE*, 31> mcd_channels_ = {};
+  bool stdio_descriptors_ready_ = false;
+  void EnsureStdioDescriptors();
 
   std::unordered_set<std::string_view> real_vars_;
 
