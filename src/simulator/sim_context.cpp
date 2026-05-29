@@ -401,6 +401,31 @@ std::string SimContext::GetRandState(Process* proc) {
   return os.str();
 }
 
+void SimContext::SetRandState(ClassObject* obj, const std::string& state) {
+  // §18.13.5: set the object's RNG internal state from `state`. ObjectRng
+  // materializes the stream lazily, so touch it first to guarantee the
+  // generator exists, then deserialize over it. mt19937's operator>> restores
+  // the complete state, so a value produced by GetRandState replays from the
+  // exact position it was captured. Mark the stream initialized so a later
+  // ObjectRng() does not reseed from the recorded seed and discard the restore.
+  std::mt19937& gen = ObjectRng(obj);
+  std::istringstream is(state);
+  is >> gen;
+  obj->rng_initialized = true;
+}
+
+void SimContext::SetRandState(Process* proc, const std::string& state) {
+  // §18.13.5: set the process RNG internal state from `state`, mirroring the
+  // object path. Ensure the stream is live before deserializing so the restore
+  // is not later overwritten by the lazy seed-on-first-use step.
+  if (!proc->rng_initialized) {
+    proc->rng.seed(proc->rng_seed);
+    proc->rng_initialized = true;
+  }
+  std::istringstream is(state);
+  is >> proc->rng;
+}
+
 int32_t SimContext::Random32() { return static_cast<int32_t>(ActiveRng()()); }
 
 uint32_t SimContext::Urandom32() {

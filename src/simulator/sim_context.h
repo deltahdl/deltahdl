@@ -322,6 +322,19 @@ class SimContext {
   // (the state obtained via the process's get_randstate() method).
   std::string GetRandState(Process* proc);
 
+  // §18.13.5 set_randstate(): install `state` as the object's RNG internal
+  // state, the inverse of GetRandState. mt19937 round-trips its full state
+  // through operator>>, so a value previously produced by GetRandState restores
+  // the generator to the exact stream position it was read from. The stream is
+  // marked live so a later draw does not reseed over the restored state. The
+  // value is treated as an opaque string of implementation-dependent length and
+  // format; supplying one not obtained from GetRandState is undefined.
+  void SetRandState(ClassObject* obj, const std::string& state);
+
+  // §18.13.5 set_randstate(): the same install for the RNG owned by a process
+  // (the state given to the process's set_randstate() method).
+  void SetRandState(Process* proc, const std::string& state);
+
   void RegisterRealVariable(std::string_view name);
   bool IsRealVariable(std::string_view name) const;
 
