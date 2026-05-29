@@ -3,7 +3,11 @@
 #include <cstdlib>
 #include <format>
 #include <optional>
+#include <string_view>
+#include <unordered_map>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -23,8 +27,7 @@ void Elaborator::ValidateDpiImport(const ModuleItem* item) {
   if (!item->dpi_is_pure) return;
 
   if (item->dpi_is_task) {
-    diag_.Error(item->loc,
-                "imported task cannot be declared pure (§35.5.2)");
+    diag_.Error(item->loc, "imported task cannot be declared pure (§35.5.2)");
     return;
   }
   if (item->return_type.kind == DataTypeKind::kVoid) {
@@ -44,6 +47,103 @@ void Elaborator::ValidateDpiImport(const ModuleItem* item) {
   }
 }
 
+namespace {
+
+// §35.5.4: the linkage name is the explicit c_identifier when given, otherwise
+// it defaults to the SystemVerilog subroutine name.
+std::string_view DpiLinkageName(const ModuleItem* item) {
+  return item->dpi_c_name.empty() ? item->name : item->dpi_c_name;
+}
+
+// §35.5.4 enumerates the parts of the type signature that must match across
+// every declaration sharing one linkage name: return type, argument count,
+// per-argument direction and type, plus the pure/context qualifiers and the
+// dpi_spec_string itself.
+struct DpiSignatureKey {
+  DataTypeKind return_type;
+  bool is_pure;
+  bool is_context;
+  bool is_task;
+  std::string_view spec_string;
+  std::vector<std::pair<Direction, DataTypeKind>> args;
+};
+
+DpiSignatureKey BuildDpiSignature(const ModuleItem* item) {
+  DpiSignatureKey key;
+  key.return_type = item->return_type.kind;
+  key.is_pure = item->dpi_is_pure;
+  key.is_context = item->dpi_is_context;
+  key.is_task = item->dpi_is_task;
+  key.spec_string = item->dpi_spec_string;
+  key.args.reserve(item->func_args.size());
+  for (const auto& arg : item->func_args) {
+    key.args.emplace_back(arg.direction, arg.data_type.kind);
+  }
+  return key;
+}
+
+bool DpiSignaturesMatch(const DpiSignatureKey& a, const DpiSignatureKey& b) {
+  return a.return_type == b.return_type && a.is_pure == b.is_pure &&
+         a.is_context == b.is_context && a.is_task == b.is_task &&
+         a.spec_string == b.spec_string && a.args == b.args;
+}
+
+}  // namespace
+
+void Elaborator::ValidateDpiDeclarations() {
+  if (unit_ == nullptr) return;
+
+  std::unordered_map<std::string_view, DpiSignatureKey> signatures;
+  std::unordered_map<std::string_view, SourceLoc> first_decl_loc;
+
+  for (const auto* mod : unit_->modules) {
+    if (mod == nullptr) continue;
+
+    // §35.5.4: "multiple imports of the same subroutine name into the same
+    // scope are forbidden." We treat each module declaration as one scope.
+    std::unordered_set<std::string_view> sv_names_in_scope;
+    for (const auto* item : mod->items) {
+      if (item == nullptr) continue;
+      if (item->kind != ModuleItemKind::kDpiImport) continue;
+      auto [it, inserted] = sv_names_in_scope.insert(item->name);
+      if (!inserted) {
+        diag_.Error(
+            item->loc,
+            std::format("DPI import name '{}' already declared in this scope",
+                        item->name));
+      }
+    }
+
+    for (const auto* item : mod->items) {
+      if (item == nullptr) continue;
+      // Signature comparison applies to imports only — an export declaration
+      // carries no signature in its syntax (the signature comes from the
+      // SystemVerilog function being exported).
+      if (item->kind != ModuleItemKind::kDpiImport) continue;
+
+      auto link_name = DpiLinkageName(item);
+      auto sig = BuildDpiSignature(item);
+
+      auto found = signatures.find(link_name);
+      if (found == signatures.end()) {
+        signatures.emplace(link_name, std::move(sig));
+        first_decl_loc[link_name] = item->loc;
+        continue;
+      }
+      // §35.5.4: "all declarations, regardless of scope, shall have exactly
+      // the same type signature." Argument names and defaults may differ.
+      if (!DpiSignaturesMatch(found->second, sig)) {
+        diag_.Error(
+            item->loc,
+            std::format(
+                "DPI declaration of linkage name '{}' disagrees with the "
+                "earlier declaration's type signature",
+                link_name));
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateElabSystemTask(const ModuleItem* item) {
   auto* expr = item->init_expr;
   if (!expr || expr->kind != ExprKind::kSystemCall) return;
@@ -53,8 +153,7 @@ void Elaborator::ValidateElabSystemTask(const ModuleItem* item) {
   if (first_arg->kind == ExprKind::kIntegerLiteral) {
     auto val = first_arg->int_val;
     if (val > 2) {
-      diag_.Error(first_arg->range.start,
-                  "finish_number must be 0, 1, or 2");
+      diag_.Error(first_arg->range.start, "finish_number must be 0, 1, or 2");
     }
   }
 }
@@ -129,18 +228,28 @@ static DataTypeKind NormalizeForCompatibility(DataTypeKind kind) {
 static int NetTypeGroup(NetType t) {
   switch (t) {
     case NetType::kWire:
-    case NetType::kTri: return 0;
+    case NetType::kTri:
+      return 0;
     case NetType::kWand:
-    case NetType::kTriand: return 1;
+    case NetType::kTriand:
+      return 1;
     case NetType::kWor:
-    case NetType::kTrior: return 2;
-    case NetType::kTrireg: return 3;
-    case NetType::kTri0: return 4;
-    case NetType::kTri1: return 5;
-    case NetType::kUwire: return 6;
-    case NetType::kSupply0: return 7;
-    case NetType::kSupply1: return 8;
-    default: return -1;
+    case NetType::kTrior:
+      return 2;
+    case NetType::kTrireg:
+      return 3;
+    case NetType::kTri0:
+      return 4;
+    case NetType::kTri1:
+      return 5;
+    case NetType::kUwire:
+      return 6;
+    case NetType::kSupply0:
+      return 7;
+    case NetType::kSupply1:
+      return 8;
+    default:
+      return -1;
   }
 }
 
@@ -149,14 +258,14 @@ static bool DissimilarNetTypeRequiresWarning(NetType internal,
   static constexpr bool kWarnTable[9][9] = {
 
       {false, false, false, false, false, false, false, false, false},
-      {false, false, true,  true,  true,  true,  true,  false, false},
-      {false, true,  false, true,  true,  true,  true,  false, false},
-      {false, true,  true,  false, false, false, true,  false, false},
-      {false, true,  true,  false, false, true,  true,  false, false},
-      {false, true,  true,  false, true,  false, true,  false, false},
-      {false, true,  true,  true,  true,  true,  false, false, false},
+      {false, false, true, true, true, true, true, false, false},
+      {false, true, false, true, true, true, true, false, false},
+      {false, true, true, false, false, false, true, false, false},
+      {false, true, true, false, false, true, true, false, false},
+      {false, true, true, false, true, false, true, false, false},
+      {false, true, true, true, true, true, false, false, false},
       {false, false, false, false, false, false, false, false, true},
-      {false, false, false, false, false, false, false, true,  false},
+      {false, false, false, false, false, false, false, true, false},
   };
   int ig = NetTypeGroup(internal);
   int eg = NetTypeGroup(external);
@@ -166,19 +275,32 @@ static bool DissimilarNetTypeRequiresWarning(NetType internal,
 
 static NetType PortNetType(DataTypeKind kind) {
   switch (kind) {
-    case DataTypeKind::kWire: return NetType::kWire;
-    case DataTypeKind::kTri: return NetType::kTri;
-    case DataTypeKind::kWand: return NetType::kWand;
-    case DataTypeKind::kTriand: return NetType::kTriand;
-    case DataTypeKind::kWor: return NetType::kWor;
-    case DataTypeKind::kTrior: return NetType::kTrior;
-    case DataTypeKind::kTri0: return NetType::kTri0;
-    case DataTypeKind::kTri1: return NetType::kTri1;
-    case DataTypeKind::kTrireg: return NetType::kTrireg;
-    case DataTypeKind::kSupply0: return NetType::kSupply0;
-    case DataTypeKind::kSupply1: return NetType::kSupply1;
-    case DataTypeKind::kUwire: return NetType::kUwire;
-    default: return NetType::kNone;
+    case DataTypeKind::kWire:
+      return NetType::kWire;
+    case DataTypeKind::kTri:
+      return NetType::kTri;
+    case DataTypeKind::kWand:
+      return NetType::kWand;
+    case DataTypeKind::kTriand:
+      return NetType::kTriand;
+    case DataTypeKind::kWor:
+      return NetType::kWor;
+    case DataTypeKind::kTrior:
+      return NetType::kTrior;
+    case DataTypeKind::kTri0:
+      return NetType::kTri0;
+    case DataTypeKind::kTri1:
+      return NetType::kTri1;
+    case DataTypeKind::kTrireg:
+      return NetType::kTrireg;
+    case DataTypeKind::kSupply0:
+      return NetType::kSupply0;
+    case DataTypeKind::kSupply1:
+      return NetType::kSupply1;
+    case DataTypeKind::kUwire:
+      return NetType::kUwire;
+    default:
+      return NetType::kNone;
   }
 }
 
@@ -223,12 +345,11 @@ bool IsProcBodyItem(ModuleItemKind k) {
          k == ModuleItemKind::kAlwaysLatchBlock;
 }
 
-}
+}  // namespace
 
 namespace {
 
-void WalkExprIdents(const Expr* e,
-                    std::vector<const Expr*>& out) {
+void WalkExprIdents(const Expr* e, std::vector<const Expr*>& out) {
   if (!e) return;
   if (e->kind == ExprKind::kIdentifier) {
     out.push_back(e);
@@ -285,7 +406,7 @@ void WalkStmtIdents(const Stmt* s, std::vector<const Expr*>& out) {
   WalkStmtIdents(s->assert_fail_stmt, out);
 }
 
-}
+}  // namespace
 
 void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
   explicit_imports_.clear();
@@ -334,10 +455,9 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
     if (name.empty()) return;
     auto wit = wildcard_claimed_.find(name);
     if (wit != wildcard_claimed_.end()) {
-      diag_.Error(loc,
-                  std::format("declaration of '{}' follows a reference "
-                              "resolved through a wildcard package import",
-                              name));
+      diag_.Error(loc, std::format("declaration of '{}' follows a reference "
+                                   "resolved through a wildcard package import",
+                                   name));
     }
     seen_decls.insert(name);
   };
@@ -351,11 +471,10 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
       if (provides(pkg, name)) providers.push_back(pkg);
     }
     if (providers.size() > 1) {
-      diag_.Error(
-          e->range.start,
-          std::format("reference to '{}' is ambiguous between wildcard "
-                      "imports of packages '{}' and '{}'",
-                      name, providers[0], providers[1]));
+      diag_.Error(e->range.start,
+                  std::format("reference to '{}' is ambiguous between wildcard "
+                              "imports of packages '{}' and '{}'",
+                              name, providers[0], providers[1]));
       return;
     }
     if (providers.size() == 1) {
@@ -378,8 +497,7 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
           break;
         }
         if (item->import_item.is_wildcard) {
-          if (std::find(wildcard_packages_.begin(),
-                        wildcard_packages_.end(),
+          if (std::find(wildcard_packages_.begin(), wildcard_packages_.end(),
                         pkg_name) == wildcard_packages_.end()) {
             wildcard_packages_.push_back(pkg_name);
           }
@@ -406,11 +524,10 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
                             "package import",
                             pkg_name, name, name));
           } else {
-            diag_.Error(
-                item->loc,
-                std::format("explicit import of '{}::{}' collides with "
-                            "existing declaration of '{}'",
-                            pkg_name, name, name));
+            diag_.Error(item->loc,
+                        std::format("explicit import of '{}::{}' collides with "
+                                    "existing declaration of '{}'",
+                                    pkg_name, name, name));
           }
           break;
         }
@@ -514,8 +631,9 @@ void Elaborator::ValidateContAssignIdentLhs(ModuleItem* item,
     } else {
       auto it = var_types_.find(name);
       if (it != var_types_.end() && it->second == DataTypeKind::kUwire) {
-        diag_.Error(item->loc,
-                    std::format("uwire '{}' cannot have multiple drivers", name));
+        diag_.Error(
+            item->loc,
+            std::format("uwire '{}' cannot have multiple drivers", name));
       }
     }
   }
@@ -636,7 +754,6 @@ void Elaborator::ValidateTypenameAsElabConstant(const Expr* init) {
 }
 
 void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
-
   bool is_type = item->data_type.kind == DataTypeKind::kVoid &&
                  item->typedef_type.kind != DataTypeKind::kImplicit;
 
@@ -672,16 +789,21 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
         resolved->kind != item->forward_type_kind) {
       static const auto basic_name = [](DataTypeKind k) -> std::string_view {
         switch (k) {
-          case DataTypeKind::kEnum:   return "enum";
-          case DataTypeKind::kStruct: return "struct";
-          case DataTypeKind::kUnion:  return "union";
-          default:                    return "type";
+          case DataTypeKind::kEnum:
+            return "enum";
+          case DataTypeKind::kStruct:
+            return "struct";
+          case DataTypeKind::kUnion:
+            return "union";
+          default:
+            return "type";
         }
       };
-      diag_.Error(item->loc,
-                  std::format("type parameter '{}' is assigned a type that does "
-                              "not conform to the required {} kind",
-                              item->name, basic_name(item->forward_type_kind)));
+      diag_.Error(
+          item->loc,
+          std::format("type parameter '{}' is assigned a type that does "
+                      "not conform to the required {} kind",
+                      item->name, basic_name(item->forward_type_kind)));
     }
   }
 
@@ -775,8 +897,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:
 
-      if (!item->name.empty() &&
-          !declared_names_.insert(item->name).second) {
+      if (!item->name.empty() && !declared_names_.insert(item->name).second) {
         diag_.Error(item->loc,
                     std::format("redeclaration of '{}'", item->name));
       }
@@ -807,8 +928,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       if (!item->gate_inst_name.empty() &&
           !declared_names_.insert(item->gate_inst_name).second) {
         diag_.Error(item->loc,
-                    std::format("redeclaration of '{}'",
-                                item->gate_inst_name));
+                    std::format("redeclaration of '{}'", item->gate_inst_name));
       }
 
       if (item->inst_range_left && item->inst_range_right) {
@@ -820,9 +940,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
                       "gate or switch instance range bound is not a constant "
                       "expression");
         } else {
-
-          uint32_t array_len =
-              static_cast<uint32_t>(std::abs(*lhi - *rhi) + 1);
+          uint32_t array_len = static_cast<uint32_t>(std::abs(*lhi - *rhi) + 1);
           for (auto* term : item->gate_terminals) {
             uint32_t w = LookupLhsWidth(term, mod);
             if (w == 0) continue;
@@ -846,8 +964,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       if (!item->gate_inst_name.empty() &&
           !declared_names_.insert(item->gate_inst_name).second) {
         diag_.Error(item->loc,
-                    std::format("redeclaration of '{}'",
-                                item->gate_inst_name));
+                    std::format("redeclaration of '{}'", item->gate_inst_name));
       }
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       break;
@@ -888,7 +1005,6 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kDefparam:
       break;
     case ModuleItemKind::kImportDecl: {
-
       RtlirImport imp;
       imp.package_name = item->import_item.package_name;
       imp.item_name = item->import_item.item_name;
@@ -903,12 +1019,10 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       // §16.12: nesting of disable iff is forbidden, explicitly or through
       // property instantiations. The flattened count via §F.4.1's rewriter
       // catches both cases.
-      int flat_disable_iff =
-          property_registry_.FlattenedDisableIffCount(item);
+      int flat_disable_iff = property_registry_.FlattenedDisableIffCount(item);
       if (flat_disable_iff > 1) {
-        diag_.Error(item->loc,
-                    "property \"" + std::string(item->name) +
-                        "\" nests disable iff clauses (§16.12)");
+        diag_.Error(item->loc, "property \"" + std::string(item->name) +
+                                   "\" nests disable iff clauses (§16.12)");
       }
       // §16.10: same formal-vs-body shadow rule applies to a property
       // declaration: a formal-argument name cannot be redeclared as a
@@ -953,27 +1067,30 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
 }
 
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
-
   static const auto kind_name = [](DataTypeKind k) -> std::string_view {
     switch (k) {
-      case DataTypeKind::kEnum:   return "enum";
-      case DataTypeKind::kStruct: return "struct";
-      case DataTypeKind::kUnion:  return "union";
-      default:                    return "type";
+      case DataTypeKind::kEnum:
+        return "enum";
+      case DataTypeKind::kStruct:
+        return "struct";
+      case DataTypeKind::kUnion:
+        return "union";
+      default:
+        return "type";
     }
   };
   bool is_forward = item->typedef_type.kind == DataTypeKind::kImplicit;
   if (is_forward) {
     if (item->forward_type_kind != DataTypeKind::kImplicit) {
-
       auto td_it = typedefs_.find(item->name);
       if (td_it != typedefs_.end() &&
           td_it->second.kind != DataTypeKind::kImplicit &&
           td_it->second.kind != item->forward_type_kind) {
-        diag_.Error(item->loc,
-                    std::format("forward typedef '{}' as {} does not conform "
-                                "to its existing definition",
-                                item->name, kind_name(item->forward_type_kind)));
+        diag_.Error(
+            item->loc,
+            std::format("forward typedef '{}' as {} does not conform "
+                        "to its existing definition",
+                        item->name, kind_name(item->forward_type_kind)));
       }
       forward_typedef_kinds_[item->name] = item->forward_type_kind;
     }
@@ -984,7 +1101,6 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   auto it = forward_typedef_kinds_.find(item->name);
   if (it != forward_typedef_kinds_.end() &&
       it->second != item->typedef_type.kind) {
-
     diag_.Error(item->loc,
                 std::format("typedef '{}' does not conform to its forward "
                             "declaration as {}",
@@ -1014,7 +1130,10 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
     uint64_t total = elem_width;
     bool all_fixed = (elem_width > 0);
     for (auto* dim : item->unpacked_dims) {
-      if (!dim) { all_fixed = false; break; }
+      if (!dim) {
+        all_fixed = false;
+        break;
+      }
       if (dim->kind == ExprKind::kIdentifier) {
         auto t = dim->text;
         if (t == "$" || t == "*" || t == "string" || t == "int" ||
@@ -1027,18 +1146,23 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
       if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
         auto lv = ConstEvalInt(dim->lhs);
         auto rv = ConstEvalInt(dim->rhs);
-        if (!lv || !rv) { all_fixed = false; break; }
+        if (!lv || !rv) {
+          all_fixed = false;
+          break;
+        }
         int64_t span = std::abs(*lv - *rv) + 1;
         total *= static_cast<uint64_t>(span);
       } else {
         auto sv = ConstEvalInt(dim);
-        if (!sv || *sv <= 0) { all_fixed = false; break; }
+        if (!sv || *sv <= 0) {
+          all_fixed = false;
+          break;
+        }
         total *= static_cast<uint64_t>(*sv);
       }
     }
     if (all_fixed && total > 0 && total < uint64_t{1} << 32) {
-      fixed_unpacked_typedef_widths_[item->name] =
-          static_cast<uint32_t>(total);
+      fixed_unpacked_typedef_widths_[item->name] = static_cast<uint32_t>(total);
     }
   }
   if (item->typedef_type.kind == DataTypeKind::kStruct ||
@@ -1069,7 +1193,6 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
     if (member.range_start) {
       auto n = ConstEvalInt(member.range_start).value_or(0);
       if (member.range_end) {
-
         auto m = ConstEvalInt(member.range_end).value_or(0);
         int step = (m >= n) ? 1 : -1;
         for (auto i = n;; i += step) {
@@ -1087,7 +1210,6 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
           if (i == m) break;
         }
       } else {
-
         for (int64_t i = 0; i < n; ++i) {
           auto s = std::format("{}{}", member.name, i);
           auto* p = arena_.AllocString(s.c_str(), s.size());
@@ -1103,7 +1225,6 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
         }
       }
     } else {
-
       enum_member_names_.insert(member.name);
       members.push_back({member.name, next_val});
       RtlirVariable var;
@@ -1176,23 +1297,22 @@ void Elaborator::ValidateForwardTypedefScopePrefix(const ModuleDecl* decl) {
   }
 }
 
-void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* ) {
+void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule*) {
   typedefs_[item->name] = item->typedef_type;
   nettype_names_.insert(item->name);
   if (!item->nettype_resolve_func.empty()) {
     nettype_resolve_funcs_[item->name] = item->nettype_resolve_func;
     nettype_canonical_[item->name] = item->name;
   } else if (item->typedef_type.kind == DataTypeKind::kNamed) {
-
     auto it = nettype_resolve_funcs_.find(item->typedef_type.type_name);
     if (it != nettype_resolve_funcs_.end()) {
       nettype_resolve_funcs_[item->name] = it->second;
     }
 
     auto cit = nettype_canonical_.find(item->typedef_type.type_name);
-    nettype_canonical_[item->name] =
-        (cit != nettype_canonical_.end()) ? cit->second
-                                          : item->typedef_type.type_name;
+    nettype_canonical_[item->name] = (cit != nettype_canonical_.end())
+                                         ? cit->second
+                                         : item->typedef_type.type_name;
   } else {
     nettype_canonical_[item->name] = item->name;
   }
@@ -1283,13 +1403,11 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
                   "virtual interface cannot be declared inside an interface");
     }
   }
-  const bool parent_is_program =
-      decl->decl_kind == ModuleDeclKind::kProgram;
-  const bool parent_is_checker =
-      decl->decl_kind == ModuleDeclKind::kChecker;
-  const std::string_view parent_kind_word =
-      parent_is_program ? std::string_view{"program"}
-                        : std::string_view{"checker"};
+  const bool parent_is_program = decl->decl_kind == ModuleDeclKind::kProgram;
+  const bool parent_is_checker = decl->decl_kind == ModuleDeclKind::kChecker;
+  const std::string_view parent_kind_word = parent_is_program
+                                                ? std::string_view{"program"}
+                                                : std::string_view{"checker"};
 
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kModuleInst) {
@@ -1466,8 +1584,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
 
 namespace {
 
-void CollectMemberAccess(const Expr* e,
-                         std::vector<const Expr*>& out) {
+void CollectMemberAccess(const Expr* e, std::vector<const Expr*>& out) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess) {
     out.push_back(e);
@@ -1516,7 +1633,7 @@ void CollectMemberAccessInStmt(const Stmt* s, std::vector<const Expr*>& out) {
   CollectMemberAccessInStmt(s->assert_fail_stmt, out);
 }
 
-}
+}  // namespace
 
 void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,
                                                const RtlirModule* mod) {
@@ -1642,8 +1759,7 @@ static uint32_t EvalInstDimSize(const Expr* left, const Expr* right) {
   if (left && right) {
     auto lv = ConstEvalInt(left);
     auto rv = ConstEvalInt(right);
-    if (lv && rv)
-      return static_cast<uint32_t>(std::abs(*lv - *rv) + 1);
+    if (lv && rv) return static_cast<uint32_t>(std::abs(*lv - *rv) + 1);
   } else if (left) {
     auto v = ConstEvalInt(left);
     if (v && *v > 0) return static_cast<uint32_t>(*v);
@@ -1703,7 +1819,6 @@ void Elaborator::ApplyConfigParamOverrides(
 }
 
 void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
-
   if (!item->inst_name.empty() &&
       !declared_names_.insert(item->inst_name).second) {
     diag_.Error(item->loc,
@@ -1723,9 +1838,8 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
       diag_.Error(item->loc,
                   std::format("unknown module '{}'", item->inst_module));
     else
-      diag_.Error(item->loc,
-                  std::format("unknown module '{}::{}'", item->inst_scope,
-                              item->inst_module));
+      diag_.Error(item->loc, std::format("unknown module '{}::{}'",
+                                         item->inst_scope, item->inst_module));
     mod->children.push_back(inst);
     current_inst_path_ = std::move(saved_inst_path);
     return;
@@ -1772,9 +1886,8 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
     }
     for (const auto& [pname, pexpr] : item->inst_params) {
       if (overridable.count(pname) == 0) {
-        diag_.Error(item->loc,
-                    std::format("module '{}' has no parameter '{}'",
-                                item->inst_module, pname));
+        diag_.Error(item->loc, std::format("module '{}' has no parameter '{}'",
+                                           item->inst_module, pname));
         continue;
       }
       if (!pexpr) continue;
@@ -1857,8 +1970,8 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
 
   for (size_t i = 0; i < item->inst_ports.size(); ++i) {
     auto& [port_name, conn_expr] = item->inst_ports[i];
-    const bool is_implicit = i < item->inst_ports_implicit.size() &&
-                             item->inst_ports_implicit[i];
+    const bool is_implicit =
+        i < item->inst_ports_implicit.size() && item->inst_ports_implicit[i];
 
     if (conn_expr && conn_expr->kind == ExprKind::kIdentifier) {
       if (is_implicit) {
@@ -1885,19 +1998,17 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       } else {
         diag_.Warning(
             item->loc,
-            std::format(
-                "too many ordered port connections for module '{}'"
-                " (expected {}, got {})",
-                inst.module_name, child_ports.size(),
-                item->inst_ports.size()));
+            std::format("too many ordered port connections for module '{}'"
+                        " (expected {}, got {})",
+                        inst.module_name, child_ports.size(),
+                        item->inst_ports.size()));
         break;
       }
     } else {
       binding.port_name = port_name;
-      it = std::find_if(child_ports.begin(), child_ports.end(),
-                         [&](const RtlirPort& p) {
-                           return p.name == port_name;
-                         });
+      it =
+          std::find_if(child_ports.begin(), child_ports.end(),
+                       [&](const RtlirPort& p) { return p.name == port_name; });
     }
 
     if (it == child_ports.end()) {
@@ -1970,11 +2081,10 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
           DataType sig_dt{};
           sig_dt.kind = sig_kind;
           if (!IsAssignmentCompatible(sig_dt, port_dt)) {
-            diag_.Error(
-                item->loc,
-                std::format("port connection type is not assignment "
-                            "compatible with port '{}'",
-                            binding.port_name));
+            diag_.Error(item->loc,
+                        std::format("port connection type is not assignment "
+                                    "compatible with port '{}'",
+                                    binding.port_name));
           }
         }
       }
@@ -1991,28 +2101,25 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       if (it->direction == Direction::kInout &&
           var_types_.count(conn_expr->text) &&
           net_names_.count(conn_expr->text) == 0) {
-        diag_.Error(
-            item->loc,
-            std::format("variable '{}' cannot be connected to "
-                        "inout port '{}'",
-                        conn_expr->text, binding.port_name));
+        diag_.Error(item->loc,
+                    std::format("variable '{}' cannot be connected to "
+                                "inout port '{}'",
+                                conn_expr->text, binding.port_name));
       }
 
       if (it->direction == Direction::kRef &&
           net_names_.count(conn_expr->text)) {
-        diag_.Error(
-            item->loc,
-            std::format("net '{}' cannot be connected to ref port "
-                        "'{}'; ref port requires a variable",
-                        conn_expr->text, binding.port_name));
+        diag_.Error(item->loc,
+                    std::format("net '{}' cannot be connected to ref port "
+                                "'{}'; ref port requires a variable",
+                                conn_expr->text, binding.port_name));
       }
 
       if (it->is_var && interconnect_names_.count(conn_expr->text)) {
-        diag_.Error(
-            item->loc,
-            std::format("port variable '{}' cannot be connected to "
-                        "interconnect net '{}'",
-                        binding.port_name, conn_expr->text));
+        diag_.Error(item->loc,
+                    std::format("port variable '{}' cannot be connected to "
+                                "interconnect net '{}'",
+                                binding.port_name, conn_expr->text));
       }
     }
 
@@ -2049,9 +2156,9 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
         net_names_.count(conn_expr->text) == 0) {
       auto name = conn_expr->text;
       if (!output_port_targets_.emplace(name, item->loc).second) {
-        diag_.Error(item->loc,
-                    std::format("variable '{}' driven by multiple outputs",
-                                name));
+        diag_.Error(
+            item->loc,
+            std::format("variable '{}' driven by multiple outputs", name));
       }
     }
 
@@ -2107,12 +2214,11 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       } else if (IsNameDeclared(port.name, parent_mod)) {
         uint32_t sig_width = FindSignalWidth(port.name, parent_mod);
         if (sig_width != 0 && sig_width != port.width) {
-          diag_.Error(
-              item->loc,
-              std::format("implicit .* port connection '.{}' requires "
-                          "equivalent data types (port width {}, "
-                          "signal width {})",
-                          port.name, port.width, sig_width));
+          diag_.Error(item->loc,
+                      std::format("implicit .* port connection '.{}' requires "
+                                  "equivalent data types (port width {}, "
+                                  "signal width {})",
+                                  port.name, port.width, sig_width));
         }
 
         NetType pnet = PortNetType(port.type_kind);
@@ -2120,11 +2226,10 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
           NetType snet = FindSignalNetType(port.name, parent_mod);
           if (snet != NetType::kNone && snet != pnet &&
               snet != NetType::kInterconnect && !port.is_interconnect) {
-            diag_.Error(
-                item->loc,
-                std::format("implicit .* port connection '.{}' between "
-                            "dissimilar net types",
-                            port.name));
+            diag_.Error(item->loc,
+                        std::format("implicit .* port connection '.{}' between "
+                                    "dissimilar net types",
+                                    port.name));
           }
         }
 
@@ -2138,30 +2243,25 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
         }
 
         if (port.direction == Direction::kInout &&
-            var_types_.count(port.name) &&
-            net_names_.count(port.name) == 0) {
-          diag_.Error(
-              item->loc,
-              std::format("variable '{}' cannot be connected to "
-                          "inout port '{}'",
-                          port.name, port.name));
+            var_types_.count(port.name) && net_names_.count(port.name) == 0) {
+          diag_.Error(item->loc,
+                      std::format("variable '{}' cannot be connected to "
+                                  "inout port '{}'",
+                                  port.name, port.name));
         }
 
-        if (port.direction == Direction::kRef &&
-            net_names_.count(port.name)) {
-          diag_.Error(
-              item->loc,
-              std::format("net '{}' cannot be connected to ref port "
-                          "'{}'; ref port requires a variable",
-                          port.name, port.name));
+        if (port.direction == Direction::kRef && net_names_.count(port.name)) {
+          diag_.Error(item->loc,
+                      std::format("net '{}' cannot be connected to ref port "
+                                  "'{}'; ref port requires a variable",
+                                  port.name, port.name));
         }
 
         if (port.is_var && interconnect_names_.count(port.name)) {
-          diag_.Error(
-              item->loc,
-              std::format("port variable '{}' cannot be connected to "
-                          "interconnect net '{}'",
-                          port.name, port.name));
+          diag_.Error(item->loc,
+                      std::format("port variable '{}' cannot be connected to "
+                                  "interconnect net '{}'",
+                                  port.name, port.name));
         }
 
         auto* expr = arena_.Create<Expr>();
@@ -2172,10 +2272,9 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
         if (binding.direction != Direction::kInput &&
             net_names_.count(port.name) == 0) {
           if (!output_port_targets_.emplace(port.name, item->loc).second) {
-            diag_.Error(
-                item->loc,
-                std::format("variable '{}' driven by multiple outputs",
-                            port.name));
+            diag_.Error(item->loc,
+                        std::format("variable '{}' driven by multiple outputs",
+                                    port.name));
           }
         }
       } else if (port.default_value) {
@@ -2294,11 +2393,10 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
         }
       }
       if (!is_ifc_port) {
-        diag_.Error(
-            item->loc,
-            std::format("interface port '{}' must be connected to an "
-                        "interface instance or interface port",
-                        port.name));
+        diag_.Error(item->loc,
+                    std::format("interface port '{}' must be connected to an "
+                                "interface instance or interface port",
+                                port.name));
         continue;
       }
     }
@@ -2326,20 +2424,19 @@ void Elaborator::CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc) {
   for (const auto& binding : inst.port_bindings) {
     if (binding.direction == Direction::kInput &&
         child_assign_targets.count(binding.port_name)) {
-      diag_.Warning(
-          loc, std::format("port '{}' is declared as input but is driven "
-                           "inside module '{}'",
-                           binding.port_name, inst.module_name));
+      diag_.Warning(loc,
+                    std::format("port '{}' is declared as input but is driven "
+                                "inside module '{}'",
+                                binding.port_name, inst.module_name));
     }
 
     if (binding.direction == Direction::kOutput && binding.connection &&
         binding.connection->kind == ExprKind::kIdentifier &&
         cont_assign_targets_.count(binding.connection->text)) {
       diag_.Warning(
-          loc,
-          std::format("port '{}' is declared as output but its connection "
-                      "'{}' is also driven externally",
-                      binding.port_name, binding.connection->text));
+          loc, std::format("port '{}' is declared as output but its connection "
+                           "'{}' is also driven externally",
+                           binding.port_name, binding.connection->text));
     }
   }
 }
@@ -2519,9 +2616,8 @@ void Elaborator::ValidateInstanceArrayPorts(
     }
 
     if (conn_is_unpacked) {
-      uint32_t expected_dims =
-          static_cast<uint32_t>(inst_dim_sizes.size()) +
-          port_it->num_unpacked_dims;
+      uint32_t expected_dims = static_cast<uint32_t>(inst_dim_sizes.size()) +
+                               port_it->num_unpacked_dims;
       if (conn_num_dims != expected_dims) {
         diag_.Error(
             item->loc,
@@ -2681,7 +2777,6 @@ static bool IsGenerateConstruct(ModuleItemKind k) {
 }
 
 void Elaborator::AssignGenerateBlockNames(const ModuleDecl* decl) {
-
   std::unordered_set<std::string_view> used;
   for (const auto& port : decl->ports) used.insert(port.name);
   for (const auto& p : decl->params) used.insert(p.first);
@@ -2726,8 +2821,7 @@ static std::string_view StepLhsName(const Stmt* step) {
   }
   if (step->expr) {
     const auto* e = step->expr;
-    if ((e->kind == ExprKind::kUnary ||
-         e->kind == ExprKind::kPostfixUnary) &&
+    if ((e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
         e->lhs && e->lhs->kind == ExprKind::kIdentifier) {
       return e->lhs->text;
     }
@@ -2790,8 +2884,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
       next = ConstEvalInt(item->gen_step->rhs, loop_scope);
     } else if (item->gen_step->expr) {
       auto* e = item->gen_step->expr;
-      if ((e->kind == ExprKind::kUnary ||
-           e->kind == ExprKind::kPostfixUnary) &&
+      if ((e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
           e->lhs && e->lhs->kind == ExprKind::kIdentifier) {
         auto it = loop_scope.find(e->lhs->text);
         if (it != loop_scope.end()) {
@@ -2813,4 +2906,4 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   gen_prefix_ = saved_prefix;
 }
 
-}
+}  // namespace delta

@@ -19,6 +19,15 @@ static bool IsValidCIdentifier(std::string_view text) {
   return true;
 }
 
+// §35.5.4: dpi_spec_string ::= "DPI-C" | "DPI". The lexer keeps the raw
+// quoted text in the token; this returns the inner characters so the rest
+// of the parser can compare against the two literal values from Syntax 35-1.
+static std::string_view StripStringLiteralQuotes(std::string_view text) {
+  if (text.size() < 2) return text;
+  if (text.front() != '"' || text.back() != '"') return text;
+  return text.substr(1, text.size() - 2);
+}
+
 static Direction TokenToDirection(TokenKind kind) {
   switch (kind) {
     case TokenKind::kKwInput:
@@ -126,7 +135,20 @@ ModuleItem* Parser::ParseDpiImport() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kDpiImport;
   item->loc = CurrentLoc();
-  Consume();
+  auto spec_tok = Consume();
+  item->dpi_spec_string = StripStringLiteralQuotes(spec_tok.text);
+  if (item->dpi_spec_string == "DPI") {
+    // §35.5.4: "DPI" is deprecated; the warning text must point at the
+    // canonical replacement and warn about possible C-code changes.
+    diag_.Warning(
+        spec_tok.loc,
+        "\"DPI\" is deprecated and should be replaced with \"DPI-C\"; "
+        "use of the \"DPI-C\" string may require changes to the DPI "
+        "application's C code");
+  } else if (item->dpi_spec_string != "DPI-C") {
+    diag_.Error(spec_tok.loc,
+                "DPI specification string must be \"DPI-C\" or \"DPI\"");
+  }
 
   if (Match(TokenKind::kKwPure)) {
     item->dpi_is_pure = true;
@@ -163,6 +185,14 @@ ModuleItem* Parser::ParseDpiImport() {
   if (Check(TokenKind::kLParen)) {
     item->func_args = ParseFunctionArgs( false);
   }
+  // §35.5.4: ref qualifier is forbidden in import declarations.
+  for (const auto& arg : item->func_args) {
+    if (arg.direction == Direction::kRef) {
+      diag_.Error(item->loc,
+                  "ref qualifier cannot be used in a DPI import declaration");
+      break;
+    }
+  }
   Expect(TokenKind::kSemicolon);
   return item;
 }
@@ -171,7 +201,18 @@ ModuleItem* Parser::ParseDpiExport(SourceLoc loc) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kDpiExport;
   item->loc = loc;
-  Consume();
+  auto spec_tok = Consume();
+  item->dpi_spec_string = StripStringLiteralQuotes(spec_tok.text);
+  if (item->dpi_spec_string == "DPI") {
+    diag_.Warning(
+        spec_tok.loc,
+        "\"DPI\" is deprecated and should be replaced with \"DPI-C\"; "
+        "use of the \"DPI-C\" string may require changes to the DPI "
+        "application's C code");
+  } else if (item->dpi_spec_string != "DPI-C") {
+    diag_.Error(spec_tok.loc,
+                "DPI specification string must be \"DPI-C\" or \"DPI\"");
+  }
 
   if (Check(TokenKind::kIdentifier)) {
     auto saved = lexer_.SavePos();

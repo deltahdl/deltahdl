@@ -134,13 +134,81 @@ void DpiRuntime::SetScope(const DpiScope* scope) { current_scope_ = scope; }
 
 const DpiScope* DpiRuntime::GetScope() const { return current_scope_; }
 
-uint32_t DpiRuntime::SvLow(const SvOpenArrayHandle& ) { return 0; }
+uint32_t DpiRuntime::SvLow(const SvOpenArrayHandle&) { return 0; }
 
 uint32_t DpiRuntime::SvHigh(const SvOpenArrayHandle& h) {
   return h.size > 0 ? h.size - 1 : 0;
 }
 
 uint32_t DpiRuntime::SvSize(const SvOpenArrayHandle& h) { return h.size; }
+
+void DpiRuntime::EnterContextImportCall(std::string_view sv_name,
+                                        DpiScope decl_scope) {
+  // §35.5.3: the chain's context is the import declaration's instantiated
+  // scope when SystemVerilog calls a context import.
+  PushScope(std::move(decl_scope));
+  call_chain_.push_back({sv_name, true});
+}
+
+void DpiRuntime::EnterNoncontextImportCall(std::string_view sv_name) {
+  call_chain_.push_back({sv_name, false});
+}
+
+void DpiRuntime::LeaveImportCall() {
+  if (call_chain_.empty()) return;
+  bool had_context = call_chain_.back().is_context;
+  call_chain_.pop_back();
+  if (had_context) PopScope();
+}
+
+uint32_t DpiRuntime::ImportCallDepth() const {
+  return static_cast<uint32_t>(call_chain_.size());
+}
+
+bool DpiRuntime::ChainRootIsContext() const {
+  if (call_chain_.empty()) return false;
+  // §35.5.3: context property attaches to the *root* of the import chain,
+  // never transitively promoted to subsequent inner calls.
+  return call_chain_.front().is_context;
+}
+
+DpiExportCallStatus DpiRuntime::CallExportFromImport(
+    std::string_view sv_name, const std::vector<DpiArgValue>& args,
+    DpiArgValue* out_result) {
+  // §35.5.3: a noncontext DPI subroutine cannot call a SystemVerilog export.
+  // The check looks at the *current* (innermost) import call's context
+  // property, not the chain root, because context is not transitively
+  // promoted.
+  if (call_chain_.empty() || !call_chain_.back().is_context) {
+    return DpiExportCallStatus::kNoncontextChain;
+  }
+  // §35.5.3: only exports declared in the chain's current scope can be
+  // invoked directly. Calling an export defined in a different scope
+  // requires the import to first set the chain scope via svSetScope.
+  // When the export's scope_name is empty we treat the export as
+  // scope-agnostic to keep callers that don't record scopes working.
+  const auto* exp = FindExport(sv_name);
+  if (exp != nullptr && !exp->scope_name.empty() && current_scope_ != nullptr &&
+      exp->scope_name != current_scope_->name) {
+    return DpiExportCallStatus::kScopeMismatch;
+  }
+  // §35.5.3: when the export call returns, the chain context shall be the
+  // value it had at the point the export was invoked. Snapshot and restore
+  // around the call so that any scope changes performed by the export (or
+  // by code it called) do not leak back to the import chain.
+  const DpiScope* saved_scope = current_scope_;
+  DpiArgValue result = CallExport(sv_name, args);
+  current_scope_ = saved_scope;
+  if (out_result) *out_result = result;
+  return DpiExportCallStatus::kOk;
+}
+
+bool DpiRuntime::IsImportCallOptimizationBarrier(
+    std::string_view sv_name) const {
+  const auto* func = FindImport(sv_name);
+  if (func == nullptr) return false;
+  return func->is_context;
+}
 
 void AssertionApi::RegisterCallback(int reason, AssertionCbFunc cb,
                                     void* user_data) {
@@ -239,4 +307,4 @@ uint32_t DataReadApi::ValueChangeCbCount() const {
   return total;
 }
 
-}
+}  // namespace delta

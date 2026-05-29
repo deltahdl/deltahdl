@@ -131,22 +131,7 @@ TEST(FunctionDeclParsing, DpiTaskProtoWithArgs) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
-TEST_F(AnnexHParseTest, AnnexHDpiImportFunction) {
-  auto* unit = Parse(
-      "module m;\n"
-      "  import \"DPI-C\" function int c_add(int a, int b);\n"
-      "endmodule\n");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
-  EXPECT_EQ(items[0]->name, "c_add");
-  EXPECT_FALSE(items[0]->dpi_is_task);
-  EXPECT_FALSE(items[0]->dpi_is_pure);
-  EXPECT_FALSE(items[0]->dpi_is_context);
-}
-
-TEST_F(AnnexHParseTest, AnnexHDpiImportWithCName) {
+TEST_F(DpiParseTest, DpiImportVoidFunctionWithCIdentifier) {
   auto* unit = Parse(
       "module m;\n"
       "  import \"DPI-C\" c_name = function void my_func();\n"
@@ -176,7 +161,7 @@ TEST_F(DpiParseTest, DpiImportCoexistsWithPackageImport) {
   EXPECT_EQ(items[2]->kind, ModuleItemKind::kDpiExport);
 }
 
-TEST_F(AnnexHParseTest, AnnexHDpiImportTask) {
+TEST_F(DpiParseTest, DpiImportTaskCapturesFormalArgName) {
   auto* unit = Parse(
       "module m;\n"
       "  import \"DPI-C\" task c_wait(int cycles);\n"
@@ -191,7 +176,7 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportTask) {
   EXPECT_EQ(items[0]->func_args[0].name, "cycles");
 }
 
-TEST_F(AnnexHParseTest, AnnexHDpiContextTaskWithCName) {
+TEST_F(DpiParseTest, DpiImportContextTaskWithCIdentifier) {
   auto* unit = Parse(
       "module m;\n"
       "  import \"DPI-C\" context c_poll = task poll_hardware(int timeout);\n"
@@ -206,7 +191,7 @@ TEST_F(AnnexHParseTest, AnnexHDpiContextTaskWithCName) {
   EXPECT_TRUE(items[0]->dpi_is_task);
 }
 
-TEST_F(AnnexHParseTest, AnnexHDpiImportNoArgs) {
+TEST_F(DpiParseTest, DpiImportFunctionOmittedParameterList) {
   auto* unit = Parse(
       "module m;\n"
       "  import \"DPI-C\" function int get_seed;\n"
@@ -219,7 +204,7 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportNoArgs) {
   EXPECT_TRUE(items[0]->func_args.empty());
 }
 
-TEST_F(AnnexHParseTest, AnnexJDpiImportCoexistence) {
+TEST_F(DpiParseTest, DpiImportCoexistsWithVarAndContAssign) {
   auto* unit = Parse(
       "module m;\n"
       "  import \"DPI-C\" function int c_func();\n"
@@ -262,20 +247,6 @@ TEST(DpiParsing, DpiImportWithCNameForCallback) {
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->dpi_c_name, "vpi_cb_rtn");
   EXPECT_EQ(items[0]->name, "cb_value_change");
-}
-
-TEST(DpiParsing, DpiImportPureFunctionForSizetf) {
-  auto r = Parse(R"(
-    module m;
-      import "DPI-C" pure function int my_sizetf(input string data);
-    endmodule
-  )");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_TRUE(items[0]->dpi_is_pure);
-  EXPECT_FALSE(items[0]->dpi_is_context);
 }
 
 TEST_F(DpiParseTest, ImportFunction) {
@@ -345,7 +316,7 @@ TEST(DpiParsing, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-TEST_F(AnnexHParseTest, AnnexHDpiImportDefaultArgs) {
+TEST_F(DpiParseTest, DpiImportFunctionWithDefaultArgValues) {
   auto* unit = Parse(
       "module m;\n"
       "  import \"DPI-C\" function int compute(\n"
@@ -364,7 +335,7 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportDefaultArgs) {
   EXPECT_NE(items[0]->func_args[2].default_value, nullptr);
 }
 
-TEST_F(AnnexHParseTest, AnnexOMultipleDpiDecls) {
+TEST_F(DpiParseTest, MultipleDpiImportExportDeclsInOneModule) {
   auto* unit = Parse(
       "module m;\n"
       "  import \"DPI-C\" function int c_add(int a, int b);\n"
@@ -388,23 +359,114 @@ TEST_F(AnnexHParseTest, AnnexOMultipleDpiDecls) {
   EXPECT_TRUE(items[3]->dpi_is_task);
 }
 
-TEST(TaskAndFunctionParsing, DpiImportWithCName) {
+TEST(FunctionDeclParsing, DpiSpecStringStoredOnImport) {
   auto r = Parse(
       "module m;\n"
-      "  import \"DPI-C\" c_real_name = function void sv_wrapper();\n"
+      "  import \"DPI-C\" function void foo();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ModuleItem* dpi = nullptr;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kDpiImport) {
-      dpi = item;
-      break;
-    }
-  }
-  ASSERT_NE(dpi, nullptr);
-  EXPECT_EQ(dpi->dpi_c_name, "c_real_name");
-  EXPECT_EQ(dpi->name, "sv_wrapper");
+  EXPECT_EQ(r.cu->modules[0]->items[0]->dpi_spec_string, "DPI-C");
 }
 
+TEST(FunctionDeclParsing, DpiSpecStringStoredOnExport) {
+  auto r = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" function sv_foo;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->dpi_spec_string, "DPI-C");
 }
+
+TEST(FunctionDeclParsing, DpiSpecStringInvalidIsError) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>",
+                         "module m;\n"
+                         "  import \"DPI-Q\" function void foo();\n"
+                         "endmodule\n");
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  EXPECT_TRUE(diag.HasErrors());
+}
+
+TEST(FunctionDeclParsing, DpiDeprecatedStringWarnsButParses) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>",
+                         "module m;\n"
+                         "  import \"DPI\" function void foo();\n"
+                         "endmodule\n");
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  EXPECT_FALSE(diag.HasErrors());
+  EXPECT_GT(diag.WarningCount(), 0u);
+}
+
+TEST(FunctionDeclParsing, DpiCanonicalStringEmitsNoWarning) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>",
+                         "module m;\n"
+                         "  import \"DPI-C\" function void foo();\n"
+                         "endmodule\n");
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  EXPECT_FALSE(diag.HasErrors());
+  EXPECT_EQ(diag.WarningCount(), 0u);
+}
+
+TEST(FunctionDeclParsing, DpiImportRefArgumentIsError) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>",
+                         "module m;\n"
+                         "  import \"DPI-C\" function void f(ref int x);\n"
+                         "endmodule\n");
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  EXPECT_TRUE(diag.HasErrors());
+}
+
+// §35.5.4: the c_identifier carries the foreign-language linkage name and
+// must conform to C identifier syntax. SystemVerilog tolerates `$` inside an
+// identifier but C does not, so an SV-legal name like `foo$bar` must be
+// rejected when supplied as the linkage name.
+TEST(FunctionDeclParsing, DpiCIdentifierWithDollarIsError) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>",
+                         "module m;\n"
+                         "  import \"DPI-C\" foo$bar = function void f();\n"
+                         "endmodule\n");
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  EXPECT_TRUE(diag.HasErrors());
+}
+
+// §35.5.4: the C-identifier conformance rule applies to export declarations
+// as well; the same parser-side check is reused on the export path.
+TEST(FunctionDeclParsing, DpiExportCIdentifierWithDollarIsError) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>",
+                         "module m;\n"
+                         "  export \"DPI-C\" foo$bar = function sv_f;\n"
+                         "endmodule\n");
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  EXPECT_TRUE(diag.HasErrors());
+}
+
+}  // namespace

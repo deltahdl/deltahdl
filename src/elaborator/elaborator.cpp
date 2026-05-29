@@ -1152,6 +1152,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateTimescaleConsistency();
 
+  ValidateDpiDeclarations();
+
   ResolveExternModules();
 }
 

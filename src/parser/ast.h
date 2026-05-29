@@ -674,6 +674,9 @@ struct ModuleItem {
   Expr* default_output_skew_delay = nullptr;
 
   std::string_view dpi_c_name;
+  // §35.5.4: the dpi_spec_string token, stripped of its surrounding quotes
+  // ("DPI-C" or the deprecated "DPI").
+  std::string_view dpi_spec_string;
   bool dpi_is_pure = false;
   bool dpi_is_context = false;
   bool dpi_is_task = false;
@@ -926,24 +929,20 @@ struct TimingCheckDecl {
   SpecifyEdge ref_edge = SpecifyEdge::kNone;
   SpecifyTerminal ref_terminal;
   Expr* ref_condition = nullptr;
-  std::vector<std::pair<char, char>>
-      ref_edge_descriptors;
+  std::vector<std::pair<char, char>> ref_edge_descriptors;
   SpecifyEdge data_edge = SpecifyEdge::kNone;
   SpecifyTerminal data_terminal;
   Expr* data_condition = nullptr;
-  std::vector<std::pair<char, char>>
-      data_edge_descriptors;
+  std::vector<std::pair<char, char>> data_edge_descriptors;
   std::vector<Expr*> limits;
   std::string_view notifier;
 
   Expr* timestamp_cond = nullptr;
   Expr* timecheck_cond = nullptr;
   std::string_view delayed_ref;
-  Expr* delayed_ref_expr =
-      nullptr;
+  Expr* delayed_ref_expr = nullptr;
   std::string_view delayed_data;
-  Expr* delayed_data_expr =
-      nullptr;
+  Expr* delayed_data_expr = nullptr;
 
   Expr* event_based_flag = nullptr;
   Expr* remain_active_flag = nullptr;
@@ -1113,4 +1112,4 @@ struct ResolvedTimescale {
   bool has_precision = false;
 };
 
-}
+}  // namespace delta

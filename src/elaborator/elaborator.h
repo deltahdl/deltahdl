@@ -40,7 +40,6 @@ class Elaborator {
   void SetLibraryDeclarationOrder(std::vector<std::string> order);
 
  private:
-
   void RunPreElaborationValidations();
 
   RtlirDesign* ElaborateTops(const std::vector<ModuleDecl*>& top_decls);
@@ -138,8 +137,8 @@ class Elaborator {
 
   void CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc);
 
-  void CheckUwirePortMerge(const RtlirModuleInst& inst,
-                           const ModuleItem* item, RtlirModule* parent_mod);
+  void CheckUwirePortMerge(const RtlirModuleInst& inst, const ModuleItem* item,
+                           RtlirModule* parent_mod);
 
   void CheckInterconnectPortMerge(const RtlirModuleInst& inst,
                                   const ModuleItem* item,
@@ -313,6 +312,11 @@ class Elaborator {
   // §35.5.2: pure-only restrictions on imported subroutines.
   void ValidateDpiImport(const ModuleItem* item);
 
+  // §35.5.4: duplicate import-name detection per declaration scope and
+  // type-signature consistency across all declarations that share a single
+  // linkage name (c_identifier, defaulting to the SystemVerilog name).
+  void ValidateDpiDeclarations();
+
   void ValidateTypenameAsElabConstant(const Expr* init);
 
   void ValidateAlias(const ModuleItem* item, RtlirModule* mod);
@@ -323,8 +327,7 @@ class Elaborator {
 
   void ValidateValueParams(const ModuleDecl* decl, const RtlirModule* mod);
 
-  void ValidateLhsPatternWidths(const ModuleDecl* decl,
-                                const RtlirModule* mod);
+  void ValidateLhsPatternWidths(const ModuleDecl* decl, const RtlirModule* mod);
 
   void CheckAlwaysCombMultiDriver(const ModuleDecl* decl, RtlirModule* mod);
 
@@ -558,8 +561,7 @@ class Elaborator {
 
   void ApplyBindDirectives(RtlirModule* top);
   void WalkForBind(RtlirModule* mod, const std::string& hier_path,
-                   const std::vector<BindDirective*>& binds,
-                   bool under_bind,
+                   const std::vector<BindDirective*>& binds, bool under_bind,
                    std::unordered_set<RtlirModule*>& visited,
                    std::unordered_set<BindDirective*>& applied);
   void ApplyBindInstance(BindDirective* bd, RtlirModule* target);
@@ -642,8 +644,7 @@ class Elaborator {
   // fixed-size (no dynamic, queue, or associative dims). Used to detect
   // fixed-size mismatch when the destination of a bit-stream cast is an
   // unpacked-array typedef.
-  std::unordered_map<std::string_view, uint32_t>
-      fixed_unpacked_typedef_widths_;
+  std::unordered_map<std::string_view, uint32_t> fixed_unpacked_typedef_widths_;
   std::unordered_set<std::string_view> cu_scope_names_;
   ScopeMap cu_param_scope_;
 
@@ -677,17 +678,13 @@ class Elaborator {
   std::unordered_set<std::string_view> class_names_;
   std::unordered_set<std::string_view> parameterized_class_names_;
   std::unordered_set<std::string_view> class_var_names_;
-  std::unordered_map<std::string_view, std::string_view>
-      class_var_types_;
+  std::unordered_map<std::string_view, std::string_view> class_var_types_;
   std::unordered_set<std::string_view> var_init_names_;
-  std::unordered_map<std::string_view, SourceLoc>
-      output_port_targets_;
+  std::unordered_map<std::string_view, SourceLoc> output_port_targets_;
   std::unordered_set<std::string_view> nettype_net_names_;
   std::unordered_set<std::string_view> nettype_names_;
-  std::unordered_map<std::string_view, std::string_view>
-      nettype_resolve_funcs_;
-  std::unordered_map<std::string_view, std::string_view>
-      nettype_canonical_;
+  std::unordered_map<std::string_view, std::string_view> nettype_resolve_funcs_;
+  std::unordered_map<std::string_view, std::string_view> nettype_canonical_;
   std::unordered_set<std::string_view> interconnect_names_;
   std::unordered_set<std::string_view> scalar_var_names_;
   std::unordered_set<std::string_view> task_names_;
@@ -697,10 +694,8 @@ class Elaborator {
   PropertyRegistry property_registry_;
 
   std::unordered_map<std::string_view, const ModuleItem*> func_decls_;
-  std::unordered_map<std::string_view, std::string_view>
-      var_named_types_;
-  std::set<std::pair<std::string_view, std::string_view>>
-      alias_pairs_;
+  std::unordered_map<std::string_view, std::string_view> var_named_types_;
+  std::set<std::pair<std::string_view, std::string_view>> alias_pairs_;
 
   std::unordered_set<std::string_view> non_ansi_complete_ports_;
   std::unordered_map<std::string_view, uint32_t> non_ansi_partial_ports_;
@@ -709,7 +704,8 @@ class Elaborator {
 
   std::unordered_map<std::string_view, std::string_view> interface_inst_types_;
 
-  std::unordered_map<std::string_view, std::string_view> vi_var_interface_types_;
+  std::unordered_map<std::string_view, std::string_view>
+      vi_var_interface_types_;
 
   std::unordered_map<std::string_view, std::string_view> vi_var_modports_;
   std::unordered_set<std::string_view> checker_inst_names_;
@@ -717,11 +713,11 @@ class Elaborator {
   std::unordered_set<std::string_view> auto_task_func_names_;
   std::unordered_map<std::string_view, ModuleDecl*> nested_module_decls_;
 
-  std::unordered_map<std::string_view,
-                     std::unordered_set<std::string_view>> pkg_provided_names_;
+  std::unordered_map<std::string_view, std::unordered_set<std::string_view>>
+      pkg_provided_names_;
 
-  std::unordered_map<std::string_view,
-                     std::pair<std::string_view, SourceLoc>> explicit_imports_;
+  std::unordered_map<std::string_view, std::pair<std::string_view, SourceLoc>>
+      explicit_imports_;
 
   std::vector<std::string_view> wildcard_packages_;
 
@@ -759,11 +755,10 @@ std::vector<ResolvedAttribute> ResolveAttributes(
     const std::vector<Attribute>& attrs, DiagEngine& diag);
 uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod);
 RtlirProcessKind MapAlwaysKind(AlwaysKind ak);
-void AddProcess(
-    RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod, Arena& arena,
-    DiagEngine& diag,
-    const std::unordered_map<std::string_view, const ModuleItem*>* func_map =
-        nullptr);
+void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
+                Arena& arena, DiagEngine& diag,
+                const std::unordered_map<std::string_view, const ModuleItem*>*
+                    func_map = nullptr);
 
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena);
 
@@ -789,4 +784,4 @@ const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit);
 bool IsRealType(DataTypeKind k);
 
-}
+}  // namespace delta

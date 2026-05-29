@@ -84,12 +84,27 @@ struct DpiRtFunction {
 struct DpiRtExport {
   std::string_view c_name;
   std::string_view sv_name;
+  // §35.5.3: the SystemVerilog scope where this export was declared. When
+  // empty, the export is treated as callable from any chain scope (a
+  // conservative default for code that doesn't yet record scopes).
+  std::string scope_name;
   DpiRtCallback impl;
+};
+
+// §35.5.3: outcome of attempting to call a SystemVerilog export from inside
+// a DPI import call chain. kOk means the call was permitted; kNoncontextChain
+// reports the §35.5.3 error of a noncontext import trying to invoke an
+// export. kScopeMismatch reports the §35.5.3 error of a context import call
+// trying to invoke an export whose scope differs from the chain's current
+// scope without first calling svSetScope.
+enum class DpiExportCallStatus : uint8_t {
+  kOk,
+  kNoncontextChain,
+  kScopeMismatch,
 };
 
 class DpiRuntime {
  public:
-
   void RegisterImport(DpiRtFunction func);
   const DpiRtFunction* FindImport(std::string_view sv_name) const;
   bool HasImport(std::string_view sv_name) const;
@@ -112,17 +127,48 @@ class DpiRuntime {
   void SetScope(const DpiScope* scope);
   const DpiScope* GetScope() const;
 
+  // §35.5.3 call-chain instrumentation. A DPI import call chain begins when
+  // SystemVerilog calls an import; the chain's context property comes from
+  // the import's declaration. EnterContextImportCall/EnterNoncontextImportCall
+  // push one frame each; the chain's "is_context" is the property of the
+  // root (the bottom-most frame), and per the LRM context is not transitively
+  // promoted to subsequent inner import calls.
+  void EnterContextImportCall(std::string_view sv_name, DpiScope decl_scope);
+  void EnterNoncontextImportCall(std::string_view sv_name);
+  void LeaveImportCall();
+  uint32_t ImportCallDepth() const;
+  bool ChainRootIsContext() const;
+
+  // §35.5.3: only context import calls (i.e., chains whose root is a context
+  // import) can safely invoke a SystemVerilog export subroutine. Returns the
+  // outcome and, on kOk, runs the export's registered implementation.
+  DpiExportCallStatus CallExportFromImport(std::string_view sv_name,
+                                           const std::vector<DpiArgValue>& args,
+                                           DpiArgValue* out_result);
+
+  // §35.5.3: reports whether a call to the named import would act as a
+  // barrier for SystemVerilog compiler optimizations — true exactly when the
+  // import is declared context. Optimizers query this to decide whether the
+  // call may be folded or eliminated.
+  bool IsImportCallOptimizationBarrier(std::string_view sv_name) const;
+
   static uint32_t SvLow(const SvOpenArrayHandle& h);
   static uint32_t SvHigh(const SvOpenArrayHandle& h);
   static uint32_t SvSize(const SvOpenArrayHandle& h);
 
  private:
+  struct ImportFrame {
+    std::string_view sv_name;
+    bool is_context = false;
+  };
+
   std::vector<DpiRtFunction> imports_;
   std::unordered_map<std::string_view, size_t> import_index_;
   std::vector<DpiRtExport> exports_;
   std::unordered_map<std::string_view, size_t> export_index_;
   std::vector<DpiScope> scope_stack_;
   const DpiScope* current_scope_ = nullptr;
+  std::vector<ImportFrame> call_chain_;
 };
 
 enum class AssertionSeverity : uint8_t {
@@ -236,7 +282,6 @@ using ValueChangeCb =
 
 class DataReadApi {
  public:
-
   DataReadValue GetValue(std::string_view name, DataReadFormat fmt) const;
 
   void PutValue(std::string_view name, const DataReadValue& val);
@@ -252,4 +297,4 @@ class DataReadApi {
   std::unordered_map<std::string, std::vector<ValueChangeCb>> change_cbs_;
 };
 
-}
+}  // namespace delta
