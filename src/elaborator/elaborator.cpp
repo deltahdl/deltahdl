@@ -1154,6 +1154,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateDpiDeclarations();
 
+  ValidateDpiGlobalNameSpace();
+
   ResolveExternModules();
 }
 

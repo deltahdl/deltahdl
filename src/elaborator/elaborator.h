@@ -317,6 +317,11 @@ class Elaborator {
   // linkage name (c_identifier, defaulting to the SystemVerilog name).
   void ValidateDpiDeclarations();
 
+  // §35.4: per-scope uniqueness for export declarations and global agreement
+  // on the DPI version string across every declaration that shares a single
+  // linkage identifier.
+  void ValidateDpiGlobalNameSpace();
+
   void ValidateTypenameAsElabConstant(const Expr* init);
 
   void ValidateAlias(const ModuleItem* item, RtlirModule* mod);

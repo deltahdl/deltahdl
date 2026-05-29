@@ -144,6 +144,60 @@ void Elaborator::ValidateDpiDeclarations() {
   }
 }
 
+void Elaborator::ValidateDpiGlobalNameSpace() {
+  if (unit_ == nullptr) return;
+
+  // §35.4: track the DPI version string ("DPI-C" or the deprecated "DPI")
+  // associated with each linkage identifier the first time we see it. Any
+  // later declaration sharing that linkage identifier must agree on the
+  // version string — the rule applies to imports and exports alike.
+  std::unordered_map<std::string_view, std::string_view> link_version;
+
+  for (const auto* mod : unit_->modules) {
+    if (mod == nullptr) continue;
+
+    // §35.4: multiple export declarations with the same c_identifier in the
+    // same scope are forbidden. Each module declaration is one scope, so we
+    // track the set of export linkage names seen within this module.
+    std::unordered_set<std::string_view> export_link_in_scope;
+
+    for (const auto* item : mod->items) {
+      if (item == nullptr) continue;
+      if (item->kind != ModuleItemKind::kDpiImport &&
+          item->kind != ModuleItemKind::kDpiExport) {
+        continue;
+      }
+
+      auto link_name = DpiLinkageName(item);
+
+      if (item->kind == ModuleItemKind::kDpiExport) {
+        auto [_, inserted] = export_link_in_scope.insert(link_name);
+        if (!inserted) {
+          diag_.Error(
+              item->loc,
+              std::format("DPI export linkage name '{}' already declared in "
+                          "this scope",
+                          link_name));
+        }
+      }
+
+      auto found = link_version.find(link_name);
+      if (found == link_version.end()) {
+        link_version.emplace(link_name, item->dpi_spec_string);
+        continue;
+      }
+      if (found->second != item->dpi_spec_string) {
+        diag_.Error(
+            item->loc,
+            std::format("DPI linkage name '{}' was previously declared with "
+                        "version string \"{}\"; all declarations sharing one "
+                        "linkage name must use the same version string",
+                        link_name, found->second));
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateElabSystemTask(const ModuleItem* item) {
   auto* expr = item->init_expr;
   if (!expr || expr->kind != ExprKind::kSystemCall) return;
