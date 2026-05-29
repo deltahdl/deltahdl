@@ -83,6 +83,44 @@ TEST(IoMonitorSim, TimeFunctionChangeDoesNotTrigger) {
   EXPECT_EQ(CountOccurrences(out, "a=5"), 1u);
 }
 
+// §21.2.3: $stime is explicitly excluded alongside $time from the set of
+// expressions whose advance triggers a $monitor redisplay. Time advances over
+// two delays but only the initial line is produced.
+TEST(IoMonitorSim, StimeChangeDoesNotTrigger) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [3:0] a;\n"
+      "  initial begin\n"
+      "    a = 4'h5;\n"
+      "    $monitor(\"%0d a=%h\", $stime, a);\n"
+      "    #10;\n"
+      "    #10;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(CountOccurrences(out, "a=5"), 1u);
+}
+
+// §21.2.3: $realtime is the third explicitly excluded time function. Even with
+// the value of $realtime changing across delays, only the single initial
+// display is produced for a constant watched value.
+TEST(IoMonitorSim, RealtimeChangeDoesNotTrigger) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [3:0] a;\n"
+      "  initial begin\n"
+      "    a = 4'h5;\n"
+      "    $monitor(\"%0t a=%h\", $realtime, a);\n"
+      "    #10;\n"
+      "    #10;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(CountOccurrences(out, "a=5"), 1u);
+}
+
 // §21.2.3: only one monitor display list is active at a time. A second
 // $monitor supersedes the first, whose signals then no longer redisplay.
 TEST(IoMonitorSim, SecondMonitorSupersedesFirst) {

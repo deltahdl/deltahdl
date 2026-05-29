@@ -15,7 +15,7 @@ TEST(IoSystemTaskParsing, MonitorOnOff) {
               "endmodule\n"));
 }
 
-TEST(SchedulingSemanticsParsing, MonitorSystemCall) {
+TEST(IoSystemTaskParsing, MonitorSystemCall) {
   auto r = Parse(
       "module m;\n"
       "  reg a;\n"
@@ -42,7 +42,7 @@ TEST(IoSystemTaskParsing, MonitorCallWithoutArguments) {
               "endmodule\n"));
 }
 
-TEST(IoSystemTaskParsing, MonitorbHexOctal) {
+TEST(IoSystemTaskParsing, MonitorBinaryHexOctalNames) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
