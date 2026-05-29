@@ -115,6 +115,15 @@ struct ArrayInfo {
 
 enum class DelayMode : uint8_t { kMin, kTyp, kMax };
 
+// State block governed by $timeformat (see 20.4.3). The four members map
+// 1:1 to the task's arguments and persist between invocations.
+struct TimeFormatSpec {
+  int units_number = -9;
+  int precision_number = 0;
+  std::string suffix_string;
+  int minimum_field_width = 20;
+};
+
 class SimContext {
  public:
   SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
@@ -149,9 +158,22 @@ class SimContext {
   void SetDelayMode(DelayMode mode) { delay_mode_ = mode; }
   DelayMode GetDelayMode() const { return delay_mode_; }
 
-  void SetGlobalPrecision(TimeUnit u) { global_precision_ = u; }
+  void SetGlobalPrecision(TimeUnit u) {
+    global_precision_ = u;
+    if (!time_format_explicit_) {
+      time_format_.units_number = static_cast<int>(u);
+    }
+  }
   TimeUnit GlobalPrecision() const { return global_precision_; }
   TimeUnit StepTimeUnit() const { return global_precision_; }
+
+  // $timeformat state per 20.4.3. The defaults follow Table 20-3; the unit
+  // number tracks the global precision until $timeformat is invoked.
+  const TimeFormatSpec& GetTimeFormat() const { return time_format_; }
+  void SetTimeFormat(const TimeFormatSpec& spec) {
+    time_format_ = spec;
+    time_format_explicit_ = true;
+  }
 
   // Timescale of the design element that is the current scope, reported by
   // $timeunit/$timeprecision when no argument is supplied (see 20.4.1).
@@ -480,6 +502,8 @@ class SimContext {
   std::unordered_map<uint32_t, std::vector<Process*>> program_initials_by_block_;
   DelayMode delay_mode_ = DelayMode::kTyp;
   TimeUnit global_precision_ = TimeUnit::kNs;
+  TimeFormatSpec time_format_;
+  bool time_format_explicit_ = false;
   TimeScale current_timescale_;
   TimeScale compunit_timescale_;
   std::unordered_map<std::string, TimeScale> scope_timescales_;

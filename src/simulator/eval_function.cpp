@@ -454,7 +454,68 @@ static bool IsIOSysCall(std::string_view n) {
 }
 
 static bool IsNoOpSysCall(std::string_view n) {
-  return n == "$printtimescale" || n == "$timeformat";
+  return n == "$printtimescale";
+}
+
+// $timeformat (20.4.3) shall accept units_number and precision_number values
+// in the Table 20-2 range from 2 to -15; out-of-range integers are rejected
+// and the configured state is left untouched.
+static bool TimeformatRangeOk(int64_t v) { return v <= 2 && v >= -15; }
+
+static std::string ExtractStringArg(const Expr* arg) {
+  if (!arg) return {};
+  auto text = arg->text;
+  if (text.size() >= 2 && text.front() == '"' && text.back() == '"') {
+    return std::string(text.substr(1, text.size() - 2));
+  }
+  return std::string(text);
+}
+
+static Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx,
+                                    Arena& arena) {
+  // Bare $timeformat with no parens block leaves the configured state alone.
+  if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
+
+  TimeFormatSpec spec = ctx.GetTimeFormat();
+  if (expr->args.size() >= 1 && expr->args[0]) {
+    auto v = static_cast<int64_t>(
+        EvalExpr(expr->args[0], ctx, arena).ToUint64());
+    // The value arrives as an unsigned 64-bit word, so widen the negative
+    // 32-bit pattern back into a signed integer for the range check.
+    int32_t units = static_cast<int32_t>(v);
+    if (!TimeformatRangeOk(units)) {
+      ctx.GetDiag().Error(
+          {}, "$timeformat units_number out of range [2 .. -15]");
+      return MakeLogic4VecVal(arena, 1, 0);
+    }
+    spec.units_number = units;
+  }
+  if (expr->args.size() >= 2 && expr->args[1]) {
+    auto v = static_cast<int64_t>(
+        EvalExpr(expr->args[1], ctx, arena).ToUint64());
+    int32_t prec = static_cast<int32_t>(v);
+    if (!TimeformatRangeOk(prec)) {
+      ctx.GetDiag().Error(
+          {}, "$timeformat precision_number out of range [2 .. -15]");
+      return MakeLogic4VecVal(arena, 1, 0);
+    }
+    spec.precision_number = prec;
+  }
+  if (expr->args.size() >= 3 && expr->args[2]) {
+    if (expr->args[2]->kind == ExprKind::kStringLiteral) {
+      spec.suffix_string = ExtractStringArg(expr->args[2]);
+    } else {
+      spec.suffix_string =
+          FormatValueAsString(EvalExpr(expr->args[2], ctx, arena));
+    }
+  }
+  if (expr->args.size() >= 4 && expr->args[3]) {
+    auto v = static_cast<int64_t>(
+        EvalExpr(expr->args[3], ctx, arena).ToUint64());
+    spec.minimum_field_width = static_cast<int>(v);
+  }
+  ctx.SetTimeFormat(spec);
+  return MakeLogic4VecVal(arena, 1, 0);
 }
 
 static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
@@ -472,6 +533,7 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
   if (name == "$monitoron" || name == "$monitoroff") {
     return EvalMonitorFlag(ctx, arena, name);
   }
+  if (name == "$timeformat") return EvalTimeformatTask(expr, ctx, arena);
   if (IsNoOpSysCall(name)) return MakeLogic4VecVal(arena, 1, 0);
   if (name == "$system") return EvalSystemCommand(expr, arena);
   if (name == "$stacktrace") {

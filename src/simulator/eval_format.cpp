@@ -6,6 +6,7 @@
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
+#include "simulator/sim_context.h"
 
 namespace delta {
 
@@ -13,6 +14,7 @@ struct FormatArgs {
   const std::vector<Logic4Vec>& vals;
   size_t vi = 0;
   const std::vector<std::string>& p_fmts;
+  const TimeFormatSpec* time_format = nullptr;
 };
 
 std::string FormatValueAsString(const Logic4Vec& val) {
@@ -68,6 +70,25 @@ static std::string FormatDecimal(const Logic4Vec& val) {
     std::snprintf(buf, sizeof(buf), "%llu", static_cast<unsigned long long>(v));
   }
   return buf;
+}
+
+// Apply the $timeformat configuration (20.4.3) to a raw time value. The
+// number is rendered with the configured decimal precision, padded with
+// leading spaces to the minimum field width, and tagged with the suffix
+// string.
+std::string FormatTimeUnderTimeformat(const Logic4Vec& val,
+                                      const TimeFormatSpec& spec) {
+  double ticks = static_cast<double>(val.ToUint64());
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "%.*f", spec.precision_number, ticks);
+  std::string body(buf);
+  int pad = spec.minimum_field_width -
+            static_cast<int>(body.size() + spec.suffix_string.size());
+  std::string out;
+  if (pad > 0) out.assign(static_cast<size_t>(pad), ' ');
+  out += body;
+  out += spec.suffix_string;
+  return out;
 }
 
 std::string FormatArg(const Logic4Vec& val, char spec) {
@@ -155,7 +176,12 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
     return true;
   }
   if (args.vi < args.vals.size()) {
-    out += FormatArg(args.vals[args.vi++], spec);
+    if (spec == 't' && args.time_format != nullptr) {
+      out += FormatTimeUnderTimeformat(args.vals[args.vi++],
+                                       *args.time_format);
+    } else {
+      out += FormatArg(args.vals[args.vi++], spec);
+    }
   }
   i = j;
   return true;
@@ -163,9 +189,10 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
 
 std::string FormatDisplay(const std::string& fmt,
                           const std::vector<Logic4Vec>& vals,
-                          const std::vector<std::string>& p_fmts) {
+                          const std::vector<std::string>& p_fmts,
+                          const TimeFormatSpec* time_format) {
   std::string out;
-  FormatArgs args{vals, 0, p_fmts};
+  FormatArgs args{vals, 0, p_fmts, time_format};
   for (size_t i = 0; i < fmt.size(); ++i) {
     if (fmt[i] != '%' || i + 1 >= fmt.size()) {
       AppendLiteralChar(fmt, i, out);

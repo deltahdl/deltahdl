@@ -13,6 +13,7 @@ namespace delta {
 struct Expr;
 struct ModuleItem;
 struct StructTypeInfo;
+struct TimeFormatSpec;
 class SimContext;
 class Arena;
 
@@ -120,8 +121,11 @@ bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out);
 
 std::string FormatDisplay(const std::string& fmt,
                           const std::vector<Logic4Vec>& vals,
-                          const std::vector<std::string>& p_fmts = {});
+                          const std::vector<std::string>& p_fmts = {},
+                          const TimeFormatSpec* time_format = nullptr);
 std::string FormatArg(const Logic4Vec& val, char spec);
+std::string FormatTimeUnderTimeformat(const Logic4Vec& val,
+                                      const TimeFormatSpec& spec);
 std::string FormatValueAsString(const Logic4Vec& val);
 std::string ExtractFormatString(const Expr* first_arg);
 
