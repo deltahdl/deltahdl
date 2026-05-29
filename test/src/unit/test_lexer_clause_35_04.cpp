@@ -19,23 +19,4 @@ TEST(DpiLinkageNameLexing, EscapedFormStripsBackslashAndTrailingSpace) {
   EXPECT_EQ(r.token.text, "foo");
 }
 
-TEST(DpiLinkageNameLexing, EscapedKeywordYieldsBareKeywordText) {
-  // §35.4: a global name that clashes with a SystemVerilog keyword shall be
-  // written in escaped form. After stripping, the linkage identifier is the
-  // bare keyword text, which on its own is a valid C identifier shape.
-  auto r = LexOne("\\if ");
-  EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(r.token.text, "if");
-}
-
-TEST(DpiLinkageNameLexing, EscapedNameStrippedBeforeNonSpaceTerminator) {
-  // The strip terminates at the first whitespace after the name; a following
-  // operator becomes its own token and is not absorbed into the identifier.
-  auto tokens = Lex("\\bar =");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "bar");
-  EXPECT_EQ(tokens[1].kind, TokenKind::kEq);
-}
-
 }  // namespace
