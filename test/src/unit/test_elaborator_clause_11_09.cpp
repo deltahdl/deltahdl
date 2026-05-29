@@ -56,6 +56,24 @@ TEST(ExpressionElaboration, TaggedUnionMemberAccessElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// When the LHS variable is a tagged union typedef, the tag name in a tagged
+// expression must be one of the declared members; otherwise the elaborator
+// rejects the assignment.
+TEST(ExpressionElaboration, TaggedUnionUnknownMemberRejected) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef union tagged { int A; int B; } U;\n"
+      "  U u;\n"
+      "  initial begin\n"
+      "    u = tagged Bogus 7;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  (void)design;
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(ExpressionElaboration, NestedTaggedUnionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

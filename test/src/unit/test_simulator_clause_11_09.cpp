@@ -6,43 +6,11 @@
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(TaggedUnionEval, TaggedUnionMismatchReturnsX) {
-  SimFixture f;
-
-  StructTypeInfo uinfo;
-  uinfo.type_name = "tagged_u";
-  uinfo.is_union = true;
-  uinfo.is_packed = true;
-  uinfo.total_width = 8;
-  uinfo.fields.push_back({"a", 0, 8, DataTypeKind::kLogic});
-  uinfo.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
-  f.ctx.RegisterStructType("tagged_u", uinfo);
-
-  MakeVar(f, "u", 8, 0x42);
-  f.ctx.SetVariableStructType("u", "tagged_u");
-  f.ctx.SetVariableTag("u", "a");
-
-  auto* access_a = f.arena.Create<Expr>();
-  access_a->kind = ExprKind::kMemberAccess;
-  access_a->lhs = MakeId(f.arena, "u");
-  access_a->rhs = MakeId(f.arena, "a");
-  auto result_a = EvalExpr(access_a, f.ctx, f.arena);
-  EXPECT_EQ(result_a.ToUint64(), 0x42u);
-
-  auto* access_b = f.arena.Create<Expr>();
-  access_b->kind = ExprKind::kMemberAccess;
-  access_b->lhs = MakeId(f.arena, "u");
-  access_b->rhs = MakeId(f.arena, "b");
-  auto result_b = EvalExpr(access_b, f.ctx, f.arena);
-
-  EXPECT_NE(result_b.nwords, 0u);
-  EXPECT_NE(result_b.words[0].bval, 0u);
-}
 
 TEST(TaggedUnionEval, TaggedUnionNoTagSetAccessesNormally) {
   SimFixture f;
@@ -193,6 +161,93 @@ TEST(TaggedUnionEval, TaggedAssignOverwriteAndRead) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 200u);
+}
+
+// A read whose member name does not match the current tag must surface a
+// run-time error diagnostic, not just return X bits.
+TEST(TaggedUnionEval, MismatchedReadEmitsDiagnostic) {
+  SimFixture f;
+
+  StructTypeInfo uinfo;
+  uinfo.type_name = "u_diag_r";
+  uinfo.is_union = true;
+  uinfo.is_packed = true;
+  uinfo.total_width = 8;
+  uinfo.fields.push_back({"a", 0, 8, DataTypeKind::kLogic});
+  uinfo.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
+  f.ctx.RegisterStructType("u_diag_r", uinfo);
+
+  MakeVar(f, "u", 8, 0x11);
+  f.ctx.SetVariableStructType("u", "u_diag_r");
+  f.ctx.SetVariableTag("u", "a");
+
+  auto* access_b = f.arena.Create<Expr>();
+  access_b->kind = ExprKind::kMemberAccess;
+  access_b->lhs = MakeId(f.arena, "u");
+  access_b->rhs = MakeId(f.arena, "b");
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  (void)EvalExpr(access_b, f.ctx, f.arena);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// A write through dot notation whose member name matches the current tag
+// updates the union storage in place and raises no diagnostic.
+TEST(TaggedUnionEval, MatchingMemberWriteUpdatesValue) {
+  SimFixture f;
+
+  StructTypeInfo uinfo;
+  uinfo.type_name = "u_wr_ok";
+  uinfo.is_union = true;
+  uinfo.is_packed = true;
+  uinfo.total_width = 8;
+  uinfo.fields.push_back({"a", 0, 8, DataTypeKind::kLogic});
+  uinfo.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
+  f.ctx.RegisterStructType("u_wr_ok", uinfo);
+
+  auto* var = MakeVar(f, "u", 8, 0x00);
+  f.ctx.SetVariableStructType("u", "u_wr_ok");
+  f.ctx.SetVariableTag("u", "a");
+
+  auto* lhs = f.arena.Create<Expr>();
+  lhs->kind = ExprKind::kMemberAccess;
+  lhs->lhs = MakeId(f.arena, "u");
+  lhs->rhs = MakeId(f.arena, "a");
+  auto rhs_val = MakeLogic4VecVal(f.arena, 8, 0x5A);
+
+  WriteStructField(lhs, rhs_val, f.ctx, f.arena);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(var->value.ToUint64(), 0x5Au);
+}
+
+// A write whose member name does not match the current tag must surface a
+// run-time error diagnostic and leave the union storage unchanged.
+TEST(TaggedUnionEval, MismatchedWriteEmitsDiagnosticAndKeepsValue) {
+  SimFixture f;
+
+  StructTypeInfo uinfo;
+  uinfo.type_name = "u_diag_w";
+  uinfo.is_union = true;
+  uinfo.is_packed = true;
+  uinfo.total_width = 8;
+  uinfo.fields.push_back({"a", 0, 8, DataTypeKind::kLogic});
+  uinfo.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
+  f.ctx.RegisterStructType("u_diag_w", uinfo);
+
+  auto* var = MakeVar(f, "u", 8, 0x33);
+  f.ctx.SetVariableStructType("u", "u_diag_w");
+  f.ctx.SetVariableTag("u", "a");
+
+  auto* lhs = f.arena.Create<Expr>();
+  lhs->kind = ExprKind::kMemberAccess;
+  lhs->lhs = MakeId(f.arena, "u");
+  lhs->rhs = MakeId(f.arena, "b");
+  auto rhs_val = MakeLogic4VecVal(f.arena, 8, 0x77);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  WriteStructField(lhs, rhs_val, f.ctx, f.arena);
+  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_EQ(var->value.ToUint64(), 0x33u);
 }
 
 TEST(TaggedUnionEval, VoidMemberThenValueMember) {

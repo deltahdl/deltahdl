@@ -51,4 +51,35 @@ TEST(TaggedUnionExprParsing, TaggedVoidMemberOmitsValue) {
   EXPECT_EQ(rhs->lhs, nullptr);
 }
 
+// The optional-primary slot of the BNF accepts a bare literal: a kTagged node
+// with the literal attached as its value subexpression should result.
+TEST(TaggedUnionExprParsing, TaggedWithBareLiteralPrimary) {
+  auto r = Parse("module m; initial x = tagged Valid 42; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTagged);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->text, "Valid");
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kIntegerLiteral);
+}
+
+// The optional-primary slot also accepts an assignment-pattern primary,
+// e.g. tagged Add '{...}, producing a kTagged node whose value subexpression
+// is the assignment pattern.
+TEST(TaggedUnionExprParsing, TaggedWithAssignmentPatternPrimary) {
+  auto r = Parse("module m; initial x = tagged Add '{19, 4, 3}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTagged);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->text, "Add");
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kAssignmentPattern);
+}
+
 }

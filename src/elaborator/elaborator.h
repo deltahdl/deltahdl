@@ -474,6 +474,10 @@ class Elaborator {
   void CheckAggregateCompareOp(const Expr* expr);
   void WalkStmtsForAggregateCompare(const Stmt* s);
 
+  void ValidateTaggedUnionMembers(const ModuleDecl* decl);
+  void WalkStmtsForTaggedExpr(const Stmt* s);
+  void CheckTaggedExprMember(const Expr* lhs, const Expr* rhs);
+
   void ValidateRealOperatorRestrictions(const ModuleDecl* decl);
   void WalkExprForRealOps(const Expr* expr);
   void WalkStmtsForRealOps(const Stmt* s);

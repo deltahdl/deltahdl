@@ -53,6 +53,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
 
   ValidateDeferredAssertionActions(decl);
   ValidateAggregateComparisons(decl);
+  ValidateTaggedUnionMembers(decl);
   ValidateRealOperatorRestrictions(decl);
   ValidateAssignInExprRestrictions(decl);
   ValidateUnsizedInConcat(decl);

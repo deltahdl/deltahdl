@@ -91,6 +91,60 @@ void Elaborator::ValidateAggregateComparisons(const ModuleDecl* decl) {
   }
 }
 
+// After the tagged keyword the BNF allows only a member identifier drawn from
+// the target tagged union type. When the LHS of an assignment resolves to a
+// variable whose typedef is a tagged union, reject a tag name that is not
+// declared in that union.
+void Elaborator::CheckTaggedExprMember(const Expr* lhs, const Expr* rhs) {
+  if (!lhs || !rhs) return;
+  if (rhs->kind != ExprKind::kTagged) return;
+  if (!rhs->rhs || rhs->rhs->kind != ExprKind::kIdentifier) return;
+  if (lhs->kind != ExprKind::kIdentifier) return;
+
+  auto vit = var_named_types_.find(lhs->text);
+  if (vit == var_named_types_.end()) return;
+
+  auto tit = typedefs_.find(vit->second);
+  if (tit == typedefs_.end()) return;
+
+  const auto& dt = tit->second;
+  if (dt.kind != DataTypeKind::kUnion || !dt.is_tagged) return;
+
+  auto tag_name = rhs->rhs->text;
+  for (const auto& m : dt.struct_members) {
+    if (m.name == tag_name) return;
+  }
+
+  diag_.Error(rhs->range.start,
+              std::format("tagged union '{}' has no member named '{}'",
+                          vit->second, tag_name));
+}
+
+void Elaborator::WalkStmtsForTaggedExpr(const Stmt* s) {
+  if (!s) return;
+  if ((s->kind == StmtKind::kBlockingAssign ||
+       s->kind == StmtKind::kNonblockingAssign) &&
+      s->lhs && s->rhs) {
+    CheckTaggedExprMember(s->lhs, s->rhs);
+  }
+  for (auto* sub : s->stmts) WalkStmtsForTaggedExpr(sub);
+  WalkStmtsForTaggedExpr(s->then_branch);
+  WalkStmtsForTaggedExpr(s->else_branch);
+  WalkStmtsForTaggedExpr(s->body);
+  WalkStmtsForTaggedExpr(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForTaggedExpr(ci.body);
+}
+
+void Elaborator::ValidateTaggedUnionMembers(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForTaggedExpr(item->body);
+    }
+  }
+}
+
 static bool IsRealVar(const Expr* e, const TypeMap& types) {
   auto name = ExprIdent(e);
   if (name.empty()) return false;

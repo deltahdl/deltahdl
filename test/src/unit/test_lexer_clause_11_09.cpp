@@ -4,12 +4,6 @@
 
 using namespace delta;
 
-TEST(TaggedUnionExprLexing, TaggedKeywordToken) {
-  auto tokens = Lex("tagged");
-  ASSERT_GE(tokens.size(), 2);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwTagged);
-}
-
 TEST(TaggedUnionExprLexing, TaggedMemberSequence) {
   auto tokens = Lex("tagged Valid 42");
   ASSERT_GE(tokens.size(), 4);
