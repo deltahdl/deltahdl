@@ -3033,7 +3033,9 @@ void Elaborator::ValidateConstraintInheritance() {
                                 m->name, cls->name));
       }
       // 18.5.2: a class that declares a pure constraint shall not also complete
-      // a constraint of the same name with an external constraint block.
+      // a constraint of the same name with an external constraint block, nor
+      // declare a same-name constraint block or constraint prototype in the
+      // same class body.
       if (m->is_pure_virtual) {
         for (const auto& ext : unit_->external_constraints) {
           if (ext.class_name == cls->name && ext.constraint_name == m->name) {
@@ -3044,6 +3046,16 @@ void Elaborator::ValidateConstraintInheritance() {
                             cls->name, m->name));
             break;
           }
+        }
+        for (const auto* other : cls->members) {
+          if (other == m) continue;
+          if (other->kind != ClassMemberKind::kConstraint) continue;
+          if (other->name != m->name) continue;
+          if (other->is_pure_virtual) continue;
+          diag_.Error(other->loc,
+                      std::format("constraint '{}' in class '{}' conflicts "
+                                  "with a pure constraint of the same name",
+                                  other->name, cls->name));
         }
       } else if (m->is_constraint_prototype) {
         ValidateConstraintSpecifierParity(cls, m);

@@ -262,4 +262,157 @@ TEST(ConstraintInheritance, PureConstraintWithExternalBlockRejected) {
              "endmodule\n"));
 }
 
+// 18.5.2: a class that declares a pure constraint shall not also declare a
+// same-name constraint block in the same class body.
+TEST(ConstraintInheritance, PureConstraintWithSameClassBlockRejected) {
+  EXPECT_FALSE(
+      ElabOk("virtual class C;\n"
+             "  rand int x;\n"
+             "  pure constraint c;\n"
+             "  constraint c { x > 0; }\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// 18.5.2: a class that declares a pure constraint shall not also declare a
+// same-name constraint prototype in the same class body.
+TEST(ConstraintInheritance, PureConstraintWithSameClassPrototypeRejected) {
+  EXPECT_FALSE(
+      ElabOk("virtual class C;\n"
+             "  rand int x;\n"
+             "  pure constraint c;\n"
+             "  constraint c;\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// 18.5.2: ':initial' on a constraint prototype must match the external
+// constraint block that completes it.
+TEST(ConstraintInheritance, PrototypeInitialMismatchRejected) {
+  EXPECT_FALSE(
+      ElabOk("class Base;\n"
+             "  rand int x;\n"
+             "endclass\n"
+             "class C extends Base;\n"
+             "  constraint :initial c;\n"
+             "endclass\n"
+             "constraint C::c { x > 0; }\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// 18.5.2: ':extends' on a constraint prototype must match the external
+// constraint block that completes it.
+TEST(ConstraintInheritance, PrototypeExtendsMismatchRejected) {
+  EXPECT_FALSE(
+      ElabOk("class Base;\n"
+             "  rand int x;\n"
+             "  constraint c { x > 0; }\n"
+             "endclass\n"
+             "class C extends Base;\n"
+             "  constraint :extends c;\n"
+             "endclass\n"
+             "constraint C::c { x > 0; }\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// 18.5.2: a same-named constraint in a derived class silently replaces the
+// inherited one without requiring an override specifier.
+TEST(ConstraintInheritance, DerivedPlainOverrideAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class Base;\n"
+             "  rand int x;\n"
+             "  constraint c { x > 0; }\n"
+             "endclass\n"
+             "class Derived extends Base;\n"
+             "  constraint c { x < 10; }\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// 18.5.2: an abstract intermediate class may override an inherited pure
+// constraint, and that override is non-pure for every class derived from it,
+// so a non-abstract grandchild need not re-implement the constraint.
+TEST(ConstraintInheritance, AbstractIntermediateOverridesInheritedPureAccepted) {
+  EXPECT_TRUE(
+      ElabOk("virtual class B;\n"
+             "  rand int x;\n"
+             "  pure constraint c;\n"
+             "endclass\n"
+             "virtual class M extends B;\n"
+             "  constraint c { x > 0; }\n"
+             "endclass\n"
+             "class D extends M;\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// 18.5.2: when ':initial' is carried on both a constraint prototype and its
+// external completing block, the parity rule is satisfied.
+TEST(ConstraintInheritance, PrototypeInitialMatchAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  rand int x;\n"
+             "  constraint :initial c;\n"
+             "endclass\n"
+             "constraint :initial C::c { x > 0; }\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// 18.5.2: a derived class may replace a base class constraint with a plain
+// constraint prototype of the same name, completed by an external constraint
+// block as described in 18.5.1.
+TEST(ConstraintInheritance, DerivedPrototypeReplacesBaseAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class Base;\n"
+             "  rand int x;\n"
+             "  constraint c { x > 0; }\n"
+             "endclass\n"
+             "class Derived extends Base;\n"
+             "  constraint c;\n"
+             "endclass\n"
+             "constraint Derived::c { x < 10; }\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// 18.5.2: a non-abstract class may discharge an inherited pure constraint by
+// supplying a constraint prototype completed by an external constraint block,
+// in addition to the simpler same-name constraint block form.
+TEST(ConstraintInheritance, NonAbstractImplementsPureViaPrototypeAccepted) {
+  EXPECT_TRUE(
+      ElabOk("virtual class B;\n"
+             "  rand int x;\n"
+             "  pure constraint c;\n"
+             "endclass\n"
+             "class D extends B;\n"
+             "  constraint c;\n"
+             "endclass\n"
+             "constraint D::c { x > 0; }\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// 18.5.2: the parity rule for prototype and external block also holds when
+// both sides carry matching ':extends' specifiers.
+TEST(ConstraintInheritance, PrototypeExtendsMatchAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class Base;\n"
+             "  rand int x;\n"
+             "  constraint c { x > 0; }\n"
+             "endclass\n"
+             "class C extends Base;\n"
+             "  constraint :extends c;\n"
+             "endclass\n"
+             "constraint :extends C::c { x > 0; }\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 }
