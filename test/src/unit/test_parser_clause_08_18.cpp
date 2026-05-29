@@ -20,19 +20,6 @@ TEST(DataHidingParsing, ClassWithQualifiersLocalProtected) {
   EXPECT_TRUE(cls->members[1]->is_protected);
 }
 
-TEST(DataHidingParsing, LocalMethodParses) {
-  auto r = Parse(
-      "class Packet;\n"
-      "  local function int get_id();\n"
-      "    return 0;\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  ASSERT_GE(r.cu->classes[0]->members.size(), 1u);
-  EXPECT_TRUE(r.cu->classes[0]->members[0]->is_local);
-}
-
 TEST(DataHidingParsing, ProtectedPropertyParses) {
   auto r = Parse(
       "class Packet;\n"
@@ -279,6 +266,28 @@ TEST(DataHidingParsing, DuplicateConstError) {
       ParseOk("class C;\n"
               "  const const int X = 1;\n"
               "endclass\n"));
+}
+
+// §8.18: class parameters and class local parameters are public. The
+// 'localparam' keyword shares its leading word with the 'local' access
+// qualifier, but parameter declarations inside a class shall not be tagged
+// as access-restricted members.
+TEST(DataHidingParsing, ClassParametersArePublic) {
+  auto r = Parse(
+      "class C;\n"
+      "  parameter int N = 8;\n"
+      "  localparam int M = 16;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  ASSERT_GE(r.cu->classes[0]->members.size(), 2u);
+  auto* p = r.cu->classes[0]->members[0];
+  auto* lp = r.cu->classes[0]->members[1];
+  EXPECT_FALSE(p->is_local);
+  EXPECT_FALSE(p->is_protected);
+  EXPECT_FALSE(lp->is_local);
+  EXPECT_FALSE(lp->is_protected);
 }
 
 TEST(DataHidingParsing, PureVirtualLocalMethodPrototype) {

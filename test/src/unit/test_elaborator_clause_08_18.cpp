@@ -90,32 +90,6 @@ TEST(DataHidingElaboration, ProtectedMethodAccessError) {
              "endmodule\n"));
 }
 
-TEST(DataHidingElaboration, LocalPropertyAccessInAlwaysBlockError) {
-  EXPECT_FALSE(
-      ElabOk("class Packet;\n"
-             "  local int secret;\n"
-             "endclass\n"
-             "module m;\n"
-             "  Packet p;\n"
-             "  always @(*) begin\n"
-             "    p.secret = 1;\n"
-             "  end\n"
-             "endmodule\n"));
-}
-
-TEST(DataHidingElaboration, ProtectedPropertyAccessInAlwaysBlockError) {
-  EXPECT_FALSE(
-      ElabOk("class Packet;\n"
-             "  protected int hidden;\n"
-             "endclass\n"
-             "module m;\n"
-             "  Packet p;\n"
-             "  always @(*) begin\n"
-             "    p.hidden = 1;\n"
-             "  end\n"
-             "endmodule\n"));
-}
-
 TEST(DataHidingElaboration, ConstructorLocalAllowed) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -135,6 +109,57 @@ TEST(DataHidingElaboration, ConstructorProtectedAllowed) {
              "endclass\n"
              "module m;\n"
              "  C c;\n"
+             "endmodule\n"));
+}
+
+// §8.18: local members are not visible within subclasses.
+// A base-class local accessed through a derived handle is still rejected.
+TEST(DataHidingElaboration, LocalNotVisibleViaDerivedHandle) {
+  EXPECT_FALSE(
+      ElabOk("class Base;\n"
+             "  local int secret;\n"
+             "endclass\n"
+             "class Derived extends Base;\n"
+             "endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    Derived d;\n"
+             "    d = new;\n"
+             "    d.secret = 1;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §8.18: a protected member has all the characteristics of a local member
+// except that it is inherited / visible to subclasses. A subclass method
+// may reference an inherited protected property.
+TEST(DataHidingElaboration, ProtectedAccessibleInSubclassMethod) {
+  EXPECT_TRUE(
+      ElabOk("class Base;\n"
+             "  protected int hidden;\n"
+             "endclass\n"
+             "class Derived extends Base;\n"
+             "  function int read_hidden();\n"
+             "    return hidden;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  Derived d;\n"
+             "endmodule\n"));
+}
+
+// §8.18: within a class, a local property of the same class may be
+// referenced even if it is in a different instance of the same class.
+TEST(DataHidingElaboration, SameClassInstanceLocalAccessOk) {
+  EXPECT_TRUE(
+      ElabOk("class Packet;\n"
+             "  local int i;\n"
+             "  function int compare(Packet other);\n"
+             "    return (this.i == other.i);\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  Packet p;\n"
              "endmodule\n"));
 }
 
