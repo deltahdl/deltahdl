@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(OperatorAndExpressionParsing, StreamingWithSliceSize) {
+TEST(StreamingOperatorParsing, StreamingWithSliceSize) {
   auto r = Parse(
       "module t;\n"
       "  initial x = {<< 8 {a, b}};\n"
@@ -18,7 +18,7 @@ TEST(OperatorAndExpressionParsing, StreamingWithSliceSize) {
   EXPECT_NE(rhs->lhs, nullptr);
 }
 
-TEST(ConcatenationParsing, StreamingConcatRightShift) {
+TEST(StreamingOperatorParsing, StreamingConcatRightShift) {
   auto r = Parse("module m; initial x = {>> {a}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -28,7 +28,7 @@ TEST(ConcatenationParsing, StreamingConcatRightShift) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kGtGt);
 }
 
-TEST(OperatorAndExpressionParsing, StreamingConcatLeftShift) {
+TEST(StreamingOperatorParsing, StreamingConcatLeftShift) {
   auto r = Parse(
       "module t;\n"
       "  initial x = {<< {a, b}};\n"
@@ -39,7 +39,7 @@ TEST(OperatorAndExpressionParsing, StreamingConcatLeftShift) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);
   EXPECT_EQ(rhs->elements.size(), 2u);
 }
-TEST(DataTypeParsing, BitStreamCastStreaming) {
+TEST(StreamingOperatorParsing, BitStreamCastStreaming) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -51,7 +51,7 @@ TEST(DataTypeParsing, BitStreamCastStreaming) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(OperatorAndExpressionParsing, StreamingAsAssignmentSource) {
+TEST(StreamingOperatorParsing, StreamingAsAssignmentSource) {
   auto r = Parse(
       "module t;\n"
       "  logic [15:0] dst;\n"
@@ -65,7 +65,7 @@ TEST(OperatorAndExpressionParsing, StreamingAsAssignmentSource) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
 }
 
-TEST(OperatorAndExpressionParsing, StreamingNestedInStreaming) {
+TEST(StreamingOperatorParsing, StreamingNestedInStreaming) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -80,7 +80,7 @@ TEST(OperatorAndExpressionParsing, StreamingNestedInStreaming) {
   EXPECT_EQ(rhs->elements[0]->kind, ExprKind::kStreamingConcat);
 }
 
-TEST(OperatorAndExpressionParsing, StreamingWithNoSliceSize) {
+TEST(StreamingOperatorParsing, StreamingWithNoSliceSize) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -94,7 +94,7 @@ TEST(OperatorAndExpressionParsing, StreamingWithNoSliceSize) {
   EXPECT_EQ(rhs->lhs, nullptr);
 }
 
-TEST(OperatorAndExpressionParsing, StreamingSliceSizeSimpleType) {
+TEST(StreamingOperatorParsing, StreamingSliceSizeSimpleType) {
   auto r = Parse(
       "module t;\n"
       "  logic [31:0] a, b;\n"
@@ -108,18 +108,82 @@ TEST(OperatorAndExpressionParsing, StreamingSliceSizeSimpleType) {
   ASSERT_NE(rhs->lhs, nullptr);
 }
 
-TEST(OperatorAndExpressionParsing, StreamingSingleElement) {
+TEST(StreamingOperatorParsing, StreamExpressionWithArrayRange) {
+  // §11.4.14 BNF: stream_expression ::= expression [ with [ array_range_expression ] ].
+  // Exercises a `with` clause carrying a colon range on the stream element.
   auto r = Parse(
       "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial b = {>> {a}};\n"
+      "  logic [7:0] arr[0:3];\n"
+      "  logic [15:0] dst;\n"
+      "  initial dst = {>> {arr with [0:1]}};\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
-  EXPECT_EQ(rhs->elements.size(), 1u);
+  ASSERT_FALSE(rhs->elements.empty());
+  EXPECT_NE(rhs->elements[0]->with_expr, nullptr);
+}
+
+TEST(StreamingOperatorParsing, StreamExpressionWithPlusColonRange) {
+  // §11.4.14 BNF: array_range_expression covers the `+:` form.
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] arr[0:3];\n"
+      "  logic [15:0] dst;\n"
+      "  initial dst = {>> {arr with [0 +: 2]}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
+  ASSERT_FALSE(rhs->elements.empty());
+  auto* with = rhs->elements[0]->with_expr;
+  ASSERT_NE(with, nullptr);
+  EXPECT_TRUE(with->is_part_select_plus);
+}
+
+TEST(StreamingOperatorParsing, StreamExpressionWithMinusColonRange) {
+  // §11.4.14 BNF: array_range_expression covers the `-:` form.
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] arr[0:3];\n"
+      "  logic [15:0] dst;\n"
+      "  initial dst = {>> {arr with [3 -: 2]}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
+  ASSERT_FALSE(rhs->elements.empty());
+  auto* with = rhs->elements[0]->with_expr;
+  ASSERT_NE(with, nullptr);
+  EXPECT_TRUE(with->is_part_select_minus);
+}
+
+TEST(StreamingOperatorParsing, StreamExpressionWithBareIndex) {
+  // §11.4.14 BNF: array_range_expression admits a single expression with no
+  // colon — the degenerate one-element range form.
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] arr[0:3];\n"
+      "  logic [7:0] dst;\n"
+      "  initial dst = {>> {arr with [2]}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
+  ASSERT_FALSE(rhs->elements.empty());
+  auto* with = rhs->elements[0]->with_expr;
+  ASSERT_NE(with, nullptr);
+  EXPECT_FALSE(with->is_part_select_plus);
+  EXPECT_FALSE(with->is_part_select_minus);
+  EXPECT_EQ(with->index_end, nullptr);
 }
 
 }
