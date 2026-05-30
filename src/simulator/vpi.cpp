@@ -284,6 +284,18 @@ int VpiContext::RemoveCb(VpiHandle cb_handle) {
   return 0;
 }
 
+int VpiContext::ExecuteCallback(VpiHandle cb_handle) {
+  if (!cb_handle || cb_handle->type != kVpiCallback) return 0;
+  int idx = cb_handle->index;
+  if (idx < 0 || idx >= static_cast<int>(callbacks_.size())) return 0;
+  VpiCbData& cb = callbacks_[idx];
+  // §38.36: the simulator executes the callback by invoking the cb_rtn the
+  // application supplied, passing it a pointer to the s_cb_data structure (which
+  // belongs to the simulator). With no cb_rtn there is nothing to invoke.
+  if (!cb.cb_rtn) return 0;
+  return cb.cb_rtn(&cb);
+}
+
 void VpiContext::RegisterCbValueChange(const VpiCbData& data) {
   if (!data.obj || !data.obj->var) return;
   void* user_data = data.user_data;

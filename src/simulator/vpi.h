@@ -126,6 +126,9 @@ struct VpiTime {
 
 struct VpiCbData {
   int reason = 0;
+  // §38.36 (Figure 38-17): the application routine the simulator invokes when it
+  // executes the callback; it is passed a pointer to this s_cb_data structure.
+  int (*cb_rtn)(VpiCbData*) = nullptr;
   VpiHandle obj = nullptr;
   VpiTime* time = nullptr;
   VpiValue* value = nullptr;
@@ -182,6 +185,7 @@ class VpiContext {
   void PutValue(VpiHandle obj, VpiValue* value, VpiTime* time, int flags);
   VpiHandle RegisterCb(VpiCbData* data);
   int RemoveCb(VpiHandle cb_handle);
+  int ExecuteCallback(VpiHandle cb_handle);
   void RegisterCbValueChange(const VpiCbData& data);
   int Get(int property, VpiHandle obj);
   const char* GetStr(int property, VpiHandle obj);
