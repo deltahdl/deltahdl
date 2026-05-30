@@ -202,6 +202,24 @@ PropertyResult ResolveFollowedByNonOverlapping(bool consequent_matched) {
   return EvalPropertyNot(ResolveNonOverlapping(!consequent_matched));
 }
 
+PropertyResult EvalNexttime(bool strong, bool target_tick_reachable,
+                            PropertyResult inner_at_target) {
+  // §16.12.10: when the target tick exists the nexttime verdict is the inner
+  // property_expr's verdict at that tick. When the target tick is unreachable
+  // the strength decides: the weak form holds (no further tick can disprove the
+  // obligation) while the strong form fails (the required tick never arrived).
+  if (target_tick_reachable) return inner_at_target;
+  return strong ? PropertyResult::kFail : PropertyResult::kPass;
+}
+
+bool NexttimeTargetReachable(uint64_t index, uint64_t future_clock_ticks) {
+  // §16.12.10: counting starts at the current time step, so the index-`n` target
+  // is the tick reached after `n` further ticks. Index 0 targets the current
+  // step and is always reachable — the alignment-operator behavior — while the
+  // non-indexed next-tick case is index 1.
+  return future_clock_ticks >= index;
+}
+
 SequencePropertyStrength DefaultSequencePropertyStrength(AssertionKind stmt) {
   // §16.12.2: assert property and assume property evaluate a bare sequence
   // weakly; the remaining assertion statements take the strong reading.

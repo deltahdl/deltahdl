@@ -159,6 +159,28 @@ PropertyResult EvalFollowedBy(bool antecedent, bool consequent,
 // the followed-by pass.
 PropertyResult ResolveFollowedByNonOverlapping(bool consequent_matched);
 
+// §16.12.10: the nexttime property operators advance evaluation to a later tick
+// of the property's clock. `nexttime property_expr` (weak) holds when the
+// property_expr holds at the next clock tick or there is no further clock tick;
+// `s_nexttime property_expr` (strong) requires the next clock tick to exist and
+// the property_expr to hold there. The indexed forms `nexttime[n]` and
+// `s_nexttime[n]` target the n-th future tick instead of the immediately next
+// one. The only difference between the weak and strong readings is how an
+// unreachable target tick is judged: weakly it passes (the clock ran out before
+// the obligation could be disproven), strongly it fails (the required tick never
+// arrived). When the target tick is reachable the nexttime verdict is exactly
+// the property_expr's verdict at that tick.
+PropertyResult EvalNexttime(bool strong, bool target_tick_reachable,
+                            PropertyResult inner_at_target);
+
+// §16.12.10: decide whether the indexed target tick is reachable. The index
+// counts ticks of the nexttime property's clock with counting starting at the
+// current time step, so reaching the target for index `n` requires `n` further
+// ticks after the current step. Consequently `nexttime[0]`/`s_nexttime[0]`
+// target the current step and act as pure alignment operators, while the
+// non-indexed nexttime/s_nexttime correspond to index 1 (the next tick).
+bool NexttimeTargetReachable(uint64_t index, uint64_t future_clock_ticks);
+
 enum class AssertionKind : uint8_t {
   kAssert = 0,
   kAssume = 1,
