@@ -178,6 +178,30 @@ PropertyResult EvalPropertyIff(PropertyResult a, PropertyResult b) {
   return (a_holds == b_holds) ? PropertyResult::kPass : PropertyResult::kFail;
 }
 
+PropertyResult EvalFollowedBy(bool antecedent, bool consequent,
+                              bool non_overlapping) {
+  // §16.12.9: apply the duality with the implication operators directly —
+  // `s #-# p` ≡ not (s |-> not p) and `s #=# p` ≡ not (s |=> not p). Negate the
+  // consequent, evaluate the matching §16.12.7 implication, then negate the
+  // verdict. A missing antecedent match makes the dual implication hold
+  // vacuously, which negates to a definite fail — capturing the requirement
+  // that the antecedent shall have at least one successful match. A deferred
+  // (nonoverlapped) implication stays pending here and is settled later by
+  // ResolveFollowedByNonOverlapping.
+  PropertyResult implied =
+      EvalImplication(antecedent, !consequent, non_overlapping);
+  if (implied == PropertyResult::kPending) return PropertyResult::kPending;
+  return EvalPropertyNot(implied);
+}
+
+PropertyResult ResolveFollowedByNonOverlapping(bool consequent_matched) {
+  // §16.12.9: settle the deferred nonoverlapped followed-by at the tick after
+  // the antecedent match. By the duality the dual implication is settled on the
+  // negated consequent and that verdict is negated, so a holding consequent
+  // yields a pass.
+  return EvalPropertyNot(ResolveNonOverlapping(!consequent_matched));
+}
+
 SequencePropertyStrength DefaultSequencePropertyStrength(AssertionKind stmt) {
   // §16.12.2: assert property and assume property evaluate a bare sequence
   // weakly; the remaining assertion statements take the strong reading.

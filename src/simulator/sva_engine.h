@@ -134,6 +134,31 @@ PropertyResult EvalPropertyImplies(PropertyResult antecedent,
 // verdicts must agree. A vacuous pass counts as the operand holding.
 PropertyResult EvalPropertyIff(PropertyResult a, PropertyResult b);
 
+// §16.12.9: a followed-by `sequence_expr #-# property_expr` (overlapped) or
+// `sequence_expr #=# property_expr` (nonoverlapped) triggers monitoring of the
+// consequent property_expr at a match point of the antecedent sequence_expr.
+// For the followed-by to succeed the antecedent shall have at least one match
+// and the consequent shall hold from a match point; unlike implication a
+// missing match is a definite fail, never a vacuous pass, so the result is
+// always plainly true or false. The followed-by operators are the duals of the
+// implication operators — `s #-# p` ≡ not (s |-> not p) and
+// `s #=# p` ≡ not (s |=> not p) — equivalently `s #-# p` is strong(s ##0 ...)
+// and `s #=# p` is strong(s ##1 ...). The verdict is therefore obtained by
+// negating the consequent, running the matching §16.12.7 implication, and
+// negating its verdict. The overlapped form evaluates the consequent at the end
+// point of the match so it settles immediately; the nonoverlapped form starts
+// the consequent one tick later, so the verdict is deferred (kPending) and
+// settled by ResolveFollowedByNonOverlapping.
+PropertyResult EvalFollowedBy(bool antecedent, bool consequent,
+                              bool non_overlapping);
+
+// §16.12.9: settles a deferred nonoverlapped followed-by (#=#) at the tick after
+// the antecedent match, where the consequent property_expr is finally
+// evaluated. By the duality with |=>, the dual implication settles on the
+// negated consequent and that verdict is negated, so a holding consequent makes
+// the followed-by pass.
+PropertyResult ResolveFollowedByNonOverlapping(bool consequent_matched);
+
 enum class AssertionKind : uint8_t {
   kAssert = 0,
   kAssume = 1,
