@@ -234,6 +234,145 @@ uint32_t AssertionApi::CallbackCount() const {
   return static_cast<uint32_t>(callbacks_.size());
 }
 
+namespace {
+
+// §39.4.2: the step callbacks. A single placed step callback covers both, so
+// matching treats the two step reasons interchangeably.
+bool IsStepReason(int reason) {
+  return reason == cbAssertionStepSuccess || reason == cbAssertionStepFailure;
+}
+
+}  // namespace
+
+bool AssertionApi::IsAssertionCallbackReason(int reason) {
+  switch (reason) {
+    case cbAssertionStart:
+    case cbAssertionSuccess:
+    case cbAssertionVacuousSuccess:
+    case cbAssertionDisabledEvaluation:
+    case cbAssertionFailure:
+    case cbAssertionStepSuccess:
+    case cbAssertionStepFailure:
+    case cbAssertionLock:
+    case cbAssertionUnlock:
+    case cbAssertionDisable:
+    case cbAssertionEnable:
+    case cbAssertionReset:
+    case cbAssertionKill:
+    case cbAssertionDisablePassAction:
+    case cbAssertionEnablePassAction:
+    case cbAssertionDisableFailAction:
+    case cbAssertionEnableFailAction:
+    case cbAssertionDisableVacuousAction:
+    case cbAssertionEnableNonvacuousAction:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool AssertionApi::IsReasonValidForHandle(int reason, int handle_type) {
+  if (!IsAssertionCallbackReason(reason)) return false;
+  // Any assertion callback reason may be placed on a concurrent or immediate
+  // assertion statement.
+  if (IsAssertionStatementHandle(handle_type)) return true;
+  // A sequence or property instance accepts only the start, success, and
+  // failure callbacks.
+  if (handle_type == vpiSequenceDecl || handle_type == vpiProperty ||
+      handle_type == vpiPropertyDecl) {
+    return reason == cbAssertionStart || reason == cbAssertionSuccess ||
+           reason == cbAssertionFailure;
+  }
+  // No other handle type bears assertion callbacks.
+  return false;
+}
+
+bool AssertionApi::ReasonCarriesAttemptInfo(int reason) {
+  switch (reason) {
+    // The control and action callbacks carry no attempt information.
+    case cbAssertionLock:
+    case cbAssertionUnlock:
+    case cbAssertionDisable:
+    case cbAssertionEnable:
+    case cbAssertionReset:
+    case cbAssertionKill:
+    case cbAssertionDisablePassAction:
+    case cbAssertionEnablePassAction:
+    case cbAssertionDisableFailAction:
+    case cbAssertionEnableFailAction:
+    case cbAssertionDisableVacuousAction:
+    case cbAssertionEnableNonvacuousAction:
+      return false;
+    default:
+      return true;
+  }
+}
+
+bool AssertionApi::IsValidFailingStep(const AssertionStepDetail& step) {
+  return !step.matched_exprs.empty();
+}
+
+AssertionCallbackHandle AssertionApi::PlaceAssertionCallback(
+    int reason, std::string_view assertion, int handle_type,
+    AssertionPlacedCallback cb, void* user_data) {
+  // An empty (null) handle, an unknown reason, or a reason that may not be
+  // placed on this handle type is a placement error: return the NULL handle.
+  if (assertion.empty()) return 0;
+  if (!IsReasonValidForHandle(reason, handle_type)) return 0;
+
+  AssertionCallbackHandle handle = next_callback_handle_++;
+  placed_callbacks_.push_back(
+      {handle, reason, std::string(assertion), std::move(cb), user_data});
+  return handle;
+}
+
+bool AssertionApi::RemoveAssertionCallback(AssertionCallbackHandle handle) {
+  if (handle == 0) return false;
+  auto before = placed_callbacks_.size();
+  std::erase_if(placed_callbacks_,
+                [handle](const PlacedCb& e) { return e.handle == handle; });
+  return placed_callbacks_.size() != before;
+}
+
+uint32_t AssertionApi::PlacedCallbackCount() const {
+  return static_cast<uint32_t>(placed_callbacks_.size());
+}
+
+uint32_t AssertionApi::DeliverAssertionEvent(std::string_view assertion,
+                                             int reason, uint64_t cb_time,
+                                             const AssertionAttemptInfo& info) {
+  // A failing step shall always carry at least one expression; a malformed one
+  // is rejected and fires nothing.
+  if (reason == cbAssertionStepFailure && !IsValidFailingStep(info.step)) {
+    return 0;
+  }
+
+  AssertionCallbackArgs args;
+  args.reason = reason;
+  args.cb_time = cb_time;
+  args.assertion = std::string(assertion);
+  args.user_data = nullptr;
+  // The attempt-info pointer is null for the reasons that carry no attempt
+  // information; otherwise it points at the supplied attempt information.
+  const AssertionAttemptInfo* info_ptr =
+      ReasonCarriesAttemptInfo(reason) ? &info : nullptr;
+  args.info = info_ptr;
+
+  uint32_t fired = 0;
+  for (auto& entry : placed_callbacks_) {
+    if (std::string_view(entry.assertion) != assertion) continue;
+    // A placed step callback is invoked for both success and failure steps;
+    // every other reason matches exactly.
+    bool matches = IsStepReason(entry.reason) ? IsStepReason(reason)
+                                              : entry.reason == reason;
+    if (!matches) continue;
+    args.user_data = entry.user_data;
+    entry.cb(args);
+    ++fired;
+  }
+  return fired;
+}
+
 void AssertionApi::SetSeverity(std::string_view name, AssertionSeverity sev) {
   severity_map_[std::string(name)] = sev;
 }

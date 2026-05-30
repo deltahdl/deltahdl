@@ -196,6 +196,14 @@ using PLI_BYTE8 = char;
 #define cbAssertionLock 661
 #define cbAssertionUnlock 662
 
+/* §39.4.2 per-assertion action callback reasons */
+#define cbAssertionDisablePassAction 663
+#define cbAssertionEnablePassAction 664
+#define cbAssertionDisableFailAction 665
+#define cbAssertionEnableFailAction 666
+#define cbAssertionDisableVacuousAction 667
+#define cbAssertionEnableNonvacuousAction 668
+
 #define vpiCoverageStart 750
 #define vpiCoverageStop 751
 #define vpiCoverageReset 752

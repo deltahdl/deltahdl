@@ -203,6 +203,49 @@ struct AssertionCbData {
 
 using AssertionCbFunc = std::function<void(const AssertionCbData&)>;
 
+// §39.4.2 step detail. Describes the set of expressions matched while satisfying
+// one step along the flattened assertion (modeled here by their source text)
+// plus the source and destination state ids identifying the path taken through
+// the assertion. State ids are integers: 0 is the origin state, 1 an accepting
+// state, any other value an intermediate point. An empty expression set models
+// an unconditional transition. On a failing step the last expression is the one
+// where the transition failed.
+struct AssertionStepDetail {
+  std::vector<std::string> matched_exprs;
+  int state_from = 0;
+  int state_to = 0;
+};
+
+// §39.4.2 attempt information delivered with a callback. Which members are
+// meaningful depends on the callback reason: attempt_start_time is always the
+// start time of the actual attempt and uniquely identifies it among the
+// attempts of an assertion; fail_expr is meaningful only on a failure callback;
+// step only on a step callback.
+struct AssertionAttemptInfo {
+  uint64_t attempt_start_time = 0;
+  std::string fail_expr;
+  AssertionStepDetail step;
+};
+
+// §39.4.2 the five arguments supplied to a placed assertion callback: the
+// reason, the callback time, the assertion (the handle, modeled here by name), a
+// pointer to the attempt information (null for the reasons that carry none), and
+// the user data registered when the callback was placed.
+struct AssertionCallbackArgs {
+  int reason = 0;
+  uint64_t cb_time = 0;
+  std::string assertion;
+  const AssertionAttemptInfo* info = nullptr;
+  void* user_data = nullptr;
+};
+
+using AssertionPlacedCallback =
+    std::function<void(const AssertionCallbackArgs&)>;
+
+// §39.4.2 a handle returned when an assertion callback is placed. 0 models the
+// NULL handle returned when a placement is in error.
+using AssertionCallbackHandle = uint64_t;
+
 constexpr int kCbAssertionStart = 601;
 constexpr int kCbAssertionSuccess = 602;
 constexpr int kCbAssertionFailure = 603;
@@ -215,6 +258,56 @@ class AssertionApi {
   void RegisterCallback(int reason, AssertionCbFunc cb, void* user_data);
   void FireCallback(const AssertionCbData& data);
   uint32_t CallbackCount() const;
+
+  // §39.4.2 per-assertion callback placement via vpi_register_assertion_cb().
+
+  // True when the reason is one of the assertion callback reasons of §39.4.2.
+  static bool IsAssertionCallbackReason(int reason);
+
+  // §39.4.2: every assertion callback reason may be placed on a concurrent or
+  // immediate assertion; only cbAssertionStart, cbAssertionSuccess, and
+  // cbAssertionFailure may also be placed on a sequence or property instance.
+  // Any other handle type accepts no assertion callbacks.
+  static bool IsReasonValidForHandle(int reason, int handle_type);
+
+  // §39.4.2: on lock, unlock, disable, enable, reset, kill, and the pass, fail,
+  // vacuous, and nonvacuous action callbacks the returned attempt-info pointer
+  // is NULL; every other reason carries attempt information.
+  static bool ReasonCarriesAttemptInfo(int reason);
+
+  // §39.4.2: in a failing transition there shall always be at least one element
+  // in the expression array. True when the step is a well-formed failing step.
+  static bool IsValidFailingStep(const AssertionStepDetail& step);
+
+  // §39.4.2: place a callback for `reason` on the assertion named `assertion`,
+  // whose handle is of vpi type `handle_type`. Returns a non-zero handle when
+  // the callback is successfully placed; returns 0 (the NULL handle) on error —
+  // an unknown reason, a reason that may not be placed on that handle type, or
+  // an empty (invalid) handle. The callback is specific to the named assertion:
+  // events occurring on a different assertion never invoke it.
+  AssertionCallbackHandle PlaceAssertionCallback(int reason,
+                                                 std::string_view assertion,
+                                                 int handle_type,
+                                                 AssertionPlacedCallback cb,
+                                                 void* user_data);
+
+  // §39.4.2: remove a previously placed callback via the handle returned when it
+  // was placed (modeling vpi_remove_cb()). Returns true when a callback was
+  // removed, false when the handle matches no placed callback.
+  bool RemoveAssertionCallback(AssertionCallbackHandle handle);
+
+  uint32_t PlacedCallbackCount() const;
+
+  // §39.4.2: deliver an assertion event for `reason` occurring on the named
+  // assertion at time `cb_time`. Each callback placed on that assertion whose
+  // reason matches the event is supplied the five §39.4.2 arguments; the
+  // attempt-info pointer is null for the reasons that carry none. A placed step
+  // callback fires for both step success and step failure. A malformed failing
+  // step (no expression in the array) is rejected and fires nothing. Returns the
+  // number of callbacks invoked.
+  uint32_t DeliverAssertionEvent(std::string_view assertion, int reason,
+                                 uint64_t cb_time,
+                                 const AssertionAttemptInfo& info);
 
   void SetSeverity(std::string_view name, AssertionSeverity sev);
   AssertionSeverity GetSeverity(std::string_view name) const;
@@ -294,6 +387,20 @@ class AssertionApi {
     void* user_data = nullptr;
   };
   std::vector<CbEntry> callbacks_;
+
+  // §39.4.2 per-assertion placed callbacks. Each is keyed by the unique handle
+  // returned at placement and remembers the assertion it was placed on, so
+  // delivery is specific to that assertion.
+  struct PlacedCb {
+    AssertionCallbackHandle handle = 0;
+    int reason = 0;
+    std::string assertion;
+    AssertionPlacedCallback cb;
+    void* user_data = nullptr;
+  };
+  std::vector<PlacedCb> placed_callbacks_;
+  AssertionCallbackHandle next_callback_handle_ = 1;
+
   std::unordered_map<std::string, AssertionSeverity> severity_map_;
   std::unordered_map<std::string, AssertionAction> action_map_;
 
