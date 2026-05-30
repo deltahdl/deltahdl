@@ -83,6 +83,14 @@ bool EvalSequenceIntersect(bool a_match, bool b_match, uint32_t a_len,
 bool EvalThroughout(const std::function<bool(uint64_t)>& check,
                     const std::vector<uint64_t>& values);
 
+// §16.12.7: an implication `sequence_expr |-> property_expr` (overlapped) or
+// `sequence_expr |=> property_expr` (nonoverlapped) preconditions the consequent
+// property_expr on a match of the antecedent sequence_expr. When the antecedent
+// has no match the implication holds vacuously. The overlapped form evaluates
+// the consequent at the end point of the match, so the result is the
+// consequent's verdict; the nonoverlapped form starts the consequent one clock
+// tick later, so its verdict is deferred (kPending) and settled by
+// ResolveNonOverlapping — capturing `seq |=> p` ≡ `seq ##1 `true |-> p`.
 PropertyResult EvalImplication(bool antecedent, bool consequent,
                                bool non_overlapping);
 
@@ -106,6 +114,10 @@ PropertyResult EvalPropertyOr(PropertyResult a, PropertyResult b);
 PropertyResult EvalPropertyIfElse(bool cond, PropertyResult then_result,
                                   bool has_else, PropertyResult else_result);
 PropertyResult EvalWithDisableIff(bool disable_cond, PropertyResult inner);
+
+// §16.12.7: settles a deferred nonoverlapped (|=>) implication once the clock
+// reaches the tick after the antecedent match, where the consequent is finally
+// evaluated.
 PropertyResult ResolveNonOverlapping(bool consequent_matched);
 
 enum class AssertionKind : uint8_t {

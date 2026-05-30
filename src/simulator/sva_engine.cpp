@@ -103,6 +103,11 @@ bool EvalThroughout(const std::function<bool(uint64_t)>& check,
 
 PropertyResult EvalImplication(bool antecedent, bool consequent,
                                bool non_overlapping) {
+  // §16.12.7: with no antecedent match the implication holds vacuously. For the
+  // overlapped form (|->) the consequent is evaluated at the end point of the
+  // match, so the verdict is the consequent's own. For the nonoverlapped form
+  // (|=>) the consequent starts one tick later, so the verdict is deferred and
+  // settled later by ResolveNonOverlapping.
   if (!antecedent) return PropertyResult::kVacuousPass;
   if (non_overlapping) return PropertyResult::kPending;
   return consequent ? PropertyResult::kPass : PropertyResult::kFail;
@@ -145,6 +150,9 @@ PropertyResult EvalWithDisableIff(bool disable_cond, PropertyResult inner) {
 }
 
 PropertyResult ResolveNonOverlapping(bool consequent_matched) {
+  // §16.12.7: settles a deferred nonoverlapped (|=>) implication at the tick
+  // after the antecedent match, where the consequent is finally evaluated;
+  // this realizes the equivalence of `seq |=> p` with `seq ##1 `true |-> p`.
   return consequent_matched ? PropertyResult::kPass : PropertyResult::kFail;
 }
 

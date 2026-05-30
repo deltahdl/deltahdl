@@ -11,6 +11,8 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
+// §16.12.7: the overlapped implication form `sequence_expr |-> property_expr`
+// is accepted at the property level of a concurrent assertion.
 TEST(AssertionSemanticsParsing, OverlapImplication) {
   auto r = Parse(
       "module m;\n"
@@ -21,6 +23,8 @@ TEST(AssertionSemanticsParsing, OverlapImplication) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
+// §16.12.7: the nonoverlapped implication form `sequence_expr |=> property_expr`
+// is likewise accepted at the property level of a concurrent assertion.
 TEST(AssertionSemanticsParsing, NonoverlapImplication) {
   auto r = Parse(
       "module m;\n"
