@@ -91,6 +91,8 @@ constexpr int kVpiPureTransportDelay = 4;
 
 constexpr int kVpiFinish = 66;
 constexpr int kVpiStop = 67;
+// §38.36.3: a reset can be requested indirectly through vpi_control(vpiReset).
+constexpr int kVpiReset = 68;
 
 constexpr int kVpi0 = 0;
 constexpr int kVpi1 = 1;
@@ -382,6 +384,7 @@ using SVpiVlogInfo = delta::VpiVlogInfo;
 
 #define vpiFinish 66
 #define vpiStop 67
+#define vpiReset 68
 
 #define vpi0 0
 #define vpi1 1

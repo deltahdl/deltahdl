@@ -402,6 +402,13 @@ int VpiContext::Control(int operation, int ) {
     stop_requested_ = true;
     return 1;
   }
+  // §38.36.3: a reset requested through vpi_control(vpiReset, ...) drives the
+  // same reset-callback sequence as a directly invoked $reset, so route it
+  // through the one DispatchReset path.
+  if (operation == kVpiReset) {
+    DispatchReset();
+    return 1;
+  }
   return 0;
 }
 

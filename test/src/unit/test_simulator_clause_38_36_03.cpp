@@ -258,5 +258,45 @@ TEST_F(VpiActionFeatureCallbacks, RestartPurgesOthersAndDeliversRestartCallbacks
   EXPECT_EQ(survivors, expected);
 }
 
+// §38.36.3: the reset callbacks occur whether the reset is invoked directly or
+// indirectly through vpi_control(vpiReset, ...). Driving the reset through the
+// C control entry point delivers the same start-then-end sequence.
+TEST_F(VpiActionFeatureCallbacks, ResetViaVpiControlDeliversCallbacks) {
+  Register(cbStartOfReset);
+  Register(cbEndOfReset);
+
+  int handled = VpiControlC(vpiReset, 0);
+
+  EXPECT_EQ(handled, 1);
+  ASSERT_EQ(g_sequence.size(), 2u);
+  EXPECT_EQ(g_sequence[0], cbStartOfReset);
+  EXPECT_EQ(g_sequence[1], cbEndOfReset);
+}
+
+// §38.36.3 (edge case): dispatching a reason with no registered callback invokes
+// no application routine and reports zero deliveries.
+TEST_F(VpiActionFeatureCallbacks, DispatchWithNoMatchingCallbackFiresNothing) {
+  Register(cbStartOfSimulation);
+
+  int fired = vpi_ctx_.DispatchCallbacks(cbEndOfCompile);
+
+  EXPECT_EQ(fired, 0);
+  EXPECT_EQ(g_invocations, 0);
+}
+
+// §38.36.3 (edge case): a callback removed before dispatch is not delivered, so
+// only the still-registered callback for the reason runs.
+TEST_F(VpiActionFeatureCallbacks, RemovedCallbackIsNotDispatched) {
+  vpiHandle removed = Register(cbStartOfSimulation);
+  Register(cbStartOfSimulation);
+  ASSERT_NE(removed, nullptr);
+  ASSERT_EQ(VpiRemoveCbC(removed), 1);
+
+  int fired = vpi_ctx_.DispatchCallbacks(cbStartOfSimulation);
+
+  EXPECT_EQ(fired, 1);
+  EXPECT_EQ(g_invocations, 1);
+}
+
 }  // namespace
 }  // namespace delta
