@@ -97,4 +97,49 @@ TEST(SimControlSim, FinishLevelTwoAddsStatistics) {
   EXPECT_GT(out_two.size(), out_one.size());
 }
 
+// §20.2 / Table 20-1, level 1: the time-and-location rule is stated for both
+// control tasks, so $finish at level 1 likewise reports the simulation time
+// without the level-2 resource-usage statistics.
+TEST(SimControlSim, FinishLevelOneReportsTimeWithoutStats) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$finish", {MkInt(f.arena, 1)});
+  std::string out = EvalCapture(expr, f);
+  EXPECT_NE(out.find("time"), std::string::npos);
+  EXPECT_EQ(out.find("statistics"), std::string::npos);
+}
+
+// §20.2 / Table 20-1, level 2 applies equally to $stop: on top of the level-1
+// time and location it emits the memory and CPU-time statistics line.
+TEST(SimControlSim, StopLevelTwoAddsStatistics) {
+  SysTaskFixture f;
+  auto* level_two = MkSysCall(f.arena, "$stop", {MkInt(f.arena, 2)});
+  std::string out_two = EvalCapture(level_two, f);
+  EXPECT_NE(out_two.find("time"), std::string::npos);
+  EXPECT_NE(out_two.find("statistics"), std::string::npos);
+
+  SysTaskFixture g;
+  auto* level_one = MkSysCall(g.arena, "$stop", {MkInt(g.arena, 1)});
+  std::string out_one = EvalCapture(level_one, g);
+  // Level 2 carries strictly more detail than level 1.
+  EXPECT_GT(out_two.size(), out_one.size());
+}
+
+// §20.2: the control action is independent of the diagnostic level. Even at
+// level 0, where nothing is printed, $finish still requests that the run halt.
+TEST(SimControlSim, FinishLevelZeroStillRequestsStop) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$finish", {MkInt(f.arena, 0)});
+  EvalCapture(expr, f);
+  EXPECT_TRUE(f.ctx.StopRequested());
+}
+
+// §20.2: likewise $stop suspends the run at level 0; the silent diagnostic does
+// not suppress the halt request.
+TEST(SimControlSim, StopLevelZeroStillRequestsStop) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$stop", {MkInt(f.arena, 0)});
+  EvalCapture(expr, f);
+  EXPECT_TRUE(f.ctx.StopRequested());
+}
+
 }  // namespace
