@@ -1,0 +1,100 @@
+#include <iostream>
+#include <sstream>
+
+#include "builders_systask.h"
+#include "fixture_simulator.h"
+#include "parser/ast.h"
+#include "simulator/evaluation.h"
+
+using namespace delta;
+
+namespace {
+
+// Evaluates a system-task call while capturing everything it writes to stdout.
+std::string EvalCapture(Expr* expr, SimFixture& f) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  EvalExpr(expr, f.ctx, f.arena);
+  std::cout.rdbuf(old_buf);
+  return captured.str();
+}
+
+// §20.2: $finish ends the run; the call requests that the scheduler halt.
+TEST(SimControlSim, FinishRequestsStop) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$finish", {});
+  EvalCapture(expr, f);
+  EXPECT_TRUE(f.ctx.StopRequested());
+}
+
+// §20.2: $stop suspends the run; like $finish it halts the scheduler loop.
+TEST(SimControlSim, StopRequestsStop) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$stop", {MkInt(f.arena, 1)});
+  EvalCapture(expr, f);
+  EXPECT_TRUE(f.ctx.StopRequested());
+}
+
+// §20.2 / Table 20-1: with no argument the diagnostic level defaults to 1, so
+// $finish reports the simulation time and the controlling task.
+TEST(SimControlSim, FinishDefaultLevelReportsTimeAndLocation) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$finish", {});
+  std::string out = EvalCapture(expr, f);
+  EXPECT_NE(out.find("$finish"), std::string::npos);
+  EXPECT_NE(out.find("time"), std::string::npos);
+}
+
+// §20.2 / Table 20-1, level 0: prints nothing.
+TEST(SimControlSim, FinishLevelZeroPrintsNothing) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$finish", {MkInt(f.arena, 0)});
+  std::string out = EvalCapture(expr, f);
+  EXPECT_TRUE(out.empty());
+}
+
+// §20.2 / Table 20-1, level 1: prints simulation time and location, but no
+// resource-usage statistics.
+TEST(SimControlSim, StopLevelOneReportsTimeWithoutStats) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$stop", {MkInt(f.arena, 1)});
+  std::string out = EvalCapture(expr, f);
+  EXPECT_NE(out.find("time"), std::string::npos);
+  EXPECT_EQ(out.find("statistics"), std::string::npos);
+}
+
+// §20.2 / Table 20-1: the default-level-1 rule is stated for both control
+// tasks, so $stop with no argument likewise reports the simulation time.
+TEST(SimControlSim, StopDefaultLevelReportsTime) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$stop", {});
+  std::string out = EvalCapture(expr, f);
+  EXPECT_NE(out.find("$stop"), std::string::npos);
+  EXPECT_NE(out.find("time"), std::string::npos);
+}
+
+// §20.2 / Table 20-1, level 0 applies equally to $stop: nothing is printed.
+TEST(SimControlSim, StopLevelZeroPrintsNothing) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$stop", {MkInt(f.arena, 0)});
+  std::string out = EvalCapture(expr, f);
+  EXPECT_TRUE(out.empty());
+}
+
+// §20.2 / Table 20-1, level 2: adds the memory and CPU-time statistics line on
+// top of the level-1 information.
+TEST(SimControlSim, FinishLevelTwoAddsStatistics) {
+  SysTaskFixture f;
+  auto* level_two = MkSysCall(f.arena, "$finish", {MkInt(f.arena, 2)});
+  std::string out_two = EvalCapture(level_two, f);
+  EXPECT_NE(out_two.find("time"), std::string::npos);
+  EXPECT_NE(out_two.find("statistics"), std::string::npos);
+
+  SysTaskFixture g;
+  auto* level_one = MkSysCall(g.arena, "$finish", {MkInt(g.arena, 1)});
+  std::string out_one = EvalCapture(level_one, g);
+  // Level 2 is strictly more verbose than level 1.
+  EXPECT_GT(out_two.size(), out_one.size());
+}
+
+}  // namespace

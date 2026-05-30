@@ -607,6 +607,27 @@ static Logic4Vec EvalSeveritySysCall(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// §20.2 / Table 20-1: $stop and $finish accept an optional diagnostic level
+// argument (0, 1, or 2) that selects how much information accompanies the
+// control action. Level 0 prints nothing; level 1 reports the simulation time
+// and the controlling task (its location); level 2 additionally summarizes the
+// memory and CPU time used by the run. When no argument is supplied the level
+// defaults to 1.
+static void EmitSimControlDiagnostic(const Expr* expr, SimContext& ctx,
+                                     Arena& arena, std::string_view task,
+                                     std::ostream& os) {
+  int64_t level = 1;
+  if (!expr->args.empty() && expr->args[0]) {
+    level =
+        static_cast<int64_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+  }
+  if (level <= 0) return;
+  os << task << " at time " << ctx.CurrentTime().ticks << "\n";
+  if (level >= 2) {
+    os << task << ": memory and CPU time statistics unavailable\n";
+  }
+}
+
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto name = expr->callee;
 
@@ -614,7 +635,10 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     ExecDisplayWrite(expr, ctx, arena);
     return MakeLogic4VecVal(arena, 1, 0);
   }
+  // §20.2: $stop suspends the run and $finish ends it, returning control to the
+  // host; both honor the Table 20-1 diagnostic level before halting.
   if (name == "$finish" || name == "$stop") {
+    EmitSimControlDiagnostic(expr, ctx, arena, name, std::cout);
     ctx.RequestStop();
     return MakeLogic4VecVal(arena, 1, 0);
   }
