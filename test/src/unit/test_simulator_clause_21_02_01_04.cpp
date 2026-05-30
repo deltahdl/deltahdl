@@ -111,6 +111,17 @@ TEST(StrengthFormat, UnknownDifferentLevelsIs65X) {
             "65X");
 }
 
+// §21.2.1.4: for an unknown value at differing levels the two digits are the
+// 0-side level then the 1-side level, in that order -- not sorted by magnitude.
+// Here the 0 side is the weaker pull (5) and the 1 side the stronger strong
+// (6), so the rendering must read 56X; a magnitude-sorted implementation would
+// wrongly emit 65X. This complements the descending 65X case to pin the order.
+TEST(StrengthFormat, UnknownDifferentLevelsKeepsZeroThenOneOrder) {
+  EXPECT_EQ(FormatStrength(MakeNS(Strength::kPull, Strength::kPull,
+                                  Strength::kStrong, Strength::kStrong)),
+            "56X");
+}
+
 // §21.2.1.4 / Table 21-5: a logic 0 driven across a range of strengths prints
 // the maximum then minimum level as decimal digits -- pull (5) down to medium
 // (2) gives 520.
@@ -140,7 +151,7 @@ TEST(StrengthFormat, ZeroOrHighZIsMnemonicL) {
 // Table 21-4: every strength-level mnemonic is reachable. Su (supply, 7), La
 // (large capacitor, 4), We (weak, 3), and Sm (small, 1) complete the set
 // alongside St/Pu/Me/Hi exercised above.
-TEST(StrengthFormat, MnemonicsCoverTable21_4) {
+TEST(StrengthFormat, AllStrengthLevelMnemonicsAreReachable) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kHighz, Strength::kHighz,
                                   Strength::kSupply, Strength::kSupply)),
             "Su1");
