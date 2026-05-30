@@ -226,29 +226,36 @@ TEST_F(SimulatorClause38_36_03, ResetDeliversStartThenEnd) {
 }
 
 // §38.36.3: a restart removes every callback other than the restart callbacks
-// and then delivers cbStartOfRestart followed by cbEndOfRestart, so that only
-// the restart callbacks exist across the restart.
+// and then delivers cbStartOfRestart followed by cbEndOfRestart, so that the
+// only callbacks that exist across the restart are those two. This observes
+// both halves of the rule: several varied non-restart callbacks are all purged,
+// while the restart pair both survives and is delivered.
 TEST_F(SimulatorClause38_36_03, RestartPurgesOthersAndDeliversRestartCallbacks) {
-  vpiHandle value_change = Register(cbValueChange);
-  Register(cbStartOfRestart);
-  Register(cbEndOfRestart);
-  ASSERT_NE(value_change, nullptr);
+  Register(cbValueChange);
+  Register(cbStmt);
+  Register(cbStartOfSave);
+  vpiHandle start_restart = Register(cbStartOfRestart);
+  vpiHandle end_restart = Register(cbEndOfRestart);
+  ASSERT_NE(start_restart, nullptr);
+  ASSERT_NE(end_restart, nullptr);
 
   int fired = vpi_ctx_.DispatchRestart();
 
-  // Only the two restart callbacks are delivered.
+  // Only the two restart callbacks are delivered, start before end.
   EXPECT_EQ(fired, 2);
   ASSERT_EQ(g_sequence.size(), 2u);
   EXPECT_EQ(g_sequence[0], cbStartOfRestart);
   EXPECT_EQ(g_sequence[1], cbEndOfRestart);
 
-  // The non-restart callback has been removed (its reason is cleared).
-  const auto& callbacks = vpi_ctx_.RegisteredCallbacks();
-  bool value_change_present = false;
-  for (const VpiCbData& cb : callbacks) {
-    if (cb.reason == cbValueChange) value_change_present = true;
+  // After the restart, the surviving callbacks are exactly the restart pair:
+  // every other reason has been removed (RemoveCb clears the reason to -1), and
+  // both restart reasons remain present.
+  std::multiset<int> survivors;
+  for (const VpiCbData& cb : vpi_ctx_.RegisteredCallbacks()) {
+    if (cb.reason != -1) survivors.insert(cb.reason);
   }
-  EXPECT_FALSE(value_change_present);
+  std::multiset<int> expected{cbStartOfRestart, cbEndOfRestart};
+  EXPECT_EQ(survivors, expected);
 }
 
 }  // namespace
