@@ -58,6 +58,16 @@ static std::string BuildFormatP(const Expr* arg, SimContext& ctx) {
   return "'{" + std::string(tag) + ":" + std::to_string(val) + "}";
 }
 
+// §21.2.1.4: %v reports the strength of a scalar net, so the operand is looked
+// up as a net and rendered from its resolved strength. An operand that does
+// not name a net carries no strength model and yields an empty string.
+static std::string BuildFormatV(const Expr* arg, SimContext& ctx) {
+  if (arg->kind != ExprKind::kIdentifier) return "";
+  Net* net = ctx.FindNet(arg->text);
+  if (net == nullptr) return "";
+  return FormatStrength(net->resolved_strength);
+}
+
 // The eight display and write system tasks named in Syntax 21-1. The b/o/h
 // suffixed forms differ from the plain ones only in the default radix used for
 // unformatted expression arguments; that radix is applied elsewhere.
@@ -103,13 +113,15 @@ static void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
       std::string fmt = ExtractFormatString(arg);
       std::vector<Logic4Vec> arg_vals;
       std::vector<std::string> p_fmts;
+      std::vector<std::string> v_fmts;
       while (i + 1 < n && expr->args[i + 1] != nullptr &&
              expr->args[i + 1]->kind != ExprKind::kStringLiteral) {
         const Expr* val_arg = expr->args[++i];
         arg_vals.push_back(EvalExpr(val_arg, ctx, arena));
         p_fmts.push_back(BuildFormatP(val_arg, ctx));
+        v_fmts.push_back(BuildFormatV(val_arg, ctx));
       }
-      output += FormatDisplay(fmt, arg_vals, p_fmts);
+      output += FormatDisplay(fmt, arg_vals, p_fmts, nullptr, v_fmts);
       continue;
     }
     // A bare expression renders under the task's default radix; a value

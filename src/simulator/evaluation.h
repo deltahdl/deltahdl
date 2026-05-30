@@ -14,6 +14,7 @@ struct Expr;
 struct ModuleItem;
 struct StructTypeInfo;
 struct TimeFormatSpec;
+struct NetStrength;
 class SimContext;
 class Arena;
 
@@ -122,8 +123,10 @@ bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out);
 std::string FormatDisplay(const std::string& fmt,
                           const std::vector<Logic4Vec>& vals,
                           const std::vector<std::string>& p_fmts = {},
-                          const TimeFormatSpec* time_format = nullptr);
+                          const TimeFormatSpec* time_format = nullptr,
+                          const std::vector<std::string>& v_fmts = {});
 std::string FormatArg(const Logic4Vec& val, char spec);
+std::string FormatStrength(const NetStrength& ns);
 std::string FormatTimeUnderTimeformat(const Logic4Vec& val,
                                       const TimeFormatSpec& spec);
 std::string FormatValueAsString(const Logic4Vec& val);
