@@ -86,6 +86,15 @@ TEST(SampledValueFunctions, PastNumberOfTicksMustBeOneOrGreater) {
   EXPECT_TRUE(IsPastNumberOfTicksWellFormed(7));
 }
 
+TEST(SampledValueFunctions, PastFallsBackToDefaultSampledValue) {
+  // §16.9.3: $past returns the default sampled value of expression1 when fewer
+  // than number_of_ticks qualifying strictly prior time steps exist.
+  EXPECT_TRUE(PastUsesDefaultSampledValue(/*ticks=*/2, /*available=*/0));
+  EXPECT_TRUE(PastUsesDefaultSampledValue(/*ticks=*/2, /*available=*/1));
+  EXPECT_FALSE(PastUsesDefaultSampledValue(/*ticks=*/2, /*available=*/2));
+  EXPECT_FALSE(PastUsesDefaultSampledValue(/*ticks=*/1, /*available=*/5));
+}
+
 TEST(SampledValueFunctions, PastArgumentsHaveStandardDefaults) {
   // §16.9.3: number_of_ticks defaults to 1 and expression2 defaults to 1'b1.
   EXPECT_EQ(kDefaultPastNumberOfTicks, 1);

@@ -54,6 +54,14 @@ bool IsPastNumberOfTicksWellFormed(long long number_of_ticks);
 // §16.9.3: if number_of_ticks is not specified, it defaults to 1.
 inline constexpr long long kDefaultPastNumberOfTicks = 1;
 
+// §16.9.3: $past returns the sampled value of expression1 from the
+// number_of_ticks-th strictly prior time step in which the (gated) clocking
+// event occurred. If fewer than number_of_ticks such prior time steps exist,
+// $past instead returns the default sampled value of expression1. This
+// predicate reports when that fallback applies.
+bool PastUsesDefaultSampledValue(long long number_of_ticks,
+                                 long long available_prior_ticks);
+
 // §16.9.3: if expression2 (the gating expression for the clocking event) is not
 // specified, it defaults to 1'b1.
 inline constexpr unsigned kDefaultPastGatingExpression = 1;

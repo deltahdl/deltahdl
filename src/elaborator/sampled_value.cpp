@@ -69,6 +69,11 @@ bool IsPastNumberOfTicksWellFormed(long long number_of_ticks) {
   return number_of_ticks >= 1;
 }
 
+bool PastUsesDefaultSampledValue(long long number_of_ticks,
+                                 long long available_prior_ticks) {
+  return available_prior_ticks < number_of_ticks;
+}
+
 bool PastArgumentMayReferenceAutomaticVariable(PastArgumentRole role) {
   switch (role) {
     case PastArgumentRole::kExpression1:
