@@ -12,8 +12,10 @@ Wired into a temp ``settings.json`` under
 ``python3 /abs/path/to/deny_bash_hook.py <pattern> <pattern> ...``.
 Patterns are bare command names (e.g. ``cmake``, ``make``); the
 script splits the Bash command on shell operators (``&&``, ``||``,
-``;``, ``|``) so a chained invocation like ``cd /tmp && cmake .`` is
-still caught.
+``;``, ``|``) and on newlines so a chained invocation like
+``cd /tmp && cmake .`` or a multi-line ``cd /tmp\ncmake .`` is still
+caught. A leading compound-command keyword (e.g. ``do``, ``then``) is
+skipped so the command inside a loop or conditional body is reached.
 
 Exit codes follow the Claude Code hooks contract: 0 = proceed,
 2 = block with stderr surfaced to the model as the rejection reason.
@@ -27,17 +29,24 @@ import re
 import shlex
 import sys
 
-_SHELL_OPERATOR_RE = re.compile(r"&&|\|\||;|\|")
+_SHELL_OPERATOR_RE = re.compile(r"&&|\|\||;|\||\n|\r")
+
+# Compound-command keywords and group openers that can precede the real
+# command inside a segment (e.g. ``do git add`` in a ``for`` loop body).
+# Skipping a leading run of these reaches the command they introduce.
+_COMPOUND_KEYWORDS = frozenset({"do", "then", "else", "{", "(", "!"})
 
 _TRUNCATE_AT = 80
 
 
 def _first_token(segment: str) -> str | None:
-    """Return the first shlex token of *segment*, or ``None``.
+    """Return the first meaningful shlex token of *segment*, or ``None``.
 
-    Empty / whitespace-only segments and segments that shlex cannot
-    parse (e.g. unclosed quotes) return ``None`` so callers can
-    skip them.
+    A leading run of compound-command keywords (``do``, ``then``, …) is
+    skipped so the command they introduce is what gets returned. Empty /
+    whitespace-only segments, segments that shlex cannot parse (e.g.
+    unclosed quotes), and segments that are only keywords return ``None``
+    so callers can skip them.
     """
     segment = segment.strip()
     if not segment:
@@ -46,15 +55,19 @@ def _first_token(segment: str) -> str | None:
         parts = shlex.split(segment)
     except ValueError:
         return None
-    return parts[0]
+    for token in parts:
+        if token not in _COMPOUND_KEYWORDS:
+            return token
+    return None
 
 
 def first_tokens(command: str) -> list[str]:
     """Return the first token of every subcommand inside *command*.
 
-    Splits on ``&&``, ``||``, ``;``, and ``|`` so a chained command
-    like ``cd /tmp && cmake .`` yields ``["cd", "cmake"]``. Malformed
-    or empty segments are skipped silently.
+    Splits on ``&&``, ``||``, ``;``, ``|``, and newlines so a chained
+    command like ``cd /tmp && cmake .`` or a multi-line ``cd /tmp\ncmake
+    .`` yields ``["cd", "cmake"]``. Malformed, empty, or
+    keyword-only segments are skipped silently.
     """
     tokens: list[str] = []
     for segment in _SHELL_OPERATOR_RE.split(command):

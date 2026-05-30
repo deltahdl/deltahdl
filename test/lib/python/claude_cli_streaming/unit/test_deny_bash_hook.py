@@ -43,6 +43,26 @@ def test_first_tokens_pipe_separator() -> None:
     assert hook.first_tokens("ls | grep foo") == ["ls", "grep"]
 
 
+def test_first_tokens_newline_separator() -> None:
+    """A newline splits subcommands like an operator does."""
+    assert hook.first_tokens("cd /tmp\ngit commit") == ["cd", "git"]
+
+
+def test_first_tokens_carriage_return_separator() -> None:
+    """A CRLF line ending splits subcommands without a stray token."""
+    assert hook.first_tokens("cd /tmp\r\ngit commit") == ["cd", "git"]
+
+
+def test_first_tokens_strips_leading_compound_keyword() -> None:
+    """A leading compound-command keyword is skipped to reach the command."""
+    assert hook.first_tokens("do git add file") == ["git"]
+
+
+def test_first_tokens_all_keyword_segment_yields_nothing() -> None:
+    """A segment that is only compound-command keywords contributes nothing."""
+    assert not hook.first_tokens("do")
+
+
 def test_first_tokens_skips_empty_segments() -> None:
     """Empty subcommands between operators are skipped."""
     assert hook.first_tokens("cmake . ;; make") == ["cmake", "make"]
@@ -132,6 +152,14 @@ def test_match_deny_pattern_chained_command() -> None:
     ) == ("cmake", "cd /tmp && cmake .")
 
 
+def test_match_deny_pattern_newline_chained_command() -> None:
+    """A denied token reached after a newline is also matched."""
+    event = _bash_event("cd /repo\ngit commit -q -m x")
+    assert hook.match_deny_pattern(event, ["git"]) == (
+        "git", "cd /repo\ngit commit -q -m x",
+    )
+
+
 def test_match_deny_pattern_no_match() -> None:
     """A command whose tokens are all allowed returns None."""
     assert hook.match_deny_pattern(_bash_event("rm foo"), ["cmake"]) is None
@@ -181,6 +209,12 @@ def test_main_truncates_long_command_in_stderr() -> None:
     long_cmd = "cmake " + "x" * 200
     _, stderr = hook.main(["hook.py", "cmake"], _bash_event(long_cmd))
     assert "x" * 100 not in stderr
+
+
+def test_main_denied_after_newline_exit_code() -> None:
+    """A denied command on a line after `cd` still exits 2."""
+    code, _ = hook.main(["hook.py", "git"], _bash_event("cd /repo\ngit commit"))
+    assert code == 2
 
 
 def test_main_no_patterns_exits_zero() -> None:
