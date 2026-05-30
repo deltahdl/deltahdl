@@ -264,6 +264,13 @@ class AssertionApi {
   // True when the reason is one of the assertion callback reasons of §39.4.2.
   static bool IsAssertionCallbackReason(int reason);
 
+  // §39.4.1: true when the reason is one of the assertion-system callback
+  // reasons placed with vpi_register_cb() — the system initialized, lock,
+  // unlock, on, off, kill, end, reset, and the pass/fail/vacuous/nonvacuous
+  // system action reasons. These are system-wide and distinct from the
+  // per-assertion reasons of §39.4.2.
+  static bool IsAssertionSysCallbackReason(int reason);
+
   // §39.4.2: every assertion callback reason may be placed on a concurrent or
   // immediate assertion; only cbAssertionStart, cbAssertionSuccess, and
   // cbAssertionFailure may also be placed on a sequence or property instance.

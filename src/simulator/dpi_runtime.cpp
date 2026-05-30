@@ -271,6 +271,28 @@ bool AssertionApi::IsAssertionCallbackReason(int reason) {
   }
 }
 
+bool AssertionApi::IsAssertionSysCallbackReason(int reason) {
+  switch (reason) {
+    case cbAssertionSysInitialized:
+    case cbAssertionSysLock:
+    case cbAssertionSysUnlock:
+    case cbAssertionSysOn:
+    case cbAssertionSysOff:
+    case cbAssertionSysKill:
+    case cbAssertionSysEnd:
+    case cbAssertionSysReset:
+    case cbAssertionSysEnablePassAction:
+    case cbAssertionSysEnableFailAction:
+    case cbAssertionSysDisablePassAction:
+    case cbAssertionSysDisableFailAction:
+    case cbAssertionSysEnableNonvacuousAction:
+    case cbAssertionSysDisableVacuousAction:
+      return true;
+    default:
+      return false;
+  }
+}
+
 bool AssertionApi::IsReasonValidForHandle(int reason, int handle_type) {
   if (!IsAssertionCallbackReason(reason)) return false;
   // Any assertion callback reason may be placed on a concurrent or immediate

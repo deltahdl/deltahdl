@@ -193,6 +193,14 @@ using PLI_BYTE8 = char;
 #define cbAssertionDisabledEvaluation 658
 #define cbAssertionSysLock 659
 #define cbAssertionSysUnlock 660
+
+/* §39.4.1 assertion-system action callback reasons */
+#define cbAssertionSysEnablePassAction 705
+#define cbAssertionSysEnableFailAction 706
+#define cbAssertionSysDisablePassAction 707
+#define cbAssertionSysDisableFailAction 708
+#define cbAssertionSysEnableNonvacuousAction 709
+#define cbAssertionSysDisableVacuousAction 710
 #define cbAssertionLock 661
 #define cbAssertionUnlock 662
 
