@@ -67,6 +67,13 @@ Strength ReduceNonresistive(Strength input);
 
 Strength ReduceResistive(Strength input);
 
+// §28.11 partitions the strength scale of Table 28-7 into the four driving
+// strengths (supply, strong, pull, weak) and the three charge storage
+// strengths (large, medium, small). highz belongs to neither group.
+bool IsDrivingStrength(Strength input);
+
+bool IsChargeStorageStrength(Strength input);
+
 struct SimTime {
   uint64_t ticks = 0;
 

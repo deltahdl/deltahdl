@@ -130,6 +130,29 @@ Strength ReduceResistive(Strength input) {
   return input;
 }
 
+bool IsDrivingStrength(Strength input) {
+  switch (input) {
+    case Strength::kSupply:
+    case Strength::kStrong:
+    case Strength::kPull:
+    case Strength::kWeak:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool IsChargeStorageStrength(Strength input) {
+  switch (input) {
+    case Strength::kLarge:
+    case Strength::kMedium:
+    case Strength::kSmall:
+      return true;
+    default:
+      return false;
+  }
+}
+
 bool IsActiveRegionSet(Region r) {
   switch (r) {
     case Region::kActive:
