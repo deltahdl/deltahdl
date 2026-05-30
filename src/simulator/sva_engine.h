@@ -181,6 +181,37 @@ PropertyResult EvalNexttime(bool strong, bool target_tick_reachable,
 // non-indexed nexttime/s_nexttime correspond to index 1 (the next tick).
 bool NexttimeTargetReachable(uint64_t index, uint64_t future_clock_ticks);
 
+// §16.12.11: sentinel maximum for an unbounded weak always range. A weak always
+// range may be unbounded; the strong form's range is always bounded.
+inline constexpr int kAlwaysUnboundedMax = -1;
+
+// §16.12.11: outcome of an `always`/`s_always` property over its window of clock
+// ticks. `strong` selects `s_always` (strong) versus `always` (weak).
+// `all_covered_ticks_present` says whether every clock tick the range demands is
+// actually present; only the strong form requires the covered ticks to exist,
+// since for a weak always it is not required that all clock ticks within the
+// range exist. `inner_holds_at_present_ticks` says whether the inner
+// property_expr held at every covered tick that is present.
+//
+// The weak form holds when the inner property_expr held at every present tick,
+// regardless of whether some covered ticks are missing. The strong form holds
+// only when every covered tick exists and the inner property_expr held at each.
+PropertyResult EvalAlways(bool strong, bool all_covered_ticks_present,
+                          bool inner_holds_at_present_ticks);
+
+// §16.12.11: whether the clock tick at `index` (counted from the current time
+// step, so index 0 is the current step) lies within an always range whose
+// inclusive bounds are [`range_min`, `range_max`]. The non-ranged weak always
+// covers every current or future tick, modelled as `range_min == 0` with an
+// unbounded maximum. `range_max == kAlwaysUnboundedMax` denotes an unbounded
+// maximum, which covers every tick from `range_min` onward.
+bool AlwaysRangeCovers(int index, int range_min, int range_max);
+
+// §16.12.11: for a strong always, every clock tick the range covers shall exist.
+// Counting starts at the current time step, so the covered ticks all exist when
+// at least `range_max` further ticks are available after the current step.
+bool AlwaysStrongTicksAllPresent(int range_max, int future_clock_ticks);
+
 enum class AssertionKind : uint8_t {
   kAssert = 0,
   kAssume = 1,

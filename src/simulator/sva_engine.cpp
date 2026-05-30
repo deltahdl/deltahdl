@@ -220,6 +220,40 @@ bool NexttimeTargetReachable(uint64_t index, uint64_t future_clock_ticks) {
   return future_clock_ticks >= index;
 }
 
+// §16.12.11: weak `always` and strong `s_always` differ only in how they treat
+// covered clock ticks that are missing. The weak form does not require the ticks
+// within its range to exist, so it depends solely on the inner property_expr
+// holding at every present tick. The strong form additionally requires every
+// covered tick to exist, failing when any is absent even if the inner verdict at
+// the present ticks was true.
+PropertyResult EvalAlways(bool strong, bool all_covered_ticks_present,
+                          bool inner_holds_at_present_ticks) {
+  if (strong && !all_covered_ticks_present) {
+    return PropertyResult::kFail;
+  }
+  return inner_holds_at_present_ticks ? PropertyResult::kPass
+                                      : PropertyResult::kFail;
+}
+
+// §16.12.11: a tick is covered when its index is at least the minimum bound and,
+// unless the maximum is unbounded, at most the maximum bound. Counting starts at
+// the current time step.
+bool AlwaysRangeCovers(int index, int range_min, int range_max) {
+  if (index < range_min) {
+    return false;
+  }
+  if (range_max == kAlwaysUnboundedMax) {
+    return true;
+  }
+  return index <= range_max;
+}
+
+// §16.12.11: with counting starting at the current time step, every covered tick
+// up to `range_max` exists when that many further ticks are available.
+bool AlwaysStrongTicksAllPresent(int range_max, int future_clock_ticks) {
+  return range_max <= future_clock_ticks;
+}
+
 SequencePropertyStrength DefaultSequencePropertyStrength(AssertionKind stmt) {
   // §16.12.2: assert property and assume property evaluate a bare sequence
   // weakly; the remaining assertion statements take the strong reading.
