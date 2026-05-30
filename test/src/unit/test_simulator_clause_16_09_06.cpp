@@ -26,13 +26,32 @@ struct SvaFixture {
 
 namespace {
 
-TEST(SvaEngine, SequenceOperatorAnd) {
-  bool a_matched = true;
-  bool b_matched = true;
-  EXPECT_TRUE(EvalSequenceAnd(a_matched, b_matched));
-  EXPECT_FALSE(EvalSequenceAnd(true, false));
-  EXPECT_FALSE(EvalSequenceAnd(false, true));
-  EXPECT_FALSE(EvalSequenceAnd(false, false));
+// §16.9.6: `intersect` matches only when both operand sequences match. Unlike
+// `and`, the operands must additionally share the same end time, i.e. the two
+// operand matches must have the same length.
+TEST(SvaEngine, IntersectRequiresBothOperandsToMatch) {
+  // Equal lengths, both matching: the composite matches.
+  EXPECT_TRUE(EvalSequenceIntersect(true, true, 5, 5));
+
+  // A non-matching operand defeats the composite even at equal length.
+  EXPECT_FALSE(EvalSequenceIntersect(true, false, 5, 5));
+  EXPECT_FALSE(EvalSequenceIntersect(false, true, 5, 5));
+  EXPECT_FALSE(EvalSequenceIntersect(false, false, 5, 5));
+}
+
+// §16.9.6: the length restriction is the basic difference between `and` and
+// `intersect`. When both operands match but their match lengths differ, `and`
+// would still match (its end time is the later of the two), whereas `intersect`
+// finds no same-length pair and therefore does not match.
+TEST(SvaEngine, IntersectRequiresEqualMatchLengths) {
+  // Mirrors Figure 16-8 vs Figure 16-6: with operands ending at ticks 12 and
+  // 10, `and` matches but `intersect` does not.
+  EXPECT_TRUE(EvalSequenceAnd(true, true));
+  EXPECT_FALSE(EvalSequenceIntersect(true, true, 4, 6));
+  EXPECT_FALSE(EvalSequenceIntersect(true, true, 6, 4));
+
+  // A Boolean-style single-tick pair shares length 1, so intersect matches.
+  EXPECT_TRUE(EvalSequenceIntersect(true, true, 1, 1));
 }
 
 }
