@@ -84,4 +84,27 @@ TEST(AssertionParsing, RoseWithExplicitClockingEvent) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §16.9.3: the sampled value functions are not limited to assertions; a value
+// change function such as $rose may appear as an ordinary expression in
+// procedural code.
+TEST(AssertionParsing, RoseInProceduralAssignment) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk) reg1 <= a & $rose(b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §16.9.3: $past may likewise be used in any SystemVerilog expression, e.g. in
+// a procedural nonblocking assignment.
+TEST(AssertionParsing, PastInProceduralAssignment) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk) reg1 <= a & $past(b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

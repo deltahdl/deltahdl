@@ -92,6 +92,22 @@ TEST(Assertion, FellDetectsHighToLow) {
   EXPECT_EQ(monitor.Evaluate("p_fell", 0), AssertionResult::kPass);
 }
 
+// §16.9.3: $fell returns false when the LSB did not change to 0.
+TEST(Assertion, FellFalseWhenNotFalling) {
+  AssertionMonitor monitor;
+  SvaProperty prop;
+  prop.name = "p_fell2";
+  prop.kind = SvaPropertyKind::kFell;
+  prop.signal_name = "sig";
+  monitor.AddProperty(prop);
+
+  monitor.Evaluate("p_fell2", 0);
+  auto* entry = const_cast<AssertionEntry*>(monitor.FindEntry("p_fell2"));
+  entry->cycle_count = 1;
+
+  EXPECT_EQ(monitor.Evaluate("p_fell2", 0), AssertionResult::kFail);
+}
+
 // §16.9.3: $stable returns true if the value of the expression did not change.
 TEST(Assertion, StableTrueWhenUnchanged) {
   AssertionMonitor monitor;

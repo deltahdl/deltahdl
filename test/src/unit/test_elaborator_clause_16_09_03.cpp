@@ -76,6 +76,7 @@ TEST(SampledValueFunctions, LocalVariableAndMatchedAreRejectedInArguments) {
   EXPECT_TRUE(SampledValueArgumentIsLegal(/*local=*/false, /*matched=*/false));
   EXPECT_FALSE(SampledValueArgumentIsLegal(/*local=*/true, /*matched=*/false));
   EXPECT_FALSE(SampledValueArgumentIsLegal(/*local=*/false, /*matched=*/true));
+  EXPECT_FALSE(SampledValueArgumentIsLegal(/*local=*/true, /*matched=*/true));
 }
 
 TEST(SampledValueFunctions, PastNumberOfTicksMustBeOneOrGreater) {
@@ -89,6 +90,7 @@ TEST(SampledValueFunctions, PastNumberOfTicksMustBeOneOrGreater) {
 TEST(SampledValueFunctions, PastFallsBackToDefaultSampledValue) {
   // §16.9.3: $past returns the default sampled value of expression1 when fewer
   // than number_of_ticks qualifying strictly prior time steps exist.
+  EXPECT_TRUE(PastUsesDefaultSampledValue(/*ticks=*/1, /*available=*/0));
   EXPECT_TRUE(PastUsesDefaultSampledValue(/*ticks=*/2, /*available=*/0));
   EXPECT_TRUE(PastUsesDefaultSampledValue(/*ticks=*/2, /*available=*/1));
   EXPECT_FALSE(PastUsesDefaultSampledValue(/*ticks=*/2, /*available=*/2));
