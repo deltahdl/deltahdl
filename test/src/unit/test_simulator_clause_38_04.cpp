@@ -69,6 +69,19 @@ TEST_F(VpiSimControlSim, ControlSetInteractiveScope) {
   EXPECT_EQ(vpi_ctx_.InteractiveScope(), scope);
 }
 
+// §38.4: vpiSetInteractiveScope retargets to a *new* scope each time it is
+// invoked, so a later call replaces the scope an earlier call established rather
+// than being ignored once a scope is set.
+TEST_F(VpiSimControlSim, ControlSetInteractiveScopeReplacesPriorScope) {
+  VpiHandle first = vpi_ctx_.CreateModule("top", "top");
+  EXPECT_EQ(VpiControlC(vpiSetInteractiveScope, first), 1);
+  EXPECT_EQ(vpi_ctx_.InteractiveScope(), first);
+
+  VpiHandle second = vpi_ctx_.CreateModule("sub", "top.sub");
+  EXPECT_EQ(VpiControlC(vpiSetInteractiveScope, second), 1);
+  EXPECT_EQ(vpi_ctx_.InteractiveScope(), second);
+}
+
 // §38.4: vpiReset is signalled by the request itself, not by the magnitude of
 // its arguments. Passing zero for all three values still requests the reset and
 // records those zeros.
@@ -80,11 +93,6 @@ TEST_F(VpiSimControlSim, ControlResetWithZeroArgumentsStillRequestsReset) {
   EXPECT_EQ(vpi_ctx_.ResetStopValue(), 0);
   EXPECT_EQ(vpi_ctx_.ResetResetValue(), 0);
   EXPECT_EQ(vpi_ctx_.ResetDiagValue(), 0);
-}
-
-TEST_F(VpiSimControlSim, ControlUnknownOpReturnsZero) {
-  int result = VpiControlC(999, 0);
-  EXPECT_EQ(result, 0);
 }
 
 // §38.4: an operation vpi_control() does not recognize fails (returns 0) and
