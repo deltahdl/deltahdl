@@ -31,17 +31,22 @@ from lib.python.lrm import (
 
 
 class AggregateRejection(ValueError):
-    """Raised when the oracle names an aggregate top-level entry.
+    """Raised when the oracle names one or more aggregate top-level entries.
 
     Subclasses ``ValueError`` so the existing parse-retry loop still
-    catches it. Carries the rejected identifier so the retry-prompt
-    builder can look up the aggregate's direct numbered children in
-    the TOC and present them to the model as concrete alternatives.
+    catches it. Carries the list of rejected identifiers so the
+    retry-prompt builder can look up each aggregate's direct numbered
+    children in the TOC and present every menu to the model in a
+    single corrective turn — the oracle frequently emits several
+    aggregates at once (e.g. mapping §14.12's "module, interface,
+    program, or checker" scope containers to a bare ``["23", "24",
+    "25", "17"]``), and peeling them off one retry at a time burns
+    the retry budget before all of them get addressed.
     """
 
-    def __init__(self, identifier: str, message: str) -> None:
+    def __init__(self, identifiers: list[str], message: str) -> None:
         super().__init__(message)
-        self.identifier: str = identifier
+        self.identifiers: list[str] = identifiers
 
 
 SubclauseDependencies: TypeAlias = list[str]
@@ -195,10 +200,20 @@ def parse_dependencies(
     subclauses, not satisfiable subclauses themselves, so a dep on one
     has no satisfaction work attached and would mislead any caller that
     treats a dep list as a queue of satisfaction prerequisites.
+
+    Shape failures (non-string entries, identifiers that don't match
+    the ``digit-or-letter head + dotted decimal parts`` grammar) still
+    short-circuit, since a malformed JSON needs the model to re-emit
+    the whole array. Aggregate failures, on the other hand, are
+    collected across the entire payload and raised at the end as a
+    single ``AggregateRejection`` carrying every offender — that way
+    one retry turn can present every menu to the model instead of
+    burning the retry budget peeling aggregates off one at a time.
     """
     body = _extract_dependency_array(text)
     payload = json.loads(body)
     result: SubclauseDependencies = []
+    aggregates: list[str] = []
     for item in payload:
         if not isinstance(item, str):
             raise ValueError(
@@ -210,22 +225,32 @@ def parse_dependencies(
                 " identifier",
             )
         if is_top_level_aggregate(item, toc):
-            raise AggregateRejection(
-                item,
-                f"Dependency entry '{item}' names an aggregate top-level"
-                " entry; depend on a specific numbered subclause instead",
-            )
+            aggregates.append(item)
+            continue
         result.append(item)
+    if aggregates:
+        quoted = ", ".join(f"'{ident}'" for ident in aggregates)
+        if len(aggregates) == 1:
+            message = (
+                f"Dependency entry {quoted} names an aggregate top-level"
+                " entry; depend on a specific numbered subclause instead"
+            )
+        else:
+            message = (
+                f"Dependency entries {quoted} name aggregate top-level"
+                " entries; depend on specific numbered subclauses instead"
+            )
+        raise AggregateRejection(aggregates, message)
     return result
 
 
-MAX_PARSE_RETRIES = 2
+MAX_PARSE_RETRIES = 4
 
 
 def build_parse_retry_prompt(
     reason: str, *,
-    aggregate: str | None = None,
-    alternatives: list[str] | None = None,
+    aggregates: list[str] | None = None,
+    alternatives_map: dict[str, list[str]] | None = None,
 ) -> str:
     """Return the corrective prompt fed to a continued session after a parse failure.
 
@@ -233,29 +258,39 @@ def build_parse_retry_prompt(
     entry was rejected and why, then restates the array shape so the
     re-emitted answer follows the schema the parser enforces.
 
-    When *aggregate* and *alternatives* are supplied (the
-    aggregate-rejection branch), the prompt names the rejected
-    aggregate, enumerates its direct numbered children from the TOC,
-    and explicitly invites listing more than one — the LRM often
-    grounds a single rule in machinery split across multiple sibling
-    subclauses (e.g. §13.3 Tasks AND §13.4 Functions both supply
-    randsequence's data-passing semantics).
+    When *aggregates* and *alternatives_map* are supplied (the
+    aggregate-rejection branch), the prompt names every rejected
+    aggregate, enumerates each aggregate's direct numbered children
+    from the TOC on its own bullet, and explicitly invites listing
+    more than one replacement per aggregate — the LRM often grounds a
+    single rule in machinery split across multiple sibling subclauses
+    (e.g. §13.3 Tasks AND §13.4 Functions both supply randsequence's
+    data-passing semantics). The aggregates list preserves order so
+    the model sees the menus in the same order the offenders appeared
+    in its rejected array.
     """
-    if aggregate is not None and alternatives is not None:
-        menu = ", ".join(alternatives)
+    if aggregates is not None and alternatives_map is not None:
+        quoted = ", ".join(f"'{ident}'" for ident in aggregates)
+        bullets = "\n".join(
+            f"- {ident}: {', '.join(alternatives_map[ident])}"
+            for ident in aggregates
+        )
         return (
             f"Your previous JSON array failed validation: {reason}."
-            f" The rejected identifier '{aggregate}' names an aggregate"
-            " chapter that has no rules of its own — its rules live in"
-            f" its numbered subclauses: {menu}. Re-emit the array with"
+            f" The rejected identifiers {quoted} each name an aggregate"
+            " chapter or annex that has no rules of its own — their"
+            " rules live in their numbered subclauses:\n"
+            f"{bullets}\n"
+            "Re-emit the array replacing every rejected aggregate with"
             " the specific numbered subclause or subclauses that carry"
             " the machinery you actually depended on; if more than one"
-            " applies, list all of them (the LRM frequently grounds a"
-            " single rule in multiple sibling subclauses, e.g. both"
-            " task and function machinery). Keep the same JSON array"
-            " shape as the original prompt — digit-or-letter heads with"
-            ' dotted decimal parts (e.g. "13.3", "13.4"). Output an'
-            " empty array [] if no remaining dependency stands."
+            " applies for a given aggregate, list all of them (the LRM"
+            " frequently grounds a single rule in multiple sibling"
+            " subclauses, e.g. both task and function machinery). Keep"
+            " the same JSON array shape as the original prompt —"
+            " digit-or-letter heads with dotted decimal parts (e.g."
+            ' "13.3", "24.3"). Output an empty array [] if no remaining'
+            " dependency stands."
         )
     return (
         f"Your previous JSON array failed validation: {reason}."
@@ -309,12 +344,14 @@ def compute_subclause_dependencies(
                 file=sys.stderr,
             )
             if isinstance(exc, AggregateRejection):
+                rejected = exc.identifiers
                 retry_prompt = build_parse_retry_prompt(
                     str(exc),
-                    aggregate=exc.identifier,
-                    alternatives=direct_numbered_children(
-                        exc.identifier, toc,
-                    ),
+                    aggregates=rejected,
+                    alternatives_map={
+                        ident: direct_numbered_children(ident, toc)
+                        for ident in rejected
+                    },
                 )
             else:
                 retry_prompt = build_parse_retry_prompt(str(exc))

@@ -14,6 +14,11 @@ from lib.python.lrm_subclause_dependencies import (
     parse_dependencies,
     run_oracle_call,
 )
+from lib.python.test_fixtures.lrm_subclause_dependencies import (
+    AGGREGATE_TOC as _AGGREGATE_TOC,
+    patched_oracle_sequence as _patched_oracle_sequence,
+    patched_retry_toc as _patched_retry_toc,
+)
 
 
 # --- ORACLE_DENY_PATTERNS ---------------------------------------------------
@@ -270,10 +275,6 @@ def test_build_dependency_prompt_says_empty_if_none() -> None:
 
 
 _EMPTY_TOC: dict[str, tuple[int, int]] = {}
-_AGGREGATE_TOC: dict[str, tuple[int, int]] = {
-    "8": (200, 250), "8.1": (200, 210),
-    "A": (900, 939), "A.1": (900, 919),
-}
 _SINGLETON_TOC: dict[str, tuple[int, int]] = {
     "2": (10, 12), "B": (940, 949),
 }
@@ -373,12 +374,12 @@ def test_parse_dependencies_rejects_aggregate_chapter_identifier() -> None:
 
 def test_parse_dependencies_aggregate_chapter_rejection_carries_identifier() -> None:
     """The aggregate-chapter rejection exposes the rejected identifier."""
-    captured: str | None = None
+    captured: list[str] | None = None
     try:
         parse_dependencies('["8"]', toc=_AGGREGATE_TOC)
     except AggregateRejection as exc:
-        captured = exc.identifier
-    assert captured == "8"
+        captured = exc.identifiers
+    assert captured == ["8"]
 
 
 def test_parse_dependencies_rejects_aggregate_annex_identifier() -> None:
@@ -389,12 +390,12 @@ def test_parse_dependencies_rejects_aggregate_annex_identifier() -> None:
 
 def test_parse_dependencies_aggregate_annex_rejection_carries_identifier() -> None:
     """The aggregate-annex rejection exposes the rejected identifier."""
-    captured: str | None = None
+    captured: list[str] | None = None
     try:
         parse_dependencies('["A"]', toc=_AGGREGATE_TOC)
     except AggregateRejection as exc:
-        captured = exc.identifier
-    assert captured == "A"
+        captured = exc.identifiers
+    assert captured == ["A"]
 
 
 def test_parse_dependencies_raises_plain_value_error_for_bad_shape() -> None:
@@ -649,27 +650,6 @@ def test_run_oracle_call_initial_cmd_uses_continue_when_opted_in() -> None:
 # --- compute_subclause_dependencies: parse-failure retry --------------------
 
 
-_RETRY_AGGREGATE_TOC: dict[str, tuple[int, int]] = {
-    "8": (200, 250), "8.1": (200, 210),
-}
-
-
-def _patched_oracle_sequence(*results: str) -> Any:
-    """Patch run_oracle_call so each invocation returns the next *results* item."""
-    return patch(
-        "lib.python.lrm_subclause_dependencies.run_oracle_call",
-        side_effect=list(results),
-    )
-
-
-def _patched_retry_toc() -> Any:
-    """Patch load_toc so the aggregate-rejection branch fires on '["8"]'."""
-    return patch(
-        "lib.python.lrm_subclause_dependencies.load_toc",
-        return_value=_RETRY_AGGREGATE_TOC,
-    )
-
-
 def test_compute_subclause_dependencies_retries_on_parse_failure() -> None:
     """A rejected oracle response triggers a follow-up run_oracle_call."""
     with _patched_oracle_sequence('["8"]', "[]") as mock_run, _patched_retry_toc():
@@ -742,15 +722,17 @@ def test_aggregate_rejection_subclass_of_value_error() -> None:
     assert issubclass(AggregateRejection, ValueError)
 
 
-def test_aggregate_rejection_carries_identifier() -> None:
-    """AggregateRejection stores the rejected identifier as ``.identifier``."""
-    exc = AggregateRejection("13", "Dependency entry '13' names an aggregate...")
-    assert exc.identifier == "13"
+def test_aggregate_rejection_carries_identifiers_list() -> None:
+    """AggregateRejection stores the rejected identifiers as ``.identifiers``."""
+    exc = AggregateRejection(
+        ["13"], "Dependency entry '13' names an aggregate...",
+    )
+    assert exc.identifiers == ["13"]
 
 
 def test_aggregate_rejection_str_returns_message() -> None:
     """str(AggregateRejection) returns the message, preserving prior callers."""
-    exc = AggregateRejection("13", "the message")
+    exc = AggregateRejection(["13"], "the message")
     assert str(exc) == "the message"
 
 
@@ -772,7 +754,8 @@ def test_build_parse_retry_prompt_without_alternatives_keeps_baseline_phrase() -
 def test_build_parse_retry_prompt_lists_first_alternative() -> None:
     """The first supplied alternative identifier appears in the corrective prompt."""
     prompt = build_parse_retry_prompt(
-        "reason", aggregate="13", alternatives=["13.3", "13.4", "13.5"],
+        "reason", aggregates=["13"],
+        alternatives_map={"13": ["13.3", "13.4", "13.5"]},
     )
     assert "13.3" in prompt
 
@@ -780,7 +763,8 @@ def test_build_parse_retry_prompt_lists_first_alternative() -> None:
 def test_build_parse_retry_prompt_lists_middle_alternative() -> None:
     """A middle supplied alternative identifier appears in the corrective prompt."""
     prompt = build_parse_retry_prompt(
-        "reason", aggregate="13", alternatives=["13.3", "13.4", "13.5"],
+        "reason", aggregates=["13"],
+        alternatives_map={"13": ["13.3", "13.4", "13.5"]},
     )
     assert "13.4" in prompt
 
@@ -788,7 +772,8 @@ def test_build_parse_retry_prompt_lists_middle_alternative() -> None:
 def test_build_parse_retry_prompt_lists_last_alternative() -> None:
     """The last supplied alternative identifier appears in the corrective prompt."""
     prompt = build_parse_retry_prompt(
-        "reason", aggregate="13", alternatives=["13.3", "13.4", "13.5"],
+        "reason", aggregates=["13"],
+        alternatives_map={"13": ["13.3", "13.4", "13.5"]},
     )
     assert "13.5" in prompt
 
@@ -796,7 +781,7 @@ def test_build_parse_retry_prompt_lists_last_alternative() -> None:
 def test_build_parse_retry_prompt_names_rejected_aggregate() -> None:
     """The aggregate-branch prompt quotes the rejected aggregate identifier."""
     prompt = build_parse_retry_prompt(
-        "reason", aggregate="13", alternatives=["13.1"],
+        "reason", aggregates=["13"], alternatives_map={"13": ["13.1"]},
     )
     assert "'13'" in prompt
 
@@ -804,7 +789,8 @@ def test_build_parse_retry_prompt_names_rejected_aggregate() -> None:
 def test_build_parse_retry_prompt_allows_plural_replacement() -> None:
     """The aggregate-branch prompt invites listing more than one subclause."""
     prompt = build_parse_retry_prompt(
-        "reason", aggregate="13", alternatives=["13.3", "13.4"],
+        "reason", aggregates=["13"],
+        alternatives_map={"13": ["13.3", "13.4"]},
     )
     assert "list all of them" in prompt
 
@@ -812,7 +798,7 @@ def test_build_parse_retry_prompt_allows_plural_replacement() -> None:
 def test_build_parse_retry_prompt_aggregate_branch_keeps_reason() -> None:
     """The aggregate-branch prompt also embeds the rejection reason."""
     prompt = build_parse_retry_prompt(
-        "the reason", aggregate="13", alternatives=["13.1"],
+        "the reason", aggregates=["13"], alternatives_map={"13": ["13.1"]},
     )
     assert "the reason" in prompt
 
