@@ -64,6 +64,19 @@ bool MatchDelaySequence(const SvaSequence& seq,
                         const std::vector<uint64_t>& vals);
 
 bool EvalSequenceAnd(bool a_match, bool b_match);
+
+// §16.9.5: the composite `e1 and e2` requires both operands to match. The
+// operands begin at the same time, but their matches can complete at different
+// times; once one operand matches it waits for the other, so the composite
+// match completes at the later of the two operand end times. This carries the
+// end-time alongside the match decision that EvalSequenceAnd reports.
+struct SequenceAndMatch {
+  bool matched = false;
+  uint32_t end_time = 0;
+};
+SequenceAndMatch EvalSequenceAndMatch(bool a_match, uint32_t a_end_time,
+                                      bool b_match, uint32_t b_end_time);
+
 bool EvalSequenceOr(bool a_match, bool b_match);
 bool EvalSequenceIntersect(bool a_match, bool b_match, uint32_t a_len,
                            uint32_t b_len);

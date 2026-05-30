@@ -79,6 +79,16 @@ bool MatchDelaySequence(const SvaSequence& seq,
 
 bool EvalSequenceAnd(bool a_match, bool b_match) { return a_match && b_match; }
 
+SequenceAndMatch EvalSequenceAndMatch(bool a_match, uint32_t a_end_time,
+                                      bool b_match, uint32_t b_end_time) {
+  SequenceAndMatch result;
+  result.matched = a_match && b_match;
+  // The operands share a start time; the composite completes when the slower
+  // operand does, i.e. at the later of the two end times.
+  result.end_time = std::max(a_end_time, b_end_time);
+  return result;
+}
+
 bool EvalSequenceOr(bool a_match, bool b_match) { return a_match || b_match; }
 
 bool EvalSequenceIntersect(bool a_match, bool b_match, uint32_t a_len,
