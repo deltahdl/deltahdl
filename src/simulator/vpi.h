@@ -95,6 +95,9 @@ constexpr int kVpiFinish = 66;
 constexpr int kVpiStop = 67;
 // §38.36.3: a reset can be requested indirectly through vpi_control(vpiReset).
 constexpr int kVpiReset = 68;
+// §38.4: vpi_control(vpiSetInteractiveScope, handle) immediately retargets the
+// tool's interactive scope to the supplied vpiScope object.
+constexpr int kVpiSetInteractiveScope = 69;
 
 constexpr int kVpi0 = 0;
 constexpr int kVpi1 = 1;
@@ -247,7 +250,13 @@ class VpiContext {
   int Get(int property, VpiHandle obj);
   const char* GetStr(int property, VpiHandle obj);
   int FreeObject(VpiHandle obj);
-  int Control(int operation, int diag_level);
+  // §38.4: vpi_control() passes an operation-specific request from the PLI
+  // application to the simulator. arg0..arg2 carry the operation's additional
+  // integer arguments (the diagnostic level for vpiStop/vpiFinish, or the
+  // stop/reset/diagnostics values for vpiReset); scope carries the vpiHandle
+  // argument of vpiSetInteractiveScope. Returns 1 on success, 0 on failure.
+  int Control(int operation, int arg0 = 0, int arg1 = 0, int arg2 = 0,
+              VpiHandle scope = nullptr);
   bool ChkError(VpiErrorInfo* info);
   void GetVlogInfo(VpiVlogInfo* info);
   VpiHandle HandleMulti(int type, VpiHandle ref1, VpiHandle ref2);
@@ -275,6 +284,23 @@ class VpiContext {
   bool StopRequested() const { return stop_requested_; }
   bool FinishRequested() const { return finish_requested_; }
 
+  // §38.4: the diagnostic message level vpi_control() forwarded with the most
+  // recent vpiStop/vpiFinish request (the same value $stop/$finish would carry,
+  // see 20.2).
+  int StopDiagLevel() const { return stop_diag_level_; }
+  int FinishDiagLevel() const { return finish_diag_level_; }
+
+  // §38.4: a reset requested through vpi_control(vpiReset, ...) and the three
+  // arguments it carried (the same values passed to the $reset task, see D.8).
+  bool ResetRequested() const { return reset_requested_; }
+  int ResetStopValue() const { return reset_stop_value_; }
+  int ResetResetValue() const { return reset_reset_value_; }
+  int ResetDiagValue() const { return reset_diag_value_; }
+
+  // §38.4: the scope vpi_control(vpiSetInteractiveScope, ...) most recently made
+  // the tool's interactive scope.
+  VpiHandle InteractiveScope() const { return interactive_scope_; }
+
   const VpiErrorInfo& LastError() const { return last_error_; }
 
  private:
@@ -289,6 +315,13 @@ class VpiContext {
   bool elaboration_started_ = false;
   bool stop_requested_ = false;
   bool finish_requested_ = false;
+  int stop_diag_level_ = 0;
+  int finish_diag_level_ = 0;
+  bool reset_requested_ = false;
+  int reset_stop_value_ = 0;
+  int reset_reset_value_ = 0;
+  int reset_diag_value_ = 0;
+  VpiHandle interactive_scope_ = nullptr;
   VpiErrorInfo last_error_ = {};
   std::string product_ = "DeltaHDL";
   std::string version_ = "0.1.0";

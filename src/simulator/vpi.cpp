@@ -488,20 +488,37 @@ const char* VpiContext::GetStr(int property, VpiHandle obj) {
 
 int VpiContext::FreeObject(VpiHandle ) { return 0; }
 
-int VpiContext::Control(int operation, int ) {
+int VpiContext::Control(int operation, int arg0, int arg1, int arg2,
+                        VpiHandle scope) {
+  // §38.4: vpiFinish/vpiStop request the matching built-in task on return of the
+  // application routine and carry its diagnostic message level (see 20.2).
   if (operation == kVpiFinish) {
     finish_requested_ = true;
+    finish_diag_level_ = arg0;
     return 1;
   }
   if (operation == kVpiStop) {
     stop_requested_ = true;
+    stop_diag_level_ = arg0;
     return 1;
   }
-  // §38.36.3: a reset requested through vpi_control(vpiReset, ...) drives the
-  // same reset-callback sequence as a directly invoked $reset, so route it
-  // through the one DispatchReset path.
+  // §38.4: vpiReset requests $reset and is passed three additional integer
+  // arguments (stop_value, reset_value, diagnostics_value), the same values the
+  // $reset task takes (see D.8). Record them, then route through the one
+  // DispatchReset path so the reset-callback sequence (§38.36.3) runs exactly as
+  // it does for a directly invoked $reset.
   if (operation == kVpiReset) {
+    reset_requested_ = true;
+    reset_stop_value_ = arg0;
+    reset_reset_value_ = arg1;
+    reset_diag_value_ = arg2;
     DispatchReset();
+    return 1;
+  }
+  // §38.4: vpiSetInteractiveScope immediately retargets the tool's interactive
+  // scope to the supplied vpiScope handle.
+  if (operation == kVpiSetInteractiveScope) {
+    interactive_scope_ = scope;
     return 1;
   }
   return 0;
@@ -687,11 +704,38 @@ int vpi_free_object(vpiHandle obj) {
 }
 
 int VpiControlC(int operation, ...) {
+  // §38.4: vpi_control(operation, varargs) takes a variable number of
+  // operation-specific arguments. Read exactly the arguments the operation
+  // defines before forwarding the request to the simulator.
   va_list args;
   va_start(args, operation);
-  int diag_level = va_arg(args, int);
+  int result = 0;
+  switch (operation) {
+    case delta::kVpiStop:
+    case delta::kVpiFinish: {
+      int diag_level = va_arg(args, int);
+      result = delta::GetGlobalVpiContext().Control(operation, diag_level);
+      break;
+    }
+    case delta::kVpiReset: {
+      int stop_value = va_arg(args, int);
+      int reset_value = va_arg(args, int);
+      int diag_value = va_arg(args, int);
+      result = delta::GetGlobalVpiContext().Control(operation, stop_value,
+                                                    reset_value, diag_value);
+      break;
+    }
+    case delta::kVpiSetInteractiveScope: {
+      vpiHandle scope = va_arg(args, vpiHandle);
+      result = delta::GetGlobalVpiContext().Control(operation, 0, 0, 0, scope);
+      break;
+    }
+    default:
+      result = delta::GetGlobalVpiContext().Control(operation);
+      break;
+  }
   va_end(args);
-  return delta::GetGlobalVpiContext().Control(operation, diag_level);
+  return result;
 }
 
 int VpiChkErrorC(SVpiErrorInfo* info) {
