@@ -138,6 +138,43 @@ TEST(ClassSim, GetReachabilityStronglyReachable) {
   EXPECT_EQ(f.ctx.GetReachability(handle), Reachability::kStronglyReachable);
 }
 
+TEST(ClassSim, GetReachabilityWeaklyReachableViaWeakReference) {
+  // §8.29 defines an object as weakly reachable when it is not strongly
+  // reachable yet can still be reached by traversing a weak reference (the
+  // construct introduced in §8.30). The classifier shares the same weak
+  // reference registry the weak_reference methods rely on, so dropping the
+  // lone strong handle while a weak reference survives leaves the object in
+  // the weakly reachable level rather than unreachable.
+  SimFixture f;
+  auto* type = MakeClassType(f, "WeaklyHeld", {"x"});
+  auto [handle, obj] = MakeObj(f, type);
+
+  WeakReference wr;
+  wr.referent_handle = handle;
+  f.ctx.RegisterWeakReference(&wr);
+
+  f.ctx.ReleaseObject(handle);
+  EXPECT_EQ(f.ctx.GetReachability(handle), Reachability::kWeaklyReachable);
+}
+
+TEST(ClassSim, StrongReferenceDominatesWeakReference) {
+  // §8.29 qualifies the weakly reachable level as applying only when an object
+  // is *not* strongly reachable. An object that still owns a live strong handle
+  // stays strongly reachable even while a weak reference also points at it, so
+  // the strong classification must win over a coexisting weak reference.
+  SimFixture f;
+  auto* type = MakeClassType(f, "BothHeld", {"x"});
+  auto [handle, obj] = MakeObj(f, type);
+
+  WeakReference wr;
+  wr.referent_handle = handle;
+  f.ctx.RegisterWeakReference(&wr);
+
+  // The creation reference count is still 1, so a strong reference coexists
+  // with the weak one.
+  EXPECT_EQ(f.ctx.GetReachability(handle), Reachability::kStronglyReachable);
+}
+
 TEST(ClassSim, GetReachabilityUnreachableAfterRelease) {
   SimFixture f;
   auto* type = MakeClassType(f, "Dead", {"x"});
@@ -238,6 +275,26 @@ TEST(ClassSim, CollectGarbagePreservesObjectWithPendingNba) {
 
   f.ctx.CollectGarbage();
   EXPECT_NE(f.ctx.GetClassObject(handle), nullptr);
+}
+
+TEST(ClassSim, CollectGarbageReclaimsWeaklyReachableObject) {
+  // §8.29: a weak reference never keeps an object alive. Once the last strong
+  // handle is dropped the object is only weakly reachable, and garbage
+  // collection may then carry its state to unreachable and reclaim the memory.
+  SimFixture f;
+  auto* type = MakeClassType(f, "WeakOnly", {"x"});
+  auto [handle, obj] = MakeObj(f, type);
+
+  WeakReference wr;
+  wr.referent_handle = handle;
+  f.ctx.RegisterWeakReference(&wr);
+
+  f.ctx.ReleaseObject(handle);
+  ASSERT_EQ(f.ctx.GetReachability(handle), Reachability::kWeaklyReachable);
+
+  f.ctx.CollectGarbage();
+  EXPECT_EQ(f.ctx.GetClassObject(handle), nullptr);
+  EXPECT_EQ(f.ctx.GetReachability(handle), Reachability::kUnreachable);
 }
 
 TEST(ClassSim, E2eNullAssignmentReleasesReference) {
