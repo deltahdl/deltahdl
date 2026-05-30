@@ -254,6 +254,38 @@ bool AlwaysStrongTicksAllPresent(int range_max, int future_clock_ticks) {
   return range_max <= future_clock_ticks;
 }
 
+// §16.12.12: the left operand is required over a prefix of the trace, so a run
+// of consecutive holding ticks from the start covers the requirement exactly
+// when it is at least as long as the required prefix. The non-overlapping forms
+// stop before the first right-operand tick (so the left operand need not hold
+// there, and need not hold at all when the right operand holds at the starting
+// tick); the overlapping forms extend through that tick; and when the right
+// operand never holds the requirement spans the whole trace.
+bool UntilLeftHoldsRequired(bool overlapping, int lhs_run_length,
+                            int first_rhs_index, int trace_length) {
+  int required_count;
+  if (first_rhs_index == kUntilRhsNever) {
+    required_count = trace_length;
+  } else if (overlapping) {
+    required_count = first_rhs_index + 1;
+  } else {
+    required_count = first_rhs_index;
+  }
+  return lhs_run_length >= required_count;
+}
+
+// §16.12.12: a strong until additionally requires a current or future tick at
+// which the right operand holds, so it fails when none exists even if the left
+// operand held throughout. A weak until ignores that requirement and settles on
+// whether the left operand met its obligation.
+PropertyResult EvalUntil(bool strong, bool rhs_holds_eventually,
+                         bool lhs_holds_required) {
+  if (strong && !rhs_holds_eventually) {
+    return PropertyResult::kFail;
+  }
+  return lhs_holds_required ? PropertyResult::kPass : PropertyResult::kFail;
+}
+
 SequencePropertyStrength DefaultSequencePropertyStrength(AssertionKind stmt) {
   // §16.12.2: assert property and assume property evaluate a bare sequence
   // weakly; the remaining assertion statements take the strong reading.

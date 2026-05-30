@@ -212,6 +212,32 @@ bool AlwaysRangeCovers(int index, int range_min, int range_max);
 // at least `range_max` further ticks are available after the current step.
 bool AlwaysStrongTicksAllPresent(int range_max, int future_clock_ticks);
 
+// §16.12.12: sentinel for the offset of the first tick at which the right
+// operand of an until property holds, used when it never holds at any current
+// or future clock tick.
+inline constexpr int kUntilRhsNever = -1;
+
+// §16.12.12: whether the left operand holds at every clock tick it is required
+// to for an until property. `lhs_run_length` is the number of consecutive ticks,
+// starting at the evaluation attempt, at which the left operand holds.
+// `first_rhs_index` is the offset of the first tick at which the right operand
+// holds (kUntilRhsNever when it never holds). For the non-overlapping forms
+// (until / s_until) the left operand is required only on the ticks before the
+// first right-operand tick; for the overlapping forms (until_with /
+// s_until_with) it is also required at that tick. When the right operand never
+// holds, the left operand is required at every tick of the trace, whose length
+// is `trace_length`.
+bool UntilLeftHoldsRequired(bool overlapping, int lhs_run_length,
+                            int first_rhs_index, int trace_length);
+
+// §16.12.12: verdict for the four until property forms given that the left
+// operand held at every required tick (`lhs_holds_required`) and whether the
+// right operand holds at some current or future tick (`rhs_holds_eventually`).
+// The strong forms (s_until / s_until_with) require the right operand to hold;
+// the weak forms (until / until_with) hold even if it never does.
+PropertyResult EvalUntil(bool strong, bool rhs_holds_eventually,
+                         bool lhs_holds_required);
+
 enum class AssertionKind : uint8_t {
   kAssert = 0,
   kAssume = 1,
