@@ -4187,6 +4187,34 @@ void Elaborator::ValidateDuplicateDefaultClocking(const ModuleDecl* decl) {
   }
 }
 
+void Elaborator::ValidateDefaultClockingReference(const ModuleDecl* decl) {
+  // §14.12: a "default clocking <id>;" assignment statement designates an
+  // existing clocking block as the default. Its clocking_identifier shall be
+  // the name of a clocking block. The assignment form is distinguished from
+  // the inline declaration form by carrying no clocking event (the inline
+  // form always declares an @(event)).
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kClockingBlock) continue;
+    if (!item->is_default_clocking) continue;
+    if (!item->clocking_event.empty()) continue;  // inline declaration form
+    if (item->name.empty()) continue;
+    bool names_block = false;
+    for (const auto* other : decl->items) {
+      if (other == item) continue;
+      if (other->kind == ModuleItemKind::kClockingBlock &&
+          !other->clocking_event.empty() && other->name == item->name) {
+        names_block = true;
+        break;
+      }
+    }
+    if (!names_block) {
+      diag_.Error(item->loc,
+                  "default clocking \"" + std::string(item->name) +
+                      "\" does not name a clocking block");
+    }
+  }
+}
+
 void Elaborator::ValidateDuplicateGlobalClocking(const ModuleDecl* decl) {
   const ModuleItem* first_global = nullptr;
   for (const auto* item : decl->items) {
