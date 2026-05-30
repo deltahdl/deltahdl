@@ -123,4 +123,4 @@ TEST(Assertion, FirstEvaluationHasNoPriorSample) {
   EXPECT_EQ(monitor.Evaluate("p_first", 5), AssertionResult::kVacuousPass);
 }
 
-}
+}  // namespace

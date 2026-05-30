@@ -61,8 +61,7 @@ TEST(SampledValueFunctions, OnlySampledOmitsTheClockingEvent) {
 TEST(SampledValueFunctions, ValueChangeResultsAreBoolean) {
   // §16.9.3: the result of a value change function is true or false and may be
   // used as a Boolean expression.
-  EXPECT_TRUE(
-      SampledValueFunctionResultIsBoolean(SampledValueFunction::kRose));
+  EXPECT_TRUE(SampledValueFunctionResultIsBoolean(SampledValueFunction::kRose));
   EXPECT_TRUE(
       SampledValueFunctionResultIsBoolean(SampledValueFunction::kChanged));
   EXPECT_FALSE(

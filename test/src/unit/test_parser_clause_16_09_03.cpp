@@ -84,4 +84,4 @@ TEST(AssertionParsing, RoseWithExplicitClockingEvent) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace
