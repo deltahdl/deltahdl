@@ -39,6 +39,7 @@ add_library(deltahdl_lib STATIC
     elaborator/property_instantiation.cpp
     elaborator/nexttime_index.cpp
     elaborator/always_range.cpp
+    elaborator/eventually_range.cpp
     elaborator/semantic_leading_clock.cpp
     elaborator/sequence_admits_empty.cpp
     elaborator/sequence_degeneracy.cpp

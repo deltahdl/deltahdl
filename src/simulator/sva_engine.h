@@ -238,6 +238,17 @@ bool UntilLeftHoldsRequired(bool overlapping, int lhs_run_length,
 PropertyResult EvalUntil(bool strong, bool rhs_holds_eventually,
                          bool lhs_holds_required);
 
+// §16.12.13: verdict for the eventually property forms. `s_eventually` (with or
+// without a range) is the strong form and the ranged `eventually` is the weak
+// form; the non-ranged strong form covers every current or future clock tick.
+// `inner_holds_within_range` is whether the inner property_expr holds at some
+// present clock tick within the range. `all_range_ticks_present` is whether every
+// clock tick the range covers exists. The strong form requires such a witness and
+// fails when none is found; the weak form also holds when the range's ticks do
+// not all exist, since it does not require those later ticks to be present.
+PropertyResult EvalEventually(bool strong, bool inner_holds_within_range,
+                              bool all_range_ticks_present);
+
 enum class AssertionKind : uint8_t {
   kAssert = 0,
   kAssume = 1,

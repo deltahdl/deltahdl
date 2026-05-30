@@ -286,6 +286,21 @@ PropertyResult EvalUntil(bool strong, bool rhs_holds_eventually,
   return lhs_holds_required ? PropertyResult::kPass : PropertyResult::kFail;
 }
 
+// §16.12.13: a strong eventually holds exactly when the inner property_expr holds
+// at some current or future clock tick within the range; with no such witness it
+// fails. A weak eventually also holds when the range's ticks do not all exist,
+// because the weak form does not require those later ticks to be present.
+PropertyResult EvalEventually(bool strong, bool inner_holds_within_range,
+                              bool all_range_ticks_present) {
+  if (inner_holds_within_range) {
+    return PropertyResult::kPass;
+  }
+  if (strong) {
+    return PropertyResult::kFail;
+  }
+  return all_range_ticks_present ? PropertyResult::kFail : PropertyResult::kPass;
+}
+
 SequencePropertyStrength DefaultSequencePropertyStrength(AssertionKind stmt) {
   // §16.12.2: assert property and assume property evaluate a bare sequence
   // weakly; the remaining assertion statements take the strong reading.
