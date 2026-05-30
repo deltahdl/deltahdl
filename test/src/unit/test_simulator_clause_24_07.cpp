@@ -152,4 +152,81 @@ TEST(ProgramControlTasksSim, ExitDoesNotTerminateOtherProgramBlock) {
   EXPECT_EQ(v->value.ToUint64(), 33u);
 }
 
+// The bare statement form `$exit;` (no parentheses) must drive the same program
+// termination as `$exit();`: the following assignment never runs.
+TEST(ProgramControlTasksSim, ExitWithoutParensTerminatesProgramInitial) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [7:0] v;\n"
+      "  initial v = 8'd0;\n"
+      "  program p;\n"
+      "    initial begin\n"
+      "      $exit;\n"
+      "      v = 8'd88;\n"
+      "    end\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(f.ctx.StopRequested());
+  auto* v = f.ctx.FindVariable("v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 0u);
+}
+
+// A descendant thread forked from a module initial inherits the module's null
+// program-block identity, so a call to $exit from it is ignored and execution
+// continues after the join.
+TEST(ProgramControlTasksSim, ExitFromForkedDescendantInModuleIsIgnored) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [7:0] v;\n"
+      "  initial begin\n"
+      "    v = 8'd0;\n"
+      "    fork\n"
+      "      $exit();\n"
+      "    join\n"
+      "    v = 8'd44;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* v = f.ctx.FindVariable("v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 44u);
+}
+
+// $exit reaching production through a task call chain (rather than a fork) still
+// counts as originating in the program's initial procedure: the task call runs
+// in the same thread, so the program is terminated and the post-call assignment
+// is skipped.
+TEST(ProgramControlTasksSim, ExitFromTaskCalledInProgramInitialTerminates) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [7:0] v;\n"
+      "  initial v = 8'd0;\n"
+      "  program p;\n"
+      "    task do_exit;\n"
+      "      $exit();\n"
+      "    endtask\n"
+      "    initial begin\n"
+      "      do_exit();\n"
+      "      v = 8'd66;\n"
+      "    end\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(f.ctx.StopRequested());
+  auto* v = f.ctx.FindVariable("v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 0u);
+}
+
 }
