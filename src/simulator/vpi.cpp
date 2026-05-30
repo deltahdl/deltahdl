@@ -305,6 +305,53 @@ void VpiContext::RegisterCbValueChange(const VpiCbData& data) {
   });
 }
 
+int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
+  int fired = 0;
+  // §38.36.3: only callbacks still registered for this reason are delivered.
+  // RemoveCb marks a removed callback by clearing its reason, so a removed slot
+  // never matches a real reason here. Snapshot the count so callbacks registered
+  // from within a routine are not delivered during this same pass.
+  size_t count = callbacks_.size();
+  for (size_t i = 0; i < count; ++i) {
+    if (callbacks_[i].reason != reason || callbacks_[i].cb_rtn == nullptr) {
+      continue;
+    }
+    // §38.36.3: the routine is passed a pointer to an s_cb_data structure that
+    // is not the one supplied at registration. Work from a copy and let the
+    // simulator fill obj/user_data when it has them for this reason.
+    VpiCbData data = callbacks_[i];
+    if (obj != nullptr) {
+      data.obj = obj;
+    }
+    if (user_data != nullptr) {
+      data.user_data = user_data;
+    }
+    data.cb_rtn(&data);
+    ++fired;
+  }
+  return fired;
+}
+
+int VpiContext::DispatchReset() {
+  int fired = DispatchCallbacks(kCbStartOfReset);
+  fired += DispatchCallbacks(kCbEndOfReset);
+  return fired;
+}
+
+int VpiContext::DispatchRestart() {
+  // §38.36.3: with the exception of the restart callbacks, every registered
+  // callback is removed when a restart occurs. Clearing the reason marks a slot
+  // removed, matching RemoveCb.
+  for (VpiCbData& slot : callbacks_) {
+    if (slot.reason != kCbStartOfRestart && slot.reason != kCbEndOfRestart) {
+      slot.reason = -1;
+    }
+  }
+  int fired = DispatchCallbacks(kCbStartOfRestart);
+  fired += DispatchCallbacks(kCbEndOfRestart);
+  return fired;
+}
+
 int VpiContext::Get(int property, VpiHandle obj) {
   if (!obj) return 0;
   switch (property) {

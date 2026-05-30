@@ -47,6 +47,28 @@ constexpr int kCbNextSimTime = 8;
 constexpr int kCbNBASynch = 9;
 constexpr int kCbAtEndOfSimTime = 10;
 
+// §38.36.3: simulator action callbacks name reasons that every VPI-compliant
+// tool provides (kCbEndOfSimulation above is also an action reason); simulator
+// feature callbacks name optional, tool-specific reasons such as save, restart,
+// reset, and interactive-mode transitions. They are registered through the same
+// vpi_register_cb() path as every other callback reason.
+constexpr int kCbEndOfCompile = 11;
+constexpr int kCbStartOfSimulation = 12;
+constexpr int kCbError = 13;
+constexpr int kCbPLIError = 14;
+constexpr int kCbTchkViolation = 15;
+constexpr int kCbSignal = 16;
+constexpr int kCbStartOfSave = 17;
+constexpr int kCbEndOfSave = 18;
+constexpr int kCbStartOfRestart = 19;
+constexpr int kCbEndOfRestart = 20;
+constexpr int kCbStartOfReset = 21;
+constexpr int kCbEndOfReset = 22;
+constexpr int kCbEnterInteractive = 23;
+constexpr int kCbExitInteractive = 24;
+constexpr int kCbInteractiveScopeChange = 25;
+constexpr int kCbUnresolvedSystf = 26;
+
 constexpr int kVpiType = 1;
 constexpr int kVpiName = 2;
 constexpr int kVpiFullName = 3;
@@ -187,6 +209,27 @@ class VpiContext {
   int RemoveCb(VpiHandle cb_handle);
   int ExecuteCallback(VpiHandle cb_handle);
   void RegisterCbValueChange(const VpiCbData& data);
+
+  // §38.36.3: deliver every active callback registered for the given action or
+  // feature reason. Each routine receives a copy of its s_cb_data whose reason
+  // field holds the reason for the callback; when a non-null obj or user_data is
+  // supplied the simulator fills that field before the routine runs (for
+  // example, the timing-check handle for cbTchkViolation, the new scope handle
+  // for cbInteractiveScopeChange, or the unresolved name for cbUnresolvedSystf).
+  // Returns how many callbacks were delivered.
+  int DispatchCallbacks(int reason, VpiHandle obj = nullptr,
+                        void* user_data = nullptr);
+
+  // §38.36.3: a reset delivers cbStartOfReset at the start of the operation and
+  // cbEndOfReset once it has completed. This is the single path used whether the
+  // reset was requested directly or through vpi_control(vpiReset, ...).
+  int DispatchReset();
+
+  // §38.36.3: a restart first removes every registered callback except the
+  // restart callbacks, then delivers cbStartOfRestart followed by cbEndOfRestart,
+  // so the only callbacks that exist across a restart are those two.
+  int DispatchRestart();
+
   int Get(int property, VpiHandle obj);
   const char* GetStr(int property, VpiHandle obj);
   int FreeObject(VpiHandle obj);
@@ -299,6 +342,24 @@ using SVpiVlogInfo = delta::VpiVlogInfo;
 #define cbNextSimTime 8
 #define cbNBASynch 9
 #define cbAtEndOfSimTime 10
+
+// §38.36.3 simulator action/feature callback reasons (mirror of the kCb* values).
+#define cbEndOfCompile 11
+#define cbStartOfSimulation 12
+#define cbError 13
+#define cbPLIError 14
+#define cbTchkViolation 15
+#define cbSignal 16
+#define cbStartOfSave 17
+#define cbEndOfSave 18
+#define cbStartOfRestart 19
+#define cbEndOfRestart 20
+#define cbStartOfReset 21
+#define cbEndOfReset 22
+#define cbEnterInteractive 23
+#define cbExitInteractive 24
+#define cbInteractiveScopeChange 25
+#define cbUnresolvedSystf 26
 
 #define vpiType 1
 #define vpiName 2
