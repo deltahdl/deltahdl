@@ -178,13 +178,21 @@ static void GetValueHexStr(VpiHandle obj, VpiValue* value,
 static void GetValueOctStr(VpiHandle obj, VpiValue* value,
                            std::vector<std::string>& pool) {
   uint64_t aval = obj->var->value.words[0].aval;
+  uint64_t bval = obj->var->value.words[0].bval;
   int width = static_cast<int>(obj->var->value.width);
   int oct_digits = (width + 2) / 3;
   std::string result;
   result.reserve(oct_digits);
   for (int i = oct_digits - 1; i >= 0; --i) {
-    uint8_t bits = (aval >> (i * 3)) & 0x7;
-    result += static_cast<char>('0' + bits);
+    uint8_t a_bits = (aval >> (i * 3)) & 0x7;
+    uint8_t b_bits = (bval >> (i * 3)) & 0x7;
+    if (b_bits != 0) {
+      // §38.15, Table 38-3 (octal row): a digit covering any unknown bit is
+      // reported as z only when the whole group is z, otherwise as x.
+      result += (b_bits == 0x7 && a_bits == 0x7) ? 'z' : 'x';
+    } else {
+      result += static_cast<char>('0' + a_bits);
+    }
   }
   pool.push_back(std::move(result));
   value->value.str = pool.back().c_str();
@@ -193,6 +201,64 @@ static void GetValueOctStr(VpiHandle obj, VpiValue* value,
 static int ScalarFromBits(uint64_t aval, uint64_t bval) {
   if (!bval) return aval ? kVpi1 : kVpi0;
   return aval ? kVpiZ : kVpiX;
+}
+
+static void GetValueVector(VpiHandle obj, VpiValue* value,
+                           std::vector<std::vector<VpiVectorVal>>& pool) {
+  const auto& v = obj->var->value;
+  int width = static_cast<int>(v.width);
+  // §38.15: the vector value occupies an array of s_vpi_vecval whose size is
+  // ((vector_size - 1) / 32 + 1), one element per 32 bits of the vector.
+  int array_size = width > 0 ? ((width - 1) / 32 + 1) : 1;
+  std::vector<VpiVectorVal> vec(static_cast<size_t>(array_size));
+  for (int i = 0; i < array_size; ++i) {
+    // Internal four-state words are 64 bits wide, so two vecval elements map
+    // onto each word: the LSB of the vector lands in element 0, bit 33 in the
+    // LSB of element 1, and so on.
+    int word_idx = i / 2;
+    int shift = (i % 2) * 32;
+    uint64_t aval = word_idx < static_cast<int>(v.nwords)
+                        ? v.words[word_idx].aval
+                        : 0;
+    uint64_t bval = word_idx < static_cast<int>(v.nwords)
+                        ? v.words[word_idx].bval
+                        : 0;
+    auto a32 = static_cast<uint32_t>((aval >> shift) & 0xFFFFFFFFu);
+    auto b32 = static_cast<uint32_t>((bval >> shift) & 0xFFFFFFFFu);
+    // §38.15 / Figure 38-8: the returned encoding is ab 00=0, 10=1, 11=X,
+    // 01=Z. That assigns the aval bit of an unknown the opposite sense from
+    // the internal word (X is a=0/b=1, Z is a=1/b=1), so flip the aval bit of
+    // every unknown position by xoring in the bval bits.
+    vec[static_cast<size_t>(i)].aval = a32 ^ b32;
+    vec[static_cast<size_t>(i)].bval = b32;
+  }
+  pool.push_back(std::move(vec));
+  value->value.vector = pool.back().data();
+}
+
+static void GetValueStrength(VpiHandle obj, VpiValue* value,
+                             std::vector<std::vector<VpiStrengthVal>>& pool) {
+  const auto& v = obj->var->value;
+  int width = static_cast<int>(v.width);
+  if (width < 1) width = 1;
+  // §38.15: the strength arm holds one descriptor per bit of the vector.
+  std::vector<VpiStrengthVal> arr(static_cast<size_t>(width));
+  for (int i = 0; i < width; ++i) {
+    int word_idx = i / 64;
+    int bit = i % 64;
+    uint64_t aval =
+        word_idx < static_cast<int>(v.nwords) ? v.words[word_idx].aval : 0;
+    uint64_t bval =
+        word_idx < static_cast<int>(v.nwords) ? v.words[word_idx].bval : 0;
+    arr[static_cast<size_t>(i)].logic =
+        ScalarFromBits((aval >> bit) & 1, (bval >> bit) & 1);
+    // §38.15: a reg or variable is always reported at strong strength, so both
+    // the 0 and 1 drive components carry the strong-drive code.
+    arr[static_cast<size_t>(i)].s0 = vpiStrongDrive;
+    arr[static_cast<size_t>(i)].s1 = vpiStrongDrive;
+  }
+  pool.push_back(std::move(arr));
+  value->value.strength = pool.back().data();
 }
 
 static void GetValueStringVal(VpiHandle obj, VpiValue* value,
@@ -210,9 +276,14 @@ static void GetValueStringVal(VpiHandle obj, VpiValue* value,
 void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
   if (!obj || !value || !obj->var) return;
   switch (value->format) {
-    case kVpiIntVal:
-      value->value.integer = static_cast<int>(obj->var->value.ToUint64());
+    case kVpiIntVal: {
+      // §38.15, Table 38-3: any x or z bit of the object maps to a 0 in the
+      // returned integer, so drop every unknown bit before handing it back.
+      uint64_t aval = obj->var->value.words[0].aval;
+      uint64_t bval = obj->var->value.words[0].bval;
+      value->value.integer = static_cast<int>(aval & ~bval);
       break;
+    }
     case kVpiRealVal:
       value->value.real = static_cast<double>(obj->var->value.ToUint64());
       break;
@@ -235,6 +306,30 @@ void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
     case kVpiTimeVal:
       value->value.integer = static_cast<int>(obj->var->value.ToUint64());
       break;
+    case kVpiVectorVal:
+      GetValueVector(obj, value, vec_pool_);
+      break;
+    case kVpiStrengthVal:
+      GetValueStrength(obj, value, strength_pool_);
+      break;
+    case kVpiObjTypeVal: {
+      // §38.15: fill in the value and rewrite the format field to the closest
+      // format for the object's type. A real object reports vpiRealVal, a
+      // single-bit object is a scalar, and anything wider is a vector.
+      const auto& v = obj->var->value;
+      if (v.is_real) {
+        value->format = kVpiRealVal;
+        value->value.real = static_cast<double>(v.ToUint64());
+      } else if (v.width == 1) {
+        value->format = kVpiScalarVal;
+        value->value.scalar =
+            ScalarFromBits(v.words[0].aval & 1, v.words[0].bval & 1);
+      } else {
+        value->format = kVpiVectorVal;
+        GetValueVector(obj, value, vec_pool_);
+      }
+      break;
+    }
     default:
       break;
   }

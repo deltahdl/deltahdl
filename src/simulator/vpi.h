@@ -31,6 +31,8 @@ constexpr int kVpiRealVal = 6;
 constexpr int kVpiStringVal = 7;
 constexpr int kVpiTimeVal = 8;
 constexpr int kVpiVectorVal = 9;
+constexpr int kVpiStrengthVal = 10;
+constexpr int kVpiObjTypeVal = 12;
 
 constexpr int kVpiSimTime = 1;
 constexpr int kVpiScaledRealTime = 2;
@@ -130,6 +132,15 @@ struct VpiVectorVal {
   uint32_t bval;
 };
 
+// §38.15 (Figure 38-9 element): one strength descriptor per vector bit. logic
+// carries the vpi0/vpi1/vpiX/vpiZ value; s0 and s1 carry the drive/charge
+// strength of the 0 and 1 components.
+struct VpiStrengthVal {
+  int logic = 0;
+  int s0 = 0;
+  int s1 = 0;
+};
+
 struct VpiValue {
   int format = 0;
   union {
@@ -138,6 +149,7 @@ struct VpiValue {
     const char* str;
     int scalar;
     VpiVectorVal* vector;
+    VpiStrengthVal* strength;
   } value = {};
 };
 
@@ -282,6 +294,16 @@ class VpiContext {
   std::string version_ = "0.1.0";
 
   std::vector<std::string> str_pool_;
+
+  // §38.15: vpi_get_value() owns the memory for the vector arm of the value
+  // union; each retrieval keeps its s_vpi_vecval array alive here until the
+  // context is torn down. Inner vectors own their own storage, so growing the
+  // outer pool never invalidates a previously handed-out array pointer.
+  std::vector<std::vector<VpiVectorVal>> vec_pool_;
+
+  // §38.15: likewise the routine owns the s_vpi_strengthval array handed back
+  // for the strength arm of the value union.
+  std::vector<std::vector<VpiStrengthVal>> strength_pool_;
 };
 
 Region RegionForPliCallback(int reason);
