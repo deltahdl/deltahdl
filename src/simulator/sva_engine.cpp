@@ -814,6 +814,141 @@ bool UsesErrorSeverityFallback(const DeferredAssertion& da) {
   return !da.has_else_clause;
 }
 
+AssertActionBlockChoice SelectAssertActionBlock(bool property_passed,
+                                                bool property_disabled) {
+  if (property_disabled) return AssertActionBlockChoice::kNone;
+  return property_passed ? AssertActionBlockChoice::kPass
+                         : AssertActionBlockChoice::kFail;
+}
+
+AssertActionBlockChoice ResolveAssertActionUnderControl(
+    AssertActionBlockChoice base, bool pass_action_enabled,
+    bool fail_action_enabled) {
+  if (base == AssertActionBlockChoice::kPass && !pass_action_enabled) {
+    return AssertActionBlockChoice::kNone;
+  }
+  if (base == AssertActionBlockChoice::kFail && !fail_action_enabled) {
+    return AssertActionBlockChoice::kNone;
+  }
+  return base;
+}
+
+bool CallsDefaultErrorOnFailure(const DeferredAssertion& da,
+                                bool fail_action_enabled) {
+  return UsesErrorSeverityFallback(da) && fail_action_enabled;
+}
+
+AssertionSeverity DefaultConcurrentAssertActionSeverity() {
+  return AssertionSeverity::kError;
+}
+
+Region ConcurrentAssertActionRegion() { return Region::kReactive; }
+
+bool RoseGclk(uint64_t prev_lsb, uint64_t cur_lsb) {
+  return (prev_lsb & 1u) == 0u && (cur_lsb & 1u) == 1u;
+}
+
+bool FellGclk(uint64_t prev_lsb, uint64_t cur_lsb) {
+  return (prev_lsb & 1u) == 1u && (cur_lsb & 1u) == 0u;
+}
+
+bool StableGclk(uint64_t prev_value, uint64_t cur_value) {
+  return prev_value == cur_value;
+}
+
+bool ChangedGclk(uint64_t prev_value, uint64_t cur_value) {
+  return prev_value != cur_value;
+}
+
+bool RisingGclk(uint64_t cur_lsb, uint64_t next_lsb) {
+  return (cur_lsb & 1u) == 0u && (next_lsb & 1u) == 1u;
+}
+
+bool FallingGclk(uint64_t cur_lsb, uint64_t next_lsb) {
+  return (cur_lsb & 1u) == 1u && (next_lsb & 1u) == 0u;
+}
+
+bool SteadyGclk(uint64_t cur_value, uint64_t next_value) {
+  return cur_value == next_value;
+}
+
+bool ChangingGclk(uint64_t cur_value, uint64_t next_value) {
+  return !SteadyGclk(cur_value, next_value);
+}
+
+bool GclkFutureActionBlockDelayedToFollowingGlobalTick() { return true; }
+
+bool GclkFutureKillAffectsAttempt(bool kill_at_or_before_last_assertion_tick) {
+  return kill_at_or_before_last_assertion_tick;
+}
+
+bool ControlTypeAffectsStatistics(int control_type) {
+  return control_type >= static_cast<int>(AssertControlType::kLock) &&
+         control_type <= static_cast<int>(AssertControlType::kKill);
+}
+
+bool ControlAffectsAssertionType(uint32_t assertion_type_mask,
+                                 AssertionTypeBit bit) {
+  return (assertion_type_mask & static_cast<uint32_t>(bit)) != 0;
+}
+
+bool ControlAffectsDirectiveType(uint32_t directive_type_mask,
+                                 DirectiveTypeBit bit) {
+  return (directive_type_mask & static_cast<uint32_t>(bit)) != 0;
+}
+
+bool EquivalentAssertControlForTask(std::string_view task_name,
+                                    AssertControlInvocation& out) {
+  // §20.11: $asserton/$assertoff/$assertkill use assertion_type 15; the action
+  // control tasks use assertion_type 31. Both families use directive_type 7.
+  constexpr uint32_t kStatusAssertionType = 15;
+  constexpr uint32_t kActionAssertionType = 31;
+  constexpr uint32_t kDirective = 7;
+  auto set = [&](uint32_t control_type, uint32_t assertion_type) {
+    out.control_type = control_type;
+    out.assertion_type = assertion_type;
+    out.directive_type = kDirective;
+    return true;
+  };
+  if (task_name == "$asserton") {
+    return set(static_cast<uint32_t>(AssertControlType::kOn),
+               kStatusAssertionType);
+  }
+  if (task_name == "$assertoff") {
+    return set(static_cast<uint32_t>(AssertControlType::kOff),
+               kStatusAssertionType);
+  }
+  if (task_name == "$assertkill") {
+    return set(static_cast<uint32_t>(AssertControlType::kKill),
+               kStatusAssertionType);
+  }
+  if (task_name == "$assertpasson") {
+    return set(static_cast<uint32_t>(AssertControlType::kPassOn),
+               kActionAssertionType);
+  }
+  if (task_name == "$assertpassoff") {
+    return set(static_cast<uint32_t>(AssertControlType::kPassOff),
+               kActionAssertionType);
+  }
+  if (task_name == "$assertfailon") {
+    return set(static_cast<uint32_t>(AssertControlType::kFailOn),
+               kActionAssertionType);
+  }
+  if (task_name == "$assertfailoff") {
+    return set(static_cast<uint32_t>(AssertControlType::kFailOff),
+               kActionAssertionType);
+  }
+  if (task_name == "$assertnonvacuouson") {
+    return set(static_cast<uint32_t>(AssertControlType::kNonvacuousOn),
+               kActionAssertionType);
+  }
+  if (task_name == "$assertvacuousoff") {
+    return set(static_cast<uint32_t>(AssertControlType::kVacuousOff),
+               kActionAssertionType);
+  }
+  return false;
+}
+
 bool IsDeferredFlushPoint(FlushPointReason reason) {
   switch (reason) {
     case FlushPointReason::kEventControlResume:
@@ -914,14 +1049,17 @@ bool AssertionControl::IsEnabled(std::string_view inst) const {
 }
 
 void AssertionControl::SetOff(std::string_view inst) {
+  if (IsLocked(inst)) return;
   disabled_.insert(std::string(inst));
 }
 
 void AssertionControl::SetOn(std::string_view inst) {
+  if (IsLocked(inst)) return;
   disabled_.erase(std::string(inst));
 }
 
 void AssertionControl::Kill(std::string_view inst) {
+  if (IsLocked(inst)) return;
   killed_.insert(std::string(inst));
   disabled_.insert(std::string(inst));
 }
@@ -934,12 +1072,51 @@ void AssertionControl::SetGlobalOff() { global_off_ = true; }
 
 void AssertionControl::SetGlobalOn() { global_off_ = false; }
 
+void AssertionControl::Lock(std::string_view inst) {
+  locked_.insert(std::string(inst));
+}
+
+void AssertionControl::Unlock(std::string_view inst) {
+  locked_.erase(std::string(inst));
+}
+
+bool AssertionControl::IsLocked(std::string_view inst) const {
+  return locked_.find(std::string(inst)) != locked_.end();
+}
+
 bool AssertionControl::IsPassEnabled(std::string_view inst) const {
-  return pass_off_.find(std::string(inst)) == pass_off_.end();
+  return IsVacuousPassEnabled(inst) && IsNonvacuousPassEnabled(inst);
 }
 
 void AssertionControl::SetPassOff(std::string_view inst) {
-  pass_off_.insert(std::string(inst));
+  if (IsLocked(inst)) return;
+  vacuous_pass_off_.insert(std::string(inst));
+  nonvacuous_pass_off_.insert(std::string(inst));
+}
+
+void AssertionControl::SetPassOn(std::string_view inst) {
+  if (IsLocked(inst)) return;
+  vacuous_pass_off_.erase(std::string(inst));
+  nonvacuous_pass_off_.erase(std::string(inst));
+}
+
+bool AssertionControl::IsVacuousPassEnabled(std::string_view inst) const {
+  return vacuous_pass_off_.find(std::string(inst)) == vacuous_pass_off_.end();
+}
+
+bool AssertionControl::IsNonvacuousPassEnabled(std::string_view inst) const {
+  return nonvacuous_pass_off_.find(std::string(inst)) ==
+         nonvacuous_pass_off_.end();
+}
+
+void AssertionControl::SetNonvacuousOn(std::string_view inst) {
+  if (IsLocked(inst)) return;
+  nonvacuous_pass_off_.erase(std::string(inst));
+}
+
+void AssertionControl::SetVacuousOff(std::string_view inst) {
+  if (IsLocked(inst)) return;
+  vacuous_pass_off_.insert(std::string(inst));
 }
 
 bool AssertionControl::IsFailEnabled(std::string_view inst) const {
@@ -947,11 +1124,58 @@ bool AssertionControl::IsFailEnabled(std::string_view inst) const {
 }
 
 void AssertionControl::SetFailOff(std::string_view inst) {
+  if (IsLocked(inst)) return;
   fail_off_.insert(std::string(inst));
 }
 
 void AssertionControl::SetFailOn(std::string_view inst) {
+  if (IsLocked(inst)) return;
   fail_off_.erase(std::string(inst));
+}
+
+void AssertionControl::ApplyControl(int control_type, std::string_view inst) {
+  // §20.11: Unlock is the only control that reaches a locked assertion; every
+  // other control_type is a no-op while the assertion is locked.
+  if (control_type == static_cast<int>(AssertControlType::kUnlock)) {
+    Unlock(inst);
+    return;
+  }
+  if (IsLocked(inst)) return;
+  switch (static_cast<AssertControlType>(control_type)) {
+    case AssertControlType::kLock:
+      Lock(inst);
+      break;
+    case AssertControlType::kUnlock:
+      Unlock(inst);
+      break;
+    case AssertControlType::kOn:
+      SetOn(inst);
+      break;
+    case AssertControlType::kOff:
+      SetOff(inst);
+      break;
+    case AssertControlType::kKill:
+      Kill(inst);
+      break;
+    case AssertControlType::kPassOn:
+      SetPassOn(inst);
+      break;
+    case AssertControlType::kPassOff:
+      SetPassOff(inst);
+      break;
+    case AssertControlType::kFailOn:
+      SetFailOn(inst);
+      break;
+    case AssertControlType::kFailOff:
+      SetFailOff(inst);
+      break;
+    case AssertControlType::kNonvacuousOn:
+      SetNonvacuousOn(inst);
+      break;
+    case AssertControlType::kVacuousOff:
+      SetVacuousOff(inst);
+      break;
+  }
 }
 
 void SvaEngine::QueueDeferredAssertion(const DeferredAssertion& da) {

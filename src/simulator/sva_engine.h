@@ -751,6 +751,171 @@ class MaturedAssertionQueue {
   std::vector<PendingProceduralAssertion> queue_;
 };
 
+// §16.14.1: which branch of an assert statement's action_block runs after the
+// property is evaluated. When the property holds, the pass statements run; when
+// it fails, the fail statements run; when the property is disabled (e.g. by a
+// `disable iff`), no action_block statement runs at all.
+enum class AssertActionBlockChoice : uint8_t {
+  kPass,
+  kFail,
+  kNone,
+};
+
+// §16.14.1: choose the action_block branch for an assert statement from the
+// outcome of evaluating its property. A disabled evaluation suppresses the
+// action_block entirely and takes precedence over the pass/fail distinction.
+AssertActionBlockChoice SelectAssertActionBlock(bool property_passed,
+                                                bool property_disabled);
+
+// §16.14.1: the execution of the pass and fail statements can be controlled
+// using the assertion action control tasks (see §20.11). This composes the base
+// §16.14.1 choice with the per-instance pass/fail enables maintained for the
+// §20.11 control tasks: a pass branch is suppressed when the pass action is
+// disabled, and a fail branch is suppressed when the fail action is disabled.
+AssertActionBlockChoice ResolveAssertActionUnderControl(
+    AssertActionBlockChoice base, bool pass_action_enabled,
+    bool fail_action_enabled);
+
+// §16.14.1: when the else clause is omitted, the tool calls $error on failure
+// unless $assertcontrol has been used to suppress the failure (see §20.11).
+// This is the §16.14.1 default-$error condition (UsesErrorSeverityFallback)
+// gated by the §20.11 fail-action enable, so a FailOff control suppresses the
+// otherwise-default $error.
+bool CallsDefaultErrorOnFailure(const DeferredAssertion& da,
+                                bool fail_action_enabled);
+
+// §16.14.1: the conventions regarding default severity for a concurrent
+// assertion action block are the same as for immediate assertions; the default
+// severity is error.
+AssertionSeverity DefaultConcurrentAssertActionSeverity();
+
+// §16.14.1: the pass and fail statements of an assert statement are executed in
+// the Reactive region.
+Region ConcurrentAssertActionRegion();
+
+// §16.9.4: the global clocking past value-change functions compare the sampled
+// value at the global clock tick that immediately precedes the current tick
+// with the value at the current tick. $rose_gclk reports the LSB changing to 1,
+// $fell_gclk the LSB changing to 0, $stable_gclk the whole expression being
+// unchanged, and $changed_gclk the whole expression having changed.
+bool RoseGclk(uint64_t prev_lsb, uint64_t cur_lsb);
+bool FellGclk(uint64_t prev_lsb, uint64_t cur_lsb);
+bool StableGclk(uint64_t prev_value, uint64_t cur_value);
+bool ChangedGclk(uint64_t prev_value, uint64_t cur_value);
+
+// §16.9.4: the global clocking future value-change functions are the same
+// except that they use the subsequent value of the expression, sampled at the
+// next global clock tick. $rising_gclk reports the LSB changing to 1 and
+// $falling_gclk the LSB changing to 0 at the next global clock tick;
+// $steady_gclk reports the expression not changing at the next tick; and
+// $changing_gclk is the complement of $steady_gclk.
+bool RisingGclk(uint64_t cur_lsb, uint64_t next_lsb);
+bool FallingGclk(uint64_t cur_lsb, uint64_t next_lsb);
+bool SteadyGclk(uint64_t cur_value, uint64_t next_value);
+bool ChangingGclk(uint64_t cur_value, uint64_t next_value);
+
+// §16.9.4: execution of the action block of an assertion containing global
+// clocking future sampled value functions is delayed until the global clock
+// tick that follows the last tick of the assertion clock for the attempt. When
+// the attempt fails and $error is called by default (see §16.14.1), that $error
+// is likewise issued at that following global clock tick rather than at the
+// last assertion-clock tick.
+bool GclkFutureActionBlockDelayedToFollowingGlobalTick();
+
+// §16.9.4: the behavior of asynchronous controls such as $assertcontrol (see
+// §20.11) is with respect to the interval of the evaluation attempt, whose end
+// is the last tick of the assertion clock. A $assertcontrol Kill (control_type
+// 5) executed in a time step strictly after that last tick does not affect the
+// attempt, even if it runs no later than the following global clock tick. The
+// parameter is true when the Kill occurs at or before the last assertion-clock
+// tick.
+bool GclkFutureKillAffectsAttempt(bool kill_at_or_before_last_assertion_tick);
+
+// §20.11: the integer control_type argument selects the effect of the
+// $assertcontrol system task. The values are those of Table 20-5.
+enum class AssertControlType : uint8_t {
+  kLock = 1,
+  kUnlock = 2,
+  kOn = 3,
+  kOff = 4,
+  kKill = 5,
+  kPassOn = 6,
+  kPassOff = 7,
+  kFailOn = 8,
+  kFailOff = 9,
+  kNonvacuousOn = 10,
+  kVacuousOff = 11,
+};
+
+// §20.11: when assertion_type is not specified it defaults to 255, so the task
+// applies to all assertion types, expect statements, and violation reports. The
+// bit values are those of Table 20-6.
+inline constexpr uint32_t kAssertionTypeDefault = 255;
+
+// §20.11: when directive_type is not specified it defaults to 7
+// (Assert|Cover|Assume), so the task applies to all directive types. The bit
+// values are those of Table 20-7.
+inline constexpr uint32_t kDirectiveTypeDefault = 7;
+
+// §20.11: Table 20-6 assertion_type bit values. A $assertcontrol assertion_type
+// argument is an OR of these, selecting which assertion and report kinds the
+// task affects.
+enum class AssertionTypeBit : uint32_t {
+  kConcurrent = 1,
+  kSimpleImmediate = 2,
+  kObservedDeferredImmediate = 4,
+  kFinalDeferredImmediate = 8,
+  kExpect = 16,
+  kUnique = 32,
+  kUnique0 = 64,
+  kPriority = 128,
+};
+
+// §20.11: Table 20-7 directive_type bit values. A $assertcontrol directive_type
+// argument is an OR of these, selecting which directive kinds the task affects.
+enum class DirectiveTypeBit : uint32_t {
+  kAssert = 1,
+  kCover = 2,
+  kAssume = 4,
+};
+
+// §20.11: the assertion_type argument selects assertion/report kinds by OR-ing
+// Table 20-6 values; a task affects an assertion when that assertion's type bit
+// is set in the mask. For example, mask 3 (Concurrent|SimpleImmediate) affects
+// concurrent and simple immediate assertions but not deferred ones.
+bool ControlAffectsAssertionType(uint32_t assertion_type_mask,
+                                 AssertionTypeBit bit);
+
+// §20.11: the directive_type argument selects directive kinds by OR-ing Table
+// 20-7 values; a task affects a directive when that directive's bit is set in
+// the mask. For example, mask 3 (Assert|Cover) affects assert and cover
+// directives but not assume directives.
+bool ControlAffectsDirectiveType(uint32_t directive_type_mask,
+                                 DirectiveTypeBit bit);
+
+// §20.11: the assertion action control tasks, and $assertcontrol with a
+// control_type from 6 (PassOn) through 11 (VacuousOff), do not affect the
+// statistics counters for the assertions; the status controls 1 (Lock) through
+// 5 (Kill) do.
+bool ControlTypeAffectsStatistics(int control_type);
+
+// §20.11: the convenience and backward-compatibility tasks are defined in terms
+// of $assertcontrol. This records the equivalent control_type, assertion_type,
+// and directive_type a named task expands to.
+struct AssertControlInvocation {
+  uint32_t control_type = 0;
+  uint32_t assertion_type = 0;
+  uint32_t directive_type = 0;
+};
+
+// §20.11: expand a convenience assertion control task name (with the leading
+// '$') to its equivalent $assertcontrol invocation. The $asserton/$assertoff/
+// $assertkill tasks expand with assertion_type 15 and the action control tasks
+// with assertion_type 31; both use directive_type 7. Returns false for a name
+// that is not one of the convenience tasks.
+bool EquivalentAssertControlForTask(std::string_view task_name,
+                                    AssertControlInvocation& out);
+
 class AssertionControl {
  public:
   bool IsEnabled(std::string_view inst) const;
@@ -762,18 +927,43 @@ class AssertionControl {
   void SetGlobalOff();
   void SetGlobalOn();
 
+  // §20.11: Lock (control_type 1) prevents any status change of the named
+  // assertion until it is unlocked; while locked, no $assertcontrol affects it.
+  // Unlock (control_type 2) removes the locked status.
+  void Lock(std::string_view inst);
+  void Unlock(std::string_view inst);
+  bool IsLocked(std::string_view inst) const;
+
   bool IsPassEnabled(std::string_view inst) const;
   void SetPassOff(std::string_view inst);
+  // §20.11: PassOn (control_type 6) re-enables the pass action for both vacuous
+  // and nonvacuous success.
+  void SetPassOn(std::string_view inst);
+
+  // §20.11: NonvacuousOn (control_type 10) enables the pass action on
+  // nonvacuous success; VacuousOff (control_type 11) stops the pass action on
+  // vacuous success. Pass enablement is therefore tracked per success kind.
+  bool IsVacuousPassEnabled(std::string_view inst) const;
+  bool IsNonvacuousPassEnabled(std::string_view inst) const;
+  void SetNonvacuousOn(std::string_view inst);
+  void SetVacuousOff(std::string_view inst);
 
   bool IsFailEnabled(std::string_view inst) const;
   void SetFailOff(std::string_view inst);
   void SetFailOn(std::string_view inst);
 
+  // §20.11: apply a $assertcontrol invocation by its integer control_type to
+  // the named assertion. A locked assertion is unaffected by any control_type
+  // other than Unlock.
+  void ApplyControl(int control_type, std::string_view inst);
+
  private:
   bool global_off_ = false;
   std::unordered_set<std::string> disabled_;
   std::unordered_set<std::string> killed_;
-  std::unordered_set<std::string> pass_off_;
+  std::unordered_set<std::string> locked_;
+  std::unordered_set<std::string> vacuous_pass_off_;
+  std::unordered_set<std::string> nonvacuous_pass_off_;
   std::unordered_set<std::string> fail_off_;
 };
 

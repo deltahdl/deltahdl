@@ -533,6 +533,21 @@ Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
+  // §16.9.4: $past_gclk(v) is defined as $past(v,,,@$global_clock) and
+  // $future_gclk(v) is the value of v sampled at the next global clock tick;
+  // both yield the (sampled) value of their argument.
+  if (name == "$past_gclk" || name == "$future_gclk") {
+    if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
+    return EvalExpr(expr->args[0], ctx, arena);
+  }
+
+  // §16.9.4: the global clocking value-change functions ($rose_gclk,
+  // $fell_gclk, $stable_gclk, $changed_gclk and the future $rising_gclk,
+  // $falling_gclk, $steady_gclk, $changing_gclk) each return a 1-bit Boolean.
+  if (name.ends_with("_gclk")) {
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+
   if (name.starts_with("$assert")) return MakeLogic4VecVal(arena, 1, 0);
 
   if (name.starts_with("$coverage")) return MakeLogic4VecVal(arena, 32, 0);

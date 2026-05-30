@@ -461,10 +461,13 @@ static bool IsArrayQuerySysCall(std::string_view n) {
 }
 
 static bool IsVerifSysCall(std::string_view n) {
+  // §16.9.4: the global clocking sampled value functions all carry the `_gclk`
+  // suffix ($past_gclk, $rose_gclk, …, $changing_gclk).
   return n == "$sampled" || n == "$rose" || n == "$fell" || n == "$stable" ||
-         n == "$past" || n == "$changed" || n.starts_with("$assert") ||
-         n.starts_with("$coverage") || n.starts_with("$q_") ||
-         n.starts_with("$async$") || n.starts_with("$sync$");
+         n == "$past" || n == "$changed" || n.ends_with("_gclk") ||
+         n.starts_with("$assert") || n.starts_with("$coverage") ||
+         n.starts_with("$q_") || n.starts_with("$async$") ||
+         n.starts_with("$sync$");
 }
 
 static bool IsIOSysCall(std::string_view n) {

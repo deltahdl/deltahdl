@@ -31,6 +31,7 @@ add_library(deltahdl_lib STATIC
     parser/time_resolve.cpp
     parser/library_map.cpp
     parser/precompiled_library.cpp
+    parser/assertion_control_task.cpp
     elaborator/elaborator.cpp
     elaborator/elaborator_items.cpp
     elaborator/property_rewrite.cpp
@@ -50,6 +51,8 @@ add_library(deltahdl_lib STATIC
     elaborator/sequence_match_attach.cpp
     elaborator/sequence_repetition.cpp
     elaborator/sampled_value.cpp
+    elaborator/global_clocking_sampled_value.cpp
+    elaborator/concurrent_assert_action.cpp
     elaborator/abort_property.cpp
     elaborator/typed_sequence_formal.cpp
     elaborator/rewrite_item.cpp
