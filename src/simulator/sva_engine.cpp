@@ -148,6 +148,27 @@ PropertyResult ResolveNonOverlapping(bool consequent_matched) {
   return consequent_matched ? PropertyResult::kPass : PropertyResult::kFail;
 }
 
+SequencePropertyStrength DefaultSequencePropertyStrength(AssertionKind stmt) {
+  // §16.12.2: assert property and assume property evaluate a bare sequence
+  // weakly; the remaining assertion statements take the strong reading.
+  if (stmt == AssertionKind::kAssert || stmt == AssertionKind::kAssume) {
+    return SequencePropertyStrength::kWeak;
+  }
+  return SequencePropertyStrength::kStrong;
+}
+
+PropertyResult EvalStrongSequenceProperty(bool has_nonempty_match) {
+  // §16.12.2: the strong reading holds exactly when a nonempty match exists.
+  return has_nonempty_match ? PropertyResult::kPass : PropertyResult::kFail;
+}
+
+PropertyResult EvalWeakSequenceProperty(bool finite_prefix_witnesses_inability) {
+  // §16.12.2: the weak reading holds unless some finite prefix has already
+  // ruled out any match.
+  return finite_prefix_witnesses_inability ? PropertyResult::kFail
+                                           : PropertyResult::kPass;
+}
+
 bool IsImmediateAssertionKindAllowed(AssertionKind kind) {
 
   return kind != AssertionKind::kRestrict;

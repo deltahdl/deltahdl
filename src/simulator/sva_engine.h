@@ -105,6 +105,32 @@ enum class AssertionKind : uint8_t {
   kRestrict = 3,
 };
 
+// §16.12.2: a sequence property has one of three forms — a bare sequence_expr,
+// weak(sequence_expr), or strong(sequence_expr). strong and weak are the
+// sequence operators that fix the evaluation strength; when neither appears the
+// strength is inferred from the enclosing assertion statement.
+enum class SequencePropertyStrength : uint8_t {
+  kWeak = 0,
+  kStrong = 1,
+};
+
+// §16.12.2: when the strong/weak operator is omitted, a bare sequence_expr is
+// evaluated weakly inside assert property and assume property, and strongly
+// inside every other assertion statement (e.g. cover property, restrict
+// property).
+SequencePropertyStrength DefaultSequencePropertyStrength(AssertionKind stmt);
+
+// §16.12.2: strong(sequence_expr) is true if, and only if, there is a nonempty
+// match of the sequence_expr. One match suffices, so this also gives
+// strong(first_match(sequence_expr)).
+PropertyResult EvalStrongSequenceProperty(bool has_nonempty_match);
+
+// §16.12.2: weak(sequence_expr) is true if, and only if, no finite prefix
+// witnesses inability to match the sequence_expr. A prefix witnesses inability
+// for sequence_expr exactly when it does for first_match(sequence_expr), so
+// this also gives weak(first_match(sequence_expr)).
+PropertyResult EvalWeakSequenceProperty(bool finite_prefix_witnesses_inability);
+
 bool IsImmediateAssertionKindAllowed(AssertionKind kind);
 
 enum class AssertionTiming : uint8_t {
