@@ -301,6 +301,64 @@ PropertyResult EvalEventually(bool strong, bool inner_holds_within_range,
   return all_range_ticks_present ? PropertyResult::kFail : PropertyResult::kPass;
 }
 
+PropertyResult EvalMulticlockedSequenceAsProperty(bool sequence_has_match) {
+  // §16.13.2: evaluated as a property at a point, a multiclocked sequence is true
+  // exactly when a match of the sequence begins at that point. The verdict is
+  // definite — there is no pending reading at the multiclocked-property level.
+  return sequence_has_match ? PropertyResult::kPass : PropertyResult::kFail;
+}
+
+PropertyResult EvalMulticlockedAnd(bool left_operand_has_match,
+                                   bool right_operand_has_match) {
+  // §16.13.2: each operand is evaluated as a property on its own clock and the
+  // multiclocked conjunction holds exactly when both operand properties hold,
+  // reusing the §16.12.4 Boolean property `and` over the two operand verdicts.
+  return EvalPropertyAnd(
+      EvalMulticlockedSequenceAsProperty(left_operand_has_match),
+      EvalMulticlockedSequenceAsProperty(right_operand_has_match));
+}
+
+uint64_t NearestClockTickAtOrAfter(uint64_t from,
+                                   const std::vector<uint64_t>& clock_ticks,
+                                   bool inclusive) {
+  // §16.13.2: ticks are in increasing time order; the first that qualifies is the
+  // nearest. The inclusive reading admits a tick coincident with `from`.
+  for (uint64_t tick : clock_ticks) {
+    if (tick > from || (inclusive && tick == from)) return tick;
+  }
+  return kNoMulticlockTick;
+}
+
+uint64_t MulticlockedConsequentEvalTick(
+    uint64_t antecedent_end_time,
+    const std::vector<uint64_t>& consequent_clock_ticks, bool overlapping) {
+  // §16.13.2: the overlapping implication (|->) may check at a tick coincident
+  // with the antecedent end; the nonoverlapping implication (|=>) advances to a
+  // strictly future tick.
+  return NearestClockTickAtOrAfter(antecedent_end_time, consequent_clock_ticks,
+                                   /*inclusive=*/overlapping);
+}
+
+bool MulticlockedImplicationChecksImmediately(
+    uint64_t antecedent_end_time,
+    const std::vector<uint64_t>& consequent_clock_ticks, bool overlapping) {
+  // §16.13.2: only the overlapping form checks immediately, and only when the
+  // consequent clock actually ticks at the antecedent match end.
+  if (!overlapping) return false;
+  return MulticlockedConsequentEvalTick(antecedent_end_time,
+                                        consequent_clock_ticks, overlapping) ==
+         antecedent_end_time;
+}
+
+uint64_t MulticlockedIfBranchEvalTick(
+    uint64_t condition_time, const std::vector<uint64_t>& branch_clock_ticks) {
+  // §16.13.2: both the possibly-overlapping then-branch and the non-strictly
+  // subsequent else-branch admit a branch-clock tick coincident with the
+  // condition check, so each is evaluated at the nearest tick at or after it.
+  return NearestClockTickAtOrAfter(condition_time, branch_clock_ticks,
+                                   /*inclusive=*/true);
+}
+
 SequencePropertyStrength DefaultSequencePropertyStrength(AssertionKind stmt) {
   // §16.12.2: assert property and assume property evaluate a bare sequence
   // weakly; the remaining assertion statements take the strong reading.

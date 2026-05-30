@@ -40,6 +40,7 @@ add_library(deltahdl_lib STATIC
     elaborator/nexttime_index.cpp
     elaborator/always_range.cpp
     elaborator/eventually_range.cpp
+    elaborator/multiclock_property.cpp
     elaborator/multiclock_sequence.cpp
     elaborator/semantic_leading_clock.cpp
     elaborator/sequence_admits_empty.cpp

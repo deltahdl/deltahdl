@@ -249,6 +249,64 @@ PropertyResult EvalUntil(bool strong, bool rhs_holds_eventually,
 PropertyResult EvalEventually(bool strong, bool inner_holds_within_range,
                               bool all_range_ticks_present);
 
+// §16.13.2: a multiclocked sequence is itself a multiclocked property. When a
+// multiclocked sequence is evaluated as a property beginning at some point, the
+// evaluation is true if, and only if, there is a match of the sequence beginning
+// at that point. Like a singly clocked property the result is always a definite
+// true or false, never pending.
+PropertyResult EvalMulticlockedSequenceAsProperty(bool sequence_has_match);
+
+// §16.13.2: a Boolean `and` whose two operands are clocked by different clocks
+// forms a multiclocked property — but not a multiclocked sequence. Both operands
+// begin at the same evaluation point, each on its own clock; the conjunction is
+// true if, and only if, both operands have a match beginning at that point.
+PropertyResult EvalMulticlockedAnd(bool left_operand_has_match,
+                                   bool right_operand_has_match);
+
+// §16.13.2: sentinel returned when no tick of the relevant clock is available to
+// locate the evaluation point of a multiclocked operand.
+inline constexpr uint64_t kNoMulticlockTick = ~static_cast<uint64_t>(0);
+
+// §16.13.2: the nearest tick of `clock_ticks` at which a multiclocked operand is
+// evaluated relative to time `from`. When `inclusive` is true a tick coincident
+// with `from` qualifies (the "possibly overlapping" / "non-strictly subsequent"
+// reading); when false only strictly future ticks qualify. `clock_ticks` shall
+// be in increasing time order. Returns kNoMulticlockTick when no qualifying tick
+// exists.
+uint64_t NearestClockTickAtOrAfter(uint64_t from,
+                                   const std::vector<uint64_t>& clock_ticks,
+                                   bool inclusive);
+
+// §16.13.2: the tick at which the consequent of a multiclocked implication is
+// evaluated. Both forms synchronize from the antecedent match end time to a tick
+// of the consequent's clock. The nonoverlapping form (|=>) advances to the
+// nearest strictly future consequent-clock tick. The overlapping form (|->)
+// awaits the nearest consequent-clock tick: when the consequent clock ticks at
+// the antecedent end the consequent is checked there immediately, otherwise it
+// behaves as the nonoverlapping form. Returns kNoMulticlockTick when no
+// qualifying consequent-clock tick exists.
+uint64_t MulticlockedConsequentEvalTick(
+    uint64_t antecedent_end_time,
+    const std::vector<uint64_t>& consequent_clock_ticks, bool overlapping);
+
+// §16.13.2: whether a multiclocked overlapping implication (|->) checks its
+// consequent immediately, i.e. the consequent clock ticks at the antecedent match
+// end. The nonoverlapping form (|=>) never checks immediately because it advances
+// to a strictly future tick.
+bool MulticlockedImplicationChecksImmediately(
+    uint64_t antecedent_end_time,
+    const std::vector<uint64_t>& consequent_clock_ticks, bool overlapping);
+
+// §16.13.2: the tick at which a branch of a multiclocked if / if-else property is
+// evaluated. The condition is checked at the property clock (`condition_time`);
+// the then-branch is then evaluated at the nearest, possibly overlapping tick of
+// its clock and the else-branch at the nearest non-strictly subsequent tick of
+// its clock. Both readings admit a tick coincident with the condition check, so
+// the branch tick is the nearest tick at or after `condition_time`. Returns
+// kNoMulticlockTick when the branch clock has no qualifying tick.
+uint64_t MulticlockedIfBranchEvalTick(
+    uint64_t condition_time, const std::vector<uint64_t>& branch_clock_ticks);
+
 enum class AssertionKind : uint8_t {
   kAssert = 0,
   kAssume = 1,
