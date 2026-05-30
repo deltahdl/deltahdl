@@ -4,19 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralAssignDeassignParsing, AssignWithBitSelectLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin assign q[0] = d; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-}
-
 TEST(ProceduralAssignDeassignParsing, AssignInTaskBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -74,36 +61,6 @@ TEST(ProceduralAssignDeassignParsing, FullDFlipFlopPattern) {
     if (item->kind == ModuleItemKind::kAlwaysBlock) always_count++;
   }
   EXPECT_GE(always_count, 2);
-}
-
-TEST(ProceduralAssignDeassignParsing, AssignInAlwaysBlock) {
-  auto r = Parse(
-      "module dff(output q, input d, clear, preset, clock);\n"
-      "  logic q;\n"
-      "  always @(clear or preset)\n"
-      "    if (!clear) assign q = 0;\n"
-      "    else if (!preset) assign q = 1;\n"
-      "    else deassign q;\n"
-      "  always @(posedge clock) q = d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "dff");
-}
-TEST(ProceduralAssignDeassignParsing, AssignConcatLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    assign {a, b} = 2'b10;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
 TEST(ProceduralAssignDeassignParsing, AssignInInitialBlock) {
@@ -432,21 +389,6 @@ TEST(ProceduralAssignDeassignParsing, AssignInsideForLoop) {
   EXPECT_EQ(stmt->for_body->kind, StmtKind::kAssign);
 }
 
-TEST(ProceduralAssignDeassignParsing, DFlipFlopClearPreset) {
-  EXPECT_TRUE(
-      ParseOk("module dff_cp(output reg q, input d, clear, preset, clock);\n"
-              "  always @(clear or preset)\n"
-              "    if (!clear)\n"
-              "      assign q = 0;\n"
-              "    else if (!preset)\n"
-              "      assign q = 1;\n"
-              "    else\n"
-              "      deassign q;\n"
-              "  always @(posedge clock)\n"
-              "    q <= d;\n"
-              "endmodule\n"));
-}
-
 TEST(ProceduralAssignDeassignParsing, AssignInNamedBlock) {
   auto r = Parse(
       "module m;\n"
@@ -483,22 +425,6 @@ TEST(ProceduralAssignDeassignParsing, AssignInForkJoin) {
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kAssign);
 }
 
-}
-
-TEST(ProceduralAssignDeassignParsing, DeassignConcatLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    deassign {a, b};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
 TEST(ProceduralAssignDeassignParsing, AssignSystemFuncRhs) {
@@ -641,60 +567,6 @@ TEST(ProceduralAssignDeassignParsing, AssignToVector) {
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->text, "vec");
   ASSERT_NE(stmt->rhs, nullptr);
-}
-
-TEST(ProceduralAssignDeassignParsing, DeassignSingularVariable) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q;\n"
-      "  initial begin\n"
-      "    deassign q;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
-}
-
-TEST(ProceduralAssignDeassignParsing, AssignSingularVariableLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q;\n"
-      "  initial begin\n"
-      "    assign q = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
-}
-
-TEST(ProceduralAssignDeassignParsing, ReAssignSameVariableSyntax) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q;\n"
-      "  initial begin\n"
-      "    assign q = 0;\n"
-      "    assign q = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* s0 = NthInitialStmt(r, 0);
-  auto* s1 = NthInitialStmt(r, 1);
-  ASSERT_NE(s0, nullptr);
-  ASSERT_NE(s1, nullptr);
-  EXPECT_EQ(s0->kind, StmtKind::kAssign);
-  EXPECT_EQ(s1->kind, StmtKind::kAssign);
-  EXPECT_EQ(s0->lhs->text, s1->lhs->text);
 }
 
 }

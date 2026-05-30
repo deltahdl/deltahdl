@@ -262,6 +262,32 @@ TEST(ProceduralContinuousAssignSim, DeassignRetainsValueThenBlockingOverwrites) 
   EXPECT_EQ(q->value.ToUint64(), 77u);
 }
 
+TEST(ProceduralContinuousAssignSim, DeassignRetainsValueThenContinuousOverwrites) {
+  // After a deassign the held value persists until the variable is reassigned.
+  // Besides an ordinary procedural assignment, a fresh procedural continuous
+  // assignment is one of the ways that new value can be installed; here the
+  // second assign must take effect and re-establish the forced state.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] q;\n"
+      "  initial begin\n"
+      "    assign q = 8'd50;\n"
+      "    deassign q;\n"
+      "    assign q = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 99u);
+  EXPECT_TRUE(q->is_forced);
+}
+
 TEST(ProceduralContinuousAssignSim, DFlipFlopClearPresetPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
