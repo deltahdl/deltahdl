@@ -120,6 +120,20 @@ PropertyResult EvalWithDisableIff(bool disable_cond, PropertyResult inner);
 // evaluated.
 PropertyResult ResolveNonOverlapping(bool consequent_matched);
 
+// §16.12.8: a property `property_expr1 implies property_expr2` evaluates to true
+// if, and only if, the antecedent fails to hold or the consequent holds — the
+// ordinary logical implication over the two operands' verdicts. Unlike the
+// sequence implication operators of §16.12.7 there is no antecedent match point
+// to defer to, so the result settles from the operand verdicts directly. A
+// vacuous pass counts as the operand holding, mirroring EvalPropertyOr.
+PropertyResult EvalPropertyImplies(PropertyResult antecedent,
+                                   PropertyResult consequent);
+
+// §16.12.8: a property `property_expr1 iff property_expr2` evaluates to true if,
+// and only if, both operands hold or both operands fail to hold — the operands'
+// verdicts must agree. A vacuous pass counts as the operand holding.
+PropertyResult EvalPropertyIff(PropertyResult a, PropertyResult b);
+
 enum class AssertionKind : uint8_t {
   kAssert = 0,
   kAssume = 1,

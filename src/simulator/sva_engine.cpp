@@ -156,6 +156,28 @@ PropertyResult ResolveNonOverlapping(bool consequent_matched) {
   return consequent_matched ? PropertyResult::kPass : PropertyResult::kFail;
 }
 
+PropertyResult EvalPropertyImplies(PropertyResult antecedent,
+                                   PropertyResult consequent) {
+  // §16.12.8: holds when the antecedent does not hold or the consequent holds.
+  // A vacuous pass counts as the operand holding, mirroring EvalPropertyOr.
+  bool ant_holds = antecedent == PropertyResult::kPass ||
+                   antecedent == PropertyResult::kVacuousPass;
+  bool con_holds = consequent == PropertyResult::kPass ||
+                   consequent == PropertyResult::kVacuousPass;
+  return (!ant_holds || con_holds) ? PropertyResult::kPass
+                                   : PropertyResult::kFail;
+}
+
+PropertyResult EvalPropertyIff(PropertyResult a, PropertyResult b) {
+  // §16.12.8: holds when the two operands' verdicts agree — both hold or both
+  // fail to hold. A vacuous pass counts as the operand holding.
+  bool a_holds =
+      a == PropertyResult::kPass || a == PropertyResult::kVacuousPass;
+  bool b_holds =
+      b == PropertyResult::kPass || b == PropertyResult::kVacuousPass;
+  return (a_holds == b_holds) ? PropertyResult::kPass : PropertyResult::kFail;
+}
+
 SequencePropertyStrength DefaultSequencePropertyStrength(AssertionKind stmt) {
   // §16.12.2: assert property and assume property evaluate a bare sequence
   // weakly; the remaining assertion statements take the strong reading.
