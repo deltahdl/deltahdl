@@ -48,7 +48,7 @@ const int kFeatureReasons[] = {
     cbUnresolvedSystf,
 };
 
-class SimulatorClause38_36_03 : public ::testing::Test {
+class VpiActionFeatureCallbacks : public ::testing::Test {
  protected:
   void SetUp() override {
     g_invocations = 0;
@@ -77,7 +77,7 @@ class SimulatorClause38_36_03 : public ::testing::Test {
 
 // §38.36.3: the listed action-related callbacks shall be defined. Registering
 // each one yields a callback handle and records the reason that was requested.
-TEST_F(SimulatorClause38_36_03, ActionReasonsAreDefinedAndRegister) {
+TEST_F(VpiActionFeatureCallbacks, ActionReasonsAreDefinedAndRegister) {
   for (int reason : kActionReasons) {
     s_cb_data cb = {};
     cb.reason = reason;
@@ -90,7 +90,7 @@ TEST_F(SimulatorClause38_36_03, ActionReasonsAreDefinedAndRegister) {
 
 // §38.36.3: the feature-related callback reasons are likewise registrable
 // through the same vpi_register_cb() mechanism.
-TEST_F(SimulatorClause38_36_03, FeatureReasonsAreDefinedAndRegister) {
+TEST_F(VpiActionFeatureCallbacks, FeatureReasonsAreDefinedAndRegister) {
   for (int reason : kFeatureReasons) {
     s_cb_data cb = {};
     cb.reason = reason;
@@ -102,7 +102,7 @@ TEST_F(SimulatorClause38_36_03, FeatureReasonsAreDefinedAndRegister) {
 }
 
 // §38.36.3: every action and feature reason denotes a distinct callback reason.
-TEST_F(SimulatorClause38_36_03, ReasonCodesAreDistinct) {
+TEST_F(VpiActionFeatureCallbacks, ReasonCodesAreDistinct) {
   std::set<int> seen;
   for (int reason : kActionReasons) seen.insert(reason);
   for (int reason : kFeatureReasons) seen.insert(reason);
@@ -113,7 +113,7 @@ TEST_F(SimulatorClause38_36_03, ReasonCodesAreDistinct) {
 // §38.36.3: the only fields that need to be set for an action or feature
 // callback are the reason, the callback routine, and (optionally) user_data.
 // Registration succeeds with the remaining fields left at their defaults.
-TEST_F(SimulatorClause38_36_03, MinimalFieldsSufficeForRegistration) {
+TEST_F(VpiActionFeatureCallbacks, MinimalFieldsSufficeForRegistration) {
   int payload = 0;
   s_cb_data cb = {};
   cb.reason = cbStartOfSimulation;
@@ -133,7 +133,7 @@ TEST_F(SimulatorClause38_36_03, MinimalFieldsSufficeForRegistration) {
 
 // §38.36.3: when the callback occurs, the application routine is passed a
 // pointer to an s_cb_data structure whose reason field holds the reason.
-TEST_F(SimulatorClause38_36_03, DispatchActionCallbackPassesReason) {
+TEST_F(VpiActionFeatureCallbacks, DispatchActionCallbackPassesReason) {
   Register(cbStartOfSimulation);
 
   int fired = vpi_ctx_.DispatchCallbacks(cbStartOfSimulation);
@@ -145,7 +145,7 @@ TEST_F(SimulatorClause38_36_03, DispatchActionCallbackPassesReason) {
 
 // §38.36.3: application data placed in user_data reaches the callback routine
 // unchanged, since the routine receives the structure supplied at registration.
-TEST_F(SimulatorClause38_36_03, ExecutingCallbackDeliversUserData) {
+TEST_F(VpiActionFeatureCallbacks, ExecutingCallbackDeliversUserData) {
   int payload = 7;
   s_cb_data cb = {};
   cb.reason = cbEndOfSimulation;
@@ -161,7 +161,7 @@ TEST_F(SimulatorClause38_36_03, ExecutingCallbackDeliversUserData) {
 // §38.36.3: to install a signal handler the application sets the reason to
 // cbSignal and the index field to the desired signal number; registration
 // preserves that signal number.
-TEST_F(SimulatorClause38_36_03, SignalCallbackPreservesSignalNumber) {
+TEST_F(VpiActionFeatureCallbacks, SignalCallbackPreservesSignalNumber) {
   s_cb_data cb = {};
   cb.reason = cbSignal;
   cb.cb_rtn = &RecordingCb;
@@ -176,7 +176,7 @@ TEST_F(SimulatorClause38_36_03, SignalCallbackPreservesSignalNumber) {
 
 // §38.36.3: for a cbTchkViolation callback the obj field is a handle to the
 // timing check; the simulator supplies it when the callback is delivered.
-TEST_F(SimulatorClause38_36_03, TchkViolationDeliversTimingCheckHandle) {
+TEST_F(VpiActionFeatureCallbacks, TchkViolationDeliversTimingCheckHandle) {
   VpiObject timing_check;
   Register(cbTchkViolation);
 
@@ -188,7 +188,7 @@ TEST_F(SimulatorClause38_36_03, TchkViolationDeliversTimingCheckHandle) {
 
 // §38.36.3: for a cbInteractiveScopeChange callback the obj field is a handle to
 // the new interactive scope.
-TEST_F(SimulatorClause38_36_03, InteractiveScopeChangeDeliversScopeHandle) {
+TEST_F(VpiActionFeatureCallbacks, InteractiveScopeChangeDeliversScopeHandle) {
   VpiObject scope;
   Register(cbInteractiveScopeChange);
 
@@ -200,7 +200,7 @@ TEST_F(SimulatorClause38_36_03, InteractiveScopeChangeDeliversScopeHandle) {
 
 // §38.36.3: for a cbUnresolvedSystf callback user_data points to the name of the
 // unresolved task or system function.
-TEST_F(SimulatorClause38_36_03, UnresolvedSystfDeliversName) {
+TEST_F(VpiActionFeatureCallbacks, UnresolvedSystfDeliversName) {
   const char* name = "$unknown_systf";
   Register(cbUnresolvedSystf);
 
@@ -213,7 +213,7 @@ TEST_F(SimulatorClause38_36_03, UnresolvedSystfDeliversName) {
 
 // §38.36.3: a reset delivers cbStartOfReset at the start of the operation and
 // cbEndOfReset after it has completed, in that order.
-TEST_F(SimulatorClause38_36_03, ResetDeliversStartThenEnd) {
+TEST_F(VpiActionFeatureCallbacks, ResetDeliversStartThenEnd) {
   Register(cbEndOfReset);
   Register(cbStartOfReset);
 
@@ -230,7 +230,7 @@ TEST_F(SimulatorClause38_36_03, ResetDeliversStartThenEnd) {
 // only callbacks that exist across the restart are those two. This observes
 // both halves of the rule: several varied non-restart callbacks are all purged,
 // while the restart pair both survives and is delivered.
-TEST_F(SimulatorClause38_36_03, RestartPurgesOthersAndDeliversRestartCallbacks) {
+TEST_F(VpiActionFeatureCallbacks, RestartPurgesOthersAndDeliversRestartCallbacks) {
   Register(cbValueChange);
   Register(cbStmt);
   Register(cbStartOfSave);
