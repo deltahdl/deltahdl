@@ -85,6 +85,11 @@ bool EvalThroughout(const std::function<bool(uint64_t)>& check,
 
 PropertyResult EvalImplication(bool antecedent, bool consequent,
                                bool non_overlapping);
+
+// §16.12.3: a negation `not property_expr` returns the opposite verdict of the
+// underlying property_expr — a true underlying evaluation makes the negation
+// false, and a false one makes it true. Each attempt of the negation drives a
+// single attempt of the underlying property_expr.
 PropertyResult EvalPropertyNot(PropertyResult inner);
 PropertyResult EvalPropertyAnd(PropertyResult a, PropertyResult b);
 PropertyResult EvalPropertyOr(PropertyResult a, PropertyResult b);
@@ -130,6 +135,11 @@ PropertyResult EvalStrongSequenceProperty(bool has_nonempty_match);
 // for sequence_expr exactly when it does for first_match(sequence_expr), so
 // this also gives weak(first_match(sequence_expr)).
 PropertyResult EvalWeakSequenceProperty(bool finite_prefix_witnesses_inability);
+
+// §16.12.3: the `not` operator switches the strength of the property it
+// negates. Negating a weak property yields a strong one and vice versa, so a
+// caller that knows the underlying strength can derive the negation's strength.
+SequencePropertyStrength NegatePropertyStrength(SequencePropertyStrength inner);
 
 bool IsImmediateAssertionKindAllowed(AssertionKind kind);
 

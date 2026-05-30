@@ -169,6 +169,14 @@ PropertyResult EvalWeakSequenceProperty(bool finite_prefix_witnesses_inability) 
                                            : PropertyResult::kPass;
 }
 
+SequencePropertyStrength NegatePropertyStrength(SequencePropertyStrength inner) {
+  // §16.12.3: negation flips the strength — a weak underlying property becomes
+  // strong under `not`, and a strong one becomes weak.
+  return inner == SequencePropertyStrength::kWeak
+             ? SequencePropertyStrength::kStrong
+             : SequencePropertyStrength::kWeak;
+}
+
 bool IsImmediateAssertionKindAllowed(AssertionKind kind) {
 
   return kind != AssertionKind::kRestrict;
