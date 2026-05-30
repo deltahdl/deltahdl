@@ -41,6 +41,7 @@ add_library(deltahdl_lib STATIC
     elaborator/always_range.cpp
     elaborator/eventually_range.cpp
     elaborator/clock_flow.cpp
+    elaborator/clock_resolution.cpp
     elaborator/multiclock_property.cpp
     elaborator/multiclock_sequence.cpp
     elaborator/semantic_leading_clock.cpp
