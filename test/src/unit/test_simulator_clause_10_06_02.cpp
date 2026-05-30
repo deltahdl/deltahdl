@@ -26,116 +26,6 @@ TEST(ForceReleaseSim, VarLvalueForce) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-TEST(ForceRelease, ReleaseContinuouslyDrivenVariableReestablishes) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4VecVal(arena, 1, 0);
-
-  Logic4Vec continuous_val = MakeLogic4VecVal(arena, 1, 0);
-
-  var->value = MakeLogic4VecVal(arena, 1, 1);
-  EXPECT_EQ(ValOf(*var), kVal1);
-
-  var->value = continuous_val;
-
-  EXPECT_EQ(ValOf(*var), kVal0);
-}
-
-void ForceNet(Net& net, const Logic4Vec& value, Arena& arena) {
-  (void)arena;
-  net.resolved->value = value;
-}
-
-TEST(ForceRelease, ForceNetOverridesAllDrivers) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-
-  ForceNet(net, MakeLogic4VecVal(arena, 1, 1), arena);
-  EXPECT_EQ(ValOf(*var), kVal1);
-}
-
-void ReleaseNet(Net& net, Arena& arena) {
-  (void)arena;
-  if (!net.drivers.empty()) {
-    net.resolved->value = net.drivers[0];
-  } else {
-    for (uint32_t i = 0; i < net.resolved->value.nwords; ++i) {
-      net.resolved->value.words[i].aval = 1;
-      net.resolved->value.words[i].bval = 1;
-    }
-  }
-}
-
-TEST(ForceRelease, ReleaseNetImmediatelyRestoresDriverValue) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-
-  ForceNet(net, MakeLogic4VecVal(arena, 1, 1), arena);
-  EXPECT_EQ(ValOf(*var), kVal1);
-
-  ReleaseNet(net, arena);
-
-  EXPECT_EQ(ValOf(*var), kVal0);
-}
-
-struct TwoNets {
-  Arena arena;
-  Variable* vd = nullptr;
-  Variable* ve = nullptr;
-  Net net_d;
-  Net net_e;
-};
-
-static TwoNets MakeTwoWireNets() {
-  TwoNets tn;
-  tn.vd = tn.arena.Create<Variable>();
-  tn.vd->value = MakeLogic4Vec(tn.arena, 1);
-  tn.ve = tn.arena.Create<Variable>();
-  tn.ve->value = MakeLogic4Vec(tn.arena, 1);
-  tn.net_d.type = NetType::kWire;
-  tn.net_d.resolved = tn.vd;
-  tn.net_d.drivers.push_back(MakeLogic4VecVal(tn.arena, 1, 0));
-  tn.net_e.type = NetType::kWire;
-  tn.net_e.resolved = tn.ve;
-  tn.net_e.drivers.push_back(MakeLogic4VecVal(tn.arena, 1, 0));
-  return tn;
-}
-
-TEST(ForceRelease, NormativeExampleInitialState) {
-  auto tn = MakeTwoWireNets();
-
-  ReleaseNet(tn.net_d, tn.arena);
-  ReleaseNet(tn.net_e, tn.arena);
-  EXPECT_EQ(ValOf(*tn.vd), kVal0);
-  EXPECT_EQ(ValOf(*tn.ve), kVal0);
-}
-
-TEST(ForceRelease, NormativeExampleForceThenRelease) {
-  auto tn = MakeTwoWireNets();
-
-  ForceNet(tn.net_d, MakeLogic4VecVal(tn.arena, 1, 1), tn.arena);
-  ForceNet(tn.net_e, MakeLogic4VecVal(tn.arena, 1, 1), tn.arena);
-  EXPECT_EQ(ValOf(*tn.vd), kVal1);
-  EXPECT_EQ(ValOf(*tn.ve), kVal1);
-
-  ReleaseNet(tn.net_d, tn.arena);
-  ReleaseNet(tn.net_e, tn.arena);
-  EXPECT_EQ(ValOf(*tn.vd), kVal0);
-  EXPECT_EQ(ValOf(*tn.ve), kVal0);
-}
-
 TEST(ForceReleaseExec, ForceOverridesValue) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("x", 32);
@@ -487,6 +377,66 @@ TEST(ForceReleaseSim, ReleaseOnNetUsesDriverValue) {
   ASSERT_NE(w, nullptr);
   EXPECT_FALSE(w->is_forced);
   EXPECT_EQ(w->value.ToUint64(), 55u);
+}
+
+// A force on a net overrides every kind of driver until the net is released,
+// not just continuous assignments. Here a primitive AND gate drives w to 1,
+// yet the force holds w at 0 while it is in effect.
+TEST(ForceReleaseSim, ForceOverridesGateOutputDriver) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, b;\n"
+      "  wire w;\n"
+      "  and g(w, a, b);\n"
+      "  initial begin\n"
+      "    a = 1'b1;\n"
+      "    b = 1'b1;\n"
+      "    #1;\n"
+      "    force w = 1'b0;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* w = f.ctx.FindVariable("w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_TRUE(w->is_forced);
+  EXPECT_EQ(w->value.ToUint64(), 0u);
+}
+
+// Releasing a net makes it take the value its drivers determine right away.
+// After release the AND gate (1 & 1) drives w back to 1, displacing the
+// forced 0.
+TEST(ForceReleaseSim, ReleaseNetReturnsToGateOutputValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, b;\n"
+      "  wire w;\n"
+      "  and g(w, a, b);\n"
+      "  initial begin\n"
+      "    a = 1'b1;\n"
+      "    b = 1'b1;\n"
+      "    #1;\n"
+      "    force w = 1'b0;\n"
+      "    #1;\n"
+      "    release w;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* w = f.ctx.FindVariable("w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_FALSE(w->is_forced);
+  EXPECT_EQ(w->value.ToUint64(), 1u);
 }
 
 }
