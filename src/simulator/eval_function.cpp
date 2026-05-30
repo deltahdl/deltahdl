@@ -606,6 +606,28 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     ctx.RequestStop();
     return MakeLogic4VecVal(arena, 1, 0);
   }
+  // Optional $reset family (Annex D.8). $reset tallies a reset of the tool and
+  // captures its reset_value argument (the second argument, after stop_value)
+  // so that the value can be communicated to after the reset; the other
+  // arguments are accepted but carry no observable state here.
+  if (name == "$reset") {
+    int64_t reset_value = 0;
+    if (expr->args.size() > 1 && expr->args[1]) {
+      reset_value =
+          static_cast<int64_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
+    }
+    ctx.RecordReset(reset_value);
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  // $reset_count reports how many times the tool has been reset.
+  if (name == "$reset_count") {
+    return MakeLogic4VecVal(arena, 32, ctx.ResetCount());
+  }
+  // $reset_value returns the reset_value argument supplied to the last $reset.
+  if (name == "$reset_value") {
+    return MakeLogic4VecVal(arena, 32,
+                            static_cast<uint64_t>(ctx.ResetValue()));
+  }
   if (name == "$exit") {
 
     auto* cur = ctx.CurrentProcess();

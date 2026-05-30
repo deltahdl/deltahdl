@@ -150,6 +150,17 @@ class SimContext {
   void RequestStop() { stop_requested_ = true; }
   bool StopRequested() const { return stop_requested_; }
 
+  // Optional $reset family (Annex D.8). RecordReset tallies one reset of the
+  // tool and remembers the reset_value argument so that the $reset_value
+  // system function can hand that value back after the reset. $reset_count
+  // reports how many resets have occurred.
+  void RecordReset(int64_t reset_value) {
+    ++reset_count_;
+    reset_value_ = reset_value;
+  }
+  uint32_t ResetCount() const { return reset_count_; }
+  int64_t ResetValue() const { return reset_value_; }
+
   void RegisterProgramInitial(uint32_t program_block_id, Process* proc);
   void OnProgramInitialComplete(Process* proc);
 
@@ -533,6 +544,8 @@ class SimContext {
   DpiContext* dpi_context_ = nullptr;
   Process* current_process_ = nullptr;
   bool stop_requested_ = false;
+  uint32_t reset_count_ = 0;
+  int64_t reset_value_ = 0;
 
   std::unordered_map<const Expr*, Logic4Vec> deferred_arg_snapshots_;
 
