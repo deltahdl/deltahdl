@@ -793,6 +793,95 @@ AssertionSeverity DefaultConcurrentAssertActionSeverity();
 // the Reactive region.
 Region ConcurrentAssertActionRegion();
 
+// === §16.14.2 Assume statement ===
+
+// §16.14.2: for simulation an assumed property is constrained to hold and, like
+// an asserted property, is checked and reported when it fails. Its action_block
+// branch follows the property outcome exactly as an assert statement's does: a
+// true evaluation runs the pass statements, a false evaluation runs the fail
+// statements, and a disabled evaluation runs neither. Delegating to the
+// §16.14.1 selector keeps the assume and assert action-block behavior identical.
+inline AssertActionBlockChoice SelectAssumeActionBlock(bool property_passed,
+                                                       bool property_disabled) {
+  return SelectAssertActionBlock(property_passed, property_disabled);
+}
+
+// §16.14.2: the pass and fail statements of an assume statement can be
+// controlled with the §20.11 assertion action control tasks, the same way an
+// assert statement's are.
+inline AssertActionBlockChoice ResolveAssumeActionUnderControl(
+    AssertActionBlockChoice base, bool pass_action_enabled,
+    bool fail_action_enabled) {
+  return ResolveAssertActionUnderControl(base, pass_action_enabled,
+                                         fail_action_enabled);
+}
+
+// §16.14.2: an assume statement has a fail action — unlike a cover statement —
+// so when its else clause is omitted the tool calls $error on a failing
+// evaluation, unless a §20.11 control has disabled the fail action. A disabled
+// evaluation is neither a pass nor a fail, so the caller passes
+// property_failed=false for it and no default $error is issued.
+inline bool AssumeCallsDefaultErrorOnFailure(bool property_failed,
+                                             bool has_else_clause,
+                                             bool fail_action_enabled) {
+  return property_failed && !has_else_clause && fail_action_enabled;
+}
+
+// §16.14.2: the directive that an assertion-biasing dist (an
+// `expression dist { dist_list }`, defined in A.1.10) appears in determines how
+// the dist operator is interpreted for random simulation.
+enum class BiasedAssertionDirective : uint8_t {
+  kAssert,
+  kAssume,
+  kCover,
+};
+
+// §16.14.2: when a property that uses biasing appears in an assert or cover
+// statement, the dist operator is equivalent to the inside operator and the
+// weight specification is ignored. Only in an assume statement do the weights
+// take effect, biasing the random selection of free-variable values.
+inline bool BiasingWeightsIgnored(BiasedAssertionDirective directive) {
+  return directive == BiasedAssertionDirective::kAssert ||
+         directive == BiasedAssertionDirective::kCover;
+}
+
+// §16.14.2: within an assert or cover statement a biased dist behaves as the
+// inside operator — plain set membership with the weights dropped. In an assume
+// statement the weights are honored, so the dist is not reduced to inside there.
+inline bool BiasedDistActsAsInside(BiasedAssertionDirective directive) {
+  return BiasingWeightsIgnored(directive);
+}
+
+// §16.14.2: a property that is assumed shall hold in the same way with or
+// without biasing. The set of free-variable values that satisfy an assumption is
+// the membership set of the distribution and does not depend on the weights;
+// biasing only chooses among those legal values when there is a choice at a
+// given time. Whether `value` is a legal selection is therefore independent of
+// whether biasing weights are present.
+inline bool AssumeValueIsLegalUnderBiasing(int64_t value,
+                                           const std::vector<int64_t>& members,
+                                           bool /*weights_present*/) {
+  for (int64_t member : members) {
+    if (member == value) return true;
+  }
+  return false;
+}
+
+// §16.14.2: for an assume statement the biasing weights select among the legal
+// free-variable values according to their cumulative distribution. Given the
+// per-candidate weights and a random draw in [0, sum(weights)), return the index
+// of the chosen candidate. (In an assert or cover statement the weights are
+// ignored, so this weighted selection does not apply there.)
+inline std::size_t SelectBiasedFreeVariable(
+    const std::vector<uint32_t>& weights, uint64_t draw) {
+  uint64_t cumulative = 0;
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    cumulative += weights[i];
+    if (draw < cumulative) return i;
+  }
+  return weights.empty() ? 0 : weights.size() - 1;
+}
+
 // §16.9.4: the global clocking past value-change functions compare the sampled
 // value at the global clock tick that immediately precedes the current tick
 // with the value at the current tick. $rose_gclk reports the LSB changing to 1,
