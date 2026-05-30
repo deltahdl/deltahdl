@@ -49,6 +49,7 @@ add_library(deltahdl_lib STATIC
     elaborator/sequence_degeneracy.cpp
     elaborator/sequence_match_attach.cpp
     elaborator/sequence_repetition.cpp
+    elaborator/sampled_value.cpp
     elaborator/typed_sequence_formal.cpp
     elaborator/rewrite_item.cpp
     elaborator/annex_f_notation.cpp

@@ -60,4 +60,28 @@ TEST(AssertionParsing, ChangedFunctionInProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §16.9.3: when intermediate optional arguments between two arguments are not
+// needed, a comma is placed for each omitted argument, e.g. $past(in1, ,
+// enable) omits number_of_ticks while supplying expression2.
+TEST(AssertionParsing, PastOmittedMiddleArgument) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) $past(in1, , enable) |-> ack);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §16.9.3: the clocking event may be supplied explicitly as an argument to a
+// sampled value function, e.g. $rose(req, @(posedge fclk)).
+TEST(AssertionParsing, RoseWithExplicitClockingEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property\n"
+      "    (@(posedge clk) en && $rose(req, @(posedge fclk)) |=> gnt);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }
