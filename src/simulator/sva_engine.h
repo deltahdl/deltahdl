@@ -249,6 +249,39 @@ PropertyResult EvalUntil(bool strong, bool rhs_holds_eventually,
 PropertyResult EvalEventually(bool strong, bool inner_holds_within_range,
                               bool all_range_ticks_present);
 
+// §16.12.14: an accept abort property (accept_on / sync_accept_on) evaluates the
+// underlying property_expr, but if the abort condition becomes true during that
+// evaluation the overall result is forced to true; otherwise the result is the
+// underlying verdict. The abort condition takes precedence, so a true condition
+// wins even over an underlying verdict that has already settled.
+PropertyResult EvalAbortAccept(bool abort_condition, PropertyResult inner);
+
+// §16.12.14: a reject abort property (reject_on / sync_reject_on) forces the
+// overall result to false when the abort condition becomes true; otherwise the
+// result is the underlying verdict. The standard defines reject_on(c) p as
+// not(accept_on(c) not p), and likewise for the synchronous form.
+PropertyResult EvalAbortReject(bool abort_condition, PropertyResult inner);
+
+// §16.12.14: nested abort operators are evaluated in lexical order, outermost
+// first. When the conditions of two nested abort operators become true in the
+// same time step during evaluation of the argument property, the outermost
+// operator takes precedence and decides the verdict. The `_forces_true` flags
+// select accept (true) versus reject (false) polarity for each operator.
+PropertyResult EvalNestedAbort(bool outer_forces_true, bool outer_condition,
+                               bool inner_forces_true, bool inner_condition,
+                               PropertyResult inner_property);
+
+// §16.12.14: the abort condition is evaluated using the sampled value as a
+// regular Boolean expression — unlike `disable iff`, whose condition uses
+// current values (see DisableConditionUsesCurrentValues).
+bool AbortConditionUsesSampledValues();
+
+// §16.12.14: the asynchronous abort operators (accept_on, reject_on) are
+// evaluated at the granularity of every simulation time step, like disable iff;
+// the synchronous operators (sync_accept_on, sync_reject_on) are evaluated only
+// at the simulation time step when the clocking event happens.
+bool AbortConditionEvaluatedAtClockingEventOnly(bool synchronous_abort);
+
 // §16.13.2: a multiclocked sequence is itself a multiclocked property. When a
 // multiclocked sequence is evaluated as a property beginning at some point, the
 // evaluation is true if, and only if, there is a match of the sequence beginning
@@ -306,6 +339,110 @@ bool MulticlockedImplicationChecksImmediately(
 // kNoMulticlockTick when the branch clock has no qualifying tick.
 uint64_t MulticlockedIfBranchEvalTick(
     uint64_t condition_time, const std::vector<uint64_t>& branch_clock_ticks);
+
+// §16.14.8: nonvacuous evaluation. Every evaluation attempt of a property is
+// either vacuous or nonvacuous, and nonvacuity is defined recursively on the
+// structure of the property. The helpers below compute that attribute for one
+// property form from the nonvacuity of its subproperty attempts together with
+// the runtime facts each form depends on (whether a guard holds, whether an
+// antecedent matched, and so on). Nonvacuity is independent of the pass/fail
+// verdict: a failing attempt can still be nonvacuous. The companion rule, that
+// an attempt succeeds nonvacuously exactly when the property evaluates to true
+// and the attempt is nonvacuous, is PropertySucceedsNonvacuously.
+
+// §16.14.8(a)(b)(c): an attempt of a property that is a bare sequence_expr, or
+// of strong(sequence_expr) or weak(sequence_expr), is always nonvacuous.
+bool NonvacuousSequenceForm();
+
+// §16.14.8(d)(i): the attempt of `not property_expr`, or of an instance of a
+// property obtained by substituting actual arguments for the formal arguments,
+// is nonvacuous exactly when its single underlying subproperty attempt is.
+bool NonvacuousPassthrough(bool inner_nonvacuous);
+
+// §16.14.8(e)(f)(aa): the attempt of `property_expr1 or property_expr2`,
+// `property_expr1 and property_expr2`, or `property_expr1 iff property_expr2`
+// is nonvacuous when either operand's underlying attempt is nonvacuous.
+bool NonvacuousDisjunctiveForm(bool left_nonvacuous, bool right_nonvacuous);
+
+// §16.14.8(g): the attempt of `if (expression_or_dist) property_expr1` is
+// nonvacuous when the guard holds and the then-branch attempt is nonvacuous.
+// With an else branch a false guard instead routes to the else-branch attempt,
+// so the attempt is nonvacuous when that branch is reached and is nonvacuous;
+// the single-branch form with a false guard holds vacuously.
+bool NonvacuousIfElse(bool guard_holds, bool then_nonvacuous, bool has_else,
+                      bool else_nonvacuous);
+
+// §16.14.8(h)(j)(k): the attempt of a sequence-preconditioned property — the
+// implications `sequence_expr |-> property_expr` and `sequence_expr |=>
+// property_expr`, and the followed-by forms `sequence_expr #-# property_expr`
+// and `sequence_expr #=# property_expr` — is nonvacuous when the antecedent
+// sequence has a match point and the consequent attempt that starts from that
+// point is nonvacuous. The overlapped forms (|->, #-#) start the consequent at
+// the antecedent end point; the nonoverlapped forms (|=>, #=#) start it at the
+// following clock event. Either way nonvacuity requires an antecedent match and
+// a nonvacuous consequent attempt.
+bool NonvacuousSequencePrecondition(bool antecedent_has_match,
+                                    bool consequent_nonvacuous);
+
+// §16.14.8(l)(m)(n)(o): the attempt of a nexttime/s_nexttime property, indexed
+// or not, is nonvacuous when the targeted future clock event is reachable and
+// the subproperty attempt that begins there is nonvacuous. Nonvacuity does not
+// distinguish the weak (nexttime) from the strong (s_nexttime) reading.
+bool NonvacuousNexttime(bool target_clock_event_reachable,
+                        bool inner_nonvacuous_at_target);
+
+// §16.14.8(p)(q)(r): the attempt of an always/s_always property, ranged or not,
+// is nonvacuous when there is a covered clock event at which the subproperty
+// attempt is nonvacuous and the subproperty does not fail at any earlier
+// covered clock event.
+bool NonvacuousAlways(bool inner_nonvacuous_at_some_covered_event,
+                      bool inner_fails_at_prior_covered_event);
+
+// §16.14.8(s)(t)(u): the attempt of an s_eventually/eventually property, ranged
+// or not, is nonvacuous when there is a covered clock event at which the
+// subproperty attempt is nonvacuous and the subproperty does not hold at any
+// earlier covered clock event.
+bool NonvacuousEventually(bool inner_nonvacuous_at_some_covered_event,
+                          bool inner_holds_at_prior_covered_event);
+
+// §16.14.8(v)(w)(x)(y): the attempt of an until-family property is nonvacuous
+// when, at some clock event, a witnessing subproperty attempt is nonvacuous,
+// the right operand does not hold at any earlier clock event, and the left
+// operand holds at every earlier clock event. For the non-overlapping forms
+// (until, s_until) the witness is either operand's attempt being nonvacuous; for
+// the overlapping forms (until_with, s_until_with) only the left operand's
+// attempt witnesses. Nonvacuity does not distinguish the weak from the strong
+// reading.
+bool NonvacuousUntil(bool overlapping, bool left_nonvacuous_at_witness,
+                     bool right_nonvacuous_at_witness,
+                     bool right_holds_at_prior_event,
+                     bool left_holds_at_all_prior_events);
+
+// §16.14.8(z): the attempt of `property_expr1 implies property_expr2` is
+// nonvacuous when the antecedent attempt is true and nonvacuous and the
+// consequent attempt is nonvacuous.
+bool NonvacuousImplies(bool antecedent_true, bool antecedent_nonvacuous,
+                       bool consequent_nonvacuous);
+
+// §16.14.8(ab)(ac)(ad)(ae)(ag): the attempt of an abort property (accept_on,
+// reject_on, sync_accept_on, sync_reject_on) or of `disable iff
+// (expression_or_dist) property_expr` is nonvacuous when the underlying
+// subproperty attempt is nonvacuous and the abort/disable condition does not
+// hold at any evaluated step of that attempt. The asynchronous abort forms and
+// the disable form evaluate the condition at every time step; the synchronous
+// abort forms evaluate it only at clock events — but in every case nonvacuity
+// requires the condition never to hold across the evaluated steps.
+bool NonvacuousAbortOrDisable(bool inner_nonvacuous,
+                             bool condition_holds_at_any_evaluated_step);
+
+// §16.14.8(af): the attempt of a `case` property is nonvacuous when one case
+// item is selected — a matching expression_or_dist, or the default when no item
+// matches — and that selected item's property_stmt attempt is nonvacuous.
+bool NonvacuousCase(bool a_branch_selected, bool selected_stmt_nonvacuous);
+
+// §16.14.8: an evaluation attempt of a property succeeds nonvacuously exactly
+// when the property evaluates to true and the attempt is nonvacuous.
+bool PropertySucceedsNonvacuously(bool property_true, bool attempt_nonvacuous);
 
 enum class AssertionKind : uint8_t {
   kAssert = 0,

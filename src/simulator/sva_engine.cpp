@@ -301,6 +301,43 @@ PropertyResult EvalEventually(bool strong, bool inner_holds_within_range,
   return all_range_ticks_present ? PropertyResult::kFail : PropertyResult::kPass;
 }
 
+PropertyResult EvalAbortAccept(bool abort_condition, PropertyResult inner) {
+  // §16.12.14: a true abort condition forces the accept forms to true and takes
+  // precedence over the underlying property_expr's verdict.
+  if (abort_condition) return PropertyResult::kPass;
+  return inner;
+}
+
+PropertyResult EvalAbortReject(bool abort_condition, PropertyResult inner) {
+  // §16.12.14: a true abort condition forces the reject forms to false and takes
+  // precedence over the underlying verdict. This is the dual of EvalAbortAccept:
+  // reject_on(c) p is not(accept_on(c) not p), so a true condition that accepts
+  // not(p) negates back to a fail, and a false condition leaves the underlying
+  // verdict unchanged.
+  if (abort_condition) return PropertyResult::kFail;
+  return inner;
+}
+
+PropertyResult EvalNestedAbort(bool outer_forces_true, bool outer_condition,
+                               bool inner_forces_true, bool inner_condition,
+                               PropertyResult inner_property) {
+  // §16.12.14: apply the inner abort operator first, then the outer one. Because
+  // the outer operator forces its own outcome whenever its condition is true, it
+  // overrides whatever the inner operator decided — so when both conditions
+  // become true in the same time step the outermost operator takes precedence.
+  PropertyResult after_inner =
+      inner_forces_true ? EvalAbortAccept(inner_condition, inner_property)
+                        : EvalAbortReject(inner_condition, inner_property);
+  return outer_forces_true ? EvalAbortAccept(outer_condition, after_inner)
+                           : EvalAbortReject(outer_condition, after_inner);
+}
+
+bool AbortConditionUsesSampledValues() { return true; }
+
+bool AbortConditionEvaluatedAtClockingEventOnly(bool synchronous_abort) {
+  return synchronous_abort;
+}
+
 PropertyResult EvalMulticlockedSequenceAsProperty(bool sequence_has_match) {
   // §16.13.2: evaluated as a property at a point, a multiclocked sequence is true
   // exactly when a match of the sequence begins at that point. The verdict is
@@ -357,6 +394,102 @@ uint64_t MulticlockedIfBranchEvalTick(
   // condition check, so each is evaluated at the nearest tick at or after it.
   return NearestClockTickAtOrAfter(condition_time, branch_clock_ticks,
                                    /*inclusive=*/true);
+}
+
+bool NonvacuousSequenceForm() {
+  // §16.14.8(a)(b)(c): a sequence, strong(sequence_expr), and
+  // weak(sequence_expr) attempt are nonvacuous unconditionally.
+  return true;
+}
+
+bool NonvacuousPassthrough(bool inner_nonvacuous) {
+  // §16.14.8(d)(i): `not property_expr` and a property instance simply carry
+  // the nonvacuity of their one underlying attempt.
+  return inner_nonvacuous;
+}
+
+bool NonvacuousDisjunctiveForm(bool left_nonvacuous, bool right_nonvacuous) {
+  // §16.14.8(e)(f)(aa): `or`, `and`, and `iff` are nonvacuous when either
+  // operand's underlying attempt is nonvacuous.
+  return left_nonvacuous || right_nonvacuous;
+}
+
+bool NonvacuousIfElse(bool guard_holds, bool then_nonvacuous, bool has_else,
+                      bool else_nonvacuous) {
+  // §16.14.8(g): a held guard takes the then-branch; otherwise the else-branch
+  // is taken when present, and a guardless miss holds vacuously.
+  if (guard_holds) return then_nonvacuous;
+  return has_else && else_nonvacuous;
+}
+
+bool NonvacuousSequencePrecondition(bool antecedent_has_match,
+                                    bool consequent_nonvacuous) {
+  // §16.14.8(h)(j)(k): the implication and followed-by forms need an antecedent
+  // match point and a nonvacuous consequent attempt from that point.
+  return antecedent_has_match && consequent_nonvacuous;
+}
+
+bool NonvacuousNexttime(bool target_clock_event_reachable,
+                        bool inner_nonvacuous_at_target) {
+  // §16.14.8(l)(m)(n)(o): the targeted future clock event must exist and the
+  // subproperty attempt beginning there must be nonvacuous.
+  return target_clock_event_reachable && inner_nonvacuous_at_target;
+}
+
+bool NonvacuousAlways(bool inner_nonvacuous_at_some_covered_event,
+                      bool inner_fails_at_prior_covered_event) {
+  // §16.14.8(p)(q)(r): a covered clock event must witness a nonvacuous
+  // subproperty attempt, with no earlier covered failure.
+  return inner_nonvacuous_at_some_covered_event &&
+         !inner_fails_at_prior_covered_event;
+}
+
+bool NonvacuousEventually(bool inner_nonvacuous_at_some_covered_event,
+                          bool inner_holds_at_prior_covered_event) {
+  // §16.14.8(s)(t)(u): a covered clock event must witness a nonvacuous
+  // subproperty attempt, with the subproperty not already holding earlier.
+  return inner_nonvacuous_at_some_covered_event &&
+         !inner_holds_at_prior_covered_event;
+}
+
+bool NonvacuousUntil(bool overlapping, bool left_nonvacuous_at_witness,
+                     bool right_nonvacuous_at_witness,
+                     bool right_holds_at_prior_event,
+                     bool left_holds_at_all_prior_events) {
+  // §16.14.8(v)(w)(x)(y): the overlapping forms witness on the left operand
+  // alone; the non-overlapping forms witness on either operand. In both cases
+  // the right operand must not have held earlier and the left operand must have
+  // held at every earlier clock event.
+  bool witness = overlapping
+                     ? left_nonvacuous_at_witness
+                     : (left_nonvacuous_at_witness || right_nonvacuous_at_witness);
+  return witness && !right_holds_at_prior_event && left_holds_at_all_prior_events;
+}
+
+bool NonvacuousImplies(bool antecedent_true, bool antecedent_nonvacuous,
+                       bool consequent_nonvacuous) {
+  // §16.14.8(z): the antecedent attempt must be both true and nonvacuous, and
+  // the consequent attempt must be nonvacuous.
+  return antecedent_true && antecedent_nonvacuous && consequent_nonvacuous;
+}
+
+bool NonvacuousAbortOrDisable(bool inner_nonvacuous,
+                             bool condition_holds_at_any_evaluated_step) {
+  // §16.14.8(ab)(ac)(ad)(ae)(ag): a nonvacuous underlying attempt whose
+  // abort/disable condition never held across the steps it was evaluated at.
+  return inner_nonvacuous && !condition_holds_at_any_evaluated_step;
+}
+
+bool NonvacuousCase(bool a_branch_selected, bool selected_stmt_nonvacuous) {
+  // §16.14.8(af): a case item (a matching expression_or_dist or the default)
+  // must be selected and its property_stmt attempt must be nonvacuous.
+  return a_branch_selected && selected_stmt_nonvacuous;
+}
+
+bool PropertySucceedsNonvacuously(bool property_true, bool attempt_nonvacuous) {
+  // §16.14.8: a nonvacuous success requires both a true verdict and a
+  // nonvacuous attempt.
+  return property_true && attempt_nonvacuous;
 }
 
 SequencePropertyStrength DefaultSequencePropertyStrength(AssertionKind stmt) {
