@@ -92,6 +92,11 @@ PropertyResult EvalImplication(bool antecedent, bool consequent,
 // single attempt of the underlying property_expr.
 PropertyResult EvalPropertyNot(PropertyResult inner);
 PropertyResult EvalPropertyAnd(PropertyResult a, PropertyResult b);
+
+// §16.12.4: a disjunction `property_expr1 or property_expr2` evaluates to true
+// if, and only if, at least one of the two operand property expressions
+// evaluates to true. A vacuous pass counts as the operand holding, so a single
+// holding operand is enough to make the whole disjunction hold.
 PropertyResult EvalPropertyOr(PropertyResult a, PropertyResult b);
 
 // §16.12.6: an if-else property is governed by the guard expression. When the
