@@ -3079,6 +3079,23 @@ static std::string_view StepLhsName(const Stmt* step) {
   return {};
 }
 
+// §27.4: a genvar value with any bit set to x or z is illegal during loop
+// evaluation. Only a based integer literal whose digits include x, z, or ?
+// can introduce such a bit, so scan the genvar's init/step expression for
+// one (recursing through operands).
+static bool ExprHasXZLiteral(const Expr* e) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kIntegerLiteral) {
+    std::string_view text = e->text;
+    if (text.find('\'') == std::string_view::npos) return false;
+    for (char c : text) {
+      if (c == 'x' || c == 'X' || c == 'z' || c == 'Z' || c == '?') return true;
+    }
+    return false;
+  }
+  return ExprHasXZLiteral(e->lhs) || ExprHasXZLiteral(e->rhs);
+}
+
 void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
                                       const ScopeMap& scope) {
   if (!item->gen_init || !item->gen_init->lhs) {
@@ -3099,6 +3116,35 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     diag_.Error(item->loc,
                 "generate-for init and step shall assign to the same genvar");
     return;
+  }
+
+  // §27.4: it shall be an error if any bit of the genvar is set to x or z
+  // during evaluation. An x/z initialization value triggers a dedicated
+  // error rather than the generic non-constant warning.
+  if (ExprHasXZLiteral(item->gen_init->rhs)) {
+    diag_.Error(item->loc,
+                "generate-for genvar shall not have any bit set to x or z "
+                "during evaluation");
+    return;
+  }
+
+  // §27.4: a named loop generate block declares an array of generate block
+  // instances, and it shall be an error if that array's name collides with any
+  // other declaration in the enclosing scope, including another generate block
+  // instance array. The array counts as declared even when the loop yields no
+  // instances, so this check runs before the iteration count is known. Loop
+  // generate arrays are an error on conflict (unlike conditional generate
+  // blocks, whose naming rules differ), so the loop path enforces it directly
+  // rather than through the shared label collector.
+  if (!item->name.empty()) {
+    if (IsNameDeclared(item->name, mod) ||
+        !declared_names_.insert(item->name).second) {
+      diag_.Error(item->loc,
+                  std::format("generate block array '{}' conflicts with an "
+                              "existing declaration in the same scope",
+                              item->name));
+      return;
+    }
   }
 
   auto init_val = ConstEvalInt(item->gen_init->rhs, scope);
@@ -3128,6 +3174,17 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     gen_prefix_ = std::format("{}{}_{}_", saved_prefix, genvar_name,
                               loop_scope[genvar_name]);
     ElaborateGenerateItems(item->gen_body, mod, loop_scope);
+
+    // §27.4: the x/z prohibition holds as the loop advances; a step that
+    // drives the genvar to an x or z bit is an error, not a silent stop.
+    if (ExprHasXZLiteral(item->gen_step->rhs) ||
+        ExprHasXZLiteral(item->gen_step->expr)) {
+      diag_.Error(item->loc,
+                  "generate-for genvar shall not have any bit set to x or z "
+                  "during evaluation");
+      gen_prefix_ = saved_prefix;
+      return;
+    }
 
     std::optional<int64_t> next;
     if (item->gen_step->rhs) {

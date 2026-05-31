@@ -175,18 +175,97 @@ TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarErrors) {
              "endmodule\n"));
 }
 
-TEST(GenerateElaboration, GenerateForDecrementingStride) {
+// §27.4: a named loop generate block declares a generate block instance array,
+// and its name conflicting with another declaration in the same scope is an
+// error. Here the block name collides with a variable. The loop also runs zero
+// times, exercising the rule that the array is declared even when the scheme
+// produces no instances.
+TEST(GenerateElaboration, GenerateForNamedBlockConflictsWithVariableErrors) {
+  EXPECT_FALSE(
+      ElabOk("module top();\n"
+             "  logic a;\n"
+             "  genvar i;\n"
+             "  generate\n"
+             "    for (i = 1; i < 0; i = i + 1) begin : a\n"
+             "      logic [7:0] x;\n"
+             "    end\n"
+             "  endgenerate\n"
+             "endmodule\n"));
+}
+
+// §27.4: the conflict rule explicitly covers a clash between two generate block
+// instance arrays. Two loop generate blocks sharing one array name in the same
+// scope is an error.
+TEST(GenerateElaboration, GenerateForDuplicateBlockArrayNameErrors) {
+  EXPECT_FALSE(
+      ElabOk("module top();\n"
+             "  genvar i;\n"
+             "  generate\n"
+             "    for (i = 1; i < 5; i = i + 1) begin : a\n"
+             "      logic [7:0] x;\n"
+             "    end\n"
+             "    for (i = 10; i < 15; i = i + 1) begin : a\n"
+             "      logic [7:0] y;\n"
+             "    end\n"
+             "  endgenerate\n"
+             "endmodule\n"));
+}
+
+// §27.4: it shall be an error if any bit of the genvar is set to x or z
+// during evaluation of the loop generate scheme. A genvar initialized to a
+// 4-state literal carries an x bit, so the elaborator rejects it with a
+// dedicated x/z diagnostic rather than a generic constant-expression error.
+TEST(GenerateElaboration, GenerateForGenvarXZInitErrors) {
   ElabFixture f;
-  auto* design = Elaborate(
+  ElaborateSrc(
       "module top();\n"
       "  generate\n"
-      "    for (i = 3; i > 0; i = i - 1) begin\n"
+      "    for (i = 2'b1x; i < 3; i = i + 1) begin\n"
       "      logic [7:0] v;\n"
       "    end\n"
       "  endgenerate\n"
       "endmodule\n",
       f);
+  // Without the dedicated x/z rule the init case is only a warning and the
+  // step case silently ends the loop; the rule turns both into errors.
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §27.4: the x/z prohibition holds throughout the loop, not just at
+// initialization. A step expression that drives the genvar to a z bit is an
+// error reported by the same dedicated diagnostic.
+TEST(GenerateElaboration, GenerateForGenvarXZStepErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  generate\n"
+      "    for (i = 0; i < 3; i = 2'b0z) begin\n"
+      "      logic [7:0] v;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  // Without the dedicated x/z rule the init case is only a warning and the
+  // step case silently ends the loop; the rule turns both into errors.
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §27.4: a loop generate block may consist of a single item that is not
+// wrapped in begin-end. It is still a generate block and is instantiated once
+// per loop index value, so a begin-less body yields one declaration copy per
+// iteration just as a begin-end body would.
+TEST(GenerateElaboration, GenerateForSingleItemBodyWithoutBeginEnd) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top #(parameter N = 3) ();\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1)\n"
+      "      logic [7:0] v;\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
   auto* mod = design->top_modules[0];
   EXPECT_EQ(mod->variables.size(), 3u);
 }
