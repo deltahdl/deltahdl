@@ -45,6 +45,20 @@ TEST(ConstEval, ShiftByZero) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("42 >>> 0", f)), 42);
 }
 
+// §11.4.10: logical and arithmetic right shift fill vacated high bits
+// differently. A negative constant exposes the split during constant folding:
+// >>> sign-fills (the value stays negative), while >> zero-fills (the value
+// becomes a large nonnegative magnitude). Positive operands cannot tell the two
+// operators apart, so this is the case the elaborator-stage checks must add.
+TEST(ConstEval, RightShiftSignedVersusLogicalFill) {
+  EvalFixture f;
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("(-8) >>> 1", f)), -4);
+  auto logical = ConstEvalInt(ParseExprFrom("(-8) >> 1", f));
+  ASSERT_TRUE(logical.has_value());
+  EXPECT_NE(*logical, -4);
+  EXPECT_GT(*logical, 0);
+}
+
 TEST(ConstEval, LeftShiftAndArithLeftShiftEquivalent) {
   EvalFixture f;
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("7 << 3", f)),

@@ -67,40 +67,6 @@ TEST(ExpressionSim, RightShift) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-TEST(OperatorSim, BinaryLogicalLeftShift) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd1 << 4;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 16u);
-}
-
-TEST(OperatorSim, BinaryLogicalRightShift) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd128 >> 3;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 16u);
-}
-
 TEST(OperatorSim, BinaryArithLeftShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -177,6 +143,19 @@ TEST(EvalOpXZ, LogicalRightShiftXAmount) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
+// §11.4.10: an x or z in the shift amount makes the result unknown. This holds
+// for every shift operator, so the arithmetic left shift completes the set
+// already exercised for <<, >>, and >>>.
+TEST(EvalOpXZ, ArithLeftShiftXAmount) {
+  SimFixture f;
+  MakeVar(f, "v", 4, 0b1100);
+  MakeVar4(f, "sa", 4, 0b0000, 0b0010);
+  auto* expr = MakeBinary(f.arena, TokenKind::kLtLtLt, MakeId(f.arena, "v"),
+                          MakeId(f.arena, "sa"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);
+}
+
 TEST(EvalOpXZ, LogicalRightShiftXOperand) {
   SimFixture f;
 
@@ -220,6 +199,21 @@ TEST(OperatorSim, AllShiftOpsPreserveLhsSignedness) {
     auto result = EvalExpr(expr, f.ctx, f.arena);
     EXPECT_TRUE(result.is_signed);
   }
+}
+
+// §11.4.10: the shift amount is always treated as an unsigned number. A signed
+// right operand whose sign bit is set is applied as its (large) unsigned
+// magnitude, never as a negative count. The 5-bit signed amount 0b10000 here is
+// 16 when read unsigned, shifting the 32-bit all-ones operand down to its upper
+// half rather than doing anything sign-driven.
+TEST(OperatorSim, ShiftAmountTreatedAsUnsigned) {
+  SimFixture f;
+  MakeVar(f, "u", 32, 0xFFFFFFFFu);
+  MakeSignedVarAdv(f, "amt", 5, 0b10000);
+  auto* expr = MakeBinary(f.arena, TokenKind::kGtGt, MakeId(f.arena, "u"),
+                          MakeId(f.arena, "amt"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64() & 0xFFFFFFFFull, 0xFFFFu);
 }
 
 TEST(OperatorSim, ShiftByZero) {
