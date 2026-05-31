@@ -188,6 +188,14 @@ using PLI_BYTE8 = char;
  *                   expression */
 #define vpiClockedSeq 790
 
+/* §37.53 sequence declaration. The diagram introduces the seq-formal-declaration
+ * object kind a sequence declaration is built from - the sequence analog of
+ * §37.51's property formal. 791 is the first free selector number above
+ * vpiClockedSeq (790).
+ *   vpiSeqFormalDecl - a formal of a sequence declaration; the kind the
+ *                      vpiSeqFormalDecl iteration yields in declaration order */
+#define vpiSeqFormalDecl 791
+
 #define vpiTop 600
 #define vpiUnit 602
 

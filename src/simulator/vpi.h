@@ -527,6 +527,33 @@ std::vector<VpiHandle> VpiMulticlockSequenceClockedSeqs(VpiHandle multiclock_seq
 // clocking-event half of the pair is reached through VpiClockingEvent.
 VpiHandle VpiClockedSeqSequenceExpr(VpiHandle clocked_seq);
 
+// §37.53 detail 1: the formals a sequence declaration declares as the
+// vpiSeqFormalDecl iteration yields them - its vpiSeqFormalDecl children in
+// declaration order. A null handle yields none.
+std::vector<VpiHandle> VpiSeqFormals(VpiHandle sequence_decl);
+
+// §37.53: the body of a sequence declaration, reached through vpiExpr. The
+// diagram draws its target as a sequence expression (the sequence-expr class,
+// §37.54) or a multiclock sequence expression (§37.56). Returns the object's
+// first such child, or null when none is present.
+VpiHandle VpiSeqDeclBodyExpr(VpiHandle sequence_decl);
+
+// §37.53 detail 4: a seq formal decl's vpiDirection. A formal that is not a local
+// variable argument has no direction (vpiNoDirection); a local variable argument
+// reports its declared direction, one of vpiInput, vpiOutput, or vpiInout. (This
+// is the sequence analog of §37.51's property formal, which only ever reports
+// vpiInput.)
+int VpiSeqFormalDirection(bool is_local_variable_argument, int local_direction);
+
+// §37.53 detail 2: the typespec of a seq formal decl (its vpiTypespec child), or
+// null when the formal is untyped.
+VpiHandle VpiSeqFormalTypespec(VpiHandle formal);
+
+// §37.53 detail 3: the initialization expression of a seq formal decl, reached
+// through vpiExpr. The diagram draws its target as a named event or a sequence
+// expression (§37.54); null when the formal has no initialization expression.
+VpiHandle VpiSeqFormalInitExpr(VpiHandle formal);
+
 struct VpiVectorVal {
   uint32_t aval;
   uint32_t bval;

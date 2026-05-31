@@ -645,6 +645,63 @@ VpiHandle VpiClockedSeqSequenceExpr(VpiHandle clocked_seq) {
   return nullptr;
 }
 
+std::vector<VpiHandle> VpiSeqFormals(VpiHandle sequence_decl) {
+  // §37.53 detail 1: the vpiSeqFormalDecl iteration yields the sequence
+  // declaration's formals - its vpiSeqFormalDecl children - in declaration
+  // order. A null handle yields none.
+  std::vector<VpiHandle> formals;
+  if (!sequence_decl) return formals;
+  for (auto* child : sequence_decl->children) {
+    if (child->type == vpiSeqFormalDecl) formals.push_back(child);
+  }
+  return formals;
+}
+
+VpiHandle VpiSeqDeclBodyExpr(VpiHandle sequence_decl) {
+  // §37.53: a sequence declaration's body is reached through vpiExpr; the diagram
+  // draws its target as a sequence expression (the sequence-expr class) or a
+  // multiclock sequence expression. Report the first such child, or null when
+  // none is present.
+  if (!sequence_decl) return nullptr;
+  for (auto* child : sequence_decl->children) {
+    if (VpiIsSequenceExprType(child->type) ||
+        child->type == vpiMulticlockSequenceExpr) {
+      return child;
+    }
+  }
+  return nullptr;
+}
+
+int VpiSeqFormalDirection(bool is_local_variable_argument, int local_direction) {
+  // §37.53 detail 4: a formal that is not a local variable argument has no
+  // direction; a local variable argument reports its declared direction (one of
+  // input, output, or inout).
+  return is_local_variable_argument ? local_direction : vpiNoDirection;
+}
+
+VpiHandle VpiSeqFormalTypespec(VpiHandle formal) {
+  // §37.53 detail 2: a typed formal carries a typespec child; an untyped formal
+  // has none, so the relation reports null.
+  if (!formal) return nullptr;
+  for (auto* child : formal->children) {
+    if (child->type == vpiTypespec) return child;
+  }
+  return nullptr;
+}
+
+VpiHandle VpiSeqFormalInitExpr(VpiHandle formal) {
+  // §37.53 detail 3: a formal's initialization expression is reached through
+  // vpiExpr; the diagram draws its target as a named event or a sequence
+  // expression. Report the first such child, or null when the formal has none.
+  if (!formal) return nullptr;
+  for (auto* child : formal->children) {
+    if (child->type == vpiNamedEvent || VpiIsSequenceExprType(child->type)) {
+      return child;
+    }
+  }
+  return nullptr;
+}
+
 void VpiContext::Attach(SimContext& sim_ctx) {
   for (auto& [name, var] : sim_ctx.GetVariables()) {
     auto* obj = AllocObject();
