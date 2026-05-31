@@ -506,6 +506,125 @@ void Elaborator::ValidateAssocWildcardTraversal(const ModuleDecl* decl) {
   }
 }
 
+// §7.12.2: the array ordering methods. reverse() and shuffle() take no with
+// clause, whereas sort() and rsort() accept an optional one.
+static bool IsArrayOrderingMethod(std::string_view name) {
+  return name == "sort" || name == "rsort" || name == "reverse" ||
+         name == "shuffle";
+}
+
+static bool OrderingMethodRejectsWith(std::string_view name) {
+  return name == "reverse" || name == "shuffle";
+}
+
+// Recognize an array-method invocation, in either the call form `arr.m()` or
+// the property form `arr.m`. On success, `base` is the receiver expression,
+// `method` is the method name, and `has_with` records whether a with clause
+// was attached (the parser hangs it on the outermost expression in both
+// forms).
+struct OrderingMethodSite {
+  const Expr* base = nullptr;
+  std::string_view method;
+  bool has_with = false;
+};
+
+static bool MatchOrderingMethodSite(const Expr* e, OrderingMethodSite& out) {
+  if (!e) return false;
+  const Expr* access = nullptr;
+  if (e->kind == ExprKind::kCall && e->lhs &&
+      e->lhs->kind == ExprKind::kMemberAccess) {
+    access = e->lhs;
+  } else if (e->kind == ExprKind::kMemberAccess) {
+    access = e;
+  } else {
+    return false;
+  }
+  if (!access->lhs || !access->rhs ||
+      access->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  if (!IsArrayOrderingMethod(access->rhs->text)) return false;
+  out.base = access->lhs;
+  out.method = access->rhs->text;
+  out.has_with = e->with_expr != nullptr;
+  return true;
+}
+
+// §7.12.2: ordering methods reorder any fixed or dynamically sized unpacked
+// array but are not defined on associative arrays, and reverse()/shuffle()
+// reject a with clause. Each is reported as a compile-time error. The
+// receiver is only checked against the array tracking map when it is a plain
+// identifier, which is enough to recognize a declared associative array.
+static void CheckArrayOrderingExpr(
+    const Expr* e,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    DiagEngine& diag) {
+  if (!e) return;
+  OrderingMethodSite site;
+  if (MatchOrderingMethodSite(e, site) && site.base &&
+      site.base->kind == ExprKind::kIdentifier) {
+    auto it = var_array_info.find(site.base->text);
+    if (it != var_array_info.end()) {
+      if (it->second.is_assoc) {
+        diag.Error(e->range.start,
+                   std::format("array ordering method '{}' cannot be applied "
+                               "to associative array '{}'",
+                               site.method, site.base->text));
+      } else if (site.has_with && OrderingMethodRejectsWith(site.method)) {
+        diag.Error(e->range.start,
+                   std::format("array ordering method '{}' does not accept a "
+                               "'with' clause",
+                               site.method));
+      }
+    }
+  }
+  CheckArrayOrderingExpr(e->lhs, var_array_info, diag);
+  CheckArrayOrderingExpr(e->rhs, var_array_info, diag);
+  CheckArrayOrderingExpr(e->base, var_array_info, diag);
+  CheckArrayOrderingExpr(e->index, var_array_info, diag);
+  CheckArrayOrderingExpr(e->condition, var_array_info, diag);
+  CheckArrayOrderingExpr(e->true_expr, var_array_info, diag);
+  CheckArrayOrderingExpr(e->false_expr, var_array_info, diag);
+  for (const auto* a : e->args) CheckArrayOrderingExpr(a, var_array_info, diag);
+  for (const auto* elem : e->elements)
+    CheckArrayOrderingExpr(elem, var_array_info, diag);
+}
+
+static void WalkStmtsForArrayOrdering(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    DiagEngine& diag) {
+  if (!s) return;
+  CheckArrayOrderingExpr(s->expr, var_array_info, diag);
+  CheckArrayOrderingExpr(s->lhs, var_array_info, diag);
+  CheckArrayOrderingExpr(s->rhs, var_array_info, diag);
+  CheckArrayOrderingExpr(s->condition, var_array_info, diag);
+  for (auto* sub : s->stmts)
+    WalkStmtsForArrayOrdering(sub, var_array_info, diag);
+  WalkStmtsForArrayOrdering(s->then_branch, var_array_info, diag);
+  WalkStmtsForArrayOrdering(s->else_branch, var_array_info, diag);
+  WalkStmtsForArrayOrdering(s->body, var_array_info, diag);
+  WalkStmtsForArrayOrdering(s->for_body, var_array_info, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForArrayOrdering(ci.body, var_array_info, diag);
+}
+
+void Elaborator::ValidateArrayOrderingMethods(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckArrayOrderingExpr(item->assign_lhs, var_array_info_, diag_);
+      CheckArrayOrderingExpr(item->assign_rhs, var_array_info_, diag_);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForArrayOrdering(item->body, var_array_info_, diag_);
+    }
+  }
+}
+
 static bool IsClassDerivedFrom(std::string_view a, std::string_view b,
                                const CompilationUnit* unit);
 

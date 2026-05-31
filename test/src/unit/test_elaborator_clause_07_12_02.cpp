@@ -52,4 +52,56 @@ TEST(ArrayOrderingElaboration, RsortWithClauseOk) {
              "endmodule\n"));
 }
 
+// §7.12.2: specifying a with clause on reverse() is a compiler error.
+TEST(ArrayOrderingElaboration, ReverseWithClauseIsError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int arr [0:3];\n"
+             "  initial arr.reverse() with (item);\n"
+             "endmodule\n"));
+}
+
+// §7.12.2: specifying a with clause on shuffle() is a compiler error.
+TEST(ArrayOrderingElaboration, ShuffleWithClauseIsError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int arr [0:3];\n"
+             "  initial arr.shuffle() with (item);\n"
+             "endmodule\n"));
+}
+
+// §7.12.2: ordering methods reorder fixed or dynamically sized unpacked
+// arrays; an associative array is not a legal receiver.
+TEST(ArrayOrderingElaboration, SortOnAssocArrayIsError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int arr [string];\n"
+             "  initial arr.sort();\n"
+             "endmodule\n"));
+}
+
+TEST(ArrayOrderingElaboration, RsortOnAssocArrayIsError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int arr [string];\n"
+             "  initial arr.rsort();\n"
+             "endmodule\n"));
+}
+
+TEST(ArrayOrderingElaboration, ReverseOnAssocArrayIsError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int arr [string];\n"
+             "  initial arr.reverse();\n"
+             "endmodule\n"));
+}
+
+TEST(ArrayOrderingElaboration, ShuffleOnAssocArrayIsError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int arr [int];\n"
+             "  initial arr.shuffle();\n"
+             "endmodule\n"));
+}
+
 }

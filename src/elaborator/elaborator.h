@@ -268,6 +268,8 @@ class Elaborator {
 
   void ValidateAssocWildcardTraversal(const ModuleDecl* decl);
 
+  void ValidateArrayOrderingMethods(const ModuleDecl* decl);
+
   void ValidateClassIndexSelect(const ModuleDecl* decl);
 
   void ValidateStringIndexSelect(const ModuleDecl* decl);

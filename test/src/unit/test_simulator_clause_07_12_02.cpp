@@ -288,4 +288,44 @@ TEST(ArrayOrdering, ShuffleViaMethodCall) {
   EXPECT_EQ(sum, 60u);
 }
 
+// §7.12.2: sort() may optionally order by the expression in a with clause
+// instead of the raw element value. Sorting {3, 1, 2} ascending by the key
+// (10 - item) inverts the natural element order, so the result proves the
+// with expression — not the element value — drives the comparison.
+TEST(ArrayOrdering, SortWithExprUsesExpression) {
+  SimFixture f;
+  MakeDynArray(f, "arr", {3, 1, 2});
+  auto* call = MakeMethodCall(f.arena, "arr", "sort", {});
+  call->with_expr = MakeBinary(f.arena, TokenKind::kMinus,
+                               MakeInt(f.arena, 10), MakeId(f.arena, "item"));
+  bool ok = TryExecArrayMethodStmt(call, f.ctx, f.arena);
+  ASSERT_TRUE(ok);
+  auto* q = f.ctx.FindQueue("arr");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 3u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 3u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 2u);
+  EXPECT_EQ(q->elements[2].ToUint64(), 1u);
+}
+
+// §7.12.2: rsort() applies the same optional with-clause ordering but ranks
+// keys in descending order. With key (10 - item), the descending key order
+// recovers the natural ascending element order, again confirming the with
+// expression governs the sort.
+TEST(ArrayOrdering, RsortWithExprUsesExpression) {
+  SimFixture f;
+  MakeDynArray(f, "arr", {3, 1, 2});
+  auto* call = MakeMethodCall(f.arena, "arr", "rsort", {});
+  call->with_expr = MakeBinary(f.arena, TokenKind::kMinus,
+                               MakeInt(f.arena, 10), MakeId(f.arena, "item"));
+  bool ok = TryExecArrayMethodStmt(call, f.ctx, f.arena);
+  ASSERT_TRUE(ok);
+  auto* q = f.ctx.FindQueue("arr");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 3u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 1u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 2u);
+  EXPECT_EQ(q->elements[2].ToUint64(), 3u);
+}
+
 }
