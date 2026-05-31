@@ -126,6 +126,17 @@ using PLI_BYTE8 = char;
 
 #define vpiAssertion 744
 
+/* §37.54 sequence expression. The diagram introduces a member object kind and a
+ * traversal that had no constant yet. 745 and 746 are free selector numbers in
+ * this module, between vpiAssertion (744) and vpiCoverageStart (750).
+ *   vpiDistribution - a weighted distribution grouped under the sequence-expr
+ *                     class alongside operations, sequence instances and bare
+ *                     expressions
+ *   vpiMatchItem    - the assignment/tf-call match items a bare boolean
+ *                     expression carries within a sequence */
+#define vpiDistribution 745
+#define vpiMatchItem 746
+
 #define vpiTop 600
 #define vpiUnit 602
 
@@ -171,6 +182,13 @@ using PLI_BYTE8 = char;
 #define vpiImplyOp 50
 #define vpiNonOverlapImplyOp 51
 #define vpiOverlapImplyOp 52
+/* §37.54 detail 2: the composite sequence "and"/"or" operators complete the set
+ * of operation kinds a sequence expression's vpiOpType may report. They had no
+ * constant yet; 66 and 67 are the lowest free values in the operation-type
+ * (vpiOpType return-value) namespace, between vpiPreDecOp (65) and vpiWildEqOp
+ * (69). They are distinct from the logical/bitwise and/or operators above. */
+#define vpiCompAndOp 66
+#define vpiCompOrOp 67
 #define vpiUnaryCycleDelayOp 53
 #define vpiCycleDelayOp 54
 #define vpiIntersectOp 55

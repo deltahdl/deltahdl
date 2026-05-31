@@ -166,6 +166,11 @@ struct VpiObject {
   std::string cell_name;
   std::string config_name;
 
+  // §37.54 (D2): the operation type an operation object reports through
+  // vpi_get(vpiOpType). For a sequence expression's operation this is one of the
+  // sequence operators (see VpiIsSequenceExprOpType); zero when unset.
+  int op_type = 0;
+
   // §37.49: the source span an assertion object occupies. start/column/end are
   // reported through vpi_get(vpiStartLine/vpiColumn/vpiEndLine/vpiEndColumn) and
   // the file through vpi_get_str(vpiFile); the assertion name reuses `name`.
@@ -268,6 +273,78 @@ bool VpiIsAssertionType(int type);
 // vpi_handle(vpiClockingBlock, ...). Returns null when no clocking block is
 // associated with the assertion.
 VpiHandle VpiAssertionClockingBlock(VpiHandle assertion);
+
+// §37.54 (D1): the sequence-expr class groups the kinds the diagram draws under
+// it - an operation, a sequence instance, a distribution, and a bare boolean
+// expression (a constant or a reference used directly as a sequence). An object
+// is a sequence expression exactly when its type is one of these.
+bool VpiIsSequenceExprType(int type);
+
+// §37.54 detail 2: the operation types a sequence expression's vpiOpType may
+// report - the composite and/or, intersect, first-match, throughout, within,
+// the unary and binary cycle delays, and the three repeat operators. Every
+// other operator value is rejected.
+bool VpiIsSequenceExprOpType(int op);
+
+// §37.54 detail 3a: the operands of a unary cycle-delay (##) operation, in the
+// order vpiOperand presents them: the sequence, the left range, then the right
+// range. The right range is reported only when it differs from the left range;
+// passing the same handle (or null) for the right range models a range whose
+// bounds coincide and yields just the sequence and the left range.
+std::vector<VpiHandle> VpiUnaryCycleDelayOperands(VpiHandle sequence,
+                                                  VpiHandle left_range,
+                                                  VpiHandle right_range);
+
+// §37.54 detail 3b: the operands of a binary cycle-delay (##) operation: the
+// left-hand side sequence, the right-hand side sequence, the left range, then
+// the right range. The right range is reported only when it differs from the
+// left range.
+std::vector<VpiHandle> VpiCycleDelayOperands(VpiHandle lhs_sequence,
+                                             VpiHandle rhs_sequence,
+                                             VpiHandle left_range,
+                                             VpiHandle right_range);
+
+// §37.54 detail 3c: the operands of any repeat operation ([*], [=], [->]): the
+// repeated sequence, the left repeat bound, then the right repeat bound. The
+// right bound is reported only when it differs from the left bound.
+std::vector<VpiHandle> VpiRepeatOperands(VpiHandle sequence,
+                                         VpiHandle left_bound,
+                                         VpiHandle right_bound);
+
+// §37.54 detail 1: a sequence formal as seen by the argument iteration. A formal
+// may carry a default value (null when it has none) that is used as the argument
+// when an instantiation does not provide one.
+struct VpiSequenceFormal {
+  VpiHandle default_value = nullptr;
+};
+
+// §37.54 detail 1: the arguments the vpiArgument iteration returns for a
+// sequence instance, in formal-declaration order. `provided` is parallel to
+// `formals`; a null entry means the instantiation omitted that argument, so the
+// formal's default value is substituted in its place (preserving the order so
+// each argument lines up with its formal).
+std::vector<VpiHandle> VpiSequenceInstArguments(
+    const std::vector<VpiSequenceFormal>& formals,
+    const std::vector<VpiHandle>& provided);
+
+// §37.54 (D5): the kinds an argument of a sequence instance may be - a named
+// event or a sequence expression. Any other kind is not a valid argument.
+bool VpiIsSequenceArgumentType(int type);
+
+// §37.54 (D4): the sequence declaration a sequence instance instantiates,
+// traversed to its vpiSequenceDecl child. Returns null for a null handle or an
+// instance with no declaration attached.
+VpiHandle VpiSequenceInstDecl(VpiHandle sequence_inst);
+
+// §37.54 (D6): the match items a sequence's bare boolean expression may carry
+// are assignments and task/function calls. Other object kinds are not match
+// items.
+bool VpiIsMatchItemType(int type);
+
+// §37.54 (D6): the match items reachable from a bare expression through the
+// vpiMatchItem iteration - its assignment/tf-call children, in order. A null
+// handle yields no items.
+std::vector<VpiHandle> VpiExprMatchItems(VpiHandle expr);
 
 struct VpiVectorVal {
   uint32_t aval;

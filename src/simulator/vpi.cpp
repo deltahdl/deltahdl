@@ -174,6 +174,144 @@ VpiHandle VpiAssertionClockingBlock(VpiHandle assertion) {
   return nullptr;
 }
 
+bool VpiIsSequenceExprType(int type) {
+  // §37.54 (D1): the kinds the sequence-expr class groups - an operation, a
+  // sequence instance, a distribution, and a bare boolean expression. The bare
+  // expression is abstract in the diagram; its concrete forms used directly as a
+  // sequence are a constant and a reference. Every other kind is not a member.
+  switch (type) {
+    case vpiOperation:
+    case vpiSequenceInst:
+    case vpiDistribution:
+    case vpiConstant:
+    case vpiRefObj:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiIsSequenceExprOpType(int op) {
+  // §37.54 detail 2: exactly these eleven operators may appear as the vpiOpType
+  // of a sequence expression's operation.
+  switch (op) {
+    case vpiCompAndOp:
+    case vpiIntersectOp:
+    case vpiCompOrOp:
+    case vpiFirstMatchOp:
+    case vpiThroughoutOp:
+    case vpiWithinOp:
+    case vpiUnaryCycleDelayOp:
+    case vpiCycleDelayOp:
+    case vpiRepeatOp:
+    case vpiConsecutiveRepeatOp:
+    case vpiGotoRepeatOp:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §37.54 detail 3: a range/bound's upper handle is reported only when it differs
+// from the lower one. Passing the same handle (or null) for the upper bound
+// models a range whose bounds coincide, so the upper bound is dropped.
+static bool VpiRangeUpperDiffers(VpiHandle lower, VpiHandle upper) {
+  return upper != nullptr && upper != lower;
+}
+
+std::vector<VpiHandle> VpiUnaryCycleDelayOperands(VpiHandle sequence,
+                                                  VpiHandle left_range,
+                                                  VpiHandle right_range) {
+  // §37.54 detail 3a: sequence, left range, then right range (the latter only
+  // when it differs from the left range).
+  std::vector<VpiHandle> operands = {sequence, left_range};
+  if (VpiRangeUpperDiffers(left_range, right_range)) {
+    operands.push_back(right_range);
+  }
+  return operands;
+}
+
+std::vector<VpiHandle> VpiCycleDelayOperands(VpiHandle lhs_sequence,
+                                             VpiHandle rhs_sequence,
+                                             VpiHandle left_range,
+                                             VpiHandle right_range) {
+  // §37.54 detail 3b: left-hand side sequence, right-hand side sequence, left
+  // range, then right range (only when it differs from the left range).
+  std::vector<VpiHandle> operands = {lhs_sequence, rhs_sequence, left_range};
+  if (VpiRangeUpperDiffers(left_range, right_range)) {
+    operands.push_back(right_range);
+  }
+  return operands;
+}
+
+std::vector<VpiHandle> VpiRepeatOperands(VpiHandle sequence,
+                                         VpiHandle left_bound,
+                                         VpiHandle right_bound) {
+  // §37.54 detail 3c: the repeated sequence, the left repeat bound, then the
+  // right repeat bound (only when it differs from the left bound). The same
+  // ordering serves every repeat operator.
+  std::vector<VpiHandle> operands = {sequence, left_bound};
+  if (VpiRangeUpperDiffers(left_bound, right_bound)) {
+    operands.push_back(right_bound);
+  }
+  return operands;
+}
+
+std::vector<VpiHandle> VpiSequenceInstArguments(
+    const std::vector<VpiSequenceFormal>& formals,
+    const std::vector<VpiHandle>& provided) {
+  // §37.54 detail 1: walk the formals in declaration order; use the supplied
+  // actual when the instantiation gives one, otherwise fall back to the formal's
+  // default value. The result lines up one-to-one with the formals.
+  std::vector<VpiHandle> arguments;
+  arguments.reserve(formals.size());
+  for (size_t i = 0; i < formals.size(); ++i) {
+    VpiHandle actual = i < provided.size() ? provided[i] : nullptr;
+    arguments.push_back(actual != nullptr ? actual : formals[i].default_value);
+  }
+  return arguments;
+}
+
+bool VpiIsSequenceArgumentType(int type) {
+  // §37.54 (D5): a sequence-instance argument is a named event or a sequence
+  // expression (the sequence-expr class grouped by VpiIsSequenceExprType).
+  return type == vpiNamedEvent || VpiIsSequenceExprType(type);
+}
+
+VpiHandle VpiSequenceInstDecl(VpiHandle sequence_inst) {
+  // §37.54 (D4): a sequence instance resolves to the sequence declaration it
+  // instantiates, modeled as a vpiSequenceDecl child. Report the first one, or
+  // null when the handle is null or no declaration is attached.
+  if (!sequence_inst) return nullptr;
+  for (auto* child : sequence_inst->children) {
+    if (child->type == vpiSequenceDecl) return child;
+  }
+  return nullptr;
+}
+
+bool VpiIsMatchItemType(int type) {
+  // §37.54 (D6): a sequence match item is an assignment or a task/function call.
+  switch (type) {
+    case vpiAssignment:
+    case vpiFuncCall:
+    case vpiTaskCall:
+      return true;
+    default:
+      return false;
+  }
+}
+
+std::vector<VpiHandle> VpiExprMatchItems(VpiHandle expr) {
+  // §37.54 (D6): the vpiMatchItem iteration over a bare expression yields its
+  // assignment/tf-call children, in order, dropping anything else.
+  std::vector<VpiHandle> items;
+  if (!expr) return items;
+  for (auto* child : expr->children) {
+    if (VpiIsMatchItemType(child->type)) items.push_back(child);
+  }
+  return items;
+}
+
 void VpiContext::Attach(SimContext& sim_ctx) {
   for (auto& [name, var] : sim_ctx.GetVariables()) {
     auto* obj = AllocObject();
@@ -640,6 +778,9 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // §37.3.7: the object's allocation scheme; defaults to kVpiOtherScheme.
     case kVpiAllocScheme:
       return obj->alloc_scheme;
+    // §37.54 (D2): an operation reports its operation type as an int property.
+    case vpiOpType:
+      return obj->op_type;
     // §37.49: the integer components of an assertion's source span.
     case vpiStartLine:
       return obj->start_line;
