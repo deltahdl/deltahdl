@@ -1155,6 +1155,15 @@ int VpiContext::Get(int property, VpiHandle obj) {
     }
     return 0;
   }
+  // §38.6: unless otherwise specified, asking vpi_get() for any property of a
+  // protected object is an error. Record the error and return vpiUndefined,
+  // the value vpi_get() yields whenever an error occurs.
+  if (obj->is_protected) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message = "vpi_get() on a protected object is an error";
+    return vpiUndefined;
+  }
   switch (property) {
     case kVpiType:
       return obj->type;

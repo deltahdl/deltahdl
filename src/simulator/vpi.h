@@ -151,6 +151,10 @@ struct VpiObject {
   // with a frame/thread or in dynamic memory reports vpiOtherScheme.
   int alloc_scheme = kVpiOtherScheme;
 
+  // §38.6: whether this object is protected. Unless otherwise specified,
+  // querying a protected object's property with vpi_get() is an error.
+  bool is_protected = false;
+
   // §37.10 detail 6: items that vpi_handle_by_name() must not be able to reach.
   // An imported item is brought into scope by an import declaration; a
   // compilation-unit object lives directly in the $unit compilation-unit scope.
