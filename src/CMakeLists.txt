@@ -50,6 +50,9 @@ add_library(deltahdl_lib STATIC
     elaborator/clock_resolution.cpp
     elaborator/multiclock_property.cpp
     elaborator/multiclock_sequence.cpp
+    elaborator/sequence_method.cpp
+    elaborator/multiclock_endpoint.cpp
+    elaborator/sequence_composition.cpp
     elaborator/semantic_leading_clock.cpp
     elaborator/sequence_admits_empty.cpp
     elaborator/sequence_degeneracy.cpp

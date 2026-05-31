@@ -1,8 +1,23 @@
 #include "fixture_elaborator.h"
 
+#include "elaborator/sequence_method.h"
+
 using namespace delta;
 
 namespace {
+
+// §9.4.4: a level-sensitive wait statement controls execution using the built-in
+// sequence method `triggered`, whose definition is shared with §16.9.11 and
+// §16.13.6. The wait-statement context is a legal place to apply `triggered`,
+// and the method's end-status result is a single bit independent of the match's
+// start point.
+TEST(SequenceTriggeredElaboration, TriggeredIsLegalInWaitContext) {
+  EXPECT_TRUE(IsSequenceMethodContextLegal(
+      SequenceMethod::kTriggered, SequenceMethodContext::kWaitStatement,
+      /*sequence_treats_formal_as_local_var=*/false));
+  EXPECT_TRUE(SequenceMethodResultIsSingleBit());
+  EXPECT_FALSE(SequenceMethodResultDependsOnStartPoint());
+}
 
 TEST(SequenceTriggeredElaboration, WaitSequenceTriggeredElaborates) {
   ElabFixture f;
