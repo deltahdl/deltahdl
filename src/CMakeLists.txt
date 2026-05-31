@@ -36,6 +36,7 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_items.cpp
     elaborator/property_rewrite.cpp
     elaborator/checker_rewrite.cpp
+    elaborator/checker_instantiation.cpp
     elaborator/concurrent_assertion_expr.cpp
     elaborator/property_instantiation.cpp
     elaborator/nexttime_index.cpp
@@ -102,6 +103,7 @@ add_library(deltahdl_lib STATIC
     simulator/vpi.cpp
     simulator/sv_callable.cpp
     simulator/clocking.cpp
+    simulator/checker_instance_scheduling.cpp
     simulator/assertion.cpp
     simulator/sva_engine.cpp
     simulator/coverage.cpp
