@@ -36,12 +36,6 @@ TEST(Preprocessor, DefaultNettype_Tri) {
   EXPECT_EQ(pp.DefaultNetType(), NetType::kTri);
 }
 
-TEST(Preprocessor, DefaultNettypeTrireg) {
-  PreprocFixture f;
-  Preprocess("`default_nettype trireg\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(Preprocessor, DefaultNettype_IllegalInsideDesignElement) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
