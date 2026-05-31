@@ -32,20 +32,6 @@ TEST(FunctionDeclParsing, FuncPrototypeExtern) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
 }
 
-TEST(FunctionDeclParsing, FuncBodyClassScope) {
-  auto r = Parse(
-      "class C;\n"
-      "  extern function int foo();\n"
-      "endclass\n"
-      "function int C::foo();\n"
-      "  return 42;\n"
-      "endfunction\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-
-  ASSERT_GE(r.cu->modules.size() + r.cu->classes.size(), 1u);
-}
-
 TEST(OutOfBlockDeclParsing, FuncBodyMethodClassStored) {
   auto r = Parse(
       "class C;\n"

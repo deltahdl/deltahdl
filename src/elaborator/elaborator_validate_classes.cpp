@@ -1973,6 +1973,34 @@ static const ModuleItem* FindExternPrototype(const ClassDecl* cls,
   return nullptr;
 }
 
+// §8.24: when an out-of-block declaration repeats a default argument value, it
+// shall be syntactically identical to the one in the prototype. The default
+// values are parsed into expression trees, so compare those trees node by node
+// as a faithful stand-in for syntactic identity.
+static bool DefaultArgExprsEqual(const Expr* a, const Expr* b) {
+  if (a == nullptr || b == nullptr) return a == b;
+  if (a->kind != b->kind || a->op != b->op || a->text != b->text ||
+      a->scope_prefix != b->scope_prefix || a->callee != b->callee ||
+      a->int_val != b->int_val || a->real_val != b->real_val ||
+      a->is_parenthesized != b->is_parenthesized) {
+    return false;
+  }
+  if (!DefaultArgExprsEqual(a->lhs, b->lhs) ||
+      !DefaultArgExprsEqual(a->rhs, b->rhs) ||
+      !DefaultArgExprsEqual(a->condition, b->condition) ||
+      !DefaultArgExprsEqual(a->true_expr, b->true_expr) ||
+      !DefaultArgExprsEqual(a->false_expr, b->false_expr) ||
+      !DefaultArgExprsEqual(a->base, b->base) ||
+      !DefaultArgExprsEqual(a->index, b->index)) {
+    return false;
+  }
+  if (a->args.size() != b->args.size()) return false;
+  for (size_t i = 0; i < a->args.size(); ++i) {
+    if (!DefaultArgExprsEqual(a->args[i], b->args[i])) return false;
+  }
+  return true;
+}
+
 static void ValidateOutOfBlockSignature(const ModuleItem* proto,
                                         const ModuleItem* impl,
                                         std::string_view class_name,
@@ -2013,6 +2041,18 @@ static void ValidateOutOfBlockSignature(const ModuleItem* proto,
                              "'{}' has mismatched direction",
                              class_name, impl->name, impl_args[i].name));
     }
+    // §8.24: omitting the prototype's default value is allowed, but repeating a
+    // default value in the out-of-block declaration requires a syntactically
+    // identical default value in the prototype.
+    const Expr* impl_default = impl_args[i].default_value;
+    if (impl_default != nullptr &&
+        !DefaultArgExprsEqual(proto_args[i].default_value, impl_default)) {
+      diag.Error(impl->loc,
+                 std::format("out-of-block declaration for '{}::{}' argument "
+                             "'{}' has a default value that is not "
+                             "syntactically identical to the prototype",
+                             class_name, impl->name, impl_args[i].name));
+    }
   }
   if (proto->kind == ModuleItemKind::kFunctionDecl) {
     auto impl_ret = impl->return_type;
@@ -2047,6 +2087,15 @@ static const ModuleItem* FindInterfaceExternPrototype(const ModuleDecl* ifc,
     }
   }
   return nullptr;
+}
+
+// True when location a strictly precedes location b within the same source
+// file. Locations from different files carry no relative order, so they are
+// reported as not-preceding to avoid spurious diagnostics.
+static bool LocPrecedes(const SourceLoc& a, const SourceLoc& b) {
+  if (a.file_id != b.file_id) return false;
+  if (a.line != b.line) return a.line < b.line;
+  return a.column < b.column;
 }
 
 void Elaborator::ValidateOutOfBlockDeclarations() {
@@ -2093,6 +2142,16 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
           item->loc,
           std::format("no matching extern prototype for '{}::{}' in "
                       "class '{}'",
+                      item->method_class, item->name, item->method_class));
+      continue;
+    }
+    // §8.24: an out-of-block declaration shall follow the class declaration, so
+    // a body that appears ahead of its class in source order is illegal.
+    if (LocPrecedes(item->loc, cls->range.start)) {
+      diag_.Error(
+          item->loc,
+          std::format("out-of-block declaration for '{}::{}' shall follow the "
+                      "declaration of class '{}'",
                       item->method_class, item->name, item->method_class));
       continue;
     }

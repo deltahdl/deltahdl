@@ -218,4 +218,114 @@ TEST(OutOfBlockDeclElaboration, MismatchedArgDirectionError) {
              "endmodule\n"));
 }
 
+// §8.24: matching the prototype exactly includes the method kind; a task body
+// for a function prototype (or vice versa) is an error.
+TEST(OutOfBlockDeclElaboration, MismatchedMethodKindError) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  extern function int foo();\n"
+             "endclass\n"
+             "task C::foo();\n"
+             "endtask\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// §8.24: a default argument value specified in the prototype may be omitted in
+// the out-of-block declaration.
+TEST(OutOfBlockDeclElaboration, DefaultArgOmittedInBodyOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  extern function int foo(int a = 5);\n"
+             "endclass\n"
+             "function int C::foo(int a);\n"
+             "  return a;\n"
+             "endfunction\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// §8.24: a default argument value repeated in the out-of-block declaration must
+// be syntactically identical to the prototype's.
+TEST(OutOfBlockDeclElaboration, DefaultArgRepeatedIdenticalOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  extern function int foo(int a = 5);\n"
+             "endclass\n"
+             "function int C::foo(int a = 5);\n"
+             "  return a;\n"
+             "endfunction\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// §8.24: a differing default argument value in the out-of-block declaration is
+// an error.
+TEST(OutOfBlockDeclElaboration, DefaultArgRepeatedMismatchError) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  extern function int foo(int a = 5);\n"
+             "endclass\n"
+             "function int C::foo(int a = 6);\n"
+             "  return a;\n"
+             "endfunction\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// §8.24: a default argument value in the out-of-block declaration with none in
+// the prototype is an error.
+TEST(OutOfBlockDeclElaboration, DefaultArgOnlyInBodyError) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  extern function int foo(int a);\n"
+             "endclass\n"
+             "function int C::foo(int a = 5);\n"
+             "  return a;\n"
+             "endfunction\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// §8.24: the repeated default value comparison is structural, so an identical
+// compound expression on both sides is accepted.
+TEST(OutOfBlockDeclElaboration, DefaultArgCompoundExprIdenticalOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  extern function int foo(int a = 1 + 1);\n"
+             "endclass\n"
+             "function int C::foo(int a = 1 + 1);\n"
+             "  return a;\n"
+             "endfunction\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// §8.24: identity is syntactic rather than value-based, so two defaults that
+// evaluate to the same number but are written differently do not match.
+TEST(OutOfBlockDeclElaboration, DefaultArgSameValueDifferentSyntaxError) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  extern function int foo(int a = 2);\n"
+             "endclass\n"
+             "function int C::foo(int a = 1 + 1);\n"
+             "  return a;\n"
+             "endfunction\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// §8.24: an out-of-block declaration shall follow the class declaration.
+TEST(OutOfBlockDeclElaboration, OutOfBlockBeforeClassError) {
+  EXPECT_FALSE(
+      ElabOk("function int C::foo();\n"
+             "  return 0;\n"
+             "endfunction\n"
+             "class C;\n"
+             "  extern function int foo();\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 }
