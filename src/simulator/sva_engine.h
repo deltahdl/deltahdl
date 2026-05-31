@@ -901,6 +901,24 @@ bool RestrictIsVerifiedInSimulation();
 // flagged — violating the restriction during simulation is not an error.
 bool RestrictViolationIsSimulationError();
 
+// === §16.14.5 Using concurrent assertion statements outside procedural code ===
+
+// §16.14.5: a concurrent assertion statement used outside procedural code (a
+// static concurrent assertion) follows `always` semantics — a new evaluation
+// attempt of the underlying property_spec begins at every occurrence of its
+// leading clock event. Over a run with the given number of leading clock ticks,
+// that many attempts are started, so the property is checked from the beginning
+// to the end of simulation.
+int StaticConcurrentAssertionAttemptsStarted(int leading_clock_ticks);
+
+// §16.14.5: an `assert property (ps) action_block` written outside procedural
+// code is equivalent to `always assert property (ps) action_block;`.
+bool StaticAssertEquivalentToAlwaysAssert();
+
+// §16.14.5: a `cover property (ps) statement_or_null` written outside procedural
+// code is equivalent to `always cover property (ps) statement_or_null`.
+bool StaticCoverEquivalentToAlwaysCover();
+
 // §16.9.4: the global clocking past value-change functions compare the sampled
 // value at the global clock tick that immediately precedes the current tick
 // with the value at the current tick. $rose_gclk reports the LSB changing to 1,

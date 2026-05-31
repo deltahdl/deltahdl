@@ -855,6 +855,21 @@ bool RestrictIsVerifiedInSimulation() { return false; }
 // since the statement is never checked there.
 bool RestrictViolationIsSimulationError() { return false; }
 
+// §16.14.5: under `always` semantics a fresh evaluation attempt begins at every
+// occurrence of the leading clock event, so over the run the number of attempts
+// started equals the number of leading clock ticks.
+int StaticConcurrentAssertionAttemptsStarted(int leading_clock_ticks) {
+  return leading_clock_ticks;
+}
+
+// §16.14.5: the bare assert form and the explicit `always` assert form are
+// equivalent.
+bool StaticAssertEquivalentToAlwaysAssert() { return true; }
+
+// §16.14.5: the bare cover form and the explicit `always` cover form are
+// equivalent.
+bool StaticCoverEquivalentToAlwaysCover() { return true; }
+
 bool RoseGclk(uint64_t prev_lsb, uint64_t cur_lsb) {
   return (prev_lsb & 1u) == 0u && (cur_lsb & 1u) == 1u;
 }
