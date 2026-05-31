@@ -42,6 +42,7 @@ add_library(deltahdl_lib STATIC
     elaborator/concurrent_assertion_expr.cpp
     elaborator/function_in_checker.cpp
     elaborator/checker_procedures.cpp
+    elaborator/checker_variable_assignment.cpp
     elaborator/property_instantiation.cpp
     elaborator/nexttime_index.cpp
     elaborator/always_range.cpp
