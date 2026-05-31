@@ -26,6 +26,29 @@ TEST(MultidimensionalArrayValidation, TwoDimUnpackedElaborates) {
   ASSERT_GE(mod->variables.size(), 1u);
 }
 
+TEST(MultidimensionalArrayValidation, PackedDimsViaTypedefStaging) {
+  // §7.4.4: multiple packed dimensions may be assembled in stages through a
+  // typedef. The packed range carried by the typedef supplies the element
+  // width, while the unpacked range at the use site sizes the array.
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  typedef bit [1:5] bsix;\n"
+      "  bsix v5 [1:10];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  const RtlirVariable* v5 = nullptr;
+  for (const auto& v : mod->variables) {
+    if (v.name == "v5") v5 = &v;
+  }
+  ASSERT_NE(v5, nullptr);
+  EXPECT_EQ(v5->width, 5u);
+  EXPECT_EQ(v5->unpacked_size, 10u);
+}
+
 TEST(MultidimensionalArrayValidation, CommaSeparatedSharePackedDims) {
   ElabFixture f;
   auto* design =
