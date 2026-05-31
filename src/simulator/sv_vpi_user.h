@@ -97,6 +97,15 @@ using PLI_BYTE8 = char;
 #define vpiClassDefn 733
 #define vpiExtends 734
 
+/* §37.10 instance relations. 735 and 736 are free selector numbers in this
+ * module (734 vpiExtends and 744 vpiAssertion bracket the gap).
+ *   vpiInstance    - the immediate instance (package/module/interface/program)
+ *                    an object is instantiated in
+ *   vpiNetTypedef  - iteration over the user-defined nettypes an instance
+ *                    explicitly declares */
+#define vpiInstance 735
+#define vpiNetTypedef 736
+
 #define vpiAssertion 744
 
 #define vpiTop 600

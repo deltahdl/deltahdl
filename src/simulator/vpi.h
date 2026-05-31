@@ -151,6 +151,17 @@ struct VpiObject {
   // with a frame/thread or in dynamic memory reports vpiOtherScheme.
   int alloc_scheme = kVpiOtherScheme;
 
+  // §37.10 detail 6: items that vpi_handle_by_name() must not be able to reach.
+  // An imported item is brought into scope by an import declaration; a
+  // compilation-unit object lives directly in the $unit compilation-unit scope.
+  bool imported = false;
+  bool in_compilation_unit = false;
+
+  // §37.10 detail 7: the time precision an instance was elaborated with. Only
+  // meaningful on module objects; the design-wide query reads it across every
+  // module to find the smallest precision.
+  int time_precision = 0;
+
   std::string library_name;
   std::string cell_name;
   std::string config_name;
@@ -175,6 +186,69 @@ enum class VpiAllocKind {
 // vpi_get(vpiAllocScheme) must report. Unrecognized/other allocations fall
 // through to kVpiOtherScheme, satisfying the "all other objects" default.
 int VpiAllocSchemeFor(VpiAllocKind kind);
+
+// §37.10 details 1 and 10: one entry per typedef/nettype an instance could
+// report. The vpiTypedef and vpiNetTypedef iterations return only entries that
+// are user-defined (not built-in) AND explicitly declared inside the instance,
+// so both flags gate visibility.
+struct VpiTypeDeclEntry {
+  std::string name;
+  bool user_defined = false;
+  bool declared_in_instance = false;
+};
+
+// §37.10 detail 1: the vpiTypedef iteration returns the user-defined typespecs
+// that have typedefs explicitly declared in the instance, dropping every other
+// entry while preserving declaration order.
+std::vector<const VpiTypeDeclEntry*> VpiInstanceTypedefs(
+    const std::vector<VpiTypeDeclEntry>& entries);
+
+// §37.10 detail 10: the vpiNetTypedef iteration returns the user-defined
+// nettypes explicitly declared in the instance, with the same gating.
+std::vector<const VpiTypeDeclEntry*> VpiInstanceNetTypedefs(
+    const std::vector<VpiTypeDeclEntry>& entries);
+
+// §37.10 detail 3: the kinds of object that count as an instance, i.e. the
+// scopes a vpiInstance relation may resolve to.
+bool VpiIsInstanceType(int type);
+
+// §37.10 detail 3: vpiInstance returns the immediate (nearest enclosing)
+// instance an object is instantiated in, or null when none encloses it.
+VpiHandle VpiInstanceOf(VpiHandle obj);
+
+// §37.10 detail 2: vpiModule returns the nearest enclosing module when the
+// object is inside a module instance, otherwise null.
+VpiHandle VpiModuleOf(VpiHandle obj);
+
+// §37.10 detail 4: the vpiMemory iteration reports array variable objects
+// rather than vpiMemory objects, so the item type is the array-variable kind.
+int VpiMemoryIterationItemType();
+
+// §37.10 detail 5: vpiFullName construction. Objects within a compilation unit
+// are prefixed with the "$unit::" scope name.
+std::string VpiCompilationUnitFullName(std::string_view object_path);
+
+// §37.10 detail 5: a package's full name is its own name and ends with the
+// "::" package separator so a module and a like-named package stay distinct.
+std::string VpiPackageFullName(std::string_view package_name);
+
+// §37.10 detail 5: an object declared in a package is named with the package
+// name, the "::" separator, then the member path.
+std::string VpiPackageMemberFullName(std::string_view package_name,
+                                     std::string_view member_path);
+
+// §37.10 detail 5: the separator placed before a name component. A component
+// immediately following a package or class-definition scope uses "::"; every
+// other boundary uses ".".
+std::string_view VpiNameSeparator(bool package_or_class_defn_boundary);
+
+// §37.10 detail 6: vpi_handle_by_name() must not reach imported items or
+// objects that exist within a compilation unit. Returns false for those.
+bool VpiHandleByNameAccessible(const VpiObject& obj);
+
+// §37.10 detail 7: the smallest time precision across the supplied modules.
+// With no modules there is nothing to report, so the result is zero.
+int VpiSmallestTimePrecision(const std::vector<int>& precisions);
 
 struct VpiVectorVal {
   uint32_t aval;
@@ -294,6 +368,12 @@ class VpiContext {
   int DispatchRestart();
 
   int Get(int property, VpiHandle obj);
+
+  // §37.10 detail 7: the smallest time precision over every module object the
+  // context knows about, used to answer vpi_get(vpiTimePrecision/vpiTimeUnit)
+  // for a null handle.
+  int SmallestModuleTimePrecision() const;
+
   const char* GetStr(int property, VpiHandle obj);
   int FreeObject(VpiHandle obj);
   // §38.4: vpi_control() passes an operation-specific request from the PLI
