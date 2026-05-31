@@ -174,6 +174,95 @@ VpiHandle VpiAssertionClockingBlock(VpiHandle assertion) {
   return nullptr;
 }
 
+bool VpiIsConcurrentAssertionType(int type) {
+  // §37.50: the concurrent-assertion class is realized by exactly the four
+  // directive kinds the diagram draws in its dashed box. Everything else - the
+  // immediate kinds and sequence/property instances (§37.49) included - is not a
+  // concurrent assertion.
+  switch (type) {
+    case vpiAssert:
+    case vpiAssume:
+    case vpiCover:
+    case vpiRestrict:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiIsConcurrentAssertionPropertyType(int type) {
+  // §37.50: vpiProperty reaches either a property instance or a property
+  // specification; no other kind is a concurrent assertion's property.
+  return type == vpiPropertyInst || type == vpiPropertySpec;
+}
+
+VpiHandle VpiConcurrentAssertionProperty(VpiHandle assertion) {
+  // §37.50: traverse to the assertion's property (instance or specification),
+  // modeled as the first such child. Null when none is attached.
+  if (!assertion) return nullptr;
+  for (auto* child : assertion->children) {
+    if (VpiIsConcurrentAssertionPropertyType(child->type)) return child;
+  }
+  return nullptr;
+}
+
+VpiHandle VpiConcurrentAssertionClockingEvent(VpiHandle assertion) {
+  // §37.50 (detail 1): the clocking event is the actual event the assertion is
+  // evaluated on regardless of whether it was explicit or inferred, so the same
+  // event-control child is reported in both cases. Null when none is attached.
+  if (!assertion) return nullptr;
+  for (auto* child : assertion->children) {
+    if (child->type == vpiEventControl) return child;
+  }
+  return nullptr;
+}
+
+bool VpiConcurrentAssertionHasPassStmt(int type) {
+  // §37.50 (-> stmt / detail 2): assert, assume and cover carry a pass action
+  // statement; a restrict has none.
+  switch (type) {
+    case vpiAssert:
+    case vpiAssume:
+    case vpiCover:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiConcurrentAssertionHasElseStmt(int type) {
+  // §37.50 (vpiElseStmt / detail 2): only assert and assume carry an else (fail)
+  // action statement. A cover has no else statement and a restrict has no fail
+  // statement.
+  return type == vpiAssert || type == vpiAssume;
+}
+
+VpiHandle VpiConcurrentAssertionStmt(VpiHandle assertion) {
+  // §37.50: the pass action statement, modeled as the assertion's first
+  // statement child reached through vpiStmt. Null when none is attached.
+  if (!assertion) return nullptr;
+  for (auto* child : assertion->children) {
+    if (child->type == vpiStmt) return child;
+  }
+  return nullptr;
+}
+
+VpiHandle VpiConcurrentAssertionElseStmt(VpiHandle assertion) {
+  // §37.50: the else (fail) action statement, modeled as the assertion's first
+  // else-statement child reached through vpiElseStmt. Null when none is attached.
+  if (!assertion) return nullptr;
+  for (auto* child : assertion->children) {
+    if (child->type == vpiElseStmt) return child;
+  }
+  return nullptr;
+}
+
+bool VpiConcurrentAssertionIsSimulated(int type) {
+  // §37.50 (detail 2): a restrict is not simulated and hence generates no
+  // run-time information; every other concurrent assertion kind is simulated.
+  return VpiIsConcurrentAssertionType(type) && type != vpiRestrict;
+}
+
 bool VpiIsSequenceExprType(int type) {
   // §37.54 (D1): the kinds the sequence-expr class groups - an operation, a
   // sequence instance, a distribution, and a bare boolean expression. The bare
@@ -1003,6 +1092,14 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // its operator as a Boolean property (TRUE for the strong form).
     case vpiOpStrong:
       return obj->op_strong ? 1 : 0;
+    // §37.50: a cover reports whether it covers a sequence (rather than a
+    // property) as a Boolean property.
+    case vpiIsCoverSequence:
+      return obj->cover_sequence ? 1 : 0;
+    // §37.50 (detail 1): a concurrent assertion reports whether its clocking
+    // event was inferred (rather than explicit) as a Boolean property.
+    case vpiIsClockInferred:
+      return obj->clock_inferred ? 1 : 0;
     // §37.49: the integer components of an assertion's source span.
     case vpiStartLine:
       return obj->start_line;

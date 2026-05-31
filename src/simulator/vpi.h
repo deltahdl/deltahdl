@@ -176,6 +176,17 @@ struct VpiObject {
   // VpiIsOpStrongValidOp accepts (and for sequence expressions); false otherwise.
   bool op_strong = false;
 
+  // §37.50: whether a cover covers a sequence rather than a property, reported
+  // through vpi_get(vpiIsCoverSequence). Meaningful only for a cover; false
+  // otherwise.
+  bool cover_sequence = false;
+
+  // §37.50 (detail 1): whether the concurrent assertion's clocking event was
+  // inferred from context rather than written explicitly, reported through
+  // vpi_get(vpiIsClockInferred). The event reached through vpiClockingEvent is
+  // the actual event either way; this flag only records which form produced it.
+  bool clock_inferred = false;
+
   // §37.49: the source span an assertion object occupies. start/column/end are
   // reported through vpi_get(vpiStartLine/vpiColumn/vpiEndLine/vpiEndColumn) and
   // the file through vpi_get_str(vpiFile); the assertion name reuses `name`.
@@ -278,6 +289,55 @@ bool VpiIsAssertionType(int type);
 // vpi_handle(vpiClockingBlock, ...). Returns null when no clocking block is
 // associated with the assertion.
 VpiHandle VpiAssertionClockingBlock(VpiHandle assertion);
+
+// §37.50: the concurrent-assertion class groups the four directive kinds the
+// diagram draws inside its dashed box - assert, assume, cover, and restrict. An
+// object is a concurrent assertion exactly when its type is one of these. (This
+// is the concurrent subset of §37.49's broader assertion class, which also
+// covers the immediate kinds and sequence/property instances.)
+bool VpiIsConcurrentAssertionType(int type);
+
+// §37.50: the kinds the concurrent assertion's vpiProperty relation may reach -
+// a property instance or a property specification. Any other kind is not a
+// concurrent assertion's property.
+bool VpiIsConcurrentAssertionPropertyType(int type);
+
+// §37.50: the property a concurrent assertion traverses to through vpiProperty -
+// its first property-instance/specification child; null for a null handle or an
+// assertion with no property attached.
+VpiHandle VpiConcurrentAssertionProperty(VpiHandle assertion);
+
+// §37.50 (detail 1): the clocking event a concurrent assertion is evaluated on,
+// reached through vpiClockingEvent and modeled as its event-control child. This
+// is always the actual event the assertion runs on, whether it was written
+// explicitly or inferred from context; vpiIsClockInferred (a separate Boolean)
+// records which form produced it. Null when no clocking event is attached.
+VpiHandle VpiConcurrentAssertionClockingEvent(VpiHandle assertion);
+
+// §37.50 (-> stmt / detail 2): whether a concurrent assertion kind carries a
+// pass action statement. assert, assume and cover do; a restrict has no pass
+// action statement.
+bool VpiConcurrentAssertionHasPassStmt(int type);
+
+// §37.50 (vpiElseStmt / detail 2): whether a concurrent assertion kind carries
+// an else (fail) action statement. Only assert and assume do; a cover has no
+// else statement and a restrict has no fail action statement.
+bool VpiConcurrentAssertionHasElseStmt(int type);
+
+// §37.50: the pass action statement a concurrent assertion traverses to through
+// vpiStmt - its first statement child; null when none is attached (for example a
+// restrict, which has no pass action statement).
+VpiHandle VpiConcurrentAssertionStmt(VpiHandle assertion);
+
+// §37.50: the else (fail) action statement a concurrent assertion traverses to
+// through vpiElseStmt - its first else-statement child; null when none is
+// attached (a cover or restrict has none).
+VpiHandle VpiConcurrentAssertionElseStmt(VpiHandle assertion);
+
+// §37.50 (detail 2): whether a concurrent assertion kind is simulated and so
+// generates run-time information. Every kind is, except restrict, which is not
+// simulated and hence generates no run-time information.
+bool VpiConcurrentAssertionIsSimulated(int type);
 
 // §37.54 (D1): the sequence-expr class groups the kinds the diagram draws under
 // it - an operation, a sequence instance, a distribution, and a bare boolean

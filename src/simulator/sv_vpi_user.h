@@ -169,6 +169,16 @@ using PLI_BYTE8 = char;
 #define vpiClockingEvent 786
 #define vpiOpStrong 787
 
+/* §37.50 concurrent assertion. The diagram introduces two Boolean properties a
+ * concurrent assertion exposes that had no constant yet. 788 and 789 are the
+ * remaining free selector numbers in the 780-789 block.
+ *   vpiIsCoverSequence  - TRUE when a cover covers a sequence (rather than a
+ *                         property)
+ *   vpiIsClockInferred  - TRUE when the assertion's clocking event was inferred
+ *                         from context rather than written explicitly */
+#define vpiIsCoverSequence 788
+#define vpiIsClockInferred 789
+
 #define vpiTop 600
 #define vpiUnit 602
 
