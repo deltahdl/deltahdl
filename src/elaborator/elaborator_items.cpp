@@ -3051,6 +3051,94 @@ void Elaborator::AssignGenerateBlockNames(const ModuleDecl* decl) {
   }
 }
 
+// §27.5: gather the block names introduced by the alternatives of a single
+// generate construct. An if-generate contributes its then-block name and,
+// recursively, the names of every else / else-if alternative; a case-generate
+// contributes the label of each case item (including default); a loop generate
+// contributes its array name. Names are collected into a set so that the same
+// name labelling more than one alternative of one conditional construct counts
+// only once -- at most one alternative is ever instantiated, so reusing a name
+// across the alternatives of a single conditional construct is permitted.
+static void CollectGenerateBlockNames(
+    const ModuleItem* item, std::unordered_set<std::string_view>& out) {
+  switch (item->kind) {
+    case ModuleItemKind::kGenerateIf:
+      if (!item->name.empty()) out.insert(item->name);
+      if (item->gen_else) CollectGenerateBlockNames(item->gen_else, out);
+      break;
+    case ModuleItemKind::kGenerateCase:
+      for (const auto& ci : item->gen_case_items) {
+        if (!ci.label.empty()) out.insert(ci.label);
+      }
+      break;
+    case ModuleItemKind::kGenerateFor:
+      if (!item->name.empty()) out.insert(item->name);
+      break;
+    default:
+      break;
+  }
+}
+
+// §27.5: enforce the naming rules for conditional generate constructs. A named
+// generate block shares the enclosing scope's namespace, so the name of a block
+// in an if-generate or case-generate must not also name another declaration in
+// that scope, nor a generate block belonging to a different generate construct
+// in the same scope. The check looks at every alternative of the construct,
+// independent of which one (if any) elaboration selects for instantiation, so a
+// collision is reported even when the offending block is not instantiated.
+// Reusing a name across the alternatives of one conditional construct is left
+// untouched: those names are deduplicated per construct, so only one will be
+// counted.
+void Elaborator::CheckConditionalGenerateNaming(const ModuleDecl* decl) {
+  // Names of ordinary declarations in this scope: ports, parameters, and the
+  // named module items that are not themselves generate constructs.
+  std::unordered_set<std::string_view> decl_names;
+  for (const auto& port : decl->ports)
+    if (!port.name.empty()) decl_names.insert(port.name);
+  for (const auto& p : decl->params)
+    if (!p.first.empty()) decl_names.insert(p.first);
+  for (const auto* item : decl->items) {
+    if (IsGenerateConstruct(item->kind)) continue;
+    if (!item->name.empty()) decl_names.insert(item->name);
+    if (!item->inst_name.empty()) decl_names.insert(item->inst_name);
+    if (!item->gate_inst_name.empty()) decl_names.insert(item->gate_inst_name);
+  }
+
+  // How many distinct generate constructs in this scope declare a block of each
+  // name. A name claimed by more than one construct violates the rule against
+  // sharing a block name across conditional or loop generate constructs.
+  std::unordered_map<std::string_view, int> construct_uses;
+  for (const auto* item : decl->items) {
+    if (!IsGenerateConstruct(item->kind)) continue;
+    std::unordered_set<std::string_view> names;
+    CollectGenerateBlockNames(item, names);
+    for (auto n : names) ++construct_uses[n];
+  }
+
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kGenerateIf &&
+        item->kind != ModuleItemKind::kGenerateCase) {
+      continue;
+    }
+    std::unordered_set<std::string_view> names;
+    CollectGenerateBlockNames(item, names);
+    for (auto n : names) {
+      if (decl_names.count(n)) {
+        diag_.Error(item->loc,
+                    std::format("generate block '{}' conflicts with another "
+                                "declaration in the same scope",
+                                n));
+      } else if (construct_uses[n] > 1) {
+        diag_.Error(item->loc,
+                    std::format("generate block '{}' has the same name as a "
+                                "generate block in another generate construct "
+                                "in the same scope",
+                                n));
+      }
+    }
+  }
+}
+
 static constexpr int64_t kMaxGenerateIterations = 65536;
 
 static bool ExprReferencesName(const Expr* e, std::string_view name) {

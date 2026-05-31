@@ -177,6 +177,8 @@ class Elaborator {
 
   void AssignGenerateBlockNames(const ModuleDecl* decl);
 
+  void CheckConditionalGenerateNaming(const ModuleDecl* decl);
+
   void ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl);
 
   void ApplyDefparamsRecursively(RtlirModule* mod);

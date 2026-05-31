@@ -1923,6 +1923,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
 
   ElaboratePorts(decl, mod);
 
+  CheckConditionalGenerateNaming(decl);
   AssignGenerateBlockNames(decl);
   ElaborateItems(decl, mod);
   current_library_ = std::move(saved_library);

@@ -84,16 +84,6 @@ TEST(GenerateElaboration, GenerateCaseSelectsDefault) {
   EXPECT_TRUE(found_def);
 }
 
-TEST(GenerateElaboration, IfGenerateElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  parameter int P = 1;\n"
-             "  if (P) begin : gen\n"
-             "    logic w;\n"
-             "  end\n"
-             "endmodule\n"));
-}
-
 TEST(GenerateElaboration, GenerateIfFalseNoElse) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -188,6 +178,108 @@ TEST(GenerateElaboration, GenerateCaseMultiplePatternsPerItem) {
   }
   EXPECT_TRUE(found_early);
   EXPECT_FALSE(found_late);
+}
+
+TEST(GenerateElaboration, SameNamedBlocksAcrossAlternativesAllowed) {
+  // §27.5: because at most one alternative of a conditional generate construct
+  // is instantiated, more than one block within a single construct may carry
+  // the same name.
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top #(parameter P = 1) ();\n"
+      "  if (P == 1) begin : u1\n"
+      "    logic a;\n"
+      "  end else if (P == 2) begin : u1\n"
+      "    logic b;\n"
+      "  end else begin : u1\n"
+      "    logic c;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(GenerateElaboration, SameNamedBlocksAcrossAlternativesAllowedCase) {
+  // §27.5: the same allowance applies to a case-generate construct.
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top #(parameter SEL = 0) ();\n"
+      "  case (SEL)\n"
+      "    0: begin : u1 logic a; end\n"
+      "    1: begin : u1 logic b; end\n"
+      "    default: begin : u1 logic c; end\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(GenerateElaboration, BlockNameCollidesAcrossConstructsIsError) {
+  // §27.5: a named generate block must not share its name with a generate block
+  // in another generate construct in the same scope, even if neither block is
+  // selected for instantiation.
+  ElabFixture f;
+  Elaborate(
+      "module top #(parameter P = 1) ();\n"
+      "  if (P) begin : dup\n"
+      "    logic a;\n"
+      "  end\n"
+      "  if (!P) begin : dup\n"
+      "    logic b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(GenerateElaboration, BlockNameCollidesWithDeclarationIsError) {
+  // §27.5: a named generate block must not share its name with any other
+  // declaration in the same scope.
+  ElabFixture f;
+  Elaborate(
+      "module top #(parameter P = 1) ();\n"
+      "  logic dup;\n"
+      "  if (P) begin : dup\n"
+      "    logic a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(GenerateElaboration, CaseBlockNameCollidesWithDeclarationIsError) {
+  // §27.5: the same-scope naming rule also covers case-generate alternatives --
+  // a case item's block name must not collide with another declaration.
+  ElabFixture f;
+  Elaborate(
+      "module top #(parameter SEL = 0) ();\n"
+      "  logic dup;\n"
+      "  case (SEL)\n"
+      "    0: begin : dup logic a; end\n"
+      "    default: begin : other logic b; end\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(GenerateElaboration, CaseAndIfBlockNameCollideAcrossConstructsIsError) {
+  // §27.5: a case-generate block and an if-generate block in separate
+  // constructs in the same scope may not share a name.
+  ElabFixture f;
+  Elaborate(
+      "module top #(parameter P = 1) ();\n"
+      "  if (P) begin : shared\n"
+      "    logic a;\n"
+      "  end\n"
+      "  case (P)\n"
+      "    1: begin : shared logic b; end\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 TEST(GenerateElaboration, GenerateIfBodyWithoutBeginEnd) {
