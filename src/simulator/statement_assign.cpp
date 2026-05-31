@@ -53,6 +53,10 @@ Variable* TryResolveArrayElement(const Expr* lhs, SimContext& ctx) {
   if (lhs->base->kind != ExprKind::kIdentifier) return nullptr;
   if (lhs->index_end) return nullptr;
   auto idx = EvalExpr(lhs->index, ctx, ctx.GetArena());
+  // An x or z bit anywhere in the index makes it invalid; an invalid-index
+  // write is a no-op, so fail to resolve the element just as an out-of-range
+  // index does.
+  if (HasUnknownBits(idx)) return nullptr;
   auto elem_name =
       std::string(lhs->base->text) + "[" + std::to_string(idx.ToUint64()) + "]";
   return ctx.FindVariable(elem_name);
@@ -66,8 +70,11 @@ bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx, Arena& arena,
   }
   if (expr->kind != ExprKind::kSelect || expr->index_end) return false;
   if (!BuildCompoundLhsName(expr->base, ctx, arena, name)) return false;
-  auto idx = EvalExpr(expr->index, ctx, arena).ToUint64();
-  name += "[" + std::to_string(idx) + "]";
+  auto idx_val = EvalExpr(expr->index, ctx, arena);
+  // A dimension indexed with an x or z bit is invalid; refuse to build a name
+  // for it so the surrounding write resolves to nothing and is a no-op.
+  if (HasUnknownBits(idx_val)) return false;
+  name += "[" + std::to_string(idx_val.ToUint64()) + "]";
   return true;
 }
 
