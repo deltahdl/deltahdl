@@ -53,6 +53,7 @@ add_library(deltahdl_lib STATIC
     elaborator/sampled_value.cpp
     elaborator/global_clocking_sampled_value.cpp
     elaborator/concurrent_assert_action.cpp
+    elaborator/cover_pass_statement.cpp
     elaborator/abort_property.cpp
     elaborator/typed_sequence_formal.cpp
     elaborator/rewrite_item.cpp
