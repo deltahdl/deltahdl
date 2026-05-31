@@ -882,6 +882,25 @@ inline std::size_t SelectBiasedFreeVariable(
   return weights.empty() ? 0 : weights.size() - 1;
 }
 
+// === §16.14.4 Restrict statement ===
+
+// §16.14.4: a restrict property statement shares the constraining semantics of
+// assume property — it directs the tool to take the property as holding and
+// bounds the explored state space the same way — so for formal analysis the two
+// behave identically.
+bool RestrictSharesAssumeConstraintSemantics();
+
+// §16.14.4: in contrast to assume property, a restrict property statement is not
+// verified in simulation. No pass/fail evaluation runs for it, so it never
+// yields a run-time pass or fail result the way an assumed or asserted property
+// does.
+bool RestrictIsVerifiedInSimulation();
+
+// §16.14.4: because a restrict is not verified in simulation, a cycle in which
+// its property does not hold (e.g. a restricted ctr taking value 1) is not
+// flagged — violating the restriction during simulation is not an error.
+bool RestrictViolationIsSimulationError();
+
 // §16.9.4: the global clocking past value-change functions compare the sampled
 // value at the global clock tick that immediately precedes the current tick
 // with the value at the current tick. $rose_gclk reports the LSB changing to 1,

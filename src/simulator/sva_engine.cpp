@@ -844,6 +844,17 @@ AssertionSeverity DefaultConcurrentAssertActionSeverity() {
 
 Region ConcurrentAssertActionRegion() { return Region::kReactive; }
 
+// §16.14.4: the same semantics as assume property — a restrict directs the tool
+// to take its property as a constraint and prunes the state space identically.
+bool RestrictSharesAssumeConstraintSemantics() { return true; }
+
+// §16.14.4: a restrict property is not verified in simulation.
+bool RestrictIsVerifiedInSimulation() { return false; }
+
+// §16.14.4: a simulation cycle that violates the restriction is not an error,
+// since the statement is never checked there.
+bool RestrictViolationIsSimulationError() { return false; }
+
 bool RoseGclk(uint64_t prev_lsb, uint64_t cur_lsb) {
   return (prev_lsb & 1u) == 0u && (cur_lsb & 1u) == 1u;
 }
