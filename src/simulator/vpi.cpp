@@ -143,6 +143,37 @@ int VpiSmallestTimePrecision(const std::vector<int>& precisions) {
   return smallest;
 }
 
+bool VpiIsAssertionType(int type) {
+  // §37.49: the kinds the assertion class groups - the concurrent assert/assume/
+  // cover/restrict directives, the three immediate-assertion kinds, and sequence
+  // and property instances. Every other object kind is not an assertion.
+  switch (type) {
+    case vpiAssert:
+    case vpiAssume:
+    case vpiCover:
+    case vpiRestrict:
+    case vpiImmediateAssert:
+    case vpiImmediateAssume:
+    case vpiImmediateCover:
+    case vpiSequenceInst:
+    case vpiPropertyInst:
+      return true;
+    default:
+      return false;
+  }
+}
+
+VpiHandle VpiAssertionClockingBlock(VpiHandle assertion) {
+  // §37.49: a concurrent assertion traverses to its governing clocking block
+  // through the untagged vpiClockingBlock relation. The association is modeled as
+  // a clocking-block child; report the first one, or null when none is present.
+  if (!assertion) return nullptr;
+  for (auto* child : assertion->children) {
+    if (child->type == vpiClockingBlock) return child;
+  }
+  return nullptr;
+}
+
 void VpiContext::Attach(SimContext& sim_ctx) {
   for (auto& [name, var] : sim_ctx.GetVariables()) {
     auto* obj = AllocObject();
@@ -222,13 +253,21 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   iter->type = type;
   iter->scan_index = 0;
 
+  // §37.49: vpiAssertion names the assertion class rather than a single object
+  // kind, so iterating it collects every object the class groups (the circle
+  // relation, when ref is null) instead of matching one exact type.
+  auto matches = [type](int obj_type) {
+    if (type == vpiAssertion) return VpiIsAssertionType(obj_type);
+    return obj_type == type;
+  };
+
   if (ref) {
     for (auto* child : ref->children) {
-      if (child->type == type) iter->children.push_back(child);
+      if (matches(child->type)) iter->children.push_back(child);
     }
   } else {
     for (auto* obj : all_objects_) {
-      if (obj->type == type) iter->children.push_back(obj);
+      if (matches(obj->type)) iter->children.push_back(obj);
     }
   }
 
@@ -601,6 +640,15 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // §37.3.7: the object's allocation scheme; defaults to kVpiOtherScheme.
     case kVpiAllocScheme:
       return obj->alloc_scheme;
+    // §37.49: the integer components of an assertion's source span.
+    case vpiStartLine:
+      return obj->start_line;
+    case vpiColumn:
+      return obj->column;
+    case vpiEndLine:
+      return obj->end_line;
+    case vpiEndColumn:
+      return obj->end_column;
     default:
       return 0;
   }
@@ -611,6 +659,11 @@ const char* VpiContext::GetStr(int property, VpiHandle obj) {
   switch (property) {
     case kVpiName:
       return obj->name.data();
+    // §37.49: the file component of an assertion's source location. The general
+    // vpiFile semantics (and the `line directive's effect) are §37.3.3/§22.12's;
+    // here the stored file string is handed back, or null when unset.
+    case vpiFile:
+      return obj->file.empty() ? nullptr : obj->file.c_str();
     case kVpiFullName:
       return obj->full_name.empty() ? obj->name.data() : obj->full_name.c_str();
     case kVpiDefName:
@@ -733,6 +786,17 @@ VpiHandle VpiContext::CreateParameter(std::string_view name, int int_value) {
   obj->name = name;
   obj->size = int_value;
   object_map_[name] = obj;
+  return obj;
+}
+
+VpiHandle VpiContext::CreateAssertion(std::string_view name, int type) {
+  // §37.49: an assertion is registered under one of the assertion-class kinds so
+  // a null-referenced iteration over the assertion class (the circle relation)
+  // can reach it. An unnamed assertion is not entered in the by-name map.
+  auto* obj = AllocObject();
+  obj->type = type;
+  obj->name = name;
+  if (!name.empty()) object_map_[name] = obj;
   return obj;
 }
 

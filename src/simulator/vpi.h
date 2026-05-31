@@ -166,6 +166,15 @@ struct VpiObject {
   std::string cell_name;
   std::string config_name;
 
+  // §37.49: the source span an assertion object occupies. start/column/end are
+  // reported through vpi_get(vpiStartLine/vpiColumn/vpiEndLine/vpiEndColumn) and
+  // the file through vpi_get_str(vpiFile); the assertion name reuses `name`.
+  std::string file;
+  int start_line = 0;
+  int column = 0;
+  int end_line = 0;
+  int end_column = 0;
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 };
@@ -249,6 +258,16 @@ bool VpiHandleByNameAccessible(const VpiObject& obj);
 // §37.10 detail 7: the smallest time precision across the supplied modules.
 // With no modules there is nothing to report, so the result is zero.
 int VpiSmallestTimePrecision(const std::vector<int>& precisions);
+
+// §37.49: the assertion class groups the concurrent assert/assume/cover/restrict
+// kinds, the immediate assert/assume/cover kinds, and sequence and property
+// instances. An object is an assertion exactly when its type is one of these.
+bool VpiIsAssertionType(int type);
+
+// §37.49: the clocking block governing a concurrent assertion, traversed with
+// vpi_handle(vpiClockingBlock, ...). Returns null when no clocking block is
+// associated with the assertion.
+VpiHandle VpiAssertionClockingBlock(VpiHandle assertion);
 
 struct VpiVectorVal {
   uint32_t aval;
@@ -392,6 +411,11 @@ class VpiContext {
   VpiHandle CreatePort(std::string_view name, int direction, VpiHandle parent);
 
   VpiHandle CreateParameter(std::string_view name, int int_value);
+
+  // §37.49: register an assertion object under one of the assertion-class kinds
+  // so that it is reachable as a top-level assertion (the circle relation) by a
+  // null-referenced vpi_iterate(vpiAssertion, NULL).
+  VpiHandle CreateAssertion(std::string_view name, int type);
 
   VpiHandle CreateNetObj(std::string_view name, Net* net_ptr, int width);
 

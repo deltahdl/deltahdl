@@ -106,6 +106,24 @@ using PLI_BYTE8 = char;
 #define vpiInstance 735
 #define vpiNetTypedef 736
 
+/* §37.49 assertion model. The diagram introduces the clocking-block relation an
+ * assertion traverses, two instance object kinds the assertion class groups that
+ * had no constant yet, and the source-span location properties an assertion
+ * exposes. 737-743 are the free selector numbers between vpiNetTypedef (736) and
+ * vpiAssertion (744).
+ *   vpiClockingBlock - the clocking block governing a concurrent assertion
+ *   vpiSequenceInst  - a sequence instance grouped under the assertion class
+ *   vpiPropertyInst  - a property instance grouped under the assertion class
+ *   vpiStartLine/vpiColumn/vpiEndLine/vpiEndColumn - the source span an assertion
+ *                      occupies (its file component is read through vpiFile) */
+#define vpiClockingBlock 737
+#define vpiSequenceInst 738
+#define vpiPropertyInst 739
+#define vpiStartLine 740
+#define vpiColumn 741
+#define vpiEndLine 742
+#define vpiEndColumn 743
+
 #define vpiAssertion 744
 
 #define vpiTop 600
