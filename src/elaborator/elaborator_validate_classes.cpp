@@ -2806,7 +2806,7 @@ void Elaborator::ValidateParameterizedScopeResolution(const ModuleDecl* decl) {
   if (parameterized_class_names_.empty()) return;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
-      CheckParamScopeExpr(item->rhs, parameterized_class_names_, diag_);
+      CheckParamScopeExpr(item->assign_rhs, parameterized_class_names_, diag_);
     }
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kAlwaysCombBlock ||

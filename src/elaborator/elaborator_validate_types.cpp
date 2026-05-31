@@ -641,8 +641,6 @@ bool Elaborator::ResolveParameterizedType(DataType& dtype) {
   if (dtype.scope_name.empty() || dtype.type_params.empty()) return false;
   const auto* cls = FindClassDecl(dtype.scope_name, unit_);
   if (!cls) return false;
-  const auto* td = FindClassTypedef(cls, dtype.type_name);
-  if (!td) return false;
 
   std::unordered_map<std::string_view, const DataType*> subst;
   for (size_t i = 0; i < cls->params.size() && i < dtype.type_params.size();
@@ -650,7 +648,18 @@ bool Elaborator::ResolveParameterizedType(DataType& dtype) {
     subst[cls->params[i].first] = &dtype.type_params[i];
   }
 
-  auto it = subst.find(td->typedef_type.type_name);
+  // The scope resolution operator applied to a specialization may name a type
+  // parameter of the class directly, or a member typedef whose aliased type is
+  // one of those parameters. Resolve a direct type-parameter reference first;
+  // otherwise look through a member typedef to the parameter it aliases.
+  std::string_view param_name = dtype.type_name;
+  if (!subst.count(param_name)) {
+    const auto* td = FindClassTypedef(cls, dtype.type_name);
+    if (!td) return false;
+    param_name = td->typedef_type.type_name;
+  }
+
+  auto it = subst.find(param_name);
   if (it == subst.end()) return false;
   const DataType& resolved = *it->second;
   dtype.kind = resolved.kind;
