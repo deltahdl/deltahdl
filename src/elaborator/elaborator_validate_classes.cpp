@@ -1745,9 +1745,134 @@ void Elaborator::ValidateSuperInNonDerivedClass() {
   }
 }
 
+// §8.17: returns the class's own 'new' constructor method, or null if the
+// class declares none.
+static const ModuleItem* FindClassCtorMethod(const ClassDecl* cls) {
+  if (!cls) return nullptr;
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kMethod && m->method &&
+        m->method->name == "new") {
+      return m->method;
+    }
+  }
+  return nullptr;
+}
+
+// §8.17: returns whether an expression tree references any identifier whose
+// name appears in 'names'. Mirrors the traversal used for 'super' detection.
+static bool ExprRefsAnyName(const Expr* e,
+                            const std::unordered_set<std::string_view>& names) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kIdentifier && names.count(e->text)) return true;
+  if (ExprRefsAnyName(e->lhs, names) || ExprRefsAnyName(e->rhs, names) ||
+      ExprRefsAnyName(e->base, names) || ExprRefsAnyName(e->index, names) ||
+      ExprRefsAnyName(e->condition, names) ||
+      ExprRefsAnyName(e->true_expr, names) ||
+      ExprRefsAnyName(e->false_expr, names) ||
+      ExprRefsAnyName(e->with_expr, names)) {
+    return true;
+  }
+  for (const auto* elem : e->elements)
+    if (ExprRefsAnyName(elem, names)) return true;
+  for (const auto* arg : e->args)
+    if (ExprRefsAnyName(arg, names)) return true;
+  return false;
+}
+
+// §8.17: enforces the rules governing the 'default' keyword in a subclass
+// constructor argument list and in an explicit super.new() call.
+void Elaborator::ValidateOneClassDefaultKeyword(const ClassDecl* cls) {
+  const ModuleItem* ctor = FindClassCtorMethod(cls);
+
+  bool ctor_has_default = false;
+  if (ctor) {
+    for (const auto& arg : ctor->func_args) {
+      if (arg.is_default) {
+        ctor_has_default = true;
+        break;
+      }
+    }
+  }
+
+  // §8.17: 'default' expands to the superclass constructor's arguments, so the
+  // class shall extend another class for the expansion to have a source.
+  if (ctor_has_default && cls->base_class.empty()) {
+    diag_.Error(ctor->loc,
+                "'default' in a constructor argument list requires the class "
+                "to extend a superclass");
+  }
+
+  // §8.17: when the extends specifier uses 'default' and the subclass also
+  // defines its own constructor, that constructor's argument list shall repeat
+  // the 'default' keyword.
+  if (cls->extends_has_default && ctor && !ctor_has_default) {
+    diag_.Error(ctor->loc,
+                "constructor argument list shall contain 'default' when the "
+                "extends specifier uses the 'default' keyword");
+  }
+
+  // §8.17: 'default' may be passed as the sole argument to super.new() only
+  // when the constructor's own argument list used the 'default' keyword.
+  if (ctor && !ctor_has_default) {
+    for (const auto* s : ctor->func_body_stmts) {
+      if (!IsSuperNewCall(s)) continue;
+      const auto& call_args = s->expr->args;
+      if (call_args.size() == 1 && call_args[0] &&
+          call_args[0]->kind == ExprKind::kIdentifier &&
+          call_args[0]->text == "default") {
+        diag_.Error(s->range.start,
+                    "'default' may be passed to super.new() only when the "
+                    "constructor argument list uses the 'default' keyword");
+      }
+    }
+  }
+
+  if (!ctor_has_default || cls->base_class.empty()) return;
+
+  const ClassDecl* base = FindClassDecl(cls->base_class, unit_);
+  const ModuleItem* base_ctor = FindClassCtorMethod(base);
+  if (!base_ctor) return;
+
+  // §8.17: because 'default' expands to the superclass constructor arguments,
+  // an explicit argument in the subclass constructor shall not share a name
+  // with any superclass constructor argument.
+  std::unordered_set<std::string_view> base_arg_names;
+  for (const auto& a : base_ctor->func_args) {
+    if (!a.name.empty()) base_arg_names.insert(a.name);
+  }
+  for (const auto& a : ctor->func_args) {
+    if (a.is_default || a.name.empty()) continue;
+    if (base_arg_names.count(a.name)) {
+      diag_.Error(ctor->loc,
+                  std::format("constructor argument '{}' shall not share a "
+                              "name with a superclass constructor argument "
+                              "when 'default' is used",
+                              a.name));
+    }
+  }
+
+  // §8.17: 'default' shall not be used when a superclass constructor argument's
+  // default value refers to a local member of the superclass.
+  std::unordered_set<std::string_view> base_locals;
+  for (const auto* m : base->members) {
+    if (m->is_local && !m->name.empty()) base_locals.insert(m->name);
+  }
+  if (!base_locals.empty()) {
+    for (const auto& a : base_ctor->func_args) {
+      if (a.default_value && ExprRefsAnyName(a.default_value, base_locals)) {
+        diag_.Error(ctor->loc,
+                    "'default' shall not be used when a superclass constructor "
+                    "argument default value refers to a local member");
+        break;
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateChainingConstructors() {
   for (const auto* cls : unit_->classes) {
     ValidateOneClassChainingCtor(cls);
+    ValidateOneClassDefaultKeyword(cls);
   }
 }
 

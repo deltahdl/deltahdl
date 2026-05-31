@@ -71,19 +71,6 @@ TEST(ChainedConstructorParsing, ImplicitSuperNewNoConstructor) {
               "endclass\n"));
 }
 
-TEST(ChainedConstructorParsing, SuperNewDefault) {
-  ParseOk(
-      "class Base;\n"
-      "  function new();\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  function new();\n"
-      "    super.new(default);\n"
-      "  endfunction\n"
-      "endclass\n");
-}
-
 TEST(ChainedConstructorParsing, ConstructorDefaultArg) {
   auto r = Parse(
       "class C extends Base;\n"
@@ -124,6 +111,38 @@ TEST(ChainedConstructorParsing, ConstructorDefaultBeforeArgs) {
   ASSERT_EQ(args.size(), 2u);
   EXPECT_TRUE(args[0].is_default);
   EXPECT_FALSE(args[1].is_default);
+}
+
+TEST(ChainedConstructorParsing, ArgAfterDefaultResetsToInputLogic) {
+  auto r = Parse(
+      "class C extends Base;\n"
+      "  function new(output int x, default, y);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  auto& args = r.cu->classes[0]->members[0]->method->func_args;
+  ASSERT_EQ(args.size(), 3u);
+  EXPECT_TRUE(args[1].is_default);
+  // The argument directly following 'default' does not inherit the preceding
+  // 'output int'; it falls back to the default direction (input) and the
+  // default data type (logic).
+  EXPECT_EQ(args[2].direction, Direction::kInput);
+  EXPECT_EQ(args[2].data_type.kind, DataTypeKind::kLogic);
+}
+
+TEST(ChainedConstructorParsing, ArgAfterDefaultKeepsExplicitDirection) {
+  auto r = Parse(
+      "class C extends Base;\n"
+      "  function new(default, output bit y);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  auto& args = r.cu->classes[0]->members[0]->method->func_args;
+  ASSERT_EQ(args.size(), 2u);
+  EXPECT_TRUE(args[0].is_default);
+  // The input/logic fallback for the argument following 'default' applies only
+  // when no direction is given; an explicit direction still takes effect.
+  EXPECT_EQ(args[1].direction, Direction::kOutput);
 }
 
 TEST(ChainedConstructorParsing, ErrorDuplicateDefaultInConstructorArgs) {

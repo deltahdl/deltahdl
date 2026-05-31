@@ -403,6 +403,7 @@ class Elaborator {
 
   void ValidateChainingConstructors();
   void ValidateOneClassChainingCtor(const ClassDecl* cls);
+  void ValidateOneClassDefaultKeyword(const ClassDecl* cls);
 
   void ValidateEmbeddedCovergroupAssign();
 

@@ -357,6 +357,11 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers) {
   bool seen_default = false;
   DataType prev_data_type;
   bool first_arg = true;
+  // §8.17: an argument that directly follows the 'default' keyword in a
+  // constructor argument list does not inherit the preceding argument's
+  // direction or data type; it falls back to the default direction (input)
+  // and default data type (logic).
+  bool prev_was_default = false;
   do {
     FunctionArg arg;
 
@@ -376,11 +381,16 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers) {
       arg.is_default = true;
       Consume();
       args.push_back(arg);
+      prev_was_default = true;
       continue;
     }
     if (Match(TokenKind::kKwConst)) {
       arg.is_const = true;
     }
+    // §8.17: the argument following 'default' starts from the default
+    // direction (input) rather than inheriting the previous argument's
+    // direction via stickiness.
+    if (prev_was_default) sticky_dir = Direction::kInput;
     bool dir_explicit = false;
     sticky_dir = ParseArgDirection(arg, sticky_dir, &dir_explicit);
 
@@ -396,7 +406,7 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers) {
 
     if (arg.data_type.kind == DataTypeKind::kImplicit &&
         arg.data_type.packed_dim_left == nullptr && !arg.data_type.is_signed) {
-      if (first_arg || dir_explicit) {
+      if (first_arg || dir_explicit || prev_was_default) {
         arg.data_type.kind = DataTypeKind::kLogic;
       } else {
         arg.data_type = prev_data_type;
@@ -416,6 +426,7 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers) {
     }
     prev_data_type = arg.data_type;
     first_arg = false;
+    prev_was_default = false;
     args.push_back(arg);
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kRParen);
