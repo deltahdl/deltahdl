@@ -661,6 +661,22 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
   if (tk == TokenKind::kKwRef) dir = Direction::kRef;
   Consume();
 
+  // §23.2.2.2 / §25.3.3: a generic interface reference uses the `interface`
+  // keyword as a placeholder port type. Such a port may only be declared with
+  // the ANSI list_of_port_declarations style; encountering it inside a non-ANSI
+  // body port declaration means it was written with the non-ANSI list_of_ports
+  // style, which is illegal.
+  if (Check(TokenKind::kKwInterface)) {
+    diag_.Error(CurrentLoc(),
+                "generic interface port must be declared with ANSI-style port "
+                "declarations, not the non-ANSI port style");
+    while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEndmodule) &&
+           !AtEnd())
+      Consume();
+    Match(TokenKind::kSemicolon);
+    return;
+  }
+
   auto dtype = ParseDataType();
 
   if (dtype.kind == DataTypeKind::kImplicit && Check(TokenKind::kLBracket)) {

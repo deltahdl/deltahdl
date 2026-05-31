@@ -33,6 +33,16 @@ TEST(AnsiStylePortDeclarations, DuplicateAnsiPortNameIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(AnsiStylePortDeclarations, DuplicateExplicitlyNamedAnsiPortIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(output .P1(a), output .P1(b));\n"
+      "  logic a, b;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(AnsiStylePortDeclarations, AnsiPortsElaborateDirectionAndWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -264,4 +264,50 @@ TEST(PortDeclParsing, ErrorMissingCloseParen) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §23.2.2.2: a module shall be declared either entirely with the
+// list_of_ports syntax or entirely with the list_of_port_declarations syntax.
+// Mixing a bare non-ANSI port name with an ANSI port declaration in the same
+// header is therefore illegal.
+TEST(AnsiStylePortDeclarations, MixedAnsiAndNonAnsiHeaderIsError) {
+  auto r = Parse("module m(a, input logic b); endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §23.2.2.2: generic interface ports cannot be declared using the non-ANSI
+// style list_of_ports syntax; declaring one in the module body is illegal.
+TEST(AnsiStylePortDeclarations, GenericInterfacePortNonAnsiIsError) {
+  auto r = Parse(
+      "module cpuMod(d, clk);\n"
+      "  input interface d;\n"
+      "  input logic clk;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §23.2.2.2: an explicitly named ANSI port may bind a concatenation of
+// elements declared inside the module, not just a single element select.
+TEST(AnsiStylePortDeclarations, ExplicitlyNamedAnsiPortConcatenation) {
+  auto r = Parse("module m(output .P1({a, b})); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_TRUE(port.is_explicit_named);
+  EXPECT_EQ(port.name, "P1");
+  ASSERT_NE(port.port_expr, nullptr);
+  EXPECT_EQ(port.port_expr->kind, ExprKind::kConcatenation);
+}
+
+// §23.2.2.2: an explicitly named ANSI port may also bind an assignment
+// pattern expression of elements declared inside the module.
+TEST(AnsiStylePortDeclarations, ExplicitlyNamedAnsiPortAssignmentPattern) {
+  auto r = Parse("module m(output .P1('{a, b})); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_TRUE(port.is_explicit_named);
+  EXPECT_EQ(port.name, "P1");
+  ASSERT_NE(port.port_expr, nullptr);
+  EXPECT_EQ(port.port_expr->kind, ExprKind::kAssignmentPattern);
+}
+
 }
