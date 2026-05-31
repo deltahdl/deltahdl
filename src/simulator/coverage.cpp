@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -177,7 +178,11 @@ void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
 void CoverageDB::SampleCross(
     CrossCover* cross,
     const std::vector<std::pair<std::string, int64_t>>& vals) {
+  // A false cross-level iff guard ignores the cross entirely (LRM 19.6).
+  if (cross->has_iff_guard && !cross->iff_guard_value) return;
   for (auto& cbin : cross->bins) {
+    // A false per-bin iff guard ignores that cross bin (LRM 19.6).
+    if (cbin.has_iff_guard && !cbin.iff_guard_value) continue;
     if (MatchesCrossBin(cbin, cross->coverpoint_names, vals)) {
       ++cbin.hit_count;
     }
@@ -260,6 +265,237 @@ double CoverageDB::GetGlobalCoverage() const {
   }
   if (total_weight == 0) return 0.0;
   return sum / static_cast<double>(total_weight);
+}
+
+// --- LRM 19.6: cross coverage -----------------------------------------------
+
+void CoverageDB::EnsureCrossCoverPoints(
+    CoverGroup* group, const std::vector<std::string>& names) {
+  for (const auto& name : names) {
+    bool found = false;
+    for (const auto& cp : group->coverpoints) {
+      if (cp.name == name) {
+        found = true;
+        break;
+      }
+    }
+    // A bare variable used in a cross is given an implicit coverpoint, just as
+    // though "coverpoint <var>;" had been written (LRM 19.6).
+    if (!found) AddCoverPoint(group, name);
+  }
+}
+
+bool CoverageDB::CrossItemsInSameGroup(const CoverGroup* group,
+                                       const std::vector<std::string>& names) {
+  for (const auto& name : names) {
+    bool found = false;
+    for (const auto& cp : group->coverpoints) {
+      if (cp.name == name) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) return false;
+  }
+  return true;
+}
+
+void CoverageDB::AutoCreateCrossBins(CoverGroup* group, CrossCover* cross) {
+  // Collect, for each crossed coverpoint, the value lists of the bins that may
+  // contribute a cross product. Default, ignore, and illegal bins are skipped
+  // (LRM 19.6).
+  std::vector<std::vector<std::vector<int64_t>>> per_point;
+  for (const auto& name : cross->coverpoint_names) {
+    CoverPoint* cp = nullptr;
+    for (auto& candidate : group->coverpoints) {
+      if (candidate.name == name) {
+        cp = &candidate;
+        break;
+      }
+    }
+    std::vector<std::vector<int64_t>> contributing;
+    if (cp != nullptr) {
+      for (const auto& bin : cp->bins) {
+        if (bin.kind == CoverBinKind::kDefault) continue;
+        if (bin.kind == CoverBinKind::kIgnore) continue;
+        if (bin.kind == CoverBinKind::kIllegal) continue;
+        contributing.push_back(bin.values);
+      }
+    }
+    per_point.push_back(std::move(contributing));
+  }
+
+  cross->bins.clear();
+  // Any constituent coverpoint with no contributing bin yields an empty
+  // Cartesian product.
+  for (const auto& point : per_point) {
+    if (point.empty()) return;
+  }
+
+  // Iterate the Cartesian product of the per-coverpoint bin lists.
+  std::vector<size_t> idx(per_point.size(), 0);
+  while (true) {
+    CrossBin cbin;
+    cbin.value_sets.reserve(per_point.size());
+    cbin.name = "<";
+    for (size_t i = 0; i < per_point.size(); ++i) {
+      cbin.value_sets.push_back(per_point[i][idx[i]]);
+      if (i != 0) cbin.name += ",";
+      cbin.name += std::to_string(idx[i]);
+    }
+    cbin.name += ">";
+    cross->bins.push_back(std::move(cbin));
+
+    size_t pos = per_point.size();
+    while (pos > 0) {
+      --pos;
+      if (++idx[pos] < per_point[pos].size()) break;
+      idx[pos] = 0;
+      if (pos == 0) return;
+    }
+  }
+}
+
+bool CoverageDB::CrossBareVariableAllowed(bool variable_is_real) {
+  return !variable_is_real;
+}
+
+// --- LRM 19.5.1.1: coverpoint bin "with" expressions ------------------------
+
+std::vector<int64_t> CoverageDB::ApplyWithExpression(
+    const std::vector<int64_t>& candidates,
+    const std::function<bool(int64_t)>& pred) {
+  std::vector<int64_t> selected;
+  for (int64_t value : candidates) {
+    // "item" is the candidate value; matching values keep their original order
+    // and any duplicates are retained (LRM 19.5.1.1).
+    if (pred(value)) selected.push_back(value);
+  }
+  return selected;
+}
+
+static std::vector<std::vector<int64_t>> DistributeValues(
+    const std::vector<int64_t>& values, uint32_t num_bins) {
+  std::vector<std::vector<int64_t>> bins;
+  if (num_bins == 0) return bins;
+  bins.resize(num_bins);
+  int64_t total = static_cast<int64_t>(values.size());
+  int64_t per_bin = total / static_cast<int64_t>(num_bins);
+  if (per_bin < 1) per_bin = 1;
+  size_t cursor = 0;
+  for (uint32_t i = 0; i < num_bins && cursor < values.size(); ++i) {
+    int64_t take = per_bin;
+    // The last bin absorbs whatever values remain (LRM 19.5.1).
+    if (i + 1 == num_bins) take = total - static_cast<int64_t>(cursor);
+    for (int64_t j = 0; j < take && cursor < values.size(); ++j) {
+      bins[i].push_back(values[cursor++]);
+    }
+  }
+  return bins;
+}
+
+std::vector<std::vector<int64_t>> CoverageDB::ApplyWithAndDistribute(
+    const std::vector<int64_t>& candidates,
+    const std::function<bool(int64_t)>& pred, uint32_t num_bins,
+    bool distribute_first) {
+  if (!distribute_first) {
+    // Default order: filter the candidate set, then distribute the survivors.
+    return DistributeValues(ApplyWithExpression(candidates, pred), num_bins);
+  }
+  // distribute_first: distribute first, then filter the contents of each bin
+  // (LRM 19.5.1.1, LRM 19.7.1).
+  std::vector<std::vector<int64_t>> distributed =
+      DistributeValues(candidates, num_bins);
+  for (auto& bin : distributed) {
+    bin = ApplyWithExpression(bin, pred);
+  }
+  return distributed;
+}
+
+bool CoverageDB::WithExpressionAllowed(const CoverPoint* cp) {
+  return !cp->is_real;
+}
+
+bool CoverageDB::WithRangeReferenceAllowed(std::string_view self_name,
+                                           std::string_view referenced_name) {
+  return self_name == referenced_name;
+}
+
+// --- LRM 19.7.1: covergroup type options ------------------------------------
+
+double CoverageDB::ComputeTypeCoverage(
+    const std::vector<const CoverGroup*>& instances, bool merge_instances) {
+  if (instances.empty()) return 0.0;
+
+  if (!merge_instances) {
+    // Weighted average of the per-instance coverage (LRM 19.7.1).
+    double sum = 0.0;
+    uint32_t total_weight = 0;
+    for (const CoverGroup* g : instances) {
+      sum += GetCoverage(g) * g->options.weight;
+      total_weight += g->options.weight;
+    }
+    if (total_weight == 0) return 0.0;
+    return sum / static_cast<double>(total_weight);
+  }
+
+  // Merge: a bin is covered if it is covered in any instance, i.e. the union
+  // of coverage across instances (LRM 19.7.1). All instances share a covergroup
+  // type and therefore the same coverpoint/bin layout.
+  const CoverGroup* first = instances.front();
+  uint32_t total = 0;
+  uint32_t covered = 0;
+  for (size_t p = 0; p < first->coverpoints.size(); ++p) {
+    for (size_t b = 0; b < first->coverpoints[p].bins.size(); ++b) {
+      const CoverBin& proto = first->coverpoints[p].bins[b];
+      if (proto.kind == CoverBinKind::kIllegal) continue;
+      if (proto.kind == CoverBinKind::kIgnore) continue;
+      if (proto.kind == CoverBinKind::kDefault) continue;
+      ++total;
+      uint64_t merged_hits = 0;
+      for (const CoverGroup* g : instances) {
+        if (p < g->coverpoints.size() && b < g->coverpoints[p].bins.size()) {
+          merged_hits += g->coverpoints[p].bins[b].hit_count;
+        }
+      }
+      if (merged_hits >= proto.at_least) ++covered;
+    }
+  }
+  if (total == 0) return 100.0;
+  return 100.0 * static_cast<double>(covered) / static_cast<double>(total);
+}
+
+bool CoverageDB::TypeOptionAllowedAt(TypeOptionKind kind,
+                                     CoverSyntacticLevel level) {
+  switch (kind) {
+    case TypeOptionKind::kWeight:
+    case TypeOptionKind::kGoal:
+    case TypeOptionKind::kComment:
+      // Allowed at covergroup, coverpoint, and cross (LRM 19.7.1, Table 19-4).
+      return true;
+    case TypeOptionKind::kStrobe:
+    case TypeOptionKind::kMergeInstances:
+    case TypeOptionKind::kDistributeFirst:
+      // Covergroup level only.
+      return level == CoverSyntacticLevel::kCovergroup;
+    case TypeOptionKind::kRealInterval:
+      // Covergroup and coverpoint, but not cross.
+      return level != CoverSyntacticLevel::kCross;
+  }
+  return false;
+}
+
+bool CoverageDB::TypeOptionDefaultsToLowerLevels(TypeOptionKind kind) {
+  // Only real_interval propagates as a default to lower syntactic levels when
+  // set at the covergroup level (LRM 19.7.1).
+  return kind == TypeOptionKind::kRealInterval;
+}
+
+bool CoverageDB::TypeOptionSettableProcedurally(TypeOptionKind kind) {
+  // strobe and real_interval may only be set in the covergroup definition; the
+  // other type options may also be assigned procedurally (LRM 19.7.1).
+  return kind != TypeOptionKind::kStrobe &&
+         kind != TypeOptionKind::kRealInterval;
 }
 
 }
