@@ -114,6 +114,7 @@ add_library(deltahdl_lib STATIC
     simulator/clocking.cpp
     simulator/checker_instance_scheduling.cpp
     simulator/checker_scheduling_semantics.cpp
+    simulator/checker_variable_randomization.cpp
     simulator/assertion.cpp
     simulator/sva_engine.cpp
     simulator/coverage.cpp
