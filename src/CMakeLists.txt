@@ -40,6 +40,7 @@ add_library(deltahdl_lib STATIC
     elaborator/checker_context_inference.cpp
     elaborator/covergroup_in_checker.cpp
     elaborator/concurrent_assertion_expr.cpp
+    elaborator/function_in_checker.cpp
     elaborator/property_instantiation.cpp
     elaborator/nexttime_index.cpp
     elaborator/always_range.cpp
