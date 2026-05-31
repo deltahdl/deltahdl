@@ -312,6 +312,224 @@ std::vector<VpiHandle> VpiExprMatchItems(VpiHandle expr) {
   return items;
 }
 
+bool VpiIsPropertyExprType(int type) {
+  // §37.52: the kinds the property-expr class groups - a (property) operation, a
+  // multiclock sequence expression, a property instance, a clocked property, and
+  // a case property. The property-expr class selector itself is not a member, and
+  // sequence-expr kinds are classified by the sequence-expr class, not here.
+  switch (type) {
+    case vpiOperation:
+    case vpiMulticlockSequenceExpr:
+    case vpiPropertyInst:
+    case vpiClockedProperty:
+    case vpiCaseProperty:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiIsPropertyExprOpType(int op) {
+  // §37.52 detail 2: exactly these twenty operators may appear as the vpiOpType
+  // of a property expression's operation.
+  switch (op) {
+    case vpiAcceptOnOp:
+    case vpiAlwaysOp:
+    case vpiCompAndOp:
+    case vpiCompOrOp:
+    case vpiEventuallyOp:
+    case vpiIfElseOp:
+    case vpiIfOp:
+    case vpiIffOp:
+    case vpiImpliesOp:
+    case vpiNexttimeOp:
+    case vpiNonOverlapFollowedByOp:
+    case vpiNonOverlapImplyOp:
+    case vpiNotOp:
+    case vpiOverlapFollowedByOp:
+    case vpiOverlapImplyOp:
+    case vpiRejectOnOp:
+    case vpiSyncAcceptOnOp:
+    case vpiSyncRejectOnOp:
+    case vpiUntilOp:
+    case vpiUntilWithOp:
+      return true;
+    default:
+      return false;
+  }
+}
+
+std::vector<VpiHandle> VpiNexttimeOperands(VpiHandle property, VpiHandle constant,
+                                           bool constant_differs_from_one) {
+  // §37.52 detail 2 (vpiNexttimeOp): the property, then the constant. The
+  // constant is given only when it differs from 1, so a nexttime whose constant
+  // is 1 (or absent) reports just the property.
+  std::vector<VpiHandle> operands = {property};
+  if (constant != nullptr && constant_differs_from_one) {
+    operands.push_back(constant);
+  }
+  return operands;
+}
+
+std::vector<VpiHandle> VpiAlwaysEventuallyOperands(VpiHandle property,
+                                                   VpiHandle left_range,
+                                                   VpiHandle right_range) {
+  // §37.52 detail 2 (vpiAlwaysOp/vpiEventuallyOp): the property, then the left
+  // and right range bounds. A bound that is absent (null) is omitted, so an
+  // unranged operator yields just the property.
+  std::vector<VpiHandle> operands = {property};
+  if (left_range != nullptr) operands.push_back(left_range);
+  if (right_range != nullptr) operands.push_back(right_range);
+  return operands;
+}
+
+bool VpiIsOpStrongValidOp(int op) {
+  // §37.52 detail 3: vpiOpStrong is valid only for these property operators. It
+  // is additionally valid for a sequence expression, whose strength the
+  // sequence-expr class governs rather than this property-operator set.
+  switch (op) {
+    case vpiNexttimeOp:
+    case vpiAlwaysOp:
+    case vpiEventuallyOp:
+    case vpiUntilOp:
+    case vpiUntilWithOp:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiIsPropertyVariableValueAccessible() {
+  // §37.52 detail 1: property variables are declarations whose value cannot be
+  // accessed through VPI.
+  return false;
+}
+
+std::vector<VpiHandle> VpiCaseItemConditions(VpiHandle case_item) {
+  // §37.52 detail 4: a case property item groups every case condition that
+  // branches to the same property statement. Its condition members are the
+  // children other than the property-expr branch (the diagram's case property
+  // item -> property expr edge). The default case item carries no condition
+  // expression (detail 5), so it groups none.
+  std::vector<VpiHandle> conditions;
+  if (!case_item) return conditions;
+  for (auto* child : case_item->children) {
+    if (!VpiIsPropertyExprType(child->type)) conditions.push_back(child);
+  }
+  return conditions;
+}
+
+bool VpiIsDisableConditionType(int type) {
+  // §37.52: a property specification's disable condition reaches a bare
+  // expression or a distribution. A property instance's disable condition (see
+  // §37.51) reaches only an expression, a subset of these kinds.
+  switch (type) {
+    case vpiDistribution:
+    case vpiExpr:
+    case vpiOperation:
+    case vpiConstant:
+    case vpiRefObj:
+      return true;
+    default:
+      return false;
+  }
+}
+
+VpiHandle VpiClockingEvent(VpiHandle obj) {
+  // §37.52: the clocking event a property spec or clocked property traverses to,
+  // modeled as the object's event-control child. Report the first one, or null
+  // when the handle is null or no clocking event is attached.
+  if (!obj) return nullptr;
+  for (auto* child : obj->children) {
+    if (child->type == vpiEventControl) return child;
+  }
+  return nullptr;
+}
+
+VpiHandle VpiPropertyExprChild(VpiHandle obj) {
+  // §37.52: the property expression reached through a "-> property expr" edge -
+  // the object's first property-expr-kind child. Null when none is present.
+  if (!obj) return nullptr;
+  for (auto* child : obj->children) {
+    if (VpiIsPropertyExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
+std::vector<VpiHandle> VpiPropFormals(VpiHandle property_decl) {
+  // §37.51 detail 1: the vpiPropFormalDecl iteration yields the property
+  // declaration's formals - its vpiPropFormalDecl children - in declaration
+  // order. A null handle yields none.
+  std::vector<VpiHandle> formals;
+  if (!property_decl) return formals;
+  for (auto* child : property_decl->children) {
+    if (child->type == vpiPropFormalDecl) formals.push_back(child);
+  }
+  return formals;
+}
+
+int VpiPropFormalDirection(bool is_local_variable_argument) {
+  // §37.51 detail 5: a local variable argument is an input; every other formal
+  // has no direction.
+  return is_local_variable_argument ? vpiInput : vpiNoDirection;
+}
+
+VpiHandle VpiPropFormalTypespec(VpiHandle formal) {
+  // §37.51 detail 3: a typed formal carries a typespec child; an untyped formal
+  // has none, so the relation reports null.
+  if (!formal) return nullptr;
+  for (auto* child : formal->children) {
+    if (child->type == vpiTypespec) return child;
+  }
+  return nullptr;
+}
+
+VpiHandle VpiPropFormalInitExpr(VpiHandle formal) {
+  // §37.51 detail 4: a formal's initialization expression is reached through
+  // vpiExpr; the diagram draws its target as a named event or a property
+  // expression. Report the first such child, or null when the formal has none.
+  if (!formal) return nullptr;
+  for (auto* child : formal->children) {
+    if (child->type == vpiNamedEvent || VpiIsPropertyExprType(child->type)) {
+      return child;
+    }
+  }
+  return nullptr;
+}
+
+std::vector<VpiHandle> VpiPropertyInstArguments(
+    const std::vector<VpiPropertyFormal>& formals,
+    const std::vector<VpiHandle>& provided) {
+  // §37.51 detail 2: walk the formals in declaration order; use the supplied
+  // actual when the instantiation gives one, otherwise fall back to the formal's
+  // default value. The result lines up one-to-one with the formals, so each
+  // argument corresponds to its respective formal.
+  std::vector<VpiHandle> arguments;
+  arguments.reserve(formals.size());
+  for (size_t i = 0; i < formals.size(); ++i) {
+    VpiHandle actual = i < provided.size() ? provided[i] : nullptr;
+    arguments.push_back(actual != nullptr ? actual : formals[i].default_value);
+  }
+  return arguments;
+}
+
+bool VpiIsPropertyArgumentType(int type) {
+  // §37.51: a property-instance argument is a named event or a property
+  // expression (the property-expr class grouped by VpiIsPropertyExprType).
+  return type == vpiNamedEvent || VpiIsPropertyExprType(type);
+}
+
+VpiHandle VpiPropertyInstDecl(VpiHandle property_inst) {
+  // §37.51: a property instance resolves to the property declaration it
+  // instantiates, modeled as a vpiPropertyDecl child. Report the first one, or
+  // null when the handle is null or no declaration is attached.
+  if (!property_inst) return nullptr;
+  for (auto* child : property_inst->children) {
+    if (child->type == vpiPropertyDecl) return child;
+  }
+  return nullptr;
+}
+
 void VpiContext::Attach(SimContext& sim_ctx) {
   for (auto& [name, var] : sim_ctx.GetVariables()) {
     auto* obj = AllocObject();
@@ -781,6 +999,10 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // §37.54 (D2): an operation reports its operation type as an int property.
     case vpiOpType:
       return obj->op_type;
+    // §37.52 detail 3: an operation reports whether it is the strong version of
+    // its operator as a Boolean property (TRUE for the strong form).
+    case vpiOpStrong:
+      return obj->op_strong ? 1 : 0;
     // §37.49: the integer components of an assertion's source span.
     case vpiStartLine:
       return obj->start_line;

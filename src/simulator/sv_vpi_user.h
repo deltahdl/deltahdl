@@ -137,6 +137,38 @@ using PLI_BYTE8 = char;
 #define vpiDistribution 745
 #define vpiMatchItem 746
 
+/* §37.51 property declaration. The diagram introduces the property-formal
+ * declaration object kind and the disable-condition relation a property instance
+ * traverses. 778 and 779 are free selector numbers above vpiMatchItem (746) and
+ * below the coverage block (vpiCoverageStart 750).
+ *   vpiPropFormalDecl   - a formal of a property declaration; the kind the
+ *                         vpiPropFormalDecl iteration yields in declaration order
+ *   vpiDisableCondition - the disable-condition relation, shared with §37.52's
+ *                         property specification */
+#define vpiPropFormalDecl 778
+#define vpiDisableCondition 779
+
+/* §37.52 property specification. The diagram introduces the property-spec and
+ * property-expr kinds, the clocked/case property member kinds and the case
+ * property item kind, plus the clocking-event and property-expr relations and the
+ * operator-strength property. 780-789 are free selector numbers in this module.
+ *   vpiPropertySpec           - a property specification
+ *   vpiPropertyExpr           - the property-expr class selector / relation
+ *   vpiMulticlockSequenceExpr - a multiclock sequence expression member
+ *   vpiClockedProperty        - a clocked property member
+ *   vpiCaseProperty           - a case property member
+ *   vpiCasePropertyItem       - a case property item
+ *   vpiClockingEvent          - the clocking-event relation
+ *   vpiOpStrong               - the Boolean operator-strength property */
+#define vpiPropertySpec 780
+#define vpiPropertyExpr 781
+#define vpiMulticlockSequenceExpr 782
+#define vpiClockedProperty 783
+#define vpiCaseProperty 784
+#define vpiCasePropertyItem 785
+#define vpiClockingEvent 786
+#define vpiOpStrong 787
+
 #define vpiTop 600
 #define vpiUnit 602
 
@@ -215,6 +247,24 @@ using PLI_BYTE8 = char;
 #define vpiEventuallyOp 91
 #define vpiUntilOp 92
 #define vpiUntilWithOp 93
+
+/* §37.52 detail 2: the property operators a property expr's operation may report
+ * through vpi_get(vpiOpType) that had no constant yet. These live in the vpiOpType
+ * return-value namespace; 73-84 are free values there (between vpiStreamRLOp(72),
+ * vpiTypeOp(81)/vpiAssignmentOp(82) and vpiInsideOp(95)). The remaining listed
+ * property operators already have constants: vpiAlwaysOp(90), vpiEventuallyOp(91),
+ * vpiNexttimeOp(89), vpiUntilOp(92), vpiUntilWithOp(93), vpiCompAndOp(66),
+ * vpiCompOrOp(67), vpiNotOp(3), vpiNonOverlapImplyOp(51), vpiOverlapImplyOp(52). */
+#define vpiAcceptOnOp 73
+#define vpiRejectOnOp 74
+#define vpiSyncAcceptOnOp 75
+#define vpiSyncRejectOnOp 76
+#define vpiIfOp 77
+#define vpiIfElseOp 78
+#define vpiIffOp 79
+#define vpiImpliesOp 80
+#define vpiNonOverlapFollowedByOp 83
+#define vpiOverlapFollowedByOp 84
 
 #define cbStartOfThread 600
 #define cbEndOfThread 601

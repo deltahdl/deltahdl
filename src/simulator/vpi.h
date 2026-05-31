@@ -171,6 +171,11 @@ struct VpiObject {
   // sequence operators (see VpiIsSequenceExprOpType); zero when unset.
   int op_type = 0;
 
+  // §37.52 detail 3: whether an operation reports the strong version of its
+  // operator through vpi_get(vpiOpStrong). Meaningful only for the operators
+  // VpiIsOpStrongValidOp accepts (and for sequence expressions); false otherwise.
+  bool op_strong = false;
+
   // §37.49: the source span an assertion object occupies. start/column/end are
   // reported through vpi_get(vpiStartLine/vpiColumn/vpiEndLine/vpiEndColumn) and
   // the file through vpi_get_str(vpiFile); the assertion name reuses `name`.
@@ -345,6 +350,107 @@ bool VpiIsMatchItemType(int type);
 // vpiMatchItem iteration - its assignment/tf-call children, in order. A null
 // handle yields no items.
 std::vector<VpiHandle> VpiExprMatchItems(VpiHandle expr);
+
+// §37.52: the property-expr class groups the kinds the diagram draws under it -
+// an operation, a multiclock sequence expression, a property instance, a clocked
+// property, and a case property. (A sequence expression is also a property
+// expression; classifying the sequence-expr kinds is the sequence-expr class's
+// concern.) The class selector itself is not one of these member kinds.
+bool VpiIsPropertyExprType(int type);
+
+// §37.52 detail 2: the property operators a property expr's operation may report
+// through vpi_get(vpiOpType). Every other operator value is not a property
+// operator.
+bool VpiIsPropertyExprOpType(int op);
+
+// §37.52 detail 2 (vpiNexttimeOp exception): the operands of a nexttime
+// operation in the order vpiOperand presents them - the property, then the
+// constant. The constant is reported only when it differs from 1.
+std::vector<VpiHandle> VpiNexttimeOperands(VpiHandle property, VpiHandle constant,
+                                           bool constant_differs_from_one);
+
+// §37.52 detail 2 (vpiAlwaysOp/vpiEventuallyOp exception): the operands of an
+// always or eventually operation - the property, then the left and right range
+// bounds. A null bound is omitted, so an unranged operator yields just the
+// property.
+std::vector<VpiHandle> VpiAlwaysEventuallyOperands(VpiHandle property,
+                                                   VpiHandle left_range,
+                                                   VpiHandle right_range);
+
+// §37.52 detail 3: vpiOpStrong is meaningful only for these property operators
+// (it is also meaningful for a sequence expression, whose strength the
+// sequence-expr class governs). For every other operator it does not apply.
+bool VpiIsOpStrongValidOp(int op);
+
+// §37.52 detail 1: the value of a property variable cannot be accessed through
+// VPI, so this is always false.
+bool VpiIsPropertyVariableValueAccessible();
+
+// §37.52 detail 4: the case conditions a case property item groups - its
+// condition members, each of which branches to the item's property statement, in
+// order. A case property item's property statement (the diagram's case property
+// item -> property expr edge) is excluded. The default case item has no
+// condition expression, so it groups none (detail 5).
+std::vector<VpiHandle> VpiCaseItemConditions(VpiHandle case_item);
+
+// §37.52: the kinds the property-spec/property-expr disable-condition relation
+// may reach - a bare expression or a distribution. (A property instance's
+// disable condition reaches only an expression; see §37.51.)
+bool VpiIsDisableConditionType(int type);
+
+// §37.52: the clocking event a property spec or clocked property traverses to
+// through vpiClockingEvent (the diagram's -> expr edge), modeled as the object's
+// event-control child; null when none is present.
+VpiHandle VpiClockingEvent(VpiHandle obj);
+
+// §37.52: the property expression reached through a "-> property expr" edge (a
+// property spec, a clocked property, or a case property item branch) - the
+// object's first property-expr-kind child; null when none is present.
+VpiHandle VpiPropertyExprChild(VpiHandle obj);
+
+// §37.51 detail 1: the formals a property declaration declares as the
+// vpiPropFormalDecl iteration yields them - its vpiPropFormalDecl children in
+// declaration order. A null handle yields none.
+std::vector<VpiHandle> VpiPropFormals(VpiHandle property_decl);
+
+// §37.51 detail 5: a property formal's vpiDirection. A formal that is a local
+// variable argument reports vpiInput; every other formal reports vpiNoDirection.
+int VpiPropFormalDirection(bool is_local_variable_argument);
+
+// §37.51 detail 3: the typespec of a property formal (its vpiTypespec child), or
+// null when the formal is untyped.
+VpiHandle VpiPropFormalTypespec(VpiHandle formal);
+
+// §37.51 detail 4: the initialization expression of a property formal, reached
+// through vpiExpr. The diagram draws this target as a named event or a property
+// expression; null when the formal has no initialization expression.
+VpiHandle VpiPropFormalInitExpr(VpiHandle formal);
+
+// §37.51 detail 2: a property formal as seen by the property-instance argument
+// iteration. A formal may carry a default value (null when none) that is used as
+// the argument when an instantiation does not provide one.
+struct VpiPropertyFormal {
+  VpiHandle default_value = nullptr;
+};
+
+// §37.51 detail 2: the arguments the vpiArgument iteration returns for a property
+// instance, in formal-declaration order so each argument corresponds to its
+// formal. `provided` is parallel to `formals`; a null entry means the
+// instantiation omitted that argument, so the formal's default value is used in
+// its place, preserving the order so each argument lines up with its formal.
+std::vector<VpiHandle> VpiPropertyInstArguments(
+    const std::vector<VpiPropertyFormal>& formals,
+    const std::vector<VpiHandle>& provided);
+
+// §37.51: the kinds an argument of a property instance may be (the diagram's
+// vpiArgument -> property expr | named event) - a named event or a property
+// expression. Any other kind is not a valid argument.
+bool VpiIsPropertyArgumentType(int type);
+
+// §37.51: the property declaration a property instance instantiates (the
+// diagram's property inst -> property decl edge), its vpiPropertyDecl child;
+// null for a null handle or an instance with no declaration attached.
+VpiHandle VpiPropertyInstDecl(VpiHandle property_inst);
 
 struct VpiVectorVal {
   uint32_t aval;
