@@ -77,4 +77,60 @@ TEST(TypedConstructorCallElaboration, TypedConstructorInDeclarationElaborates) {
              "endmodule\n"));
 }
 
+// §8.8: the specified type shall be assignment compatible with the target.
+// An unrelated class as the constructor scope is therefore an error.
+TEST(TypedConstructorCallElaboration, IncompatibleTypedConstructorRejected) {
+  EXPECT_FALSE(
+      ElabOk("class C; endclass\n"
+             "class U; endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "  initial c = U::new;\n"
+             "endmodule\n"));
+}
+
+// §8.8: the assignment-compatibility requirement holds regardless of whether
+// arguments are passed to the typed constructor call.
+TEST(TypedConstructorCallElaboration,
+     IncompatibleTypedConstructorWithArgsRejected) {
+  EXPECT_FALSE(
+      ElabOk("class C; endclass\n"
+             "class U;\n"
+             "  function new(int x); endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "  initial c = U::new(1);\n"
+             "endmodule\n"));
+}
+
+// §8.8: assignment compatibility is directional. A superclass type is not
+// compatible with a subclass target, so naming the base class in a typed
+// constructor call assigned to a derived handle is an error.
+TEST(TypedConstructorCallElaboration,
+     BaseTypeConstructorToDerivedTargetRejected) {
+  EXPECT_FALSE(
+      ElabOk("class C; endclass\n"
+             "class D extends C; endclass\n"
+             "module m;\n"
+             "  D d;\n"
+             "  initial d = C::new;\n"
+             "endmodule\n"));
+}
+
+// §8.8: a type several levels down the inheritance chain is still assignment
+// compatible with a base-class target, so the typed constructor call is
+// accepted across more than one extension step.
+TEST(TypedConstructorCallElaboration,
+     MultiLevelDerivedTypedConstructorElaborates) {
+  EXPECT_TRUE(
+      ElabOk("class C; endclass\n"
+             "class D extends C; endclass\n"
+             "class E extends D; endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "  initial c = E::new;\n"
+             "endmodule\n"));
+}
+
 }

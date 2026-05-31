@@ -1010,6 +1010,28 @@ static bool AreClassTypesComparable(
          IsClassDerivedFrom(type_b, type_a, unit);
 }
 
+// §8.8: a typed constructor call writes the class scope before 'new' to fix
+// the constructed object's type independently of the assignment target (e.g.
+// Derived::new or Param#(...)::new). Return that scope type name when *rhs*
+// is such a call, otherwise an empty view. The argument-less form is parsed
+// as a bare scope-resolved member access; the parenthesized form is a call
+// whose callee is that member access.
+static std::string_view TypedConstructorScopeType(const Expr* rhs) {
+  if (!rhs) return {};
+  const Expr* access = nullptr;
+  if (rhs->kind == ExprKind::kMemberAccess) {
+    access = rhs;
+  } else if (rhs->kind == ExprKind::kCall && rhs->lhs &&
+             rhs->lhs->kind == ExprKind::kMemberAccess) {
+    access = rhs->lhs;
+  }
+  if (!access) return {};
+  if (!access->lhs || access->lhs->kind != ExprKind::kIdentifier) return {};
+  if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return {};
+  if (access->rhs->text != "new") return {};
+  return access->lhs->text;
+}
+
 static void CheckClassHandleExpr(
     const Expr* e, const std::unordered_set<std::string_view>& class_vars,
     const std::unordered_map<std::string_view, std::string_view>&
@@ -1211,6 +1233,22 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
                                     cls->name));
           }
         }
+      }
+    }
+
+    // §8.8: a typed constructor call may name a type different from the
+    // assignment target, but that specified type shall be assignment
+    // compatible with the target — i.e. the same class or one derived from
+    // it. Reject a scope type that is an unrelated class.
+    auto specified = TypedConstructorScopeType(s->rhs);
+    if (!specified.empty() && class_names_.count(specified)) {
+      auto lhs_name = ExprIdent(s->lhs);
+      auto lt = class_var_types_.find(lhs_name);
+      if (lt != class_var_types_.end() &&
+          !IsClassDerivedFrom(specified, lt->second, unit_)) {
+        diag_.Error(s->range.start,
+                    "typed constructor call type is not assignment compatible "
+                    "with the target");
       }
     }
 

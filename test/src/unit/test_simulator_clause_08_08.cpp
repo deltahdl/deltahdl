@@ -139,6 +139,32 @@ TEST(TypedConstructorCallSim, ParameterizedTypedConstructor) {
       "endmodule\n", "result"), 77u);
 }
 
+TEST(TypedConstructorCallSim, MultiLevelInheritanceConstructsSpecifiedType) {
+  // §8.8: the constructed object is the named (specified) type even when that
+  // type sits several levels below the target's type, and §8.7-style chained
+  // construction runs every level's constructor in order. The most-derived
+  // constructor runs last, so its assignment to the shared property wins.
+  EXPECT_EQ(RunAndGet(
+      "class C;\n"
+      "  int x;\n"
+      "  function new(); x = 1; endfunction\n"
+      "endclass\n"
+      "class D extends C;\n"
+      "  function new(); super.new(); x = 2; endfunction\n"
+      "endclass\n"
+      "class E extends D;\n"
+      "  function new(); super.new(); x = 3; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = E::new;\n"
+      "    result = c.x;\n"
+      "  end\n"
+      "endmodule\n", "result"), 3u);
+}
+
 TEST(TypedConstructorCallSim, ParameterizedTypedConstructorWithArgs) {
   EXPECT_EQ(RunAndGet(
       "class C;\n"
