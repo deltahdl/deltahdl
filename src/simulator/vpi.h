@@ -155,6 +155,12 @@ struct VpiObject {
   // querying a protected object's property with vpi_get() is an error.
   bool is_protected = false;
 
+  // §38.12: whether this callback object stands in for a user-defined system
+  // task or system function. When true, `index` selects the registration
+  // record vpi_get_systf_info() reports; this separates a system task/function
+  // callback from a simulation callback, which is also a vpiCallback object.
+  bool is_systf = false;
+
   // §37.10 detail 6: items that vpi_handle_by_name() must not be able to reach.
   // An imported item is brought into scope by an import declaration; a
   // compilation-unit object lives directly in the $unit compilation-unit scope.
@@ -643,6 +649,14 @@ class VpiContext {
   void SetScheduler(Scheduler* sched) { scheduler_ = sched; }
 
   VpiHandle RegisterSystf(VpiSystfData* data);
+
+  // §38.12: report the registration of the system task or system function
+  // callback denoted by `obj` into the application-allocated structure
+  // `systf_data_p`. The structure's memory belongs to the caller; this routine
+  // only writes the stored s_vpi_systf_data fields into it. A null handle, a
+  // null destination, or a handle that does not name a registered system
+  // task/function callback leaves the destination untouched.
+  void GetSystfInfo(VpiHandle obj, VpiSystfData* systf_data_p);
   VpiHandle HandleByName(const char* name, VpiHandle scope);
   VpiHandle HandleByIndex(int index, VpiHandle parent);
   VpiHandle Handle(int type, VpiHandle ref);
@@ -1343,6 +1357,7 @@ typedef struct t_vpi_arrayvalue {
 
 
 vpiHandle vpi_register_systf(s_vpi_systf_data* data);
+void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p);
 vpiHandle VpiHandleC(int type, vpiHandle ref);
 vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope);
 vpiHandle VpiHandleByIndexC(vpiHandle parent, int index);

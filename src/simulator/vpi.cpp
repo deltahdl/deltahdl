@@ -744,7 +744,26 @@ VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
   auto* systf_obj = AllocObject();
   systf_obj->type = kVpiCallback;
   systf_obj->index = static_cast<int>(systfs_.size() - 1);
+  // §38.12: mark this callback as a system task/function so vpi_get_systf_info()
+  // can tell it apart from a simulation callback and read back its record.
+  systf_obj->is_systf = true;
   return systf_obj;
+}
+
+void VpiContext::GetSystfInfo(VpiHandle obj, VpiSystfData* systf_data_p) {
+  // §38.12 / §38.1: the handle and the destination are both mandatory. With no
+  // structure to fill, or no callback to read, there is nothing to report.
+  if (obj == nullptr || systf_data_p == nullptr) return;
+
+  // §38.12: obj must name a system task or system function callback. Other
+  // objects (including simulation callbacks) carry no s_vpi_systf_data record.
+  if (obj->type != kVpiCallback || !obj->is_systf) return;
+  int idx = obj->index;
+  if (idx < 0 || idx >= static_cast<int>(systfs_.size())) return;
+
+  // §38.12: copy the stored registration into the application-owned structure.
+  // The routine never allocates that memory; it only writes the fields.
+  *systf_data_p = systfs_[idx];
 }
 
 VpiHandle VpiContext::HandleByName(const char* name, VpiHandle ) {
@@ -1408,6 +1427,10 @@ void InvokeVlogStartupRoutines(VlogStartupRoutine* routines) {
 
 vpiHandle vpi_register_systf(s_vpi_systf_data* data) {
   return delta::GetGlobalVpiContext().RegisterSystf(data);
+}
+
+void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p) {
+  delta::GetGlobalVpiContext().GetSystfInfo(obj, systf_data_p);
 }
 
 vpiHandle VpiHandleC(int type, vpiHandle ref) {
