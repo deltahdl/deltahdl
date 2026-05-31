@@ -62,6 +62,25 @@ TEST(ClassAssignRenameSim, ShallowCopyPreservesAllProperties) {
   EXPECT_EQ(copy->GetProperty("c", f.arena).ToUint64(), 3u);
 }
 
+TEST(ClassAssignRenameSim, ShallowCopyCopiesStringProperty) {
+  SimFixture f;
+  auto* type = MakeClassType(f, "Named", {"name"});
+  auto [h, obj] = MakeObj(f, type);
+  // A string property is held as packed bytes in the same property store as any
+  // other variable ("Hi" packs to 0x4869). §8.12 lists strings among the
+  // variables a shallow copy duplicates, so the full packed value must carry
+  // across to the copy rather than being dropped or truncated.
+  obj->SetProperty("name", MakeLogic4VecVal(f.arena, 64, 0x4869u));
+
+  auto* copy = obj->ShallowCopy(f.arena);
+  EXPECT_EQ(copy->GetProperty("name", f.arena).ToUint64(), 0x4869u);
+
+  // The copied string is independent: rewriting it in the source leaves the
+  // copy holding the original packed value.
+  obj->SetProperty("name", MakeLogic4VecVal(f.arena, 64, 0x426Au));
+  EXPECT_EQ(copy->GetProperty("name", f.arena).ToUint64(), 0x4869u);
+}
+
 TEST(ClassAssignRenameSim, ShallowCopySharesNestedHandles) {
   SimFixture f;
   auto* inner_type = MakeClassType(f, "Inner", {"val"});
@@ -76,6 +95,46 @@ TEST(ClassAssignRenameSim, ShallowCopySharesNestedHandles) {
   auto* copy = outer_obj->ShallowCopy(f.arena);
 
   EXPECT_EQ(copy->GetProperty("ref", f.arena).ToUint64(), inner_handle);
+}
+
+TEST(ClassAssignRenameSim, ShallowCopyCopiesRngState) {
+  SimFixture f;
+  auto* type = MakeClassType(f, "R", {"x"});
+  auto [h, obj] = MakeObj(f, type);
+  obj->rng_seed = 0xC0FFEEu;
+  obj->rng_initialized = true;
+  obj->rng.seed(obj->rng_seed);
+  // Advance the generator so its live state diverges from a freshly seeded one.
+  (void)obj->rng();
+  (void)obj->rng();
+
+  auto* copy = obj->ShallowCopy(f.arena);
+  EXPECT_EQ(copy->rng_seed, 0xC0FFEEu);
+  EXPECT_TRUE(copy->rng_initialized);
+  // The copy resumes the source's generator state, not a fresh one.
+  EXPECT_EQ(copy->rng, obj->rng);
+}
+
+TEST(ClassAssignRenameSim, E2eShallowCopyDoesNotRerunFieldInitializer) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int x = 7;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C p1, p2;\n"
+      "    p1 = new;\n"
+      "    p1.x = 42;\n"
+      "    p2 = new p1;\n"
+      "    result = p2.x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  // The shallow copy preserves the mutated value; the `x = 7` declaration
+  // initializer is not re-executed during the copy's allocation.
+  LowerRunAndCheck(f, design, {{"result", 42u}});
 }
 
 TEST(ClassAssignRenameSim, ShallowCopyPreservesDerivedType) {

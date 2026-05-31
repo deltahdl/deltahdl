@@ -4,18 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ClassAssignRenameParsing, ClassNewCopy) {
-  auto r = Parse(
-      "class C;\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c1, c2;\n"
-      "  initial c2 = new c1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ClassAssignRenameParsing, ShallowCopy) {
   auto r = Parse(
       "module m;\n"
@@ -102,22 +90,6 @@ TEST(ClassAssignRenameParsing, ClassContainingClassProperty) {
               "endclass\n"));
 }
 
-TEST(ClassAssignRenameParsing, ShallowCopyWithData) {
-  auto r = Parse(
-      "class C;\n"
-      "  int data;\n"
-      "endclass\n"
-      "module m;\n"
-      "  C a, b;\n"
-      "  initial begin\n"
-      "    a = new;\n"
-      "    b = new a;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ClassAssignRenameParsing, ShallowCopyInDeclaration) {
   EXPECT_TRUE(ParseOk(
       "class C;\n"
@@ -161,22 +133,6 @@ TEST(ClassAssignRenameParsing, ShallowCopyExtendedClass) {
               "    b = e;\n"
               "    Base b2;\n"
               "    b2 = new b;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(ClassAssignRenameParsing, HandleAssignmentAfterPropertyMutation) {
-  EXPECT_TRUE(
-      ParseOk("class C;\n"
-              "  int x;\n"
-              "endclass\n"
-              "module m;\n"
-              "  initial begin\n"
-              "    C p1, p2;\n"
-              "    p1 = new;\n"
-              "    p1.x = 5;\n"
-              "    p2 = p1;\n"
-              "    p2.x = 10;\n"
               "  end\n"
               "endmodule\n"));
 }

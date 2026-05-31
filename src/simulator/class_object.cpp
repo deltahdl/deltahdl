@@ -103,6 +103,13 @@ ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   auto* copy = arena.Create<ClassObject>();
   copy->type = type;
   copy->properties = properties;
+  // §8.12: a shallow copy carries over the source object's internal
+  // randomization state. The per-instance RNG (its seed and live generator
+  // state) is duplicated into the new object so it resumes from where the
+  // source left off rather than from a fresh, unseeded generator.
+  copy->rng_seed = rng_seed;
+  copy->rng = rng;
+  copy->rng_initialized = rng_initialized;
   return copy;
 }
 
