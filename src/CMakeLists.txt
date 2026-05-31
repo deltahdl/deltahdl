@@ -49,6 +49,7 @@ add_library(deltahdl_lib STATIC
     elaborator/sequence_admits_empty.cpp
     elaborator/sequence_degeneracy.cpp
     elaborator/disable_iff_resolution.cpp
+    elaborator/inferred_clock_disable.cpp
     elaborator/sequence_match_attach.cpp
     elaborator/sequence_repetition.cpp
     elaborator/sampled_value.cpp
