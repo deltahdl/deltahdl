@@ -689,6 +689,11 @@ class VpiContext {
   // scheduled time of the next future event.
   VpiHandle CreateTimeQueue();
 
+  // §38.21: return a handle to the object named `name`, which may be a simple
+  // or a hierarchical name. With a null scope the name is searched for from the
+  // top level of the design hierarchy; with a scope the search is confined to
+  // that scope's contents. A protected scope object, or a hierarchical name
+  // that passes through a protected scope, makes the call an error (no handle).
   VpiHandle HandleByName(const char* name, VpiHandle scope);
   VpiHandle HandleByIndex(int index, VpiHandle parent);
   VpiHandle Handle(int type, VpiHandle ref);

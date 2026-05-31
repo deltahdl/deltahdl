@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/types.h"
 #include "simulator/net.h"
@@ -814,14 +815,86 @@ void VpiContext::GetTime(VpiHandle obj, VpiTime* time_p) {
   }
 }
 
-VpiHandle VpiContext::HandleByName(const char* name, VpiHandle ) {
+namespace {
+
+// §38.21: split a possibly hierarchical name into its dot-separated path
+// components, outermost scope first. A simple name yields a single component.
+std::vector<std::string_view> VpiNamePathComponents(std::string_view name) {
+  std::vector<std::string_view> parts;
+  size_t start = 0;
+  for (;;) {
+    size_t dot = name.find('.', start);
+    if (dot == std::string_view::npos) {
+      parts.push_back(name.substr(start));
+      break;
+    }
+    parts.push_back(name.substr(start, dot - start));
+    start = dot + 1;
+  }
+  return parts;
+}
+
+}  // namespace
+
+VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
   if (!name) return nullptr;
-  auto it = object_map_.find(std::string_view(name));
-  if (it == object_map_.end()) return nullptr;
+
+  // §38.21: a protected object cannot serve as the search scope. Unless
+  // otherwise specified, asking for a handle relative to a protected scope is
+  // an error; record it and return no handle.
+  if (scope != nullptr && scope->is_protected) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_handle_by_name() with a protected scope is an error";
+    return nullptr;
+  }
+
+  // §38.21: the name may be simple or hierarchical, so resolve it one path
+  // component at a time from the leftmost (outermost) scope to the rightmost.
+  std::vector<std::string_view> parts = VpiNamePathComponents(name);
+
+  VpiHandle current = nullptr;
+  for (size_t i = 0; i < parts.size(); ++i) {
+    VpiHandle next = nullptr;
+    if (current == nullptr && scope == nullptr) {
+      // §38.21: with no scope the outermost component is searched for from the
+      // top level of the design hierarchy.
+      auto it = object_map_.find(parts[i]);
+      next = (it == object_map_.end()) ? nullptr : it->second;
+    } else {
+      // §38.21: within a scope - the supplied scope for the first component, or
+      // the previously resolved scope for a deeper one - the search is confined
+      // to that scope's immediate contents and nothing outside it.
+      VpiHandle within = (current == nullptr) ? scope : current;
+      for (auto* child : within->children) {
+        if (child->name == parts[i]) {
+          next = child;
+          break;
+        }
+      }
+    }
+    if (next == nullptr) return nullptr;
+
+    // §38.21: a hierarchical name that passes through a protected scope is an
+    // error - an intermediate component naming a protected object cannot be
+    // descended into to reach a deeper object.
+    bool is_last = (i + 1 == parts.size());
+    if (!is_last && next->is_protected) {
+      last_error_.state = kVpiError;
+      last_error_.level = kVpiError;
+      last_error_.message =
+          "vpi_handle_by_name() through a protected scope is an error";
+      return nullptr;
+    }
+    current = next;
+  }
+
+  if (current == nullptr) return nullptr;
   // §37.10 detail 6: imported items and compilation-unit objects must not be
   // reachable by name even when an object happens to be registered under it.
-  if (!VpiHandleByNameAccessible(*it->second)) return nullptr;
-  return it->second;
+  if (!VpiHandleByNameAccessible(*current)) return nullptr;
+  return current;
 }
 
 VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
