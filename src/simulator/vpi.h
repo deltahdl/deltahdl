@@ -22,6 +22,11 @@ constexpr int kVpiPort = 44;
 constexpr int kVpiParameter = 41;
 constexpr int kVpiCallback = 107;
 
+// §38.13: a time queue object stands in for the simulator's pending-event
+// queue. vpi_get_time() treats it specially, reporting the scheduled time of
+// the next future event rather than the current simulation time.
+constexpr int kVpiTimeQueue = 64;
+
 constexpr int kVpiBinStrVal = 1;
 constexpr int kVpiOctStrVal = 2;
 constexpr int kVpiHexStrVal = 3;
@@ -171,6 +176,12 @@ struct VpiObject {
   // meaningful on module objects; the design-wide query reads it across every
   // module to find the smallest precision.
   int time_precision = 0;
+
+  // §38.13: the object's time unit, as a base-ten exponent of one second (e.g.
+  // -9 for 1 ns, -12 for 1 ps). vpi_get_time() scales a scaled-real result to
+  // this unit - the "timescale of the object". Zero leaves the scaled value
+  // expressed in the simulation time unit (no scaling).
+  int time_unit = 0;
 
   std::string library_name;
   std::string cell_name;
@@ -657,6 +668,27 @@ class VpiContext {
   // null destination, or a handle that does not name a registered system
   // task/function callback leaves the destination untouched.
   void GetSystfInfo(VpiHandle obj, VpiSystfData* systf_data_p);
+
+  // §38.13: write the relevant simulation time into the application-allocated
+  // structure `time_p`. The caller selects the form through `time_p->type`:
+  // vpiSimTime delivers the raw 64-bit count in high/low; vpiScaledRealTime
+  // delivers a real scaled to the object's timescale. A null obj uses the
+  // simulation time unit; a time queue object reports the scheduled time of the
+  // next future event, also in the simulation time unit. The structure's memory
+  // belongs to the caller, so the routine only fills it and never allocates. A
+  // null `time_p` leaves nothing to do.
+  void GetTime(VpiHandle obj, VpiTime* time_p);
+
+  // §38.13: set the simulation time unit, as a base-ten exponent of one second
+  // (the unit the scheduler counts ticks in). vpi_get_time() uses it both as the
+  // scaling reference for a scaled-real result and as the unit reported for a
+  // null obj or a time queue object.
+  void SetSimTimeUnit(int exponent) { sim_time_unit_ = exponent; }
+
+  // §38.13: create a time queue object so vpi_get_time() can report the
+  // scheduled time of the next future event.
+  VpiHandle CreateTimeQueue();
+
   VpiHandle HandleByName(const char* name, VpiHandle scope);
   VpiHandle HandleByIndex(int index, VpiHandle parent);
   VpiHandle Handle(int type, VpiHandle ref);
@@ -765,6 +797,10 @@ class VpiContext {
   std::unordered_map<std::string_view, VpiObject*> object_map_;
   std::vector<VpiObject*> all_objects_;
   Scheduler* scheduler_ = nullptr;
+  // §38.13: the simulation time unit (base-ten exponent of one second) the
+  // scheduler's tick count is expressed in; the reference vpi_get_time() scales
+  // a scaled-real result against.
+  int sim_time_unit_ = 0;
   bool elaboration_started_ = false;
   bool stop_requested_ = false;
   bool finish_requested_ = false;
@@ -1358,6 +1394,7 @@ typedef struct t_vpi_arrayvalue {
 
 vpiHandle vpi_register_systf(s_vpi_systf_data* data);
 void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p);
+void vpi_get_time(vpiHandle obj, s_vpi_time* time_p);
 vpiHandle VpiHandleC(int type, vpiHandle ref);
 vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope);
 vpiHandle VpiHandleByIndexC(vpiHandle parent, int index);

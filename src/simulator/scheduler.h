@@ -63,6 +63,15 @@ class Scheduler {
   explicit Scheduler(Arena& arena) : pool_(arena) {}
 
   SimTime CurrentTime() const { return current_time_; }
+
+  // The time of the earliest event still scheduled - the next future event.
+  // When nothing remains queued there is no future event, so the current time
+  // is reported instead.
+  SimTime NextEventTime() const {
+    return event_calendar_.empty() ? current_time_
+                                   : event_calendar_.begin()->first;
+  }
+
   Region CurrentRegion() const { return current_region_; }
   bool HasEvents() const { return !event_calendar_.empty(); }
 

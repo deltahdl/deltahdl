@@ -1,5 +1,6 @@
 #include "simulator/vpi.h"
 
+#include <cmath>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
@@ -766,6 +767,53 @@ void VpiContext::GetSystfInfo(VpiHandle obj, VpiSystfData* systf_data_p) {
   *systf_data_p = systfs_[idx];
 }
 
+VpiHandle VpiContext::CreateTimeQueue() {
+  // §38.13: a time queue object carries no further state of its own; its kind is
+  // enough for GetTime() to know to report the next future event time.
+  auto* obj = AllocObject();
+  obj->type = kVpiTimeQueue;
+  return obj;
+}
+
+void VpiContext::GetTime(VpiHandle obj, VpiTime* time_p) {
+  // §38.13 / §38.1: the destination is mandatory and its memory belongs to the
+  // application. With nowhere to write, there is nothing to do; the routine
+  // never allocates the structure itself.
+  if (time_p == nullptr) return;
+
+  // §38.13: choose the time value and the unit it is expressed in. A time queue
+  // object reports the scheduled time of the next future event; every other
+  // query reports the current simulation time. Both a null handle and a time
+  // queue object are read in the simulation time unit; a regular object is read
+  // in its own timescale.
+  uint64_t ticks = 0;
+  bool use_sim_time_unit = (obj == nullptr);
+  if (obj != nullptr && obj->type == kVpiTimeQueue) {
+    ticks = scheduler_ ? scheduler_->NextEventTime().ticks : 0;
+    use_sim_time_unit = true;
+  } else {
+    ticks = scheduler_ ? scheduler_->CurrentTime().ticks : 0;
+  }
+
+  // §38.13 (Figure 38-6): the caller's time_p->type selects the form of the
+  // result. vpiScaledRealTime asks for a real scaled to the relevant time unit;
+  // anything else (vpiSimTime) asks for the raw 64-bit count.
+  if (time_p->type == kVpiScaledRealTime) {
+    // §38.13: scale the simulation-time-unit count into the target unit - the
+    // object's timescale, or the simulation time unit for a null handle or a
+    // time queue object. The exponent difference is the power-of-ten conversion
+    // between the two units.
+    int target_unit = use_sim_time_unit ? sim_time_unit_ : obj->time_unit;
+    double scale = std::pow(10.0, static_cast<double>(sim_time_unit_ - target_unit));
+    time_p->real = static_cast<double>(ticks) * scale;
+  } else {
+    // §38.13 (Figure 38-6): vpiSimTime delivers the 64-bit simulation time split
+    // into its high and low 32-bit halves.
+    time_p->high = static_cast<uint32_t>(ticks >> 32);
+    time_p->low = static_cast<uint32_t>(ticks & 0xFFFFFFFFu);
+  }
+}
+
 VpiHandle VpiContext::HandleByName(const char* name, VpiHandle ) {
   if (!name) return nullptr;
   auto it = object_map_.find(std::string_view(name));
@@ -1431,6 +1479,10 @@ vpiHandle vpi_register_systf(s_vpi_systf_data* data) {
 
 void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p) {
   delta::GetGlobalVpiContext().GetSystfInfo(obj, systf_data_p);
+}
+
+void vpi_get_time(vpiHandle obj, s_vpi_time* time_p) {
+  delta::GetGlobalVpiContext().GetTime(obj, time_p);
 }
 
 vpiHandle VpiHandleC(int type, vpiHandle ref) {
