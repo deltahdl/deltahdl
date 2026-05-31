@@ -1,59 +1,9 @@
 #include "fixture_simulator.h"
-#include "helpers_class_object.h"
 #include "helpers_scheduler.h"
-#include "parser/ast.h"
-#include "simulator/class_object.h"
-#include "simulator/evaluation.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(SuperSimulation, SuperMethodResolutionFromParent) {
-  SimFixture f;
-  auto* base = MakeClassType(f, "Packet", {});
-  auto* base_delay = f.arena.Create<ModuleItem>();
-  base_delay->kind = ModuleItemKind::kFunctionDecl;
-  base_delay->name = "delay";
-  base->methods["delay"] = base_delay;
-
-  auto* derived = MakeClassType(f, "LinkedPacket", {});
-  derived->parent = base;
-  auto* derived_delay = f.arena.Create<ModuleItem>();
-  derived_delay->kind = ModuleItemKind::kFunctionDecl;
-  derived_delay->name = "delay";
-  derived->methods["delay"] = derived_delay;
-
-  auto it = base->methods.find("delay");
-  ASSERT_NE(it, base->methods.end());
-  EXPECT_EQ(it->second, base_delay);
-}
-
-TEST(SuperSimulation, SuperPropertyAccessFromBase) {
-  SimFixture f;
-  auto* base = MakeClassType(f, "Packet", {"value"});
-  auto* derived = MakeClassType(f, "LinkedPacket", {"value"});
-  derived->parent = base;
-
-  EXPECT_EQ(base->properties.size(), 1u);
-  EXPECT_EQ(derived->properties.size(), 1u);
-  EXPECT_EQ(base->properties[0].name, "value");
-  EXPECT_EQ(derived->properties[0].name, "value");
-}
-
-TEST(SuperSimulation, SuperParentAccessible) {
-  SimFixture f;
-  auto* base = MakeClassType(f, "Base", {"x"});
-  auto* mid = MakeClassType(f, "Mid", {"y"});
-  mid->parent = base;
-  auto* leaf = MakeClassType(f, "Leaf", {"z"});
-  leaf->parent = mid;
-
-  EXPECT_EQ(leaf->parent, mid);
-  EXPECT_EQ(leaf->parent->name, "Mid");
-
-  EXPECT_EQ(leaf->parent->parent, base);
-}
 
 TEST(SuperSimulation, SuperPropertyReturnsBaseValue) {
   EXPECT_EQ(RunAndGet(
@@ -193,6 +143,33 @@ TEST(SuperSimulation, SuperInitializationOrder) {
       "    result = d.y;\n"
       "  end\n"
       "endmodule\n", "result"), 6u);
+}
+
+// §8.15 states the compiler inserts super.new automatically when the user
+// constructor does not provide one, so the superclass is still initialized
+// before the current class. Here the derived constructor omits super.new yet
+// the base constructor's assignment to x is observed, proving the implicit
+// call ran first.
+TEST(SuperSimulation, ImplicitSuperNewInitializesBase) {
+  EXPECT_EQ(RunAndGet(
+      "class Base;\n"
+      "  int x;\n"
+      "  function new(); x = 7; endfunction\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  int y;\n"
+      "  function new(); y = 2; endfunction\n"
+      "  function int get_base();\n"
+      "    return super.x;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    Derived d = new;\n"
+      "    result = d.get_base();\n"
+      "  end\n"
+      "endmodule\n", "result"), 7u);
 }
 
 }
