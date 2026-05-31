@@ -193,3 +193,30 @@ TEST(BlockingAssignSchedulingSim, ContinuesWithNextStatementAndOtherEvents) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 2u);
   EXPECT_EQ(f.ctx.FindVariable("parallel_marker")->value.ToUint64(), 9u);
 }
+
+// §4.9.3 also covers the case where the assigning process returns immediately
+// because no intra-assignment delay is specified: it still performs the update
+// of the left-hand side and enables any events that depend on that update. This
+// exercises the immediate (no-delay) execution path, which is dispatched
+// separately from the delayed path, so the event-enabling behavior is verified
+// on its own rather than being inferred from the delayed cases above.
+TEST(BlockingAssignSchedulingSim, ImmediateAssignNoDelayEnablesEventsOnLhsUpdate) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sig, trig;\n"
+      "  initial begin\n"
+      "    sig = 8'd0;\n"
+      "    trig = 8'd0;\n"
+      "    sig = 8'd1;\n"
+      "  end\n"
+      "  always @(sig) trig = 8'd1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("sig")->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("trig")->value.ToUint64(), 1u);
+}
