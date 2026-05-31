@@ -57,5 +57,46 @@ TEST_F(VpiIterateSim, ScanNullIteratorReturnsNull) {
   EXPECT_EQ(vpi_scan(nullptr), nullptr);
 }
 
+// §38.23: the returned handle is an iterator whose own type is vpiIterator,
+// not the type of the objects being traversed.
+TEST_F(VpiIterateSim, IteratorHandleTypeIsIterator) {
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
+  vpi_ctx_.CreatePort("p0", kVpiInput, mod);
+
+  vpiHandle iter = vpi_iterate(vpiPort, mod);
+  ASSERT_NE(iter, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, iter), vpiIterator);
+}
+
+// §38.23: vpi_handle(vpiUse, iterator) recovers the reference object the
+// iterator was created over.
+TEST_F(VpiIterateSim, HandleVpiUseReturnsReferenceObject) {
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
+  vpi_ctx_.CreatePort("p0", kVpiInput, mod);
+
+  vpiHandle iter = vpi_iterate(vpiPort, mod);
+  ASSERT_NE(iter, nullptr);
+  EXPECT_EQ(VpiHandleC(vpiUse, iter), mod);
+}
+
+// §38.23: unless otherwise specified, iterating a protected object is an error,
+// so no iterator handle is produced.
+TEST_F(VpiIterateSim, IterateProtectedObjectReturnsNull) {
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
+  vpi_ctx_.CreatePort("p0", kVpiInput, mod);
+  mod->is_protected = true;
+
+  EXPECT_EQ(vpi_iterate(vpiPort, mod), nullptr);
+}
+
+// §38.23: when no objects of the requested type are associated with the
+// reference handle, vpi_iterate() returns NULL.
+TEST_F(VpiIterateSim, IterateNoMatchingObjectsReturnsNull) {
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
+  vpi_ctx_.CreatePort("p0", kVpiInput, mod);
+
+  EXPECT_EQ(vpi_iterate(vpiParameter, mod), nullptr);
+}
+
 }
 }

@@ -219,6 +219,11 @@ struct VpiObject {
 
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
+
+  // §38.23: for an iterator object (type vpiIterator), the reference object the
+  // iteration was created over. It is reported back through the vpiUse relation,
+  // so vpi_handle(vpiUse, iterator) recovers the object the iterator walks.
+  VpiObject* iter_ref = nullptr;
 };
 
 using VpiHandle = VpiObject*;

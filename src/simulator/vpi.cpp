@@ -908,6 +908,10 @@ VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
 VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   if (!ref) return nullptr;
 
+  // §38.23: vpi_handle(vpiUse, iterator) recovers the reference object the
+  // iterator was created to walk.
+  if (type == vpiUse && ref->type == vpiIterator) return ref->iter_ref;
+
   if (ref->parent && ref->parent->type == type) return ref->parent;
 
   for (auto* child : ref->children) {
@@ -917,8 +921,16 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
 }
 
 VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
+  // §38.23: unless otherwise specified, iterating the relationships of a
+  // protected object is an error, so no iterator is produced.
+  if (ref && ref->is_protected) return nullptr;
+
+  // §38.23: the handle returned is an iterator whose own type is vpiIterator;
+  // the requested object type only selects which related objects it walks. The
+  // reference object is remembered so it can be recovered through vpiUse.
   auto* iter = new VpiObject();
-  iter->type = type;
+  iter->type = vpiIterator;
+  iter->iter_ref = ref;
   iter->scan_index = 0;
 
   // §37.49: vpiAssertion names the assertion class rather than a single object
