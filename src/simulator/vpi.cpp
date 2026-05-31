@@ -959,7 +959,13 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
 }
 
 VpiHandle VpiContext::Scan(VpiHandle iterator) {
+  // §38.40: walk the objects an iterator (from vpi_iterate()) was built over,
+  // handing back the next one on each call so the traversal advances one object
+  // at a time. A null handle has nothing to traverse.
   if (!iterator) return nullptr;
+  // §38.40: when the objects are exhausted there is nothing more to return.
+  // Reporting NULL also retires the iterator handle - it is no longer valid and
+  // must not be used again - so the storage is released here.
   if (iterator->scan_index >= iterator->children.size()) {
     delete iterator;
     return nullptr;
