@@ -395,6 +395,8 @@ class Elaborator {
   void ValidateChainingConstructors();
   void ValidateOneClassChainingCtor(const ClassDecl* cls);
 
+  void ValidateEmbeddedCovergroupAssign();
+
   void ValidateLocalProtectedAccess(const ModuleDecl* decl);
 
   void ValidateConstClassProperties();

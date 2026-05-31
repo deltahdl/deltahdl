@@ -1130,6 +1130,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateChainingConstructors();
 
+  ValidateEmbeddedCovergroupAssign();
+
   ValidateConstClassProperties();
 
   ValidateVirtualMethodOverrides();

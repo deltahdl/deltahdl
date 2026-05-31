@@ -1436,6 +1436,59 @@ void Elaborator::ValidateOneClassChainingCtor(const ClassDecl* cls) {
   }
 }
 
+// §19.4: a covergroup declared inside a class is an embedded covergroup whose
+// identifier names an implicitly declared instance variable. That variable is
+// instantiated by assigning the result of new() to it inside the enclosing
+// class's new() method, and the standard requires it not be assigned anywhere
+// outside that constructor. Any assignment to the covergroup identifier from
+// another method of the same class therefore violates the rule.
+static void CheckCovergroupAssignStmt(
+    const Stmt* s, const std::unordered_set<std::string_view>& cg_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  if ((s->kind == StmtKind::kBlockingAssign ||
+       s->kind == StmtKind::kNonblockingAssign) &&
+      s->lhs && s->lhs->kind == ExprKind::kIdentifier &&
+      cg_names.count(s->lhs->text)) {
+    diag.Error(s->range.start,
+               std::format("embedded covergroup '{}' shall only be assigned "
+                           "inside the new() method of its class",
+                           s->lhs->text));
+  }
+  for (const auto* sub : s->stmts) {
+    CheckCovergroupAssignStmt(sub, cg_names, diag);
+  }
+  CheckCovergroupAssignStmt(s->then_branch, cg_names, diag);
+  CheckCovergroupAssignStmt(s->else_branch, cg_names, diag);
+  CheckCovergroupAssignStmt(s->body, cg_names, diag);
+  CheckCovergroupAssignStmt(s->for_body, cg_names, diag);
+  for (const auto& ci : s->case_items) {
+    CheckCovergroupAssignStmt(ci.body, cg_names, diag);
+  }
+}
+
+void Elaborator::ValidateEmbeddedCovergroupAssign() {
+  for (const auto* cls : unit_->classes) {
+    std::unordered_set<std::string_view> cg_names;
+    for (const auto* m : cls->members) {
+      if (m->kind == ClassMemberKind::kCovergroup && !m->name.empty()) {
+        cg_names.insert(m->name);
+      }
+    }
+    if (cg_names.empty()) continue;
+
+    for (const auto* m : cls->members) {
+      if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
+      // The constructor is the one place an embedded covergroup may be
+      // instantiated, so assignments there are permitted.
+      if (m->method->name == "new") continue;
+      for (const auto* s : m->method->func_body_stmts) {
+        CheckCovergroupAssignStmt(s, cg_names, diag_);
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateClassMethodBodies(const ModuleDecl* decl) {
   for (const auto* cls : unit_->classes) {
     for (const auto* m : cls->members) {
