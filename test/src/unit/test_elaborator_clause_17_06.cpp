@@ -43,6 +43,10 @@ TEST(CovergroupInChecker, ConstActualIsLegalWhenFormalIsNotReferenced) {
       /*formal_referenced_by_covergroup=*/false, /*actual_is_const=*/true));
   EXPECT_FALSE(CheckerCovergroupConstFormalIsError(
       /*formal_referenced_by_covergroup=*/true, /*actual_is_const=*/false));
+  // Neither condition present: a formal that no covergroup references and whose
+  // actual is not const is plainly fine.
+  EXPECT_FALSE(CheckerCovergroupConstFormalIsError(
+      /*formal_referenced_by_covergroup=*/false, /*actual_is_const=*/false));
 }
 
 TEST(CovergroupInChecker, SampleMethodCallIsAPermittedTrigger) {
