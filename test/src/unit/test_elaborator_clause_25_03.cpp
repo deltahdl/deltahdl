@@ -1,3 +1,4 @@
+#include "elaborator/interface_syntax.h"
 #include "fixture_elaborator.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -165,6 +166,65 @@ TEST(InterfaceDefinitions, NestedInterfaceNotImplicitlyInstantiated) {
   auto* outer = top->children[0].resolved;
   ASSERT_NE(outer, nullptr);
   EXPECT_TRUE(outer->children.empty());
+}
+
+// §25.3: an interface-port-connection actual that is a hierarchical reference
+// to an interface instance, taking only plain instance steps, is legal.
+TEST(InterfacePortHierRef, PlainInterfacePathIsLegal) {
+  EXPECT_TRUE(InterfacePortHierRefIsLegal(
+      {InterfaceHierRefStep::kInterfaceInstance,
+       InterfaceHierRefStep::kInterfaceInstance}));
+}
+
+// §25.3: the reference must terminate at an interface instance; a path ending
+// at something other than an interface instance is rejected.
+TEST(InterfacePortHierRef, NonInterfaceTargetIsIllegal) {
+  EXPECT_FALSE(InterfacePortHierRefIsLegal(
+      {InterfaceHierRefStep::kInterfaceInstance,
+       InterfaceHierRefStep::kNonInterface}));
+}
+
+// §25.3: the reference shall not resolve through an arrayed instance.
+TEST(InterfacePortHierRef, PathThroughArrayedInstanceIsIllegal) {
+  EXPECT_FALSE(InterfacePortHierRefIsLegal(
+      {InterfaceHierRefStep::kArrayedInstanceElement,
+       InterfaceHierRefStep::kInterfaceInstance}));
+}
+
+// §25.3: the reference shall not resolve through a generate block.
+TEST(InterfacePortHierRef, PathThroughGenerateBlockIsIllegal) {
+  EXPECT_FALSE(InterfacePortHierRefIsLegal(
+      {InterfaceHierRefStep::kGenerateBlock,
+       InterfaceHierRefStep::kInterfaceInstance}));
+}
+
+// §25.3: an empty reference designates no interface instance and is illegal.
+TEST(InterfacePortHierRef, EmptyPathIsIllegal) {
+  EXPECT_FALSE(InterfacePortHierRefIsLegal({}));
+}
+
+// §25.3: a defparam inside an instance whose port actuals refer to an arrayed
+// interface may override a parameter within that instance's own hierarchy.
+TEST(ArrayedInterfaceDefparam, WithinHierarchyIsLegal) {
+  EXPECT_TRUE(ArrayedInterfaceDefparamIsLegal(
+      /*instance_has_arrayed_interface_actual=*/true,
+      DefparamReach::kWithinInstance));
+}
+
+// §25.3: such a defparam shall not modify a parameter outside the instance's
+// hierarchy.
+TEST(ArrayedInterfaceDefparam, OutsideHierarchyIsIllegal) {
+  EXPECT_FALSE(ArrayedInterfaceDefparamIsLegal(
+      /*instance_has_arrayed_interface_actual=*/true,
+      DefparamReach::kOutsideInstance));
+}
+
+// §25.3: when the enclosing instance's port actuals do not refer to an arrayed
+// interface, this rule adds no restriction on the defparam's reach.
+TEST(ArrayedInterfaceDefparam, NonArrayedInstanceIsUnconstrained) {
+  EXPECT_TRUE(ArrayedInterfaceDefparamIsLegal(
+      /*instance_has_arrayed_interface_actual=*/false,
+      DefparamReach::kOutsideInstance));
 }
 
 }
