@@ -192,6 +192,8 @@ void CoverageDB::SampleCross(
 void CoverageDB::Sample(
     CoverGroup* group,
     const std::vector<std::pair<std::string, int64_t>>& values) {
+  // A stopped instance ignores triggered samples entirely (LRM 19.8).
+  if (!group->collecting) return;
   ++group->sample_count;
   for (auto& cp : group->coverpoints) {
     for (const auto& [name, val] : values) {
@@ -253,6 +255,65 @@ double CoverageDB::GetCoverage(const CoverGroup* group) {
 
 double CoverageDB::GetInstCoverage(const CoverGroup* group) {
   return GetCoverage(group);
+}
+
+// --- LRM 19.8: predefined coverage methods ----------------------------------
+
+void CoverageDB::Start(CoverGroup* group) { group->collecting = true; }
+
+void CoverageDB::Stop(CoverGroup* group) { group->collecting = false; }
+
+void CoverageDB::SetInstName(CoverGroup* group, std::string name) {
+  group->options.name = std::move(name);
+}
+
+// Counts, for a coverpoint, the bins that participate in coverage (excluding
+// illegal, ignore, and default bins) and how many of them are covered.
+static void CountPointBins(const CoverPoint* cp, int32_t& covered,
+                           int32_t& total) {
+  for (const auto& bin : cp->bins) {
+    if (bin.kind == CoverBinKind::kIllegal) continue;
+    if (bin.kind == CoverBinKind::kIgnore) continue;
+    if (bin.kind == CoverBinKind::kDefault) continue;
+    ++total;
+    if (bin.hit_count >= bin.at_least) ++covered;
+  }
+}
+
+static void CountCrossBins(const CrossCover* cross, int32_t& covered,
+                           int32_t& total) {
+  for (const auto& bin : cross->bins) {
+    ++total;
+    if (bin.hit_count >= bin.at_least) ++covered;
+  }
+}
+
+double CoverageDB::GetCoverage(const CoverGroup* group, int32_t& covered_bins,
+                               int32_t& total_bins) {
+  // Aggregate the covered/defined bin counts across all coverpoints and crosses
+  // of the covergroup (LRM 19.8).
+  covered_bins = 0;
+  total_bins = 0;
+  for (const auto& cp : group->coverpoints) {
+    CountPointBins(&cp, covered_bins, total_bins);
+  }
+  for (const auto& cross : group->crosses) {
+    CountCrossBins(&cross, covered_bins, total_bins);
+  }
+  return GetCoverage(group);
+}
+
+double CoverageDB::GetInstCoverage(const CoverGroup* group,
+                                   int32_t& covered_bins, int32_t& total_bins) {
+  covered_bins = 0;
+  total_bins = 0;
+  for (const auto& cp : group->coverpoints) {
+    CountPointBins(&cp, covered_bins, total_bins);
+  }
+  for (const auto& cross : group->crosses) {
+    CountCrossBins(&cross, covered_bins, total_bins);
+  }
+  return GetInstCoverage(group);
 }
 
 double CoverageDB::GetGlobalCoverage() const {

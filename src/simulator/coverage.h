@@ -144,6 +144,9 @@ struct CoverGroup {
   std::vector<CrossCover> crosses;
   CoverOptions options;
   uint64_t sample_count = 0;
+  // Whether the instance is currently collecting coverage. start() and stop()
+  // toggle this; while stopped a triggered sample() records nothing (LRM 19.8).
+  bool collecting = true;
   CoverGroupTypeOption type_option;
 };
 
@@ -189,6 +192,28 @@ class CoverageDB {
   static double GetCrossCoverage(const CrossCover* cross);
 
   double GetGlobalCoverage() const;
+
+  // --- LRM 19.8: predefined coverage methods --------------------------------
+
+  // start()/stop() control whether the instance collects coverage. While
+  // stopped, a triggered sample() records neither a sampling event nor any bin
+  // hit (LRM 19.8).
+  static void Start(CoverGroup* group);
+  static void Stop(CoverGroup* group);
+
+  // set_inst_name() assigns the instance name procedurally (LRM 19.8). The
+  // instance name is the per-instance option.name of LRM 19.10.
+  static void SetInstName(CoverGroup* group, std::string name);
+
+  // The optional ref-int pair of get_coverage()/get_inst_coverage() reports the
+  // number of covered bins and the number of coverage bins defined for the
+  // item. For a covergroup the counts are aggregated over all coverpoints and
+  // crosses; for a coverpoint or cross they are the numerator and denominator
+  // of the (unscaled) coverage value (LRM 19.8).
+  static double GetCoverage(const CoverGroup* group, int32_t& covered_bins,
+                            int32_t& total_bins);
+  static double GetInstCoverage(const CoverGroup* group, int32_t& covered_bins,
+                                int32_t& total_bins);
 
   // --- LRM 19.6: cross coverage ---------------------------------------------
 
