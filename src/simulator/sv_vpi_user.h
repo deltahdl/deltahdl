@@ -406,6 +406,188 @@ using PLI_BYTE8 = char;
 #define vpiAssertionSysDisableVacuousAction 657
 #define vpiAssertionSysEnableNonvacuousAction 658
 
+/* Annex M source-listing completion. The constants below are entries of the
+ * sv_vpi_user.h listing that no other VPI subclause had yet introduced into this
+ * header. Annex M is the defining home of these numeric values, so they are
+ * provided here with the values the listing assigns. Symbols already supplied by
+ * another subclause (possibly with that subclause's own value) are left to their
+ * owner and are not repeated. */
+
+/* Variable object types aliased onto their IEEE 1364 register counterparts. */
+#define vpiVarBit vpiRegBit
+#define vpiLogicVar vpiReg
+#define vpiArrayVar vpiRegArray
+
+/* Typespec object types. */
+#define vpiChandleTypespec 632
+#define vpiEnumConst 634
+#define vpiIntegerTypespec 635
+#define vpiTimeTypespec 636
+#define vpiRealTypespec 637
+#define vpiArrayTypespec 642
+#define vpiVoidTypespec 643
+#define vpiTypespecMember 644
+#define vpiSequenceTypespec 696
+#define vpiPropertyTypespec 697
+#define vpiEventTypespec 698
+
+/* Clocking, statement, method-call, property and pattern object types. */
+#define vpiClockingIODecl 651
+#define vpiDistItem 645
+#define vpiAliasStmt 646
+#define vpiThread 647
+#define vpiMethodFuncCall 648
+#define vpiMethodTaskCall 649
+#define vpiClockedProp 902
+#define vpiReturn 666
+#define vpiAnyPattern 667
+#define vpiTaggedPattern 668
+#define vpiStructPattern 669
+#define vpiWaitFork 672
+#define vpiDisableFork 673
+#define vpiExpectStmt 674
+#define vpiReturnStmt 691
+#define vpiFinal 676
+
+/* Net object types; the array/logic variants alias the IEEE 1364 nets. */
+#define vpiArrayNet vpiNetArray
+#define vpiLogicNet vpiNet
+#define vpiUnionNet 525
+#define vpiShortRealNet 526
+#define vpiRealNet 527
+#define vpiByteNet 528
+#define vpiShortIntNet 529
+#define vpiIntNet 530
+#define vpiLongIntNet 531
+#define vpiBitNet 532
+#define vpiInterconnectNet 533
+#define vpiInterconnectArray 534
+#define vpiBreak 684
+#define vpiContinue 685
+#define vpiNettypeDecl 523
+
+/* Constraint and let-construct object types. */
+#define vpiConstraintExpr 747
+#define vpiElseConst 748
+#define vpiImplication 749
+#define vpiConstrIf 738
+#define vpiConstrIfElse 739
+#define vpiConstrForEach 736
+#define vpiSoftDisable 733
+#define vpiLetDecl 903
+#define vpiLetExpr 904
+
+/* One-to-one traversal relations. */
+#define vpiIndexTypespec 702
+#define vpiNetTypedefAlias 705
+#define vpiInputSkew 706
+#define vpiOutputSkew 707
+#define vpiGlobalClocking 708
+#define vpiDefaultClocking 709
+#define vpiDefaultDisableIff 710
+#define vpiOrigin 713
+#define vpiPrefix 714
+#define vpiWith 715
+#define vpiValueRange 720
+#define vpiPattern 721
+#define vpiWeight 722
+#define vpiConstraintItem 746
+
+/* One-to-many traversal relations; vpiInterfaceDecl is a deprecated spelling of
+ * the virtual-interface variable kind. */
+#define vpiInterfaceDecl vpiVirtualInterfaceVar
+#define vpiSolveBefore 731
+#define vpiSolveAfter 732
+#define vpiWaitingProcesses 734
+#define vpiMessages 735
+#define vpiLoopVars 737
+#define vpiConcurrentAssertion 740
+#define vpiConcurrentAssertions vpiConcurrentAssertion
+#define vpiMember 742
+#define vpiElement 743
+
+/* Generic object properties and their enumerated return values. */
+#define vpiArrayMember 607
+#define vpiIsRandomized 608
+#define vpiLocalVarDecls 609
+#define vpiPortType 611
+#define vpiInterfacePort 1
+#define vpiModportPort 2
+#define vpiConstantVariable 612
+#define vpiStructUnionMember 615
+
+/* Return values for the vpiConstType property. */
+#define vpiOneStepConst 9
+#define vpiUnboundedConst 10
+#define vpiNullConst 11
+
+/* Distribution kind for constraints. */
+#define vpiDistType 625
+#define vpiEqualDist 1
+#define vpiDivDist 2
+
+#define vpiPacked 630
+#define vpiTagged 632
+/* Return value for the vpiDirection property denoting a ref port. */
+#define vpiRef 6
+#define vpiVirtual 635
+#define vpiHasActual 636
+#define vpiIsConstraintEnabled 638
+#define vpiSoft 639
+
+/* Class kind property and its return values. */
+#define vpiMailboxClass 1
+#define vpiSemaphoreClass 2
+#define vpiUserDefinedClass 3
+#define vpiProcessClass 4
+#define vpiMethod 645
+#define vpiIsDeferred 657
+#define vpiIsFinal 670
+
+/* Qualifier property carrying an OR of the qualifier bit flags. */
+#define vpiQualifier 650
+#define vpiNoQualifier 0
+#define vpiUniqueQualifier 1
+#define vpiPriorityQualifier 2
+#define vpiTaggedQualifier 4
+#define vpiRandQualifier 8
+#define vpiInsideQualifier 16
+
+/* Clocking-block skew edge properties and the generic object property. */
+#define vpiInputEdge 651
+#define vpiOutputEdge 652
+#define vpiGeneric 653
+
+/* Compatibility-mode property and its supported language-version values. */
+#define vpiCompatibilityMode 654
+#define vpiMode1364v1995 1
+#define vpiMode1364v2001 2
+#define vpiMode1364v2005 3
+#define vpiMode1800v2005 4
+#define vpiMode1800v2009 5
+
+#define vpiPackedArrayMember 655
+#define vpiObjId 660
+#define vpiIsModPort 669
+
+/* Sequence/property and assignment-pattern operation kinds (vpiOpType return
+ * values). These occupy operation-type values distinct from the existing
+ * operator constants in this header. */
+#define vpiMatchOp 66
+#define vpiCastOp 67
+#define vpiMatchedOp 73
+#define vpiTriggeredOp 74
+#define vpiAssignmentPatternOp 75
+#define vpiMultiAssignmentPatternOp 76
+
+/* Function return-type value and the deprecated validity-unknown value. */
+#define vpiOtherFunc 6
+#define vpiValidUnknown 2
+
+/* Coverage status property; vpiCoveredMax is the spelling retained alongside the
+ * backward-compatible vpiCoverMax. */
+#define vpiCoveredMax 766
+
 typedef struct t_vpi_assertion_step_info {
   PLI_INT32 matched_expression_count;
   vpiHandle* matched_exprs;
