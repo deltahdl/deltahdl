@@ -343,21 +343,93 @@ void Parser::ParseBlockEventExpression() {
   } while (Match(TokenKind::kKwOr));
 }
 
-void Parser::ParseCovergroupFormalList() {
-  // Skip across the covergroup's optional formal-argument list, which follows
+void Parser::ParseCovergroupFormalList(std::vector<std::string>& names) {
+  // Scan across the covergroup's optional formal-argument list, which follows
   // the same balanced-parenthesis shape as a tf_port_list. While scanning,
   // reject any formal declared with output or inout direction, which is not
-  // permitted for a covergroup formal (LRM 19.3).
+  // permitted for a covergroup formal (LRM 19.3), and collect each formal's
+  // name. In a tf_port the declared name is the last identifier that appears
+  // before a comma, a default-value '=', or the closing parenthesis.
   int depth = 1;
+  std::string_view pending;
+  bool have_pending = false;
+  bool in_default = false;
+  auto flush = [&]() {
+    if (have_pending) names.emplace_back(pending);
+    have_pending = false;
+    in_default = false;
+  };
   while (depth > 0 && !AtEnd()) {
     if (Check(TokenKind::kLParen)) {
       ++depth;
     } else if (Check(TokenKind::kRParen)) {
       --depth;
+      if (depth == 0) flush();
     } else if (Check(TokenKind::kKwOutput) || Check(TokenKind::kKwInout)) {
       diag_.Error(CurrentLoc(),
                   "a covergroup formal argument cannot be declared 'output' "
                   "or 'inout'");
+    } else if (depth == 1 && Check(TokenKind::kComma)) {
+      flush();
+    } else if (depth == 1 && Check(TokenKind::kEq)) {
+      // Everything up to the next comma is a default-value expression whose
+      // identifiers are not formal-argument names.
+      in_default = true;
+    } else if (!in_default && Check(TokenKind::kIdentifier)) {
+      pending = CurrentToken().text;
+      have_pending = true;
+    }
+    if (depth > 0) Consume();
+  }
+  if (Check(TokenKind::kRParen)) Consume();
+}
+
+void Parser::ParseSampleFormalList(
+    const std::vector<std::string>& covergroup_formals) {
+  // Scan across the formal-argument list of an overridden sample method
+  // (introduced by "with function sample"). LRM 19.8.1 places two constraints
+  // on these formals that are checked here: a sample formal shall not designate
+  // an output direction, and because the sample formals share the covergroup's
+  // argument scope (the formals consumed by the covergroup new operator), a
+  // name shall not be specified in both the covergroup and sample lists.
+  int depth = 1;
+  std::string_view pending;
+  SourceLoc pending_loc{};
+  bool have_pending = false;
+  bool in_default = false;
+  auto flush = [&]() {
+    if (have_pending) {
+      for (const auto& formal : covergroup_formals) {
+        if (formal == pending) {
+          diag_.Error(pending_loc,
+                      "sample method formal argument '" + std::string(pending) +
+                          "' shares the covergroup argument scope and cannot "
+                          "reuse a covergroup formal-argument name");
+          break;
+        }
+      }
+    }
+    have_pending = false;
+    in_default = false;
+  };
+  while (depth > 0 && !AtEnd()) {
+    if (Check(TokenKind::kLParen)) {
+      ++depth;
+    } else if (Check(TokenKind::kRParen)) {
+      --depth;
+      if (depth == 0) flush();
+    } else if (Check(TokenKind::kKwOutput) || Check(TokenKind::kKwInout)) {
+      diag_.Error(CurrentLoc(),
+                  "a sample method formal argument cannot designate an output "
+                  "direction");
+    } else if (depth == 1 && Check(TokenKind::kComma)) {
+      flush();
+    } else if (depth == 1 && Check(TokenKind::kEq)) {
+      in_default = true;
+    } else if (!in_default && Check(TokenKind::kIdentifier)) {
+      pending = CurrentToken().text;
+      pending_loc = CurrentLoc();
+      have_pending = true;
     }
     if (depth > 0) Consume();
   }
@@ -377,9 +449,10 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
     ExpectIdentifier();
   }
 
+  std::vector<std::string> covergroup_formals;
   if (Check(TokenKind::kLParen)) {
     Consume();
-    ParseCovergroupFormalList();
+    ParseCovergroupFormalList(covergroup_formals);
   }
 
   if (Match(TokenKind::kAt)) {
@@ -400,7 +473,7 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
                       std::string(sample_id.text) + "'");
     }
     Expect(TokenKind::kLParen);
-    SkipParenContents(lexer_);
+    ParseSampleFormalList(covergroup_formals);
   }
   Expect(TokenKind::kSemicolon);
 

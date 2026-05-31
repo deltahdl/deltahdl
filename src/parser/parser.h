@@ -1,6 +1,8 @@
 #pragma once
 
+#include <string>
 #include <unordered_set>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -147,7 +149,9 @@ class Parser {
   RsProductionItem ParseRsProductionItem();
   RsCaseItem ParseRsCaseItem();
   void ParseCovergroupDecl(std::vector<ModuleItem*>& items);
-  void ParseCovergroupFormalList();
+  void ParseCovergroupFormalList(std::vector<std::string>& names);
+  void ParseSampleFormalList(
+      const std::vector<std::string>& covergroup_formals);
   void ParseBlockEventExpression();
   void SkipCovergroupItem();
 

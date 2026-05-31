@@ -55,6 +55,7 @@ add_library(deltahdl_lib STATIC
     elaborator/sequence_match_attach.cpp
     elaborator/sequence_repetition.cpp
     elaborator/sampled_value.cpp
+    elaborator/overridden_sample_method.cpp
     elaborator/global_clocking_sampled_value.cpp
     elaborator/concurrent_assert_action.cpp
     elaborator/cover_pass_statement.cpp
