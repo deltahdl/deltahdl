@@ -460,7 +460,8 @@ bool VpiIsDisableConditionType(int type);
 
 // §37.52: the clocking event a property spec or clocked property traverses to
 // through vpiClockingEvent (the diagram's -> expr edge), modeled as the object's
-// event-control child; null when none is present.
+// event-control child; null when none is present. §37.56's clocked seq shares
+// this relation (its own vpiClockingEvent -> expr edge has the same shape).
 VpiHandle VpiClockingEvent(VpiHandle obj);
 
 // §37.52: the property expression reached through a "-> property expr" edge (a
@@ -511,6 +512,20 @@ bool VpiIsPropertyArgumentType(int type);
 // diagram's property inst -> property decl edge), its vpiPropertyDecl child;
 // null for a null handle or an instance with no declaration attached.
 VpiHandle VpiPropertyInstDecl(VpiHandle property_inst);
+
+// §37.56: the clocked-seq members of a multiclock sequence expression. The
+// diagram's double (one-to-many) tagless arrow is the vpiClockedSeq iteration,
+// so this returns the multiclock sequence expression's vpiClockedSeq children in
+// order, dropping anything else. A null handle yields none.
+std::vector<VpiHandle> VpiMulticlockSequenceClockedSeqs(VpiHandle multiclock_seq);
+
+// §37.56: the sequence expression a clocked seq clocks (the diagram's single
+// tagless arrow, vpi_handle(vpiSequenceExpr, ...)). A clocked seq pairs one
+// clocking event with one sequence expression, so this is the clocked seq's
+// first sequence-expr-kind child (classified by VpiIsSequenceExprType); null for
+// a null handle or a clocked seq with no sequence expression attached. The
+// clocking-event half of the pair is reached through VpiClockingEvent.
+VpiHandle VpiClockedSeqSequenceExpr(VpiHandle clocked_seq);
 
 struct VpiVectorVal {
   uint32_t aval;

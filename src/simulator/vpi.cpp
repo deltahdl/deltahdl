@@ -619,6 +619,32 @@ VpiHandle VpiPropertyInstDecl(VpiHandle property_inst) {
   return nullptr;
 }
 
+std::vector<VpiHandle> VpiMulticlockSequenceClockedSeqs(
+    VpiHandle multiclock_seq) {
+  // §37.56: the multiclock sequence expr -> clocked seq edge is a one-to-many
+  // (double arrow) tagless relation, i.e. the vpiClockedSeq iteration. Return the
+  // multiclock sequence expression's clocked-seq children in order, dropping
+  // anything else. A null handle yields none.
+  std::vector<VpiHandle> clocked_seqs;
+  if (!multiclock_seq) return clocked_seqs;
+  for (auto* child : multiclock_seq->children) {
+    if (child->type == vpiClockedSeq) clocked_seqs.push_back(child);
+  }
+  return clocked_seqs;
+}
+
+VpiHandle VpiClockedSeqSequenceExpr(VpiHandle clocked_seq) {
+  // §37.56: the clocked seq -> sequence expr edge is a one-to-one (single arrow)
+  // tagless relation, vpi_handle(vpiSequenceExpr, ...). Report the clocked seq's
+  // first sequence-expr-kind child (the sequence-expr class of §37.54), or null
+  // when the handle is null or no sequence expression is attached.
+  if (!clocked_seq) return nullptr;
+  for (auto* child : clocked_seq->children) {
+    if (VpiIsSequenceExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
 void VpiContext::Attach(SimContext& sim_ctx) {
   for (auto& [name, var] : sim_ctx.GetVariables()) {
     auto* obj = AllocObject();

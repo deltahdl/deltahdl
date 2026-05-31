@@ -179,6 +179,15 @@ using PLI_BYTE8 = char;
 #define vpiIsCoverSequence 788
 #define vpiIsClockInferred 789
 
+/* §37.56 multiclock sequence expression. The diagram introduces the clocked-seq
+ * object kind a multiclock sequence expression is built from. The arrow into it
+ * carries no tag, so the access type is the enclosure name with "vpi" prepended.
+ * 790 is the first free selector number above the §37.50/§37.52 block (780-789).
+ *   vpiClockedSeq - a single-clock sequence (a sequence expression paired with a
+ *                   clocking event) grouped under a multiclock sequence
+ *                   expression */
+#define vpiClockedSeq 790
+
 #define vpiTop 600
 #define vpiUnit 602
 
