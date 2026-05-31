@@ -95,6 +95,13 @@ TEST(GenerateBlockContent, SpecparamRejectedInSingleItemGenerateBody) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(GenerateBlockContent, SpecparamAllowedAtModuleScope) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  specparam t = 1.0;\n"
+      "endmodule\n"));
+}
+
 TEST(GenerateBlockContent, PortDeclarationRejectedInGenerateIf) {
   auto r = Parse(
       "module m;\n"
@@ -116,6 +123,37 @@ TEST(GenerateBlockContent, PortDeclarationRejectedInGenerateFor) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(GenerateBlockContent, PortDeclarationRejectedInGenerateCase) {
+  auto r = Parse(
+      "module m;\n"
+      "  case (1)\n"
+      "    1: begin input a; end\n"
+      "    default: ;\n"
+      "  endcase\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(GenerateBlockContent, PortDeclarationRejectedInNestedGenerate) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (1) begin\n"
+      "    if (1) begin\n"
+      "      inout c;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(GenerateBlockContent, PortDeclarationAllowedAtModuleScope) {
+  EXPECT_TRUE(ParseOk(
+      "module m(a, b);\n"
+      "  input a;\n"
+      "  output b;\n"
+      "endmodule\n"));
+}
+
 TEST(GenerateBlockContent, GenerateBlockAcceptsMultipleModuleItems) {
   EXPECT_TRUE(ParseOk(
       "module m;\n"
@@ -125,6 +163,13 @@ TEST(GenerateBlockContent, GenerateBlockAcceptsMultipleModuleItems) {
       "    assign w = l;\n"
       "    initial begin end\n"
       "  end\n"
+      "endmodule\n"));
+}
+
+TEST(GenerateBlockContent, GenerateBlockAcceptsSingleModuleItem) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  if (1) wire w;\n"
       "endmodule\n"));
 }
 

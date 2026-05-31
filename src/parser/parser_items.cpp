@@ -368,6 +368,22 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
   // Consume the label here so the dispatch below sees the bare keyword.
   auto assertion_label = TryParseAssertionItemLabel();
 
+  // §27.2: a generate block may not contain port declarations. Top-level
+  // non-ANSI port declarations are consumed directly in ParseModuleBody, so a
+  // leading port direction reaching a generate-block item is always an illegal
+  // non-ANSI port declaration. Reject it explicitly and recover past the
+  // declaration, mirroring the specify/specparam rejections above.
+  if (InGenerateBlock() && IsPortDirection(CurrentToken().kind)) {
+    diag_.Error(CurrentLoc(),
+                "port declaration not allowed inside a generate block");
+    while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEnd) &&
+           !AtEnd()) {
+      Consume();
+    }
+    Match(TokenKind::kSemicolon);
+    return;
+  }
+
   if (TryParseKeywordItem(items)) {
     if (!assertion_label.empty()) {
       for (size_t i = before; i < items.size(); ++i) {
