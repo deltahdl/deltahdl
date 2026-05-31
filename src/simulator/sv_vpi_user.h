@@ -87,6 +87,16 @@ using PLI_BYTE8 = char;
 #define vpiImport 726
 #define vpiDerivedClasses 727
 #define vpiMethods 730
+
+/* §37.32 class typespec relations/properties. 732-734 are free selector numbers
+ * in this module (730 vpiMethods and 744 vpiAssertion bracket the gap).
+ *   vpiClassType  - the class type of a class typespec
+ *   vpiClassDefn  - the defining class (NULL for built-in classes)
+ *   vpiExtends    - the base class typespec a typespec derives from */
+#define vpiClassType 732
+#define vpiClassDefn 733
+#define vpiExtends 734
+
 #define vpiAssertion 744
 
 #define vpiTop 600

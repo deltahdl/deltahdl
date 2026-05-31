@@ -1,5 +1,7 @@
 #include "simulator/class_object.h"
 
+#include <algorithm>
+
 #include "common/arena.h"
 #include "parser/ast.h"
 
@@ -102,6 +104,109 @@ ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   copy->type = type;
   copy->properties = properties;
   return copy;
+}
+
+// §37.32: only a specialization exposes the member-collection relations; a
+// purely lexical typespec answers them as empty/unsupported.
+bool VpiClassTypespecSupportsMembers(const ClassTypespecInfo& ts) {
+  return ts.kind == ClassTypespecKind::kSpecialization;
+}
+
+// §37.32: a specialization must have a non-empty name; for any other kind the
+// name is not required to be meaningful.
+bool VpiClassTypespecNameValid(const ClassTypespecInfo& ts) {
+  if (ts.kind != ClassTypespecKind::kSpecialization) return true;
+  return !ts.name.empty();
+}
+
+// §37.32: built-in classes report no defining class.
+const ClassTypeInfo* VpiClassDefnOf(const ClassTypeInfo& cls) {
+  if (cls.is_builtin) return nullptr;
+  return &cls;
+}
+
+// §37.32: the base class typespec, or nullptr if none.
+const ClassTypespecInfo* VpiExtendsOf(const ClassTypespecInfo& ts) {
+  return ts.extends;
+}
+
+// §37.32: the base typespec of a specialization is required to also be a
+// specialization. The check is vacuously satisfied when there is no base or
+// when ts is not itself a specialization.
+bool VpiClassTypespecBaseIsSpecialization(const ClassTypespecInfo& ts) {
+  if (ts.kind != ClassTypespecKind::kSpecialization) return true;
+  if (ts.extends == nullptr) return true;
+  return ts.extends->kind == ClassTypespecKind::kSpecialization;
+}
+
+// §37.32: iterating methods yields both static and automatic methods but drops
+// built-in methods that were never explicitly declared.
+std::vector<ClassTypespecMethod> VpiClassTypespecMethods(
+    const ClassTypespecInfo& ts) {
+  std::vector<ClassTypespecMethod> result;
+  if (ts.kind != ClassTypespecKind::kSpecialization) return result;
+  for (const ClassTypespecMethod& m : ts.methods) {
+    if (m.has_explicit_decl) result.push_back(m);
+  }
+  return result;
+}
+
+// §37.32: vpiLocalParam is true exactly for parameters declared in the class
+// body.
+bool VpiClassTypespecParamIsLocal(const ClassTypespecParam& param) {
+  return param.is_local_param;
+}
+
+// §37.32: an explicit argument overrides the declared default for vpiRhs.
+std::string_view VpiClassTypespecParamRhs(const ClassTypespecParamAssign& pa) {
+  return pa.has_explicit_arg ? pa.explicit_rhs : pa.default_rhs;
+}
+
+// §37.32: reading a value through the typespec is allowed unless the member is a
+// non-static member reached only via the typespec.
+bool VpiClassTypespecValueAccessAllowed(bool obtained_from_class_typespec,
+                                        bool is_static) {
+  return !(obtained_from_class_typespec && !is_static);
+}
+
+// §37.32: drop inline constraints, then order the rest by declaration order,
+// using the prototype order for external constraints.
+std::vector<ClassTypespecConstraint> VpiClassTypespecConstraints(
+    const ClassTypespecInfo& ts) {
+  std::vector<ClassTypespecConstraint> result;
+  for (const ClassTypespecConstraint& c : ts.constraints) {
+    if (!c.is_inline) result.push_back(c);
+  }
+  std::stable_sort(result.begin(), result.end(),
+                   [](const ClassTypespecConstraint& a,
+                      const ClassTypespecConstraint& b) {
+                     int ea = a.is_extern ? a.prototype_order : a.decl_order;
+                     int eb = b.is_extern ? b.prototype_order : b.decl_order;
+                     return ea < eb;
+                   });
+  return result;
+}
+
+// §37.32: expanding arrays counts each element of a virtual interface array as a
+// separate variable; scalars count once.
+int VpiClassTypespecVirtualInterfaceVarCount(const ClassTypespecInfo& ts) {
+  int total = 0;
+  for (const ClassTypespecVifVar& v : ts.vif_vars) {
+    total += (v.array_size > 0) ? v.array_size : 1;
+  }
+  return total;
+}
+
+// §37.32: collapsing arrays counts each virtual interface variable once,
+// regardless of array size.
+int VpiClassTypespecArrayVarCount(const ClassTypespecInfo& ts) {
+  return static_cast<int>(ts.vif_vars.size());
+}
+
+// §37.32: the specializations directly naming this class definition.
+std::vector<const ClassTypespecInfo*> VpiClassDefnSpecializations(
+    const ClassTypeInfo& cls) {
+  return cls.direct_specializations;
 }
 
 }

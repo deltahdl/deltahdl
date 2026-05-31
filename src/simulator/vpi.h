@@ -78,6 +78,27 @@ constexpr int kVpiSize = 4;
 constexpr int kVpiDirection = 5;
 constexpr int kVpiDefName = 6;
 
+// §37.3.7: vpiAutomatic is the standard Boolean lifetime selector (the same
+// value 50 already used elsewhere in this header). It is repeated here as a
+// kVpi* constant so the Get() switch can read an object's declared lifetime in
+// the same idiom as the other property selectors.
+constexpr int kVpiAutomatic = 50;
+
+// §37.3.7: vpiAllocScheme is the enumeration property naming how an object's
+// memory was obtained. 731 is the lowest selector value not yet claimed by any
+// other property/object/callback constant in this module.
+constexpr int kVpiAllocScheme = 731;
+
+// §37.3.7: the three (and only three) allocation schemes vpi_get(vpiAllocScheme)
+// may return. These live in the property-RETURN-value namespace, distinct from
+// the selector numbers above, so small contiguous ints are unambiguous.
+//   kVpiAutomaticScheme -> object lives with a frame or thread
+//   kVpiDynamicScheme   -> object was allocated in dynamic memory (e.g. a class)
+//   kVpiOtherScheme     -> the mandated default for every other object
+constexpr int kVpiAutomaticScheme = 1;
+constexpr int kVpiDynamicScheme = 2;
+constexpr int kVpiOtherScheme = 3;
+
 constexpr int kVpiLibrary = 67;
 constexpr int kVpiConfig = 70;
 constexpr int kVpiCell = 71;
@@ -120,6 +141,16 @@ struct VpiObject {
   int size = 0;
   int index = 0;
 
+  // §37.3.7: declared lifetime. False means the object is static; true means it
+  // is non-static (an automatic variable or a dynamic object). Static is the
+  // default.
+  bool automatic = false;
+
+  // §37.3.7: how this object's storage was obtained. Defaulting to
+  // kVpiOtherScheme directly encodes the rule that every object not allocated
+  // with a frame/thread or in dynamic memory reports vpiOtherScheme.
+  int alloc_scheme = kVpiOtherScheme;
+
   std::string library_name;
   std::string cell_name;
   std::string config_name;
@@ -129,6 +160,21 @@ struct VpiObject {
 };
 
 using VpiHandle = VpiObject*;
+
+// §37.3.7: the categories an allocator can place an object into, used to derive
+// its vpiAllocScheme. Keeping this separate from the scheme return values lets
+// callers describe an allocation in intent ("this came from a frame") and have
+// the mapping to the reported scheme live in one place.
+enum class VpiAllocKind {
+  kFrameOrThread,  // allocated with a frame or thread -> Automatic scheme
+  kDynamic,        // allocated in dynamic memory (class object) -> Dynamic
+  kOther,          // anything else -> the mandated Other default
+};
+
+// §37.3.7: map an allocation category to the vpiAllocScheme value that
+// vpi_get(vpiAllocScheme) must report. Unrecognized/other allocations fall
+// through to kVpiOtherScheme, satisfying the "all other objects" default.
+int VpiAllocSchemeFor(VpiAllocKind kind);
 
 struct VpiVectorVal {
   uint32_t aval;
@@ -795,6 +841,14 @@ using PLI_UBYTE8 = unsigned char;
 #define vpiScheduled 46
 #define vpiActive 49
 #define vpiAutomatic 50
+
+// §37.3.7: allocation-scheme property selector and its three return values. The
+// selector (731) is a free property number; the return values share the small
+// property-result namespace.
+#define vpiAllocScheme 731
+#define vpiAutomaticScheme 1
+#define vpiDynamicScheme 2
+#define vpiOtherScheme 3
 #define vpiConstantSelect 53
 #define vpiDecompile 54
 #define vpiDefAttribute 55

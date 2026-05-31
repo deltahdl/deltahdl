@@ -24,6 +24,7 @@ enum class Reachability {
 };
 
 struct ClassTypeInfo;
+struct ClassTypespecInfo;
 
 struct VTableEntry {
   std::string_view method_name;
@@ -37,6 +38,9 @@ struct ClassTypeInfo {
   const ClassDecl* decl = nullptr;
   bool is_abstract = false;
   bool is_interface = false;
+  // §37.32: a built-in class has no user-written declaration; its class-defn
+  // relation reports NULL.
+  bool is_builtin = false;
   std::vector<const ClassTypeInfo*> extended_interfaces;
 
   struct PropertyInfo {
@@ -57,6 +61,10 @@ struct ClassTypeInfo {
   std::unordered_map<std::string, Logic4Vec> static_properties;
 
   std::unordered_map<std::string, uint64_t> enum_members;
+
+  // §37.32: the class specializations that name this class definition as their
+  // defining class; reported by the vpiClassTypespec iteration on a class defn.
+  std::vector<const ClassTypespecInfo*> direct_specializations;
 
   int FindVTableIndex(std::string_view mname) const;
 
@@ -100,6 +108,144 @@ struct ClassObject {
 
   ClassObject* ShallowCopy(Arena& arena) const;
 };
+
+// §37.32: a class typespec is either a purely lexical construct (a typespec
+// written in source that names a class) or a class specialization (a concrete
+// instantiation of a parameterized class). The two forms support different
+// relations, so the kind is modeled explicitly.
+enum class ClassTypespecKind {
+  kLexical,
+  kSpecialization,
+};
+
+// §37.32: one method visible from a class typespec. has_explicit_decl is false
+// for built-in methods that were never declared in source; those are excluded
+// when iterating the methods of a specialization.
+struct ClassTypespecMethod {
+  std::string_view name;
+  bool is_static = false;
+  bool has_explicit_decl = true;
+};
+
+// §37.32: one parameter visible from a class typespec. is_local_param is true
+// for parameters declared in the class body (as opposed to the parameter port
+// list); it is the value vpi_get(vpiLocalParam) reports for that parameter.
+struct ClassTypespecParam {
+  std::string_view name;
+  bool is_local_param = false;
+};
+
+// §37.32: a parameter assignment for a class typespec. vpiRhs reports the
+// explicit argument supplied at the specialization site when one is given, and
+// otherwise falls back to the parameter's declared default.
+struct ClassTypespecParamAssign {
+  std::string_view name;
+  bool has_explicit_arg = false;
+  std::string_view explicit_rhs;
+  std::string_view default_rhs;
+};
+
+// §37.32: a constraint visible from a class typespec. An inline constraint is
+// not part of the typespec's constraint set; an external constraint is ordered
+// by its prototype declaration rather than its out-of-body definition.
+struct ClassTypespecConstraint {
+  std::string_view name;
+  bool is_inline = false;
+  bool is_extern = false;
+  int decl_order = 0;
+  int prototype_order = 0;
+};
+
+// §37.32: a virtual interface variable of a class typespec. array_size greater
+// than zero denotes an array of that many elements; zero denotes a scalar.
+struct ClassTypespecVifVar {
+  std::string_view name;
+  int array_size = 0;
+};
+
+// §37.32: lightweight description of a class typespec sufficient to answer the
+// VPI queries this clause defines. It reuses ClassTypeInfo for the class
+// definition (which already carries the base-class chain and the built-in flag).
+struct ClassTypespecInfo {
+  std::string_view name;
+  ClassTypespecKind kind = ClassTypespecKind::kLexical;
+
+  // §37.32: declared lifetime, shared with §37.3.7. False => static.
+  bool automatic = false;
+
+  // §37.32: the defining class. May be a built-in class (class_defn then
+  // reports NULL) or null when unknown.
+  const ClassTypeInfo* class_defn = nullptr;
+
+  // §37.32: the base class typespec this one extends, if any.
+  const ClassTypespecInfo* extends = nullptr;
+
+  std::vector<ClassTypespecMethod> methods;
+  std::vector<ClassTypespecParam> params;
+  std::vector<ClassTypespecConstraint> constraints;
+  std::vector<ClassTypespecVifVar> vif_vars;
+  std::vector<ClassTypespecParamAssign> param_assigns;
+};
+
+// §37.32: a lexical-only typespec does not support the member-collection
+// relations (vpiVariables, vpiMethods, vpiConstraint, vpiNamedEvent,
+// vpiNamedEventArray, vpiTypedef, vpiInternalScope). Only a specialization does.
+bool VpiClassTypespecSupportsMembers(const ClassTypespecInfo& ts);
+
+// §37.32: a specialization must carry a valid, non-empty (though tool-chosen)
+// name.
+bool VpiClassTypespecNameValid(const ClassTypespecInfo& ts);
+
+// §37.32: the defining class returned by the vpiClassDefn relation, or nullptr
+// for a built-in class.
+const ClassTypeInfo* VpiClassDefnOf(const ClassTypeInfo& cls);
+
+// §37.32: the base class typespec returned by vpiExtends, or nullptr when the
+// typespec derives from nothing.
+const ClassTypespecInfo* VpiExtendsOf(const ClassTypespecInfo& ts);
+
+// §37.32: the base typespec of a specialization shall itself be a
+// specialization. Returns true when this invariant holds for ts (vacuously true
+// when ts has no base or ts is not a specialization).
+bool VpiClassTypespecBaseIsSpecialization(const ClassTypespecInfo& ts);
+
+// §37.32: the methods reported when iterating vpiMethods on a specialization:
+// both static and automatic methods, but excluding built-in methods that have
+// no explicit declaration.
+std::vector<ClassTypespecMethod> VpiClassTypespecMethods(
+    const ClassTypespecInfo& ts);
+
+// §37.32: vpi_get(vpiLocalParam) for a class-typespec parameter -- true when the
+// parameter was declared in the class body.
+bool VpiClassTypespecParamIsLocal(const ClassTypespecParam& param);
+
+// §37.32: the vpiRhs of a parameter assignment -- the explicit argument when
+// one was supplied, otherwise the declared default.
+std::string_view VpiClassTypespecParamRhs(const ClassTypespecParamAssign& pa);
+
+// §37.32: a value read through a class typespec is only well defined for static
+// members; a non-static member has no value until an instance is selected, so
+// access via the typespec alone is disallowed for it.
+bool VpiClassTypespecValueAccessAllowed(bool obtained_from_class_typespec,
+                                        bool is_static);
+
+// §37.32: the constraints reported when iterating a class typespec -- inline
+// constraints are excluded, and the remaining constraints follow declaration
+// order, with external constraints ordered by their prototype.
+std::vector<ClassTypespecConstraint> VpiClassTypespecConstraints(
+    const ClassTypespecInfo& ts);
+
+// §37.32: the number of virtual interface variables when arrays are expanded to
+// one entry per element.
+int VpiClassTypespecVirtualInterfaceVarCount(const ClassTypespecInfo& ts);
+
+// §37.32: the number of virtual interface variables when each array counts as a
+// single collapsed variable.
+int VpiClassTypespecArrayVarCount(const ClassTypespecInfo& ts);
+
+// §37.32: the class specializations that directly name this class definition.
+std::vector<const ClassTypespecInfo*> VpiClassDefnSpecializations(
+    const ClassTypeInfo& cls);
 
 inline constexpr uint64_t kNullClassHandle = 0;
 

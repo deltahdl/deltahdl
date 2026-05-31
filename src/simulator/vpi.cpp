@@ -27,6 +27,22 @@ VpiHandle VpiContext::AllocObject() {
   return obj;
 }
 
+// §37.3.7: derive the reported allocation scheme from how the object was
+// allocated. Frame/thread allocations are Automatic, dynamic-memory (class)
+// allocations are Dynamic, and everything else falls through to the mandated
+// Other default.
+int VpiAllocSchemeFor(VpiAllocKind kind) {
+  switch (kind) {
+    case VpiAllocKind::kFrameOrThread:
+      return kVpiAutomaticScheme;
+    case VpiAllocKind::kDynamic:
+      return kVpiDynamicScheme;
+    case VpiAllocKind::kOther:
+      return kVpiOtherScheme;
+  }
+  return kVpiOtherScheme;
+}
+
 void VpiContext::Attach(SimContext& sim_ctx) {
   for (auto& [name, var] : sim_ctx.GetVariables()) {
     auto* obj = AllocObject();
@@ -456,6 +472,12 @@ int VpiContext::Get(int property, VpiHandle obj) {
       return obj->size;
     case kVpiDirection:
       return obj->direction;
+    // §37.3.7: declared lifetime as a Boolean (0 static, 1 non-static).
+    case kVpiAutomatic:
+      return obj->automatic ? 1 : 0;
+    // §37.3.7: the object's allocation scheme; defaults to kVpiOtherScheme.
+    case kVpiAllocScheme:
+      return obj->alloc_scheme;
     default:
       return 0;
   }
