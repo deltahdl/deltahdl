@@ -3073,6 +3073,32 @@ void Elaborator::ValidateOneClassBuiltinMethods(const ClassDecl* cls) {
           m->loc,
           "'constraint_mode' is a built-in method and cannot be overridden");
     }
+    // 18.6.2: pre_randomize() and post_randomize() are built-in methods with a
+    // fixed prototype, 'function void <name>();'. Unlike rand_mode and
+    // constraint_mode a user may override them, but an override shall match
+    // that prototype: a void-returning function taking no arguments. A task
+    // form, a non-void return type, or any formal argument does not conform.
+    if (m->name == "pre_randomize" || m->name == "post_randomize") {
+      const ModuleItem* fn = m->method;
+      if (fn) {
+        if (fn->kind != ModuleItemKind::kFunctionDecl) {
+          diag_.Error(m->loc,
+                      std::format("'{}' shall be a void function taking no "
+                                  "arguments, not a task",
+                                  m->name));
+        } else {
+          if (fn->return_type.kind != DataTypeKind::kVoid) {
+            diag_.Error(
+                m->loc,
+                std::format("'{}' shall have a void return type", m->name));
+          }
+          if (!fn->func_args.empty()) {
+            diag_.Error(m->loc,
+                        std::format("'{}' shall take no arguments", m->name));
+          }
+        }
+      }
+    }
   }
 }
 
