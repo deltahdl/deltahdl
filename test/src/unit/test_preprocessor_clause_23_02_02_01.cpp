@@ -144,7 +144,7 @@ TEST(NonAnsiStylePortDeclarations, ExplicitPortConcatSelectAndImplicit) {
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 3u);
 }
 
-TEST(NonAnsiStylePortDeclarations, Example1SignednessParses) {
+TEST(NonAnsiStylePortDeclarations, SignednessInheritanceParses) {
   EXPECT_TRUE(ParseWithPreprocessorOk(
       "module test(a, b, c, d, e, f, g, h);\n"
       "  input [7:0] a;\n"

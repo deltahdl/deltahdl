@@ -1982,6 +1982,10 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
       } else {
         non_ansi_partial_ports_[port.name] =
             EvalTypeWidth(port.data_type, typedefs_, param_scope);
+        // §23.2.2.1: remember a `signed` port direction declaration so the
+        // matching net/variable declaration can be considered signed too.
+        if (port.data_type.is_signed)
+          non_ansi_signed_ports_.insert(port.name);
       }
     }
 
@@ -2012,6 +2016,16 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
                     std::format("default value on non-singular port '{}'",
                                 port.name));
       }
+    }
+
+    // §23.2.2.1: it is illegal to specify `signed` for a port declared as an
+    // interconnect port. Interconnect is an untyped generic connection, so it
+    // carries no signedness of its own.
+    if (port.data_type.is_interconnect && port.data_type.is_signed) {
+      diag_.Error(port.loc,
+                  std::format("interconnect port '{}' shall not be declared "
+                              "signed",
+                              port.name));
     }
 
     bool port_is_var =
@@ -2066,6 +2080,20 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
 
     mod->ports.push_back(rp);
   }
+}
+
+RtlirNet MakeImplicitPortNet(std::string_view name, uint32_t port_width,
+                             bool port_is_signed, NetType default_nettype) {
+  RtlirNet net;
+  net.name = name;
+  // §6.10: an implicit net assumed for a port expression takes the default net
+  // type and the vector width of the port expression declaration.
+  net.net_type = default_nettype;
+  net.width = port_width == 0 ? 1 : port_width;
+  // §23.2.2.1: nets connected to ports without an explicit net declaration are
+  // unsigned unless the port itself is declared signed.
+  net.is_signed = port_is_signed;
+  return net;
 }
 
 uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod) {
@@ -2567,6 +2595,22 @@ static void ComputeUnpackedDims(
   }
 }
 
+bool Elaborator::ReconcilePartialPortSignedness(std::string_view name,
+                                                bool decl_signed,
+                                                RtlirModule* mod) {
+  // §23.2.2.1: the signed attribute may sit on the port direction declaration,
+  // on the corresponding net/variable declaration, or on both; if either is
+  // signed, the other is considered signed too.
+  bool effective = decl_signed || non_ansi_signed_ports_.count(name) != 0;
+  if (effective) {
+    non_ansi_signed_ports_.insert(name);
+    for (auto& p : mod->ports) {
+      if (p.name == name) p.is_signed = true;
+    }
+  }
+  return effective;
+}
+
 void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   if (ansi_port_names_.count(item->name)) {
     diag_.Error(item->loc,
@@ -2611,6 +2655,10 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   }
   net.width = EvalTypeWidth(item->data_type, typedefs_);
   net.is_signed = IsSignedType(item->data_type, typedefs_);
+  if (non_ansi_partial_ports_.count(item->name)) {
+    net.is_signed =
+        ReconcilePartialPortSignedness(item->name, net.is_signed, mod);
+  }
   ValidatePackedDimRange(item->data_type, item->loc);
 
   if (!item->data_type.is_interconnect) {
@@ -2921,6 +2969,10 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
                  item->data_type.kind == DataTypeKind::kShortreal ||
                  item->data_type.kind == DataTypeKind::kRealtime);
   var.is_signed = IsSignedType(item->data_type, typedefs_);
+  if (non_ansi_partial_ports_.count(item->name)) {
+    var.is_signed =
+        ReconcilePartialPortSignedness(item->name, var.is_signed, mod);
+  }
   var.elem_type_kind = item->data_type.kind;
   var.init_expr = item->init_expr;
 

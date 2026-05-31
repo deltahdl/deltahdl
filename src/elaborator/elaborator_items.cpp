@@ -841,10 +841,13 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                                  name));
     return false;
   }
-  RtlirNet net;
-  net.name = ScopedName(name);
-  net.net_type = unit_->default_nettype;
-  net.width = 1;
+  // §6.10: an identifier used in an instance terminal/port-connection list or
+  // on the left side of a continuous assignment gets an implicit scalar net of
+  // the default net type. It shares the implicit-net constructor with the
+  // port-expression case; here the width is scalar and the net is unsigned.
+  RtlirNet net = MakeImplicitPortNet(ScopedName(name), /*port_width=*/1,
+                                     /*port_is_signed=*/false,
+                                     unit_->default_nettype);
   mod->nets.push_back(net);
   declared_names_.insert(name);
   net_names_.insert(name);
@@ -1162,6 +1165,15 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
                     std::format("redeclaration of '{}'", item->gate_inst_name));
       }
 
+      // §6.10: an undeclared identifier used in a primitive instance's
+      // terminal list is assumed to be an implicit scalar net of the default
+      // net type, the same assumption made for a module instance's port
+      // connections.
+      for (auto* term : item->gate_terminals) {
+        if (term && term->kind == ExprKind::kIdentifier)
+          MaybeCreateImplicitNet(term->text, item->loc, mod);
+      }
+
       if (item->inst_range_left && item->inst_range_right) {
         auto range_scope = BuildParamScope(mod);
         auto lhi = ConstEvalInt(item->inst_range_left, range_scope);
@@ -1196,6 +1208,12 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
           !declared_names_.insert(item->gate_inst_name).second) {
         diag_.Error(item->loc,
                     std::format("redeclaration of '{}'", item->gate_inst_name));
+      }
+      // §6.10: undeclared identifiers in a UDP instance's terminal list also
+      // become implicit scalar nets of the default net type.
+      for (auto* term : item->gate_terminals) {
+        if (term && term->kind == ExprKind::kIdentifier)
+          MaybeCreateImplicitNet(term->text, item->loc, mod);
       }
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       break;

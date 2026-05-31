@@ -309,7 +309,7 @@ TEST(NonAnsiStylePortDeclarations, PortDeclWithNetType) {
   EXPECT_EQ(mod->ports[1].data_type.kind, DataTypeKind::kReg);
 }
 
-TEST(NonAnsiStylePortDeclarations, Example1SignednessParses) {
+TEST(NonAnsiStylePortDeclarations, SignednessInheritanceParses) {
   EXPECT_TRUE(ParseOk(
       "module test(a, b, c, d, e, f, g, h);\n"
       "  input [7:0] a;\n"
@@ -325,6 +325,28 @@ TEST(NonAnsiStylePortDeclarations, Example1SignednessParses) {
       "  logic signed [7:0] f;\n"
       "  logic [7:0] g;\n"
       "endmodule\n"));
+}
+
+// §23.2.2.1: a port name shall not be given a direction declaration more than
+// once in the module body.
+TEST(NonAnsiStylePortDeclarations, DuplicatePortDirectionDeclarationIsError) {
+  auto r = Parse(
+      "module m(a);\n"
+      "  input a;\n"
+      "  input a;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §23.2.2.1: redeclaring a port with a second, conflicting direction is also
+// rejected.
+TEST(NonAnsiStylePortDeclarations, ConflictingPortDirectionDeclarationIsError) {
+  auto r = Parse(
+      "module m(a);\n"
+      "  input a;\n"
+      "  output a;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }

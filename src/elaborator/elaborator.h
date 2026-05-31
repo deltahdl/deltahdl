@@ -108,6 +108,11 @@ class Elaborator {
   void ElaborateParamDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateNetDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateVarDecl(ModuleItem* item, RtlirModule* mod);
+  // §23.2.2.1: reconciles the signedness of a non-ANSI port with its separate
+  // net or variable declaration -- `signed` on either side makes both signed.
+  // Returns the reconciled signedness for the net/variable declaration.
+  bool ReconcilePartialPortSignedness(std::string_view name, bool decl_signed,
+                                      RtlirModule* mod);
   void SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var);
   void ElaborateContAssign(ModuleItem* item, RtlirModule* mod);
   void ValidateContAssignIdentLhs(ModuleItem* item, RtlirModule* mod);
@@ -725,6 +730,8 @@ class Elaborator {
 
   std::unordered_set<std::string_view> non_ansi_complete_ports_;
   std::unordered_map<std::string_view, uint32_t> non_ansi_partial_ports_;
+  // Non-ANSI partial ports whose port direction declaration carried `signed`.
+  std::unordered_set<std::string_view> non_ansi_signed_ports_;
 
   std::unordered_set<std::string_view> ansi_port_names_;
 
@@ -809,5 +816,14 @@ std::string_view ExprIdent(const Expr* e);
 const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit);
 bool IsRealType(DataTypeKind k);
+
+// Constructs the implicit net that an identifier acquires when it is used as a
+// port expression. This is the single point shared by two subclauses: §6.10
+// fixes the net's kind and size -- the default net type, sized to the vector
+// width of the port expression declaration -- while §23.2.2.1 fixes its
+// signedness -- such a net is unsigned unless the port itself is declared
+// signed. Both subclauses depend on the same materialization, so they share it.
+RtlirNet MakeImplicitPortNet(std::string_view name, uint32_t port_width,
+                             bool port_is_signed, NetType default_nettype);
 
 }  // namespace delta
