@@ -98,6 +98,22 @@ TEST(Elaboration, AssocArgToDynamicArrayRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(Elaboration, AssocArgElementTypeMismatchRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa[int];\n"
+      "  function automatic int f(logic [7:0] x[int]);\n"
+      "    return x[0];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    f(aa);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(Elaboration, AssocArgIntIndexOk) {
   EXPECT_TRUE(
       ElabOk("module top;\n"

@@ -147,9 +147,13 @@ void Elaborator::ValidateArrayAssignments(const ModuleDecl* decl) {
 
 static Elaborator::VarArrayInfo FormalArrayInfo(
     const FunctionArg& arg,
-    const std::unordered_set<std::string_view>& class_names) {
+    const std::unordered_set<std::string_view>& class_names,
+    const TypedefMap& typedefs) {
   Elaborator::VarArrayInfo info;
   info.elem_type = arg.data_type.kind;
+  info.elem_width = EvalTypeWidth(arg.data_type, typedefs);
+  info.elem_is_signed = arg.data_type.is_signed;
+  info.elem_is_4state = Is4stateType(arg.data_type, typedefs);
   if (arg.unpacked_dims.empty()) return info;
   auto* dim = arg.unpacked_dims[0];
   if (!dim) {
@@ -182,7 +186,7 @@ static void CheckArrayArgTypes(
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
         var_array_info,
     const std::unordered_set<std::string_view>& class_names,
-    DiagEngine& diag) {
+    const TypedefMap& typedefs, DiagEngine& diag) {
   if (!expr || expr->kind != ExprKind::kCall || expr->callee.empty()) return;
   auto it = func_decls.find(expr->callee);
   if (it == func_decls.end()) return;
@@ -190,7 +194,7 @@ static void CheckArrayArgTypes(
   size_t positional_count = expr->args.size() - expr->arg_names.size();
   for (size_t i = 0; i < func->func_args.size(); ++i) {
     const auto& formal = func->func_args[i];
-    auto formal_info = FormalArrayInfo(formal, class_names);
+    auto formal_info = FormalArrayInfo(formal, class_names, typedefs);
 
     if (formal.unpacked_dims.empty()) continue;
 
@@ -223,6 +227,19 @@ static void CheckArrayArgTypes(
         actual_info.assoc_index_type != formal_info.assoc_index_type) {
       diag.Error(actual->range.start,
                  "associative array index type mismatch in argument");
+      continue;
+    }
+    // The value type carried by an associative actual must be equivalent to the
+    // value type of the associative formal it binds to.
+    if (actual_info.is_assoc && formal_info.is_assoc &&
+        !ElementTypesEquivalent(
+            actual_info.elem_type, actual_info.elem_width,
+            actual_info.elem_is_signed, actual_info.elem_is_4state,
+            formal_info.elem_type, formal_info.elem_width,
+            formal_info.elem_is_signed, formal_info.elem_is_4state)) {
+      diag.Error(actual->range.start,
+                 "associative array element type mismatch in argument");
+      continue;
     }
   }
 }
@@ -233,23 +250,26 @@ static void WalkExprForArrayArgTypes(
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
         var_array_info,
     const std::unordered_set<std::string_view>& class_names,
-    DiagEngine& diag) {
+    const TypedefMap& typedefs, DiagEngine& diag) {
   if (!expr) return;
-  CheckArrayArgTypes(expr, func_decls, var_array_info, class_names, diag);
+  CheckArrayArgTypes(expr, func_decls, var_array_info, class_names, typedefs,
+                     diag);
   WalkExprForArrayArgTypes(expr->lhs, func_decls, var_array_info, class_names,
-                           diag);
+                           typedefs, diag);
   WalkExprForArrayArgTypes(expr->rhs, func_decls, var_array_info, class_names,
-                           diag);
+                           typedefs, diag);
   WalkExprForArrayArgTypes(expr->condition, func_decls, var_array_info,
-                           class_names, diag);
+                           class_names, typedefs, diag);
   WalkExprForArrayArgTypes(expr->true_expr, func_decls, var_array_info,
-                           class_names, diag);
+                           class_names, typedefs, diag);
   WalkExprForArrayArgTypes(expr->false_expr, func_decls, var_array_info,
-                           class_names, diag);
+                           class_names, typedefs, diag);
   for (auto* a : expr->args)
-    WalkExprForArrayArgTypes(a, func_decls, var_array_info, class_names, diag);
+    WalkExprForArrayArgTypes(a, func_decls, var_array_info, class_names,
+                             typedefs, diag);
   for (auto* e : expr->elements)
-    WalkExprForArrayArgTypes(e, func_decls, var_array_info, class_names, diag);
+    WalkExprForArrayArgTypes(e, func_decls, var_array_info, class_names,
+                             typedefs, diag);
 }
 
 static void WalkStmtForArrayArgTypes(
@@ -258,36 +278,38 @@ static void WalkStmtForArrayArgTypes(
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
         var_array_info,
     const std::unordered_set<std::string_view>& class_names,
-    DiagEngine& diag) {
+    const TypedefMap& typedefs, DiagEngine& diag) {
   if (!s) return;
   WalkExprForArrayArgTypes(s->expr, func_decls, var_array_info, class_names,
-                           diag);
+                           typedefs, diag);
   WalkExprForArrayArgTypes(s->lhs, func_decls, var_array_info, class_names,
-                           diag);
+                           typedefs, diag);
   WalkExprForArrayArgTypes(s->rhs, func_decls, var_array_info, class_names,
-                           diag);
+                           typedefs, diag);
   WalkExprForArrayArgTypes(s->condition, func_decls, var_array_info,
-                           class_names, diag);
+                           class_names, typedefs, diag);
   for (auto* sub : s->stmts)
     WalkStmtForArrayArgTypes(sub, func_decls, var_array_info, class_names,
-                             diag);
+                             typedefs, diag);
   WalkStmtForArrayArgTypes(s->then_branch, func_decls, var_array_info,
-                           class_names, diag);
+                           class_names, typedefs, diag);
   WalkStmtForArrayArgTypes(s->else_branch, func_decls, var_array_info,
-                           class_names, diag);
+                           class_names, typedefs, diag);
   WalkStmtForArrayArgTypes(s->body, func_decls, var_array_info, class_names,
-                           diag);
+                           typedefs, diag);
   for (auto* fi : s->for_inits)
-    WalkStmtForArrayArgTypes(fi, func_decls, var_array_info, class_names, diag);
+    WalkStmtForArrayArgTypes(fi, func_decls, var_array_info, class_names,
+                             typedefs, diag);
   WalkStmtForArrayArgTypes(s->for_body, func_decls, var_array_info,
-                           class_names, diag);
+                           class_names, typedefs, diag);
   for (auto* fs : s->for_steps)
-    WalkStmtForArrayArgTypes(fs, func_decls, var_array_info, class_names, diag);
+    WalkStmtForArrayArgTypes(fs, func_decls, var_array_info, class_names,
+                             typedefs, diag);
   WalkExprForArrayArgTypes(s->for_cond, func_decls, var_array_info,
-                           class_names, diag);
+                           class_names, typedefs, diag);
   for (auto& ci : s->case_items)
     WalkStmtForArrayArgTypes(ci.body, func_decls, var_array_info, class_names,
-                             diag);
+                             typedefs, diag);
 }
 
 void Elaborator::ValidateArrayArgTypes(const ModuleDecl* decl) {
@@ -301,13 +323,13 @@ void Elaborator::ValidateArrayArgTypes(const ModuleDecl* decl) {
         item->kind == ModuleItemKind::kAlwaysBlock ||
         item->kind == ModuleItemKind::kFinalBlock) {
       WalkStmtForArrayArgTypes(item->body, all_decls, var_array_info_,
-                               class_names_, diag_);
+                               class_names_, typedefs_, diag_);
     }
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
       for (auto* s : item->func_body_stmts) {
         WalkStmtForArrayArgTypes(s, all_decls, var_array_info_, class_names_,
-                                 diag_);
+                                 typedefs_, diag_);
       }
     }
   }
