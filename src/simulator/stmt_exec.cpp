@@ -1462,8 +1462,8 @@ static ExecTask ExecBlockingAssignRepeatEvent(const Stmt* stmt,
                                               SimContext& ctx, Arena& arena) {
   auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
   uint64_t count = EvalRepeatCount(stmt->repeat_event_count, ctx, arena);
-  for (uint64_t i = 0; i < count; ++i) {
-    co_await EventAwaiter{ctx, stmt->events, arena};
+  if (count > 0) {
+    co_await RepeatEventAwaiter{ctx, stmt->events, arena, count};
   }
   PerformBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
   co_return StmtResult::kDone;
@@ -1478,9 +1478,7 @@ static SimCoroutine NbaEventCoroutine(const Stmt* stmt, Logic4Vec rhs_val,
 static SimCoroutine NbaRepeatEventCoroutine(const Stmt* stmt,
                                             Logic4Vec rhs_val, uint64_t count,
                                             SimContext& ctx, Arena& arena) {
-  for (uint64_t i = 0; i < count; ++i) {
-    co_await EventAwaiter{ctx, stmt->events, arena};
-  }
+  co_await RepeatEventAwaiter{ctx, stmt->events, arena, count};
   ScheduleNonblockingAssign(stmt, rhs_val, 0, ctx, arena);
 }
 

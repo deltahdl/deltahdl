@@ -289,6 +289,102 @@ struct EventAwaiter {
   }
 };
 
+// §9.4.5 intra-assignment repeat event control. A plain event control is
+// awaited once, but the repeat form has to accumulate a fixed number of event
+// occurrences across the whole OR-list. Each operand keeps a single persistent
+// watcher (rather than being re-armed once per occurrence), so two edges in the
+// same time step on different operands are each counted, and a shared guard
+// resumes the issuing process exactly once when the target count is reached —
+// any later sibling watcher that fires afterwards removes itself without
+// touching the already-resumed coroutine.
+struct RepeatEventAwaiter {
+  SimContext& ctx;
+  const std::vector<EventExpr>& events;
+  Arena& arena;
+  uint64_t count;
+
+  bool await_ready() const noexcept { return count == 0; }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    auto* proc = ctx.CurrentProcess();
+    auto remaining = std::make_shared<uint64_t>(count);
+    auto done = std::make_shared<bool>(false);
+    auto* ctx_ptr = &ctx;
+    for (const auto& ev : events) {
+      if (!ev.signal) continue;
+      Variable* var = nullptr;
+      if (ev.signal->kind == ExprKind::kIdentifier) {
+        var = ctx.FindVariable(ev.signal->text);
+      } else if (ev.signal->kind == ExprKind::kMemberAccess) {
+        if (ev.signal->lhs &&
+            ev.signal->lhs->kind == ExprKind::kIdentifier) {
+          auto* mgr = ctx.GetClockingManager();
+          std::string_view member;
+          if (ev.signal->rhs && ev.signal->rhs->kind == ExprKind::kIdentifier)
+            member = ev.signal->rhs->text;
+          else if (!ev.signal->text.empty())
+            member = ev.signal->text;
+          if (mgr && !member.empty())
+            var = mgr->ResolveClockingMember(ev.signal->lhs->text, member, ctx);
+        }
+        if (!var) {
+          std::string hier_name;
+          BuildLhsName(ev.signal, hier_name);
+          var = ctx.FindVariable(hier_name);
+        }
+      }
+      if (!var) continue;
+
+      // Counts one occurrence and, when the target is reached, resumes the
+      // process once. Returning false keeps the watcher armed for the next
+      // occurrence; returning true removes it.
+      auto tally = [h, proc, ctx_ptr, remaining, done]() {
+        if (*remaining > 0) --(*remaining);
+        if (*remaining == 0) {
+          *done = true;
+          EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
+          return true;
+        }
+        return false;
+      };
+
+      if (var->is_event) {
+        var->AddWatcher([proc, done, tally]() mutable {
+          if (*done) return true;
+          if (proc && !proc->active) return true;
+          if (proc && proc->is_suspended) return false;
+          return tally();
+        });
+        continue;
+      }
+
+      var->prev_value = var->value;
+      Edge edge = ev.edge;
+      const Expr* iff_cond = ev.iff_condition;
+      var->AddWatcher([var, edge, iff_cond, ctx_ptr, proc, done, tally]() mutable {
+        if (*done) return true;
+        if (proc && !proc->active) return true;
+        if (proc && proc->is_suspended) return false;
+        if (!EventAwaiter::CheckEdge(var, edge)) {
+          var->prev_value = var->value;
+          return false;
+        }
+        if (iff_cond) {
+          auto val = EvalExpr(iff_cond, *ctx_ptr, ctx_ptr->GetArena());
+          if (val.ToUint64() == 0) {
+            var->prev_value = var->value;
+            return false;
+          }
+        }
+        var->prev_value = var->value;
+        return tally();
+      });
+    }
+  }
+
+  void await_resume() const noexcept {}
+};
+
 struct NamedEventAwaiter {
   SimContext& ctx;
   std::string_view event_name;
