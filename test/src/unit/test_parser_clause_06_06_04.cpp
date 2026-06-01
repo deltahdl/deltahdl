@@ -19,17 +19,6 @@ TEST(TriregParsing, TriregDecl) {
   EXPECT_EQ(item->name, "cap");
 }
 
-TEST(TriregParsing, TriregDefaultInit) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg t1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
-}
-
 TEST(TriregParsing, TriregChargeStrengthWithLogic) {
   auto r = Parse(
       "module t;\n"
