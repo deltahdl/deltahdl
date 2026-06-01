@@ -260,4 +260,66 @@ TEST(IpcSync, TriggeredStateClearsAfterTimeAdvances) {
   EXPECT_EQ(next->value.ToUint64(), 0u);
 }
 
+TEST(IpcSync, WaitOnNullEventTriggeredNeverUnblocks) {
+  // §15.5.3: the triggered method of a null named event is always false, so a
+  // process waiting on it has no condition that can ever hold and must remain
+  // blocked. The value set before the wait therefore survives to end of sim.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev = null;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    result = 8'd5;\n"
+      "    wait(ev.triggered);\n"
+      "    result = 8'd9;\n"
+      "  end\n"
+      "  initial #3 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 5u);
+}
+
+TEST(IpcSync, TriggeredStatePersistsAcrossSuccessiveWaitsInSameStep) {
+  // §15.5.3: the triggered state holds for the whole time step in which the
+  // event fired, so more than one wait evaluated within that same step observes
+  // it and unblocks. Both waits clear at time 0 with no time advance between.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [7:0] first;\n"
+      "  logic [7:0] second;\n"
+      "  initial begin\n"
+      "    -> ev;\n"
+      "    wait(ev.triggered);\n"
+      "    first = 8'd1;\n"
+      "    wait(ev.triggered);\n"
+      "    second = 8'd1;\n"
+      "  end\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* first = f.ctx.FindVariable("first");
+  auto* second = f.ctx.FindVariable("second");
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+  EXPECT_EQ(first->value.ToUint64(), 1u);
+  EXPECT_EQ(second->value.ToUint64(), 1u);
+}
+
 }
