@@ -24,7 +24,11 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
     auto val = var->value;
     if (ctx.IsRealVariable(expr->text)) val.is_real = true;
     if (ctx.IsStringVariable(expr->text)) val.is_string = true;
-    if (var->is_signed) val.is_signed = true;
+    // An object's signedness is fixed by its own declaration; it is never
+    // inherited from a value that flowed in from elsewhere (e.g. across a
+    // module port). Derive the read value's signedness from the declaration
+    // so a signed value stored into an unsigned object reads back unsigned.
+    val.is_signed = var->is_signed;
     return val;
   }
   return MakeLogic4Vec(arena, 1);
