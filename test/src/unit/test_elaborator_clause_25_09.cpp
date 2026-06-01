@@ -508,4 +508,54 @@ TEST(VirtualInterfaceElaboration, PassAsTaskArgument_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// Two virtual interfaces of the same interface with identical parameter value
+// overrides are the same type, so assignment between them is legal. Covers the
+// matching-parameters path for a virtual-to-virtual assignment (the mismatch
+// path is exercised by ParameterValuesDifferAcrossVirtual_Error).
+TEST(VirtualInterfaceElaboration, ParameterValuesMatchAcrossVirtual_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface pbus #(parameter W = 8); endinterface\n"
+      "module top;\n"
+      "  virtual pbus #(16) a;\n"
+      "  virtual pbus #(16) b;\n"
+      "  initial a = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// The defparam restriction is scoped to the specific interface instance the
+// defparam targets. A defparam on a sibling instance must not block assigning
+// a different, untargeted interface instance to a virtual interface.
+TEST(VirtualInterfaceElaboration, DefparamOnSiblingInstanceAllowsAssign_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface pbus #(parameter W = 8); endinterface\n"
+      "module top;\n"
+      "  pbus tainted();\n"
+      "  defparam tainted.W = 16;\n"
+      "  pbus clean();\n"
+      "  virtual pbus vif;\n"
+      "  initial vif = clean;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// An interface whose ports reference other interfaces cannot be used as the
+// type of a virtual interface.
+TEST(VirtualInterfaceElaboration, InterfaceWithInterfacePortAsVi_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface outer_bus(interface ib); endinterface\n"
+      "module top;\n"
+      "  virtual outer_bus vif;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }

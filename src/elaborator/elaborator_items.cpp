@@ -1631,6 +1631,8 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   interface_inst_types_.clear();
   vi_var_interface_types_.clear();
   vi_var_modports_.clear();
+  vi_var_param_values_.clear();
+  interface_inst_param_values_.clear();
   checker_inst_names_.clear();
   program_inst_names_.clear();
   auto_task_func_names_.clear();
@@ -1663,6 +1665,29 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       auto* child = FindModuleInScope(item->inst_module);
       if (child && child->decl_kind == ModuleDeclKind::kInterface) {
         interface_inst_types_[item->inst_name] = item->inst_module;
+        // §25.9: record explicit parameter overrides (when they evaluate to
+        // constants) so a later virtual-interface assignment can confirm the
+        // actual parameter values match.
+        if (!item->inst_params.empty()) {
+          std::vector<int64_t> values;
+          bool all_const = true;
+          for (const auto& param : item->inst_params) {
+            const Expr* pexpr = param.second;
+            if (pexpr == nullptr) {
+              all_const = false;
+              break;
+            }
+            auto v = ConstEvalInt(pexpr);
+            if (!v) {
+              all_const = false;
+              break;
+            }
+            values.push_back(*v);
+          }
+          if (all_const) {
+            interface_inst_param_values_[item->inst_name] = std::move(values);
+          }
+        }
       }
       if (child && child->decl_kind == ModuleDeclKind::kChecker) {
         checker_inst_names_.insert(item->inst_name);

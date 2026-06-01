@@ -2888,6 +2888,85 @@ void Elaborator::TrackVarArrayInfo(const ModuleItem* item,
   var_array_info_[item->name] = info;
 }
 
+namespace {
+
+// §25.9: leftmost identifier of a (possibly hierarchical) reference, e.g.
+// "top" for the path top.u.sig.
+std::string_view ReferenceRootName(const Expr* e) {
+  while (e != nullptr) {
+    if (e->kind == ExprKind::kIdentifier) return e->text;
+    if (e->lhs != nullptr) {
+      e = e->lhs;
+    } else if (e->base != nullptr) {
+      e = e->base;
+    } else {
+      break;
+    }
+  }
+  return {};
+}
+
+// §25.9: a reference is "external" to an interface when it is a hierarchical
+// (dotted or scope-qualified) reference whose root name is not declared
+// within the interface body.
+bool ExprRefsOutsideInterface(
+    const Expr* e, const std::unordered_set<std::string_view>& local) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kMemberAccess) {
+    auto root = ReferenceRootName(e);
+    if (!root.empty() && local.find(root) == local.end()) return true;
+  }
+  if (e->kind == ExprKind::kIdentifier && !e->scope_prefix.empty() &&
+      local.find(e->text) == local.end()) {
+    return true;
+  }
+  if (ExprRefsOutsideInterface(e->lhs, local)) return true;
+  if (ExprRefsOutsideInterface(e->rhs, local)) return true;
+  if (ExprRefsOutsideInterface(e->base, local)) return true;
+  if (ExprRefsOutsideInterface(e->index, local)) return true;
+  if (ExprRefsOutsideInterface(e->index_end, local)) return true;
+  if (ExprRefsOutsideInterface(e->condition, local)) return true;
+  if (ExprRefsOutsideInterface(e->true_expr, local)) return true;
+  if (ExprRefsOutsideInterface(e->false_expr, local)) return true;
+  if (ExprRefsOutsideInterface(e->repeat_count, local)) return true;
+  for (const auto* a : e->args)
+    if (ExprRefsOutsideInterface(a, local)) return true;
+  for (const auto* el : e->elements)
+    if (ExprRefsOutsideInterface(el, local)) return true;
+  return false;
+}
+
+// §25.9: does the interface body reach outside itself through a hierarchical
+// reference in a net/variable initializer or a continuous assignment?
+bool InterfaceContainsExternalReference(const ModuleDecl* iface) {
+  // §25.9: a port that references another interface also disqualifies the
+  // interface from being used as a virtual interface type.
+  for (const auto& p : iface->ports) {
+    if (p.is_interface_port) return true;
+  }
+  std::unordered_set<std::string_view> local;
+  for (const auto& p : iface->ports)
+    if (!p.name.empty()) local.insert(p.name);
+  for (const auto& param : iface->params)
+    if (!param.first.empty()) local.insert(param.first);
+  for (const auto* mp : iface->modports)
+    if (mp && !mp->name.empty()) local.insert(mp->name);
+  for (const auto* it : iface->items) {
+    if (it == nullptr) continue;
+    if (!it->name.empty()) local.insert(it->name);
+    if (!it->inst_name.empty()) local.insert(it->inst_name);
+  }
+  for (const auto* it : iface->items) {
+    if (it == nullptr) continue;
+    if (ExprRefsOutsideInterface(it->init_expr, local)) return true;
+    if (ExprRefsOutsideInterface(it->assign_lhs, local)) return true;
+    if (ExprRefsOutsideInterface(it->assign_rhs, local)) return true;
+  }
+  return false;
+}
+
+}  // namespace
+
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item, mod);
 
@@ -2961,6 +3040,28 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     auto modport_name = item->data_type.modport_name;
     vi_var_interface_types_[item->name] = iface_name;
     vi_var_modports_[item->name] = modport_name;
+    // §25.9: record explicit parameter overrides (when they evaluate to
+    // constants) so a later assignment can confirm the actual parameter
+    // values match the interface it is assigned from.
+    if (!item->data_type.type_params.empty()) {
+      std::vector<int64_t> values;
+      bool all_const = true;
+      for (const auto& tp : item->data_type.type_params) {
+        if (tp.type_ref_expr == nullptr) {
+          all_const = false;
+          break;
+        }
+        auto v = ConstEvalInt(tp.type_ref_expr);
+        if (!v) {
+          all_const = false;
+          break;
+        }
+        values.push_back(*v);
+      }
+      if (all_const) {
+        vi_var_param_values_[item->name] = std::move(values);
+      }
+    }
     auto* iface_decl = FindModule(iface_name);
     if (!iface_decl ||
         iface_decl->decl_kind != ModuleDeclKind::kInterface) {
@@ -2981,6 +3082,18 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
                     std::format("modport '{}' not found in interface '{}'",
                                 modport_name, iface_name));
       }
+    }
+    // §25.9: an interface containing hierarchical references to objects
+    // outside its body (or ports that reference other interfaces) shall not
+    // be used as the type of a virtual interface.
+    if (iface_decl &&
+        iface_decl->decl_kind == ModuleDeclKind::kInterface &&
+        InterfaceContainsExternalReference(iface_decl)) {
+      diag_.Error(item->loc,
+                  std::format("interface '{}' contains references to objects "
+                              "outside its body and cannot be used as a "
+                              "virtual interface",
+                              iface_name));
     }
   }
   RtlirVariable var;

@@ -757,6 +757,20 @@ class Elaborator {
       vi_var_interface_types_;
 
   std::unordered_map<std::string_view, std::string_view> vi_var_modports_;
+
+  // §25.9: explicit parameter value overrides, evaluated to constants, for
+  // virtual interface variables and for interface instances. Used to verify
+  // that the actual parameter values match for a virtual interface and the
+  // interface (instance or other virtual interface) it is assigned from.
+  std::unordered_map<std::string_view, std::vector<int64_t>>
+      vi_var_param_values_;
+  std::unordered_map<std::string_view, std::vector<int64_t>>
+      interface_inst_param_values_;
+
+  // §25.9: interface instances targeted by a defparam declared outside the
+  // interface; such an instance shall not be assigned to a virtual interface.
+  std::unordered_set<std::string_view> vi_external_defparam_insts_;
+
   std::unordered_set<std::string_view> checker_inst_names_;
   std::unordered_set<std::string_view> program_inst_names_;
   std::unordered_set<std::string_view> auto_task_func_names_;

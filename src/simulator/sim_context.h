@@ -392,6 +392,21 @@ class SimContext {
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
 
+  // §25.9 virtual interface runtime. A virtual interface variable carries a
+  // binding to the scope of the interface instance it currently refers to, or
+  // is unbound (the null state, which is also the value before initialization).
+  // Bindings are keyed by the variable object, so no name re-resolution is
+  // needed when the binding is later consulted.
+  void RegisterVirtualInterfaceVar(const Variable* v);
+  bool IsVirtualInterfaceVar(const Variable* v) const;
+  void BindVirtualInterface(const Variable* v, std::string_view scope);
+  void UnbindVirtualInterface(const Variable* v);
+  bool VirtualInterfaceIsBound(const Variable* v) const;
+  std::string_view VirtualInterfaceBinding(const Variable* v) const;
+  // Full hierarchical scope of an interface instance named `ident` relative to
+  // the current process, or empty if `ident` is not a known interface instance.
+  std::string ResolveInstanceScope(std::string_view ident) const;
+
   void AddPlusArg(std::string arg);
   const std::vector<std::string>& GetPlusArgs() const { return plus_args_; }
 
@@ -623,6 +638,11 @@ class SimContext {
   std::unordered_map<std::string_view, uint32_t> type_widths_;
 
   std::unordered_map<std::string, std::string> instance_types_;
+
+  // §25.9: virtual interface variables and their current interface-instance
+  // scope bindings (absence of a binding means null / uninitialized).
+  std::unordered_set<const Variable*> vi_vars_;
+  std::unordered_map<const Variable*, std::string> vi_bindings_;
 
   int assertion_fail_count_ = 0;
 

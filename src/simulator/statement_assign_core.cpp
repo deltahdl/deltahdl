@@ -866,10 +866,43 @@ static Logic4Vec ApplyStreamPackToTargetWidening(const Stmt* stmt,
   return widened;
 }
 
+// §25.9: assignment to a virtual interface variable. The right-hand side is
+// another virtual interface, an interface instance, or null; bind, copy, or
+// clear the target's interface-instance binding accordingly.
+static bool TryVirtualInterfaceAssign(const Stmt* stmt, SimContext& ctx) {
+  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) return false;
+  auto* lhs_var = ctx.FindVariable(stmt->lhs->text);
+  if (!ctx.IsVirtualInterfaceVar(lhs_var)) return false;
+  const Expr* rhs = stmt->rhs;
+  if (!rhs || rhs->kind != ExprKind::kIdentifier) return false;
+
+  if (rhs->text == "null") {
+    ctx.UnbindVirtualInterface(lhs_var);
+    return true;
+  }
+  auto* rhs_var = ctx.FindVariable(rhs->text);
+  if (ctx.IsVirtualInterfaceVar(rhs_var)) {
+    if (ctx.VirtualInterfaceIsBound(rhs_var)) {
+      std::string src(ctx.VirtualInterfaceBinding(rhs_var));
+      ctx.BindVirtualInterface(lhs_var, src);
+    } else {
+      ctx.UnbindVirtualInterface(lhs_var);
+    }
+    return true;
+  }
+  std::string scope = ctx.ResolveInstanceScope(rhs->text);
+  if (!scope.empty()) {
+    ctx.BindVirtualInterface(lhs_var, scope);
+    return true;
+  }
+  return false;
+}
+
 StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena) {
   if (!stmt->lhs) return StmtResult::kDone;
 
+  if (TryVirtualInterfaceAssign(stmt, ctx)) return StmtResult::kDone;
   if (TryClassNewAssign(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryTypedClassNewAssign(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryAssocCopyAssign(stmt, ctx)) return StmtResult::kDone;

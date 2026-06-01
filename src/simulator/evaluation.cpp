@@ -937,6 +937,27 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
       return MakeLogic4VecVal(arena, 1,
                               (is_eq_op == equal) ? 1u : 0u);
     }
+
+    // §25.9: equality of a virtual interface against another virtual interface,
+    // an interface instance, or null compares the interface instance each side
+    // refers to (an unbound virtual interface and null compare equal).
+    bool lhs_is_vi = ctx.IsVirtualInterfaceVar(lv);
+    bool rhs_is_vi = ctx.IsVirtualInterfaceVar(rv);
+    if (lhs_is_vi || rhs_is_vi) {
+      auto operand_scope = [&](Variable* v, const Expr* id, bool is_vi,
+                               bool is_null) -> std::string {
+        if (is_vi) return std::string(ctx.VirtualInterfaceBinding(v));
+        if (is_null) return std::string();
+        if (id) return ctx.ResolveInstanceScope(id->text);
+        return std::string();
+      };
+      std::string ls = operand_scope(lv, lhs_id, lhs_is_vi, lhs_is_null);
+      std::string rs = operand_scope(rv, rhs_id, rhs_is_vi, rhs_is_null);
+      bool equal = (ls == rs);
+      bool is_eq_op = (expr->op == TokenKind::kEqEq ||
+                       expr->op == TokenKind::kEqEqEq);
+      return MakeLogic4VecVal(arena, 1, (is_eq_op == equal) ? 1u : 0u);
+    }
   }
   return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena),
                       EvalExpr(expr->rhs, ctx, arena), arena, context_width);

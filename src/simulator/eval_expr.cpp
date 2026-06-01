@@ -349,6 +349,27 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
 }
 
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
+  // §25.9: a component referenced through a virtual interface redirects to the
+  // bound interface instance. Referencing a component of an unbound (null or
+  // uninitialized) virtual interface is a fatal runtime error.
+  if (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier) {
+    auto* base = ctx.FindVariable(expr->lhs->text);
+    if (ctx.IsVirtualInterfaceVar(base)) {
+      if (!ctx.VirtualInterfaceIsBound(base)) {
+        ctx.GetDiag().Error({}, "reference through a null virtual interface");
+        return MakeLogic4Vec(arena, 1);
+      }
+      std::string_view field =
+          (expr->rhs && expr->rhs->kind == ExprKind::kIdentifier)
+              ? expr->rhs->text
+              : std::string_view(expr->text);
+      std::string target = std::string(ctx.VirtualInterfaceBinding(base)) +
+                           "." + std::string(field);
+      if (auto* tv = ctx.FindVariable(target)) return tv->value;
+      return MakeLogic4Vec(arena, 1);
+    }
+  }
+
   std::string name;
   BuildMemberName(expr, name);
   auto resolved = StripRootPrefix(name);

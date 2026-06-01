@@ -540,6 +540,54 @@ std::string_view SimContext::FindInstanceType(std::string_view prefix) const {
                                        : std::string_view{};
 }
 
+void SimContext::RegisterVirtualInterfaceVar(const Variable* v) {
+  if (v) vi_vars_.insert(v);
+}
+
+bool SimContext::IsVirtualInterfaceVar(const Variable* v) const {
+  return v && vi_vars_.count(v) != 0;
+}
+
+void SimContext::BindVirtualInterface(const Variable* v,
+                                      std::string_view scope) {
+  if (v) vi_bindings_[v] = std::string(scope);
+}
+
+void SimContext::UnbindVirtualInterface(const Variable* v) {
+  vi_bindings_.erase(v);
+}
+
+bool SimContext::VirtualInterfaceIsBound(const Variable* v) const {
+  return vi_bindings_.find(v) != vi_bindings_.end();
+}
+
+std::string_view SimContext::VirtualInterfaceBinding(const Variable* v) const {
+  auto it = vi_bindings_.find(v);
+  return (it != vi_bindings_.end()) ? std::string_view(it->second)
+                                    : std::string_view{};
+}
+
+std::string SimContext::ResolveInstanceScope(std::string_view ident) const {
+  std::string prefix;
+  if (current_process_) prefix = current_process_->inst_prefix;
+  // Walk progressively shorter instance prefixes, mirroring FindVariable, so a
+  // bare instance name resolves to its full hierarchical scope.
+  std::string p = prefix;
+  for (;;) {
+    std::string cand = p + std::string(ident);
+    if (instance_types_.find(cand) != instance_types_.end()) return cand;
+    if (p.empty()) break;
+    size_t last = (p.size() >= 2) ? p.find_last_of('.', p.size() - 2)
+                                  : std::string::npos;
+    if (last == std::string::npos) {
+      p.clear();
+    } else {
+      p = p.substr(0, last + 1);
+    }
+  }
+  return {};
+}
+
 void SimContext::RegisterArray(std::string_view name, const ArrayInfo& info) {
   array_infos_[name] = info;
 }

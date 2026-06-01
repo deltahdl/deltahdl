@@ -579,6 +579,12 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
   uint32_t width = var.class_type_name.empty() ? var.width : 64;
   auto* v = ctx_.CreateVariable(var.name, width);
 
+  // §25.9: track virtual interface variables so assignments bind them to an
+  // interface instance and component access redirects through that binding.
+  if (var.elem_type_kind == DataTypeKind::kVirtualInterface) {
+    ctx_.RegisterVirtualInterfaceVar(v);
+  }
+
   if (!var.is_4state && !var.is_event && !var.is_string && !var.is_chandle) {
     v->value = MakeLogic4VecVal(arena_, width, 0);
   }
