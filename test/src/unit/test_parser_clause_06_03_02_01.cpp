@@ -65,6 +65,31 @@ TEST(DataTypeParsing, TriregChargeStrengthSignedVector) {
   EXPECT_EQ(item->name, "cap2");
 }
 
+TEST(DataTypeParsing, TriregChargeStrengthMedium) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (medium) m;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
+  EXPECT_EQ(item->data_type.charge_strength, 2);
+  EXPECT_EQ(item->name, "m");
+}
+
+// Only small/medium/large name a charge strength. A drive-strength keyword
+// such as weak is not in the charge-strength set, so the parser declines to
+// consume the parenthesized group and the declaration fails.
+TEST(DataTypeParsing, DriveStrengthKeywordIsNotChargeStrength) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (weak) c;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 TEST(DataTypeParsing, ChargeStrengthKeywordOnWireFails) {
   auto r = Parse(
       "module t;\n"
