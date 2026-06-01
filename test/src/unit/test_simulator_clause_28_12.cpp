@@ -107,6 +107,38 @@ TEST(UserNettypeStrength, UserNettypeIgnoresStrengthWithThreeDrivers) {
   EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
 }
 
+TEST(UserNettypeStrength, UserNettypeConflictKeepsNoStrengthLevels) {
+  // Two equally strong, opposing drivers on a user-defined-nettype net. On an
+  // ordinary net this conflict would populate a strength range (an ambiguous
+  // strength); the nettype net must instead carry no strength levels at all,
+  // resolving the conflict as a value only.
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+  net.is_user_nettype = true;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  // Value resolves to x, the strengths having played no part in the outcome.
+  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+
+  // No strength levels appear on either side of the scale.
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
+  EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
+}
+
 TEST(NetStrengthDisjunction, UnambiguousDriversYieldUnambiguousNetStrength) {
   Arena arena;
   auto* var = arena.Create<Variable>();
