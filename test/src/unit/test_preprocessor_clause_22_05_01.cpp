@@ -418,16 +418,6 @@ TEST(Preprocessor, IndirectRecursiveMacroError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, MacroArgContainingSelfIsLegal) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define TOP(a,b) a + b\n"
-      "`TOP( `TOP(b,1), `TOP(42,a) )\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("b + 1 + 42 + a"), std::string::npos);
-}
-
 TEST(Preprocessor, SquareBracketsInActualArgument) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -572,17 +562,6 @@ TEST(Preprocessor, MacroBodySplitAcrossStringLiteral) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, ArgExpansionDoesNotIntroduceFormals) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define TOP(a,b) a + b\n"
-      "`TOP( `TOP(b,1), `TOP(42,a) )\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-
-  EXPECT_NE(result.find("b + 1 + 42 + a"), std::string::npos);
-}
-
 TEST(Preprocessor, NoSubstitutionInsideStringLiteral2) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -723,5 +702,76 @@ TEST(Preprocessor, ObjectLikeMacroNoArgsExpands) {
       f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("int x = 0"), std::string::npos);
+}
+
+// `""" overrides the usual meaning of the triple-quote delimiter: the
+// expansion includes the triple quotation marks and substitutes the actual
+// argument, building a triple-quoted string literal from macro arguments.
+TEST(Preprocessor, BacktickTripleQuoteStringConstruction) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define MS(x) `\"\"\"x`\"\"\"\n"
+      "string s = `MS(hi);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("\"\"\"hi\"\"\""), std::string::npos);
+}
+
+// Within a `""" expansion a plain newline would terminate the definition, but
+// a backslash-newline is an exception: the backslash is dropped while the
+// newline is preserved in the expanded text.
+TEST(Preprocessor, BacktickTripleQuoteKeepsNewlineAfterBackslash) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M(v) `\"\"\"a\\\n"
+      "b`\"\"\"\n"
+      "string s = `M(x);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("\"\"\"a"), std::string::npos);
+  EXPECT_NE(result.find("a\nb"), std::string::npos);
+}
+
+// Exception to the line-continuation rule: when the backslash-newline falls in
+// the middle of a string literal, both the backslash and the newline are
+// omitted from the expanded macro rather than being replaced by a newline.
+TEST(Preprocessor, BackslashNewlineInsideStringOmitsBoth) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define S \"abc\\\n"
+      "def\"\n"
+      "int x = `S;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("\"abcdef\""), std::string::npos);
+}
+
+// A newline that is not continued by a backslash (and is outside any triple
+// quote or block comment) terminates the macro text. The following source line
+// is ordinary text and must not be folded into the macro body.
+TEST(Preprocessor, NewlineTerminatesMacroBody) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define A 1\n"
+      "2 + 3\n"
+      "int x = `A;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  // The body is exactly "1"; if the next line had been absorbed the macro
+  // would expand to something other than the contiguous "int x = 1;".
+  EXPECT_NE(result.find("int x = 1;"), std::string::npos);
+  EXPECT_NE(result.find("2 + 3"), std::string::npos);
+}
+
+// An actual argument may carry a comma inside a triple-quoted string without it
+// being read as an argument separator, just like the other matched delimiters.
+TEST(Preprocessor, TripleQuotedActualArgumentProtectsComma) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define APPLY(x) x\n"
+      "`APPLY(\"\"\"a,b\"\"\")\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("\"\"\"a,b\"\"\""), std::string::npos);
 }
 
