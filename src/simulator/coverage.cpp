@@ -482,6 +482,95 @@ bool CoverageDB::WithRangeReferenceAllowed(std::string_view self_name,
   return self_name == referenced_name;
 }
 
+// --- LRM 19.7: instance coverage options ------------------------------------
+
+bool CoverageDB::OptionWeightValid(int32_t weight) {
+  // The weight option shall be a non-negative integral value (LRM 19.7, Table
+  // 19-1). Integrality is guaranteed by the parameter type.
+  return weight >= 0;
+}
+
+bool CoverageDB::OptionSpecifiedMoreThanOnce(
+    const std::vector<InstanceOptionKind>& assigned) {
+  for (size_t i = 0; i < assigned.size(); ++i) {
+    for (size_t j = i + 1; j < assigned.size(); ++j) {
+      if (assigned[i] == assigned[j]) return true;
+    }
+  }
+  return false;
+}
+
+bool CoverageDB::OptionAllowedAt(InstanceOptionKind kind,
+                                 CoverSyntacticLevel level) {
+  switch (kind) {
+    case InstanceOptionKind::kWeight:
+    case InstanceOptionKind::kGoal:
+    case InstanceOptionKind::kComment:
+    case InstanceOptionKind::kAtLeast:
+      // Allowed at covergroup, coverpoint, and cross (LRM 19.7, Table 19-2).
+      return true;
+    case InstanceOptionKind::kAutoBinMax:
+    case InstanceOptionKind::kDetectOverlap:
+      // Covergroup and coverpoint, but not cross.
+      return level != CoverSyntacticLevel::kCross;
+    case InstanceOptionKind::kCrossNumPrintMissing:
+    case InstanceOptionKind::kCrossRetainAutoBins:
+      // Covergroup and cross, but not coverpoint.
+      return level != CoverSyntacticLevel::kCoverpoint;
+    case InstanceOptionKind::kName:
+    case InstanceOptionKind::kPerInstance:
+    case InstanceOptionKind::kGetInstCoverage:
+      // Covergroup level only.
+      return level == CoverSyntacticLevel::kCovergroup;
+  }
+  return false;
+}
+
+bool CoverageDB::OptionDefaultsToLowerLevels(InstanceOptionKind kind) {
+  // Options set at the covergroup level act as defaults for the coverpoints and
+  // crosses, except weight, goal, comment, and per_instance (LRM 19.7). name
+  // and get_inst_coverage are covergroup-only, so they never propagate either.
+  switch (kind) {
+    case InstanceOptionKind::kAtLeast:
+    case InstanceOptionKind::kAutoBinMax:
+    case InstanceOptionKind::kCrossNumPrintMissing:
+    case InstanceOptionKind::kCrossRetainAutoBins:
+    case InstanceOptionKind::kDetectOverlap:
+      return true;
+    case InstanceOptionKind::kName:
+    case InstanceOptionKind::kWeight:
+    case InstanceOptionKind::kGoal:
+    case InstanceOptionKind::kComment:
+    case InstanceOptionKind::kPerInstance:
+    case InstanceOptionKind::kGetInstCoverage:
+      return false;
+  }
+  return false;
+}
+
+bool CoverageDB::OptionSettableProcedurally(InstanceOptionKind kind) {
+  // per_instance and get_inst_coverage are definition-only; auto_bin_max,
+  // detect_overlap, and cross_retain_auto_bins are covergroup/coverpoint
+  // definition-only. Everything else may be assigned procedurally after
+  // instantiation (LRM 19.7).
+  switch (kind) {
+    case InstanceOptionKind::kPerInstance:
+    case InstanceOptionKind::kGetInstCoverage:
+    case InstanceOptionKind::kAutoBinMax:
+    case InstanceOptionKind::kDetectOverlap:
+    case InstanceOptionKind::kCrossRetainAutoBins:
+      return false;
+    case InstanceOptionKind::kName:
+    case InstanceOptionKind::kWeight:
+    case InstanceOptionKind::kGoal:
+    case InstanceOptionKind::kComment:
+    case InstanceOptionKind::kAtLeast:
+    case InstanceOptionKind::kCrossNumPrintMissing:
+      return true;
+  }
+  return false;
+}
+
 // --- LRM 19.7.1: covergroup type options ------------------------------------
 
 double CoverageDB::ComputeTypeCoverage(

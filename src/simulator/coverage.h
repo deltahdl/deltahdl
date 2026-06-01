@@ -163,11 +163,28 @@ enum class TypeOptionKind : uint8_t {
 };
 
 // The syntactic level at which an option assignment appears (LRM 19.7.1,
-// Table 19-4).
+// Table 19-4). The same levels apply to instance options (LRM 19.7, Table
+// 19-2).
 enum class CoverSyntacticLevel : uint8_t {
   kCovergroup,
   kCoverpoint,
   kCross,
+};
+
+// Identifies an instance-specific coverage option for the Table 19-1/Table
+// 19-2 queries (LRM 19.7).
+enum class InstanceOptionKind : uint8_t {
+  kName,
+  kWeight,
+  kGoal,
+  kComment,
+  kAtLeast,
+  kAutoBinMax,
+  kCrossNumPrintMissing,
+  kCrossRetainAutoBins,
+  kDetectOverlap,
+  kPerInstance,
+  kGetInstCoverage,
 };
 
 class CoverageDB {
@@ -264,6 +281,38 @@ class CoverageDB {
   // is permitted (LRM 19.5.1.1).
   static bool WithRangeReferenceAllowed(std::string_view self_name,
                                         std::string_view referenced_name);
+
+  // --- LRM 19.7: instance coverage options ----------------------------------
+
+  // A weight value supplied for the weight option shall be a non-negative
+  // integral value (LRM 19.7, Table 19-1).
+  static bool OptionWeightValid(int32_t weight);
+
+  // Specifying a value for the same option more than once within a single
+  // covergroup definition is an error (LRM 19.7). Given the options assigned in
+  // definition order, returns true when any option appears more than once.
+  static bool OptionSpecifiedMoreThanOnce(
+      const std::vector<InstanceOptionKind>& assigned);
+
+  // Table 19-2: whether an instance option may be specified at a given
+  // syntactic level (LRM 19.7). All instance options may be set at the
+  // covergroup level.
+  static bool OptionAllowedAt(InstanceOptionKind kind,
+                              CoverSyntacticLevel level);
+
+  // When set at the covergroup level, every instance option acts as a default
+  // for the corresponding option of the coverpoints and crosses, except weight,
+  // goal, comment, and per_instance (LRM 19.7). The covergroup-only options
+  // (name, get_inst_coverage) likewise do not propagate, as they cannot be set
+  // at a lower level.
+  static bool OptionDefaultsToLowerLevels(InstanceOptionKind kind);
+
+  // per_instance and get_inst_coverage can only be set in the covergroup
+  // definition; auto_bin_max, detect_overlap, and cross_retain_auto_bins can
+  // only be set in the covergroup or coverpoint definition. The remaining
+  // instance options can also be assigned procedurally after the covergroup has
+  // been instantiated (LRM 19.7).
+  static bool OptionSettableProcedurally(InstanceOptionKind kind);
 
   // --- LRM 19.7.1: covergroup type options ----------------------------------
 
