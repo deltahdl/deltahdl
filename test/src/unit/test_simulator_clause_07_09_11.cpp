@@ -278,4 +278,83 @@ TEST(AssocMethods, DefaultDoesNotAffectDelete) {
   EXPECT_TRUE(aa->has_default);
 }
 
+// §7.9.11: the whole array contents can be replaced using an array literal,
+// not just at declaration but in a procedural assignment.
+TEST(AssocMethods, RuntimeLiteralReplacesWholeContents) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[1] = 10;\n"
+      "    aa[2] = 20;\n"
+      "    aa = '{5:50, 6:60};\n"
+      "    result = aa.num();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 2u);
+}
+
+TEST(AssocMethods, RuntimeLiteralDropsPriorEntries) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[1] = 10;\n"
+      "    aa = '{5:50, 6:60};\n"
+      "    result = aa[1];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0u);
+}
+
+TEST(AssocMethods, RuntimeLiteralEstablishesNewEntry) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[1] = 10;\n"
+      "    aa = '{5:50, 6:60};\n"
+      "    result = aa[6];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 60u);
+}
+
+// §7.9.11 cross §7.8.6: a default supplied by the replacement literal governs
+// subsequent reads of nonexistent indices.
+TEST(AssocMethods, RuntimeLiteralDefaultGovernsMissingRead) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa = '{5:50, default:77};\n"
+      "    result = aa[999];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 77u);
+}
+
+TEST(AssocMethods, RuntimeLiteralStringKeyedReplaces) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[\"old\"] = 1;\n"
+      "    aa = '{\"x\":5, \"y\":9};\n"
+      "    result = aa[\"y\"] + aa.num();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 11u);
+}
+
 }

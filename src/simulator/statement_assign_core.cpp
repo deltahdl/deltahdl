@@ -92,6 +92,43 @@ static bool TryAssocCopyAssign(const Stmt* stmt, SimContext& ctx) {
   return true;
 }
 
+static std::string StripAssocKeyQuotes(std::string_view key) {
+  if (key.size() >= 2 && key.front() == '"' && key.back() == '"')
+    return std::string(key.substr(1, key.size() - 2));
+  return std::string(key);
+}
+
+// §7.9.11: besides writing an associative array one entry at a time, the whole
+// array contents can be replaced by assigning an '{index:value} array literal.
+// Discard the existing entries and repopulate keyed entries and the optional
+// default from the pattern, mirroring the declaration-time initialization.
+static bool TryAssocLiteralAssign(const Stmt* stmt, SimContext& ctx,
+                                  Arena& arena) {
+  if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
+  if (!stmt->rhs || stmt->rhs->kind != ExprKind::kAssignmentPattern)
+    return false;
+  if (stmt->rhs->pattern_keys.empty()) return false;
+  auto* aa = ctx.FindAssocArray(stmt->lhs->text);
+  if (!aa) return false;
+  aa->int_data.clear();
+  aa->str_data.clear();
+  const Expr* rhs = stmt->rhs;
+  for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
+    if (i >= rhs->elements.size()) break;
+    const auto& key = rhs->pattern_keys[i];
+    auto val = EvalExpr(rhs->elements[i], ctx, arena);
+    if (key == "default") {
+      aa->has_default = true;
+      aa->default_value = val;
+    } else if (aa->is_string_key) {
+      aa->str_data[StripAssocKeyQuotes(key)] = val;
+    } else {
+      aa->int_data[static_cast<int64_t>(std::stoll(std::string(key)))] = val;
+    }
+  }
+  return true;
+}
+
 static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall) return false;
   if (stmt->rhs->text != "new") return false;
@@ -836,6 +873,7 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   if (TryClassNewAssign(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryTypedClassNewAssign(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryAssocCopyAssign(stmt, ctx)) return StmtResult::kDone;
+  if (TryAssocLiteralAssign(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryStreamingConcatToQueueTarget(stmt, ctx, arena))
     return StmtResult::kDone;
   if (TryQueueBlockingAssign(stmt, ctx, arena)) return StmtResult::kDone;

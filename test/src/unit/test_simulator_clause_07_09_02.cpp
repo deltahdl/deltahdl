@@ -27,16 +27,6 @@ TEST(AssocMethods, DeleteNoArgClearsAll) {
   EXPECT_EQ(aa->str_data.size(), 0u);
 }
 
-TEST(AssocMethods, DeleteNonexistentKeyIsNoop) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 100);
-  auto* call = MkAssocCallInt(f.arena, "aa", "delete", 999);
-  TryExecAssocMethodStmt(call, f.ctx, f.arena);
-  EXPECT_EQ(aa->int_data.size(), 1u);
-  EXPECT_EQ(aa->int_data.count(10), 1u);
-}
-
 TEST(AssocMethods, DeleteByKeyStringKeyed) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
@@ -60,20 +50,6 @@ TEST(AssocMethods, DeleteNoArgClearsAllIntKeyed) {
   auto* call = MkAssocCallNoArg(f.arena, "aa", "delete");
   TryExecAssocMethodStmt(call, f.ctx, f.arena);
   EXPECT_EQ(aa->int_data.size(), 0u);
-}
-
-TEST(AssocMethods, DeleteNonexistentKeyStringKeyed) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
-  aa->str_data["hello"] = MakeLogic4VecVal(f.arena, 32, 1);
-  auto* expr = MkAssocCallNoArg(f.arena, "aa", "delete");
-  auto* arg = f.arena.Create<Expr>();
-  arg->kind = ExprKind::kStringLiteral;
-  arg->text = "missing";
-  expr->args.push_back(arg);
-  TryExecAssocMethodStmt(expr, f.ctx, f.arena);
-  EXPECT_EQ(aa->str_data.size(), 1u);
-  EXPECT_EQ(aa->str_data.count("hello"), 1u);
 }
 
 TEST(AssocMethods, DeletePropertySyntaxClearsAll) {
@@ -101,6 +77,34 @@ TEST(AssocMethods, DeleteNoArgOnEmptyArrayIsNoop) {
   auto* call = MkAssocCallNoArg(f.arena, "aa", "delete");
   TryExecAssocMethodStmt(call, f.ctx, f.arena);
 
+}
+
+// §7.9.2: deleting an index that does not exist issues no warning. Observe the
+// warning count staying flat across the no-op delete.
+TEST(AssocMethods, DeleteMissingIntKeyIssuesNoWarning) {
+  SimFixture f;
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
+  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 100);
+  uint32_t before = f.diag.WarningCount();
+  auto* call = MkAssocCallInt(f.arena, "aa", "delete", 999);
+  TryExecAssocMethodStmt(call, f.ctx, f.arena);
+  EXPECT_EQ(f.diag.WarningCount(), before);
+  EXPECT_EQ(aa->int_data.size(), 1u);
+}
+
+TEST(AssocMethods, DeleteMissingStringKeyIssuesNoWarning) {
+  SimFixture f;
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
+  aa->str_data["hello"] = MakeLogic4VecVal(f.arena, 32, 1);
+  uint32_t before = f.diag.WarningCount();
+  auto* expr = MkAssocCallNoArg(f.arena, "aa", "delete");
+  auto* arg = f.arena.Create<Expr>();
+  arg->kind = ExprKind::kStringLiteral;
+  arg->text = "missing";
+  expr->args.push_back(arg);
+  TryExecAssocMethodStmt(expr, f.ctx, f.arena);
+  EXPECT_EQ(f.diag.WarningCount(), before);
+  EXPECT_EQ(aa->str_data.size(), 1u);
 }
 
 }

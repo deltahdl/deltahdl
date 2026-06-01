@@ -93,6 +93,23 @@ TEST(AssocArrayAllocation, EndToEndAssignCreatesElement) {
   EXPECT_EQ(v, 55u);
 }
 
+// §7.8.7: a string-keyed nonexistent element is allocated the same way when it
+// is the target of a plain assignment. Driven end-to-end through the write
+// path so the allocation is observed via production, not a direct map insert.
+TEST(AssocArrayAllocation, EndToEndStringKeyAssignCreatesElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[\"k\"] = 33;\n"
+      "    result = aa[\"k\"];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 33u);
+}
+
 TEST(AssocArrayAllocation, IncrementNonexistentUsesZeroDefault) {
   auto v = RunAndGet(
       "module t;\n"
@@ -220,6 +237,59 @@ TEST(AssocArrayAllocation, StringKeyIncrementAllocates) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 1u);
+}
+
+// §7.8.7: a nonexistent element shall be allocated when used as the actual to
+// an argument passed by reference. The callee's write to the ref then persists
+// back into the freshly allocated entry.
+TEST(AssocArrayAllocation, RefArgToNonexistentElementAllocatesAndPersists) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  task automatic set_ref(ref int x);\n"
+      "    x = 42;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    set_ref(aa[7]);\n"
+      "    result = aa[7];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 42u);
+}
+
+TEST(AssocArrayAllocation, RefArgAllocationGrowsArray) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  task automatic touch(ref int x);\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    touch(aa[9]);\n"
+      "    result = aa.num();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 1u);
+}
+
+TEST(AssocArrayAllocation, RefArgToNonexistentStringKeyAllocates) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  int result;\n"
+      "  task automatic set_ref(ref int x);\n"
+      "    x = 8;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    set_ref(aa[\"k\"]);\n"
+      "    result = aa[\"k\"];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 8u);
 }
 
 }

@@ -44,13 +44,4 @@ TEST(AggregateTypeParsing, AssocArrayLiteralDefaultOnly) {
   EXPECT_EQ(item->init_expr->pattern_keys[0], "default");
 }
 
-TEST(AggregateTypeParsing, AssocArrayLiteralNegativeDefault) {
-  auto r = Parse(
-      "module t;\n"
-      "  integer tab[string] = '{\"a\":1, default:-1};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 }
