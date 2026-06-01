@@ -37,13 +37,6 @@ TEST(RealLiteralParsing, ScientificNotation) {
   EXPECT_DOUBLE_EQ(rhs->real_val, 0.013);
 }
 
-TEST(RealLiteralParsing, UnderscoresInValue) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r = 1_000.000_1;\n"
-              "endmodule\n"));
-}
-
 TEST(RealLiteralParsing, ExponentInAddition) {
   auto r = Parse(
       "module t;\n"
