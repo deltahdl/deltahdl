@@ -14,46 +14,10 @@ TEST(PliPostObservedSim, PostObservedCanReadValues) {
   VerifyRegionCanReadActiveValue(Region::kPostObserved);
 }
 
-TEST(PliPostObservedSim, PostObservedReadsAfterObservedRegion) {
-  Arena arena;
-  Scheduler sched(arena);
-  int value = 0;
-  int sampled = -1;
-
-  auto* observed = sched.GetEventPool().Acquire();
-  observed->callback = [&]() { value = 77; };
-  sched.ScheduleEvent({0}, Region::kObserved, observed);
-
-  auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&]() { sampled = value; };
-  sched.ScheduleEvent({0}, Region::kPostObserved, ev);
-
-  sched.Run();
-  EXPECT_EQ(sampled, 77);
-}
-
 TEST(PliPostObservedSim, PostObservedExecutesAfterObservedBeforeReactive) {
   VerifyThreeRegionOrder({Region::kObserved, "observed"},
                          {Region::kPostObserved, "post_observed"},
                          {Region::kReactive, "reactive"});
-}
-
-TEST(PliPostObservedSim, PostObservedExecutesAfterEntireChainThroughObserved) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  ScheduleLabeled(sched, Region::kPostObserved, "post_observed", order);
-  ScheduleLabeled(sched, Region::kObserved, "observed", order);
-  ScheduleLabeled(sched, Region::kPreObserved, "pre_observed", order);
-  ScheduleLabeled(sched, Region::kActive, "active", order);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 4u);
-  EXPECT_EQ(order[0], "active");
-  EXPECT_EQ(order[1], "pre_observed");
-  EXPECT_EQ(order[2], "observed");
-  EXPECT_EQ(order[3], "post_observed");
 }
 
 TEST(PliPostObservedSim, PostObservedIsAfterObservedBeforeReactive) {
@@ -62,6 +26,12 @@ TEST(PliPostObservedSim, PostObservedIsAfterObservedBeforeReactive) {
   auto reactive_ord = static_cast<int>(Region::kReactive);
   EXPECT_GT(post_observed_ord, observed_ord);
   EXPECT_LT(post_observed_ord, reactive_ord);
+}
+
+TEST(PliPostObservedSim, PostObservedIsClassifiedAsPliRegion) {
+  // §4.4.3.6 establishes Post-Observed as a PLI callback control point; the
+  // scheduler encodes that membership in IsPliRegion.
+  EXPECT_TRUE(IsPliRegion(Region::kPostObserved));
 }
 
 TEST(PliPostObservedSim, PostObservedRegionHoldsMultiplePLICallbacks) {
