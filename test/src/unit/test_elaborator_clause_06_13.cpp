@@ -55,4 +55,35 @@ TEST(VoidDataType, VoidFunctionNoReturn_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// A value-bearing return is rejected even when nested inside a block, since a
+// void function has no return value to carry. Exercises the recursive walk of
+// the function body rather than only its top-level statements.
+TEST(VoidDataType, VoidFunctionNestedReturnValue_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  function void bad();\n"
+      "    begin\n"
+      "      return 7;\n"
+      "    end\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// A bare return nested inside a conditional is still legal: the recursive walk
+// must not mistake a value-less return for a value-bearing one.
+TEST(VoidDataType, VoidFunctionConditionalBareReturn_Ok) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  function void ok_func();\n"
+      "    if (1) return;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }
