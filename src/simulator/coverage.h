@@ -250,7 +250,28 @@ class CoverageDB {
   static double GetPointCoverage(const CoverPoint* cp);
   static double GetCrossCoverage(const CrossCover* cross);
 
+  // Overall coverage of all coverage group types, as a real number in the
+  // range 0 to 100. This is the value returned by the $get_coverage() system
+  // function (LRM 19.9); the underlying computation is the coverage average of
+  // LRM 19.11.
   double GetGlobalCoverage() const;
+
+  // --- LRM 19.9: predefined coverage system tasks and system functions ------
+
+  // $set_coverage_db_name(filename) records the file name of the coverage
+  // database into which coverage information is written at the end of a
+  // simulation run (LRM 19.9). A later call replaces the recorded name.
+  void SetCoverageDbName(std::string filename);
+  const std::string& CoverageDbName() const;
+
+  // $load_coverage_db(filename) loads cumulative coverage information for all
+  // coverage group types (LRM 19.9). This applies the loaded snapshot to the
+  // live database: for a covergroup type that already exists, the loaded bin
+  // hit counts and sample count accumulate onto the live ones (matching
+  // coverpoints, crosses, and bins by name); a coverpoint, cross, or bin found
+  // only in the loaded data is appended; a covergroup type absent from the live
+  // database is added in full.
+  void MergeCumulativeCoverage(const std::vector<CoverGroup>& cumulative);
 
   // --- LRM 19.8: predefined coverage methods --------------------------------
 
@@ -601,6 +622,9 @@ class CoverageDB {
 
   std::deque<CoverGroup> groups_;
   std::unordered_map<std::string, size_t> name_index_;
+  // Destination file for the coverage database, set by $set_coverage_db_name
+  // and written at the end of the run (LRM 19.9).
+  std::string coverage_db_name_;
 };
 
 }

@@ -368,6 +368,104 @@ double CoverageDB::GetGlobalCoverage() const {
   return sum / static_cast<double>(total_weight);
 }
 
+// --- LRM 19.9: predefined coverage system tasks and system functions --------
+
+void CoverageDB::SetCoverageDbName(std::string filename) {
+  coverage_db_name_ = std::move(filename);
+}
+
+const std::string& CoverageDB::CoverageDbName() const {
+  return coverage_db_name_;
+}
+
+// Accumulates one loaded coverpoint onto a live coverpoint of the same name:
+// matching bins add their hit counts, and a bin found only in the loaded data
+// is appended (LRM 19.9).
+static void MergeLoadedCoverPoint(CoverPoint* live, const CoverPoint& loaded) {
+  for (const auto& lb : loaded.bins) {
+    CoverBin* match = nullptr;
+    for (auto& b : live->bins) {
+      if (b.name == lb.name) {
+        match = &b;
+        break;
+      }
+    }
+    if (match != nullptr) {
+      match->hit_count += lb.hit_count;
+    } else {
+      live->bins.push_back(lb);
+    }
+  }
+}
+
+// Accumulates one loaded cross onto a live cross of the same name, mirroring the
+// per-bin accumulation used for coverpoints (LRM 19.9).
+static void MergeLoadedCross(CrossCover* live, const CrossCover& loaded) {
+  for (const auto& lb : loaded.bins) {
+    CrossBin* match = nullptr;
+    for (auto& b : live->bins) {
+      if (b.name == lb.name) {
+        match = &b;
+        break;
+      }
+    }
+    if (match != nullptr) {
+      match->hit_count += lb.hit_count;
+    } else {
+      live->bins.push_back(lb);
+    }
+  }
+}
+
+void CoverageDB::MergeCumulativeCoverage(
+    const std::vector<CoverGroup>& cumulative) {
+  for (const auto& loaded : cumulative) {
+    CoverGroup* live = FindGroup(loaded.name);
+    if (live == nullptr) {
+      // A covergroup type seen only in the persisted database is added in full.
+      live = CreateGroup(loaded.name);
+      live->coverpoints = loaded.coverpoints;
+      live->crosses = loaded.crosses;
+      live->options = loaded.options;
+      live->type_option = loaded.type_option;
+      live->collecting = loaded.collecting;
+      live->sample_count = loaded.sample_count;
+      continue;
+    }
+
+    // The loaded coverage is cumulative, so its counts add to the live ones.
+    live->sample_count += loaded.sample_count;
+    for (const auto& lcp : loaded.coverpoints) {
+      CoverPoint* match = nullptr;
+      for (auto& cp : live->coverpoints) {
+        if (cp.name == lcp.name) {
+          match = &cp;
+          break;
+        }
+      }
+      if (match != nullptr) {
+        MergeLoadedCoverPoint(match, lcp);
+      } else {
+        live->coverpoints.push_back(lcp);
+      }
+    }
+    for (const auto& lcross : loaded.crosses) {
+      CrossCover* match = nullptr;
+      for (auto& cross : live->crosses) {
+        if (cross.name == lcross.name) {
+          match = &cross;
+          break;
+        }
+      }
+      if (match != nullptr) {
+        MergeLoadedCross(match, lcross);
+      } else {
+        live->crosses.push_back(lcross);
+      }
+    }
+  }
+}
+
 // --- LRM 19.6: cross coverage -----------------------------------------------
 
 void CoverageDB::EnsureCrossCoverPoints(
