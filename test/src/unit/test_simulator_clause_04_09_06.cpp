@@ -170,4 +170,28 @@ TEST(PortConnectionSchedulingSim, PrimitiveInputAcceptsExpression) {
   EXPECT_EQ(f.ctx.FindVariable("out_sig")->value.ToUint64() & 1u, 1u);
 }
 
+// A primitive evaluation triggered by an input change after time zero schedules
+// an active update event in the connected output net, so the output tracks the
+// later input value rather than only the time-zero one.
+TEST(PortConnectionSchedulingSim,
+     PrimitiveEvaluationSchedulesActiveUpdateOnInputChange) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic in_sig;\n"
+      "  wire out_sig;\n"
+      "  initial begin\n"
+      "    in_sig = 1'b0;\n"
+      "    #5 in_sig = 1'b1;\n"
+      "  end\n"
+      "  buf b(out_sig, in_sig);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("out_sig")->value.ToUint64() & 1u, 1u);
+}
+
 }

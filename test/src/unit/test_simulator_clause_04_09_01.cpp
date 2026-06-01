@@ -113,3 +113,52 @@ TEST(ContinuousAssignSchedulingSim,
   EXPECT_EQ(f.ctx.FindVariable("computed")->value.ToUint64(), 8u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
+
+// §4.9.1 closes by noting that the continuous-assignment process it describes
+// also covers the implicit continuous assignments inferred from port
+// connections (see §4.9.6). An input port connected to a constant outside
+// expression is therefore evaluated at time zero, just like any explicit
+// continuous assignment, propagating the constant into the local port net.
+TEST(ContinuousAssignSchedulingSim,
+     ImplicitPortAssignmentPropagatesConstantAtTimeZero) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input logic [7:0] p);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  child u(8'd7 + 8'd1);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("u.p")->value.ToUint64(), 8u);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
+}
+
+// The implicit continuous assignment inferred from a port connection is a real
+// continuous-assignment process: it stays sensitive to the source elements of
+// the outside expression and re-evaluates with current values whenever they
+// change, exactly as the explicit form does.
+TEST(ContinuousAssignSchedulingSim,
+     ImplicitPortAssignmentTracksSourceElements) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input logic [7:0] p);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic [7:0] src;\n"
+      "  child u(src + 8'd1);\n"
+      "  initial begin\n"
+      "    src = 8'd10;\n"
+      "    #10 src = 8'd100;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("u.p")->value.ToUint64(), 101u);
+}
