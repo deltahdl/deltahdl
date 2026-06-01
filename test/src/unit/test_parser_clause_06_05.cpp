@@ -96,4 +96,25 @@ TEST(DataTypeParsing, NetAndVarSameWidthVectors) {
   EXPECT_EQ(items[1]->data_type.packed_dim_left->int_val, 31u);
 }
 
+// §6.5: an assignment in a variable's declaration is a variable initialization,
+// not an implicit continuous assignment. It must parse as a single var-decl
+// item carrying the initializer expression, with no separate continuous-assign
+// item produced.
+TEST(DataTypeParsing, VarDeclAssignmentIsInitializerNotContAssign) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic v = 1'b0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_FALSE(items[0]->data_type.is_net);
+  EXPECT_NE(items[0]->init_expr, nullptr);
+  for (const auto* it : items) {
+    EXPECT_NE(it->kind, ModuleItemKind::kContAssign);
+  }
+}
+
 }
