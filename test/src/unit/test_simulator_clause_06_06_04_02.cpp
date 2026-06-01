@@ -47,6 +47,41 @@ TEST(ChargeDecay, NoDecayScheduledWithoutScheduler) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
+// §6.6.4.2: in the ideal capacitive state the trireg holds its last driven
+// value exactly, independent of what that value is. A value that already
+// contains unknown (x) and high-impedance (z) bits must be retained verbatim;
+// the ideal state never forces any retained bit to x (that only happens on
+// charge decay, which is disabled when the decay time is zero).
+TEST(ChargeDecay, IdealStatePreservesUnknownBits) {
+  Arena arena;
+  Scheduler sched(arena);
+  auto* var = arena.Create<Variable>();
+  // Low nibble encodes, from bit 0 up: 0, 1, x, z (a mix of known and
+  // unknown bits); the high nibble is all known zeros.
+  auto val = MakeLogic4Vec(arena, 8);
+  val.words[0].aval = 0b1010;
+  val.words[0].bval = 0b1100;
+  var->value = val;
+  const uint64_t expected_aval = val.words[0].aval;
+  const uint64_t expected_bval = val.words[0].bval;
+
+  Net net;
+  net.type = NetType::kTrireg;
+  net.resolved = var;
+  net.decay_ticks = 0;
+  net.drivers.push_back(MakeAllZ(arena, 8));
+
+  net.Resolve(arena, &sched);
+  EXPECT_EQ(var->value.words[0].aval, expected_aval);
+  EXPECT_EQ(var->value.words[0].bval, expected_bval);
+
+  net.Resolve(arena, &sched);
+  EXPECT_EQ(var->value.words[0].aval, expected_aval);
+  EXPECT_EQ(var->value.words[0].bval, expected_bval);
+
+  EXPECT_FALSE(sched.HasEvents());
+}
+
 TEST(ChargeDecay, IdealCapacitiveRetainsValue) {
   Arena arena;
   Scheduler sched(arena);
