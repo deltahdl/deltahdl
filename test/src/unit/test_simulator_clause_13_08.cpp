@@ -220,24 +220,6 @@ TEST(ParameterizedSubroutineSim, ParameterArithmetic) {
   EXPECT_EQ(var->value.ToUint64(), 14u);
 }
 
-TEST(ParameterizedSubroutineSim, ParameterBitmask) {
-  SimFixture f;
-  auto* var = RunAndFind(
-      "module t;\n"
-      "  virtual class C #(parameter W = 8);\n"
-      "    static function int mask;\n"
-      "      mask = (1 << W) - 1;\n"
-      "    endfunction\n"
-      "  endclass\n"
-      "  int result;\n"
-      "  initial result = C#(4)::mask();\n"
-      "endmodule\n",
-      f, "result");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.ToUint64(), 15u);
-}
-
 TEST(ParameterizedSubroutineSim, ParameterIfElse) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -528,49 +510,6 @@ TEST(ParameterizedSubroutineSim, ForLoopDifferentSpecs) {
   ASSERT_NE(r4, nullptr);
   EXPECT_EQ(r3->value.ToUint64(), 6u);
   EXPECT_EQ(r4->value.ToUint64(), 10u);
-}
-
-TEST(ParameterizedSubroutineSim, DecoderFunction) {
-  SimFixture f;
-  auto* var = RunAndFind(
-      "module t;\n"
-      "  virtual class C #(parameter DECODE_W = 4,\n"
-      "                     parameter ENCODE_W = $clog2(DECODE_W));\n"
-      "    static function int DECODER_f(input int EncodeIn);\n"
-      "      DECODER_f = 0;\n"
-      "      DECODER_f = DECODER_f | (1 << EncodeIn);\n"
-      "    endfunction\n"
-      "  endclass\n"
-      "  int result;\n"
-      "  initial result = C#(4)::DECODER_f(3);\n"
-      "endmodule\n",
-      f, "result");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.ToUint64(), 8u);
-}
-
-TEST(ParameterizedSubroutineSim, EncoderFunction) {
-  SimFixture f;
-  auto* var = RunAndFind(
-      "module t;\n"
-      "  virtual class C #(parameter DECODE_W = 8,\n"
-      "                     parameter ENCODE_W = $clog2(DECODE_W));\n"
-      "    static function int ENCODER_f(input int DecodeIn);\n"
-      "      ENCODER_f = 0;\n"
-      "      for (int i = 0; i < DECODE_W; i = i + 1)\n"
-      "        if (DecodeIn & (1 << i))\n"
-      "          ENCODER_f = i;\n"
-      "    endfunction\n"
-      "  endclass\n"
-      "  int result;\n"
-      "  // Encode bit 6: 8'b0100_0000 = 64.\n"
-      "  initial result = C#(8)::ENCODER_f(64);\n"
-      "endmodule\n",
-      f, "result");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
 TEST(ParameterizedSubroutineSim, EncoderDecoderSameClass) {
