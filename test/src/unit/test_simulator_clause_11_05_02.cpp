@@ -150,4 +150,22 @@ TEST(ArrayAddressing, PartSelectAfterArrayElement) {
   EXPECT_EQ(v, 0x5u);
 }
 
+// §11.5.2 — once every array dimension has been addressed, the selected word may
+// be bit-selected with a run-time (variable) index, as in twod_array[1][3][sel].
+TEST(ArrayAddressing, VariableBitSelectAfterArrayElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] twod [0:3][0:3];\n"
+      "  logic result;\n"
+      "  int sel;\n"
+      "  initial begin\n"
+      "    twod[1][2] = 8'b00100000;\n"
+      "    sel = 5;\n"
+      "    result = twod[1][2][sel];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 1u);
+}
+
 }

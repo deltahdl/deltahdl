@@ -48,6 +48,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateAssocOperandInExpr(decl);
   ValidateArrayPatternElemType(decl);
   ValidateReplicateTargetingArray(decl);
+  ValidateArrayElementPartSelect(decl);
   ValidateUnpackedArrayConcatNesting(decl);
   ValidateClassHandleOps(decl);
   ValidateChandleOps(decl);

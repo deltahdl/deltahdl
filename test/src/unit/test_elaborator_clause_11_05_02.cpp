@@ -55,4 +55,38 @@ TEST(ArrayAddressingElaboration, BitSelectAfterArrayElementElaborates) {
       "endmodule\n"));
 }
 
+// §11.5.2 — a bit-select or part-select of an array element requires an address
+// for every dimension first. Addressing all dimensions, then part-selecting the
+// selected word, is legal.
+TEST(ArrayAddressingElaboration, PartSelectAfterAllDimensionsAddressed) {
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  logic [7:0] twod [0:3][0:3];\n"
+      "  logic [3:0] result;\n"
+      "  initial result = twod[1][2][3:0];\n"
+      "endmodule\n"));
+}
+
+// §11.5.2 — the part-select here reaches the third dimension before it has been
+// addressed (only two of the three dimensions are indexed), which is illegal.
+TEST(ArrayAddressingElaboration, PartSelectBeforeAllDimensionsAddressedIsIllegal) {
+  EXPECT_FALSE(ElabOk(
+      "module m;\n"
+      "  logic [7:0] threed [0:3][0:3][0:7];\n"
+      "  logic [3:0] result;\n"
+      "  initial result = threed[2][1][3:0];\n"
+      "endmodule\n"));
+}
+
+// §11.5.2 — the same rule applies to the indexed part-select form: leaving a
+// dimension unaddressed and then applying an indexed part-select is illegal.
+TEST(ArrayAddressingElaboration, IndexedPartSelectBeforeAllDimensionsAddressedIsIllegal) {
+  EXPECT_FALSE(ElabOk(
+      "module m;\n"
+      "  logic [7:0] threed [0:3][0:3][0:7];\n"
+      "  logic [3:0] result;\n"
+      "  initial result = threed[2][1][0 +: 4];\n"
+      "endmodule\n"));
+}
+
 }

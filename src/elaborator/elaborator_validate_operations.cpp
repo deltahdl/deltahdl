@@ -809,6 +809,96 @@ void Elaborator::ValidateReplicateTargetingArray(const ModuleDecl* decl) {
   }
 }
 
+// §11.5.2 — To express a bit-select or part-select of an array element, an
+// address shall first be supplied for every dimension so that a single word is
+// selected; only then may the bit-select or part-select be applied. A
+// part-select that reaches a dimension which has not yet been addressed (for
+// example threed_array[14][1][3:0] on a three-dimensional unpacked array, where
+// the third dimension remains unaddressed) is illegal. We count the index
+// selects sitting beneath the part-select down to the array's name; if that
+// count falls short of the number of unpacked dimensions, the part-select lands
+// on an unaddressed dimension and is rejected.
+void Elaborator::CheckArrayElementPartSelectNode(const Expr* e) {
+  uint32_t addressed = 0;
+  const Expr* cur = e->base;
+  std::string_view base_name;
+  while (cur) {
+    if (cur->kind == ExprKind::kSelect) {
+      if (cur->index) ++addressed;
+      cur = cur->base;
+    } else if (cur->kind == ExprKind::kIdentifier) {
+      base_name = cur->text;
+      break;
+    } else {
+      return;  // base is not a plain array reference
+    }
+  }
+  if (base_name.empty()) return;
+  auto it = var_array_info_.find(base_name);
+  if (it == var_array_info_.end()) return;
+  const auto& info = it->second;
+  if (info.is_dynamic || info.is_assoc) return;
+  // Restrict to genuinely multidimensional arrays, the form the normative
+  // example illustrates; single-dimension part-selects are governed elsewhere.
+  if (info.num_unpacked_dims < 2) return;
+  if (addressed < info.num_unpacked_dims) {
+    diag_.Error(e->range.start,
+                "part-select of an array element requires an address for each "
+                "array dimension");
+  }
+}
+
+void Elaborator::WalkExprForArrayElementPartSelect(const Expr* e) {
+  if (!e) return;
+  if (e->kind == ExprKind::kSelect &&
+      (e->index_end || e->is_part_select_plus || e->is_part_select_minus)) {
+    CheckArrayElementPartSelectNode(e);
+  }
+  WalkExprForArrayElementPartSelect(e->lhs);
+  WalkExprForArrayElementPartSelect(e->rhs);
+  WalkExprForArrayElementPartSelect(e->base);
+  WalkExprForArrayElementPartSelect(e->index);
+  WalkExprForArrayElementPartSelect(e->index_end);
+  WalkExprForArrayElementPartSelect(e->condition);
+  WalkExprForArrayElementPartSelect(e->true_expr);
+  WalkExprForArrayElementPartSelect(e->false_expr);
+  for (auto* elem : e->elements) WalkExprForArrayElementPartSelect(elem);
+  for (auto* arg : e->args) WalkExprForArrayElementPartSelect(arg);
+}
+
+void Elaborator::WalkStmtsForArrayElementPartSelect(const Stmt* s) {
+  if (!s) return;
+  WalkExprForArrayElementPartSelect(s->rhs);
+  WalkExprForArrayElementPartSelect(s->lhs);
+  WalkExprForArrayElementPartSelect(s->expr);
+  WalkExprForArrayElementPartSelect(s->condition);
+  WalkExprForArrayElementPartSelect(s->assert_expr);
+  for (auto* sub : s->stmts) WalkStmtsForArrayElementPartSelect(sub);
+  WalkStmtsForArrayElementPartSelect(s->then_branch);
+  WalkStmtsForArrayElementPartSelect(s->else_branch);
+  WalkStmtsForArrayElementPartSelect(s->body);
+  WalkStmtsForArrayElementPartSelect(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForArrayElementPartSelect(ci.body);
+}
+
+void Elaborator::ValidateArrayElementPartSelect(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock ||
+                   item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForArrayElementPartSelect(item->body);
+    }
+    if (item->kind == ModuleItemKind::kContAssign) {
+      WalkExprForArrayElementPartSelect(item->assign_rhs);
+      WalkExprForArrayElementPartSelect(item->assign_lhs);
+    }
+  }
+}
+
 void Elaborator::CheckArrayConcatNestingInAssign(const Stmt* s) {
   if (!s->lhs || !s->rhs) return;
   if (s->lhs->kind != ExprKind::kIdentifier) return;

@@ -502,6 +502,11 @@ class Elaborator {
   void WalkStmtsForReplicateTargetingArray(const Stmt* s);
   void CheckReplicateTargetingArrayInAssign(const Stmt* s);
 
+  void ValidateArrayElementPartSelect(const ModuleDecl* decl);
+  void WalkStmtsForArrayElementPartSelect(const Stmt* s);
+  void WalkExprForArrayElementPartSelect(const Expr* e);
+  void CheckArrayElementPartSelectNode(const Expr* e);
+
   void ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl);
   void WalkStmtsForArrayConcatNesting(const Stmt* s);
   void CheckArrayConcatNestingInAssign(const Stmt* s);
