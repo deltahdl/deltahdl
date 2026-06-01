@@ -428,6 +428,35 @@ class CoverageDB {
   static bool DefaultSequenceTransitionIncrements(bool any_nondefault_incremented,
                                                   bool any_pending);
 
+  // --- LRM 19.5.5: excluding coverage point values or transitions -----------
+
+  // Removes every value named by an ignore_bins state set from a coverage bin's
+  // value set. Each occurrence of an ignored value is dropped; values not
+  // ignored keep their order. Per LRM 19.5.5 this removal is performed only
+  // after values have been distributed to the specified bins, so it is applied
+  // to a bin's already-populated value set (LRM 19.5.5).
+  static std::vector<int64_t> RemoveIgnoredValues(
+      const std::vector<int64_t>& bin_values,
+      const std::vector<int64_t>& ignored_values);
+
+  // True when a covered transition sequence must be excluded because it cannot
+  // be matched without also matching an ignored transition sequence — that is,
+  // when the ignored sequence occurs as a contiguous subsequence of the covered
+  // one (ignoring 2=>3 removes the covered 1=>2=>3=>4) (LRM 19.5.5).
+  static bool CoveredTransitionIsIgnored(const std::vector<int64_t>& covered,
+                                         const std::vector<int64_t>& ignored);
+
+  // An ignored individual value has no effect on a transition that includes the
+  // value: a transition bin is never removed merely because its sequence passes
+  // through an ignored state value. Always false (LRM 19.5.5).
+  static bool IgnoredValueAffectsTransition(
+      int64_t ignored_value, const std::vector<int64_t>& transition);
+
+  // An ignore_bins transition specification cannot describe a sequence of
+  // unbounded or undetermined varying length; it is legal only when the
+  // sequence has a bounded (determined) length (LRM 19.5.5).
+  static bool IgnoreTransitionLengthLegal(bool sequence_bounded);
+
   // --- LRM 19.7: instance coverage options ----------------------------------
 
   // A weight value supplied for the weight option shall be a non-negative

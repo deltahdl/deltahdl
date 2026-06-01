@@ -688,6 +688,61 @@ bool CoverageDB::DefaultSequenceTransitionIncrements(
   return !any_nondefault_incremented && !any_pending;
 }
 
+// --- LRM 19.5.5: excluding coverage point values or transitions -------------
+
+std::vector<int64_t> CoverageDB::RemoveIgnoredValues(
+    const std::vector<int64_t>& bin_values,
+    const std::vector<int64_t>& ignored_values) {
+  // Each ignored value is removed from the bin's set of values; the rest keep
+  // their relative order (LRM 19.5.5).
+  std::vector<int64_t> result;
+  result.reserve(bin_values.size());
+  for (int64_t value : bin_values) {
+    bool ignored = false;
+    for (int64_t ig : ignored_values) {
+      if (ig == value) {
+        ignored = true;
+        break;
+      }
+    }
+    if (!ignored) result.push_back(value);
+  }
+  return result;
+}
+
+bool CoverageDB::CoveredTransitionIsIgnored(
+    const std::vector<int64_t>& covered, const std::vector<int64_t>& ignored) {
+  // The covered sequence is removed when the ignored sequence appears within it
+  // contiguously: every occurrence of the covered sequence then necessarily
+  // matches the ignored one as well (LRM 19.5.5).
+  if (ignored.empty()) return false;
+  if (ignored.size() > covered.size()) return false;
+  for (size_t start = 0; start + ignored.size() <= covered.size(); ++start) {
+    bool match = true;
+    for (size_t i = 0; i < ignored.size(); ++i) {
+      if (covered[start + i] != ignored[i]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return true;
+  }
+  return false;
+}
+
+bool CoverageDB::IgnoredValueAffectsTransition(
+    int64_t /*ignored_value*/, const std::vector<int64_t>& /*transition*/) {
+  // Ignoring a single value never removes a transition that passes through it
+  // (LRM 19.5.5).
+  return false;
+}
+
+bool CoverageDB::IgnoreTransitionLengthLegal(bool sequence_bounded) {
+  // An ignored transition sequence of unbounded or undetermined length is
+  // illegal; only a bounded sequence is allowed (LRM 19.5.5).
+  return sequence_bounded;
+}
+
 // --- LRM 19.7: instance coverage options ------------------------------------
 
 bool CoverageDB::OptionWeightValid(int32_t weight) {
