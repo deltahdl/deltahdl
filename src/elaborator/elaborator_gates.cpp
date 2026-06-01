@@ -74,6 +74,19 @@ void ValidateBidirectionalSwitchConnections(const ModuleItem* item,
   const auto& terms = item->gate_terminals;
   if (terms.size() < 2) return;
 
+  // §6.6.2: a uwire net allows only a single driver, so it shall not be
+  // connected to a bidirectional terminal of a bidirectional pass switch
+  // (which is itself a potential driver). The first two terminals are the
+  // bidirectional ones for every tran/tranif variant.
+  for (size_t i = 0; i < 2; ++i) {
+    auto* net = TerminalNet(terms[i], mod);
+    if (net && net->net_type == NetType::kUwire) {
+      diag.Error(item->loc,
+                 "uwire net cannot connect to a bidirectional terminal of a "
+                 "bidirectional pass switch");
+    }
+  }
+
   bool is_resistive = (kind == GateKind::kRtran ||
                        kind == GateKind::kRtranif0 ||
                        kind == GateKind::kRtranif1);

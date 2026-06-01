@@ -57,6 +57,85 @@ TEST(UwireElaboration, UwireNetDeclAssignPlusContinuousAssignError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(UwireElaboration, MultipleContinuousAssignmentsOnPlainWireOk) {
+  // The single-driver restriction is specific to uwire: an ordinary wire
+  // resolves multiple drivers, so two continuous assignments are not an error.
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  wire w;\n"
+      "  assign w = 1'b0;\n"
+      "  assign w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(UwireElaboration, UwireOnBidirectionalSwitchTerminalError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  uwire a;\n"
+      "  wire b;\n"
+      "  tran sw(a, b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(UwireElaboration, UwireOnSecondBidirectionalTerminalError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  wire a;\n"
+      "  uwire b;\n"
+      "  wire ctrl;\n"
+      "  tranif1 sw(a, b, ctrl);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(UwireElaboration, UwireBitSelectOnBidirectionalTerminalError) {
+  // Connecting a single bit of a uwire net to a bidirectional terminal is
+  // still connecting (a bit of) a uwire net, so it is an error.
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  uwire [1:0] u;\n"
+      "  wire w;\n"
+      "  tran sw(u[0], w);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(UwireElaboration, UwireOnResistiveBidirectionalSwitchTerminalError) {
+  // The restriction applies to every bidirectional pass switch variant,
+  // including the resistive rtran.
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  uwire a;\n"
+      "  wire b;\n"
+      "  rtran sw(a, b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(UwireElaboration, PlainWireOnBidirectionalSwitchTerminalOk) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  wire a;\n"
+      "  wire b;\n"
+      "  tran sw(a, b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(UwireElaboration, UwireVectorWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
