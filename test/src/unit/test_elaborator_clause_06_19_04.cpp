@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, EnumArithNoCast_Error) {
+TEST(EnumNumericalExpr, EnumArithNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -23,7 +23,7 @@ TEST(Elaboration, EnumArithNoCast_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, EnumToIntAutocast_Ok) {
+TEST(EnumNumericalExpr, EnumToIntAutocast_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top();\n"
@@ -36,7 +36,7 @@ TEST(Elaboration, EnumToIntAutocast_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, EnumAssignToInt_Ok) {
+TEST(EnumNumericalExpr, EnumAssignToInt_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top();\n"
@@ -49,7 +49,7 @@ TEST(Elaboration, EnumAssignToInt_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, EnumIntComparison_Ok) {
+TEST(EnumNumericalExpr, EnumIntComparison_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top();\n"
@@ -63,7 +63,7 @@ TEST(Elaboration, EnumIntComparison_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, EnumExprAssignNoCast_Error) {
+TEST(EnumNumericalExpr, EnumExprAssignNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -78,7 +78,7 @@ TEST(Elaboration, EnumExprAssignNoCast_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, EnumCastExprAssign_Ok) {
+TEST(EnumNumericalExpr, EnumCastExprAssign_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top();\n"
@@ -94,7 +94,7 @@ TEST(Elaboration, EnumCastExprAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, EnumAddTwoEnumsToInt_Ok) {
+TEST(EnumNumericalExpr, EnumAddTwoEnumsToInt_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top();\n"
@@ -114,7 +114,27 @@ TEST(Elaboration, EnumAddTwoEnumsToInt_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, EnumIncrementNoCast_Error) {
+// 6.19.4: a cast to an enum type converts the expression to the base type
+// without checking the value's validity, so casting an out-of-range value into
+// an enum is accepted. Here Su (a Week member, value 6) is cast into the
+// three-member Colors enum; the cast is legal even though 6 names no Colors.
+TEST(EnumNumericalExpr, EnumCastOutOfRange_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {Red, Green, Blue} Colors;\n"
+      "  typedef enum {Mo, Tu, We, Th, Fr, Sa, Su} Week;\n"
+      "  initial begin\n"
+      "    Colors C;\n"
+      "    C = Colors'(Su);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(EnumNumericalExpr, EnumIncrementNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -123,21 +143,6 @@ TEST(Elaboration, EnumIncrementNoCast_Error) {
       "    Colors C;\n"
       "    C = Red;\n"
       "    C++;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(Elaboration, EnumDecrementNoCast_Error) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  typedef enum {Red, Green, Blue} Colors;\n"
-      "  initial begin\n"
-      "    Colors C;\n"
-      "    C = Blue;\n"
-      "    C--;\n"
       "  end\n"
       "endmodule\n",
       f);
