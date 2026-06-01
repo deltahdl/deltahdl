@@ -1,8 +1,10 @@
 #include "simulator/coverage.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -127,6 +129,9 @@ void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
     matched_defined = true;
     if (bin.kind == CoverBinKind::kIllegal) continue;
     if (bin.kind == CoverBinKind::kIgnore) continue;
+    // A per-bin iff guard that is false at this sampling point suppresses the
+    // increment for this bin (LRM 19.5.1).
+    if (bin.has_iff_guard && !bin.iff_guard_value) continue;
     ++bin.hit_count;
   }
   if (!matched_defined) {
@@ -428,6 +433,115 @@ bool CoverageDB::CrossBareVariableAllowed(bool variable_is_real) {
   return !variable_is_real;
 }
 
+// --- LRM 19.5.1: specifying bins for values ---------------------------------
+
+std::string CoverageDB::StateBinName(std::string_view base, int64_t index) {
+  return std::string(base) + "[" + std::to_string(index) + "]";
+}
+
+std::vector<CoverBin> CoverageDB::OpenArrayValueBins(
+    std::string_view base, const std::vector<int64_t>& values) {
+  std::vector<CoverBin> bins;
+  for (int64_t value : values) {
+    // A value already given a bin is not given another, so overlapping ranges
+    // collapse to one bin per distinct value (LRM 19.5.1).
+    bool seen = false;
+    for (const auto& existing : bins) {
+      if (!existing.values.empty() && existing.values.front() == value) {
+        seen = true;
+        break;
+      }
+    }
+    if (seen) continue;
+    CoverBin bin;
+    bin.name = StateBinName(base, value);
+    bin.kind = CoverBinKind::kExplicit;
+    bin.values = {value};
+    bins.push_back(std::move(bin));
+  }
+  return bins;
+}
+
+// Renders a real value the way coverage bin names present it: a plain decimal
+// that always shows a fractional point (e.g. 1.0, 0.75, -100.1).
+static std::string FormatReal(double value) {
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "%g", value);
+  std::string text(buf);
+  if (text.find('.') == std::string::npos &&
+      text.find('e') == std::string::npos &&
+      text.find('n') == std::string::npos) {
+    text += ".0";
+  }
+  return text;
+}
+
+std::vector<RealInterval> CoverageDB::RealRangeIntervals(double low, double high,
+                                                         double interval,
+                                                         bool uses_dollar) {
+  std::vector<RealInterval> result;
+  // A range bounded by the $ primary is assigned to a single bin and is never
+  // divided into intervals (LRM 19.5.1).
+  if (uses_dollar) {
+    result.push_back({low, high, true});
+    return result;
+  }
+  constexpr double kEps = 1e-9;
+  double width = high - low;
+  // A range no wider than one interval becomes a single interval, inclusive of
+  // both endpoints (LRM 19.5.1).
+  if (interval <= 0.0 || width <= interval + kEps) {
+    result.push_back({low, high, true});
+    return result;
+  }
+  int count = static_cast<int>(std::ceil(width / interval - kEps));
+  if (count < 1) count = 1;
+  for (int i = 0; i < count; ++i) {
+    bool last = (i == count - 1);
+    double lo = low + static_cast<double>(i) * interval;
+    // The last partition runs to the range's high value (it may be shorter than
+    // the interval) and is the only one inclusive of its high value
+    // (LRM 19.5.1).
+    double hi = last ? high : low + static_cast<double>(i + 1) * interval;
+    result.push_back({lo, hi, last});
+  }
+  return result;
+}
+
+std::string CoverageDB::RealIntervalBinName(std::string_view base,
+                                            const RealInterval& interval) {
+  return std::string(base) + "[" + FormatReal(interval.low) + ":" +
+         FormatReal(interval.high) + (interval.high_inclusive ? "]" : ")");
+}
+
+std::string CoverageDB::RealValueBinName(std::string_view base, double value) {
+  return std::string(base) + "[" + FormatReal(value) + "]";
+}
+
+static bool IntervalsIdentical(const RealInterval& a, const RealInterval& b) {
+  constexpr double kEps = 1e-9;
+  return std::fabs(a.low - b.low) < kEps && std::fabs(a.high - b.high) < kEps &&
+         a.high_inclusive == b.high_inclusive;
+}
+
+std::vector<RealInterval> CoverageDB::MergeIdenticalIntervals(
+    const std::vector<RealInterval>& intervals) {
+  std::vector<RealInterval> merged;
+  for (const auto& iv : intervals) {
+    bool duplicate = false;
+    for (const auto& kept : merged) {
+      if (IntervalsIdentical(iv, kept)) {
+        duplicate = true;
+        break;
+      }
+    }
+    if (!duplicate) merged.push_back(iv);
+  }
+  return merged;
+}
+
+bool CoverageDB::RealDefaultBinMayBeArray() { return false; }
+
 // --- LRM 19.5.1.1: coverpoint bin "with" expressions ------------------------
 
 std::vector<int64_t> CoverageDB::ApplyWithExpression(
@@ -442,7 +556,7 @@ std::vector<int64_t> CoverageDB::ApplyWithExpression(
   return selected;
 }
 
-static std::vector<std::vector<int64_t>> DistributeValues(
+std::vector<std::vector<int64_t>> CoverageDB::DistributeValues(
     const std::vector<int64_t>& values, uint32_t num_bins) {
   std::vector<std::vector<int64_t>> bins;
   if (num_bins == 0) return bins;

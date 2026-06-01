@@ -30,6 +30,21 @@ struct CoverBin {
   std::vector<std::vector<int64_t>> transitions;
   uint64_t hit_count = 0;
   uint32_t at_least = 1;
+  // Per-bin guard from a trailing "iff" on a value bin definition: when the
+  // guard expression is false at a sampling point, the bin's count is not
+  // incremented (LRM 19.5.1).
+  bool has_iff_guard = false;
+  bool iff_guard_value = true;
+};
+
+// One partition of a real coverpoint range. A real bin may divide a range of
+// real values into intervals; each interval includes its low value and excludes
+// its high value, except the final interval of a range, which also includes its
+// high value (LRM 19.5.1).
+struct RealInterval {
+  double low = 0.0;
+  double high = 0.0;
+  bool high_inclusive = false;
 };
 
 struct CoverPoint {
@@ -266,6 +281,60 @@ class CoverageDB {
   // participate in a cross through an explicitly declared coverpoint of a real
   // expression (LRM 19.6).
   static bool CrossBareVariableAllowed(bool variable_is_real);
+
+  // --- LRM 19.5.1: specifying bins for values -------------------------------
+
+  // Distributes a covergroup_range_list's items across a fixed number of bins.
+  // B = floor(total / num_bins), but not less than 1; the first B items go to
+  // the first bin, the next B to the next, and so on, with the last bin
+  // absorbing any remainder. Duplicate items are retained, so the same value
+  // can land in more than one bin. When num_bins exceeds the item count, the
+  // trailing bins are left empty. The same distribution applies to a real
+  // coverpoint, whose items are the intervals of its ranges plus its individual
+  // values (LRM 19.5.1).
+  static std::vector<std::vector<int64_t>> DistributeValues(
+      const std::vector<int64_t>& values, uint32_t num_bins);
+
+  // Names one element of an integral state bin array. For an open array
+  // "name[]" the argument is the matched value, so names read "name[value]";
+  // for a sized array "name[N]" it is the ordinal position, ranging from 0
+  // through N-1 (LRM 19.5.1).
+  static std::string StateBinName(std::string_view base, int64_t index);
+
+  // Builds the open-array integral bins for "name[]": one bin per distinct
+  // value of the range list, named "name[value]". A value listed more than once
+  // (e.g. via overlapping ranges) still yields a single bin; first-occurrence
+  // order is preserved (LRM 19.5.1).
+  static std::vector<CoverBin> OpenArrayValueBins(
+      std::string_view base, const std::vector<int64_t>& values);
+
+  // Partitions a real range [low, high] into intervals of the given real
+  // interval size. A range no wider than one interval yields a single inclusive
+  // interval; a wider range is split into interval-size partitions, the last of
+  // which may be shorter and is inclusive of high. A range bounded with the $
+  // primary is never divided and always yields a single bin (LRM 19.5.1).
+  static std::vector<RealInterval> RealRangeIntervals(double low, double high,
+                                                      double interval,
+                                                      bool uses_dollar);
+
+  // Names a real interval bin. A square bracket denotes an inclusive endpoint,
+  // a parenthesis an exclusive one (LRM 19.5.1).
+  static std::string RealIntervalBinName(std::string_view base,
+                                         const RealInterval& interval);
+
+  // Names a real bin covering a single individual value (LRM 19.5.1).
+  static std::string RealValueBinName(std::string_view base, double value);
+
+  // Merges intervals that are exactly identical when an open real bin array
+  // spans several ranges. Two intervals merge only when both endpoints and
+  // their inclusivity agree; intervals that share endpoints but differ in
+  // inclusivity are kept separate (LRM 19.5.1).
+  static std::vector<RealInterval> MergeIdenticalIntervals(
+      const std::vector<RealInterval>& intervals);
+
+  // A default bin for a real coverpoint cannot be an array of bins: neither the
+  // [] form nor the [N] form is allowed (LRM 19.5.1).
+  static bool RealDefaultBinMayBeArray();
 
   // --- LRM 19.5.1.1: coverpoint bin "with" expressions ----------------------
 
