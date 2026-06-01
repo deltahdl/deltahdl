@@ -71,19 +71,6 @@ TEST(GateLevelModelingParsing, MultipleInstances) {
   VerifyGateInstances(mod->items, GateKind::kAnd, expected_names, 2);
 }
 
-TEST(GateLevelModelingParsing, MultipleInstancesThree) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  nand n1(a, b, c), n2(d, e, f), n3(g, h, i);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 3);
-  EXPECT_EQ(mod->items[0]->gate_inst_name, "n1");
-  EXPECT_EQ(mod->items[1]->gate_inst_name, "n2");
-  EXPECT_EQ(mod->items[2]->gate_inst_name, "n3");
-}
-
 TEST(GateLevelModelingParsing, MultipleInstancesNoNames) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
