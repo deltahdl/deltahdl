@@ -603,6 +603,91 @@ bool CoverageDB::WithRangeReferenceAllowed(std::string_view self_name,
   return self_name == referenced_name;
 }
 
+// --- LRM 19.5.2: specifying bins for transitions ----------------------------
+
+bool CoverageDB::TransitionBinAllowed(const CoverPoint* cp) {
+  // Transition bins of real values are not allowed (LRM 19.5.2).
+  return !cp->is_real;
+}
+
+bool CoverageDB::TransitionLengthLegal(size_t sample_points) {
+  // A length-0 transition specification (one sample point, no transition) is
+  // illegal; a valid transition spans at least two successive points
+  // (LRM 19.5.2).
+  return sample_points >= 2;
+}
+
+std::vector<std::vector<int64_t>> CoverageDB::ExpandSetTransition(
+    const std::vector<std::vector<int64_t>>& steps) {
+  // The set transition expands to every ordered combination that picks one
+  // value from each step in turn (LRM 19.5.2).
+  std::vector<std::vector<int64_t>> result;
+  if (steps.empty()) return result;
+  result.push_back({});
+  for (const auto& step : steps) {
+    std::vector<std::vector<int64_t>> next;
+    for (const auto& prefix : result) {
+      for (int64_t value : step) {
+        std::vector<int64_t> seq = prefix;
+        seq.push_back(value);
+        next.push_back(std::move(seq));
+      }
+    }
+    result = std::move(next);
+  }
+  return result;
+}
+
+std::vector<std::vector<int64_t>> CoverageDB::ExpandConsecutiveRepeat(
+    const std::vector<int64_t>& item, uint32_t lo, uint32_t hi) {
+  // For each repetition count in [lo, hi] the item's values are concatenated
+  // that many times, yielding one concrete sequence per count (LRM 19.5.2).
+  std::vector<std::vector<int64_t>> result;
+  if (hi < lo) return result;
+  for (uint32_t n = lo; n <= hi; ++n) {
+    std::vector<int64_t> seq;
+    seq.reserve(item.size() * n);
+    for (uint32_t r = 0; r < n; ++r) {
+      seq.insert(seq.end(), item.begin(), item.end());
+    }
+    result.push_back(std::move(seq));
+  }
+  return result;
+}
+
+std::string CoverageDB::TransitionArrayBinName(
+    std::string_view base, const std::vector<int64_t>& transition) {
+  std::string name(base);
+  name += "[";
+  for (size_t i = 0; i < transition.size(); ++i) {
+    if (i != 0) name += "=>";
+    name += std::to_string(transition[i]);
+  }
+  name += "]";
+  return name;
+}
+
+bool CoverageDB::TransitionRepeatBounded(TransitionRepeatKind kind) {
+  // Consecutive repetition has a determined length; the goto and nonconsecutive
+  // forms can vary in length and are unbounded (LRM 19.5.2).
+  return kind == TransitionRepeatKind::kConsecutive;
+}
+
+bool CoverageDB::MultipleBinsAllowsTransition(bool sequence_bounded) {
+  // The "[]" notation requires a bounded transition; an unbounded sequence with
+  // it is an error (LRM 19.5.2).
+  return sequence_bounded;
+}
+
+bool CoverageDB::DefaultSequenceAllowsMultipleBins() { return false; }
+
+bool CoverageDB::DefaultSequenceTransitionIncrements(
+    bool any_nondefault_incremented, bool any_pending) {
+  // The default sequence bin counts only when no other transition bin fired on
+  // this sample and nothing remains pending (LRM 19.5.2).
+  return !any_nondefault_incremented && !any_pending;
+}
+
 // --- LRM 19.7: instance coverage options ------------------------------------
 
 bool CoverageDB::OptionWeightValid(int32_t weight) {

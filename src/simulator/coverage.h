@@ -214,6 +214,16 @@ enum class InstanceOptionKind : uint8_t {
   kGetInstCoverage,
 };
 
+// The repetition a transition item may carry inside a transition bin (LRM
+// 19.5.2). Consecutive repetition repeats a value at successive sample points;
+// the goto and nonconsecutive forms permit intervening samples and mirror the
+// assertion repetitions of §16.9.2.
+enum class TransitionRepeatKind : uint8_t {
+  kConsecutive,     // trans_item [* repeat_range]
+  kGoto,            // trans_item [-> repeat_range]
+  kNonconsecutive,  // trans_item [= repeat_range]
+};
+
 class CoverageDB {
  public:
   CoverGroup* CreateGroup(std::string name);
@@ -362,6 +372,61 @@ class CoverageDB {
   // is permitted (LRM 19.5.1.1).
   static bool WithRangeReferenceAllowed(std::string_view self_name,
                                         std::string_view referenced_name);
+
+  // --- LRM 19.5.2: specifying bins for transitions --------------------------
+
+  // A trans_list specifies ordered integral value transitions of the coverage
+  // point; transition bins of a real coverpoint are not allowed (LRM 19.5.2).
+  static bool TransitionBinAllowed(const CoverPoint* cp);
+
+  // A transition bin specification must describe at least one transition, i.e.
+  // two successive sample points. A specification of "length 0" — a single
+  // value range, or a single value range whose repeat_range evaluates to 1 —
+  // is illegal. Returns true when the spec spans at least two sample points
+  // (LRM 19.5.2).
+  static bool TransitionLengthLegal(size_t sample_points);
+
+  // Expands a set transition such as "range_list1 => range_list2" into the
+  // individual ordered transitions it denotes. Each step is the list of values
+  // permitted at that sample point; the result is the Cartesian product taken
+  // in order, so {{1,5},{6,7}} yields 1=>6, 1=>7, 5=>6, 5=>7 (LRM 19.5.2).
+  static std::vector<std::vector<int64_t>> ExpandSetTransition(
+      const std::vector<std::vector<int64_t>>& steps);
+
+  // Expands a consecutive repetition "item [* lo:hi]" into one concrete
+  // sequence per repetition count in [lo, hi]: the item's values are repeated
+  // n times for each n. A single count (lo == hi) yields a single sequence;
+  // e.g. {3} [*3:5] yields 3=>3=>3, 3=>3=>3=>3 and 3=>3=>3=>3=>3 (LRM 19.5.2).
+  static std::vector<std::vector<int64_t>> ExpandConsecutiveRepeat(
+      const std::vector<int64_t>& item, uint32_t lo, uint32_t hi);
+
+  // Names one element of a transition bin array declared as "name[]". The bin
+  // name embeds the bounded transition it matched, e.g. "name[4=>5=>6]"
+  // (LRM 19.5.2).
+  static std::string TransitionArrayBinName(
+      std::string_view base, const std::vector<int64_t>& transition);
+
+  // A consecutive repetition has a determined length; the goto and
+  // nonconsecutive repetitions vary in length and are therefore unbounded
+  // (LRM 19.5.2).
+  static bool TransitionRepeatBounded(TransitionRepeatKind kind);
+
+  // Transitions of unbounded or undetermined varying length cannot be used with
+  // the multiple bins construct (the "[]" notation); attempting to do so is an
+  // error. Returns true only when the transition sequence has a bounded length
+  // (LRM 19.5.2).
+  static bool MultipleBinsAllowsTransition(bool sequence_bounded);
+
+  // A default sequence specification does not accept multiple transition bins:
+  // the "[]" notation is not allowed on it (LRM 19.5.2).
+  static bool DefaultSequenceAllowsMultipleBins();
+
+  // A default sequence transition bin is incremented for a sample only when no
+  // other nondefault transition bin of the coverpoint increments on that sample
+  // and none of the coverpoint's previously pending transition sequences
+  // remains pending (LRM 19.5.2).
+  static bool DefaultSequenceTransitionIncrements(bool any_nondefault_incremented,
+                                                  bool any_pending);
 
   // --- LRM 19.7: instance coverage options ----------------------------------
 
