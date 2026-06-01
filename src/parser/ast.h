@@ -686,6 +686,11 @@ struct ModuleItem {
   std::vector<SpecifyItem*> specify_items;
 
   ModuleDecl* nested_module_decl = nullptr;
+
+  // §19.4.1: for the embedded-covergroup inheritance form
+  // `covergroup extends base ;`, the covergroup_identifier of the base
+  // covergroup being extended. Empty for a covergroup that is not derived.
+  std::string_view covergroup_extends_base;
 };
 
 enum class ModuleDeclKind : uint8_t {
@@ -796,6 +801,11 @@ struct ClassMember {
   ModuleItem* typedef_item = nullptr;
 
   ClassDecl* nested_class = nullptr;
+
+  // §19.4.1: when this member is a derived covergroup declared with the
+  // embedded inheritance form `covergroup extends base ;`, the
+  // covergroup_identifier of the base covergroup. Empty otherwise.
+  std::string_view covergroup_extends_base;
 };
 
 struct InterfaceRef {

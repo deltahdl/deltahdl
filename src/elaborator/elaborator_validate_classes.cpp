@@ -1794,6 +1794,46 @@ void Elaborator::ValidateEmbeddedCovergroupAssign() {
   }
 }
 
+// §19.4.1: a derived embedded covergroup, written `covergroup extends base ;`,
+// inherits the covergroup named by `base`. It shall be an error to use the
+// extends form when no covergroup of that name has previously been defined in a
+// base class of the enclosing class. The search starts at the immediate base
+// class and follows the inheritance chain upward; a covergroup defined in the
+// derived class itself does not satisfy the requirement.
+static bool BaseClassDefinesCovergroup(const ClassDecl* cls,
+                                       std::string_view cg_name,
+                                       const CompilationUnit* unit) {
+  for (const ClassDecl* base =
+           cls->base_class.empty() ? nullptr
+                                   : FindClassDecl(cls->base_class, unit);
+       base; base = base->base_class.empty()
+                        ? nullptr
+                        : FindClassDecl(base->base_class, unit)) {
+    for (const auto* m : base->members) {
+      if (m->kind == ClassMemberKind::kCovergroup && m->name == cg_name) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+void Elaborator::ValidateDerivedCovergroupBase() {
+  for (const auto* cls : unit_->classes) {
+    for (const auto* m : cls->members) {
+      if (m->kind != ClassMemberKind::kCovergroup) continue;
+      if (m->covergroup_extends_base.empty()) continue;
+      if (!BaseClassDefinesCovergroup(cls, m->covergroup_extends_base, unit_)) {
+        diag_.Error(
+            m->loc,
+            std::format("derived covergroup cannot extend '{}': no covergroup "
+                        "of that name is defined in a base class",
+                        m->covergroup_extends_base));
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateClassMethodBodies(const ModuleDecl* decl) {
   for (const auto* cls : unit_->classes) {
     for (const auto* m : cls->members) {

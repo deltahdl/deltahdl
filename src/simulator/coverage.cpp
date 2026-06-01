@@ -1,5 +1,6 @@
 #include "simulator/coverage.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -687,6 +688,42 @@ double CoverageDB::ComputeOverallCoverage(
   // zero — yields full coverage (LRM 19.11).
   if (denominator == 0) return 100.0;
   return numerator / static_cast<double>(denominator);
+}
+
+void CoverageDB::ApplyDerivedCoverpointOverrides(
+    CoverGroup* base,
+    const std::vector<std::string>& derived_coverpoint_names) {
+  // LRM 19.4.1: a derived coverpoint whose name matches a base coverpoint
+  // overrides it; the overridden base coverpoint no longer contributes to the
+  // coverage computation.
+  for (CoverPoint& cp : base->coverpoints) {
+    if (std::find(derived_coverpoint_names.begin(),
+                  derived_coverpoint_names.end(),
+                  cp.name) != derived_coverpoint_names.end()) {
+      cp.excluded_from_coverage = true;
+    }
+  }
+}
+
+void CoverageDB::ApplyDerivedCrossOverrides(
+    CoverGroup* base, const std::vector<std::string>& derived_cross_names) {
+  // LRM 19.4.1: a base cross stops contributing only when the derived covergroup
+  // defines a cross with the same name. A base cross whose coverpoint was
+  // overridden still contributes as long as no derived cross shares its name.
+  for (CrossCover& cross : base->crosses) {
+    if (std::find(derived_cross_names.begin(), derived_cross_names.end(),
+                  cross.name) != derived_cross_names.end()) {
+      cross.excluded_from_coverage = true;
+    }
+  }
+}
+
+bool CoverageDB::CovergroupTypesAggregate(std::string_view type_a,
+                                          std::string_view type_b) {
+  // LRM 19.4.1: only instances of the same covergroup type aggregate for type
+  // coverage. A derived covergroup names a different type than its base, so the
+  // two never aggregate.
+  return type_a == type_b;
 }
 
 }

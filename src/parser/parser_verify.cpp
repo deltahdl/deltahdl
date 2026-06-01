@@ -441,13 +441,25 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   item->kind = ModuleItemKind::kCovergroupDecl;
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwCovergroup);
-  item->name = Expect(TokenKind::kIdentifier).text;
+
+  if (Check(TokenKind::kKwExtends)) {
+    // §19.4.1 embedded covergroup inheritance: the derived covergroup is
+    // written `covergroup extends base ;` with no fresh name of its own. The
+    // covergroup_identifier that follows `extends` names the base covergroup,
+    // and the derived covergroup takes that same name so every reference to it
+    // resolves to the derived instance.
+    Consume();
+    auto base = Expect(TokenKind::kIdentifier);
+    item->name = base.text;
+    item->covergroup_extends_base = base.text;
+  } else {
+    item->name = Expect(TokenKind::kIdentifier).text;
+    if (Match(TokenKind::kKwExtends)) {
+      item->covergroup_extends_base = ExpectIdentifier().text;
+    }
+  }
 
   known_types_.insert(item->name);
-
-  if (Match(TokenKind::kKwExtends)) {
-    ExpectIdentifier();
-  }
 
   std::vector<std::string> covergroup_formals;
   if (Check(TokenKind::kLParen)) {

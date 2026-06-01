@@ -364,6 +364,34 @@ class CoverageDB {
   static double ComputeOverallCoverage(
       const std::vector<const CoverGroup*>& instances);
 
+  // --- LRM 19.4.1: embedded covergroup inheritance --------------------------
+
+  // When a derived covergroup defines a coverpoint whose name is identical to a
+  // coverpoint in the base covergroup, that base coverpoint no longer
+  // contributes to the coverage computation. Marks every base coverpoint whose
+  // name appears among the derived covergroup's coverpoint names as excluded so
+  // the covergroup average (LRM 19.11) drops it (LRM 19.4.1).
+  static void ApplyDerivedCoverpointOverrides(
+      CoverGroup* base, const std::vector<std::string>& derived_coverpoint_names);
+
+  // Even when a base coverpoint no longer contributes, a cross in the base
+  // covergroup that includes that coverpoint still contributes to the
+  // computation — unless the derived covergroup defines a cross with the same
+  // name, which overrides it. Marks only the base crosses whose names appear
+  // among the derived covergroup's cross names as excluded; all other base
+  // crosses keep contributing regardless of overridden coverpoints (LRM
+  // 19.4.1).
+  static void ApplyDerivedCrossOverrides(
+      CoverGroup* base, const std::vector<std::string>& derived_cross_names);
+
+  // For the purposes of get_coverage(), a derived covergroup and its base
+  // covergroup are separate types; no aggregation occurs across them. Two
+  // covergroup instances aggregate for type coverage only when they are the
+  // same covergroup type, so a base type name and a derived type name never
+  // aggregate (LRM 19.4.1).
+  static bool CovergroupTypesAggregate(std::string_view type_a,
+                                       std::string_view type_b);
+
  private:
   void SampleCoverPoint(CoverPoint* cp, int64_t value);
   void SampleCross(CrossCover* cross,

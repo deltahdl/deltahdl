@@ -443,7 +443,12 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
     member->kind = ClassMemberKind::kCovergroup;
     std::vector<ModuleItem*> temp;
     ParseCovergroupDecl(temp);
-    if (!temp.empty()) member->name = temp[0]->name;
+    if (!temp.empty()) {
+      member->name = temp[0]->name;
+      // §19.4.1: carry the extended base covergroup name onto the class member
+      // so a derived embedded covergroup can be recognized in class scope.
+      member->covergroup_extends_base = temp[0]->covergroup_extends_base;
+    }
     members.push_back(member);
     return true;
   }

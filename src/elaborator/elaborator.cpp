@@ -1132,6 +1132,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateEmbeddedCovergroupAssign();
 
+  ValidateDerivedCovergroupBase();
+
   ValidateConstClassProperties();
 
   ValidateVirtualMethodOverrides();

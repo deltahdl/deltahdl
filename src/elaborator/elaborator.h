@@ -407,6 +407,7 @@ class Elaborator {
   void ValidateOneClassDefaultKeyword(const ClassDecl* cls);
 
   void ValidateEmbeddedCovergroupAssign();
+  void ValidateDerivedCovergroupBase();
 
   void ValidateLocalProtectedAccess(const ModuleDecl* decl);
 
