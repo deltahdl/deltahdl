@@ -369,4 +369,66 @@ TEST(SignedUnsignedArithmetic,
   EXPECT_FALSE(uresult.is_signed);
 }
 
+// §11.4.3.1: real operands use a floating-point representation, so a difference
+// that is both negative and fractional is preserved exactly rather than being
+// truncated or losing its sign.
+TEST(SignedUnsignedArithmetic, RealArithmeticPreservesNegativeFraction) {
+  SimFixture f;
+  MakeRealVar(f, "rc", 2.0);
+  MakeRealVar(f, "rd", 7.5);
+  auto* expr = MakeBinary(f.arena, TokenKind::kMinus, MakeId(f.arena, "rc"),
+                          MakeId(f.arena, "rd"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_TRUE(result.is_real);
+  EXPECT_DOUBLE_EQ(ToDouble(result), -5.5);
+}
+
+// §11.4.3.1: converting a signed value into an unsigned target keeps the bit
+// pattern; only the interpretation changes. Signed -1 stored into an unsigned
+// int retains its all-ones bits and reads back as an unsigned quantity.
+TEST(SignedUnsignedArithmetic, EndToEndSignedToUnsignedConversionKeepsBits) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int s;\n"
+      "  int unsigned u;\n"
+      "  initial begin\n"
+      "    s = -1;\n"
+      "    u = s;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("u");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(),
+            static_cast<uint64_t>(static_cast<uint32_t>(-1)));
+  EXPECT_FALSE(var->is_signed);
+}
+
+// §11.4.3.1: the reverse conversion likewise preserves the stored bits. An
+// all-ones unsigned value placed into a signed int keeps its bit pattern while
+// the destination's signed interpretation now applies.
+TEST(SignedUnsignedArithmetic, EndToEndUnsignedToSignedConversionKeepsBits) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] u;\n"
+      "  int s;\n"
+      "  initial begin\n"
+      "    u = 32'hFFFFFFFF;\n"
+      "    s = u;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("s");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(),
+            static_cast<uint64_t>(static_cast<uint32_t>(-1)));
+  EXPECT_TRUE(var->is_signed);
+}
+
 }
