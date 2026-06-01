@@ -169,6 +169,22 @@ TEST(SingleSourceNetsElaboration,
 }
 
 TEST(SingleSourceNetsElaboration,
+     ExternalUwireNetConnectedToInternalWirePortNoWarning) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input wire a);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  uwire x;\n"
+      "  child u(.a(x));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(SingleSourceNetsElaboration,
      UwirePortLeftUnconnectedNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
