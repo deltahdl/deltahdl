@@ -897,25 +897,13 @@ static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
   return StmtResult::kDone;
 }
 
-static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
-                                         Arena& arena) {
-  if (!stmt->expr || stmt->expr->kind != ExprKind::kIdentifier) {
-    return StmtResult::kDone;
-  }
-  auto* var = ctx.FindVariable(stmt->expr->text);
-  if (!var) return StmtResult::kDone;
-
-  if (var->is_null_event) return StmtResult::kDone;
-
-  uint64_t delay = 0;
-  if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();
-
-  auto event_name = stmt->expr->text;
+// Schedules the nonblocking-assignment-region update event that fires a named
+// event: it marks the event triggered and wakes every process waiting on it.
+// Shared by both the delay/immediate and the event-control forms of ->>.
+static void ScheduleNbEventTrigger(Variable* var, std::string_view event_name,
+                                   SimTime time, bool reactive,
+                                   SimContext& ctx) {
   auto& sched = ctx.GetScheduler();
-  auto time = ctx.CurrentTime();
-  time.ticks += delay;
-
-  bool reactive = ctx.IsReactiveContext();
   auto* nba_event = sched.GetEventPool().Acquire();
   nba_event->callback = [var, event_name, reactive, &ctx]() {
     ctx.SetEventTriggered(event_name);
@@ -929,8 +917,63 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
       s.ScheduleEvent(ctx.CurrentTime(), wake_region, ev);
     }
   };
-  sched.ScheduleEvent(time, reactive ? Region::kReNBA : Region::kNBA,
-                      nba_event);
+  sched.ScheduleEvent(time, reactive ? Region::kReNBA : Region::kNBA, nba_event);
+}
+
+// The event-control form of ->> reuses the same detached-process machinery that
+// an intra-assignment event on a nonblocking assignment uses; declared here,
+// defined alongside that machinery below.
+static uint64_t EvalRepeatCount(const Expr* count_expr, SimContext& ctx,
+                                Arena& arena);
+static void SpawnNbaEventProcess(SimCoroutine coro, SimContext& ctx,
+                                 Arena& arena);
+static SimCoroutine NbEventTriggerEventCoroutine(const Stmt* stmt,
+                                                 Variable* var,
+                                                 std::string_view event_name,
+                                                 uint64_t count, bool reactive,
+                                                 SimContext& ctx, Arena& arena);
+
+static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
+                                         Arena& arena) {
+  if (!stmt->expr || stmt->expr->kind != ExprKind::kIdentifier) {
+    return StmtResult::kDone;
+  }
+  auto* var = ctx.FindVariable(stmt->expr->text);
+  if (!var) return StmtResult::kDone;
+
+  if (var->is_null_event) return StmtResult::kDone;
+
+  auto event_name = stmt->expr->text;
+  bool reactive = ctx.IsReactiveContext();
+
+  // Event-control form: ->> @(...) ev  or  ->> repeat(n) @(...) ev. The update
+  // event is created when the event control occurs (after n occurrences for the
+  // repeat form), not immediately. ->> never blocks the issuing process, so the
+  // wait happens in a spawned process.
+  if (!stmt->events.empty()) {
+    uint64_t count = 1;
+    if (stmt->repeat_event_count) {
+      count = EvalRepeatCount(stmt->repeat_event_count, ctx, arena);
+      if (count == 0) {
+        ScheduleNbEventTrigger(var, event_name, ctx.CurrentTime(), reactive,
+                               ctx);
+        return StmtResult::kDone;
+      }
+    }
+    SpawnNbaEventProcess(
+        NbEventTriggerEventCoroutine(stmt, var, event_name, count, reactive,
+                                     ctx, arena),
+        ctx, arena);
+    return StmtResult::kDone;
+  }
+
+  // Delay form (or no timing control): the update event is created when the
+  // optional delay expires.
+  uint64_t delay = 0;
+  if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();
+  auto time = ctx.CurrentTime();
+  time.ticks += delay;
+  ScheduleNbEventTrigger(var, event_name, time, reactive, ctx);
   return StmtResult::kDone;
 }
 
@@ -1471,6 +1514,21 @@ static StmtResult ExecNbaWithEvent(const Stmt* stmt, SimContext& ctx,
                          arena);
   }
   return StmtResult::kDone;
+}
+
+// Detached waiter for the event-control form of ->>: blocks (off the issuing
+// process) until the event control has occurred the required number of times,
+// then creates the nonblocking-region update event that fires the named event.
+static SimCoroutine NbEventTriggerEventCoroutine(const Stmt* stmt,
+                                                 Variable* var,
+                                                 std::string_view event_name,
+                                                 uint64_t count, bool reactive,
+                                                 SimContext& ctx,
+                                                 Arena& arena) {
+  for (uint64_t i = 0; i < count; ++i) {
+    co_await EventAwaiter{ctx, stmt->events, arena};
+  }
+  ScheduleNbEventTrigger(var, event_name, ctx.CurrentTime(), reactive, ctx);
 }
 
 static StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {

@@ -28,6 +28,15 @@ TEST(EventTriggerElaborator, NonblockingTriggerWithDelayElaborates) {
       "endmodule\n"));
 }
 
+TEST(EventTriggerElaborator, NonblockingTriggerWithEventControlElaborates) {
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  event ev;\n"
+      "  logic clk;\n"
+      "  initial ->> @(posedge clk) ev;\n"
+      "endmodule\n"));
+}
+
 TEST(EventTriggerElaborator, TriggerAndWaitElaborates) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"

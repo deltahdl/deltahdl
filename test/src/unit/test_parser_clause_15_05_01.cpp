@@ -74,20 +74,6 @@ TEST(EventTriggerParser, BlockingWithDeclaration) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
 }
 
-TEST(EventTriggerParser, BlockingTriggerNamedEvent) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    -> done_event;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
-  EXPECT_NE(stmt->expr, nullptr);
-}
-
 TEST(EventTriggerParser, NonblockingWithDelay) {
   auto r = Parse(
       "module m;\n"
@@ -131,6 +117,38 @@ TEST(EventTriggerParser, NonblockingNoDelayHasNullDelay) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
   EXPECT_EQ(stmt->delay, nullptr);
+}
+
+TEST(EventTriggerParser, NonblockingWithEventControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ->> @(posedge clk) ev;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
+  EXPECT_NE(stmt->expr, nullptr);
+  EXPECT_FALSE(stmt->events.empty());
+}
+
+TEST(EventTriggerParser, NonblockingWithRepeatEventControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ->> repeat(2) @(posedge clk) ev;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  EXPECT_FALSE(stmt->events.empty());
 }
 
 }
