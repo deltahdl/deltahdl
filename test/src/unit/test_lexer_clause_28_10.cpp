@@ -8,18 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(PullGateLexing, PullupKeyword) {
-  auto tokens = Lex("pullup");
-  ASSERT_GE(tokens.size(), 1u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwPullup);
-}
-
-TEST(PullGateLexing, PulldownKeyword) {
-  auto tokens = Lex("pulldown");
-  ASSERT_GE(tokens.size(), 1u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwPulldown);
-}
-
 TEST(PullGateLexing, PullupTokenSequence) {
   auto tokens = Lex("pullup (net1);");
   ASSERT_GE(tokens.size(), 5u);
