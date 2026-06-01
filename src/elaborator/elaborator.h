@@ -480,6 +480,7 @@ class Elaborator {
 
   void ValidateClockvarAccess(const ModuleDecl* decl);
   void ValidateCycleDelayDefaultClocking(const ModuleDecl* decl);
+  void ValidateIntraAssignCycleDelay(const ModuleDecl* decl);
   void ValidateDuplicateDefaultClocking(const ModuleDecl* decl);
   void ValidateDefaultClockingReference(const ModuleDecl* decl);
   void ValidateDuplicateGlobalClocking(const ModuleDecl* decl);

@@ -1814,6 +1814,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ValidateLhsPatternWidths(decl, mod);
   ValidateClockvarAccess(decl);
   ValidateCycleDelayDefaultClocking(decl);
+  ValidateIntraAssignCycleDelay(decl);
   ValidateDuplicateDefaultClocking(decl);
   ValidateDefaultClockingReference(decl);
   ValidateDuplicateGlobalClocking(decl);
