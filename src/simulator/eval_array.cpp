@@ -784,8 +784,11 @@ static bool AssocStrTraversal(AssocArrayObject* aa, std::string_view method,
     out = MakeLogic4VecVal(arena, 32, 1);
     return true;
   }
-  auto it = m.find(cur_key);
-  if (it == m.end() || it == m.begin()) {
+  // §7.9.7 — prev() yields the largest index strictly smaller than the
+  // argument value. The argument need not itself be a stored index, so locate
+  // the lower bound by value and step back to its predecessor.
+  auto it = m.lower_bound(cur_key);
+  if (it == m.begin()) {
     out = MakeLogic4VecVal(arena, 32, 0);
     return true;
   }
@@ -836,8 +839,11 @@ static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
     out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(r));
     return true;
   }
-  auto it = m.find(cur_key);
-  if (it == m.end() || it == m.begin()) {
+  // §7.9.7 — prev() yields the largest index strictly smaller than the
+  // argument value. The argument need not itself be a stored index, so locate
+  // the lower bound by value and step back to its predecessor.
+  auto it = m.lower_bound(cur_key);
+  if (it == m.begin()) {
     out = MakeLogic4VecVal(arena, 32, 0);
     return true;
   }
