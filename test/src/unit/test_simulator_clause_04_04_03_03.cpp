@@ -148,3 +148,33 @@ TEST(PliPreNbaSim, PreNBAReadWriteInActiveRegionSetContext) {
   EXPECT_EQ(active_sample, 10);
   EXPECT_EQ(nba_sample, 55);
 }
+
+// Edge case: an event created from within a Pre-NBA callback that lands back in
+// the Pre-NBA region of the same time slot must still drain before any NBA event
+// is evaluated. Exercises the scheduler's iterative draining of the region so the
+// "create events before NBA" guarantee holds even for re-entrant scheduling.
+TEST(PliPreNbaSim, PreNBAReentrantEventStillRunsBeforeNBA) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+
+  auto* nba = sched.GetEventPool().Acquire();
+  nba->callback = [&]() { order.push_back("nba"); };
+  sched.ScheduleEvent({0}, Region::kNBA, nba);
+
+  auto* pre_nba = sched.GetEventPool().Acquire();
+  pre_nba->callback = [&]() {
+    order.push_back("pre_nba");
+
+    auto* again = sched.GetEventPool().Acquire();
+    again->callback = [&order]() { order.push_back("pre_nba_reentrant"); };
+    sched.ScheduleEvent({0}, Region::kPreNBA, again);
+  };
+  sched.ScheduleEvent({0}, Region::kPreNBA, pre_nba);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 3u);
+  EXPECT_EQ(order[0], "pre_nba");
+  EXPECT_EQ(order[1], "pre_nba_reentrant");
+  EXPECT_EQ(order[2], "nba");
+}
