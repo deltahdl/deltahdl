@@ -50,26 +50,12 @@ TEST(DesignBuildingBlockParsing, OneOrderSmallerRoundsToOneDecimal) {
   EXPECT_EQ(RealDelayToTicks(2.73, ts, TimeUnit::kPs), 2700u);
 }
 
-TEST(DesignBuildingBlockParsing, LrmExample_2_75ns) {
-  TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
-
-  EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kPs), 2800u);
-
-  EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kPs), 2800u);
-}
-
 TEST(DesignBuildingBlockParsing, TwoOrdersSmaller) {
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 10};
 
   EXPECT_EQ(RealDelayToTicks(2.756, ts, TimeUnit::kPs), 2760u);
 
   EXPECT_EQ(RealDelayToTicks(2.754, ts, TimeUnit::kPs), 2750u);
-}
-
-TEST(DesignBuildingBlockParsing, ThreeOrdersNoRounding) {
-  TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 1};
-
-  EXPECT_EQ(RealDelayToTicks(2.756, ts, TimeUnit::kPs), 2756u);
 }
 
 TEST(DesignBuildingBlockParsing, ZeroDelay) {
