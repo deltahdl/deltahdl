@@ -146,6 +146,14 @@ struct VpiObject {
   int size = 0;
   int index = 0;
 
+  // §6.9.2: the advisory accessibility keyword a vector net was declared with.
+  // At most one is set. They drive how the PLI reports the net's expansion
+  // through vpi_get(vpiExplicitScalared/vpiExplicitVectored/vpiExpanded): a
+  // scalared net is always reported expanded; a vectored net is reported
+  // unexpanded.
+  bool is_vectored = false;
+  bool is_scalared = false;
+
   // §37.3.7: declared lifetime. False means the object is static; true means it
   // is non-static (an automatic variable or a dynamic object). Static is the
   // default.

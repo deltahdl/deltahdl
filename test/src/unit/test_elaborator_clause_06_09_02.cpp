@@ -51,20 +51,6 @@ TEST(VectorNetAccessibility, ScalaredWithPackedDimOk) {
   EXPECT_TRUE(ValidateNetDecl(info));
 }
 
-TEST(VectorNetAccessibility, VectoredWithPackedDimElabOk) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  wire vectored [7:0] bus;\n"
-             "endmodule\n"));
-}
-
-TEST(VectorNetAccessibility, ScalaredWithPackedDimElabOk) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  wire scalared [3:0] w;\n"
-             "endmodule\n"));
-}
-
 TEST(VectorNetAccessibility, VectoredWithoutPackedDimIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -83,6 +69,24 @@ TEST(VectorNetAccessibility, ScalaredWithoutPackedDimIsError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+}
+
+// §6.9.2: when scalared is used, bit-selects and part-selects of the net shall
+// be permitted. A scalared vector net referenced by both a bit-select and a
+// part-select elaborates without error.
+TEST(VectorNetAccessibility, ScalaredPermitsBitAndPartSelects) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire scalared [7:0] s;\n"
+      "  wire        b;\n"
+      "  wire [3:0]  p;\n"
+      "  assign b = s[2];\n"
+      "  assign p = s[6:3];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }

@@ -1350,6 +1350,18 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // event was inferred (rather than explicit) as a Boolean property.
     case vpiIsClockInferred:
       return obj->clock_inferred ? 1 : 0;
+    // §6.9.2: the advisory vector-net accessibility keywords, reported as
+    // Boolean properties. vpiExplicitScalared/vpiExplicitVectored each report
+    // whether that keyword was written on the declaration. vpiExpanded reports
+    // whether the PLI treats the net as expanded: a scalared net shall be
+    // expanded, while a vectored net is reported unexpanded; a net declared
+    // with neither keyword defaults to expanded.
+    case vpiExplicitScalared:
+      return obj->is_scalared ? 1 : 0;
+    case vpiExplicitVectored:
+      return obj->is_vectored ? 1 : 0;
+    case vpiExpanded:
+      return obj->is_vectored ? 0 : 1;
     // §37.49: the integer components of an assertion's source span.
     case vpiStartLine:
       return obj->start_line;

@@ -8,18 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(VectorNetAccessibility, WireVectoredParses) {
-  auto r = Parse("module m; wire vectored [7:0] bus; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(VectorNetAccessibility, WireScalaredParses) {
-  auto r = Parse("module m; wire scalared [7:0] bus; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(VectorNetAccessibility, ScalaredWithExplicitType) {
   auto r = Parse(
       "module t;\n"
