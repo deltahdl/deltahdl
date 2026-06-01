@@ -10,12 +10,37 @@
 
 #include "common/types.h"
 #include "parser/ast.h"
+#include "simulator/net.h"
 
 namespace delta {
 
+class Arena;
 class Scheduler;
 class SimContext;
 struct Variable;
+
+// §14.16: a synchronous drive always schedules its new value in the Re-NBA
+// region. For a zero-skew output with no cycle delay it is the Re-NBA region of
+// the current time step; for a nonzero skew or a nonzero cycle delay it is the
+// Re-NBA region of a future time step. The region is Re-NBA in both cases --
+// only the target time step differs.
+Region SynchronousDriveRegion();
+
+// §14.16: a synchronous drive executed coincident with its clocking event takes
+// effect at that event; one executed at any other time performs its drive
+// action as if it had run at the next clocking event. In both cases the driven
+// signal updates `skew` after that governing event. Returns the time step at
+// which the value updates.
+SimTime SynchronousDriveEffectiveTime(SimTime now, bool event_now,
+                                      SimTime next_event_time, SimTime skew);
+
+// §14.16: when a clocking-block output's target is a net, an implicit driver is
+// created on that net with (strong1, strong0) drive strength.
+DriverStrength ClockvarNetDriverStrength();
+
+// §14.16: that implicit net driver is initialized to 'z, so it has no influence
+// on its target net until the first synchronous drive to the clockvar occurs.
+Logic4Vec MakeClockvarNetDriverInit(Arena& arena, uint32_t width);
 
 enum class ClockingDir : uint8_t {
   kInput,

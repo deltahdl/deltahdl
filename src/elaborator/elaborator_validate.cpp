@@ -4403,6 +4403,87 @@ void Elaborator::ValidateContAssignToClockvar(const ModuleDecl* decl) {
   }
 }
 
+// §14.16: a synchronous drive reaches a clocking-block output (or inout)
+// through a member access such as cb.sig, optionally wrapped in a bit-select
+// or slice (cb.sig[2], cb.sig[8:2]). Returns true when `e` designates such a
+// writable clockvar. Input clockvars are excluded here; writes to them are
+// rejected separately by the clockvar-access check.
+bool Elaborator::ExprTargetsWritableClockvar(const Expr* e) const {
+  while (e != nullptr && e->kind == ExprKind::kSelect) e = e->base;
+  if (e == nullptr || e->kind != ExprKind::kMemberAccess || e->lhs == nullptr ||
+      e->lhs->kind != ExprKind::kIdentifier)
+    return false;
+  auto block_it = clocking_signals_.find(e->lhs->text);
+  if (block_it == clocking_signals_.end()) return false;
+  std::string_view member;
+  if (e->rhs && e->rhs->kind == ExprKind::kIdentifier)
+    member = e->rhs->text;
+  else if (!e->text.empty())
+    member = e->text;
+  if (member.empty()) return false;
+  auto sig_it = block_it->second.find(member);
+  if (sig_it == block_it->second.end()) return false;
+  return sig_it->second.direction == Direction::kOutput ||
+         sig_it->second.direction == Direction::kInout;
+}
+
+void Elaborator::WalkStmtsForSyncDriveForm(const Stmt* s) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign) {
+    if (ExprTargetsWritableClockvar(s->lhs)) {
+      // §14.16: the only timing control permitted on a synchronous drive is a
+      // leading cycle delay (## ...). A regular intra-assignment delay (# ...)
+      // is not a legal form of synchronous drive to a clockvar.
+      if (s->delay != nullptr) {
+        diag_.Error(s->delay->range.start,
+                    "intra-assignment delay (#) is not a legal synchronous "
+                    "drive to a clocking output variable");
+      }
+    }
+    // §14.16: the clockvar_expression of a synchronous drive is a bit-select,
+    // slice, or whole clockvar; a concatenation target is not allowed.
+    if (s->lhs != nullptr && s->lhs->kind == ExprKind::kConcatenation) {
+      for (const auto* elem : s->lhs->elements) {
+        if (ExprTargetsWritableClockvar(elem)) {
+          diag_.Error(s->lhs->range.start,
+                      "a concatenation is not a legal synchronous drive target "
+                      "for a clocking output variable");
+          break;
+        }
+      }
+    }
+  } else if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
+    // §14.16: writing to a clockvar by any means other than a synchronous
+    // drive is an error; procedural continuous assignment (assign/force) is
+    // explicitly disallowed.
+    if (ExprTargetsWritableClockvar(s->lhs)) {
+      diag_.Error(s->lhs->range.start,
+                  "procedural continuous assignment (assign/force) to a "
+                  "clocking output variable is not allowed");
+    }
+  }
+  for (auto* sub : s->stmts) WalkStmtsForSyncDriveForm(sub);
+  WalkStmtsForSyncDriveForm(s->then_branch);
+  WalkStmtsForSyncDriveForm(s->else_branch);
+  WalkStmtsForSyncDriveForm(s->body);
+  WalkStmtsForSyncDriveForm(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForSyncDriveForm(ci.body);
+}
+
+void Elaborator::ValidateSyncDriveForm(const ModuleDecl* decl) {
+  if (clocking_signals_.empty()) return;
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body) WalkStmtsForSyncDriveForm(item->body);
+  }
+}
+
 static void WalkStmtsForSequenceEvents(
     Stmt* s, const std::unordered_set<std::string_view>& seq_names,
     bool in_automatic, DiagEngine& diag) {

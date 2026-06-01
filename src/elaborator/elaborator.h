@@ -488,6 +488,9 @@ class Elaborator {
   void ValidateContAssignToClockvar(const ModuleDecl* decl);
   void WalkStmtsForClockvarAccess(const Stmt* s);
   void CheckClockvarAccessExpr(const Expr* e, bool is_lvalue);
+  void ValidateSyncDriveForm(const ModuleDecl* decl);
+  void WalkStmtsForSyncDriveForm(const Stmt* s);
+  bool ExprTargetsWritableClockvar(const Expr* e) const;
 
   void ValidateAssocConcatTarget(const ModuleDecl* decl);
   void WalkStmtsForAssocConcatTarget(const Stmt* s);

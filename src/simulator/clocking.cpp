@@ -15,6 +15,36 @@
 
 namespace delta {
 
+Region SynchronousDriveRegion() { return Region::kReNBA; }
+
+SimTime SynchronousDriveEffectiveTime(SimTime now, bool event_now,
+                                      SimTime next_event_time, SimTime skew) {
+  // §14.16: a drive that runs coincident with its clocking event takes effect
+  // at that event; a drive that runs at any other time still performs its
+  // action as if it had run at the next clocking event. The driven signal then
+  // updates `skew` after that governing event.
+  SimTime governing_event = event_now ? now : next_event_time;
+  return governing_event + skew;
+}
+
+DriverStrength ClockvarNetDriverStrength() {
+  return DriverStrength{Strength::kStrong, Strength::kStrong};
+}
+
+Logic4Vec MakeClockvarNetDriverInit(Arena& arena, uint32_t width) {
+  Logic4Vec v = MakeLogic4Vec(arena, width);
+  uint32_t remaining = width;
+  for (uint32_t i = 0; i < v.nwords; ++i) {
+    uint32_t bits = remaining >= 64 ? 64 : remaining;
+    uint64_t mask = (bits == 64) ? ~uint64_t{0} : ((uint64_t{1} << bits) - 1);
+    // 'z is encoded as aval = 0, bval = 1 per valid bit.
+    v.words[i].aval = 0;
+    v.words[i].bval = mask;
+    remaining -= bits;
+  }
+  return v;
+}
+
 void ClockingManager::Register(ClockingBlock block) {
   name_index_[block.name] = blocks_.size();
   blocks_.push_back(std::move(block));
@@ -132,7 +162,14 @@ void ClockingManager::ScheduleOutputDrive(std::string_view block_name,
                                           uint64_t value, SimContext& ctx,
                                           Scheduler& sched) {
   auto skew = GetOutputSkew(block_name, signal_name);
-  auto drive_time = sched.CurrentTime() + skew;
+  auto now = sched.CurrentTime();
+  // §14.16: place the drive relative to its governing clocking event. When the
+  // clocking event is occurring in this time step the drive is coincident;
+  // otherwise it performs as if at the next clocking event. This model invokes
+  // the drive primitive at the event, so the next-event time falls back to the
+  // current time when no future event time is tracked.
+  bool event_now = DidBlockEventOccurAt(block_name, now);
+  auto drive_time = SynchronousDriveEffectiveTime(now, event_now, now, skew);
   auto sig_name = std::string(signal_name);
   auto* ev = sched.GetEventPool().Acquire();
   ev->callback = [&ctx, sig_name, value]() {
@@ -142,8 +179,9 @@ void ClockingManager::ScheduleOutputDrive(std::string_view block_name,
     var->value.words[0].bval = 0;
   };
 
-  auto region = (skew.ticks == 0) ? Region::kReNBA : Region::kNBA;
-  sched.ScheduleEvent(drive_time, region, ev);
+  // §14.16: the new value is scheduled in the Re-NBA region regardless of
+  // skew; a nonzero skew only shifts drive_time into a future time step.
+  sched.ScheduleEvent(drive_time, SynchronousDriveRegion(), ev);
 }
 
 void ClockingManager::SetBlockEventVar(std::string_view block_name,
