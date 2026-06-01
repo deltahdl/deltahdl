@@ -83,4 +83,47 @@ TEST(AssocMethods, AssocArgCallerUnchangedEndToEnd) {
   EXPECT_EQ(v, 42u);
 }
 
+// A string-keyed associative array passed by value must reach the callee with
+// its entries copied, so the formal observes the actual's value. Exercises the
+// production str_data copy in the real argument-binding path.
+TEST(AssocMethods, AssocArgStringKeyByValueEndToEnd) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  int result;\n"
+      "  function automatic int read_key(int x[string]);\n"
+      "    return x[\"k\"];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    aa[\"k\"] = 77;\n"
+      "    result = read_key(aa);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 77u);
+}
+
+// Because the copy is local, mutating a string-keyed formal inside the callee
+// leaves the caller's array untouched. Exercises the production binding path
+// rather than a hand-written copy.
+TEST(AssocMethods, AssocArgStringKeyCallerUnchangedEndToEnd) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  int dummy;\n"
+      "  int result;\n"
+      "  function automatic int mutate(int x[string]);\n"
+      "    x[\"k\"] = 999;\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    aa[\"k\"] = 12;\n"
+      "    dummy = mutate(aa);\n"
+      "    result = aa[\"k\"];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 12u);
+}
+
 }
