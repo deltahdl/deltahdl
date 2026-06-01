@@ -528,6 +528,120 @@ void Elaborator::ValidateAssocWildcardTraversal(const ModuleDecl* decl) {
   }
 }
 
+// Section 7.9.8 -- the argument passed to one of the four associative-array
+// traversal methods (first/last/next/prev) shall be assignment compatible with
+// the array's index type. A string-indexed array therefore requires a string
+// argument and an integral-indexed array requires an integral argument; the two
+// categories are not assignment compatible with each other. A narrower integral
+// argument is still assignment compatible -- the resulting truncation is
+// resolved at run time and is not flagged during elaboration.
+enum class AssocKeyCategory { kOther, kStringKey, kIntegralKey };
+
+static AssocKeyCategory ClassifyAssocKey(std::string_view index_type,
+                                         const TypedefMap& typedefs) {
+  if (index_type == "string") return AssocKeyCategory::kStringKey;
+  auto builtin_integral = [](std::string_view t) {
+    return t == "bit" || t == "logic" || t == "reg" || t == "byte" ||
+           t == "shortint" || t == "int" || t == "longint" || t == "integer" ||
+           t == "time";
+  };
+  if (builtin_integral(index_type)) return AssocKeyCategory::kIntegralKey;
+  auto it = typedefs.find(index_type);
+  if (it != typedefs.end() && IsIntegralType(it->second.kind))
+    return AssocKeyCategory::kIntegralKey;
+  return AssocKeyCategory::kOther;
+}
+
+static bool TraversalArgIsString(const Expr* arg, const TypeMap& var_types) {
+  if (!arg || arg->kind != ExprKind::kIdentifier) return false;
+  auto it = var_types.find(arg->text);
+  return it != var_types.end() && it->second == DataTypeKind::kString;
+}
+
+static bool TraversalArgIsIntegral(const Expr* arg, const TypeMap& var_types) {
+  if (!arg || arg->kind != ExprKind::kIdentifier) return false;
+  auto it = var_types.find(arg->text);
+  return it != var_types.end() && IsIntegralType(it->second);
+}
+
+static void CheckTraversalArgTypeExpr(
+    const Expr* e,
+    const std::unordered_map<std::string_view, AssocKeyCategory>& assoc_keys,
+    const TypeMap& var_types, DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kCall && e->base &&
+      e->base->kind == ExprKind::kIdentifier && IsTraversalMethod(e->callee) &&
+      !e->args.empty()) {
+    auto it = assoc_keys.find(e->base->text);
+    if (it != assoc_keys.end()) {
+      const Expr* arg = e->args[0];
+      bool wrong =
+          (it->second == AssocKeyCategory::kStringKey &&
+           TraversalArgIsIntegral(arg, var_types)) ||
+          (it->second == AssocKeyCategory::kIntegralKey &&
+           TraversalArgIsString(arg, var_types));
+      if (wrong) {
+        diag.Error(arg ? arg->range.start : e->range.start,
+                   std::format("traversal method '{}' argument is not "
+                               "assignment compatible with the index type of "
+                               "associative array '{}'",
+                               e->callee, e->base->text));
+      }
+    }
+  }
+  CheckTraversalArgTypeExpr(e->lhs, assoc_keys, var_types, diag);
+  CheckTraversalArgTypeExpr(e->rhs, assoc_keys, var_types, diag);
+  CheckTraversalArgTypeExpr(e->base, assoc_keys, var_types, diag);
+  CheckTraversalArgTypeExpr(e->index, assoc_keys, var_types, diag);
+  CheckTraversalArgTypeExpr(e->index_end, assoc_keys, var_types, diag);
+  CheckTraversalArgTypeExpr(e->condition, assoc_keys, var_types, diag);
+  CheckTraversalArgTypeExpr(e->true_expr, assoc_keys, var_types, diag);
+  CheckTraversalArgTypeExpr(e->false_expr, assoc_keys, var_types, diag);
+  for (const auto* a : e->args)
+    CheckTraversalArgTypeExpr(a, assoc_keys, var_types, diag);
+  for (const auto* el : e->elems)
+    CheckTraversalArgTypeExpr(el, assoc_keys, var_types, diag);
+}
+
+static void WalkStmtsForTraversalArgType(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, AssocKeyCategory>& assoc_keys,
+    const TypeMap& var_types, DiagEngine& diag) {
+  if (!s) return;
+  CheckTraversalArgTypeExpr(s->lhs, assoc_keys, var_types, diag);
+  CheckTraversalArgTypeExpr(s->rhs, assoc_keys, var_types, diag);
+  CheckTraversalArgTypeExpr(s->expr, assoc_keys, var_types, diag);
+  CheckTraversalArgTypeExpr(s->condition, assoc_keys, var_types, diag);
+  for (auto* sub : s->stmts)
+    WalkStmtsForTraversalArgType(sub, assoc_keys, var_types, diag);
+  WalkStmtsForTraversalArgType(s->then_branch, assoc_keys, var_types, diag);
+  WalkStmtsForTraversalArgType(s->else_branch, assoc_keys, var_types, diag);
+  WalkStmtsForTraversalArgType(s->body, assoc_keys, var_types, diag);
+  WalkStmtsForTraversalArgType(s->for_body, assoc_keys, var_types, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForTraversalArgType(ci.body, assoc_keys, var_types, diag);
+}
+
+void Elaborator::ValidateAssocTraversalArgType(const ModuleDecl* decl) {
+  std::unordered_map<std::string_view, AssocKeyCategory> assoc_keys;
+  for (const auto& [name, info] : var_array_info_) {
+    if (!info.is_assoc || info.assoc_index_type == "*") continue;
+    auto cat = ClassifyAssocKey(info.assoc_index_type, typedefs_);
+    if (cat != AssocKeyCategory::kOther) assoc_keys[name] = cat;
+  }
+  if (assoc_keys.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckTraversalArgTypeExpr(item->assign_lhs, assoc_keys, var_types_, diag_);
+      CheckTraversalArgTypeExpr(item->assign_rhs, assoc_keys, var_types_, diag_);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body)
+      WalkStmtsForTraversalArgType(item->body, assoc_keys, var_types_, diag_);
+  }
+}
+
 // §7.12.2: the array ordering methods. reverse() and shuffle() take no with
 // clause, whereas sort() and rsort() accept an optional one.
 static bool IsArrayOrderingMethod(std::string_view name) {

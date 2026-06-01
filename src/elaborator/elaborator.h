@@ -267,6 +267,7 @@ class Elaborator {
   void ValidateAssocArraySlices(const ModuleDecl* decl);
 
   void ValidateAssocWildcardTraversal(const ModuleDecl* decl);
+  void ValidateAssocTraversalArgType(const ModuleDecl* decl);
 
   void ValidateArrayOrderingMethods(const ModuleDecl* decl);
 
