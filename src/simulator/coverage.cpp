@@ -84,26 +84,75 @@ CoverBin* CoverageDB::AddBin(CoverPoint* cp, CoverBin bin) {
   return &cp->bins.back();
 }
 
+bool CoverageDB::AutoBinsAllowed(const CoverPoint* cp) {
+  // Automatic bins are created for an integral coverpoint only; a real
+  // coverpoint never receives them (LRM 19.5.3).
+  return !cp->is_real;
+}
+
+uint64_t CoverageDB::AutoBinCount(uint32_t coverpoint_bits,
+                                  uint64_t auto_bin_max) {
+  // N = MIN(2^M, auto_bin_max), where M is the number of bits needed to
+  // represent the coverpoint. A coverpoint wide enough that 2^M overflows is
+  // capped by auto_bin_max in practice (LRM 19.5.3).
+  uint64_t two_pow_m =
+      coverpoint_bits >= 64 ? UINT64_MAX : (uint64_t{1} << coverpoint_bits);
+  return std::min(two_pow_m, auto_bin_max);
+}
+
+uint64_t CoverageDB::AutoBinCountEnum(uint64_t enum_cardinality) {
+  // One automatic bin per enumeration member (LRM 19.5.3).
+  return enum_cardinality;
+}
+
+bool CoverageDB::AutoBinSampleIncluded(bool sample_has_xz) {
+  // Automatically created bins consider 2-state values only; a sample whose
+  // value contains x or z is excluded (LRM 19.5.3).
+  return !sample_has_xz;
+}
+
+std::string CoverageDB::AutoBinName(int64_t low, int64_t high) {
+  // A single-value bin is named after that value; a bin spanning a range is
+  // named "auto[low:high]" (LRM 19.5.3).
+  if (low == high) return "auto[" + std::to_string(low) + "]";
+  return "auto[" + std::to_string(low) + ":" + std::to_string(high) + "]";
+}
+
+std::string CoverageDB::AutoEnumBinName(std::string_view constant_name) {
+  // For an enumerated type the bin name embeds the named constant (LRM 19.5.3).
+  return "auto[" + std::string(constant_name) + "]";
+}
+
 void CoverageDB::AutoCreateBins(CoverPoint* cp, int64_t min_val,
                                 int64_t max_val) {
+  // No automatic bins for a real coverpoint (LRM 19.5.3).
+  if (!AutoBinsAllowed(cp)) return;
   cp->auto_bin_min = min_val;
   cp->auto_bin_max = max_val;
   int64_t range = max_val - min_val + 1;
+  if (range <= 0) return;
+  // The number of bins is N = MIN(2^M, auto_bin_max); the [min,max] window the
+  // caller supplies carries the 2^M possible values and auto_bin_count carries
+  // the auto_bin_max limit (LRM 19.5.3).
   uint32_t bin_count = cp->auto_bin_count;
   if (static_cast<int64_t>(bin_count) > range) {
     bin_count = static_cast<uint32_t>(range);
   }
   if (bin_count == 0) return;
 
+  // Distribute the 2^M values uniformly across the N bins. When the count does
+  // not divide evenly, the last bin absorbs the remaining items, e.g. M=3, N=3
+  // yields {0,1}, {2,3}, {4,5,6,7} (LRM 19.5.3).
   int64_t per_bin = range / static_cast<int64_t>(bin_count);
-  int64_t remainder = range % static_cast<int64_t>(bin_count);
   int64_t cursor = min_val;
-
   for (uint32_t i = 0; i < bin_count; ++i) {
+    bool last = (i + 1 == bin_count);
+    int64_t count = last ? (max_val - cursor + 1) : per_bin;
+    int64_t low = cursor;
+    int64_t high = cursor + count - 1;
     CoverBin bin;
-    bin.name = "auto[" + std::to_string(i) + "]";
     bin.kind = CoverBinKind::kAuto;
-    int64_t count = per_bin + (static_cast<int64_t>(i) < remainder ? 1 : 0);
+    bin.name = AutoBinName(low, high);
     for (int64_t j = 0; j < count; ++j) {
       bin.values.push_back(cursor + j);
     }
@@ -242,20 +291,33 @@ void CoverageDB::Sample(
   }
 }
 
+// Whether a coverpoint bin contributes to the coverpoint's coverage numerator
+// and denominator. Illegal, ignore, and default bins never contribute (LRM
+// 19.5/19.5.6), and a bin with no associated value or transition is excluded
+// from both the numerator and the denominator (LRM 19.11.1).
+static bool BinParticipates(const CoverBin& bin) {
+  if (bin.kind == CoverBinKind::kIllegal) return false;
+  if (bin.kind == CoverBinKind::kIgnore) return false;
+  if (bin.kind == CoverBinKind::kDefault) return false;
+  if (bin.values.empty() && bin.transitions.empty()) return false;
+  return true;
+}
+
 double CoverageDB::GetPointCoverage(const CoverPoint* cp) {
   if (cp->bins.empty()) return 100.0;
   uint32_t total = 0;
   uint32_t covered = 0;
   for (const auto& bin : cp->bins) {
-    if (bin.kind == CoverBinKind::kIllegal) continue;
-    if (bin.kind == CoverBinKind::kIgnore) continue;
-    // Coverage shall not account for values captured by default bins (LRM
-    // 19.5).
-    if (bin.kind == CoverBinKind::kDefault) continue;
+    if (!BinParticipates(bin)) continue;
     ++total;
     if (bin.hit_count >= bin.at_least) ++covered;
   }
-  if (total == 0) return 100.0;
+  if (total == 0) {
+    // None of the bins has an associated value or transition, so the
+    // denominator is zero. A nonzero coverpoint weight reports 0.0; a zero
+    // weight reports 100.0 (LRM 19.11.1).
+    return cp->weight == 0 ? 100.0 : 0.0;
+  }
   return 100.0 * static_cast<double>(covered) / static_cast<double>(total);
 }
 
@@ -280,6 +342,10 @@ double CoverageDB::GetCoverage(const CoverGroup* group) {
   int64_t denominator = 0;
   for (const auto& cp : group->coverpoints) {
     if (cp.excluded_from_coverage) continue;
+    // A coverpoint whose own denominator is zero does not contribute to the
+    // covergroup average; it is dropped from both the numerator and the
+    // denominator (LRM 19.11.1).
+    if (PointCoverageDenominatorZero(&cp)) continue;
     numerator += static_cast<double>(cp.weight) * GetPointCoverage(&cp);
     denominator += cp.weight;
   }
@@ -317,9 +383,7 @@ void CoverageDB::SetInstName(CoverGroup* group, std::string name) {
 static void CountPointBins(const CoverPoint* cp, int32_t& covered,
                            int32_t& total) {
   for (const auto& bin : cp->bins) {
-    if (bin.kind == CoverBinKind::kIllegal) continue;
-    if (bin.kind == CoverBinKind::kIgnore) continue;
-    if (bin.kind == CoverBinKind::kDefault) continue;
+    if (!BinParticipates(bin)) continue;
     ++total;
     if (bin.hit_count >= bin.at_least) ++covered;
   }
@@ -354,6 +418,40 @@ double CoverageDB::GetCoverage(const CoverGroup* group, int32_t& covered_bins,
 double CoverageDB::GetInstCoverage(const CoverGroup* group,
                                    int32_t& covered_bins, int32_t& total_bins) {
   return GetCoverage(group, covered_bins, total_bins);
+}
+
+bool CoverageDB::PointCoverageDenominatorZero(const CoverPoint* cp) {
+  // The denominator is zero unless at least one bin participates in the
+  // coverage; a bin with no associated value or transition does not (LRM
+  // 19.11.1).
+  for (const auto& bin : cp->bins) {
+    if (BinParticipates(bin)) return false;
+  }
+  return true;
+}
+
+double CoverageDB::GetPointCoverage(const CoverPoint* cp, int32_t& covered_bins,
+                                    int32_t& total_bins) {
+  covered_bins = 0;
+  total_bins = 0;
+  // With a zero denominator the reported numerator and denominator are both
+  // zero (LRM 19.11.1). Otherwise they are the covered and participating bin
+  // counts.
+  if (PointCoverageDenominatorZero(cp)) return GetPointCoverage(cp);
+  CountPointBins(cp, covered_bins, total_bins);
+  return GetPointCoverage(cp);
+}
+
+uint32_t CoverageDB::CumulativeAtLeast(
+    const std::vector<uint32_t>& at_least_values) {
+  // For cumulative coverage a bin is not considered covered unless its hit count
+  // reaches the maximum of the at_least values of all instances; the maximum is
+  // the more conservative choice (LRM 19.11.1).
+  uint32_t result = 1;
+  for (uint32_t v : at_least_values) {
+    result = std::max(result, v);
+  }
+  return result;
 }
 
 double CoverageDB::GetGlobalCoverage() const {

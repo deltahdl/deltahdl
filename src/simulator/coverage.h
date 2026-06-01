@@ -454,6 +454,41 @@ class CoverageDB {
   static bool DefaultSequenceTransitionIncrements(bool any_nondefault_incremented,
                                                   bool any_pending);
 
+  // --- LRM 19.5.3: automatic bin creation for integral coverage points ------
+
+  // Bins are created automatically only for a coverpoint of an integral
+  // expression. A real coverpoint never receives automatically created bins, so
+  // this returns false for a real coverpoint (LRM 19.5.3).
+  static bool AutoBinsAllowed(const CoverPoint* cp);
+
+  // Number of automatic bins N for a non-enumeration integral coverpoint: the
+  // minimum of 2^M (M is the number of bits needed to represent the coverpoint)
+  // and the auto_bin_max option in effect. This same N is the denominator of the
+  // automatic-bin coverpoint coverage, MIN(auto_bin_max, 2^M) (LRM 19.11.1), so
+  // the two subclauses share this count.
+  static uint64_t AutoBinCount(uint32_t coverpoint_bits, uint64_t auto_bin_max);
+
+  // Number of automatic bins for an enumeration coverpoint: one bin per
+  // enumeration member, i.e. the cardinality of the enumeration. The auto_bin_max
+  // limit does not apply to an enumeration coverpoint (LRM 19.5.3).
+  static uint64_t AutoBinCountEnum(uint64_t enum_cardinality);
+
+  // A sampled value is collected into an automatic bin only when it is a 2-state
+  // value; a value containing x or z is excluded. Returns true when a sample
+  // with the given unknown-bit status is eligible for an automatic bin
+  // (LRM 19.5.3).
+  static bool AutoBinSampleIncluded(bool sample_has_xz);
+
+  // Name of an automatically created bin: "auto[value]" when the bin holds a
+  // single coverage point value (low == high) and "auto[low:high]" when it spans
+  // a range of values (LRM 19.5.3).
+  static std::string AutoBinName(int64_t low, int64_t high);
+
+  // Name of an automatically created bin of an enumeration coverpoint. The name
+  // embeds the named constant associated with the enumerated value rather than a
+  // numeric value: "auto[NAME]" (LRM 19.5.3).
+  static std::string AutoEnumBinName(std::string_view constant_name);
+
   // --- LRM 19.5.5: excluding coverage point values or transitions -----------
 
   // Removes every value named by an ignore_bins state set from a coverage bin's
@@ -586,6 +621,29 @@ class CoverageDB {
   // 100.0 (LRM 19.11).
   static double ComputeOverallCoverage(
       const std::vector<const CoverGroup*>& instances);
+
+  // --- LRM 19.11.1: coverpoint coverage computation -------------------------
+
+  // True when a coverpoint's coverage denominator is zero: none of its bins has
+  // an associated value or transition. A bin with neither is excluded from both
+  // the numerator and the denominator, and a coverpoint left with no such bin
+  // does not contribute to the covergroup coverage average (LRM 19.11.1).
+  static bool PointCoverageDenominatorZero(const CoverPoint* cp);
+
+  // The ref-int pair form of get_coverage()/get_inst_coverage() applied to a
+  // coverpoint: reports the number of covered bins and the number of bins that
+  // participate in the coverage (the numerator and denominator of the coverpoint
+  // coverage). When the denominator is zero, zero is reported for both counts
+  // (LRM 19.11.1).
+  static double GetPointCoverage(const CoverPoint* cp, int32_t& covered_bins,
+                                 int32_t& total_bins);
+
+  // The hit-count threshold a bin must reach to be considered covered in
+  // cumulative (type) coverage: the maximum of the at_least option values across
+  // all instances, which is the more conservative choice. With no instance
+  // values supplied the default at_least of 1 applies (LRM 19.11.1).
+  static uint32_t CumulativeAtLeast(
+      const std::vector<uint32_t>& at_least_values);
 
   // --- LRM 19.4.1: embedded covergroup inheritance --------------------------
 
