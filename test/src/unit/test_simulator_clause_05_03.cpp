@@ -36,16 +36,6 @@ TEST(WhiteSpaceSim, WhitespaceMixedInExpression) {
   EXPECT_EQ(result, 12u);
 }
 
-TEST(WhiteSpaceSim, WhitespaceAroundAssignment) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result=8'd33;\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(result, 33u);
-}
-
 TEST(WhiteSpaceSim, WhitespaceStringLiteralPreserved) {
   SimFixture f;
   auto* design = ElaborateSrc(

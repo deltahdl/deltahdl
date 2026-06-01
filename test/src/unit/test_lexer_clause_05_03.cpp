@@ -6,6 +6,34 @@ using namespace delta;
 
 namespace {
 
+TEST(LexicalConventionLexing, SpaceIsWhitespace) {
+  auto tokens = Lex("a b");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(LexicalConventionLexing, TabIsWhitespace) {
+  auto tokens = Lex("a\tb");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(LexicalConventionLexing, NewlineIsWhitespace) {
+  auto tokens = Lex("a\nb");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(LexicalConventionLexing, FormfeedIsWhitespace) {
+  auto tokens = Lex("a\fb");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
 TEST(LexicalConventionLexing, VerticalTabIsWhitespace) {
   auto tokens = Lex("a\vb");
   ASSERT_EQ(tokens.size(), 3u);

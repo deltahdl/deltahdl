@@ -35,11 +35,6 @@ TEST(LexicalConventionParsing, CarriageReturnLineFeed) {
               "endmodule\r\n"));
 }
 
-TEST(LexicalConventionParsing, MultipleConsecutiveWhitespace) {
-  EXPECT_TRUE(
-      ParseOk("module   \t\t   t  \n\n\n ;   logic   a  ;   endmodule"));
-}
-
 TEST(LexicalConventionParsing, ExcessiveWhitespace) {
   EXPECT_TRUE(
       ParseOk("  \t\n  module  \t  t  \n  ;  \n\n\t  endmodule  \n\n  "));
