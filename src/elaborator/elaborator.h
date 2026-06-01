@@ -384,6 +384,11 @@ class Elaborator {
 
   void CheckEnumAssignStmt(const Stmt* s);
 
+  // §6.19.3: strong typing also applies when an actual argument is bound to an
+  // enum-typed formal of a called subroutine.
+  void WalkExprForEnumCalls(const Expr* e);
+  void CheckEnumCallArguments(const Expr* call);
+
   void ValidateClassHandleOps(const ModuleDecl* decl);
 
   void WalkStmtsForClassHandleOps(const Stmt* s);

@@ -415,8 +415,61 @@ void Elaborator::CheckEnumAssignStmt(const Stmt* s) {
   diag_.Error(s->range.start, "integer assigned to enum variable without cast");
 }
 
+void Elaborator::CheckEnumCallArguments(const Expr* call) {
+  if (!call || call->kind != ExprKind::kCall) return;
+  // Restrict to free-function calls: a member/method receiver could share a
+  // name with a module function and must not be matched here.
+  if (call->lhs && call->lhs->kind != ExprKind::kIdentifier) return;
+  auto it = func_decls_.find(call->callee);
+  if (it == func_decls_.end() || it->second == nullptr) return;
+  const ModuleItem* fn = it->second;
+  // Positional binding only; a named association is left for the general
+  // argument-binding path and is not second-guessed by the strong-typing rule.
+  for (auto name : call->arg_names) {
+    if (!name.empty()) return;
+  }
+  size_t count = std::min(call->args.size(), fn->func_args.size());
+  for (size_t i = 0; i < count; ++i) {
+    const DataType& formal = fn->func_args[i].data_type;
+    bool formal_is_enum = formal.kind == DataTypeKind::kEnum;
+    if (!formal_is_enum && formal.kind == DataTypeKind::kNamed) {
+      auto t = typedefs_.find(formal.type_name);
+      formal_is_enum =
+          t != typedefs_.end() && t->second.kind == DataTypeKind::kEnum;
+    }
+    if (!formal_is_enum) continue;
+    const Expr* actual = call->args[i];
+    if (!actual) continue;
+    // Mirror the assignment rule: a bare name (an enum member or another enum
+    // of the same family) and an explicit cast are accepted; a plain integral
+    // value is rejected because it is not a member of the enumeration.
+    if (actual->kind == ExprKind::kIdentifier) continue;
+    if (actual->kind == ExprKind::kCast) continue;
+    diag_.Error(actual->range.start,
+                "integer value passed to enum argument without cast");
+  }
+}
+
+void Elaborator::WalkExprForEnumCalls(const Expr* e) {
+  if (!e) return;
+  CheckEnumCallArguments(e);
+  WalkExprForEnumCalls(e->lhs);
+  WalkExprForEnumCalls(e->rhs);
+  WalkExprForEnumCalls(e->condition);
+  WalkExprForEnumCalls(e->true_expr);
+  WalkExprForEnumCalls(e->false_expr);
+  WalkExprForEnumCalls(e->base);
+  WalkExprForEnumCalls(e->index);
+  WalkExprForEnumCalls(e->index_end);
+  for (auto* a : e->args) WalkExprForEnumCalls(a);
+  for (auto* el : e->elements) WalkExprForEnumCalls(el);
+}
+
 void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
   if (!s) return;
+  WalkExprForEnumCalls(s->rhs);
+  WalkExprForEnumCalls(s->expr);
+  WalkExprForEnumCalls(s->condition);
   if (s->kind == StmtKind::kVarDecl) {
     bool is_enum = false;
     if (s->var_decl_type.kind == DataTypeKind::kEnum) {
