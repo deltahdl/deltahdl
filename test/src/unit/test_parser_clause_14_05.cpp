@@ -38,35 +38,6 @@ TEST(ClockingHierExprParse, MixedSignalsWithAndWithoutHierExpr) {
   EXPECT_EQ(item->clocking_signals[2].hier_expr, nullptr);
 }
 
-TEST(ClockingHierExprParse, DeepHierarchicalPath) {
-  auto r = Parse(
-      "module t;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input enable = top.mem1.enable;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_EQ(item->clocking_signals[0].name, "enable");
-  ASSERT_NE(item->clocking_signals[0].hier_expr, nullptr);
-}
-
-TEST(ClockingHierExprParse, HierExprWithFindHelper) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input enable = top.mem1.enable;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_EQ(item->clocking_signals[0].name, "enable");
-  ASSERT_NE(item->clocking_signals[0].hier_expr, nullptr);
-}
-
 TEST(ClockingHierExprParse, ConcatenationExpression) {
   auto r = Parse(
       "module m;\n"

@@ -4023,6 +4023,33 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
   }
 }
 
+// §14.5: an expression bound to a clocking output (or inout) signal forwards to
+// a module output port, so it must be a legal output-port connection — that is,
+// an assignable target. Assignable forms are a simple name, a hierarchical
+// reference, a bit/part-select of one, or a concatenation of such targets.
+// Non-assignable forms (literals, operator expressions, calls, replications)
+// cannot drive an output port and are therefore rejected. Inputs impose no such
+// restriction, since any readable expression is a valid input-port connection.
+static bool IsLegalClockingOutputExpr(const Expr* e) {
+  if (e == nullptr) return false;
+  switch (e->kind) {
+    case ExprKind::kIdentifier:
+    case ExprKind::kMemberAccess:
+      return true;
+    case ExprKind::kSelect:
+      return IsLegalClockingOutputExpr(e->base);
+    case ExprKind::kConcatenation: {
+      if (e->elements.empty()) return false;
+      for (const Expr* el : e->elements) {
+        if (!IsLegalClockingOutputExpr(el)) return false;
+      }
+      return true;
+    }
+    default:
+      return false;
+  }
+}
+
 void Elaborator::ValidateClockingBlock(ModuleItem* item,
                                        const RtlirModule* mod) {
 
@@ -4045,6 +4072,24 @@ void Elaborator::ValidateClockingBlock(ModuleItem* item,
   for (const auto& sig : item->clocking_signals) {
     check_skew(sig.skew_delay);
     check_skew(sig.out_skew_delay);
+
+    // §14.5: a hierarchical expression bound to a clocking output or inout
+    // signal must be a legal output-port connection (an assignable target).
+    // A clocking inout is shorthand for an input and an output sharing the
+    // same signal, so it must meet the output-port rule as well — though a
+    // plain variable, being assignable, remains acceptable. Input signals are
+    // unconstrained here, as any readable expression is a valid input.
+    if (sig.hier_expr != nullptr &&
+        (sig.direction == Direction::kOutput ||
+         sig.direction == Direction::kInout) &&
+        !IsLegalClockingOutputExpr(sig.hier_expr)) {
+      diag_.Error(
+          sig.hier_expr->range.start,
+          std::format("clocking {} signal '{}' is bound to an expression that "
+                      "is not a legal output-port connection (§14.5)",
+                      sig.direction == Direction::kInout ? "inout" : "output",
+                      sig.name));
+    }
   }
 
   if (!item->name.empty()) {
