@@ -146,3 +146,55 @@ TEST(PliPreActiveSim, PreActiveReadWriteContrastWithPreponed) {
   EXPECT_EQ(preponed_sample, 0);
   EXPECT_EQ(active_sample, 55);
 }
+
+// Edge case for "create events before the Active region is evaluated": an event
+// created while inside Pre-Active that is itself scheduled into Pre-Active for
+// the current time slot must still be drained within the same Pre-Active pass,
+// ahead of any Active event.
+TEST(PliPreActiveSim, PreActiveCreatedPreActiveEventRunsBeforeActive) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+
+  auto* active = sched.GetEventPool().Acquire();
+  active->callback = [&]() { order.push_back("active"); };
+  sched.ScheduleEvent({0}, Region::kActive, active);
+
+  auto* pre_active = sched.GetEventPool().Acquire();
+  pre_active->callback = [&]() {
+    order.push_back("pre_active");
+    auto* again = sched.GetEventPool().Acquire();
+    again->callback = [&order]() { order.push_back("pre_active_created"); };
+    sched.ScheduleEvent({0}, Region::kPreActive, again);
+  };
+  sched.ScheduleEvent({0}, Region::kPreActive, pre_active);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 3u);
+  EXPECT_EQ(order[0], "pre_active");
+  EXPECT_EQ(order[1], "pre_active_created");
+  EXPECT_EQ(order[2], "active");
+}
+
+// Pre-Active is an unrestricted control point: writing values and creating
+// events from within it is explicitly permitted, unlike the read-only Preponed
+// and Postponed regions. The scheduler must not flag such activity as illegal.
+TEST(PliPreActiveSim, PreActiveWritesAndSchedulingAreNotFlaggedIllegal) {
+  Arena arena;
+  Scheduler sched(arena);
+
+  auto* pre_active = sched.GetEventPool().Acquire();
+  pre_active->callback = [&]() {
+    sched.NoteWriteAttempt();
+    auto* ev = sched.GetEventPool().Acquire();
+    ev->callback = []() {};
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, ev);
+  };
+  sched.ScheduleEvent({0}, Region::kPreActive, pre_active);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreponedWriteCount(), 0u);
+  EXPECT_EQ(sched.IllegalPostponedWriteCount(), 0u);
+  EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 0u);
+  EXPECT_EQ(sched.IllegalPostponedScheduleCount(), 0u);
+}
