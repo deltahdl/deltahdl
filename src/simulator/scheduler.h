@@ -104,6 +104,17 @@ class Scheduler {
     return illegal_observed_pli_count_;
   }
 
+  // §4.4.3.5: the Pre-Observed region is read-only - it is illegal to schedule
+  // an event into the current time slot or to write a net or variable from
+  // within it. Each violation attempt is tallied here.
+  size_t IllegalPreObservedScheduleCount() const {
+    return illegal_pre_observed_schedule_count_;
+  }
+
+  size_t IllegalPreObservedWriteCount() const {
+    return illegal_pre_observed_write_count_;
+  }
+
   size_t UpdateEventScheduledCount() const {
     return update_events_scheduled_count_;
   }
@@ -117,6 +128,8 @@ class Scheduler {
       ++illegal_preponed_write_count_;
     } else if (current_region_ == Region::kPostponed) {
       ++illegal_postponed_write_count_;
+    } else if (current_region_ == Region::kPreObserved) {
+      ++illegal_pre_observed_write_count_;
     }
   }
 
@@ -168,6 +181,8 @@ class Scheduler {
   size_t illegal_postponed_schedule_count_ = 0;
   size_t illegal_postponed_write_count_ = 0;
   size_t illegal_observed_pli_count_ = 0;
+  size_t illegal_pre_observed_schedule_count_ = 0;
+  size_t illegal_pre_observed_write_count_ = 0;
   size_t update_events_scheduled_count_ = 0;
   size_t evaluation_events_scheduled_count_ = 0;
   size_t mid_statement_suspension_count_ = 0;

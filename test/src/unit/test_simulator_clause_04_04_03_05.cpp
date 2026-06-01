@@ -6,7 +6,10 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "helpers_scheduler_event.h"
+#include "simulator/net.h"
 #include "simulator/scheduler.h"
+#include "simulator/variable.h"
+#include "simulator/vpi.h"
 
 using namespace delta;
 
@@ -60,14 +63,6 @@ TEST(PliPreObservedSim, PreObservedExecutesAfterEntireActiveRegionSet) {
   EXPECT_EQ(order[3], "pre_observed");
 }
 
-TEST(PliPreObservedSim, PreObservedIsAfterPostNBABeforeObserved) {
-  auto pre_observed_ord = static_cast<int>(Region::kPreObserved);
-  auto post_nba_ord = static_cast<int>(Region::kPostNBA);
-  auto observed_ord = static_cast<int>(Region::kObserved);
-  EXPECT_GT(pre_observed_ord, post_nba_ord);
-  EXPECT_LT(pre_observed_ord, observed_ord);
-}
-
 TEST(PliPreObservedSim, PreObservedRegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
@@ -103,28 +98,6 @@ TEST(PliPreObservedSim, PreObservedEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-TEST(PliPreObservedSim, PreObservedProvidesReadOnlySnapshotAfterActiveSet) {
-  Arena arena;
-  Scheduler sched(arena);
-  int a = 0;
-  int b = 0;
-  int sum_in_pre_observed = -1;
-
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() {
-    a = 10;
-    b = 20;
-  };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  auto* pre_obs = sched.GetEventPool().Acquire();
-  pre_obs->callback = [&]() { sum_in_pre_observed = a + b; };
-  sched.ScheduleEvent({0}, Region::kPreObserved, pre_obs);
-
-  sched.Run();
-  EXPECT_EQ(sum_in_pre_observed, 30);
-}
-
 TEST(PliPreObservedSim, PreObservedReadsFullyStabilizedActiveSetState) {
   Arena arena;
   Scheduler sched(arena);
@@ -155,4 +128,219 @@ TEST(PliPreObservedSim, PreObservedReadsFullyStabilizedActiveSetState) {
 
   sched.Run();
   EXPECT_EQ(sampled, 99);
+}
+
+// §4.4.3.5: within the Pre-Observed region it is illegal to schedule an event
+// within the current time slot. Scheduling into the current time slot from a
+// Pre-Observed callback is recorded as a violation.
+TEST(PliPreObservedSim, ScheduleIntoCurrentTimeSlotFromPreObservedIsFlagged) {
+  Arena arena;
+  Scheduler sched(arena);
+
+  auto* pre_obs = sched.GetEventPool().Acquire();
+  pre_obs->callback = [&]() {
+    auto* ev = sched.GetEventPool().Acquire();
+    ev->callback = []() {};
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kObserved, ev);
+  };
+  sched.ScheduleEvent({0}, Region::kPreObserved, pre_obs);
+
+  EXPECT_EQ(sched.IllegalPreObservedScheduleCount(), 0u);
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreObservedScheduleCount(), 1u);
+}
+
+TEST(PliPreObservedSim, MultipleIllegalSchedulesFromPreObservedAreEachCounted) {
+  Arena arena;
+  Scheduler sched(arena);
+
+  auto* pre_obs = sched.GetEventPool().Acquire();
+  pre_obs->callback = [&]() {
+    for (int i = 0; i < 3; ++i) {
+      auto* ev = sched.GetEventPool().Acquire();
+      ev->callback = []() {};
+      sched.ScheduleEvent(sched.CurrentTime(), Region::kObserved, ev);
+    }
+  };
+  sched.ScheduleEvent({0}, Region::kPreObserved, pre_obs);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreObservedScheduleCount(), 3u);
+}
+
+// Scheduling an event at a future time slot from a Pre-Observed callback is
+// legal - the restriction only bars events in the current time slot.
+TEST(PliPreObservedSim, FutureScheduleFromPreObservedIsNotFlagged) {
+  Arena arena;
+  Scheduler sched(arena);
+
+  auto* pre_obs = sched.GetEventPool().Acquire();
+  pre_obs->callback = [&]() {
+    auto* future = sched.GetEventPool().Acquire();
+    future->callback = []() {};
+    sched.ScheduleEvent({1}, Region::kActive, future);
+  };
+  sched.ScheduleEvent({0}, Region::kPreObserved, pre_obs);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreObservedScheduleCount(), 0u);
+}
+
+// A schedule into the current time slot from a non-Pre-Observed region carries
+// no Pre-Observed violation.
+TEST(PliPreObservedSim, ScheduleFromActiveIsNotFlaggedAgainstPreObserved) {
+  Arena arena;
+  Scheduler sched(arena);
+
+  auto* active = sched.GetEventPool().Acquire();
+  active->callback = [&]() {
+    auto* nba = sched.GetEventPool().Acquire();
+    nba->callback = []() {};
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
+  };
+  sched.ScheduleEvent({0}, Region::kActive, active);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreObservedScheduleCount(), 0u);
+}
+
+// §4.4.3.5: within the Pre-Observed region it is illegal to write values to any
+// net or variable. A VPI write performed from a Pre-Observed callback is
+// recorded as a violation.
+TEST(PliPreObservedSim, VpiPutValueFromPreObservedRecordsWriteViolation) {
+  Arena arena;
+  Scheduler sched(arena);
+  VpiContext vpi;
+  vpi.SetScheduler(&sched);
+
+  Logic4Word storage{};
+  Variable var{};
+  var.value.width = 32;
+  var.value.nwords = 1;
+  var.value.words = &storage;
+
+  VpiObject obj{};
+  obj.var = &var;
+
+  auto* pre_obs = sched.GetEventPool().Acquire();
+  pre_obs->callback = [&]() {
+    VpiValue value{};
+    value.format = kVpiIntVal;
+    value.value.integer = 42;
+    vpi.PutValue(&obj, &value, nullptr, 0);
+  };
+  sched.ScheduleEvent({0}, Region::kPreObserved, pre_obs);
+
+  EXPECT_EQ(sched.IllegalPreObservedWriteCount(), 0u);
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreObservedWriteCount(), 1u);
+}
+
+TEST(PliPreObservedSim, MultipleIllegalWritesFromPreObservedAreEachCounted) {
+  Arena arena;
+  Scheduler sched(arena);
+  VpiContext vpi;
+  vpi.SetScheduler(&sched);
+
+  Logic4Word storage{};
+  Variable var{};
+  var.value.width = 32;
+  var.value.nwords = 1;
+  var.value.words = &storage;
+
+  VpiObject obj{};
+  obj.var = &var;
+
+  auto* pre_obs = sched.GetEventPool().Acquire();
+  pre_obs->callback = [&]() {
+    for (int i = 0; i < 4; ++i) {
+      VpiValue value{};
+      value.format = kVpiIntVal;
+      value.value.integer = i;
+      vpi.PutValue(&obj, &value, nullptr, 0);
+    }
+  };
+  sched.ScheduleEvent({0}, Region::kPreObserved, pre_obs);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreObservedWriteCount(), 4u);
+}
+
+// A VPI write from a writable region (e.g. Post-NBA, see §4.4.3.4) carries no
+// Pre-Observed violation.
+TEST(PliPreObservedSim, VpiPutValueFromPostNbaIsNotFlaggedAgainstPreObserved) {
+  Arena arena;
+  Scheduler sched(arena);
+  VpiContext vpi;
+  vpi.SetScheduler(&sched);
+
+  Logic4Word storage{};
+  Variable var{};
+  var.value.width = 32;
+  var.value.nwords = 1;
+  var.value.words = &storage;
+
+  VpiObject obj{};
+  obj.var = &var;
+
+  auto* post_nba = sched.GetEventPool().Acquire();
+  post_nba->callback = [&]() {
+    VpiValue value{};
+    value.format = kVpiIntVal;
+    value.value.integer = 7;
+    vpi.PutValue(&obj, &value, nullptr, 0);
+  };
+  sched.ScheduleEvent({0}, Region::kPostNBA, post_nba);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreObservedWriteCount(), 0u);
+}
+
+// §4.4.3.5 bars scheduling into the current time slot outright - unlike the
+// Preponed region, there is no exemption for scheduling back into the same
+// region. An event scheduled into Pre-Observed itself at the current time is
+// still a violation (the re-entrant event itself is harmless and runs).
+TEST(PliPreObservedSim, ScheduleIntoSamePreObservedRegionAtCurrentTimeIsFlagged) {
+  Arena arena;
+  Scheduler sched(arena);
+  bool inner_ran = false;
+
+  auto* pre_obs = sched.GetEventPool().Acquire();
+  pre_obs->callback = [&]() {
+    auto* inner = sched.GetEventPool().Acquire();
+    inner->callback = [&]() { inner_ran = true; };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kPreObserved, inner);
+  };
+  sched.ScheduleEvent({0}, Region::kPreObserved, pre_obs);
+
+  sched.Run();
+  EXPECT_TRUE(inner_ran);
+  EXPECT_EQ(sched.IllegalPreObservedScheduleCount(), 1u);
+}
+
+// §4.4.3.5 forbids writing "any net or variable" from the region. A VPI write
+// to a net (rather than a variable) from a Pre-Observed callback is likewise
+// recorded as a write violation.
+TEST(PliPreObservedSim, VpiPutValueOnNetFromPreObservedRecordsWriteViolation) {
+  Arena arena;
+  Scheduler sched(arena);
+  VpiContext vpi;
+  vpi.SetScheduler(&sched);
+
+  Net net{};
+  VpiObject obj{};
+  obj.net = &net;
+
+  auto* pre_obs = sched.GetEventPool().Acquire();
+  pre_obs->callback = [&]() {
+    VpiValue value{};
+    value.format = kVpiIntVal;
+    value.value.integer = 1;
+    vpi.PutValue(&obj, &value, nullptr, 0);
+  };
+  sched.ScheduleEvent({0}, Region::kPreObserved, pre_obs);
+
+  EXPECT_EQ(sched.IllegalPreObservedWriteCount(), 0u);
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreObservedWriteCount(), 1u);
 }

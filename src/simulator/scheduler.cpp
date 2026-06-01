@@ -103,6 +103,13 @@ void Scheduler::ScheduleEvent(SimTime time, Region region, Event* event) {
     ++illegal_postponed_schedule_count_;
   }
 
+  // §4.4.3.5: the Pre-Observed region only lets PLI routines read the
+  // stabilized active region set; scheduling any event into the current time
+  // slot from within it is illegal.
+  if (current_region_ == Region::kPreObserved && time == current_time_) {
+    ++illegal_pre_observed_schedule_count_;
+  }
+
   if (event->kind == EventKind::kUpdate) {
     ++update_events_scheduled_count_;
   } else {
