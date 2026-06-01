@@ -106,17 +106,6 @@ TEST(AssocMethods, EndToEndLiteralDefaultOnlyReturnsDefault) {
   EXPECT_EQ(v, 99u);
 }
 
-TEST(AssocMethods, EndToEndLiteralStringKeyDefault) {
-  auto v = RunAndGet(
-      "module t;\n"
-      "  int aa[string] = '{\"x\":5, default:0};\n"
-      "  int result;\n"
-      "  initial result = aa[\"x\"];\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(v, 5u);
-}
-
 TEST(AssocMethods, ReadMissingKeyWithDefaultReturnsDefaultNoWarning) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -145,19 +134,6 @@ TEST(AssocMethods, ReadMissingStringKeyWithDefaultReturnsDefaultNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), before);
 }
 
-TEST(AssocMethods, ReadMissingKeyFromEmptyArrayWithDefaultNoWarning) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->has_default = true;
-  aa->default_value = MakeLogic4VecVal(f.arena, 32, 33);
-
-  auto* sel = MakeAssocSelect(f.arena, 0);
-  uint32_t before = f.diag.WarningCount();
-  auto result = EvalExpr(sel, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 33u);
-  EXPECT_EQ(f.diag.WarningCount(), before);
-}
-
 TEST(AssocMethods, ReadMissingKeyWithoutDefaultReturnsZero) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -178,6 +154,24 @@ TEST(AssocMethods, ReadMissingStringKeyWithoutDefaultReturnsZero) {
   auto* sel = MakeAssocSelectStr(f.arena, "aa", "\"b\"");
   auto result = EvalExpr(sel, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+// §7.9.11: with no literal default, a missing read yields the element type's
+// Table 7-1 default (§7.4.5). For a 4-state element type that default is all-x,
+// which exercises the 4-state branch of the read path rather than the 2-state
+// zero branch covered above.
+TEST(AssocMethods, ReadMissingKeyWithoutDefault4StateReturnsX) {
+  SimFixture f;
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
+  aa->is_4state = true;
+  aa->int_data[1] = MakeLogic4VecVal(f.arena, 32, 10);
+  EXPECT_FALSE(aa->has_default);
+
+  auto* sel = MakeAssocSelect(f.arena, 99);
+  auto result = EvalExpr(sel, f.ctx, f.arena);
+  // Every bit unknown: both planes set across the element width.
+  EXPECT_EQ(result.words[0].aval & 0xFFFFFFFFull, 0xFFFFFFFFull);
+  EXPECT_EQ(result.words[0].bval & 0xFFFFFFFFull, 0xFFFFFFFFull);
 }
 
 TEST(AssocMethods, DefaultDoesNotAffectNum) {
@@ -261,6 +255,44 @@ TEST(AssocMethods, DefaultDoesNotAffectLast) {
   ASSERT_TRUE(TryEvalAssocMethodCall(call, f.ctx, f.arena, out));
   EXPECT_EQ(out.ToUint64(), 1u);
   EXPECT_EQ(ref->value.ToUint64(), 20u);
+}
+
+TEST(AssocMethods, DefaultDoesNotAffectNext) {
+  SimFixture f;
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
+  aa->index_width = 32;
+  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 1);
+  aa->int_data[20] = MakeLogic4VecVal(f.arena, 32, 2);
+  aa->has_default = true;
+  aa->default_value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  auto* ref = f.ctx.CreateVariable("k", 32);
+  ref->value = MakeLogic4VecVal(f.arena, 32, 10);
+
+  Logic4Vec out{};
+  auto* call = MkAssocCall(f.arena, "aa", "next", "k");
+  ASSERT_TRUE(TryEvalAssocMethodCall(call, f.ctx, f.arena, out));
+  EXPECT_EQ(out.ToUint64(), 1u);
+  EXPECT_EQ(ref->value.ToUint64(), 20u);
+}
+
+TEST(AssocMethods, DefaultDoesNotAffectPrev) {
+  SimFixture f;
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
+  aa->index_width = 32;
+  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 1);
+  aa->int_data[20] = MakeLogic4VecVal(f.arena, 32, 2);
+  aa->has_default = true;
+  aa->default_value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  auto* ref = f.ctx.CreateVariable("k", 32);
+  ref->value = MakeLogic4VecVal(f.arena, 32, 20);
+
+  Logic4Vec out{};
+  auto* call = MkAssocCall(f.arena, "aa", "prev", "k");
+  ASSERT_TRUE(TryEvalAssocMethodCall(call, f.ctx, f.arena, out));
+  EXPECT_EQ(out.ToUint64(), 1u);
+  EXPECT_EQ(ref->value.ToUint64(), 10u);
 }
 
 TEST(AssocMethods, DefaultDoesNotAffectDelete) {

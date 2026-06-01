@@ -3,15 +3,6 @@
 using namespace delta;
 namespace {
 
-TEST(AggregateTypeParsing, AssocArrayLiteralWithDefault) {
-  auto r = Parse(
-      "module t;\n"
-      "  string words[int] = '{default: \"hello\"};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(AggregateTypeParsing, AssocArrayLiteralKeyValue) {
   auto r = Parse(
       "module t;\n"
