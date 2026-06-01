@@ -28,6 +28,9 @@ struct ClockingSignal {
   ClockingDir direction = ClockingDir::kInput;
   SimTime skew{0};
   bool is_explicit_zero_skew = false;
+  // §14.4: an input skew of 1step samples the signal's value as it stood
+  // immediately before the clock edge (the previous time step's value).
+  bool is_one_step_skew = false;
 };
 
 struct ClockingBlock {

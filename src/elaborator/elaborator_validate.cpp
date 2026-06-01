@@ -4023,10 +4023,28 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
   }
 }
 
-void Elaborator::ValidateClockingBlock(ModuleItem* item) {
+void Elaborator::ValidateClockingBlock(ModuleItem* item,
+                                       const RtlirModule* mod) {
 
   if (item->name.empty() && !item->is_default_clocking) {
     diag_.Error(item->loc, "non-default clocking block must have a name");
+  }
+
+  // §14.4: a clocking skew shall be a constant expression; a parameter is an
+  // acceptable form. Any skew delay that cannot be folded against the module's
+  // parameter scope (e.g. a reference to a net or variable) violates the rule.
+  ScopeMap skew_scope = mod ? BuildParamScope(mod) : ScopeMap{};
+  auto check_skew = [&](const Expr* delay) {
+    if (delay != nullptr && !IsConstantExpr(delay, skew_scope)) {
+      diag_.Error(delay->range.start,
+                  "clocking skew shall be a constant expression (§14.4)");
+    }
+  };
+  check_skew(item->default_input_skew_delay);
+  check_skew(item->default_output_skew_delay);
+  for (const auto& sig : item->clocking_signals) {
+    check_skew(sig.skew_delay);
+    check_skew(sig.out_skew_delay);
   }
 
   if (!item->name.empty()) {

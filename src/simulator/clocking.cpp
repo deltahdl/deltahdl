@@ -63,7 +63,11 @@ static void SampleBlockInputs(ClockingManager* mgr, const std::string& name,
     if (!only_zero_skew && sig.is_explicit_zero_skew) continue;
     auto* var = ctx.FindVariable(sig.signal_name);
     if (!var) continue;
-    mgr->SampleInput(name, sig.signal_name, var->value.ToUint64());
+    // §14.4: a 1step input takes the value held just before the clock edge,
+    // i.e. the signal's last value from the preceding time step.
+    uint64_t sampled = sig.is_one_step_skew ? var->prev_value.ToUint64()
+                                            : var->value.ToUint64();
+    mgr->SampleInput(name, sig.signal_name, sampled);
   }
 }
 

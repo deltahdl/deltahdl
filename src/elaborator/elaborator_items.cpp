@@ -1249,7 +1249,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       // §16.10: a name that is already a formal argument of the sequence
       // declaration may not be redeclared as a body-scope local variable.
       ValidateNoFormalShadowedByBodyLocal(item);
-      ValidateClockingBlock(item);
+      ValidateClockingBlock(item, mod);
       break;
     case ModuleItemKind::kDefparam:
       break;
@@ -1277,7 +1277,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       // declaration: a formal-argument name cannot be redeclared as a
       // body-scope local variable.
       ValidateNoFormalShadowedByBodyLocal(item);
-      ValidateClockingBlock(item);
+      ValidateClockingBlock(item, mod);
       break;
     }
     case ModuleItemKind::kAssertProperty:
@@ -1286,7 +1286,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kCoverSequence:
     case ModuleItemKind::kRestrictProperty:
     case ModuleItemKind::kClockingBlock:
-      ValidateClockingBlock(item);
+      ValidateClockingBlock(item, mod);
       break;
     case ModuleItemKind::kElabSystemTask:
       ValidateElabSystemTask(item, mod);

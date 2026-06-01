@@ -471,7 +471,7 @@ class Elaborator {
 
   void ValidateSequenceEventArgs(const ModuleDecl* decl);
 
-  void ValidateClockingBlock(ModuleItem* item);
+  void ValidateClockingBlock(ModuleItem* item, const RtlirModule* mod);
 
   // §16.10: a formal-argument name of a sequence/property declaration cannot
   // also be declared as a body-scope local variable in an
