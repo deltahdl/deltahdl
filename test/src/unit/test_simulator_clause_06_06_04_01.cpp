@@ -152,4 +152,60 @@ TEST(CapacitiveNetwork, MultiWordVectorPropagation) {
   EXPECT_EQ(var_a->value.ToUint64(), 0xDEADu);
 }
 
+// §6.6.4.1: charge propagates from the larger net to the smaller one. The
+// extreme pair (large/small) is covered above; this exercises the medium/small
+// ordering so the intermediate size is observed to act as the larger net. The
+// smaller net adopts both the value and the charge strength of the larger.
+TEST(CapacitiveNetwork, MediumOverridesSmall) {
+  Arena arena;
+  Variable* var_a = nullptr;
+  Variable* var_b = nullptr;
+  Net a = MakeTriregNet(arena, var_a, Strength::kMedium, 8, 1);
+  Net b = MakeTriregNet(arena, var_b, Strength::kSmall, 8, 0);
+
+  PropagateCharge(a, b);
+  EXPECT_EQ(var_b->value.ToUint64(), 1u);
+  EXPECT_EQ(b.charge_strength, Strength::kMedium);
+}
+
+// §6.6.4.1: the large/medium ordering, confirming a large net acts as the
+// larger side against a medium net (the size comparison is not limited to the
+// small/large extremes).
+TEST(CapacitiveNetwork, LargeOverridesMedium) {
+  Arena arena;
+  Variable* var_a = nullptr;
+  Variable* var_b = nullptr;
+  Net a = MakeTriregNet(arena, var_a, Strength::kLarge, 8, 0);
+  Net b = MakeTriregNet(arena, var_b, Strength::kMedium, 8, 1);
+
+  PropagateCharge(a, b);
+  EXPECT_EQ(var_b->value.ToUint64(), 0u);
+  EXPECT_EQ(b.charge_strength, Strength::kLarge);
+}
+
+// §6.6.4.1 edge: propagation happens only while BOTH trireg nets are in the
+// capacitive state. OnlyWhenBothCapacitive drives the second net; this drives
+// the first net instead, so the other operand of the capacitive-state guard is
+// observed to block propagation. The driven net keeps its value and the
+// capacitive net is left unchanged.
+TEST(CapacitiveNetwork, NoPropagationWhenFirstNetDriven) {
+  Arena arena;
+  auto* var_a = arena.Create<Variable>();
+  var_a->value = MakeLogic4VecVal(arena, 8, 1);
+  Net a;
+  a.type = NetType::kTrireg;
+  a.resolved = var_a;
+  a.charge_strength = Strength::kSmall;
+  a.base_charge_strength = Strength::kSmall;
+  a.drivers.push_back(MakeLogic4VecVal(arena, 8, 99));
+
+  Variable* var_b = nullptr;
+  Net b = MakeTriregNet(arena, var_b, Strength::kLarge, 8, 0);
+
+  PropagateCharge(a, b);
+
+  EXPECT_EQ(var_a->value.ToUint64(), 1u);
+  EXPECT_EQ(var_b->value.ToUint64(), 0u);
+}
+
 }
