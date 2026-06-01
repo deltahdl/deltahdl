@@ -74,6 +74,43 @@ TEST(VectorSpecification, BitVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
+// §6.9.1: the range bounds are constant integer expressions, not just literals.
+// The elaborator folds an arithmetic bound expression before computing width.
+TEST(VectorSpecification, ConstantExpressionRange) {
+  ElabFixture f;
+  auto* design = Elaborate("module m; logic [2+1:0] v; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 4u);
+}
+
+// §6.9.1: range bounds may be any integer value, including negative on both
+// ends; the width is the magnitude of the span plus one.
+TEST(VectorSpecification, BothNegativeRangeWidth) {
+  ElabFixture f;
+  auto* design = Elaborate("module m; logic [-1:-4] v; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 4u);
+}
+
+// §6.9.1: implementations may cap the maximum vector length, but the cap shall
+// be no smaller than 2**16 bits. A vector at exactly that guaranteed minimum
+// must elaborate without error and carry its full declared width.
+TEST(VectorSpecification, GuaranteedMinimumMaxLength) {
+  ElabFixture f;
+  auto* design = Elaborate("module m; logic [65535:0] big; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 65536u);
+}
+
 TEST(VectorSpecification, XInRangeIsError) {
   ElabFixture f;
   Elaborate("module m; logic [1'bx:0] a; endmodule\n", f);
