@@ -228,4 +228,93 @@ TEST(OverriddenMemberSimulation, E2eNonOverriddenMemberAccessibleThroughBase) {
       "endmodule\n", "result"), 5u);
 }
 
+// §8.14: a non-virtual method reference is bound by the handle's declared type.
+// Resolving the method from the base's declared type yields the base method
+// even though the object is a LinkedPacket, while resolving from the derived
+// type yields the override -- the static-binding production helper itself.
+TEST(OverriddenMemberSimulation, StaticMethodBindingSelectsDeclaredType) {
+  SimFixture f;
+  auto* base = MakeClassType(f, "Packet", {});
+  auto* base_get = f.arena.Create<ModuleItem>();
+  base_get->kind = ModuleItemKind::kFunctionDecl;
+  base_get->name = "get";
+  base->methods["get"] = base_get;
+
+  auto* derived = MakeClassType(f, "LinkedPacket", {});
+  derived->parent = base;
+  auto* derived_get = f.arena.Create<ModuleItem>();
+  derived_get->kind = ModuleItemKind::kFunctionDecl;
+  derived_get->name = "get";
+  derived->methods["get"] = derived_get;
+
+  auto [handle, obj] = MakeObj(f, derived);
+  EXPECT_EQ(obj->ResolveMethodForType("get", base), base_get);
+  EXPECT_EQ(obj->ResolveMethodForType("get", derived), derived_get);
+}
+
+// §8.14: a shadowed property is read through the slot of the handle's declared
+// type. With the per-level scoped slots the lowerer populates, a base-typed
+// reference sees the base value and a derived-typed reference sees the override
+// -- both observed through the property-read production helper.
+TEST(OverriddenMemberSimulation, StaticPropertyBindingSelectsDeclaredType) {
+  SimFixture f;
+  auto* base = MakeClassType(f, "Packet", {"i"});
+  auto* derived = MakeClassType(f, "LinkedPacket", {"i"});
+  derived->parent = base;
+
+  auto [handle, obj] = MakeObj(f, derived);
+  obj->properties["Packet::i"] = MakeLogic4VecVal(f.arena, 32, 1);
+  obj->properties["LinkedPacket::i"] = MakeLogic4VecVal(f.arena, 32, 2);
+
+  EXPECT_EQ(obj->GetPropertyForType("i", base, f.arena).ToUint64(), 1u);
+  EXPECT_EQ(obj->GetPropertyForType("i", derived, f.arena).ToUint64(), 2u);
+}
+
+// §8.14: a write through a base-typed reference targets the base-level slot of
+// a shadowed property, leaving the derived level's slot untouched -- the
+// write-side static-binding production helper.
+TEST(OverriddenMemberSimulation, WriteThroughBaseTypeTargetsBaseSlot) {
+  SimFixture f;
+  auto* base = MakeClassType(f, "Packet", {"i"});
+  auto* derived = MakeClassType(f, "LinkedPacket", {"i"});
+  derived->parent = base;
+
+  auto [handle, obj] = MakeObj(f, derived);
+  obj->properties["Packet::i"] = MakeLogic4VecVal(f.arena, 32, 1);
+  obj->properties["LinkedPacket::i"] = MakeLogic4VecVal(f.arena, 32, 2);
+
+  obj->SetPropertyForType("i", base, MakeLogic4VecVal(f.arena, 32, 7));
+  EXPECT_EQ(obj->GetPropertyForType("i", base, f.arena).ToUint64(), 7u);
+  EXPECT_EQ(obj->GetPropertyForType("i", derived, f.arena).ToUint64(), 2u);
+}
+
+// §8.14: static binding holds at every level of the chain, not just the root.
+// A mid-chain (B) handle pointing at a C object sees B's member, hiding C's
+// override -- exercised through the full elaborate/lower/run path.
+TEST(OverriddenMemberSimulation, E2eIntermediateHandleSeesIntermediateMember) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class A;\n"
+      "  integer x = 1;\n"
+      "endclass\n"
+      "class B extends A;\n"
+      "  integer x = 2;\n"
+      "endclass\n"
+      "class C extends B;\n"
+      "  integer x = 3;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    B b;\n"
+      "    c = new;\n"
+      "    b = c;\n"
+      "    result = b.x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"result", 2u}});
+}
+
 }
