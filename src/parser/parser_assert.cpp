@@ -348,9 +348,12 @@ ModuleItem* Parser::ParsePropertyDecl() {
       } else if (depth == 1 &&
                  (Check(TokenKind::kKwOutput) ||
                   Check(TokenKind::kKwInout))) {
-        // property_lvar_port_direction is restricted to `input` only;
-        // `output` and `inout` have no legal role inside a property port,
-        // with or without a preceding `local`.
+        // §16.12.19: a local variable formal argument of a named property
+        // shall have direction `input`; declaring one with direction `inout`
+        // or `output` is illegal. The borrowed A.2.10 production
+        // property_lvar_port_direction admits only `input`, so `output` and
+        // `inout` have no legal role inside a property port, with or without a
+        // preceding `local`.
         diag_.Error(CurrentLoc(),
                     "property port direction must be 'input'");
         Consume();
