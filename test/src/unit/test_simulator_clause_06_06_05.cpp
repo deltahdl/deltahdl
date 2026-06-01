@@ -274,4 +274,79 @@ TEST(Tri0Tri1Resolution, Tri1DrivenValuePassesThrough) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
+// §6.6.5: with no driver connected, a tri0 net settles to 0 carrying pull
+// strength (the implicit resistive pulldown), not the default high-impedance.
+TEST(Tri0Tri1Resolution, Tri0UndrivenDefaultsToZeroWithPull) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kTri0;
+  net.resolved = var;
+  // No drivers connected to the net.
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.words[0].aval & 1, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 1, 0u);
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kPull);
+}
+
+// §6.6.5: with no driver connected, a tri1 net settles to 1 carrying pull
+// strength (the implicit resistive pullup).
+TEST(Tri0Tri1Resolution, Tri1UndrivenDefaultsToOneWithPull) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kTri1;
+  net.resolved = var;
+  // No drivers connected to the net.
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.words[0].aval & 1, 1u);
+  EXPECT_EQ(var->value.words[0].bval & 1, 0u);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kPull);
+}
+
+// §6.6.5: a tri0 net is equivalent to a wire driven by a continuous 0 of pull
+// strength. Within one vector, an actual driver wins on the bits it drives,
+// while every bit it leaves at z falls to the pulldown value 0. Exercises the
+// per-bit residual-z fixup across a multi-bit net (low nibble driven, high
+// nibble left floating).
+TEST(Tri0Tri1Resolution, Tri0PullsOnlyResidualZBitsLowAcrossVector) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  Net net;
+  net.type = NetType::kTri0;
+  net.resolved = var;
+  // Bits 0-3 drive 1,0,1,0; bits 4-7 are z (aval&bval both set).
+  auto drv = MakeLogic4Vec(arena, 8);
+  drv.words[0] = {0xF5, 0xF0};
+  net.drivers.push_back(drv);
+  net.Resolve(arena);
+  // Driven bits pass through unchanged; floating bits pull down to 0.
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0x05u);
+  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0x00u);
+}
+
+// §6.6.5: a tri1 net is equivalent to a wire driven by a continuous 1 of pull
+// strength. The driven bits pass through; the floating bits pull up to 1.
+TEST(Tri0Tri1Resolution, Tri1PullsOnlyResidualZBitsHighAcrossVector) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  Net net;
+  net.type = NetType::kTri1;
+  net.resolved = var;
+  // Bits 0-3 drive 1,0,1,0; bits 4-7 are z.
+  auto drv = MakeLogic4Vec(arena, 8);
+  drv.words[0] = {0xF5, 0xF0};
+  net.drivers.push_back(drv);
+  net.Resolve(arena);
+  // Driven bits pass through unchanged; floating bits pull up to 1.
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xF5u);
+  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0x00u);
+}
+
 }
