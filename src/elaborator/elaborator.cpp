@@ -723,11 +723,20 @@ void Elaborator::ValidateModports() {
   };
   for (auto* iface : unit_->interfaces) {
     std::unordered_set<std::string_view> clocking_names;
+    // §25.5: a modport may only reference names that this interface itself
+    // declares. Collect every such name — the interface's own ports plus the
+    // signals, subprograms, and other items declared in its body — so a modport
+    // item naming anything outside this set can be rejected below.
+    std::unordered_set<std::string_view> declared_names;
+    for (const auto& port : iface->ports) {
+      if (!port.name.empty()) declared_names.insert(port.name);
+    }
     for (const auto* item : iface->items) {
       if (item->kind == ModuleItemKind::kClockingBlock &&
           !item->name.empty()) {
         clocking_names.insert(item->name);
       }
+      if (!item->name.empty()) declared_names.insert(item->name);
     }
     for (auto* mp : iface->modports) {
       std::unordered_set<std::string_view> port_names;
@@ -737,6 +746,20 @@ void Elaborator::ValidateModports() {
           diag_.Error(mp->loc,
                       std::format("duplicate port-id '{}' in modport '{}'",
                                   port.name, mp->name));
+        }
+        // §25.5: a plain simple modport item (one written as a bare identifier,
+        // not a `.name(expr)` modport expression, and not an imported/exported
+        // subprogram or a clocking item) names an object that this interface
+        // shall already declare. Naming something declared only by an enclosing
+        // scope, or nowhere at all, would implicitly create a new port and is
+        // illegal.
+        if (!port.is_clocking && !port.is_import && !port.is_export &&
+            port.expr == nullptr && !declared_names.contains(port.name)) {
+          diag_.Error(
+              mp->loc,
+              std::format("modport '{}' references '{}', which interface '{}' "
+                          "does not declare",
+                          mp->name, port.name, iface->name));
         }
         if (is_literal_expr(port.expr) &&
             (port.direction == Direction::kOutput ||

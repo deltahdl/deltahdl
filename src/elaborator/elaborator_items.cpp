@@ -2431,6 +2431,37 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       binding.connection = MakeHighZExpr();
     }
 
+    // §25.5: a modport may be selected in the module header for an interface
+    // port (e.g. `iface.target a`) and again in the instance connection
+    // (`.a(inst.initiator)`). When both sites select one, they shall name the
+    // same modport. Only the genuine both-specified case is checked: a bare
+    // instance reference in the connection, or a header port without a modport,
+    // leaves nothing to disagree about.
+    if (it != child_ports.end() && it->is_interface_port && conn_expr &&
+        conn_expr->kind == ExprKind::kMemberAccess && conn_expr->lhs &&
+        conn_expr->lhs->kind == ExprKind::kIdentifier && conn_expr->rhs &&
+        conn_expr->rhs->kind == ExprKind::kIdentifier) {
+      std::string_view header_modport;
+      if (const auto* child_decl = FindModule(inst.module_name)) {
+        for (const auto& p : child_decl->ports) {
+          if (p.name == binding.port_name) {
+            header_modport = p.data_type.modport_name;
+            break;
+          }
+        }
+      }
+      auto connection_modport = conn_expr->rhs->text;
+      if (!header_modport.empty() && !connection_modport.empty() &&
+          header_modport != connection_modport) {
+        diag_.Error(
+            item->loc,
+            std::format("interface port '{}' selects modport '{}' in the module "
+                        "header but '{}' in the instance connection; both shall "
+                        "name the same modport",
+                        binding.port_name, header_modport, connection_modport));
+      }
+    }
+
     inst.port_bindings.push_back(binding);
   }
 
