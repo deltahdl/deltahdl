@@ -20,6 +20,32 @@ TEST(LogicValuesSim, FourBasicValuesEncodeDistinctly) {
   EXPECT_FALSE(vz.IsKnown());
 }
 
+TEST(LogicValuesSim, KnownOneIsTrueConditionAndKnownZeroIsFalseCondition) {
+  // §6.3.1: 1 represents a true condition and 0 represents a false condition.
+  Arena arena;
+  auto one = MakeLogic4VecVal(arena, 1, 1);
+  auto zero = MakeLogic4VecVal(arena, 1, 0);
+  EXPECT_TRUE(one.IsKnown());
+  EXPECT_TRUE(zero.IsKnown());
+  EXPECT_TRUE(one.IsTruthy());
+  EXPECT_FALSE(zero.IsTruthy());
+}
+
+TEST(LogicValuesSim, UnknownAndHighZAreNeitherKnownNorTrue) {
+  // §6.3.1: x is an unknown value and z is a high-impedance state; neither is
+  // a definite 0 or 1, so each is unknown and does not yield a true condition.
+  Arena arena;
+  auto vx = MakeLogic4Vec(arena, 1);
+  vx.words[0].bval = 1;  // x encodes as aval=0, bval=1
+  auto vz = MakeLogic4Vec(arena, 1);
+  vz.words[0].aval = 1;
+  vz.words[0].bval = 1;  // z encodes as aval=1, bval=1
+  EXPECT_FALSE(vx.IsKnown());
+  EXPECT_FALSE(vz.IsKnown());
+  EXPECT_FALSE(vx.IsTruthy());
+  EXPECT_FALSE(vz.IsTruthy());
+}
+
 TEST(LogicValuesSim, ZeroComplementsToOne) {
   Logic4Word v0{0, 0};
   auto r = Logic4Not(v0);

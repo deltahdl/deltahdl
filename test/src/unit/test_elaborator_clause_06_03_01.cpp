@@ -59,6 +59,25 @@ TEST(LogicValuesElab, UserTypeBuiltFromLogicInheritsFourState) {
   EXPECT_TRUE(found);
 }
 
+TEST(LogicValuesElab, TwoStateTypeStoresOnlyZeroOrOne) {
+  // §6.3.1: some data types are 2-state and store only 0 or 1 in each bit,
+  // in contrast to the 4-state logic type. A 2-state declaration such as
+  // bit must therefore be classified as not 4-state by the elaborator.
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  bit b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].name, "b");
+  EXPECT_EQ(mod->variables[0].width, 1u);
+  EXPECT_FALSE(mod->variables[0].is_4state);
+}
+
 TEST(LogicValuesElab, EventTypeIsNotFourState) {
   ElabFixture f;
   auto* design = Elaborate(

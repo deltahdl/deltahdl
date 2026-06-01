@@ -20,10 +20,14 @@ TEST(LogicValuesLexer, LongerWordStartingWithLogicIsIdentifier) {
   EXPECT_EQ(tokens[0].text, "logical");
 }
 
-TEST(LogicValuesLexer, LogicKeywordRecognizedInsideDeclaration) {
-  auto tokens = Lex("logic [7:0] v;");
+TEST(LogicValuesLexer, KeywordMatchIsCaseSensitive) {
+  // §6.3.1 names the basic 4-state type with the exact keyword "logic".
+  // Keyword recognition is case-sensitive, so a capitalized spelling is an
+  // ordinary identifier rather than the type keyword.
+  auto tokens = Lex("Logic");
   ASSERT_GE(tokens.size(), 1u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwLogic);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "Logic");
 }
 
 }
