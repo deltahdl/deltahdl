@@ -178,6 +178,59 @@ TEST(SubroutineArgSchedulingSim, CopyOutSupportsBlockingAssignLhsForms) {
   EXPECT_EQ(f.ctx.FindVariable("sibling")->value.ToUint64(), 7u);
 }
 
+// A non-void function delivers two distinct results on return: its return
+// value, and the copy-out of any output argument. These travel through the
+// function-call evaluation path (not the task-call statement path), so the
+// copy-out is exercised here on that separate production path while confirming
+// it does not disturb the returned value.
+TEST(SubroutineArgSchedulingSim, OutputArgAndReturnValueBothDeliveredFromFunction) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] outv, ret;\n"
+      "  function logic [7:0] compute(output logic [7:0] o);\n"
+      "    o = 8'd7;\n"
+      "    return 8'd200;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    outv = 8'd0;\n"
+      "    ret = 8'd0;\n"
+      "    ret = compute(outv);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("outv")->value.ToUint64(), 7u);
+  EXPECT_EQ(f.ctx.FindVariable("ret")->value.ToUint64(), 200u);
+}
+
+// Because the copy-out is a blocking assignment, it adapts the value to the
+// width of the target the same way a direct blocking assignment would: an
+// output formal wider than the actual it is bound to truncates on return.
+TEST(SubroutineArgSchedulingSim, CopyOutTruncatesToTargetWidthLikeBlockingAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] narrow;\n"
+      "  task widen(output logic [7:0] o);\n"
+      "    o = 8'd255;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    narrow = 4'd0;\n"
+      "    widen(narrow);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("narrow")->value.ToUint64(), 0xFu);
+}
+
 TEST(SubroutineArgSchedulingSim, MultipleOutputArgsAllWrittenOnReturn) {
   SimFixture f;
   auto* design = ElaborateSrc(
