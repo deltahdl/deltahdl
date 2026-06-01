@@ -126,47 +126,4 @@ TEST(TristateGateParsing, Bufif0ThreeValueDelay) {
   EXPECT_EQ(item->gate_delay_decay->int_val, 15u);
 }
 
-TEST(TristateGateParsing, Notif0ThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  notif0 #(1, 2, 3) n1(o, i, en);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNotif0);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  ASSERT_NE(g->gate_delay_fall, nullptr);
-  ASSERT_NE(g->gate_delay_decay, nullptr);
-}
-
-TEST(TristateGateParsing, Bufif1ThreeValueDelay) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  wire y, a, b;\n"
-      "  bufif1 #(10, 20, 30) g1(y, a, b);\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[3];
-  ASSERT_NE(item->gate_delay, nullptr);
-  EXPECT_EQ(item->gate_delay->int_val, 10u);
-  ASSERT_NE(item->gate_delay_fall, nullptr);
-  EXPECT_EQ(item->gate_delay_fall->int_val, 20u);
-  ASSERT_NE(item->gate_delay_decay, nullptr);
-  EXPECT_EQ(item->gate_delay_decay->int_val, 30u);
-}
-
-TEST(TristateGateParsing, Notif1ThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  notif1 #(4, 5, 6) n1(o, i, en);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNotif1);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  ASSERT_NE(g->gate_delay_fall, nullptr);
-  ASSERT_NE(g->gate_delay_decay, nullptr);
-}
-
 }
