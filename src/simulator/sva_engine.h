@@ -1124,6 +1124,50 @@ class AssertionControl {
   std::unordered_set<std::string> fail_off_;
 };
 
+// §16.17: the expect statement is a blocking statement that waits on a property
+// evaluation. When activated it starts a single evaluation thread, and the
+// outcome of that thread drives both whether the process keeps blocking and
+// which arm of the action block runs. These pure helpers encode that behavior
+// independent of the surrounding scheduling machinery.
+enum class ExpectActionKind : uint8_t {
+  kBlock,        // property still pending — the process stays blocked
+  kRunPass,      // property succeeded — take the action block's pass arm
+  kRunFail,      // property failed and an else clause is present
+  kReportError,  // property failed with no else clause — call $error
+};
+
+// §16.17: map an expect property's evaluation outcome onto the action the
+// expecting process takes. While the property is pending the process remains
+// blocked. On success the optional pass statement runs. On failure the else
+// clause runs when present; otherwise the tool reports the failure via $error
+// (the $assertcontrol suppression of §20.11 is applied by that machinery).
+ExpectActionKind ResolveExpectAction(PropertyResult result,
+                                     bool has_else_clause);
+
+// §16.17: the expecting process blocks until the property succeeds or fails,
+// and is unblocked exactly when the evaluation resolves. While the result is
+// pending it stays blocked and the single evaluation thread keeps running; once
+// the property resolves it stops being evaluated.
+bool ExpectProcessRemainsBlocked(PropertyResult result);
+
+// §16.17: when executed, an expect statement starts its evaluation on the
+// subsequent clocking event — the first evaluation takes place on the next
+// clocking event, never on one coincident with the tick at which the expect
+// was activated. Returns true for a clocking event strictly after that tick.
+bool ExpectClockingEventBeginsEvaluation(uint64_t activation_tick,
+                                         uint64_t clocking_event_tick);
+
+// §16.17: the statement following the expect, and the action block, run after
+// the Observed region in which the property completes its evaluation — i.e. in
+// the Reactive region of that time step.
+inline constexpr Region ExpectResumeRegion() { return Region::kReactive; }
+
+// §16.17: when the else clause is omitted, the tool reports a failed expect by
+// calling $error, i.e. at error severity.
+inline constexpr AssertionSeverity ExpectDefaultFailSeverity() {
+  return AssertionSeverity::kError;
+}
+
 class SvaEngine {
  public:
   void QueueDeferredAssertion(const DeferredAssertion& da);

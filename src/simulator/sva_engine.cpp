@@ -1377,4 +1377,33 @@ void SvaEngine::ApplyDisableToDeferredAssertions(
   }
 }
 
+ExpectActionKind ResolveExpectAction(PropertyResult result,
+                                     bool has_else_clause) {
+  // §16.17: a pending property keeps the process blocked; a resolved property
+  // selects which arm of the action block runs.
+  switch (result) {
+    case PropertyResult::kPending:
+      return ExpectActionKind::kBlock;
+    case PropertyResult::kPass:
+    case PropertyResult::kVacuousPass:
+      return ExpectActionKind::kRunPass;
+    case PropertyResult::kFail:
+      return has_else_clause ? ExpectActionKind::kRunFail
+                             : ExpectActionKind::kReportError;
+  }
+  return ExpectActionKind::kBlock;
+}
+
+bool ExpectProcessRemainsBlocked(PropertyResult result) {
+  // §16.17: the process unblocks only once the property succeeds or fails.
+  return result == PropertyResult::kPending;
+}
+
+bool ExpectClockingEventBeginsEvaluation(uint64_t activation_tick,
+                                         uint64_t clocking_event_tick) {
+  // §16.17: the first evaluation is on the next clocking event after the expect
+  // executes, not on one coincident with activation.
+  return clocking_event_tick > activation_tick;
+}
+
 }
