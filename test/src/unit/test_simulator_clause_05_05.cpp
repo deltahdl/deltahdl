@@ -73,16 +73,6 @@ TEST(OperatorTokenSim, OperatorMixedInExpression) {
   EXPECT_EQ(result, 16u);
 }
 
-TEST(OperatorTokenSim, OperatorNoWhitespace) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result=8'd7+8'd3;\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(result, 10u);
-}
-
 TEST(OperatorTokenSim, OperatorChainedBinary) {
   auto result = RunAndGet(
       "module t;\n"

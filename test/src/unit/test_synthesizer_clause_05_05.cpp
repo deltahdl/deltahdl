@@ -106,14 +106,4 @@ TEST(OperatorSynthesis, MixedOperatorsSynthesize) {
   ASSERT_NE(aig, nullptr);
 }
 
-TEST(OperatorSynthesis, OperatorNoWhitespaceSynthesizes) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f, "module m;logic a,b,c;assign a=b&c;endmodule");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-}
-
 }

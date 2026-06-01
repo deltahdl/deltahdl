@@ -246,6 +246,17 @@ TEST(LexicalConventionParsing, BinaryOperatorMissingRightOperandFails) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// A binary operator sits between two operands; with the left operand absent
+// (here a purely-binary '*' opening the expression) the parse must fail. This
+// is the mirror of the missing-right-operand case above.
+TEST(LexicalConventionParsing, BinaryOperatorMissingLeftOperandFails) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = * b;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 TEST(LexicalConventionParsing, UnaryOperatorMissingOperandFails) {
   auto r = Parse(
       "module m;\n"
@@ -274,6 +285,16 @@ TEST(LexicalConventionParsing, ConditionalMissingTrueOperandFails) {
   auto r = Parse(
       "module m;\n"
       "  initial x = a ? : c;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// The conditional operator separates three operands; with the first operand
+// (the condition, before '?') absent, the parse must fail.
+TEST(LexicalConventionParsing, ConditionalMissingConditionOperandFails) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = ? b : c;\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
