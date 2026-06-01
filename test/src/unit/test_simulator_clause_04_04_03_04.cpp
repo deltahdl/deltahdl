@@ -152,3 +152,34 @@ TEST(PliPostNbaSim, PostNBAReadWriteInActiveRegionSetContext) {
   EXPECT_EQ(nba_sample, 10);
   EXPECT_EQ(observed_sample, 55);
 }
+
+// Edge case: an event created from within a Post-NBA callback that lands back in
+// the Post-NBA region of the same time slot must still be evaluated, and still
+// only after the NBA region has run. Exercises the scheduler draining the region
+// to empty so the "create events after NBA" guarantee holds for re-entrant
+// scheduling.
+TEST(PliPostNbaSim, PostNBAReentrantEventStillRunsAfterNBA) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+
+  auto* nba = sched.GetEventPool().Acquire();
+  nba->callback = [&]() { order.push_back("nba"); };
+  sched.ScheduleEvent({0}, Region::kNBA, nba);
+
+  auto* post_nba = sched.GetEventPool().Acquire();
+  post_nba->callback = [&]() {
+    order.push_back("post_nba");
+
+    auto* again = sched.GetEventPool().Acquire();
+    again->callback = [&order]() { order.push_back("post_nba_reentrant"); };
+    sched.ScheduleEvent({0}, Region::kPostNBA, again);
+  };
+  sched.ScheduleEvent({0}, Region::kPostNBA, post_nba);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 3u);
+  EXPECT_EQ(order[0], "nba");
+  EXPECT_EQ(order[1], "post_nba");
+  EXPECT_EQ(order[2], "post_nba_reentrant");
+}
