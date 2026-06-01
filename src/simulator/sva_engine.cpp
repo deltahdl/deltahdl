@@ -77,6 +77,33 @@ bool MatchDelaySequence(const SvaSequence& seq,
   return seq.expr_check && seq.expr_check(check_val);
 }
 
+EmptyConcatResult ConcatEmptyMatch(EmptyConcatSide side, uint32_t delay) {
+  EmptyConcatResult result;
+  // (empty ##0 seq) and (seq ##0 empty): a length-0 endpoint can never align
+  // with the neighboring sequence at the same time step, so neither matches.
+  if (delay == 0) {
+    result.matchable = false;
+    return result;
+  }
+  // With delay n > 0 the empty operand contributes nothing, and the leftover
+  // delay collapses onto the surviving operand as ##(n-1).
+  result.matchable = true;
+  result.effective_delay = delay - 1;
+  // (seq ##n empty) is equivalent to (seq ##(n-1) `true), extending the match
+  // one tick past seq; (empty ##n seq) is equivalent to (##(n-1) seq), which
+  // merely prefixes the reduced delay.
+  result.append_true = (side == EmptyConcatSide::kEmptyRight);
+  return result;
+}
+
+bool MatchEmptyOrNonempty(uint32_t rep_min, bool empty_case_match,
+                          bool nonempty_case_match) {
+  // A repetition that can take zero iterations is the disjunction of its empty
+  // and nonempty cases; otherwise only the nonempty case is reachable.
+  if (rep_min == 0) return empty_case_match || nonempty_case_match;
+  return nonempty_case_match;
+}
+
 bool EvalSequenceAnd(bool a_match, bool b_match) { return a_match && b_match; }
 
 SequenceAndMatch EvalSequenceAndMatch(bool a_match, uint32_t a_end_time,

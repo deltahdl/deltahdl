@@ -63,6 +63,37 @@ bool MatchNonConsecutiveRepetition(const SvaSequence& seq,
 bool MatchDelaySequence(const SvaSequence& seq,
                         const std::vector<uint64_t>& vals);
 
+// §16.9.2.1: an empty sequence match (e.g. a[*0]) spans zero clock ticks and is
+// thus of length 0, so concatenating it with another sequence through the
+// ##delay operator obeys a dedicated set of rules. Which operand of the
+// concatenation is the empty match.
+enum class EmptyConcatSide : uint8_t { kEmptyLeft, kEmptyRight };
+
+// Outcome of concatenating an empty match with another sequence via ##n.
+struct EmptyConcatResult {
+  // false records that "(empty ##0 seq)" and "(seq ##0 empty)" do not result in
+  // a match; true means the concatenation collapses onto the surviving operand.
+  bool matchable = false;
+  // The ##(n-1) delay carried onto the surviving operand. Because the empty
+  // operand occupies zero ticks, concatenating across it spends one tick fewer
+  // than the written delay — the same reason an empty case (a[*0]) runs one tick
+  // shorter than the corresponding length-1 case (a[*1]).
+  uint32_t effective_delay = 0;
+  // "(seq ##n empty)" trails the surviving sequence with `true, extending the
+  // match one tick past seq's end; the empty-on-the-left rule does not.
+  bool append_true = false;
+};
+
+EmptyConcatResult ConcatEmptyMatch(EmptyConcatSide side, uint32_t delay);
+
+// §16.9.2.1: a sequence admitting both empty and nonempty matches — a repetition
+// whose count range spans zero, e.g. a[*0:1] — is evaluated by rewriting it as
+// the OR of its empty case (count 0) and its nonempty cases (count >= 1). The
+// composite matches when either disjunct matches; a range that excludes zero has
+// only the nonempty case.
+bool MatchEmptyOrNonempty(uint32_t rep_min, bool empty_case_match,
+                          bool nonempty_case_match);
+
 bool EvalSequenceAnd(bool a_match, bool b_match);
 
 // §16.9.5: the composite `e1 and e2` requires both operands to match. The
