@@ -105,6 +105,72 @@ TEST(ConstEval, LongestStaticPrefixVarIdxThenFieldSelect) {
   EXPECT_EQ(LongestStaticPrefix(expr), "arr");
 }
 
+TEST(ConstEval, LongestStaticPrefixHierarchicalRef) {
+  Arena arena;
+  // A multi-level dotted reference (e.g. top.sub.sig) is a hierarchical
+  // reference to an object; the whole chain is a static prefix.
+  auto* sub = MakeMember(arena, MakeId(arena, "top"), "sub");
+  auto* sig = MakeMember(arena, sub, "sig");
+  EXPECT_EQ(LongestStaticPrefix(sig), "top.sub.sig");
+}
+
+TEST(ConstEval, LongestStaticPrefixHierarchicalRefConstIdx) {
+  Arena arena;
+  // A constant index applied to a hierarchical reference stays inside the
+  // static prefix.
+  auto* mem = MakeMember(arena, MakeMember(arena, MakeId(arena, "top"), "sub"),
+                         "mem");
+  auto* sel = MakeSelectExpr(arena, mem, MakeInt(arena, 2));
+  EXPECT_EQ(LongestStaticPrefix(sel), "top.sub.mem[2]");
+}
+
+TEST(ConstEval, LongestStaticPrefixHierarchicalRefVarIdx) {
+  Arena arena;
+  // A variable index breaks the static prefix back to the hierarchical name.
+  auto* mem = MakeMember(arena, MakeMember(arena, MakeId(arena, "top"), "sub"),
+                         "mem");
+  auto* sel = MakeSelectExpr(arena, mem, MakeId(arena, "i"));
+  EXPECT_EQ(LongestStaticPrefix(sel), "top.sub.mem");
+}
+
+TEST(ConstEval, LongestStaticPrefixParamThenConstIdx) {
+  Arena arena;
+  // LRM example: m[p][1] with localparam p = 7. Both indices are constant, so
+  // the whole select is a static prefix; the parameter resolves to its value.
+  ScopeMap scope = {{"p", 7}};
+  auto* inner = MakeSelectExpr(arena, MakeId(arena, "m"), MakeId(arena, "p"));
+  auto* outer = MakeSelectExpr(arena, inner, MakeInt(arena, 1));
+  EXPECT_EQ(LongestStaticPrefix(outer, scope), "m[7][1]");
+}
+
+TEST(ConstEval, LongestStaticPrefixVarThenConstIdx) {
+  Arena arena;
+  // LRM example: m[i][1]. The inner select is non-static, so a constant outer
+  // index cannot extend the static prefix beyond the identifier.
+  auto* inner = MakeSelectExpr(arena, MakeId(arena, "m"), MakeId(arena, "i"));
+  auto* outer = MakeSelectExpr(arena, inner, MakeInt(arena, 1));
+  EXPECT_EQ(LongestStaticPrefix(outer), "m");
+}
+
+TEST(ConstEval, LongestStaticPrefixConstExprIdx) {
+  Arena arena;
+  // The select expression may be any constant expression, not just a literal.
+  auto* idx = MakeBinary(arena, TokenKind::kPlus, MakeInt(arena, 1),
+                         MakeInt(arena, 1));
+  auto* sel = MakeSelectExpr(arena, MakeId(arena, "m"), idx);
+  EXPECT_EQ(LongestStaticPrefix(sel), "m[2]");
+}
+
+TEST(ConstEval, LongestStaticPrefixIndexedPartSelectVarBase) {
+  Arena arena;
+  // An indexed part-select is an indexing select; with a base that can vary at
+  // run time it is not a static prefix, so the prefix stops at the identifier.
+  auto* sel = MakeSelectExpr(arena, MakeId(arena, "arr"), MakeId(arena, "i"));
+  sel->index_end = MakeInt(arena, 4);
+  sel->is_part_select_plus = true;
+  EXPECT_EQ(LongestStaticPrefix(sel), "arr");
+}
+
 TEST(ConstEval, LongestStaticPrefixPackageRef) {
   Arena arena;
   auto* id = MakeId(arena, "var");
