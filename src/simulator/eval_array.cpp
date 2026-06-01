@@ -771,26 +771,26 @@ static bool AssocStrTraversal(AssocArrayObject* aa, std::string_view method,
     return true;
   }
   auto cur_key = Vec2Str(ref_var->value);
-  auto it = m.find(cur_key);
-  if (it == m.end()) {
-    out = MakeLogic4VecVal(arena, 32, 0);
-    return true;
-  }
   if (method == "next") {
-    ++it;
+    // §7.9.6 — next() yields the smallest index strictly greater than the
+    // argument value. The argument need not itself be a stored index, so
+    // compare by value rather than locating an existing entry first.
+    auto it = m.upper_bound(cur_key);
     if (it == m.end()) {
       out = MakeLogic4VecVal(arena, 32, 0);
       return true;
     }
     ref_var->value = Str2Vec(it->first, arena);
-  } else {
-    if (it == m.begin()) {
-      out = MakeLogic4VecVal(arena, 32, 0);
-      return true;
-    }
-    --it;
-    ref_var->value = Str2Vec(it->first, arena);
+    out = MakeLogic4VecVal(arena, 32, 1);
+    return true;
   }
+  auto it = m.find(cur_key);
+  if (it == m.end() || it == m.begin()) {
+    out = MakeLogic4VecVal(arena, 32, 0);
+    return true;
+  }
+  --it;
+  ref_var->value = Str2Vec(it->first, arena);
   out = MakeLogic4VecVal(arena, 32, 1);
   return true;
 }
@@ -823,24 +823,25 @@ static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
     return true;
   }
   auto cur_key = static_cast<int64_t>(ref_var->value.ToUint64());
-  auto it = m.find(cur_key);
-  if (it == m.end()) {
-    out = MakeLogic4VecVal(arena, 32, 0);
-    return true;
-  }
   if (method == "next") {
-    ++it;
+    // §7.9.6 — next() yields the smallest index strictly greater than the
+    // argument value. The argument need not itself be a stored index, so
+    // compare by value rather than locating an existing entry first.
+    auto it = m.upper_bound(cur_key);
     if (it == m.end()) {
       out = MakeLogic4VecVal(arena, 32, 0);
       return true;
     }
-  } else {
-    if (it == m.begin()) {
-      out = MakeLogic4VecVal(arena, 32, 0);
-      return true;
-    }
-    --it;
+    auto r = WriteTraversalKey(ref_var, it->first, aa->index_width, arena);
+    out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(r));
+    return true;
   }
+  auto it = m.find(cur_key);
+  if (it == m.end() || it == m.begin()) {
+    out = MakeLogic4VecVal(arena, 32, 0);
+    return true;
+  }
+  --it;
   auto r = WriteTraversalKey(ref_var, it->first, aa->index_width, arena);
   out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(r));
   return true;

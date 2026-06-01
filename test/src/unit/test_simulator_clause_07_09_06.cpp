@@ -6,18 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(AssocTraversal, NextFindsSuccessor) {
-  SimFixture f;
-  auto [aa, ref] = MakeAssocWith3Entries(f);
-  ref->value = MakeLogic4VecVal(f.arena, 32, 10);
-  Logic4Vec out{};
-  auto* call = MkAssocCall(f.arena, "aa", "next", "k");
-  bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 1u);
-  EXPECT_EQ(ref->value.ToUint64(), 20u);
-}
-
 TEST(AssocTraversal, NextReturnsZeroAtEnd) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -94,6 +82,42 @@ TEST(AssocTraversal, NextNoRefArgReturnsZero) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
+TEST(AssocTraversal, NextArgumentNeedNotBeStoredIndex) {
+  SimFixture f;
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
+  aa->index_width = 32;
+  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 1);
+  aa->int_data[30] = MakeLogic4VecVal(f.arena, 32, 2);
+  aa->int_data[50] = MakeLogic4VecVal(f.arena, 32, 3);
+  auto* ref = f.ctx.CreateVariable("k", 32);
+  ref->value = MakeLogic4VecVal(f.arena, 32, 20);
+  Logic4Vec out{};
+  auto* call = MkAssocCall(f.arena, "aa", "next", "k");
+  bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 1u);
+  EXPECT_EQ(ref->value.ToUint64(), 30u);
+}
+
+TEST(AssocTraversal, NextStringArgumentNeedNotBeStoredIndex) {
+  SimFixture f;
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
+  aa->str_data["apple"] = MakeLogic4VecVal(f.arena, 32, 1);
+  aa->str_data["cherry"] = MakeLogic4VecVal(f.arena, 32, 2);
+  auto* ref = f.ctx.CreateVariable("s", 48);
+  // "banana" sorts between the two stored keys but is not itself stored.
+  auto v = MakeLogic4Vec(f.arena, 48);
+  v.words[0].aval = (uint64_t('b') << 40) | (uint64_t('a') << 32) |
+                    (uint64_t('n') << 24) | (uint64_t('a') << 16) |
+                    (uint64_t('n') << 8) | uint64_t('a');
+  ref->value = v;
+  Logic4Vec out{};
+  auto* call = MkAssocCall(f.arena, "aa", "next", "s");
+  bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 1u);
+}
+
 TEST(AssocTraversal, NextStringKey) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
@@ -113,6 +137,36 @@ TEST(AssocTraversal, NextStringKey) {
   bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
   ASSERT_TRUE(ok);
   EXPECT_EQ(out.ToUint64(), 1u);
+}
+
+// §7.9.6 — on success the ref index variable is updated to the successor key.
+// The string-key success tests above only check the return code; this asserts
+// the assignment half of the rule by reading back the key written into ref.
+TEST(AssocTraversal, NextStringAssignsSuccessorKey) {
+  SimFixture f;
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
+  aa->str_data["apple"] = MakeLogic4VecVal(f.arena, 32, 1);
+  aa->str_data["banana"] = MakeLogic4VecVal(f.arena, 32, 2);
+  aa->str_data["cherry"] = MakeLogic4VecVal(f.arena, 32, 3);
+
+  auto* ref = f.ctx.CreateVariable("s", 48);
+  auto start = MakeLogic4Vec(f.arena, 40);
+  start.words[0].aval = (uint64_t('a') << 32) | (uint64_t('p') << 24) |
+                        (uint64_t('p') << 16) | (uint64_t('l') << 8) |
+                        uint64_t('e');
+  ref->value = start;
+
+  Logic4Vec out{};
+  auto* call = MkAssocCall(f.arena, "aa", "next", "s");
+  bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 1u);
+
+  // Successor of "apple" is "banana"; ref must now hold that encoding.
+  uint64_t expected = (uint64_t('b') << 40) | (uint64_t('a') << 32) |
+                      (uint64_t('n') << 24) | (uint64_t('a') << 16) |
+                      (uint64_t('n') << 8) | uint64_t('a');
+  EXPECT_EQ(ref->value.ToUint64(), expected);
 }
 
 }
