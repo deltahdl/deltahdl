@@ -56,7 +56,51 @@ TEST(CycleDelaySim, DefaultClockingRegistered) {
   EXPECT_NE(cmgr.Find("bus"), nullptr);
 }
 
-TEST(CycleDelaySim, ZeroCycleDelayNoSuspend) {
+TEST(CycleDelaySim, ZeroDelaySuspendsUntilEventThenProceeds) {
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kPosedge;
+  cmgr.Register(block);
+
+  // §14.11: with no clocking block event yet in the current time step, a ##0
+  // cycle delay must suspend the calling process.
+  EXPECT_FALSE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{0}));
+
+  // Once the event has occurred in the current step, a ##0 continues without
+  // suspension at that step...
+  cmgr.MarkBlockEventTime("cb", SimTime{7});
+  EXPECT_TRUE(cmgr.DidBlockEventOccurAt("cb", SimTime{7}));
+  EXPECT_TRUE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{7}));
+  // ...but a later time step has not yet seen its own clocking event.
+  EXPECT_FALSE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{8}));
+}
+
+TEST(CycleDelaySim, ZeroDelayEventTimeTracksMostRecentStep) {
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kPosedge;
+  cmgr.Register(block);
+
+  // §14.11: a ##0 continues only at the exact step whose clocking event fired.
+  cmgr.MarkBlockEventTime("cb", SimTime{4});
+  EXPECT_TRUE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{4}));
+
+  // A later clocking event advances the recorded step; the earlier step no
+  // longer counts as having a coincident event, so a ##0 there would suspend.
+  cmgr.MarkBlockEventTime("cb", SimTime{9});
+  EXPECT_FALSE(cmgr.DidBlockEventOccurAt("cb", SimTime{4}));
+  EXPECT_FALSE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{4}));
+  EXPECT_TRUE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{9}));
+
+  // A block that has never seen an event has no coincident step at all.
+  EXPECT_FALSE(cmgr.ZeroCycleDelayProceeds("absent", SimTime{9}));
+}
+
+TEST(CycleDelaySim, ZeroDelayEventTimeRecordedFromClockWatcher) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -70,11 +114,17 @@ TEST(CycleDelaySim, ZeroCycleDelayNoSuspend) {
   block.default_output_skew = SimTime{0};
   cmgr.Register(block);
   cmgr.SetDefaultClocking("cb");
-
   f.ctx.SetClockingManager(&cmgr);
+
+  SchedulePosedge(f, clk, 10);
   cmgr.Attach(f.ctx, f.scheduler);
   f.scheduler.Run();
 
+  // The clocking block event fired at time 10, so a ##0 evaluated at that step
+  // proceeds, while one evaluated at an earlier step would have suspended.
+  EXPECT_TRUE(cmgr.DidBlockEventOccurAt("cb", SimTime{10}));
+  EXPECT_TRUE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{10}));
+  EXPECT_FALSE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{5}));
 }
 
 }

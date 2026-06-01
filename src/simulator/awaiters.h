@@ -448,7 +448,17 @@ struct CycleDelayAwaiter {
   SimContext& ctx;
   uint32_t cycles;
 
-  bool await_ready() const noexcept { return cycles == 0; }
+  bool await_ready() const noexcept {
+    if (cycles != 0) return false;
+    // §14.11: ##0 proceeds immediately only when there is no governing
+    // clocking block, or when that block's event has already occurred in the
+    // current time step.
+    auto* mgr = ctx.GetClockingManager();
+    if (!mgr) return true;
+    auto block_name = mgr->GetDefaultClocking();
+    if (block_name.empty()) return true;
+    return mgr->ZeroCycleDelayProceeds(block_name, ctx.CurrentTime());
+  }
 
   void await_suspend(std::coroutine_handle<> h) {
     auto* mgr = ctx.GetClockingManager();
@@ -459,6 +469,19 @@ struct CycleDelayAwaiter {
     auto block_name = mgr->GetDefaultClocking();
     if (block_name.empty()) {
       h.resume();
+      return;
+    }
+    if (cycles == 0) {
+      // §14.11: a ##0 whose clocking event has not yet occurred this time step
+      // suspends until that event fires, then proceeds. Resume exactly once.
+      auto* done = new bool(false);
+      mgr->RegisterEdgeCallback(block_name, ctx, ctx.GetScheduler(),
+                                [h, done]() mutable {
+                                  if (*done) return;
+                                  *done = true;
+                                  delete done;
+                                  h.resume();
+                                });
       return;
     }
     auto* counter = new uint32_t(cycles);

@@ -72,6 +72,19 @@ class ClockingManager {
   void NotifyBlockEvent(std::string_view block_name);
   void InvokeEdgeCallbacks(std::string_view block_name);
 
+  // Records that the clocking block event for `block_name` fired at time `t`.
+  void MarkBlockEventTime(std::string_view block_name, SimTime t);
+
+  // True when the most recent clocking block event for `block_name` happened
+  // exactly at time `t`.
+  bool DidBlockEventOccurAt(std::string_view block_name, SimTime t) const;
+
+  // §14.11: a ##0 cycle delay continues without suspension only when the
+  // associated clocking block event has already occurred in the current time
+  // step; otherwise it must suspend until that event. Returns true when the
+  // delay may proceed immediately at time `now`.
+  bool ZeroCycleDelayProceeds(std::string_view block_name, SimTime now) const;
+
   Variable* ResolveClockingMember(std::string_view block_name,
                                   std::string_view signal_name,
                                   SimContext& ctx) const;
@@ -97,6 +110,7 @@ class ClockingManager {
   std::unordered_map<std::string_view, Variable*> block_event_vars_;
   std::unordered_map<std::string, std::vector<std::function<void()>>>
       edge_callbacks_;
+  std::unordered_map<std::string, SimTime> last_event_time_;
 };
 
 }

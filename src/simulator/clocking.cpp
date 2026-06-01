@@ -87,9 +87,10 @@ static void RegisterClockWatcher(ClockingManager* mgr, Variable* clk_var,
         auto* ev = sched.GetEventPool().Acquire();
         auto bn_copy = block_name;
         auto sigs_copy = signals;
-        ev->callback = [mgr, bn_copy, sigs_copy, &ctx]() {
+        ev->callback = [mgr, bn_copy, sigs_copy, &ctx, &sched]() {
           SampleBlockInputs(mgr, bn_copy, sigs_copy, ctx,
                             true);
+          mgr->MarkBlockEventTime(bn_copy, sched.CurrentTime());
           mgr->NotifyBlockEvent(bn_copy);
           mgr->InvokeEdgeCallbacks(bn_copy);
         };
@@ -160,6 +161,23 @@ void ClockingManager::RegisterEdgeCallback(std::string_view block_name,
   auto bn = std::string(block_name);
   edge_callbacks_[bn].push_back(std::move(cb));
 
+}
+
+void ClockingManager::MarkBlockEventTime(std::string_view block_name,
+                                         SimTime t) {
+  last_event_time_[std::string(block_name)] = t;
+}
+
+bool ClockingManager::DidBlockEventOccurAt(std::string_view block_name,
+                                           SimTime t) const {
+  auto it = last_event_time_.find(std::string(block_name));
+  if (it == last_event_time_.end()) return false;
+  return it->second == t;
+}
+
+bool ClockingManager::ZeroCycleDelayProceeds(std::string_view block_name,
+                                             SimTime now) const {
+  return DidBlockEventOccurAt(block_name, now);
 }
 
 void ClockingManager::InvokeEdgeCallbacks(std::string_view block_name) {
