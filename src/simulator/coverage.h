@@ -47,6 +47,14 @@ struct CoverPoint {
   // Trailing window of recently sampled values, used to recognize value
   // transition sequences for transition bins.
   std::vector<int64_t> sample_history;
+  // Weight Wi of this coverpoint within the covergroup coverage average (LRM
+  // 19.11). The value originates from option.weight (LRM 19.7); a coverpoint
+  // carries it so the covergroup average can weight each item.
+  int32_t weight = 1;
+  // When the coverpoint's own coverage rules (LRM 19.11.1) indicate it is to be
+  // excluded, the covergroup average drops it from both the numerator and the
+  // denominator (LRM 19.11).
+  bool excluded_from_coverage = false;
 };
 
 struct CrossBin {
@@ -89,6 +97,10 @@ struct CrossCover {
   bool iff_guard_value = true;
   CrossOption option;
   CrossTypeOption type_option;
+  // When the cross's own coverage rules (LRM 19.11.2) indicate it is to be
+  // excluded, the covergroup average drops it from both the numerator and the
+  // denominator (LRM 19.11).
+  bool excluded_from_coverage = false;
 };
 
 // Instance options of a covergroup, as organized in LRM 19.10. The legacy
@@ -335,6 +347,22 @@ class CoverageDB {
   // strobe and real_interval may only be set in the covergroup definition; the
   // remaining type options may also be assigned procedurally (LRM 19.7.1).
   static bool TypeOptionSettableProcedurally(TypeOptionKind kind);
+
+  // --- LRM 19.11: coverage computation --------------------------------------
+
+  // True when the denominator Σ Wi of the covergroup coverage equation is zero:
+  // the covergroup has no coverage items, every item weight is zero, or every
+  // item is excluded by its own coverage rules (LRM 19.11). GetCoverage maps a
+  // zero denominator to 0.0 or 100.0 depending on the covergroup's own weight.
+  static bool CovergroupCoverageDenominatorZero(const CoverGroup* group);
+
+  // Computes the $get_coverage value of a design: the weighted average of the
+  // coverage of all covergroup instances. An instance whose own denominator is
+  // zero does not contribute to the overall score. With no contributing
+  // instance — none exist, or every covergroup weight is zero — the result is
+  // 100.0 (LRM 19.11).
+  static double ComputeOverallCoverage(
+      const std::vector<const CoverGroup*>& instances);
 
  private:
   void SampleCoverPoint(CoverPoint* cp, int64_t value);

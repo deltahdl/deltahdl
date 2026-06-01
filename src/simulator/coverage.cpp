@@ -238,19 +238,30 @@ double CoverageDB::GetCrossCoverage(const CrossCover* cross) {
 }
 
 double CoverageDB::GetCoverage(const CoverGroup* group) {
-  if (group->coverpoints.empty() && group->crosses.empty()) return 0.0;
-  double sum = 0.0;
-  uint32_t count = 0;
+  // Covergroup coverage is the weighted average of its items' coverage,
+  // Cg = Σ(Wi×Ci) / Σ(Wi), where the items are the coverpoints and crosses.
+  // An item excluded by its own coverage rules is dropped from both the
+  // numerator and the denominator (LRM 19.11).
+  double numerator = 0.0;
+  int64_t denominator = 0;
   for (const auto& cp : group->coverpoints) {
-    sum += GetPointCoverage(&cp);
-    ++count;
+    if (cp.excluded_from_coverage) continue;
+    numerator += static_cast<double>(cp.weight) * GetPointCoverage(&cp);
+    denominator += cp.weight;
   }
   for (const auto& cross : group->crosses) {
-    sum += GetCrossCoverage(&cross);
-    ++count;
+    if (cross.excluded_from_coverage) continue;
+    numerator +=
+        static_cast<double>(cross.option.weight) * GetCrossCoverage(&cross);
+    denominator += cross.option.weight;
   }
-  if (count == 0) return 0.0;
-  return sum / static_cast<double>(count);
+  if (denominator == 0) {
+    // Zero denominator (no items, all weights zero, or all items excluded). A
+    // nonzero covergroup weight reports 0.0; a zero covergroup weight reports
+    // 100.0 (LRM 19.11).
+    return group->options.weight == 0 ? 100.0 : 0.0;
+  }
+  return numerator / static_cast<double>(denominator);
 }
 
 double CoverageDB::GetInstCoverage(const CoverGroup* group) {
@@ -290,10 +301,13 @@ static void CountCrossBins(const CrossCover* cross, int32_t& covered,
 
 double CoverageDB::GetCoverage(const CoverGroup* group, int32_t& covered_bins,
                                int32_t& total_bins) {
-  // Aggregate the covered/defined bin counts across all coverpoints and crosses
-  // of the covergroup (LRM 19.8).
   covered_bins = 0;
   total_bins = 0;
+  // When the covergroup's coverage denominator is zero, the numerator and
+  // denominator reported through the optional ref-int pair are both zero (LRM
+  // 19.11). Otherwise they aggregate the covered/defined bin counts across all
+  // coverpoints and crosses (LRM 19.8).
+  if (CovergroupCoverageDenominatorZero(group)) return GetCoverage(group);
   for (const auto& cp : group->coverpoints) {
     CountPointBins(&cp, covered_bins, total_bins);
   }
@@ -305,15 +319,7 @@ double CoverageDB::GetCoverage(const CoverGroup* group, int32_t& covered_bins,
 
 double CoverageDB::GetInstCoverage(const CoverGroup* group,
                                    int32_t& covered_bins, int32_t& total_bins) {
-  covered_bins = 0;
-  total_bins = 0;
-  for (const auto& cp : group->coverpoints) {
-    CountPointBins(&cp, covered_bins, total_bins);
-  }
-  for (const auto& cross : group->crosses) {
-    CountCrossBins(&cross, covered_bins, total_bins);
-  }
-  return GetInstCoverage(group);
+  return GetCoverage(group, covered_bins, total_bins);
 }
 
 double CoverageDB::GetGlobalCoverage() const {
@@ -646,6 +652,41 @@ bool CoverageDB::TypeOptionSettableProcedurally(TypeOptionKind kind) {
   // other type options may also be assigned procedurally (LRM 19.7.1).
   return kind != TypeOptionKind::kStrobe &&
          kind != TypeOptionKind::kRealInterval;
+}
+
+// --- LRM 19.11: coverage computation ----------------------------------------
+
+bool CoverageDB::CovergroupCoverageDenominatorZero(const CoverGroup* group) {
+  // The denominator Σ Wi sums the weights of the items that participate in the
+  // covergroup average. Excluded items contribute no weight (LRM 19.11).
+  int64_t denominator = 0;
+  for (const auto& cp : group->coverpoints) {
+    if (cp.excluded_from_coverage) continue;
+    denominator += cp.weight;
+  }
+  for (const auto& cross : group->crosses) {
+    if (cross.excluded_from_coverage) continue;
+    denominator += cross.option.weight;
+  }
+  return denominator == 0;
+}
+
+double CoverageDB::ComputeOverallCoverage(
+    const std::vector<const CoverGroup*>& instances) {
+  // Weighted average over the covergroup instances. An instance whose own
+  // denominator is zero does not contribute to the overall score, so it is
+  // left out of both the numerator and the denominator (LRM 19.11).
+  double numerator = 0.0;
+  int64_t denominator = 0;
+  for (const CoverGroup* g : instances) {
+    if (CovergroupCoverageDenominatorZero(g)) continue;
+    numerator += GetCoverage(g) * static_cast<double>(g->options.weight);
+    denominator += g->options.weight;
+  }
+  // No contributing instance — none exist, or every covergroup weight is
+  // zero — yields full coverage (LRM 19.11).
+  if (denominator == 0) return 100.0;
+  return numerator / static_cast<double>(denominator);
 }
 
 }
