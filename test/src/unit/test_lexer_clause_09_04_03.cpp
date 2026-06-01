@@ -19,11 +19,4 @@ TEST(LevelSensitiveEventLexing, WaitFollowedByLParen) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kLParen);
 }
 
-TEST(LevelSensitiveEventLexing, WaitFollowedByWhitespaceAndLParen) {
-  auto tokens = Lex("wait (");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwWait);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kLParen);
-}
-
 }

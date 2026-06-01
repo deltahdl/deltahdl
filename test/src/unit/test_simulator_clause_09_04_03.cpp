@@ -50,16 +50,6 @@ TEST(LevelSensitiveEventSimulation, WaitAlreadyTrue) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-bool EvaluateWaitCondition(uint64_t value) { return value != 0; }
-
-TEST(LevelSensitiveEventSimulation, WaitConditionTrueUnblocks) {
-  EXPECT_TRUE(EvaluateWaitCondition(1));
-}
-
-TEST(LevelSensitiveEventSimulation, WaitConditionFalseBlocks) {
-  EXPECT_FALSE(EvaluateWaitCondition(0));
-}
-
 TEST(LevelSensitiveEventSimulation, WaitStatementNullBody) {
   auto val = RunAndGet(
       "module m;\n"
@@ -159,6 +149,43 @@ TEST(LevelSensitiveEventSimulation, WaitZeroConditionNeverUnblocks) {
       "endmodule\n",
       "x");
   EXPECT_EQ(val, 0u);
+}
+
+// A variable condition already satisfied when the wait is reached must let the
+// following statement run without ever suspending the process.
+TEST(LevelSensitiveEventSimulation, WaitVariableAlreadyTrueProceeds) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic flag;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    flag = 1;\n"
+      "    x = 8'd0;\n"
+      "    wait (flag) x = 8'd200;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 200u);
+}
+
+// A multi-bit condition follows the same truthiness rule as a scalar: it is
+// false while zero and becomes true once any bit is set, releasing the wait.
+TEST(LevelSensitiveEventSimulation, WaitVectorNonzeroConditionUnblocks) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [3:0] cnt;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    cnt = 4'd0;\n"
+      "    x = 8'd0;\n"
+      "    #5 cnt = 4'd6;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    wait (cnt) x = 8'd123;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 123u);
 }
 
 }

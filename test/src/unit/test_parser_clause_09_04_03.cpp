@@ -23,19 +23,6 @@ TEST(LevelSensitiveEventParsing, WaitStatementWithBlock) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-TEST(LevelSensitiveEventParsing, WaitNullBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait(done);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWait);
-}
-
 TEST(LevelSensitiveEventParsing, WaitNegatedCondition) {
   auto r = Parse(
       "module m;\n"

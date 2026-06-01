@@ -53,36 +53,6 @@ TEST(LevelSensitiveEventElaboration, WaitWithBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(LevelSensitiveEventElaboration, WaitNegatedExprElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic enable;\n"
-      "  int a;\n"
-      "  initial begin\n"
-      "    wait (!enable) a = 42;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(LevelSensitiveEventElaboration, WaitComparisonExprElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] count;\n"
-      "  int x;\n"
-      "  initial begin\n"
-      "    wait (count == 8'd10) x = 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(LevelSensitiveEventElaboration, WaitWithDelayInBodyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
