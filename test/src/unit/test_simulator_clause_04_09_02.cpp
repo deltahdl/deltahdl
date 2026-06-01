@@ -120,6 +120,58 @@ TEST(ProceduralContinuousSchedulingSim, AssignTracksCurrentValuesAcrossMultipleS
   EXPECT_TRUE(c->is_forced);
 }
 
+// Claim 1 edge case: the process stays sensitive to the source, so the target
+// tracks every subsequent source change, not just the first one.
+TEST(ProceduralContinuousSchedulingSim, AssignStaysSensitiveAcrossRepeatedChanges) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, c;\n"
+      "  initial begin\n"
+      "    a = 8'd5;\n"
+      "    assign c = a;\n"
+      "    #10 a = 8'd10;\n"
+      "    #10 a = 8'd20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->value.ToUint64(), 20u);
+  EXPECT_TRUE(c->is_forced);
+}
+
+// Claim 2 followed by claim 1: after deassign deactivates the assign, a fresh
+// procedural continuous assignment re-establishes a source-sensitive process.
+TEST(ProceduralContinuousSchedulingSim, AssignReactivatesAfterDeassign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, c;\n"
+      "  initial begin\n"
+      "    a = 8'd5;\n"
+      "    assign c = a;\n"
+      "    #10 deassign c;\n"
+      "    #10 a = 8'd99;\n"
+      "    #10 assign c = a;\n"
+      "    #10 a = 8'd7;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->value.ToUint64(), 7u);
+  EXPECT_TRUE(c->is_forced);
+}
+
 TEST(ProceduralContinuousSchedulingSim, ReleaseDeactivatesForce) {
   SimFixture f;
   auto* design = ElaborateSrc(
