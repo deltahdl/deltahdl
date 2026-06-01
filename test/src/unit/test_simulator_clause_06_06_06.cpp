@@ -93,4 +93,71 @@ TEST(SupplyNetResolution, Supply1IgnoresZDriver) {
   EXPECT_EQ(var->value.ToUint64() & 0xFF, 0xFFu);
 }
 
+// §6.6.6: supply0 nets shall have supply strength on the 0 they drive.
+TEST(SupplyNetResolution, Supply0CarriesSupplyStrength) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  Net net;
+  net.type = NetType::kSupply0;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0xFF));
+  net.Resolve(arena);
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kSupply);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kSupply);
+}
+
+// §6.6.6: supply1 nets shall have supply strength on the 1 they drive.
+TEST(SupplyNetResolution, Supply1CarriesSupplyStrength) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  Net net;
+  net.type = NetType::kSupply1;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0));
+  net.Resolve(arena);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kSupply);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kSupply);
+}
+
+// §6.6.6 edge case: supply strength is unconditional. A driver declared with a
+// weaker strength does not lower the supply0 net's resolved strength below
+// supply -- the supply path runs before normal strength resolution.
+TEST(SupplyNetResolution, Supply0StrengthOverridesWeakerDriver) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  Net net;
+  net.type = NetType::kSupply0;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0xFF));
+  net.driver_strengths.push_back(DriverStrength{Strength::kWeak, Strength::kWeak});
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kSupply);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kSupply);
+}
+
+// §6.6.6 edge case: a weaker driver strength does not lower the supply1 net's
+// resolved strength below supply.
+TEST(SupplyNetResolution, Supply1StrengthOverridesWeakerDriver) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  Net net;
+  net.type = NetType::kSupply1;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0));
+  net.driver_strengths.push_back(DriverStrength{Strength::kPull, Strength::kPull});
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.ToUint64() & 0xFF, 0xFFu);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kSupply);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kSupply);
+}
+
 }

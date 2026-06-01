@@ -468,8 +468,15 @@ static bool ResolveTriPullDefault(Net& net, Arena& arena) {
 }
 
 static bool ResolveSpecialNet(Net& net, Arena& arena, Scheduler* sched) {
+  // §6.6.6: supply0 and supply1 nets model the power supplies in a circuit and
+  // shall carry supply strength. The value is pinned to 0 (supply0) or 1
+  // (supply1) and the resolved strength is forced to supply on the driven side,
+  // overriding whatever the drivers contribute.
   if (net.type == NetType::kSupply0) {
     net.resolved->value = MakeLogic4VecVal(arena, net.resolved->value.width, 0);
+    net.resolved_strength = NetStrength{};
+    net.resolved_strength.s0_hi = Strength::kSupply;
+    net.resolved_strength.s0_lo = Strength::kSupply;
     net.resolved->NotifyWatchers();
     return true;
   }
@@ -479,6 +486,9 @@ static bool ResolveSpecialNet(Net& net, Arena& arena, Scheduler* sched) {
       result.words[w] = {~uint64_t{0}, 0};
     }
     net.resolved->value = result;
+    net.resolved_strength = NetStrength{};
+    net.resolved_strength.s1_hi = Strength::kSupply;
+    net.resolved_strength.s1_lo = Strength::kSupply;
     net.resolved->NotifyWatchers();
     return true;
   }
