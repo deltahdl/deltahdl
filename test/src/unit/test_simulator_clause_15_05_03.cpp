@@ -45,6 +45,24 @@ TEST(IpcSync, TriggeredMethodReturnsOneWhenTriggered) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
+TEST(IpcSync, TriggeredMethodYieldsSingleBit) {
+  // §15.5.3: triggered is prototyped as a bit-valued method, so the evaluated
+  // result is a single-bit quantity regardless of the event's triggered state.
+  SimFixture f;
+  auto* ev = f.ctx.CreateVariable("ev", 1);
+  ev->is_event = true;
+  ev->value = MakeLogic4VecVal(f.arena, 1, 0);
+  f.ctx.SetEventTriggered("ev");
+
+  auto* access = f.arena.Create<Expr>();
+  access->kind = ExprKind::kMemberAccess;
+  access->lhs = MakeId(f.arena, "ev");
+  access->rhs = MakeId(f.arena, "triggered");
+
+  auto result = EvalExpr(access, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+}
+
 TEST(IpcSync, TriggeredMethodReturnsZeroByDefault) {
   SimFixture f;
   auto* ev = f.ctx.CreateVariable("ev", 1);
@@ -111,6 +129,35 @@ TEST(IpcSync, WaitTriggeredUnblocksInFork) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
+TEST(IpcSync, WaitTriggeredUnblocksWhenWaitPrecedesSameTimeTrigger) {
+  // §15.5.3: a process waiting on the triggered state unblocks regardless of
+  // execution order at the same simulation time. Here the waiting branch runs
+  // and blocks first, then the trigger fires later in the same step.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin wait(ev.triggered); result = 33; end\n"
+      "      -> ev;\n"
+      "    join\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 33u);
+}
+
 TEST(IpcSync, WaitTriggeredUnblocksWhenTriggerAfterWait) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -140,9 +187,11 @@ TEST(IpcSync, WaitTriggeredUnblocksWhenTriggerAfterWait) {
 
 TEST(IpcSync, NullEventTriggeredReturnsFalse) {
   SimFixture f;
-  auto* ev = f.ctx.CreateVariable("ev", 1);
-  ev->is_event = true;
-  ev->value = MakeLogic4VecVal(f.arena, 1, 0);
+  f.ctx.NullifyEventVariable("ev");
+  // §15.5.3: a null named event's triggered method is false even if a trigger
+  // tick happens to match the current time step, so record one to prove the
+  // null case is handled distinctly from the merely-never-triggered case.
+  f.ctx.SetEventTriggered("ev");
 
   auto* access = f.arena.Create<Expr>();
   access->kind = ExprKind::kMemberAccess;
@@ -176,6 +225,39 @@ TEST(IpcSync, WaitTriggeredWithBodyStatement) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+TEST(IpcSync, TriggeredStateClearsAfterTimeAdvances) {
+  // §15.5.3: the triggered state holds for the whole time step in which the
+  // event fired and then clears once simulation time advances. Reading it in
+  // the same step yields 1; reading it after a delay yields 0.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [7:0] same_step;\n"
+      "  logic [7:0] next_step;\n"
+      "  initial begin\n"
+      "    -> ev;\n"
+      "    if (ev.triggered) same_step = 8'd1; else same_step = 8'd0;\n"
+      "    #1;\n"
+      "    if (ev.triggered) next_step = 8'd1; else next_step = 8'd0;\n"
+      "  end\n"
+      "  initial #2 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* same = f.ctx.FindVariable("same_step");
+  auto* next = f.ctx.FindVariable("next_step");
+  ASSERT_NE(same, nullptr);
+  ASSERT_NE(next, nullptr);
+  EXPECT_EQ(same->value.ToUint64(), 1u);
+  EXPECT_EQ(next->value.ToUint64(), 0u);
 }
 
 }

@@ -329,6 +329,9 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   }
 
   if (base_var && base_var->is_event && field_name == "triggered") {
+    // §15.5.3: the triggered method of a null named event evaluates to false,
+    // independent of any triggered state recorded for the current time step.
+    if (base_var->is_null_event) return MakeLogic4VecVal(arena, 1, 0u);
     return MakeLogic4VecVal(arena, 1,
                             ctx.IsEventTriggered(base_name) ? 1u : 0u);
   }
