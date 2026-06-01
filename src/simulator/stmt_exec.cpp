@@ -1080,7 +1080,11 @@ static ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       co_return co_await ExecStmt(stmt->else_branch, ctx, arena);
     }
 
-    ctx.GetDiag().Error({}, "wait_order failure: events triggered out of order");
+    // §15.5.4: when no else (fail) clause is supplied, a failed sequence
+    // raises a default run-time error by calling $error (see §20.10), which
+    // records ERROR severity and lets the run continue.
+    EmitSeverityHeader(ctx, "ERROR",
+                       "wait_order events triggered out of order", std::cerr);
     co_return StmtResult::kDone;
   }
 

@@ -5,34 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(WaitOrderParser, ActionBlockWaitOrder) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait_order (a, b, c) $display(\"ok\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
-}
-
-TEST(WaitOrderParser, ActionBlockWaitOrderElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait_order (a, b) else $display(\"out of order\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
-}
-
 TEST(WaitOrderParser, WaitOrderBasic) {
   auto r = Parse(
       "module m;\n"
@@ -51,36 +23,6 @@ TEST(WaitOrderParser, WaitOrderBasic) {
   }
 }
 
-TEST(WaitOrderParser, WaitOrderWithElseKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait_order(a, b, c) success = 1;\n"
-      "    else success = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
-  ASSERT_EQ(stmt->wait_order_events.size(), 3u);
-}
-
-TEST(WaitOrderParser, WaitOrderWithElseBranches) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait_order(a, b, c) success = 1;\n"
-      "    else success = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->then_branch, nullptr);
-  ASSERT_NE(stmt->else_branch, nullptr);
-}
-
 TEST(WaitOrderParser, WaitOrderTwoEvents) {
   auto r = Parse(
       "module m;\n"
@@ -93,19 +35,6 @@ TEST(WaitOrderParser, WaitOrderTwoEvents) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
   ASSERT_EQ(stmt->wait_order_events.size(), 2u);
-}
-
-TEST(WaitOrderParser, WaitOrderNullAction) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait_order(a, b, c);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
 }
 
 TEST(WaitOrderParser, WaitOrderNull) {

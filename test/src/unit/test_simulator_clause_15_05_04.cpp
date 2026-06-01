@@ -204,6 +204,98 @@ TEST(IpcSync, WaitOrderEmptyEventsCompletes) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
+// §15.5.4: preceding events are not limited to occur only once. Once an event
+// has occurred in the prescribed order, it can be triggered again without
+// causing the construct to fail.
+TEST(IpcSync, WaitOrderPrecedingEventMayRetrigger) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event a, b, c;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    wait_order(a, b, c) result = 1;\n"
+      "    else result = 2;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 -> a;\n"
+      "    #1 -> a;\n"  // a re-triggers after already passing in order
+      "    #1 -> b;\n"
+      "    #1 -> c;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §15.5.4: only the first event in the list can wait for the persistent
+// triggered state. A non-first event that is already triggered in the current
+// time step must still be triggered afresh, so this sequence never completes
+// and neither the action nor the fail statement runs.
+TEST(IpcSync, WaitOrderOnlyFirstEventUsesPersistentTrigger) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event a, b;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    result = 8'd5;\n"
+      "    -> a;\n"  // first event: persistent triggered state satisfies it
+      "    -> b;\n"  // second event: persistent state must NOT satisfy it
+      "    wait_order(a, b) result = 8'd1;\n"
+      "    else result = 8'd2;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 5u);
+}
+
+// §15.5.4: when the else (fail) clause is omitted, a failed sequence generates
+// a default run-time error by calling $error (see §20.10).
+TEST(IpcSync, WaitOrderDefaultFailureCallsError) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event a, b;\n"
+      "  initial begin\n"
+      "    wait_order(a, b);\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 -> b;\n"
+      "    #1 -> a;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  EXPECT_EQ(f.ctx.LastSeverity(), "ERROR");
+}
+
 TEST(IpcSync, WaitOrderElseOnlyBranch) {
   LowerFixture f;
   auto* design = ElaborateSrc(
