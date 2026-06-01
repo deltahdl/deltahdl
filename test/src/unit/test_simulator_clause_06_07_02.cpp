@@ -86,4 +86,30 @@ TEST(NettypeSimulation, NettypeNetIsTaggedInSimulator) {
   EXPECT_TRUE(found);
 }
 
+// §6.7.2: a net declared with a nettype uses any associated resolution
+// function. Verify the resolution function is carried onto the lowered net
+// in the simulator (not just recorded in the RTLIR).
+TEST(NettypeSimulation, ResolvedNettypeNetCarriesResolveFunc) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef logic [7:0] T;\n"
+      "  function T Tsum(input T driver[]);\n"
+      "    Tsum = driver[0];\n"
+      "  endfunction\n"
+      "  nettype T resolved_net with Tsum;\n"
+      "  resolved_net x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+
+  auto* net = f.ctx.FindNet("x");
+  ASSERT_NE(net, nullptr);
+  EXPECT_TRUE(net->is_user_nettype);
+  EXPECT_EQ(net->resolve_func, "Tsum");
+}
+
 }

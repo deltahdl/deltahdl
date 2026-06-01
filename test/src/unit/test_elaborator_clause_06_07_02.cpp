@@ -166,6 +166,32 @@ TEST(NettypeElaboration, NettypeNetCarriesResolveFunc) {
   EXPECT_TRUE(found);
 }
 
+// §6.7.2: a net uses *any associated* resolution function of its nettype.
+// An unresolved nettype has none, so its net must carry no resolution function.
+TEST(NettypeElaboration, UnresolvedNettypeNetHasNoResolveFunc) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  nettype logic [7:0] mynet;\n"
+      "  mynet x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+
+  bool found = false;
+  for (const auto& n : mod->nets) {
+    if (n.name == "x") {
+      found = true;
+      EXPECT_TRUE(n.is_user_nettype);
+      EXPECT_TRUE(n.resolve_func.empty())
+          << "unresolved nettype net must not carry a resolution function";
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
 TEST(NettypeElaboration, MultipleNettypeNetsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(

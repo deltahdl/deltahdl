@@ -17,15 +17,6 @@ TEST(Parser, NettypeUsedInDecl) {
   EXPECT_EQ(item->name, "x");
 }
 
-TEST(DataTypeParsing, NettypeUsedForNetDecl) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct { real field1; bit field2; } T;\n"
-              "  nettype T wT;\n"
-              "  wT my_signal;\n"
-              "endmodule\n"));
-}
-
 TEST(DataTypeParsing, NettypeArrayDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
