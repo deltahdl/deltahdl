@@ -105,4 +105,22 @@ TEST(CmosSwitchElaboration, RcmosLowersToNestedTernary) {
   EXPECT_EQ(rhs->false_expr->condition->text, "pctrl");
 }
 
+// As with cmos, the rcmos lowering drives the first terminal (the data output)
+// as the left-hand side of the synthesized continuous assignment.
+TEST(CmosSwitchElaboration, RcmosOutputIsFirstTerminal) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  wire out, data, nctrl, pctrl;\n"
+      "  rcmos r1(out, data, nctrl, pctrl);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->assigns.size(), 1u);
+  ASSERT_NE(mod->assigns[0].lhs, nullptr);
+  EXPECT_EQ(mod->assigns[0].lhs->text, "out");
+}
+
 }

@@ -172,4 +172,58 @@ TEST(CmosSwitches, RcmosBlocksOutputWhenBothHalvesOff) {
   EXPECT_TRUE(SettledToHighZ(f, "y"));
 }
 
+// rcmos passes a low data value through its conducting n-channel half, observed
+// end to end through the elaborated-and-simulated design rather than a helper.
+TEST(CmosSwitches, RcmosPassesDataLowWhenNcontrolHigh) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire y, d, nc, pc;\n"
+      "  assign d = 1'b0;\n"
+      "  assign nc = 1'b1;\n"
+      "  assign pc = 1'b1;\n"
+      "  rcmos r1(y, d, nc, pc);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(SettledToKnown(f, "y", 0u));
+}
+
+// The p-channel half of rcmos conducts when its control is low, passing the
+// data value to the output through the real simulator path.
+TEST(CmosSwitches, RcmosPassesDataHighWhenPcontrolLow) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire y, d, nc, pc;\n"
+      "  assign d = 1'b1;\n"
+      "  assign nc = 1'b0;\n"
+      "  assign pc = 1'b0;\n"
+      "  rcmos r1(y, d, nc, pc);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(SettledToKnown(f, "y", 1u));
+}
+
+// When the data input is high-impedance and a half conducts, the cmos output is
+// high-impedance too — exercised through the simulator rather than the helper.
+TEST(CmosSwitches, CmosPassesHighZDataAsHighZ) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire y, d, nc, pc;\n"
+      "  assign d = 1'bz;\n"
+      "  assign nc = 1'b1;\n"
+      "  assign pc = 1'b1;\n"
+      "  cmos c1(y, d, nc, pc);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(SettledToHighZ(f, "y"));
+}
+
 }

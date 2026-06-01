@@ -189,4 +189,80 @@ TEST(CmosSwitches, CmosTerminalOrderIsOutDataNctrlPctrl) {
   EXPECT_EQ(g->gate_terminals[3]->text, "pctrl");
 }
 
+// rcmos carries the same up-to-three delay form as cmos; two delays map to the
+// rise then fall slots with no decay value retained.
+TEST(CmosSwitches, RcmosTwoValueDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  rcmos #(4, 6) r1(o, i, n, p);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRcmos);
+  ASSERT_NE(g, nullptr);
+  ASSERT_NE(g->gate_delay, nullptr);
+  EXPECT_EQ(g->gate_delay->int_val, 4u);
+  ASSERT_NE(g->gate_delay_fall, nullptr);
+  EXPECT_EQ(g->gate_delay_fall->int_val, 6u);
+  EXPECT_EQ(g->gate_delay_decay, nullptr);
+}
+
+// A single delay on rcmos applies to every output transition, so only the
+// first slot is populated.
+TEST(CmosSwitches, RcmosOneValueDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  rcmos #5 r1(out, data, nctrl, pctrl);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRcmos);
+  ASSERT_NE(g, nullptr);
+  ASSERT_NE(g->gate_delay, nullptr);
+  EXPECT_EQ(g->gate_delay->int_val, 5u);
+  EXPECT_EQ(g->gate_delay_fall, nullptr);
+  EXPECT_EQ(g->gate_delay_decay, nullptr);
+}
+
+// With no delay specification rcmos retains no delay values at all.
+TEST(CmosSwitches, RcmosNoDelaySpec) {
+  auto r = Parse(
+      "module m;\n"
+      "  rcmos r1(out, data, nctrl, pctrl);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRcmos);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_delay, nullptr);
+  EXPECT_EQ(g->gate_delay_fall, nullptr);
+  EXPECT_EQ(g->gate_delay_decay, nullptr);
+}
+
+// The delay form tops out at three values; a fourth is a parse error for rcmos
+// just as it is for cmos.
+TEST(CmosSwitches, RcmosTooManyDelaysRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  rcmos #(1, 2, 3, 4) r1(out, data, nctrl, pctrl);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// rcmos shares cmos's terminal ordering: data output, data input, then the
+// n-channel and p-channel control inputs.
+TEST(CmosSwitches, RcmosTerminalOrderIsOutDataNctrlPctrl) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire out, data, nctrl, pctrl;\n"
+      "  rcmos r1(out, data, nctrl, pctrl);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRcmos);
+  ASSERT_NE(g, nullptr);
+  ASSERT_EQ(g->gate_terminals.size(), 4u);
+  EXPECT_EQ(g->gate_terminals[0]->text, "out");
+  EXPECT_EQ(g->gate_terminals[1]->text, "data");
+  EXPECT_EQ(g->gate_terminals[2]->text, "nctrl");
+  EXPECT_EQ(g->gate_terminals[3]->text, "pctrl");
+}
+
 }
