@@ -1327,8 +1327,12 @@ static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
                               Arena& arena) {
   auto val = EvalExpr(idx_expr, ctx, arena);
   if (HasUnknownBits(val)) {
-    ctx.GetDiag().Warning({}, "associative array '" + std::string(name) +
-                                  "': index contains x/z");
+    // §7.8.6: an x/z index is an invalid read. A configured user default
+    // suppresses the diagnostic and supplies the returned value (see §7.9.11),
+    // matching the nonexistent-entry path in WarnAssocMiss.
+    if (!aa->has_default)
+      ctx.GetDiag().Warning({}, "associative array '" + std::string(name) +
+                                    "': index contains x/z");
     return AssocDefault(aa, arena);
   }
   auto key =
