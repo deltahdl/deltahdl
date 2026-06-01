@@ -86,6 +86,14 @@ TEST(PliPrePostponedSim, PrePostponedExecutesAfterPostReNBABeforePostponed) {
                          {Region::kPostponed, "postponed"});
 }
 
+// §4.4.3.9 places Pre-Postponed after processing every other region except
+// Postponed. The pairwise check above only pins its immediate neighbors;
+// drain the full region set through the production scheduler to confirm
+// Pre-Postponed is second-to-last across all regions, trailing only Postponed.
+TEST(PliPrePostponedSim, PrePostponedExecutesAfterAllRegionsExceptPostponed) {
+  VerifyAllRegionOrder();
+}
+
 TEST(PliPrePostponedSim, PrePostponedRegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
