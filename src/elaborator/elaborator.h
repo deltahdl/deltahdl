@@ -856,4 +856,21 @@ bool IsRealType(DataTypeKind k);
 RtlirNet MakeImplicitPortNet(std::string_view name, uint32_t port_width,
                              bool port_is_signed, NetType default_nettype);
 
+// §6.6.7: the structural constraints a user-defined resolution function for a
+// nettype whose data type is T must satisfy. The function shall return T, take a
+// single input argument that is a dynamic array of T, and be automatic (hold no
+// state). A class method used as a resolution function shall be a static method,
+// since it is called in a context where no class object is involved.
+struct NettypeResolutionSig {
+  bool return_type_matches_nettype = false;
+  bool single_input_argument = false;
+  bool argument_is_dynamic_array_of_type = false;
+  bool is_automatic = false;
+  bool is_class_method = false;
+  bool is_static_method = false;
+};
+
+// Returns true iff the resolution-function signature conforms to §6.6.7.
+bool ValidateNettypeResolutionFunction(const NettypeResolutionSig& sig);
+
 }  // namespace delta

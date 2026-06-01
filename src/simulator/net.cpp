@@ -579,4 +579,35 @@ void DisconnectCharge(Net& net) {
   net.charge_strength = net.base_charge_strength;
 }
 
+bool ValidateNettypeDataKind(NettypeDataKind kind) {
+  switch (kind) {
+    case NettypeDataKind::k4StateIntegral:
+    case NettypeDataKind::k2StateIntegral:
+    case NettypeDataKind::kReal:
+    case NettypeDataKind::kShortreal:
+    case NettypeDataKind::kFixedUnpackedArray:
+      return true;
+    case NettypeDataKind::kDynamicArray:
+    case NettypeDataKind::kString:
+    case NettypeDataKind::kClass:
+      return false;
+  }
+  return false;
+}
+
+bool ResolveUserDefinedNet(Net& net, const UserNettype& nettype, Arena& arena) {
+  // With a resolution function the whole driver set is handed to the function,
+  // which computes the single atomic value of the net. Without one the net is
+  // left at its existing value (an undriven nettype net is unknown).
+  if (nettype.resolution) {
+    Logic4Vec result = nettype.resolution(arena, net.drivers);
+    net.resolved->value = result;
+  }
+  return true;
+}
+
+bool CheckUnresolvedMultipleDrivers(const Net& net, const UserNettype& nt) {
+  return !nt.resolution && net.drivers.size() > 1;
+}
+
 }

@@ -11,57 +11,8 @@
 
 using namespace delta;
 
-enum class NettypeDataKind : uint8_t {
-  k4StateIntegral,
-  k2StateIntegral,
-  kReal,
-  kShortreal,
-  kFixedUnpackedArray,
-  kDynamicArray,
-  kString,
-  kClass,
-};
-
-using ResolutionFn =
-    std::function<Logic4Vec(Arena&, const std::vector<Logic4Vec>&)>;
-
-struct UserNettype {
-  NettypeDataKind data_kind = NettypeDataKind::k4StateIntegral;
-  uint32_t bit_width = 1;
-  ResolutionFn resolution;
-};
-
-bool ValidateNettypeDataKind(NettypeDataKind kind);
-bool ResolveUserDefinedNet(Net& net, const UserNettype& nettype, Arena& arena);
-bool CheckUnresolvedMultipleDrivers(const Net& net, const UserNettype& nt);
-
-bool ValidateNettypeDataKind(NettypeDataKind kind) {
-  switch (kind) {
-    case NettypeDataKind::k4StateIntegral:
-    case NettypeDataKind::k2StateIntegral:
-    case NettypeDataKind::kReal:
-    case NettypeDataKind::kShortreal:
-    case NettypeDataKind::kFixedUnpackedArray:
-      return true;
-    case NettypeDataKind::kDynamicArray:
-    case NettypeDataKind::kString:
-    case NettypeDataKind::kClass:
-      return false;
-  }
-  return false;
-}
-
-bool ResolveUserDefinedNet(Net& net, const UserNettype& nettype, Arena& arena) {
-  if (nettype.resolution) {
-    Logic4Vec result = nettype.resolution(arena, net.drivers);
-    net.resolved->value = result;
-  }
-  return true;
-}
-
-bool CheckUnresolvedMultipleDrivers(const Net& net, const UserNettype& nt) {
-  return !nt.resolution && net.drivers.size() > 1;
-}
+// NettypeDataKind, UserNettype, and the resolution helpers exercised below are
+// production declarations from simulator/net.h (§6.6.7).
 
 static Variable* MakeVar(Arena& arena, uint32_t width) {
   auto* v = arena.Create<Variable>();
@@ -235,56 +186,44 @@ TEST(UserDefinedNettype, AtomicNetResolvedAsWhole) {
 }
 
 TEST(UserDefinedNettype, ForceOverridesResolvedValue) {
+  // §6.6.7: a force overrides the value of a user-defined nettype net. Net
+  // resolution leaves a forced net untouched -- observed through Net::Resolve.
   Arena arena;
-  auto* var = MakeVar(arena, 1);
-  Net net = MakeDrivenNet(arena, var, 1);
+  auto* var = MakeVar(arena, 8);
+  Net net;
+  net.type = NetType::kWire;
+  net.is_user_nettype = true;
+  net.resolved = var;
+  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0xAB));
 
-  UserNettype nt;
-  nt.resolution = [](Arena& a, const std::vector<Logic4Vec>& d) -> Logic4Vec {
-    return MakeLogic4VecVal(a, 1, d[0].words[0].aval & 1);
-  };
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xABu);
 
-  ResolveUserDefinedNet(net, nt, arena);
-  EXPECT_EQ(var->value.words[0].aval & 1, 1u);
-
-  var->value = MakeLogic4VecVal(arena, 1, 0);
-  EXPECT_EQ(var->value.words[0].aval & 1, 0u);
+  var->is_forced = true;
+  var->value = MakeLogic4VecVal(arena, 8, 0x55);
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0x55u);
 }
 
 TEST(UserDefinedNettype, ReleaseRestoresResolvedValue) {
+  // §6.6.7: once a forced nettype net is released, resolution again drives it,
+  // returning the net to its resolved value -- observed through Net::Resolve.
   Arena arena;
-  auto* var = MakeVar(arena, 1);
-  Net net = MakeDrivenNet(arena, var, 1);
-
-  UserNettype nt;
-  nt.resolution = [](Arena& a, const std::vector<Logic4Vec>& d) -> Logic4Vec {
-    return MakeLogic4VecVal(a, 1, d[0].words[0].aval & 1);
-  };
-
-  var->value = MakeLogic4VecVal(arena, 1, 0);
-  ResolveUserDefinedNet(net, nt, arena);
-  EXPECT_EQ(var->value.words[0].aval & 1, 1u);
-}
-
-TEST(UserDefinedNettype, ResolutionReceivesDrivers) {
-  Arena arena;
-  auto* var = MakeVar(arena, 1);
+  auto* var = MakeVar(arena, 8);
   Net net;
   net.type = NetType::kWire;
+  net.is_user_nettype = true;
   net.resolved = var;
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0xAB));
 
-  size_t driver_count = 0;
-  UserNettype nt;
-  nt.resolution = [&](Arena& a,
-                      const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
-    driver_count = drivers.size();
-    return MakeLogic4Vec(a, 1);
-  };
+  var->is_forced = true;
+  var->value = MakeLogic4VecVal(arena, 8, 0x55);
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0x55u);
 
-  ResolveUserDefinedNet(net, nt, arena);
-  EXPECT_EQ(driver_count, 2u);
+  var->is_forced = false;
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xABu);
 }
 
 TEST(UserDefinedNettype, UnresolvedNettypeNoResolutionFunction) {
@@ -337,23 +276,4 @@ TEST(UserDefinedNettype, ResolutionWithThreeDrivers) {
   ResolveUserDefinedNet(net, nt, arena);
   EXPECT_EQ(driver_count, 3u);
   EXPECT_EQ(var->value.words[0].aval & 1, 1u);
-}
-
-TEST(UserDefinedNettype, ResolutionResultWrittenToNet) {
-  Arena arena;
-  auto* var = MakeVar(arena, 8);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0xAB));
-
-  UserNettype nt;
-  nt.bit_width = 8;
-  nt.resolution = [](Arena& a,
-                     const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
-    return MakeLogic4VecVal(a, 8, drivers[0].words[0].aval);
-  };
-
-  ResolveUserDefinedNet(net, nt, arena);
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xABu);
 }

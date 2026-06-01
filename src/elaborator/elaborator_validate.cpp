@@ -4801,4 +4801,18 @@ void Elaborator::ValidateDeferredAssertionActions(const ModuleDecl* decl) {
   }
 }
 
+bool ValidateNettypeResolutionFunction(const NettypeResolutionSig& sig) {
+  // The signature shape §6.6.7 requires: returns the nettype's data type, takes
+  // exactly one input argument that is a dynamic array of that type, and holds
+  // no state across calls.
+  if (!sig.return_type_matches_nettype) return false;
+  if (!sig.single_input_argument) return false;
+  if (!sig.argument_is_dynamic_array_of_type) return false;
+  if (!sig.is_automatic) return false;
+  // A class method is admissible only when it is static, because the resolution
+  // call occurs with no class object involved.
+  if (sig.is_class_method && !sig.is_static_method) return false;
+  return true;
+}
+
 }

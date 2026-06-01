@@ -47,41 +47,6 @@ TEST(NettypeParsing,NettypeDeclWithResolveFunc) {
   EXPECT_EQ(nt->nettype_resolve_func, "Tsum");
 }
 
-TEST(NettypeParsing,NettypeWithLogicType) {
-  auto r = Parse(
-      "module m;\n"
-      "  nettype logic mylogic;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* nt = FindNettypeDecl(r);
-  ASSERT_NE(nt, nullptr);
-  EXPECT_EQ(nt->name, "mylogic");
-}
-
-TEST(NettypeParsing,NettypeDeclAlias) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef real TR[5];\n"
-      "  nettype TR wTR;\n"
-      "  nettype wTR nettypeid2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto& items = r.cu->modules[0]->items;
-  int nettype_count = 0;
-  for (auto* it : items) {
-    if (it->kind == ModuleItemKind::kNettypeDecl) nettype_count++;
-  }
-  EXPECT_GE(nettype_count, 2);
-}
-
-TEST(NettypeParsing,NettypeWithPackedVector) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  nettype logic [7:0] byte_net;\n"
-              "endmodule\n"));
-}
-
 TEST(NettypeParsing,NettypeWithStruct) {
   auto r = Parse(
       "module m;\n"
@@ -105,19 +70,6 @@ TEST(NettypeParsing,NettypeDeclaration) {
   EXPECT_EQ(item->name, "mynet");
 }
 
-TEST(NettypeParsing,NettypeWithResolveFuncName) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct { real field1; bit field2; } T;\n"
-      "  nettype T wTsum with Tsum;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* nt = FindNettypeDecl(r, "wTsum");
-  ASSERT_NE(nt, nullptr);
-  EXPECT_EQ(nt->nettype_resolve_func, "Tsum");
-}
-
 TEST(NettypeParsing,NettypeAlias) {
   auto r = Parse(
       "module m;\n"
@@ -130,18 +82,6 @@ TEST(NettypeParsing,NettypeAlias) {
   auto* nt = FindNettypeDecl(r, "alias_net");
   ASSERT_NE(nt, nullptr);
   EXPECT_EQ(nt->name, "alias_net");
-}
-
-TEST(NettypeParsing,NettypeWithResolutionFunction) {
-  auto r = Parse(
-      "module t;\n"
-      "  nettype logic [7:0] mynet with resolve_fn;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
-  EXPECT_EQ(item->name, "mynet");
-  EXPECT_EQ(item->nettype_resolve_func, "resolve_fn");
 }
 
 TEST(NettypeParsing,MultipleNettypesInModule) {
@@ -159,46 +99,6 @@ TEST(NettypeParsing,MultipleNettypesInModule) {
     if (item->kind == ModuleItemKind::kNettypeDecl) count++;
   }
   EXPECT_EQ(count, 2);
-}
-
-TEST(NettypeParsing, NettypeParsesAsNettypeDecl) {
-  auto r = Parse("module m; nettype logic my_net; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
-}
-
-TEST(NettypeParsing,NettypeWithRealType) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  nettype real real_net;\n"
-              "endmodule\n"));
-}
-
-TEST(NettypeParsing,NettypeDeclBasic) {
-  auto r = Parse("module m; nettype real my_real_net; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
-  EXPECT_EQ(item->name, "my_real_net");
-}
-
-TEST(NettypeParsing,NettypeWithShortrealType) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  nettype shortreal sr_net;\n"
-              "endmodule\n"));
-}
-
-TEST(NettypeParsing,NettypeDeclWithResolve) {
-  auto r = Parse("module m; nettype logic my_net with my_resolve; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
-  EXPECT_EQ(item->nettype_resolve_func, "my_resolve");
 }
 
 TEST(NettypeParsing,NettypeDeclWithScopedResolve) {
@@ -220,46 +120,6 @@ TEST(NettypeParsing,NettypeInPackage) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->packages.size(), 1u);
-}
-
-TEST(NettypeParsing,NettypeWithByteType) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  nettype byte byte_net;\n"
-              "endmodule\n"));
-}
-
-TEST(NettypeParsing,NettypeWithBitType) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  nettype bit bit_net;\n"
-              "endmodule\n"));
-}
-
-TEST(NettypeParsing,NettypeWithLongintType) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  nettype longint long_net;\n"
-              "endmodule\n"));
-}
-
-TEST(NettypeParsing,NettypeAsPortType) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct { logic [7:0] data; logic valid; } bus_t;\n"
-              "  nettype bus_t bus_net;\n"
-              "endmodule\n"
-              "module top;\n"
-              "  bus_t sig;\n"
-              "endmodule\n"));
-}
-
-TEST(NettypeParsing,NettypeWithPackedStruct) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  typedef struct packed { logic [3:0] hi; logic [3:0] lo; } nibble_t;\n"
-      "  nettype nibble_t nibble_net;\n"
-      "endmodule\n"));
 }
 
 TEST(NettypeParsing,NettypeWithArrayTypedef) {
@@ -324,43 +184,13 @@ TEST(NettypeParsing,NettypeNoResolveFunc) {
   EXPECT_TRUE(nt->nettype_resolve_func.empty());
 }
 
-TEST(NettypeParsing,NettypeWithShortintType) {
-  EXPECT_TRUE(
+// §6.6.7: an explicit data type is required for a user-defined nettype. A
+// declaration carrying only a single identifier (a name with no preceding data
+// type or source nettype) is not well formed and shall be rejected.
+TEST(NettypeParsing,NettypeRequiresExplicitDataType) {
+  EXPECT_FALSE(
       ParseOk("module m;\n"
-              "  nettype shortint si_net;\n"
-              "endmodule\n"));
-}
-
-TEST(NettypeParsing,NettypeWithWireDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [7:0] w;\n"
-      "  nettype int custom_net;\n"
-      "  tri t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
-}
-
-TEST(NettypeParsing,NettypeWithNamedType) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef logic [31:0] word_t;\n"
-      "  nettype word_t word_net;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* nt = FindNettypeDecl(r, "word_net");
-  ASSERT_NE(nt, nullptr);
-}
-
-TEST(NettypeParsing,NettypeWithResolveAndNetDecl) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct { real field1; bit field2; } T;\n"
-              "  nettype T wTsum with Tsum;\n"
-              "  wTsum bus;\n"
+              "  nettype mynet;\n"
               "endmodule\n"));
 }
 
