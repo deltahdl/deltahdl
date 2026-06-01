@@ -397,6 +397,33 @@ static size_t FindDirectiveInStripped(std::string_view stripped) {
   return std::string_view::npos;
 }
 
+// 22.2: a language element is allowed on the same line before a directive.
+// FindDirectiveInStripped only reports a directive that begins the line; this
+// locates a directive that follows code, so the preceding element is emitted
+// and the directive still acts. Backticks inside string literals are not
+// directives, and a backtick that introduces a name absent from the directive
+// set is a macro usage rather than a directive, so both are skipped.
+static size_t FindMidLineDirective(std::string_view s) {
+  bool in_string = false;
+  for (size_t i = 0; i < s.size(); ++i) {
+    char c = s[i];
+    if (c == '"' && (i == 0 || s[i - 1] != '\\') && (i == 0 || s[i - 1] != '`')) {
+      in_string = !in_string;
+      continue;
+    }
+    if (in_string) continue;
+    if (c == '`') {
+      size_t start = i + 1;
+      size_t end = start;
+      while (end < s.size() && IsIdentChar(s[end])) ++end;
+      if (end > start && IsCompilerDirective(s.substr(start, end - start))) {
+        return i;
+      }
+    }
+  }
+  return std::string_view::npos;
+}
+
 bool Preprocessor::ProcessBlockCommentLine(std::string_view line,
                                            uint32_t file_id, uint32_t line_num,
                                            int depth, std::string& output) {
@@ -489,6 +516,22 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
           auto conditioned = ExpandInlineConditionals(std::string(dir_text));
           auto expanded =
               ExpandInlineMacros(conditioned, file_id, line_num);
+          TrackDesignElement(Trim(expanded));
+          output.append(expanded);
+        }
+      } else if (size_t mid = FindMidLineDirective(stripped);
+                 mid != std::string_view::npos) {
+        // A language element precedes a directive on this line (22.2): emit the
+        // element with full expansion, then let the directive take effect.
+        auto prefix = std::string_view(stripped).substr(0, mid);
+        auto pre_cond = ExpandInlineConditionals(std::string(prefix));
+        auto pre_expanded = ExpandInlineMacros(pre_cond, file_id, line_num);
+        TrackDesignElement(Trim(pre_expanded));
+        output.append(pre_expanded);
+        auto dir_text = std::string_view(stripped).substr(mid);
+        if (!ProcessDirective(dir_text, file_id, line_num, depth, output)) {
+          auto cond = ExpandInlineConditionals(std::string(dir_text));
+          auto expanded = ExpandInlineMacros(cond, file_id, line_num);
           TrackDesignElement(Trim(expanded));
           output.append(expanded);
         }

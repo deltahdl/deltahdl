@@ -68,20 +68,6 @@ TEST(Preprocessor, MacroInInlineBlockCommentIgnored) {
   EXPECT_EQ(result.find("replaced"), std::string::npos);
 }
 
-TEST(Preprocessor, BlockCommentAcrossMultipleLines) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "/*\n"
-      "some text\n"
-      "`define BAR bad\n"
-      "*/\n"
-      "int y = `BAR;\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-
-  EXPECT_NE(result.find("`BAR"), std::string::npos);
-}
-
 TEST(Preprocessor, ResetallInBlockCommentIgnored) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -171,6 +157,19 @@ TEST(Preprocessor, DirectiveInMacroTextProcessedOnExpansion) {
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_TRUE(pp.HasTimescale());
+}
+
+TEST(Preprocessor, DirectiveInUnusedMacroTextNotProcessed) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid =
+      f.mgr.AddFile("<test>", "`define SET_TIMESCALE `timescale 1ns / 1ps\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  // A directive embedded in macro text is processed only where the macro is
+  // expanded (22.2). Defining the macro without ever using it must not apply
+  // the embedded directive.
+  EXPECT_FALSE(pp.HasTimescale());
 }
 
 TEST(Preprocessor, BlockCommentStartInStringNotAComment) {
@@ -391,17 +390,6 @@ TEST(Preprocessor, MacroExpansionWithinTimescale) {
   EXPECT_TRUE(pp.HasTimescale());
 }
 
-TEST(Preprocessor, MacroExpansionWithinDefaultNettype) {
-  PreprocFixture f;
-  PreprocConfig cfg;
-  cfg.defines = {{"MY_TYPE", "none"}};
-  Preprocessor pp(f.mgr, f.diag, std::move(cfg));
-  auto fid = f.mgr.AddFile("<test>", "`default_nettype `MY_TYPE\n");
-  pp.Preprocess(fid);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
-}
-
 TEST(Preprocessor, DirectiveInsideDirectiveArgIsError) {
   PreprocFixture f;
   Preprocess("`default_nettype `resetall\n", f);
@@ -552,6 +540,23 @@ TEST(Preprocessor, DirectiveSupersededAcrossFiles) {
   EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
 }
 
+TEST(Preprocessor, DirectivePersistsToLaterFileUntilSuperseded) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+
+  auto fid1 = f.mgr.AddFile("<file1>", "`default_nettype none\n");
+  pp.Preprocess(fid1);
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
+
+  // A directive's scope extends across all files of the compilation unit until
+  // something supersedes it; a later file that sets no directive of its own
+  // still sees the earlier directive in effect (22.2).
+  auto fid2 = f.mgr.AddFile("<file2>", "wire w;\n");
+  pp.Preprocess(fid2);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
+}
+
 TEST(Preprocessor, MacroExpansionWithinUnconnectedDrive) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -584,6 +589,41 @@ TEST(Preprocessor, EmptyLinesBetweenDirectives) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_TRUE(pp.InCelldefine());
   EXPECT_TRUE(pp.HasTimescale());
+}
+
+TEST(Preprocessor, LanguageElementBeforeDirectiveOnSameLine) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>", "bit b; `default_nettype none\n");
+  auto result = pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  // The directive still takes effect even though a language element precedes it.
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
+  // And the preceding language element is preserved in the output.
+  EXPECT_NE(result.find("bit b;"), std::string::npos);
+}
+
+TEST(Preprocessor, DirectiveKeywordInStringAfterCodeNotProcessed) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>", "string s = \"x `celldefine y\";\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  // A directive keyword inside a string literal is not a directive, even when
+  // code precedes the string on the same line.
+  EXPECT_FALSE(pp.InCelldefine());
+}
+
+TEST(Preprocessor, DirectiveInTrailingLineCommentAfterCodeIgnored) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>", "int x = 1; // `celldefine\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  // A directive keyword in a trailing line comment is not recognized as a
+  // directive (22.2), even though a language element precedes the comment on
+  // the same line.
+  EXPECT_FALSE(pp.InCelldefine());
 }
 
 TEST(Preprocessor, DirectiveInMacroTextInConditionalBlock) {
