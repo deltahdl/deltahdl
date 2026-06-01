@@ -112,4 +112,33 @@ bool ResolveUserDefinedNet(Net& net, const UserNettype& nettype, Arena& arena);
 // a net of that nettype to be driven by more than one driver.
 bool CheckUnresolvedMultipleDrivers(const Net& net, const UserNettype& nt);
 
+// §6.7.3 initialization of nets with user-defined nettypes. The rules below all
+// describe the state a nettype net is brought to at time zero, before any
+// initial/always procedure runs, so they are exposed as a pure helper that can
+// be applied and observed without the surrounding scheduling machinery.
+
+// §6.7.3: establish a nettype net's value at time zero. First the net's initial
+// value is set to the default defined by its data type (per Table 6-7); for a
+// 4-state data type that default is x, not z. The resolution function, when the
+// nettype has one, is then activated exactly once -- this guaranteed call
+// happens even when the net has no drivers, in which case it is handed an empty
+// driver array. Returns false only when the net has no resolved storage.
+bool InitializeUserDefinedNet(Net& net, const UserNettype& nettype,
+                              Arena& arena);
+
+// §6.7.3: one initializer for a member of a struct-typed nettype net. offset is
+// the member's least-significant bit position within the packed struct value.
+struct StructMemberInit {
+  uint32_t offset = 0;
+  uint32_t width = 0;
+  bool has_initializer = false;
+  Logic4Vec init_value;
+};
+
+// §6.7.3: compute the time-zero value of a net whose nettype data type is a
+// struct. Members start at the 4-state data-type default (x); any member that
+// carries an initialization expression has that value applied over its bits.
+Logic4Vec InitialStructNetValue(Arena& arena, uint32_t total_width,
+                                const std::vector<StructMemberInit>& members);
+
 }
