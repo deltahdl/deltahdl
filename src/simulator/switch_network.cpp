@@ -142,6 +142,23 @@ bool BidirSwitchControlIsUnknown(BidirSwitchKind kind, Logic4Word control) {
   return (control.bval & 1) != 0;
 }
 
+uint64_t BidirSwitchTurnOnDelay(const BidirSwitchDelaySpec& spec) {
+  return spec.has_turn_on ? spec.turn_on : 0;
+}
+
+uint64_t BidirSwitchTurnOffDelay(const BidirSwitchDelaySpec& spec) {
+  if (spec.has_turn_off) return spec.turn_off;
+  if (spec.has_turn_on) return spec.turn_on;
+  return 0;
+}
+
+uint64_t BidirSwitchBuiltinControlXZDelay(const BidirSwitchDelaySpec& spec) {
+  if (spec.has_turn_off)
+    return spec.turn_on < spec.turn_off ? spec.turn_on : spec.turn_off;
+  if (spec.has_turn_on) return spec.turn_on;
+  return 0;
+}
+
 void ResolveBidirSwitchNetwork(std::vector<BidirSwitchInst>& switches,
                                Arena& ) {
   InitialiseTerminals(switches);

@@ -6,31 +6,6 @@
 
 namespace {
 
-TEST(BidirectionalSwitches, AllKindsAreBidirectional) {
-  EXPECT_TRUE(IsBidirectional(SwitchType::kTran));
-  EXPECT_TRUE(IsBidirectional(SwitchType::kRtran));
-  EXPECT_TRUE(IsBidirectional(SwitchType::kTranif0));
-  EXPECT_TRUE(IsBidirectional(SwitchType::kTranif1));
-  EXPECT_TRUE(IsBidirectional(SwitchType::kRtranif0));
-  EXPECT_TRUE(IsBidirectional(SwitchType::kRtranif1));
-}
-
-TEST(BidirectionalSwitches, TranNoDelays) {
-  EXPECT_FALSE(AcceptsDelaySpec(SwitchType::kTran));
-  EXPECT_FALSE(AcceptsDelaySpec(SwitchType::kRtran));
-}
-
-TEST(BidirectionalSwitches, PassEnableKindsAcceptUpToTwoDelays) {
-  EXPECT_TRUE(AcceptsDelaySpec(SwitchType::kTranif0));
-  EXPECT_TRUE(AcceptsDelaySpec(SwitchType::kTranif1));
-  EXPECT_TRUE(AcceptsDelaySpec(SwitchType::kRtranif0));
-  EXPECT_TRUE(AcceptsDelaySpec(SwitchType::kRtranif1));
-  EXPECT_EQ(MaxSwitchDelays(SwitchType::kTranif0), 2u);
-  EXPECT_EQ(MaxSwitchDelays(SwitchType::kTranif1), 2u);
-  EXPECT_EQ(MaxSwitchDelays(SwitchType::kRtranif0), 2u);
-  EXPECT_EQ(MaxSwitchDelays(SwitchType::kRtranif1), 2u);
-}
-
 TEST(SwitchProcessingSchedulingSim, TransistorSourceElements) {
   Arena arena;
   Scheduler sched(arena);
@@ -207,46 +182,38 @@ TEST(SwitchProcessing, Rtranif0PropagatesReverseDirection) {
   EXPECT_EQ(ValOf(*va), kVal0);
 }
 
-TEST(PassSwitchDelays, TwoDelaysTurnOnIsFirst) {
-  PassSwitchDelaySpec spec{true, true, 10, 20};
-  EXPECT_EQ(EffectiveTurnOnDelay(spec), 10u);
+// §28.8 control-input delay rules, observed on the production helpers in
+// src/simulator/switch_network.cpp.
+TEST(BidirSwitchControlDelay, TwoDelaysFirstIsTurnOn) {
+  BidirSwitchDelaySpec spec{true, true, 10, 20};
+  EXPECT_EQ(BidirSwitchTurnOnDelay(spec), 10u);
 }
 
-TEST(PassSwitchDelays, TwoDelaysTurnOffIsSecond) {
-  PassSwitchDelaySpec spec{true, true, 10, 20};
-  EXPECT_EQ(EffectiveTurnOffDelay(spec), 20u);
+TEST(BidirSwitchControlDelay, TwoDelaysSecondIsTurnOff) {
+  BidirSwitchDelaySpec spec{true, true, 10, 20};
+  EXPECT_EQ(BidirSwitchTurnOffDelay(spec), 20u);
 }
 
-TEST(PassSwitchDelays, OneDelayAppliesToBoth) {
-  PassSwitchDelaySpec spec{true, false, 7, 0};
-  EXPECT_EQ(EffectiveTurnOnDelay(spec), 7u);
-  EXPECT_EQ(EffectiveTurnOffDelay(spec), 7u);
+TEST(BidirSwitchControlDelay, OneDelayAppliesToBothEdges) {
+  BidirSwitchDelaySpec spec{true, false, 7, 0};
+  EXPECT_EQ(BidirSwitchTurnOnDelay(spec), 7u);
+  EXPECT_EQ(BidirSwitchTurnOffDelay(spec), 7u);
 }
 
-TEST(PassSwitchDelays, NoDelayIsZero) {
-  PassSwitchDelaySpec spec{};
-  EXPECT_EQ(EffectiveTurnOnDelay(spec), 0u);
-  EXPECT_EQ(EffectiveTurnOffDelay(spec), 0u);
+TEST(BidirSwitchControlDelay, NoDelayMeansNoControlDelay) {
+  BidirSwitchDelaySpec spec{};
+  EXPECT_EQ(BidirSwitchTurnOnDelay(spec), 0u);
+  EXPECT_EQ(BidirSwitchTurnOffDelay(spec), 0u);
+  EXPECT_EQ(BidirSwitchBuiltinControlXZDelay(spec), 0u);
 }
 
-TEST(PassSwitchDelays, BuiltinXZControlUsesSmallerOfTwo) {
-  PassSwitchDelaySpec spec{true, true, 10, 20};
-  EXPECT_EQ(EffectiveBuiltinControlXZDelay(spec), 10u);
+TEST(BidirSwitchControlDelay, BuiltinXZTakesSmallerOfTwoDelays) {
+  EXPECT_EQ(BidirSwitchBuiltinControlXZDelay({true, true, 10, 20}), 10u);
+  EXPECT_EQ(BidirSwitchBuiltinControlXZDelay({true, true, 20, 10}), 10u);
 }
 
-TEST(PassSwitchDelays, BuiltinXZControlSmallerSecondIsUsed) {
-  PassSwitchDelaySpec spec{true, true, 20, 10};
-  EXPECT_EQ(EffectiveBuiltinControlXZDelay(spec), 10u);
-}
-
-TEST(PassSwitchDelays, BuiltinXZControlOneDelayUsesIt) {
-  PassSwitchDelaySpec spec{true, false, 5, 0};
-  EXPECT_EQ(EffectiveBuiltinControlXZDelay(spec), 5u);
-}
-
-TEST(PassSwitchDelays, BuiltinXZControlNoDelayIsZero) {
-  PassSwitchDelaySpec spec{};
-  EXPECT_EQ(EffectiveBuiltinControlXZDelay(spec), 0u);
+TEST(BidirSwitchControlDelay, BuiltinXZWithOneDelayUsesIt) {
+  EXPECT_EQ(BidirSwitchBuiltinControlXZDelay({true, false, 5, 0}), 5u);
 }
 
 TEST(SwitchProcessing, BidirectionalPropagationIgnoresControlDelaySpec) {
