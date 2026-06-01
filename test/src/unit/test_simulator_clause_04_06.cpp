@@ -93,6 +93,52 @@ TEST(DeterminismSim, NBAExecutionOrderMatchesSourceOrder) {
   EXPECT_EQ(result, 1u);
 }
 
+// §4.6(b): the NBA scheduled by the last source statement is the one performed
+// last, no matter the values assigned. A high-then-low-then-high sequence rules
+// out any "largest value wins" misreading -- only source order decides, so the
+// final value must equal the last statement's right-hand side.
+TEST(DeterminismSim, NBALastSourceStatementWinsRegardlessOfValue) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin\n"
+      "    a <= 8'd9;\n"
+      "    a <= 8'd4;\n"
+      "    a <= 8'd7;\n"
+      "  end\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result, 7u);
+}
+
+// §4.6(a): source order is preserved when statements live inside an inner
+// begin-end block. Each assignment reads the result of the previous one, so any
+// reordering across the nested-block boundary would change the observed values.
+TEST(DeterminismSim, NestedBlockStatementsExecuteInSourceOrder) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c, d;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"
+      "    begin\n"
+      "      b = a + 8'd1;\n"
+      "      c = b + 8'd1;\n"
+      "    end\n"
+      "    d = c + 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 3u);
+  EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 4u);
+}
+
 TEST(DeterminismSim, SourceOrderPreservedAcrossSuspension) {
   auto result = RunAndGet(
       "module t;\n"
