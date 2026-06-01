@@ -70,6 +70,11 @@ struct CoverPoint {
   // excluded, the covergroup average drops it from both the numerator and the
   // denominator (LRM 19.11).
   bool excluded_from_coverage = false;
+  // Number of run-time errors raised by samples that hit an illegal bin. An
+  // illegal value or transition occurrence is reported as a run-time error and
+  // contributes to no coverage bin; illegal bins take precedence over every
+  // other bin a sample might also match (LRM 19.5.6).
+  uint64_t illegal_violations = 0;
 };
 
 struct CrossBin {
@@ -456,6 +461,40 @@ class CoverageDB {
   // unbounded or undetermined varying length; it is legal only when the
   // sequence has a bounded (determined) length (LRM 19.5.5).
   static bool IgnoreTransitionLengthLegal(bool sequence_bounded);
+
+  // --- LRM 19.5.6: specifying illegal coverage point values or transitions ---
+
+  // Removes every value named by an illegal_bins state set from a coverage
+  // bin's value set. Each occurrence of an illegal value is dropped; the
+  // remaining values keep their relative order. Like the ignore case, this
+  // removal is performed only after values have been distributed to the
+  // specified bins, so it acts on an already-populated value set (LRM 19.5.6).
+  static std::vector<int64_t> RemoveIllegalValues(
+      const std::vector<int64_t>& bin_values,
+      const std::vector<int64_t>& illegal_values);
+
+  // True when a covered transition sequence must be excluded because it cannot
+  // be matched without also matching an illegal transition sequence — that is,
+  // when the illegal sequence occurs as a contiguous subsequence of the covered
+  // one (an illegal 2=>3 removes the covered 1=>2=>3=>4) (LRM 19.5.6).
+  static bool CoveredTransitionIsIllegal(const std::vector<int64_t>& covered,
+                                         const std::vector<int64_t>& illegal);
+
+  // Specifying an illegal individual value has no effect on a transition that
+  // includes the value: a transition bin is never removed merely because its
+  // sequence passes through an illegal state value. Always false (LRM 19.5.6).
+  static bool IllegalValueAffectsTransition(
+      int64_t illegal_value, const std::vector<int64_t>& transition);
+
+  // An illegal_bins transition specification cannot describe a sequence of
+  // unbounded or undetermined varying length; it is legal only when the
+  // sequence has a bounded (determined) length (LRM 19.5.6).
+  static bool IllegalTransitionLengthLegal(bool sequence_bounded);
+
+  // Illegal bins take precedence over any other bins: a value or transition
+  // that hits an illegal bin raises a run-time error even when it is also
+  // included in another (legal) bin. Always true (LRM 19.5.6).
+  static bool IllegalTakesPrecedence(bool also_in_other_bin);
 
   // --- LRM 19.7: instance coverage options ----------------------------------
 

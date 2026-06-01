@@ -119,6 +119,16 @@ CrossCover* CoverageDB::AddCross(CoverGroup* group, CrossCover cross) {
 
 void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
   if (cp->has_iff_guard && !cp->iff_guard_value) return;
+  // An illegal bin takes precedence over every other bin: a sampled value that
+  // hits an illegal state bin is a run-time error and is counted toward no
+  // coverage bin, even when it also belongs to another bin (LRM 19.5.6).
+  bool value_is_illegal = false;
+  for (const auto& bin : cp->bins) {
+    if (bin.kind == CoverBinKind::kIllegal && MatchesBin(bin, value)) {
+      value_is_illegal = true;
+      break;
+    }
+  }
   // A value "lies within a defined bin" if it matches any non-default bin,
   // including illegal and ignore bins. The default bin catches only what the
   // defined bins miss (LRM 19.5).
@@ -129,11 +139,16 @@ void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
     matched_defined = true;
     if (bin.kind == CoverBinKind::kIllegal) continue;
     if (bin.kind == CoverBinKind::kIgnore) continue;
+    // The illegal match dominates this sample, so the value counts toward no
+    // other bin (LRM 19.5.6).
+    if (value_is_illegal) continue;
     // A per-bin iff guard that is false at this sampling point suppresses the
     // increment for this bin (LRM 19.5.1).
     if (bin.has_iff_guard && !bin.iff_guard_value) continue;
     ++bin.hit_count;
   }
+  // Issue the run-time error for an illegal value occurrence (LRM 19.5.6).
+  if (value_is_illegal) ++cp->illegal_violations;
   if (!matched_defined) {
     for (auto& bin : cp->bins) {
       if (bin.kind == CoverBinKind::kDefault) ++bin.hit_count;
@@ -142,10 +157,17 @@ void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
 
   // Transition bins count whenever the most recent samples complete one of
   // their value-transition sequences (LRM 19.5).
+  // An illegal_bins transition bin (kind kIllegal carrying transition
+  // sequences) is tracked alongside ordinary transition bins so that a
+  // completed illegal sequence can raise its run-time error (LRM 19.5.6).
+  auto is_transition_bin = [](const CoverBin& bin) {
+    return bin.kind == CoverBinKind::kTransition ||
+           (bin.kind == CoverBinKind::kIllegal && !bin.transitions.empty());
+  };
   size_t max_seq = 0;
   bool any_transition = false;
   for (const auto& bin : cp->bins) {
-    if (bin.kind != CoverBinKind::kTransition) continue;
+    if (!is_transition_bin(bin)) continue;
     any_transition = true;
     for (const auto& seq : bin.transitions) {
       if (seq.size() > max_seq) max_seq = seq.size();
@@ -162,7 +184,7 @@ void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
   }
 
   for (auto& bin : cp->bins) {
-    if (bin.kind != CoverBinKind::kTransition) continue;
+    if (!is_transition_bin(bin)) continue;
     for (const auto& seq : bin.transitions) {
       if (seq.empty() || cp->sample_history.size() < seq.size()) continue;
       size_t off = cp->sample_history.size() - seq.size();
@@ -174,7 +196,13 @@ void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
         }
       }
       if (match) {
-        ++bin.hit_count;
+        // A completed illegal transition is a run-time error and counts toward
+        // no coverage bin; an ordinary transition bin increments (LRM 19.5.6).
+        if (bin.kind == CoverBinKind::kIllegal) {
+          ++cp->illegal_violations;
+        } else {
+          ++bin.hit_count;
+        }
         break;
       }
     }
@@ -741,6 +769,68 @@ bool CoverageDB::IgnoreTransitionLengthLegal(bool sequence_bounded) {
   // An ignored transition sequence of unbounded or undetermined length is
   // illegal; only a bounded sequence is allowed (LRM 19.5.5).
   return sequence_bounded;
+}
+
+// --- LRM 19.5.6: specifying illegal coverage point values or transitions ----
+
+std::vector<int64_t> CoverageDB::RemoveIllegalValues(
+    const std::vector<int64_t>& bin_values,
+    const std::vector<int64_t>& illegal_values) {
+  // Each illegal value is removed from the bin's set of values; the surviving
+  // values keep their relative order (LRM 19.5.6).
+  std::vector<int64_t> result;
+  result.reserve(bin_values.size());
+  for (int64_t value : bin_values) {
+    bool illegal = false;
+    for (int64_t bad : illegal_values) {
+      if (bad == value) {
+        illegal = true;
+        break;
+      }
+    }
+    if (!illegal) result.push_back(value);
+  }
+  return result;
+}
+
+bool CoverageDB::CoveredTransitionIsIllegal(
+    const std::vector<int64_t>& covered, const std::vector<int64_t>& illegal) {
+  // The covered sequence is removed when the illegal sequence appears within it
+  // contiguously: every occurrence of the covered sequence then necessarily
+  // matches the illegal one as well (LRM 19.5.6).
+  if (illegal.empty()) return false;
+  if (illegal.size() > covered.size()) return false;
+  for (size_t start = 0; start + illegal.size() <= covered.size(); ++start) {
+    bool match = true;
+    for (size_t i = 0; i < illegal.size(); ++i) {
+      if (covered[start + i] != illegal[i]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return true;
+  }
+  return false;
+}
+
+bool CoverageDB::IllegalValueAffectsTransition(
+    int64_t /*illegal_value*/, const std::vector<int64_t>& /*transition*/) {
+  // Specifying a single illegal value never removes a transition that passes
+  // through it (LRM 19.5.6).
+  return false;
+}
+
+bool CoverageDB::IllegalTransitionLengthLegal(bool sequence_bounded) {
+  // An illegal transition sequence of unbounded or undetermined length is not
+  // allowed; only a bounded sequence is legal (LRM 19.5.6).
+  return sequence_bounded;
+}
+
+bool CoverageDB::IllegalTakesPrecedence(bool /*also_in_other_bin*/) {
+  // An illegal bin always wins: hitting it raises a run-time error regardless
+  // of whether the value or transition also belongs to another bin
+  // (LRM 19.5.6).
+  return true;
 }
 
 // --- LRM 19.7: instance coverage options ------------------------------------
