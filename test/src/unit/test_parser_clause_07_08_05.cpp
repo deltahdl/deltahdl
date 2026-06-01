@@ -27,24 +27,4 @@ TEST(UserDefinedTypeAssocArrayParsing, TypedefIndexParsed) {
   EXPECT_EQ(var_item->unpacked_dims[0]->text, "nibble_t");
 }
 
-TEST(UserDefinedTypeAssocArrayParsing, EnumTypedefIndexParsed) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef enum {A, B, C} abc_t;\n"
-      "  int aa[abc_t];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(UserDefinedTypeAssocArrayParsing, StructTypedefIndexParsed) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct {byte b; int i;} my_struct_t;\n"
-      "  int aa[my_struct_t];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 }

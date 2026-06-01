@@ -1076,15 +1076,27 @@ void Elaborator::ValidateIntegralIndexSelect(const ModuleDecl* decl) {
   }
 }
 
-static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds) {
+static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds,
+                             int depth = 0) {
+  // Guard against a pathological recursive typedef chain; a legitimate type
+  // nests only a handful of levels deep.
+  if (depth > 16) return false;
   if (dtype.kind == DataTypeKind::kNamed) {
     auto it = tds.find(dtype.type_name);
-    if (it != tds.end()) return ContainsRealType(it->second, tds);
+    if (it != tds.end()) return ContainsRealType(it->second, tds, depth + 1);
     return false;
   }
   if (IsRealType(dtype.kind)) return true;
   for (const auto& m : dtype.struct_members) {
     if (IsRealType(m.type_kind)) return true;
+    // A member written through a typedef only reveals a real after the alias is
+    // resolved, so follow a named member type into the typedef table and check
+    // whatever it ultimately denotes (including a nested struct that holds one).
+    if (m.type_kind == DataTypeKind::kNamed) {
+      auto it = tds.find(m.type_name);
+      if (it != tds.end() && ContainsRealType(it->second, tds, depth + 1))
+        return true;
+    }
   }
   return false;
 }
