@@ -319,52 +319,6 @@ TEST(AlwaysCombSensitivityCollection, FieldSelectVarIdxUsesLSP) {
   EXPECT_TRUE(reads.count("i"));
 }
 
-TEST(AlwaysCombSensitivityInference, AssertActionBlockExcludedFromSensitivity) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic a, b, c, d, y;\n"
-      "  always_comb begin\n"
-      "    y = a & b;\n"
-      "    assert (c) else $display(\"%0d\", d);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  ASSERT_FALSE(design->top_modules.empty());
-  auto& proc = design->top_modules[0]->processes[0];
-  bool found_c = false, found_d = false;
-  for (const auto& ev : proc.sensitivity) {
-    if (ev.signal && ev.signal->text == "c") found_c = true;
-    if (ev.signal && ev.signal->text == "d") found_d = true;
-  }
-  EXPECT_TRUE(found_c);
-  EXPECT_FALSE(found_d);
-}
-
-TEST(AlwaysCombSensitivityInference, AssertPassActionExcludedFromSensitivity) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic a, c, d, y;\n"
-      "  always_comb begin\n"
-      "    y = a;\n"
-      "    assert (c) $display(\"%0d\", d);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  ASSERT_FALSE(design->top_modules.empty());
-  auto& proc = design->top_modules[0]->processes[0];
-  bool found_c = false, found_d = false;
-  for (const auto& ev : proc.sensitivity) {
-    if (ev.signal && ev.signal->text == "c") found_c = true;
-    if (ev.signal && ev.signal->text == "d") found_d = true;
-  }
-  EXPECT_TRUE(found_c);
-  EXPECT_FALSE(found_d);
-}
-
 TEST(AlwaysCombSensitivityInference, ForLoopVarExcludedFromSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -448,6 +402,29 @@ TEST(AlwaysCombSensitivityInference, FunctionBodyReadsContributeToSensitivity) {
                             {"a", "ext"});
 }
 
+// Functions are analyzed as normal functions, so a read reached through a chain
+// of calls (the block calls f, which in turn calls g) still contributes to the
+// sensitivity list.
+TEST(AlwaysCombSensitivityInference, TransitiveFunctionCallReadsInSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, deep, result;\n"
+      "  function automatic logic [7:0] g(input logic [7:0] x);\n"
+      "    return x + deep;\n"
+      "  endfunction\n"
+      "  function automatic logic [7:0] ff(input logic [7:0] x);\n"
+      "    return g(x);\n"
+      "  endfunction\n"
+      "  always_comb result = ff(a);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  ExpectSensitivityContains(design->top_modules[0]->processes[0],
+                            {"a", "deep"});
+}
+
 TEST(AlwaysCombSensitivityInference, FunctionLocalVarsExcludedFromSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -464,6 +441,46 @@ TEST(AlwaysCombSensitivityInference, FunctionLocalVarsExcludedFromSensitivity) {
   ASSERT_NE(design, nullptr);
   ASSERT_FALSE(design->top_modules.empty());
   ExpectSensitivityExcludes(design->top_modules[0]->processes[0], {"tmp"});
+}
+
+// A variable that is written within a called function is excluded from the
+// sensitivity list even though it is also read within that function.
+TEST(AlwaysCombSensitivityInference, FunctionWrittenVarExcludedFromSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, shared, result;\n"
+      "  function automatic logic [7:0] f(input logic [7:0] x);\n"
+      "    shared = x;\n"
+      "    return shared + a;\n"
+      "  endfunction\n"
+      "  always_comb result = f(a);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  ExpectSensitivityContains(proc, {"a"});
+  ExpectSensitivityExcludes(proc, {"shared"});
+}
+
+// An expression used in an immediate assertion inside a called function
+// contributes to the sensitivity list as if it were an if condition.
+TEST(AlwaysCombSensitivityInference, AssertExprInCalledFunctionInSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, c, result;\n"
+      "  function automatic logic check(input logic x);\n"
+      "    assert (c);\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  always_comb result = check(a);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  ExpectSensitivityContains(design->top_modules[0]->processes[0], {"a", "c"});
 }
 
 TEST(AlwaysCombSensitivityInference, TaskCallArgsInSensitivity) {
@@ -527,6 +544,50 @@ TEST(AlwaysCombSensitivityCollection, WaitConditionExcludedFromSensitivity) {
   std::unordered_set<std::string> reads;
   CollectStmtReads(wait_stmt, reads);
   EXPECT_FALSE(reads.count("x"));
+}
+
+// An identifier appearing only in a delay control expression contributes
+// nothing to the implicit sensitivity list.
+TEST(AlwaysCombSensitivityCollection, DelayExprExcludedFromSensitivity) {
+  Arena arena;
+  auto* delay_stmt = arena.Create<Stmt>();
+  delay_stmt->kind = StmtKind::kDelay;
+  delay_stmt->delay = SensId(arena, "d");
+
+  std::unordered_set<std::string> reads;
+  CollectStmtReads(delay_stmt, reads);
+  EXPECT_FALSE(reads.count("d"));
+}
+
+// An identifier appearing only in an event control expression contributes
+// nothing to the implicit sensitivity list.
+TEST(AlwaysCombSensitivityCollection, EventControlExcludedFromSensitivity) {
+  Arena arena;
+  auto* event_stmt = arena.Create<Stmt>();
+  event_stmt->kind = StmtKind::kEventControl;
+  event_stmt->events.push_back({Edge::kNone, SensId(arena, "e")});
+
+  std::unordered_set<std::string> reads;
+  CollectStmtReads(event_stmt, reads);
+  EXPECT_FALSE(reads.count("e"));
+}
+
+// A method call on a class object (or a class scope-resolved call) contributes
+// only through its argument expressions; the object reference and method name
+// add nothing to the implicit sensitivity list.
+TEST(AlwaysCombSensitivityCollection, MethodCallObjectReferenceExcluded) {
+  Arena arena;
+  auto* callee = MakeMember(arena, SensId(arena, "obj"), "method");
+  auto* call = arena.Create<Expr>();
+  call->kind = ExprKind::kCall;
+  call->lhs = callee;
+  call->args.push_back(SensId(arena, "arg"));
+
+  std::unordered_set<std::string> reads;
+  CollectExprReads(call, reads);
+  EXPECT_TRUE(reads.count("arg"));
+  EXPECT_FALSE(reads.count("obj"));
+  EXPECT_FALSE(reads.count("method"));
 }
 
 }

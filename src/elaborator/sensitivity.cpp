@@ -29,6 +29,15 @@ void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out) {
     CollectSelectReads(expr, out);
     return;
   }
+  if (expr->kind == ExprKind::kCall) {
+    // A call contributes to the implicit sensitivity list only through its
+    // argument expressions. The callee reference itself adds nothing: a plain
+    // function name is neither a net nor a variable, and a reference to a class
+    // object on which a method is invoked (or a class scope-resolved name)
+    // contributes only via the arguments passed to the call.
+    for (auto* arg : expr->args) CollectExprReads(arg, out);
+    return;
+  }
   CollectExprReads(expr->lhs, out);
   CollectExprReads(expr->rhs, out);
   CollectExprReads(expr->condition, out);
