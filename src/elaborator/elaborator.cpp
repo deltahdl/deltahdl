@@ -2879,6 +2879,7 @@ void Elaborator::TrackVarArrayInfo(const ModuleItem* item,
                     var.is_assoc,
                     {},
                     {}};
+  info.is_queue = var.is_queue;
   if (var.is_assoc && item->unpacked_dims[0] &&
       item->unpacked_dims[0]->kind == ExprKind::kIdentifier) {
     info.assoc_index_type = item->unpacked_dims[0]->text;

@@ -3423,6 +3423,83 @@ void Elaborator::ValidateConstantFunctionCalls(const ModuleDecl* decl) {
   ValidateConstFuncCallsInItems(decl->items, ctx);
 }
 
+// §7.7: at a DPI import call, an open-array (unsized) formal with an output
+// direction may not receive a dynamic array or queue actual. The unsized
+// dimension means the C side has no agreed-upon element count to write back
+// into, so this association is prohibited.
+void Elaborator::CheckDpiOpenArrayCall(const Expr* call) {
+  if (!call || call->kind != ExprKind::kCall || call->callee.empty()) return;
+  auto it = dpi_import_decls_.find(call->callee);
+  if (it == dpi_import_decls_.end() || it->second == nullptr) return;
+  const ModuleItem* imp = it->second;
+  // Only positional binding is analyzed; named association is left untouched.
+  for (auto name : call->arg_names) {
+    if (!name.empty()) return;
+  }
+  size_t count = std::min(call->args.size(), imp->func_args.size());
+  for (size_t i = 0; i < count; ++i) {
+    const FunctionArg& formal = imp->func_args[i];
+    bool is_open =
+        !formal.unpacked_dims.empty() && formal.unpacked_dims[0] == nullptr;
+    bool is_output = formal.direction == Direction::kOutput ||
+                     formal.direction == Direction::kInout;
+    if (!is_open || !is_output) continue;
+    const Expr* actual = call->args[i];
+    if (!actual || actual->kind != ExprKind::kIdentifier) continue;
+    auto vit = var_array_info_.find(actual->text);
+    if (vit == var_array_info_.end()) continue;
+    if (vit->second.is_dynamic || vit->second.is_queue) {
+      diag_.Error(
+          actual->range.start,
+          std::format("a dynamic array or queue cannot be passed to the "
+                      "open-array output argument of DPI import '{}'",
+                      call->callee));
+    }
+  }
+}
+
+void Elaborator::WalkExprForDpiCalls(const Expr* e) {
+  if (!e) return;
+  CheckDpiOpenArrayCall(e);
+  WalkExprForDpiCalls(e->lhs);
+  WalkExprForDpiCalls(e->rhs);
+  WalkExprForDpiCalls(e->condition);
+  WalkExprForDpiCalls(e->true_expr);
+  WalkExprForDpiCalls(e->false_expr);
+  WalkExprForDpiCalls(e->base);
+  WalkExprForDpiCalls(e->index);
+  WalkExprForDpiCalls(e->index_end);
+  for (auto* a : e->args) WalkExprForDpiCalls(a);
+  for (auto* el : e->elements) WalkExprForDpiCalls(el);
+}
+
+void Elaborator::WalkStmtsForDpiArgs(const Stmt* s) {
+  if (!s) return;
+  WalkExprForDpiCalls(s->rhs);
+  WalkExprForDpiCalls(s->expr);
+  WalkExprForDpiCalls(s->condition);
+  for (auto* sub : s->stmts) WalkStmtsForDpiArgs(sub);
+  WalkStmtsForDpiArgs(s->then_branch);
+  WalkStmtsForDpiArgs(s->else_branch);
+  WalkStmtsForDpiArgs(s->body);
+  WalkStmtsForDpiArgs(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForDpiArgs(ci.body);
+}
+
+void Elaborator::ValidateDpiOpenArrayArgs(const ModuleDecl* decl) {
+  dpi_import_decls_.clear();
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kDpiImport && !item->name.empty())
+      dpi_import_decls_[item->name] = item;
+  }
+  if (dpi_import_decls_.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->body) WalkStmtsForDpiArgs(item->body);
+    for (auto* s : item->func_body_stmts) WalkStmtsForDpiArgs(s);
+    WalkExprForDpiCalls(item->init_expr);
+  }
+}
+
 // §13.4.4
 static bool StmtSpawnsBackgroundProcess(const Stmt* s) {
   if (!s) return false;

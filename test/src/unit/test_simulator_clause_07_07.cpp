@@ -161,29 +161,167 @@ TEST(ArrayArgPassing, MultipleArrayArgs) {
   EXPECT_EQ(result.ToUint64(), 20u);
 }
 
-TEST(ArrayArgPassing, AllElementsCopied) {
-  FuncFixture f;
+// A fixed-size formal may also receive a dynamic array of equal size. The
+// elements are copied in by value and read back through the formal.
+TEST(ArrayArgPassing, DynamicArrayEqualSizeToFixedFormal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int d[] = '{10, 20, 30, 40};\n"
+      "  int result;\n"
+      "  function int second(int arr[4]);\n"
+      "    return arr[1];\n"
+      "  endfunction\n"
+      "  initial result = second(d);\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 20u);
+}
 
-  MakeArray4(f, "src");
+// Passing a dynamic array whose size differs from a fixed-size formal is the
+// case the standard flags as requiring a run-time check: the mismatch is
+// diagnosed when the call is bound.
+TEST(ArrayArgPassing, DynamicArraySizeMismatchToFixedFormalRuntimeError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int d[] = '{10, 20, 30};\n"
+      "  int result;\n"
+      "  function int second(int arr[4]);\n"
+      "    return arr[1];\n"
+      "  endfunction\n"
+      "  initial result = second(d);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_TRUE(f.diag.HasErrors());
+}
 
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "read_last";
-  func->is_automatic = true;
-  FunctionArg arg;
-  arg.direction = Direction::kInput;
-  arg.data_type.kind = DataTypeKind::kInt;
-  arg.name = "arr";
-  arg.unpacked_dims.push_back(MakeInt(f.arena, 4));
-  func->func_args.push_back(arg);
+// The same equal-size run-time check governs a queue actual bound to a
+// fixed-size formal.
+TEST(ArrayArgPassing, QueueSizeMismatchToFixedFormalRuntimeError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int result;\n"
+      "  function int second(int arr[4]);\n"
+      "    return arr[1];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    q.push_back(10);\n"
+      "    q.push_back(20);\n"
+      "    result = second(q);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_TRUE(f.diag.HasErrors());
+}
 
-  auto* ret_expr = MakeSelect(f.arena, "arr", 3);
-  func->func_body_stmts.push_back(MakeReturn(f.arena, ret_expr));
-  f.ctx.RegisterFunction("read_last", func);
+// An unsized formal dimension matches any size of the actual, so a formal that
+// accepts a dynamic array can be passed a fixed-size array of compatible type.
+TEST(ArrayArgPassing, FixedArrayToUnsizedDynamicFormal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int a[4];\n"
+      "  int result;\n"
+      "  function int third(int arr[]);\n"
+      "    return arr[2];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    a[0] = 5; a[1] = 10; a[2] = 30; a[3] = 40;\n"
+      "    result = third(a);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 30u);
+}
 
-  auto* call = MakeCall(f.arena, "read_last", {MakeId(f.arena, "src")});
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 40u);
+// A dynamic array bound to an unsized formal is copied by value through the
+// queue-backed representation, so the callee reads the actual's elements.
+TEST(ArrayArgPassing, DynamicArrayToUnsizedFormal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int d[] = '{10, 20, 30, 40};\n"
+      "  int result;\n"
+      "  function int third(int arr[]);\n"
+      "    return arr[2];\n"
+      "  endfunction\n"
+      "  initial result = third(d);\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 30u);
+}
+
+// A queue of equal size binds to a fixed-size formal: its elements are copied
+// in by value and read back through the formal.
+TEST(ArrayArgPassing, QueueEqualSizeToFixedFormal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int result;\n"
+      "  function int second(int arr[4]);\n"
+      "    return arr[1];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    q.push_back(10);\n"
+      "    q.push_back(20);\n"
+      "    q.push_back(30);\n"
+      "    q.push_back(40);\n"
+      "    result = second(q);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 20u);
+}
+
+// A queue bound to an unsized formal is copied by value into the formal's own
+// queue-backed storage, so the callee reads the actual's elements.
+TEST(ArrayArgPassing, QueueToUnsizedFormal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int result;\n"
+      "  function int third(int arr[]);\n"
+      "    return arr[2];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    q.push_back(10);\n"
+      "    q.push_back(20);\n"
+      "    q.push_back(30);\n"
+      "    q.push_back(40);\n"
+      "    result = third(q);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 30u);
+}
+
+// Because the bind makes an independent copy, mutating the formal inside the
+// callee leaves the caller's dynamic array untouched.
+TEST(ArrayArgPassing, DynamicArrayCallerUnchanged) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int d[] = '{42, 7, 3};\n"
+      "  int dummy;\n"
+      "  int result;\n"
+      "  function int modify(int arr[3]);\n"
+      "    arr[0] = 999;\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    dummy = modify(d);\n"
+      "    result = d[0];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 42u);
 }
 
 }

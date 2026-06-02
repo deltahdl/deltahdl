@@ -373,6 +373,13 @@ class Elaborator {
 
   void ValidateConstantFunctionCalls(const ModuleDecl* decl);
 
+  // §7.7: a dynamic array or queue may not be passed to a DPI import formal
+  // that is an open array (unsized) with an output direction.
+  void ValidateDpiOpenArrayArgs(const ModuleDecl* decl);
+  void WalkStmtsForDpiArgs(const Stmt* s);
+  void WalkExprForDpiCalls(const Expr* e);
+  void CheckDpiOpenArrayCall(const Expr* call);
+
   // §13.4.4
   void ValidateBackgroundFuncCallContext(const ModuleDecl* decl);
 
@@ -719,6 +726,7 @@ class Elaborator {
     bool is_assoc = false;
     std::string_view assoc_index_type;
     std::vector<uint32_t> dim_sizes;
+    bool is_queue = false;
   };
 
   std::unordered_set<std::string_view> declared_names_;
@@ -727,6 +735,7 @@ class Elaborator {
   std::unordered_map<std::string_view, SourceLoc> proc_assign_targets_;
   std::unordered_map<std::string_view, DataTypeKind> var_types_;
   std::unordered_map<std::string_view, VarArrayInfo> var_array_info_;
+  std::unordered_map<std::string_view, const ModuleItem*> dpi_import_decls_;
 
   std::unordered_set<std::string_view> packed_array_vars_;
   std::unordered_set<std::string_view> specparam_names_;

@@ -834,20 +834,49 @@ static bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
                             SimContext& ctx, Arena& arena) {
   if (!call_arg || call_arg->kind != ExprKind::kIdentifier) return false;
   if (TryBindAssocArg(call_arg, formal.name, ctx)) return true;
-  auto* info = ctx.FindArrayInfo(call_arg->text);
-  if (!info) return false;
 
-  if (!formal.unpacked_dims.empty() && formal.unpacked_dims[0] != nullptr &&
-      (info->is_dynamic || info->is_queue)) {
-    auto formal_size = EvalExpr(formal.unpacked_dims[0], ctx, arena).ToUint64();
-    if (info->size != formal_size) {
-      ctx.GetDiag().Error(
-          {}, "array size mismatch: formal expects " +
-                  std::to_string(formal_size) + " elements, actual has " +
-                  std::to_string(info->size));
+  // Dynamic arrays and queues hold their elements in a QueueObject rather than
+  // as per-element variables, so a by-value bind copies through that object;
+  // the formal becomes a fresh, independent copy of the actual.
+  if (auto* src_q = ctx.FindQueue(call_arg->text)) {
+    if (formal.unpacked_dims.empty()) return false;
+    if (formal.unpacked_dims[0] != nullptr) {
+      // A fixed-size formal accepts a dynamic array or queue only when the
+      // sizes are equal; this can only be verified at the time of the call.
+      auto formal_size =
+          EvalExpr(formal.unpacked_dims[0], ctx, arena).ToUint64();
+      if (src_q->elements.size() != formal_size) {
+        ctx.GetDiag().Error(
+            {}, "array size mismatch: formal expects " +
+                    std::to_string(formal_size) + " elements, actual has " +
+                    std::to_string(src_q->elements.size()));
+        return true;
+      }
+      ArrayInfo finfo;
+      finfo.size = static_cast<uint32_t>(formal_size);
+      finfo.elem_width = src_q->elem_width;
+      finfo.is_4state = src_q->is_4state;
+      ctx.RegisterArray(formal.name, finfo);
+      for (uint32_t j = 0; j < finfo.size; ++j) {
+        auto dst = std::string(formal.name) + "[" + std::to_string(j) + "]";
+        auto* dst_var = ctx.CreateLocalVariable(
+            *arena.Create<std::string>(std::move(dst)),
+            src_q->elements[j].width);
+        dst_var->value = src_q->elements[j];
+      }
       return true;
     }
+    // An unsized formal keeps the dynamic-array/queue representation, so the
+    // callee reads the copy through the same queue-backed select path.
+    auto* dst_q = ctx.CreateQueue(formal.name, src_q->elem_width,
+                                  src_q->max_size, src_q->is_4state);
+    dst_q->elements = src_q->elements;
+    dst_q->AssignFreshIds();
+    return true;
   }
+
+  auto* info = ctx.FindArrayInfo(call_arg->text);
+  if (!info) return false;
 
   ctx.RegisterArray(formal.name, *info);
   for (uint32_t j = 0; j < info->size; ++j) {

@@ -1871,6 +1871,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ValidateContAssignToClockvar(decl);
   ValidateSyncDriveForm(decl);
   ValidateConstantFunctionCalls(decl);
+  ValidateDpiOpenArrayArgs(decl);
   ValidateBackgroundFuncCallContext(decl);
   ValidateSequenceEventArgs(decl);
   ValidateHierRefIntoChecker(decl);
