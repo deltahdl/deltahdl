@@ -657,6 +657,117 @@ bool CoverageDB::CrossBareVariableAllowed(bool variable_is_real) {
   return !variable_is_real;
 }
 
+// --- LRM 19.6.1: defining cross coverage bins -------------------------------
+
+std::vector<std::vector<int64_t>> CoverageDB::BinsofYield(const CoverPoint* cp,
+                                                          int64_t bin_index) {
+  std::vector<std::vector<int64_t>> yielded;
+  if (cp == nullptr) return yielded;
+  if (bin_index >= 0) {
+    // binsof(cp.bin) yields the single named coverpoint bin.
+    if (static_cast<size_t>(bin_index) < cp->bins.size()) {
+      yielded.push_back(cp->bins[static_cast<size_t>(bin_index)].values);
+    }
+    return yielded;
+  }
+  // binsof(cp) yields every bin of the coverpoint.
+  for (const auto& bin : cp->bins) {
+    yielded.push_back(bin.values);
+  }
+  return yielded;
+}
+
+std::vector<size_t> CoverageDB::SelectBinsByIntersect(
+    const std::vector<std::vector<int64_t>>& bins,
+    const std::vector<int64_t>& values, bool negate) {
+  std::vector<size_t> selected;
+  for (size_t i = 0; i < bins.size(); ++i) {
+    bool intersects = false;
+    for (int64_t v : bins[i]) {
+      if (IsInValueSet(values, v)) {
+        intersects = true;
+        break;
+      }
+    }
+    // The inclusion form keeps the bins that intersect the desired values; the
+    // negated form keeps those that do not (LRM 19.6.1).
+    if (intersects != negate) selected.push_back(i);
+  }
+  return selected;
+}
+
+std::vector<std::vector<size_t>> CoverageDB::EnumerateCrossProducts(
+    const std::vector<size_t>& per_point_bin_counts) {
+  std::vector<std::vector<size_t>> products;
+  if (per_point_bin_counts.empty()) return products;
+  for (size_t count : per_point_bin_counts) {
+    if (count == 0) return products;
+  }
+  std::vector<size_t> idx(per_point_bin_counts.size(), 0);
+  while (true) {
+    products.push_back(idx);
+    size_t pos = per_point_bin_counts.size();
+    while (true) {
+      --pos;
+      if (++idx[pos] < per_point_bin_counts[pos]) break;
+      idx[pos] = 0;
+      if (pos == 0) return products;
+    }
+  }
+}
+
+std::vector<std::vector<size_t>> CoverageDB::SelectProductsByPointBins(
+    const std::vector<size_t>& per_point_bin_counts, size_t point,
+    const std::vector<size_t>& selected_point_bins) {
+  std::vector<std::vector<size_t>> selected;
+  for (const auto& product : EnumerateCrossProducts(per_point_bin_counts)) {
+    if (point >= product.size()) continue;
+    if (std::find(selected_point_bins.begin(), selected_point_bins.end(),
+                  product[point]) != selected_point_bins.end()) {
+      selected.push_back(product);
+    }
+  }
+  return selected;
+}
+
+std::vector<std::vector<size_t>> CoverageDB::AndCrossSelections(
+    const std::vector<std::vector<size_t>>& lhs,
+    const std::vector<std::vector<size_t>>& rhs) {
+  std::vector<std::vector<size_t>> both;
+  for (const auto& p : lhs) {
+    if (std::find(rhs.begin(), rhs.end(), p) != rhs.end()) both.push_back(p);
+  }
+  return both;
+}
+
+std::vector<std::vector<size_t>> CoverageDB::OrCrossSelections(
+    const std::vector<std::vector<size_t>>& lhs,
+    const std::vector<std::vector<size_t>>& rhs) {
+  std::vector<std::vector<size_t>> either = lhs;
+  for (const auto& q : rhs) {
+    if (std::find(either.begin(), either.end(), q) == either.end()) {
+      either.push_back(q);
+    }
+  }
+  return either;
+}
+
+std::vector<std::vector<size_t>> CoverageDB::RetainedAutoCrossProducts(
+    const std::vector<size_t>& per_point_bin_counts,
+    const std::vector<std::vector<size_t>>& user_selected_products,
+    bool retain_auto_bins) {
+  std::vector<std::vector<size_t>> retained;
+  if (!retain_auto_bins) return retained;
+  for (const auto& product : EnumerateCrossProducts(per_point_bin_counts)) {
+    if (std::find(user_selected_products.begin(),
+                  user_selected_products.end(),
+                  product) == user_selected_products.end()) {
+      retained.push_back(product);
+    }
+  }
+  return retained;
+}
+
 // --- LRM 19.5.1: specifying bins for values ---------------------------------
 
 std::string CoverageDB::StateBinName(std::string_view base, int64_t index) {

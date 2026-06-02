@@ -318,6 +318,61 @@ class CoverageDB {
   // expression (LRM 19.6).
   static bool CrossBareVariableAllowed(bool variable_is_real);
 
+  // --- LRM 19.6.1: defining cross coverage bins -----------------------------
+
+  // binsof yields the bins of its expression. With bin_index < 0 the argument
+  // is a coverpoint (binsof(cp)) and every bin of the coverpoint is yielded;
+  // with bin_index >= 0 the argument is a single coverpoint bin (binsof(cp.bin))
+  // and only that one bin is yielded. The yielded bins are returned as their
+  // associated value sets (LRM 19.6.1).
+  static std::vector<std::vector<int64_t>> BinsofYield(const CoverPoint* cp,
+                                                       int64_t bin_index = -1);
+
+  // From a coverpoint's bins (given as their value sets), selects those whose
+  // associated values intersect the desired value set: the inclusion form
+  // "binsof(x) intersect {y}". With negate, selects the bins whose values do
+  // not intersect, i.e. "! binsof(x) intersect {y}". Returns the indices of the
+  // selected bins (LRM 19.6.1).
+  static std::vector<size_t> SelectBinsByIntersect(
+      const std::vector<std::vector<int64_t>>& bins,
+      const std::vector<int64_t>& values, bool negate);
+
+  // Enumerates the cross products of a cross whose coverpoints have the given
+  // bin counts: the Cartesian product of bin indices, one index per coverpoint.
+  // Each product is the tuple of chosen bin indices. A coverpoint with no bins
+  // yields no products (LRM 19.6.1).
+  static std::vector<std::vector<size_t>> EnumerateCrossProducts(
+      const std::vector<size_t>& per_point_bin_counts);
+
+  // The cross products a single-coverpoint select expression denotes within a
+  // cross: those whose chosen bin at coverpoint `point` is one of
+  // `selected_point_bins` (the bins kept by SelectBinsByIntersect). The other
+  // coverpoints range over all of their bins (LRM 19.6.1).
+  static std::vector<std::vector<size_t>> SelectProductsByPointBins(
+      const std::vector<size_t>& per_point_bin_counts, size_t point,
+      const std::vector<size_t>& selected_point_bins);
+
+  // Combines two cross-product selections with the logical && operator: the
+  // products present in both selections (LRM 19.6.1).
+  static std::vector<std::vector<size_t>> AndCrossSelections(
+      const std::vector<std::vector<size_t>>& lhs,
+      const std::vector<std::vector<size_t>>& rhs);
+
+  // Combines two cross-product selections with the logical || operator: the
+  // products present in either selection, without duplication (LRM 19.6.1).
+  static std::vector<std::vector<size_t>> OrCrossSelections(
+      const std::vector<std::vector<size_t>>& lhs,
+      const std::vector<std::vector<size_t>>& rhs);
+
+  // The automatically generated cross products retained alongside a set of
+  // user-defined cross bins. By default (cross_retain_auto_bins true) an auto
+  // bin is retained for each cross product not selected by any user-defined
+  // cross bin; when the option is false none are retained (LRM 19.6.1).
+  static std::vector<std::vector<size_t>> RetainedAutoCrossProducts(
+      const std::vector<size_t>& per_point_bin_counts,
+      const std::vector<std::vector<size_t>>& user_selected_products,
+      bool retain_auto_bins);
+
   // --- LRM 19.5.1: specifying bins for values -------------------------------
 
   // Distributes a covergroup_range_list's items across a fixed number of bins.
