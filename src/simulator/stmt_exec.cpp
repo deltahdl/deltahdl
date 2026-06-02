@@ -1158,12 +1158,16 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto* spawning_proc = ctx.CurrentProcess();
   state->parent_proc = spawning_proc;
 
-  WaitForkState* parent_wfs = nullptr;
-  Process* parent_proc = nullptr;
-  if (stmt->join_kind == TokenKind::kKwJoinNone) {
-    parent_proc = spawning_proc;
-    if (parent_proc) parent_wfs = &parent_proc->wait_fork_state;
-  }
+  // §9.6.1: wait fork blocks until every immediate child subprocess of the
+  // current process has terminated, irrespective of how the child was
+  // spawned. Register each child against the spawning process's wait-fork
+  // tally for all join kinds, not just join_none: after join_any the
+  // unblocked siblings keep running and a later wait fork must still wait on
+  // them. (For plain join the count is already drained by the join site, so
+  // the extra bookkeeping is inert.)
+  Process* parent_proc = spawning_proc;
+  WaitForkState* parent_wfs =
+      parent_proc ? &parent_proc->wait_fork_state : nullptr;
 
   for (auto* s : stmt->fork_stmts) {
     if (IsForkBlockItemDecl(s)) continue;
