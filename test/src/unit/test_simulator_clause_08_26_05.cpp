@@ -251,4 +251,54 @@ TEST(InterfaceClassCastingAndRefAssignment, E2eCastNullLiteralToInterfaceSucceed
       "endmodule\n", "result"), 1u);
 }
 
+// A dynamic cast between interface class variables is only legal when the
+// concrete object actually held by the source can satisfy the destination
+// interface. Here the held object implements IA but not IB, so casting the
+// IA-typed handle into an IB-typed handle must fail and report 0.
+TEST(InterfaceClassCastingAndRefAssignment, E2eCastBetweenInterfaceVarsFailsWhenNotImplemented) {
+  EXPECT_EQ(RunAndGet(
+      "interface class IA;\n"
+      "  pure virtual function void fa();\n"
+      "endclass\n"
+      "interface class IB;\n"
+      "  pure virtual function void fb();\n"
+      "endclass\n"
+      "class C implements IA;\n"
+      "  virtual function void fa();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c_obj;\n"
+      "    IA a_ref;\n"
+      "    IB b_ref;\n"
+      "    c_obj = new;\n"
+      "    a_ref = c_obj;\n"
+      "    result = $cast(b_ref, a_ref);\n"
+      "  end\n"
+      "endmodule\n", "result"), 0u);
+}
+
+// Casting an object handle to an interface class type is only legal when the
+// actual object implements that interface. Class C does not implement IC, so
+// the cast must fail and report 0 rather than succeed.
+TEST(InterfaceClassCastingAndRefAssignment, E2eCastObjectToUnimplementedInterfaceFails) {
+  EXPECT_EQ(RunAndGet(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "class C;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c_obj;\n"
+      "    IC ic_ref;\n"
+      "    c_obj = new;\n"
+      "    result = $cast(ic_ref, c_obj);\n"
+      "  end\n"
+      "endmodule\n", "result"), 0u);
+}
+
 }
