@@ -162,4 +162,46 @@ TEST(InterfaceClassMethodConflict, VirtualClassPrototypeResolvesConflict) {
       "endmodule\n"));
 }
 
+// Claim A: the single resolving "implementation" need not be declared in the
+// implementing class itself; a concrete virtual method inherited from a base
+// class can simultaneously satisfy the same-named pure virtuals of every
+// implemented interface.
+TEST(InterfaceClassMethodConflict, InheritedConcreteMethodResolvesConflict) {
+  EXPECT_TRUE(ElabOk(
+      "interface class IA;\n"
+      "  pure virtual function bit f();\n"
+      "endclass\n"
+      "interface class IB;\n"
+      "  pure virtual function bit f();\n"
+      "endclass\n"
+      "class Base;\n"
+      "  virtual function bit f();\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Derived extends Base implements IA, IB;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n"));
+}
+
+// Claim A (cannot be resolved): the conflicting interface prototypes differ
+// only in argument direction, so no single method can be a valid simultaneous
+// implementation of both, and an error is required.
+TEST(InterfaceClassMethodConflict, IncompatibleArgDirectionError) {
+  EXPECT_FALSE(ElabOk(
+      "interface class IA;\n"
+      "  pure virtual function void f(input int a);\n"
+      "endclass\n"
+      "interface class IB;\n"
+      "  pure virtual function void f(output int a);\n"
+      "endclass\n"
+      "class C implements IA, IB;\n"
+      "  virtual function void f(input int a);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n"));
+}
+
 }
