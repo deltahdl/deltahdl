@@ -543,7 +543,12 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kColonColon)) {
     Consume();
     auto type_tok = ExpectIdentifier();
-    if (CheckIdentifier() || Check(TokenKind::kHash)) {
+    // The built-in package name `std` is reserved (it cannot hold modules), so
+    // `std :: type_identifier` is a built_in_data_type. A declarator that
+    // follows is a variable declaration of that scoped type rather than a
+    // scoped module instantiation.
+    bool is_builtin_pkg = name_tok.text == "std";
+    if (!is_builtin_pkg && (CheckIdentifier() || Check(TokenKind::kHash))) {
       if (InProgramBlock())
         diag_.Error(name_tok.loc, "instantiations not allowed in programs");
       auto start = items.size();
@@ -556,6 +561,10 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
     dtype.kind = DataTypeKind::kNamed;
     dtype.scope_name = name_tok.text;
     dtype.type_name = type_tok.text;
+    if (Check(TokenKind::kHash)) {
+      Consume();
+      dtype.type_params = ParseTypeParamList();
+    }
     ParseVarDeclList(items, dtype);
     return;
   }
