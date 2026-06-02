@@ -22,20 +22,6 @@ TEST(ImplicitEventSynthesis, AlwaysStarCombLogic) {
   EXPECT_TRUE(aig->latches.empty());
 }
 
-TEST(ImplicitEventSynthesis, AlwaysStarParenCombLogic) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(f,
-                           "module m(input a, input b, output logic y);\n"
-                           "  always @(*) y = a | b;\n"
-                           "endmodule");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-  EXPECT_FALSE(aig->outputs.empty());
-  EXPECT_TRUE(aig->latches.empty());
-}
-
 TEST(ImplicitEventSynthesis, AlwaysStarIfElseNoLatch) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

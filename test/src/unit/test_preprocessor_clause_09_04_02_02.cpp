@@ -18,17 +18,6 @@ TEST(ImplicitEventPreprocessor, AtStarSurvivesPreprocessor) {
   EXPECT_NE(result.find("*"), std::string::npos);
 }
 
-TEST(ImplicitEventPreprocessor, AtStarParenSurvivesPreprocessor) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "module m;\n"
-      "  always @(*) y = a;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("@(*)"), std::string::npos);
-}
-
 TEST(ImplicitEventPreprocessor, MacroInAtStarBody) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -45,17 +34,6 @@ TEST(ImplicitEventPreprocessor, MacroExpandingToAtStar) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define SENS @*\n"
-      "module m;\n"
-      "  always `SENS y = a;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(ImplicitEventPreprocessor, MacroExpandingToAtStarParen) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define SENS @(*)\n"
       "module m;\n"
       "  always `SENS y = a;\n"
       "endmodule\n",

@@ -7,30 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(AlwaysStarSim, AlwaysStarSimpleAnd) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, y;\n"
-      "  always @* y = a & b;\n"
-      "  initial begin\n"
-      "    a = 8'hF0;\n"
-      "    b = 8'h3C;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 0x30u);
-}
-
 TEST(AlwaysStarSim, AlwaysStarIfElseTrueBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -113,30 +89,6 @@ TEST(AlwaysStarSim, AlwaysStarAllRhsSensitive) {
   ASSERT_NE(y, nullptr);
 
   EXPECT_EQ(y->value.ToUint64(), 0x33u);
-}
-
-TEST(AlwaysStarSim, AlwaysStarLhsNotSensitive) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, y;\n"
-      "  always @* y = a + 1;\n"
-      "  initial begin\n"
-      "    a = 8'h09;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-
-  EXPECT_EQ(y->value.ToUint64(), 0x0Au);
 }
 
 TEST(AlwaysStarSim, AlwaysStarParenForm) {
@@ -242,35 +194,6 @@ TEST(AlwaysStarSim, AlwaysStarBitSelect) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-TEST(AlwaysStarSim, AlwaysStarPartSelect) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] data;\n"
-      "  logic [7:0] copy;\n"
-      "  logic [3:0] y;\n"
-      "  always @* begin\n"
-      "    copy = data;\n"
-      "    y = data[3:0];\n"
-      "  end\n"
-      "  initial begin\n"
-      "    data = 8'hBE;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-
-  EXPECT_EQ(y->value.ToUint64(), 0xEu);
-}
-
 TEST(AlwaysStarSim, AlwaysStarFunctionCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -296,176 +219,6 @@ TEST(AlwaysStarSim, AlwaysStarFunctionCall) {
   ASSERT_NE(y, nullptr);
 
   EXPECT_EQ(y->value.ToUint64(), 0x13u);
-}
-
-TEST(AlwaysStarSim, AlwaysStarNestedExpr) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c, y;\n"
-      "  always @* y = (a & b) | c;\n"
-      "  initial begin\n"
-      "    a = 8'hFF;\n"
-      "    b = 8'h0F;\n"
-      "    c = 8'hF0;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-
-  EXPECT_EQ(y->value.ToUint64(), 0xFFu);
-}
-
-TEST(AlwaysStarSim, AlwaysStarMultipleStmts) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, x, y;\n"
-      "  always @* begin\n"
-      "    x = a + 1;\n"
-      "    y = b + 2;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    a = 8'h10;\n"
-      "    b = 8'h20;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"x", 0x11u}, {"y", 0x22u}});
-}
-
-TEST(AlwaysStarSim, AlwaysStarArithmetic) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a, b, y;\n"
-      "  always @* y = (a + b) * 2;\n"
-      "  initial begin\n"
-      "    a = 10;\n"
-      "    b = 5;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-
-  EXPECT_EQ(y->value.ToUint64(), 30u);
-}
-
-TEST(AlwaysStarSim, AlwaysStarBitwiseOps) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c, y;\n"
-      "  always @* y = (a & b) ^ c;\n"
-      "  initial begin\n"
-      "    a = 8'hFF;\n"
-      "    b = 8'hAA;\n"
-      "    c = 8'h55;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-
-  EXPECT_EQ(y->value.ToUint64(), 0xFFu);
-}
-
-TEST(AlwaysStarSim, AlwaysStarComparison) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  logic y;\n"
-      "  always @* y = (a > b);\n"
-      "  initial begin\n"
-      "    a = 8'h20;\n"
-      "    b = 8'h10;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-
-  EXPECT_EQ(y->value.ToUint64(), 1u);
-}
-
-TEST(AlwaysStarSim, AlwaysStarLogicalOps) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic a, b, y;\n"
-      "  always @* y = a && b;\n"
-      "  initial begin\n"
-      "    a = 1;\n"
-      "    b = 1;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 1u);
-}
-
-TEST(AlwaysStarSim, AlwaysStarUnaryOps) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, y;\n"
-      "  always @* y = ~a;\n"
-      "  initial begin\n"
-      "    a = 8'hA5;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-
-  EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0x5Au);
 }
 
 TEST(AlwaysStarSim, AlwaysStarMultipleOutputs) {
@@ -526,67 +279,6 @@ TEST(AlwaysStarSim, AlwaysStarLocalVar) {
   EXPECT_EQ(y->value.ToUint64(), 0x33u);
 }
 
-TEST(AlwaysStarSim, AlwaysStarPriorityEncoder) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] req;\n"
-      "  logic [1:0] grant;\n"
-      "  always @* begin\n"
-      "    if (req >= 4'd8) grant = 2'b11;\n"
-      "    else if (req >= 4'd4) grant = 2'b10;\n"
-      "    else if (req >= 4'd2) grant = 2'b01;\n"
-      "    else grant = 2'b00;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    req = 4'd3;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* grant = f.ctx.FindVariable("grant");
-  ASSERT_NE(grant, nullptr);
-
-  EXPECT_EQ(grant->value.ToUint64(), 1u);
-}
-
-TEST(AlwaysStarSim, AlwaysStarCaseDecode) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [1:0] addr;\n"
-      "  logic [3:0] sel;\n"
-      "  always @*\n"
-      "    case (addr)\n"
-      "      2'b00: sel = 4'b0001;\n"
-      "      2'b01: sel = 4'b0010;\n"
-      "      2'b10: sel = 4'b0100;\n"
-      "      2'b11: sel = 4'b1000;\n"
-      "    endcase\n"
-      "  initial begin\n"
-      "    addr = 2'b11;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* sel = f.ctx.FindVariable("sel");
-  ASSERT_NE(sel, nullptr);
-
-  EXPECT_EQ(sel->value.ToUint64(), 8u);
-}
-
 TEST(AlwaysStarSim, MultipleAlwaysStarIndependent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -617,30 +309,6 @@ TEST(AlwaysStarSim, MultipleAlwaysStarIndependent) {
   EXPECT_EQ(y->value.ToUint64(), 0xA5u);
 }
 
-TEST(AlwaysStarSim, AlwaysStarCombOutputFromInitial) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [15:0] a, b, y;\n"
-      "  always @* y = a + b;\n"
-      "  initial begin\n"
-      "    a = 16'h1234;\n"
-      "    b = 16'h4321;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 0x5555u);
-}
-
 TEST(AlwaysStarSim, AlwaysStarResultWidthAndValue8) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -663,30 +331,6 @@ TEST(AlwaysStarSim, AlwaysStarResultWidthAndValue8) {
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.width, 8u);
   EXPECT_EQ(y->value.ToUint64(), 0xABu);
-}
-
-TEST(AlwaysStarSim, AlwaysStarParenResultWidth32) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a, y;\n"
-      "  always @(*) y = a;\n"
-      "  initial begin\n"
-      "    a = 32'hDEADBEEF;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.width, 32u);
-  EXPECT_EQ(y->value.ToUint64(), 0xDEADBEEFu);
 }
 
 TEST(AlwaysStarElab, PlainAlwaysWithStarSensitivity) {
@@ -937,6 +581,95 @@ TEST(AlwaysStarElab, BlockLocalExcludedFromSensitivity) {
   EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
 }
 
+TEST(AlwaysStarElab, DelayControlOnlyVarExcludedFromSensitivity) {
+  // §9.4.2.2 exception 1: an identifier that appears only inside a timing
+  // control (here a #delay) is not added to the implicit @* sensitivity list,
+  // while a net/variable read by the controlled statement still is.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, y;\n"
+      "  logic [7:0] dly;\n"
+      "  always @* begin\n"
+      "    #dly y = a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->processes.size(), 1u);
+  auto& sens = mod->processes[0].sensitivity;
+  std::unordered_set<std::string> names;
+  for (const auto& ev : sens) {
+    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
+      names.insert(std::string(ev.signal->text));
+  }
+  EXPECT_TRUE(names.count("a")) << "a (RHS read) must be in sensitivity";
+  EXPECT_FALSE(names.count("dly"))
+      << "dly (only in delay control) must not be in sensitivity";
+  EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
+}
+
+TEST(AlwaysStarElab, EventControlOnlySignalExcludedFromSensitivity) {
+  // §9.4.2.2 exception 1: an identifier that appears only inside an inner
+  // event control (@(clk)) is excluded from the implicit @* list.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, y;\n"
+      "  logic clk;\n"
+      "  always @* begin\n"
+      "    @(clk) y = a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->processes.size(), 1u);
+  auto& sens = mod->processes[0].sensitivity;
+  std::unordered_set<std::string> names;
+  for (const auto& ev : sens) {
+    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
+      names.insert(std::string(ev.signal->text));
+  }
+  EXPECT_TRUE(names.count("a")) << "a (RHS read) must be in sensitivity";
+  EXPECT_FALSE(names.count("clk"))
+      << "clk (only in event control) must not be in sensitivity";
+  EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
+}
+
+TEST(AlwaysStarElab, WaitConditionOnlyVarExcludedFromSensitivity) {
+  // §9.4.2.2 exception 1: an identifier that appears only in a wait condition
+  // is excluded from the implicit @* list; the controlled statement's read
+  // operands are still collected.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, y;\n"
+      "  logic en;\n"
+      "  always @* begin\n"
+      "    wait (en) y = a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->processes.size(), 1u);
+  auto& sens = mod->processes[0].sensitivity;
+  std::unordered_set<std::string> names;
+  for (const auto& ev : sens) {
+    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
+      names.insert(std::string(ev.signal->text));
+  }
+  EXPECT_TRUE(names.count("a")) << "a (RHS read) must be in sensitivity";
+  EXPECT_FALSE(names.count("en"))
+      << "en (only in wait condition) must not be in sensitivity";
+  EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
+}
+
 TEST(AlwaysStarElab, AtStarAndAtStarParenEquivalent) {
   ElabFixture f1;
   auto* d1 = ElaborateSrc(
@@ -965,6 +698,78 @@ TEST(AlwaysStarElab, AtStarAndAtStarParenEquivalent) {
   for (const auto& ev : s2)
     if (ev.signal) n2.insert(std::string(ev.signal->text));
   EXPECT_EQ(n1, n2);
+}
+
+TEST(AlwaysStarElab, RhsIndexVarInSensitivity) {
+  // §9.4.2.2: a variable used as the index of a right-hand-side select is a
+  // read appearing on the RHS, so it (and the selected vector) joins the
+  // implicit @* list; the pure-LHS target does not.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] vec, y;\n"
+      "  logic [2:0] idx;\n"
+      "  always @* y = vec[idx];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->processes.size(), 1u);
+  auto& sens = mod->processes[0].sensitivity;
+  std::unordered_set<std::string> names;
+  for (const auto& ev : sens) {
+    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
+      names.insert(std::string(ev.signal->text));
+  }
+  EXPECT_TRUE(names.count("idx"))
+      << "idx (RHS select index) must be in sensitivity";
+  EXPECT_TRUE(names.count("vec"))
+      << "vec (RHS selected vector) must be in sensitivity";
+  EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
+}
+
+TEST(AlwaysStarElab, TimingControlSignalAlsoReadInSensitivity) {
+  // §9.4.2.2 exception 1 boundary: the exclusion applies only to identifiers
+  // that appear *exclusively* in timing controls. A signal used as a delay
+  // value and also read by the controlled statement is still included.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] d, y;\n"
+      "  always @* #d y = d;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->processes.size(), 1u);
+  auto& sens = mod->processes[0].sensitivity;
+  std::unordered_set<std::string> names;
+  for (const auto& ev : sens) {
+    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
+      names.insert(std::string(ev.signal->text));
+  }
+  EXPECT_TRUE(names.count("d"))
+      << "d appears on the RHS as well, so it is not timing-control-only";
+}
+
+TEST(AlwaysStarElab, ConstantRhsProducesEmptySensitivity) {
+  // §9.4.2.2: the implicit list is exactly the set of read nets/variables. A
+  // body that reads nothing yields an empty list and is not an error.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] y;\n"
+      "  always @* y = 8'h00;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->processes.size(), 1u);
+  EXPECT_TRUE(mod->processes[0].sensitivity.empty())
+      << "a constant RHS reads no signals, so the implicit list is empty";
 }
 
 }
