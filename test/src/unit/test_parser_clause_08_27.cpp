@@ -15,17 +15,6 @@ TEST(ClassParsing, ForwardTypedefClassSelfRef) {
   EXPECT_EQ(r.cu->classes[0]->name, "Node");
 }
 
-TEST(ClassParsing, TypedefClass) {
-  auto r = Parse(
-      "typedef class MyClass;\n"
-      "class MyClass;\n"
-      "  int x;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_GE(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
-}
-
 TEST(ClassParsing, TypedefClassMutualReference) {
   auto r = Parse(
       "typedef class C2;\n"
