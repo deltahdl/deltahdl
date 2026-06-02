@@ -5,14 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ExtendsVsImplementsParsing, ClassWithImplements) {
-  auto r = Parse("class C implements I; endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "C");
-}
-
 TEST(ExtendsVsImplementsParsing, ClassImplementsMultipleInterfaces) {
   EXPECT_TRUE(
       ParseOk("interface class A;\n"
@@ -58,22 +50,6 @@ TEST(ExtendsVsImplementsParsing, InterfaceClassExtendsMultiple) {
   ASSERT_EQ(r.cu->classes.size(), 3u);
   EXPECT_EQ(r.cu->classes[2]->name, "C");
   EXPECT_EQ(r.cu->classes[2]->base_class, "A");
-}
-
-TEST(ExtendsVsImplementsParsing, ExtendsAndImplements) {
-  auto r = Parse(
-      "interface class Iface;\n"
-      "  pure virtual function void foo();\n"
-      "endclass\n"
-      "class Base;\n"
-      "endclass\n"
-      "class Child extends Base implements Iface;\n"
-      "  virtual function void foo();\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 3u);
-  EXPECT_EQ(r.cu->classes[2]->base_class, "Base");
 }
 
 TEST(ExtendsVsImplementsParsing, ImplementsMultipleInterfaces) {

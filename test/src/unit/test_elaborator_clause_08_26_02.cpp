@@ -30,6 +30,21 @@ TEST(InterfaceClassImplements, InterfaceImplementsInterfaceError) {
              "endmodule\n"));
 }
 
+// An interface class is barred from the 'implements' mechanism entirely: it may
+// not implement a regular class (nor a virtual class) any more than it may
+// implement another interface class. Inheritance for an interface class is
+// exclusively through 'extends' targeting interface classes.
+TEST(InterfaceClassImplements, InterfaceImplementsClassError) {
+  EXPECT_FALSE(
+      ElabOk("class Base;\n"
+             "endclass\n"
+             "interface class IC implements Base;\n"
+             "  pure virtual function void foo();\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 TEST(InterfaceClassInheritance, InterfaceExtendsClassError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
@@ -204,6 +219,26 @@ TEST(InterfaceClassImplements, InheritedNonVirtualFromBaseDoesNotSatisfy) {
              "  endfunction\n"
              "endclass\n"
              "class ExtClass extends BaseClass implements IC;\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// A subclass that declares its own virtual method of the same name as a
+// non-virtual base method hides that base method, and the override is what
+// satisfies the implemented interface's pure virtual requirement.
+TEST(InterfaceClassImplements, OwnVirtualOverrideHidesNonVirtualBaseAndSatisfies) {
+  EXPECT_TRUE(
+      ElabOk("interface class IC;\n"
+             "  pure virtual function void f();\n"
+             "endclass\n"
+             "class BaseClass;\n"
+             "  function void f();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "class ExtClass extends BaseClass implements IC;\n"
+             "  virtual function void f();\n"
+             "  endfunction\n"
              "endclass\n"
              "module m;\n"
              "endmodule\n"));
