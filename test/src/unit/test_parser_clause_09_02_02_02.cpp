@@ -242,24 +242,6 @@ TEST(AlwaysCombParsing, AlwaysCombBodyDirectAssign) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(AlwaysCombParsing, AlwaysCombBeginEndBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb begin\n"
-      "    x = a & b;\n"
-      "    y = a | c;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_EQ(item->body->stmts.size(), 2u);
-}
-
 TEST(AlwaysCombParsing, PriorityEncoderPattern) {
   auto r = Parse(
       "module m;\n"

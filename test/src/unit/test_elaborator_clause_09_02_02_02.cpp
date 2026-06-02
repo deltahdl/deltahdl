@@ -485,62 +485,6 @@ TEST(AlwaysCombIfElseFalseBranch, AlwaysCombIfElseFalseBranch) {
   EXPECT_EQ(y->value.ToUint64(), 0xBBu);
 }
 
-TEST(AlwaysCombMuxIfElse, AlwaysCombMuxIfElse) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic sel;\n"
-      "  logic [7:0] a, b, result;\n"
-      "  initial begin\n"
-      "    sel = 1;\n"
-      "    a = 8'd10;\n"
-      "    b = 8'd20;\n"
-      "  end\n"
-      "  always_comb begin\n"
-      "    if (sel)\n"
-      "      result = a;\n"
-      "    else\n"
-      "      result = b;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);
-}
-
-TEST(AlwaysCombIfElse, AlwaysCombIfElseFalseBranch) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic sel;\n"
-      "  logic [7:0] a, b, result;\n"
-      "  initial begin\n"
-      "    sel = 0;\n"
-      "    a = 8'd10;\n"
-      "    b = 8'd20;\n"
-      "  end\n"
-      "  always_comb begin\n"
-      "    if (sel)\n"
-      "      result = a;\n"
-      "    else\n"
-      "      result = b;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 20u);
-}
-
 TEST(AlwaysCombCaseDecode, AlwaysCombCaseDecode) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -690,6 +634,47 @@ TEST(AlwaysCombMultiDriver, OverlappingElementsConflict) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(AlwaysCombMultiDriver, FunctionAssignedLhsCountsAsCombDriver) {
+  // §9.2.2.2: a variable assigned inside a function called by the procedure is
+  // treated as assigned by the always_comb itself, so a second driver of that
+  // variable is an error.
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, y, z;\n"
+      "  function automatic logic f();\n"
+      "    y = a;\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "  always_comb z = f();\n"
+      "  assign y = a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, TaskAssignedLhsNotCombDriver) {
+  // §9.2.2.2: variables assigned inside a task called by the procedure are
+  // explicitly excluded, so the always_comb is not a driver of 'y' and the lone
+  // continuous assignment to 'y' is legal.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, y, z;\n"
+      "  task automatic t();\n"
+      "    y = a;\n"
+      "  endtask\n"
+      "  always_comb begin\n"
+      "    t();\n"
+      "    z = a;\n"
+      "  end\n"
+      "  assign y = a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(AlwaysCombMultiDriver, WholeArrayAndElementConflict) {
   ElabFixture f;
   ElaborateSrc(
@@ -697,6 +682,60 @@ TEST(AlwaysCombMultiDriver, WholeArrayAndElementConflict) {
       "  logic [7:0] arr [0:1];\n"
       "  always_comb arr[0] = 8'd1;\n"
       "  always_comb arr = '{8'd3, 8'd4};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, IndependentElementAndContinuousAssignNoConflict) {
+  // §9.2.2.2: the single-driver rule permits one element of an array to be
+  // driven by an always_comb while a different element is driven continuously,
+  // since their longest static prefixes do not overlap.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] arr [0:1];\n"
+      "  always_comb arr[0] = 8'd1;\n"
+      "  assign arr[1] = 8'd2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, IndependentStructFieldsNoConflict) {
+  // §9.2.2.2: the structure analog of independent elements — distinct fields
+  // driven by separate always_comb procedures have non-overlapping prefixes and
+  // are therefore not multiple drivers of the same variable.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] a;\n"
+      "    logic [7:0] b;\n"
+      "  } pair_t;\n"
+      "  pair_t s;\n"
+      "  always_comb s.a = 8'd1;\n"
+      "  always_comb s.b = 8'd2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, WholeStructAndFieldConflict) {
+  // §9.2.2.2: when one always_comb drives a whole structure and another drives a
+  // field of it, the prefixes overlap, so it is an illegal multiple driver.
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] a;\n"
+      "    logic [7:0] b;\n"
+      "  } pair_t;\n"
+      "  pair_t s;\n"
+      "  always_comb s = 16'd0;\n"
+      "  always_comb s.a = 8'd1;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
