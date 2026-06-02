@@ -489,6 +489,31 @@ class CoverageDB {
   // numeric value: "auto[NAME]" (LRM 19.5.3).
   static std::string AutoEnumBinName(std::string_view constant_name);
 
+  // --- LRM 19.5.4: wildcard specification of coverage point bins ------------
+
+  // Expands a wildcard value pattern into the concrete 2-state values it
+  // matches. In a wildcard bin every x, z, or ? bit position is a wildcard that
+  // matches both 0 and 1; the remaining bits must match exactly. The fixed bits
+  // are supplied as `pattern` and marked by the set bits of `care_mask` (a set
+  // mask bit denotes a fixed position); the cleared mask bits within `width` are
+  // the wildcards. The result enumerates every value obtained by filling the
+  // wildcard positions with all combinations of 0 and 1, e.g. 4'b11?? yields
+  // 12, 13, 14, 15 (LRM 19.5.4).
+  static std::vector<int64_t> ExpandWildcardValue(int64_t pattern,
+                                                  uint64_t care_mask,
+                                                  uint32_t width);
+
+  // A wildcard bin definition only considers 2-state values; a sampled value
+  // that contains x or z is excluded from the wildcard comparison. Returns true
+  // when a sample with the given unknown-bit status is eligible to be matched
+  // against a wildcard bin (LRM 19.5.4).
+  static bool WildcardSampleIncluded(bool sample_has_xz);
+
+  // Wildcard specification of coverpoint bins of a real type is not allowed.
+  // Returns false for a real coverpoint, mirroring the other bin-legality
+  // queries (LRM 19.5.4).
+  static bool WildcardBinsAllowed(const CoverPoint* cp);
+
   // --- LRM 19.5.5: excluding coverage point values or transitions -----------
 
   // Removes every value named by an ignore_bins state set from a coverage bin's

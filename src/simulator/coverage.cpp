@@ -912,6 +912,47 @@ bool CoverageDB::DefaultSequenceTransitionIncrements(
   return !any_nondefault_incremented && !any_pending;
 }
 
+// --- LRM 19.5.4: wildcard specification of coverage point bins ---------------
+
+std::vector<int64_t> CoverageDB::ExpandWildcardValue(int64_t pattern,
+                                                     uint64_t care_mask,
+                                                     uint32_t width) {
+  // Each wildcard (x, z, or ?) bit matches both 0 and 1, while the fixed bits
+  // must match exactly; the matching set is therefore every value formed by
+  // filling the wildcard positions with all combinations of 0 and 1, so a
+  // single wildcard bin covers a contiguous group such as 12..15 for 4'b11??
+  // (LRM 19.5.4).
+  if (width == 0 || width > 63) return {};
+  uint64_t width_mask = (uint64_t{1} << width) - 1;
+  uint64_t fixed = static_cast<uint64_t>(pattern) & care_mask & width_mask;
+  std::vector<uint32_t> wild_positions;
+  for (uint32_t b = 0; b < width; ++b) {
+    if ((care_mask & (uint64_t{1} << b)) == 0) wild_positions.push_back(b);
+  }
+  std::vector<int64_t> out;
+  uint64_t combos = uint64_t{1} << wild_positions.size();
+  out.reserve(combos);
+  for (uint64_t c = 0; c < combos; ++c) {
+    uint64_t v = fixed;
+    for (size_t i = 0; i < wild_positions.size(); ++i) {
+      if (c & (uint64_t{1} << i)) v |= (uint64_t{1} << wild_positions[i]);
+    }
+    out.push_back(static_cast<int64_t>(v));
+  }
+  return out;
+}
+
+bool CoverageDB::WildcardSampleIncluded(bool sample_has_xz) {
+  // A wildcard bin considers 2-state values only; a sample carrying x or z is
+  // excluded from the comparison (LRM 19.5.4).
+  return !sample_has_xz;
+}
+
+bool CoverageDB::WildcardBinsAllowed(const CoverPoint* cp) {
+  // Wildcard bins may not be specified for a real coverpoint (LRM 19.5.4).
+  return !cp->is_real;
+}
+
 // --- LRM 19.5.5: excluding coverage point values or transitions -------------
 
 std::vector<int64_t> CoverageDB::RemoveIgnoredValues(
