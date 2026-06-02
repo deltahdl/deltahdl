@@ -61,39 +61,27 @@ TEST(ContAssignStatementSim, ContinuousAssignChain) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 7u);
 }
 
-TEST(ContAssignStatementSim, AssignPropagatesInitialValue) {
+TEST(ContAssignStatementSim, ReEvaluatesWhenOperandChanges) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] a, b;\n"
-      "  initial a = 8'd5;\n"
       "  assign b = a;\n"
+      "  initial begin\n"
+      "    a = 8'd10;\n"
+      "    #1;\n"
+      "    a = 8'd42;\n"
+      "  end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 5u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 5u);
-}
-
-TEST(ContAssignStatementSim, ContAssignChainWithExpressions) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial a = 8'd5;\n"
-      "  assign b = a + 8'd3;\n"
-      "  assign c = b + 8'd2;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 8u);
-  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 10u);
+  // The continuous assignment statement re-evaluates its RHS on every change of
+  // an operand, so b tracks the latest value driven onto a rather than freezing
+  // at the value present when simulation started.
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 42u);
 }
 
 TEST(ContAssignStatementSim, ContAssignOnVectorVariable) {

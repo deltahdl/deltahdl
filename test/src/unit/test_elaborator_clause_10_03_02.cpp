@@ -128,18 +128,6 @@ TEST(ContAssignStatementElaboration, ContAssignInInterfaceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ContAssignStatementElaboration, VarContAssignAndAlwaysBlockErrors) {
-  ElabFixture f;
-  Elaborate(
-      "module t;\n"
-      "  logic v;\n"
-      "  assign v = 1'b0;\n"
-      "  always @(*) v = 1'b1;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(ContAssignStatementElaboration, VarContAssignAndNonblockingErrors) {
   ElabFixture f;
   Elaborate(
@@ -152,26 +140,29 @@ TEST(ContAssignStatementElaboration, VarContAssignAndNonblockingErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ContAssignStatementElaboration, NetThreeContAssignsAllowed) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module t;\n"
-      "  wire w;\n"
-      "  assign w = 1'b0;\n"
-      "  assign w = 1'b1;\n"
-      "  assign w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(ContAssignStatementElaboration, NetDeclAssignAndContAssignAllowed) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
       "  wire w = 1'b0;\n"
       "  assign w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Unlike a variable, a net may be driven by a mixture of drivers — here a
+// module output and a continuous assignment together — without error.
+TEST(ContAssignStatementElaboration, NetDrivenByOutputAndContAssignAllowed) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module child(output logic y);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire w;\n"
+      "  assign w = 1'b0;\n"
+      "  child c(.y(w));\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -212,6 +203,38 @@ TEST(ContAssignStatementElaboration, VarOutputPortWithInitializerErrors) {
       "module t;\n"
       "  logic v = 1'b0;\n"
       "  child c(.y(v));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// A variable may have at most one driver: a module output and a continuous
+// assignment targeting the same variable are two drivers, which is an error.
+TEST(ContAssignStatementElaboration, VarContAssignAndOutputPortErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module child(output logic y);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic v;\n"
+      "  assign v = 1'b0;\n"
+      "  child c(.y(v));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// A variable driven by a module output may not also be the target of a
+// procedural assignment.
+TEST(ContAssignStatementElaboration, VarOutputPortWithProceduralAssignErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module child(output logic y);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic v;\n"
+      "  child c(.y(v));\n"
+      "  initial v = 1'b1;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
