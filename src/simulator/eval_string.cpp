@@ -194,7 +194,21 @@ static Logic4Vec StringAtoBase(const std::string& str, int base, Arena& arena) {
 }
 
 static Logic4Vec StringAtoreal(const std::string& str, Arena& arena) {
-  double d = std::strtod(str.c_str(), nullptr);
+  const char* start = str.c_str();
+  char* end = nullptr;
+  double d = std::strtod(start, &end);
+  // The conversion only recognizes real constants, and the result is zero when
+  // no digits were scanned. strtod additionally accepts digit-free spellings
+  // such as "inf"/"nan"; these are not real constants, so force the result to
+  // zero unless the scanned prefix actually contained a decimal digit.
+  bool found_digit = false;
+  for (const char* p = start; p < end; ++p) {
+    if (*p >= '0' && *p <= '9') {
+      found_digit = true;
+      break;
+    }
+  }
+  if (!found_digit) d = 0.0;
   uint64_t bits = 0;
   std::memcpy(&bits, &d, sizeof(double));
   return MakeLogic4VecVal(arena, 64, bits);

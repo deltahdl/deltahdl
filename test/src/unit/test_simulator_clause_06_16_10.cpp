@@ -61,6 +61,19 @@ TEST(StringMethods, AtorealStopsAtNonConforming) {
   EXPECT_NEAR(d, 2.5, 0.001);
 }
 
+TEST(StringMethods, AtorealNonNumericKeywordReturnsZero) {
+  // "inf" is not a real constant and contains no digits, so per the
+  // no-digits-encountered rule the result must be zero rather than infinity.
+  StringFixture f;
+  f.CreateStringVar("s", "inf");
+  auto* call = f.MakeMethodCall("s", "atoreal");
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  uint64_t bits = result.ToUint64();
+  double d = 0.0;
+  std::memcpy(&d, &bits, sizeof(double));
+  EXPECT_EQ(d, 0.0);
+}
+
 TEST(StringMethods, AtorealIntegerString) {
   StringFixture f;
   f.CreateStringVar("s", "42");
@@ -70,6 +83,19 @@ TEST(StringMethods, AtorealIntegerString) {
   double d = 0.0;
   std::memcpy(&d, &bits, sizeof(double));
   EXPECT_NEAR(d, 42.0, 0.001);
+}
+
+TEST(StringMethods, AtorealNegativeValue) {
+  // The ASCII decimal representation may carry a leading sign; the conversion
+  // yields the corresponding negative real value.
+  StringFixture f;
+  f.CreateStringVar("s", "-3.5");
+  auto* call = f.MakeMethodCall("s", "atoreal");
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  uint64_t bits = result.ToUint64();
+  double d = 0.0;
+  std::memcpy(&d, &bits, sizeof(double));
+  EXPECT_NEAR(d, -3.5, 0.001);
 }
 
 }
