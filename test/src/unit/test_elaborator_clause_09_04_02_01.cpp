@@ -104,4 +104,46 @@ TEST(EventOrOperatorElaboration, MixedOrCommaCountPreserved) {
   EXPECT_EQ(procs[0].sensitivity.size(), 5u);
 }
 
+// §9.4.2.1: a comma-separated sensitivity list shall be synonymous to the
+// or-separated form. Elaborate one edge-qualified list spelled both ways and
+// confirm the elaborator emits structurally identical RTLIR sensitivity
+// (same length, same per-entry edge, same signal) for each spelling.
+TEST(EventOrOperatorElaboration, CommaAndOrYieldIdenticalSensitivity) {
+  ElabFixture fo;
+  auto* or_design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, rst, q;\n"
+      "  always @(posedge clk or negedge rst) q = clk;\n"
+      "endmodule\n",
+      fo);
+  ElabFixture fc;
+  auto* comma_design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, rst, q;\n"
+      "  always @(posedge clk, negedge rst) q = clk;\n"
+      "endmodule\n",
+      fc);
+  ASSERT_NE(or_design, nullptr);
+  ASSERT_NE(comma_design, nullptr);
+  EXPECT_FALSE(fo.has_errors);
+  EXPECT_FALSE(fc.has_errors);
+  ASSERT_FALSE(or_design->top_modules.empty());
+  ASSERT_FALSE(comma_design->top_modules.empty());
+  auto& or_procs = or_design->top_modules[0]->processes;
+  auto& comma_procs = comma_design->top_modules[0]->processes;
+  ASSERT_EQ(or_procs.size(), 1u);
+  ASSERT_EQ(comma_procs.size(), 1u);
+
+  auto& os = or_procs[0].sensitivity;
+  auto& cs = comma_procs[0].sensitivity;
+  ASSERT_EQ(os.size(), cs.size());
+  ASSERT_EQ(os.size(), 2u);
+  for (size_t i = 0; i < os.size(); ++i) {
+    EXPECT_EQ(os[i].edge, cs[i].edge) << "entry " << i;
+    ASSERT_NE(os[i].signal, nullptr) << "entry " << i;
+    ASSERT_NE(cs[i].signal, nullptr) << "entry " << i;
+    EXPECT_EQ(os[i].signal->text, cs[i].signal->text) << "entry " << i;
+  }
+}
+
 }

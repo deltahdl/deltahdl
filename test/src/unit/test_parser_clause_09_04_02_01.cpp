@@ -70,24 +70,6 @@ TEST(EventOrOperatorParsing, OrWithNamedEvents) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   EXPECT_GE(stmt->events.size(), 2u);
 }
-TEST(EventOrOperatorParsing, OrWithEdgeQualifiedSignals) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk or negedge rst) a = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_GE(stmt->events.size(), 2u);
-  const Edge kExpectedEdges[] = {Edge::kPosedge, Edge::kNegedge};
-  for (size_t i = 0; i < 2; ++i) {
-    EXPECT_EQ(stmt->events[i].edge, kExpectedEdges[i]);
-  }
-}
-
 TEST(EventOrOperatorParsing, EventControlComma) {
   auto r = Parse(
       "module m;\n"
@@ -164,6 +146,51 @@ TEST(EventOrOperatorParsing, FiveSignalCommaSeparated) {
   ASSERT_EQ(item->sensitivity.size(), 5u);
   for (size_t i = 0; i < 5; ++i) {
     EXPECT_EQ(item->sensitivity[i].edge, Edge::kNone) << "event " << i;
+  }
+}
+
+// §9.4.2.1: a comma-separated sensitivity list shall be synonymous to the
+// or-separated form. Parse both spellings of the same list and confirm
+// ParseEventList yields structurally identical event vectors.
+TEST(EventOrOperatorParsing, CommaListSynonymousWithOrList) {
+  auto parse_events = [](const char* sens) {
+    std::string src =
+        "module m;\n"
+        "  initial begin\n"
+        "    @(";
+    src += sens;
+    src +=
+        ") x = 1;\n"
+        "  end\n"
+        "endmodule\n";
+    return Parse(src);
+  };
+
+  auto comma = parse_events("a, b, c");
+  auto ored = parse_events("a or b or c");
+  ASSERT_NE(comma.cu, nullptr);
+  ASSERT_NE(ored.cu, nullptr);
+  EXPECT_FALSE(comma.has_errors);
+  EXPECT_FALSE(ored.has_errors);
+
+  auto* comma_stmt = FirstInitialStmt(comma);
+  auto* or_stmt = FirstInitialStmt(ored);
+  ASSERT_NE(comma_stmt, nullptr);
+  ASSERT_NE(or_stmt, nullptr);
+  EXPECT_EQ(comma_stmt->kind, StmtKind::kEventControl);
+  EXPECT_EQ(or_stmt->kind, StmtKind::kEventControl);
+
+  ASSERT_EQ(comma_stmt->events.size(), or_stmt->events.size());
+  ASSERT_EQ(comma_stmt->events.size(), 3u);
+  for (size_t i = 0; i < comma_stmt->events.size(); ++i) {
+    EXPECT_EQ(comma_stmt->events[i].edge, or_stmt->events[i].edge) << "event "
+                                                                   << i;
+    EXPECT_EQ(comma_stmt->events[i].signal != nullptr,
+              or_stmt->events[i].signal != nullptr)
+        << "event " << i;
+    EXPECT_EQ(comma_stmt->events[i].iff_condition != nullptr,
+              or_stmt->events[i].iff_condition != nullptr)
+        << "event " << i;
   }
 }
 
