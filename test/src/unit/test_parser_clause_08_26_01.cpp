@@ -25,14 +25,6 @@ TEST(InterfaceClassSyntax, InterfaceClassItems) {
   EXPECT_EQ(members[3]->kind, ClassMemberKind::kProperty);
 }
 
-TEST(InterfaceClassSyntax, InterfaceClassDecl) {
-  auto r = Parse("interface class IC; endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "IC");
-}
-
 TEST(InterfaceClassSyntax, ClassNestedInterfaceClass) {
   auto r = Parse(
       "class Outer;\n"
@@ -154,6 +146,7 @@ TEST(InterfaceClassSyntax, EmptyInterfaceClass) {
   auto r = Parse("interface class IC; endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "IC");
   EXPECT_TRUE(r.cu->classes[0]->is_interface);
   EXPECT_TRUE(r.cu->classes[0]->members.empty());
 }
