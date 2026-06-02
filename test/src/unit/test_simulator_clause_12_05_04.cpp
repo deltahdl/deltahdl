@@ -484,6 +484,62 @@ TEST(CaseInsideStatementSim, CaseInsideTolerancePlusPercentMinusOutOfRange) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
+// §12.5.4: the set-membership comparison is evaluated in the order specified by
+// a priority-case statement. A priority-qualified case-inside acts on the first
+// matching item even when later items also match (mirrors the LRM example, which
+// qualifies a case-inside with priority).
+TEST(CaseInsideStatementSim, CaseInsidePriorityFirstMatch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd5;\n"
+      "    priority case(sel) inside\n"
+      "      [8'd0:8'd10]: x = 8'd1;\n"
+      "      [8'd3:8'd7]:  x = 8'd2;\n"
+      "      default: x = 8'd3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §12.5.4: the set-membership comparison is evaluated in the order specified by
+// a unique-case statement. A unique-qualified case-inside selects the single
+// matching item through the unique evaluation path, with the inside operator
+// performing the comparison.
+TEST(CaseInsideStatementSim, CaseInsideUniqueSingleMatch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd5;\n"
+      "    unique case(sel) inside\n"
+      "      8'd1, 8'd3: x = 8'd10;\n"
+      "      8'd5:       x = 8'd20;\n"
+      "      default:    x = 8'd30;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
 TEST(CaseInsideStatementSim, CaseInsideEmptyNoItems) {
   SimFixture f;
   auto* design = ElaborateSrc(

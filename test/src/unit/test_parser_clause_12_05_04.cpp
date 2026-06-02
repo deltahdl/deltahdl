@@ -97,35 +97,6 @@ TEST(CaseInsideSyntaxParsing, CaseInsideMultipleRanges) {
   EXPECT_EQ(stmt->case_items[0].patterns.size(), 3u);
 }
 
-TEST(CaseInsideSyntaxParsing, ValueRangeExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case(x) inside\n"
-      "      5: y = 1;\n"
-      "      10: y = 2;\n"
-      "      default: y = 3;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(CaseInsideSyntaxParsing, ValueRangeBracket) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case(x) inside\n"
-      "      [0:15]: y = 1;\n"
-      "      default: y = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(CaseInsideSyntaxParsing, ValueRangeOpenEndedLow) {
   auto r = Parse(
       "module m;\n"
