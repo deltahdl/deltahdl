@@ -62,9 +62,10 @@ static const char* DisallowedControlVariableKind(const Expr* term,
   return nullptr;
 }
 
-void ValidateBidirectionalSwitchConnections(const ModuleItem* item,
-                                            const RtlirModule* mod,
-                                            DiagEngine& diag) {
+void ValidateBidirectionalSwitchConnections(
+    const ModuleItem* item, const RtlirModule* mod, DiagEngine& diag,
+    const std::unordered_map<std::string_view, std::string_view>&
+        nettype_canonical) {
   if (!item || item->kind != ModuleItemKind::kGateInst) return;
   auto kind = item->gate_kind;
   bool is_bidir = (kind == GateKind::kTran || kind == GateKind::kRtran ||
@@ -131,8 +132,11 @@ void ValidateBidirectionalSwitchConnections(const ModuleItem* item,
                "nettype to a built-in net");
     return;
   }
+  // §6.22.6: two nettypes are the same when they match -- a nettype matches
+  // itself and any renaming alias of it. Compare via the matching relation so
+  // that an alias and its source nettype are treated as one type here.
   if (n0->is_user_nettype && n1->is_user_nettype &&
-      n0->nettype_name != n1->nettype_name) {
+      !NettypesMatch(n0->nettype_name, n1->nettype_name, nettype_canonical)) {
     diag.Error(item->loc,
                std::format("bidirectional pass switch cannot connect "
                            "different user-defined nettypes ('{}' and '{}')",

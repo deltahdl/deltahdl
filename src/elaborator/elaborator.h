@@ -124,8 +124,6 @@ class Elaborator {
 
   void ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod);
 
-  bool NettypesMatch(std::string_view a, std::string_view b) const;
-
   void ElaborateItems(const ModuleDecl* decl, RtlirModule* mod);
 
   void ElaborateModuleInst(ModuleItem* item, RtlirModule* mod);
@@ -840,9 +838,19 @@ void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
 
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena);
 
-void ValidateBidirectionalSwitchConnections(const ModuleItem* item,
-                                            const RtlirModule* mod,
-                                            DiagEngine& diag);
+// §6.22.6: a nettype matches itself and the nettype of nets declared using it,
+// and a renaming alias of a user-defined nettype matches the nettype it renames.
+// Two nettype names match when they resolve to the same canonical (source)
+// nettype; `nettype_canonical` maps each nettype name to its canonical name.
+bool NettypesMatch(
+    std::string_view a, std::string_view b,
+    const std::unordered_map<std::string_view, std::string_view>&
+        nettype_canonical);
+
+void ValidateBidirectionalSwitchConnections(
+    const ModuleItem* item, const RtlirModule* mod, DiagEngine& diag,
+    const std::unordered_map<std::string_view, std::string_view>&
+        nettype_canonical);
 
 void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                                            const RtlirModule* mod,

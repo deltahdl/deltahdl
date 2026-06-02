@@ -1211,7 +1211,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
           }
         }
       }
-      ValidateBidirectionalSwitchConnections(item, mod, diag_);
+      ValidateBidirectionalSwitchConnections(item, mod, diag_,
+                                             nettype_canonical_);
       ValidatePrimitiveOutputTerminalWidths(item, mod, diag_);
       ElaborateGateInst(item, mod, arena_);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
@@ -1581,12 +1582,21 @@ void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule*) {
   }
 }
 
-bool Elaborator::NettypesMatch(std::string_view a, std::string_view b) const {
+// §6.22.6 Matching nettypes: a nettype matches itself (and the nettype of nets
+// declared using it), and a simple nettype that renames a user-defined nettype
+// matches the nettype it renames. Both cases reduce to comparing the canonical
+// (source) nettype each name resolves to: an alias shares its source's
+// canonical name, so it matches; unrelated nettypes have distinct canonical
+// names, so they do not.
+bool NettypesMatch(
+    std::string_view a, std::string_view b,
+    const std::unordered_map<std::string_view, std::string_view>&
+        nettype_canonical) {
   if (a == b) return true;
-  auto ait = nettype_canonical_.find(a);
-  auto bit = nettype_canonical_.find(b);
-  std::string_view ca = (ait != nettype_canonical_.end()) ? ait->second : a;
-  std::string_view cb = (bit != nettype_canonical_.end()) ? bit->second : b;
+  auto ait = nettype_canonical.find(a);
+  auto bit = nettype_canonical.find(b);
+  std::string_view ca = (ait != nettype_canonical.end()) ? ait->second : a;
+  std::string_view cb = (bit != nettype_canonical.end()) ? bit->second : b;
   return ca == cb;
 }
 
