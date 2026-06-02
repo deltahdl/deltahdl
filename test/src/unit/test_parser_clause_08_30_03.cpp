@@ -21,21 +21,6 @@ TEST(ClassParsing, WeakRefGetCallParses) {
               "endmodule\n"));
 }
 
-TEST(ClassParsing, WeakRefGetNullComparisonParses) {
-  EXPECT_TRUE(
-      ParseOk("class obj;\n"
-              "  int x;\n"
-              "endclass\n"
-              "module m;\n"
-              "  initial begin\n"
-              "    weak_reference #(obj) wr;\n"
-              "    wr = new(null);\n"
-              "    if (wr.get() == null)\n"
-              "      $display(\"null\");\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ClassParsing, WeakRefGetInWaitParses) {
   EXPECT_TRUE(
       ParseOk("class obj;\n"

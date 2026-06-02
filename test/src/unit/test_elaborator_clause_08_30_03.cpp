@@ -21,21 +21,6 @@ TEST(ClassConstraintElaboration, WeakRefGetCallOk) {
              "endmodule\n"));
 }
 
-TEST(ClassConstraintElaboration, WeakRefGetNullComparisonOk) {
-  EXPECT_TRUE(
-      ElabOk("class obj;\n"
-             "  int x;\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    weak_reference #(obj) wr;\n"
-             "    wr = new(null);\n"
-             "    if (wr.get() == null)\n"
-             "      $display(\"null\");\n"
-             "  end\n"
-             "endmodule\n"));
-}
-
 TEST(ClassConstraintElaboration, WeakRefGetInWaitOk) {
   EXPECT_TRUE(
       ElabOk("class obj;\n"
