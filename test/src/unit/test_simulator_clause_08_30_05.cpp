@@ -58,12 +58,43 @@ TEST(ClassSim, WeakRefGetIdSameAcrossInheritanceTree) {
   EXPECT_EQ(id_via_child, id_via_parent);
 }
 
-TEST(ClassSim, WeakRefGetIdReturnsLongint) {
+// §8.30.5: the id is independent of where the queried handle sits in the
+// inheritance tree. Drive the production static-call path end to end: one
+// handle is base-typed and one is derived-typed, but both refer to the same
+// object, so get_id() through the two distinct specializations must agree (and
+// be nonzero for a live object). This exercises the runtime dispatch that maps
+// weak_reference#(T)::get_id(obj) onto the production id computation.
+TEST(ClassSim, WeakRefGetIdStaticCallSameAcrossSpecializations) {
   SimFixture f;
-  auto* type = MakeClassType(f, "obj", {"x"});
-  auto [handle, obj] = MakeObj(f, type);
-  int64_t id = WeakReference::GetId(handle);
-  EXPECT_GT(id, 0);
+  auto* design = ElaborateSrc(
+      "class obj;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class ex_obj extends obj;\n"
+      "  int y;\n"
+      "endclass\n"
+      "module m;\n"
+      "  obj base_ref;\n"
+      "  ex_obj derived_ref;\n"
+      "  longint id_base;\n"
+      "  longint id_derived;\n"
+      "  initial begin\n"
+      "    derived_ref = new();\n"
+      "    base_ref = derived_ref;\n"
+      "    id_base = weak_reference#(obj)::get_id(base_ref);\n"
+      "    id_derived = weak_reference#(ex_obj)::get_id(derived_ref);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* id_base = f.ctx.FindVariable("id_base");
+  auto* id_derived = f.ctx.FindVariable("id_derived");
+  ASSERT_NE(id_base, nullptr);
+  ASSERT_NE(id_derived, nullptr);
+  EXPECT_NE(id_base->value.ToUint64(), 0u);
+  EXPECT_EQ(id_base->value.ToUint64(), id_derived->value.ToUint64());
 }
 
 }
