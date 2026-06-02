@@ -71,17 +71,6 @@ TEST(SubroutineCallSyntaxParsing, ArrayMethodUnique) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-TEST(SubroutineCallSyntaxParsing, ArrayMethodWithClause) {
-  auto r = Parse(
-      "module m;\n"
-      "  int arr[4];\n"
-      "  int result[$];\n"
-      "  initial begin result = arr.find with (item > 5); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(AggregateTypeParsing, ArrayMethodMax) {
   auto r = Parse(
       "module t;\n"

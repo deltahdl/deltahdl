@@ -1186,6 +1186,125 @@ static bool ExtractLocatorParts(const Expr* expr, MethodCallParts& out) {
   return ExtractMethodCallParts(expr, out);
 }
 
+// §7.12.1 — array locator methods over an associative array. Two rules differ
+// from the indexed-array case: index locators (find_index/.../unique_index)
+// return a queue of the *index type* holding the matching keys rather than a
+// queue of int holding 0-based positions; and "first"/"last" are the entries
+// with the smallest/largest index (the first()/last() ordering of 7.9), which a
+// std::map gives for free by visiting keys in ascending order. Only integer
+// keys are representable through this value vector — string-keyed and wildcard
+// arrays are left for the caller to handle.
+static bool TryCollectAssocLocatorResult(const Expr* expr,
+                                         const MethodCallParts& parts,
+                                         AssocArrayObject& aa, SimContext& ctx,
+                                         Arena& arena,
+                                         std::vector<Logic4Vec>& out) {
+  std::string_view method = parts.method_name;
+  if (method == "map") return false;  // not a 7.12.1 locator method
+
+  const bool needs_with =
+      method == "find" || method == "find_index" || method == "find_first" ||
+      method == "find_first_index" || method == "find_last" ||
+      method == "find_last_index";
+  if (!expr->with_expr && needs_with) {
+    ctx.GetDiag().Error({}, "array locator method '" + std::string(method) +
+                                "' requires a 'with' clause");
+    return false;
+  }
+  if (aa.is_string_key) return false;  // index type not representable here
+
+  std::vector<int64_t> keys;
+  std::vector<Logic4Vec> vals;
+  for (const auto& [k, v] : aa.int_data) {
+    keys.push_back(k);
+    vals.push_back(v);
+  }
+
+  LocatorCtx lc = MakeLocatorCtx(vals, /*is_str=*/false, expr, ctx, arena);
+  const uint32_t iw = aa.index_width;
+  auto key_vec = [&](size_t i) {
+    return MakeLogic4VecVal(arena, iw, static_cast<uint64_t>(keys[i]));
+  };
+  // Evaluates the with expression for entry i, binding the element iterator to
+  // the value and the index iterator to the key.
+  auto eval_with = [&](size_t i) {
+    ctx.PushScope();
+    auto* item_var = ctx.CreateLocalVariable(lc.iter_name, vals[i].width);
+    item_var->value = vals[i];
+    auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, iw);
+    idx_var->value = key_vec(i);
+    Logic4Vec r = EvalExpr(lc.with_expr, ctx, arena);
+    ctx.PopScope();
+    return r;
+  };
+  auto matches = [&](size_t i) { return eval_with(i).ToUint64() != 0; };
+  auto sort_key = [&](size_t i) {
+    return lc.with_expr ? eval_with(i).ToUint64() : vals[i].ToUint64();
+  };
+
+  if (method == "find") {
+    for (size_t i = 0; i < vals.size(); ++i)
+      if (matches(i)) out.push_back(vals[i]);
+  } else if (method == "find_first") {
+    for (size_t i = 0; i < vals.size(); ++i)
+      if (matches(i)) {
+        out.push_back(vals[i]);
+        break;
+      }
+  } else if (method == "find_last") {
+    for (size_t i = vals.size(); i > 0; --i)
+      if (matches(i - 1)) {
+        out.push_back(vals[i - 1]);
+        break;
+      }
+  } else if (method == "find_index") {
+    for (size_t i = 0; i < vals.size(); ++i)
+      if (matches(i)) out.push_back(key_vec(i));
+  } else if (method == "find_first_index") {
+    for (size_t i = 0; i < vals.size(); ++i)
+      if (matches(i)) {
+        out.push_back(key_vec(i));
+        break;
+      }
+  } else if (method == "find_last_index") {
+    for (size_t i = vals.size(); i > 0; --i)
+      if (matches(i - 1)) {
+        out.push_back(key_vec(i - 1));
+        break;
+      }
+  } else if (method == "min" || method == "max") {
+    if (vals.empty()) return true;
+    size_t best = 0;
+    uint64_t best_key = sort_key(0);
+    for (size_t i = 1; i < vals.size(); ++i) {
+      uint64_t k = sort_key(i);
+      if ((method == "min" && k < best_key) ||
+          (method == "max" && k > best_key)) {
+        best_key = k;
+        best = i;
+      }
+    }
+    out.push_back(vals[best]);
+  } else if (method == "unique" || method == "unique_index") {
+    std::vector<uint64_t> seen;
+    for (size_t i = 0; i < vals.size(); ++i) {
+      uint64_t v = sort_key(i);
+      bool dup = false;
+      for (uint64_t s : seen)
+        if (s == v) {
+          dup = true;
+          break;
+        }
+      if (dup) continue;
+      seen.push_back(v);
+      out.push_back(method == "unique" ? vals[i] : key_vec(i));
+    }
+  } else {
+    return false;
+  }
+  return true;
+}
+
 bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::vector<Logic4Vec>& out) {
   MethodCallParts parts;
@@ -1198,7 +1317,13 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   }
 
   auto* info = ctx.FindArrayInfo(parts.var_name);
-  if (!info) return false;
+  if (!info) {
+    // Associative arrays are stored separately and honor index-type returns
+    // and key ordering through a dedicated path.
+    if (auto* aa = ctx.FindAssocArray(parts.var_name))
+      return TryCollectAssocLocatorResult(expr, parts, *aa, ctx, arena, out);
+    return false;
+  }
 
   auto elems = CollectVecElements(parts.var_name, *info, ctx, arena);
   bool is_str = IsStringArray(parts.var_name, *info, ctx);
@@ -1227,7 +1352,23 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
     return true;
   }
 
-  if (!expr->with_expr) return false;
+  if (!expr->with_expr) {
+    // §7.12.1 — the with clause is mandatory for the element- and
+    // index-finding locators; it carries the Boolean predicate they filter on.
+    // A bare find* call is illegal, so flag it instead of silently yielding
+    // nothing. (Reduction methods such as map are governed elsewhere and keep
+    // the quiet fall-through.)
+    if (parts.method_name == "find" || parts.method_name == "find_index" ||
+        parts.method_name == "find_first" ||
+        parts.method_name == "find_first_index" ||
+        parts.method_name == "find_last" ||
+        parts.method_name == "find_last_index") {
+      ctx.GetDiag().Error({}, "array locator method '" +
+                                  std::string(parts.method_name) +
+                                  "' requires a 'with' clause");
+    }
+    return false;
+  }
 
   LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
   if (parts.method_name == "map") {
