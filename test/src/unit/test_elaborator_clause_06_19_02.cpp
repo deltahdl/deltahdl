@@ -111,6 +111,111 @@ TEST(Elaboration, EnumRangeNMDecrementing) {
   EXPECT_EQ(it->second[2].value, 2);
 }
 
+TEST(Elaboration, EnumRangeNWithValueOnRangedMember) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {sub[3] = 20} E1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  auto it = mod->enum_types.find("E1");
+  ASSERT_NE(it, mod->enum_types.end());
+  ASSERT_EQ(it->second.size(), 3u);
+  EXPECT_EQ(it->second[0].name, "sub0");
+  EXPECT_EQ(it->second[0].value, 20);
+  EXPECT_EQ(it->second[1].name, "sub1");
+  EXPECT_EQ(it->second[1].value, 21);
+  EXPECT_EQ(it->second[2].name, "sub2");
+  EXPECT_EQ(it->second[2].value, 22);
+}
+
+TEST(Elaboration, EnumRangeNZeroIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {sub[0]} E1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, EnumRangeNNegativeIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {sub[-2]} E1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, EnumRangeNMNegativeIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {sub[-1:2]} E1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, EnumRangeNOneProducesSingle) {
+  // Boundary of the positive-N rule: N == 1 is the smallest legal count and
+  // yields exactly one generated constant, name0.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {sub[1]} E1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  auto it = mod->enum_types.find("E1");
+  ASSERT_NE(it, mod->enum_types.end());
+  ASSERT_EQ(it->second.size(), 1u);
+  EXPECT_EQ(it->second[0].name, "sub0");
+  EXPECT_EQ(it->second[0].value, 0);
+}
+
+TEST(Elaboration, EnumRangeNMZeroBoundsAllowed) {
+  // Zero is a legal bound for the name[N:M] form, since both bounds need only
+  // be non-negative.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {reg[0:2]} E1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  auto it = mod->enum_types.find("E1");
+  ASSERT_NE(it, mod->enum_types.end());
+  ASSERT_EQ(it->second.size(), 3u);
+  EXPECT_EQ(it->second[0].name, "reg0");
+  EXPECT_EQ(it->second[0].value, 0);
+  EXPECT_EQ(it->second[1].name, "reg1");
+  EXPECT_EQ(it->second[1].value, 1);
+  EXPECT_EQ(it->second[2].name, "reg2");
+  EXPECT_EQ(it->second[2].value, 2);
+}
+
+TEST(Elaboration, EnumRangeNMNegativeEndIsError) {
+  // A negative upper bound violates the non-negative requirement on the second
+  // bound of name[N:M].
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {sub[2:-1]} E1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 TEST(Elaboration, EnumRangeLrmExample) {
   ElabFixture f;
   auto* design = ElaborateSrc(

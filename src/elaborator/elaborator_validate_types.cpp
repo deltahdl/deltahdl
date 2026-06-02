@@ -337,8 +337,24 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
       auto n = ConstEvalInt(member.range_start).value_or(0);
       if (member.range_end) {
         auto m = ConstEvalInt(member.range_end).value_or(0);
+        // Table 6-10: for the name[N:M] form, both bounds shall be
+        // non-negative integral numbers.
+        if (n < 0 || m < 0) {
+          diag_.Error(loc,
+                      std::format("enum range bounds of '{}' shall be "
+                                  "non-negative integral numbers",
+                                  member.name));
+        }
         count = (m >= n) ? (m - n + 1) : (n - m + 1);
       } else {
+        // Table 6-10: for the name[N] form, N shall be a positive integral
+        // number.
+        if (n < 1) {
+          diag_.Error(loc,
+                      std::format("enum range count of '{}' shall be a "
+                                  "positive integral number",
+                                  member.name));
+        }
         count = n;
       }
       if (count < 1) count = 1;
