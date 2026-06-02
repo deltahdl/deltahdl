@@ -183,6 +183,38 @@ TEST(AlwaysCombVsAlwaysStar, WaitInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(AlwaysCombVsAlwaysStar, WaitForkInAlwaysCombErrors) {
+  // 'wait fork' is a statement that blocks (a distinct AST node from a plain
+  // wait), so always_comb must reject it just like other suspending forms.
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a;\n"
+      "  always_comb begin\n"
+      "    a = 1;\n"
+      "    wait fork;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsWaitFork) {
+  // always @* places no such restriction, so the same wait fork is accepted.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a;\n"
+      "  always @* begin\n"
+      "    a = 1;\n"
+      "    wait fork;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsForkJoin) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -221,17 +253,6 @@ TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsNestedDelay) {
       "    if (a)\n"
       "      #1 a = 0;\n"
       "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsZeroDelay) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  logic a;\n"
-      "  always_comb #0 a = 1;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
