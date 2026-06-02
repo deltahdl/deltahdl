@@ -63,6 +63,32 @@ TEST(EnumMethods, NextWithCountWraps) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
+// A step count of zero leaves the position unchanged: the method should hand
+// back the member the variable already holds.
+TEST(EnumMethods, NextWithZeroCountReturnsCurrent) {
+  EnumFixture f;
+  auto* var = f.RegisterEnum("color", "color_t",
+                             {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
+  var->value = MakeLogic4VecVal(f.arena, 32, 1);
+  auto* call =
+      f.MakeEnumMethodCallWithArgs("color", "next", {f.MakeIntLiteral(0)});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+// A step count beyond the member count reduces modulo the size before
+// advancing, so N=4 over three members lands one past the start.
+TEST(EnumMethods, NextWithCountLargerThanSize) {
+  EnumFixture f;
+  auto* var = f.RegisterEnum("color", "color_t",
+                             {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
+  var->value = MakeLogic4VecVal(f.arena, 32, 0);
+  auto* call =
+      f.MakeEnumMethodCallWithArgs("color", "next", {f.MakeIntLiteral(4)});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 TEST(EnumMethods, NextOnNonMemberValue) {
   EnumFixture f;
   auto* var = f.RegisterEnum("color", "color_t",
