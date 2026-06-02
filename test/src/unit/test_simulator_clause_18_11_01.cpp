@@ -227,4 +227,25 @@ TEST(InlineConstraintChecker, NullArgumentHoldsAllVariablesAsState) {
   EXPECT_EQ(solver.GetValue("y"), 8);
 }
 
+// 18.11.1: a checker returns 1 when every constraint is satisfied. With no
+// constraint blocks at all there is nothing that can fail, so the inline checker
+// reports success at this boundary while still drawing no value for the rand
+// variable, which keeps its current value.
+TEST(InlineConstraintChecker, NullArgumentWithNoConstraintsReturnsOne) {
+  ConstraintSolver solver(99);
+
+  RandVariable x;
+  x.name = "x";
+  x.qualifier = RandQualifier::kRand;
+  x.min_val = 0;
+  x.max_val = 100;
+  x.value = 42;
+  solver.AddVariable(x);
+
+  // No constraint blocks added: the checker has nothing to test and so reports
+  // success, without ever solving for a fresh value.
+  EXPECT_TRUE(solver.InlineConstraintCheck());
+  EXPECT_EQ(solver.GetValue("x"), 42);
+}
+
 }
