@@ -1151,6 +1151,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateFinalClassExtension();
 
+  ValidateWeakReferenceMembers();
+
   ValidateChainingConstructors();
 
   ValidateEmbeddedCovergroupAssign();

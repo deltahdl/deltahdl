@@ -418,6 +418,8 @@ class Elaborator {
 
   void ValidateFinalClassExtension();
 
+  void ValidateWeakReferenceMembers();
+
   void ValidateClassMethodBodies(const ModuleDecl* decl);
 
   void ApplyClassMethodAutomaticDefault();

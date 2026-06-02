@@ -1697,6 +1697,27 @@ void Elaborator::ValidateFinalClassExtension() {
   }
 }
 
+// §8.30.1: a weak_reference incorporated into another object as a class property
+// carries the same parameter restriction as a standalone variable or a
+// subroutine argument — its type argument shall name a class type. Any other
+// type argument is a compile error, mirroring the variable-declaration and
+// subroutine-argument checks elsewhere in the elaborator.
+void Elaborator::ValidateWeakReferenceMembers() {
+  for (const auto* cls : unit_->classes) {
+    for (const auto* m : cls->members) {
+      if (m->kind != ClassMemberKind::kProperty) continue;
+      if (m->data_type.kind != DataTypeKind::kNamed) continue;
+      if (m->data_type.type_name != "weak_reference") continue;
+      if (m->data_type.type_params.empty()) continue;
+      const auto& tp = m->data_type.type_params[0];
+      if (tp.kind != DataTypeKind::kNamed || !class_names_.count(tp.type_name)) {
+        diag_.Error(m->loc,
+                    "weak_reference type parameter shall be a class type");
+      }
+    }
+  }
+}
+
 static bool IsSuperNewCall(const Stmt* s) {
   if (!s || s->kind != StmtKind::kExprStmt || !s->expr) return false;
   const auto* call = s->expr;
