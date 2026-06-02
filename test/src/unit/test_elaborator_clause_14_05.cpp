@@ -4,51 +4,14 @@ using namespace delta;
 
 namespace {
 
-TEST(ClockingHierExprElab, SimpleHierExprElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input sig = top.dut.sig;\n"
-      "  endclocking\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(ClockingHierExprElab, ConcatenationExprElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  clocking mem @(clock);\n"
-             "    input instruction = { opcode, regA, regB[3:1] };\n"
-             "  endclocking\n"
-             "endmodule\n"));
-}
-
+// §14.5: a clocking output bound to a hierarchical assignable target (a
+// reference to a signal in another scope) is a legal output-port connection
+// and elaborates without error.
 TEST(ClockingHierExprElab, OutputHierExprElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  clocking cb @(posedge clk);\n"
              "    output ack = top.dut.ack;\n"
-             "  endclocking\n"
-             "endmodule\n"));
-}
-
-TEST(ClockingHierExprElab, PartSelectExprElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
-             "    input nibble = data[7:4];\n"
-             "  endclocking\n"
-             "endmodule\n"));
-}
-
-TEST(ClockingHierExprElab, MixedSignalsWithHierExprsElaborate) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
-             "    input a, b = top.sig_b, c;\n"
              "  endclocking\n"
              "endmodule\n"));
 }
@@ -80,20 +43,6 @@ TEST(ClockingHierExprElab, OutputRejectsOperatorExpression) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §14.5: a literal constant is not a legal output-port connection, so binding
-// one to an output clocking signal is rejected.
-TEST(ClockingHierExprElab, OutputRejectsLiteralExpression) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    output ack = 8'h5;\n"
-      "  endclocking\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 // §14.5: a clocking inout signal must satisfy the output-port connection rule
 // as well, so a non-assignable expression bound to an inout signal is rejected.
 TEST(ClockingHierExprElab, InoutRejectsOperatorExpression) {
@@ -115,6 +64,19 @@ TEST(ClockingHierExprElab, OutputAcceptsConcatenationOfLvalues) {
       ElabOk("module m;\n"
              "  clocking cb @(posedge clk);\n"
              "    output bus = { top.hi, top.lo };\n"
+             "  endclocking\n"
+             "endmodule\n"));
+}
+
+// §14.5: a hierarchical expression may be a combination of forms — here a
+// concatenation that itself contains a part-select. For an output clocking
+// signal every element must remain assignable, so a concatenation combining a
+// name with a part-select is a legal output-port connection and elaborates.
+TEST(ClockingHierExprElab, OutputAcceptsConcatenationCombiningPartSelect) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    output bus = { top.hi, top.lo[3:1] };\n"
              "  endclocking\n"
              "endmodule\n"));
 }

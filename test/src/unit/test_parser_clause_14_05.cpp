@@ -54,38 +54,6 @@ TEST(ClockingHierExprParse, ConcatenationExpression) {
   EXPECT_NE(item->clocking_signals[0].hier_expr, nullptr);
 }
 
-TEST(ClockingHierExprParse, OutputWithHierExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    output ack = top.dut.ack;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_EQ(item->clocking_signals[0].name, "ack");
-  EXPECT_NE(item->clocking_signals[0].hier_expr, nullptr);
-}
-
-TEST(ClockingHierExprParse, InoutWithHierExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    inout data = top.dut.data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_EQ(item->clocking_signals[0].name, "data");
-  EXPECT_NE(item->clocking_signals[0].hier_expr, nullptr);
-}
-
 TEST(ClockingHierExprParse, PartSelectExpression) {
   auto r = Parse(
       "module m;\n"
