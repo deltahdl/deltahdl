@@ -177,4 +177,134 @@ TEST(Process, ForkCreatesThreadPerStatement) {
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}});
 }
 
+// §9.5: the per-parallel-statement thread rule applies to join_any groups too,
+// not just join. The parent unblocks as soon as one branch finishes, but the
+// remaining branches keep running as their own threads to completion.
+TEST(Process, ForkJoinAnyCreatesThreadPerStatement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 8'd1;\n"
+      "      b = 8'd2;\n"
+      "      c = 8'd3;\n"
+      "    join_any\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}});
+}
+
+// §9.5: each parallel statement in a fork-join_none group spawns its own
+// dynamic process. The parent does not wait, yet every spawned thread still
+// runs to completion as an independent thread of execution.
+TEST(Process, ForkJoinNoneSpawnsDynamicProcessPerStatement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 8'd1;\n"
+      "      b = 8'd2;\n"
+      "      c = 8'd3;\n"
+      "    join_none\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}});
+}
+
+// §9.5: a final procedure is its own thread of execution. It runs once at the
+// end of simulation, independently of the initial thread that calls $finish.
+TEST(Process, FinalRunsAsOwnThread) {
+  auto marker = RunAndGet(
+      "module m;\n"
+      "  logic [7:0] marker;\n"
+      "  initial begin marker = 8'd1; #5 $finish; end\n"
+      "  final marker = 8'd42;\n"
+      "endmodule\n",
+      "marker");
+  EXPECT_EQ(marker, 42u);
+}
+
+// §9.5: a general always procedure is its own thread. It wakes on a clock edge
+// produced by a separate initial thread and drives its output.
+TEST(Process, GeneralAlwaysRunsAsOwnThread) {
+  auto q = RunAndGet(
+      "module m;\n"
+      "  logic clk, d, q;\n"
+      "  initial begin clk = 0; d = 1; #1 clk = 1; #1 $finish; end\n"
+      "  always @(posedge clk) q = d;\n"
+      "endmodule\n",
+      "q");
+  EXPECT_EQ(q, 1u);
+}
+
+// §9.5: an always_ff procedure is its own thread, waking on the clock edge
+// driven by the initial thread.
+TEST(Process, AlwaysFFRunsAsOwnThread) {
+  auto q = RunAndGet(
+      "module m;\n"
+      "  logic clk, d, q;\n"
+      "  initial begin clk = 0; d = 1; #1 clk = 1; #1 $finish; end\n"
+      "  always_ff @(posedge clk) q <= d;\n"
+      "endmodule\n",
+      "q");
+  EXPECT_EQ(q, 1u);
+}
+
+// §9.5: an always_latch procedure is its own thread, sensitive to its inputs.
+// Once the initial thread enables it, the latch thread follows d.
+TEST(Process, AlwaysLatchRunsAsOwnThread) {
+  auto q = RunAndGet(
+      "module m;\n"
+      "  logic en;\n"
+      "  logic [7:0] d, q;\n"
+      "  initial begin en = 1; d = 8'hCD; end\n"
+      "  always_latch if (en) q = d;\n"
+      "endmodule\n",
+      "q");
+  EXPECT_EQ(q, 0xCDu);
+}
+
+// §9.5 edge case: a fork-join with no parallel statements creates no thread
+// and does not block the spawning thread, which proceeds past the join.
+TEST(Process, EmptyForkSpawnsNoThreadAndContinues) {
+  auto x = RunAndGet(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd7;\n"
+      "    fork join\n"
+      "    x = 8'd9;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(x, 9u);
+}
+
+// §9.5 edge case: forks nest. Each parallel statement at every nesting level
+// becomes its own thread of execution.
+TEST(Process, NestedForkSpawnsThreadPerStatement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 8'd1;\n"
+      "      fork\n"
+      "        b = 8'd2;\n"
+      "        c = 8'd3;\n"
+      "      join\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}});
+}
+
 }

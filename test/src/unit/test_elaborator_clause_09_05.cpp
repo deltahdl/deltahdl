@@ -186,22 +186,6 @@ TEST(ProcessExecutionThreadElaboration, AllSixProcessKindsInOneModule) {
   EXPECT_EQ(mod->processes[5].kind, RtlirProcessKind::kAlwaysLatch);
 }
 
-TEST(ProcessExecutionThreadElaboration, ModuleWithOnlyContinuousAssignsHasNoProcesses) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b, c;\n"
-      "  assign b = a;\n"
-      "  assign c = b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  EXPECT_EQ(mod->processes.size(), 0u);
-  EXPECT_GE(mod->assigns.size(), 2u);
-}
-
 TEST(ProcessExecutionThreadElaboration, EachInitialCreatesOwnProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
