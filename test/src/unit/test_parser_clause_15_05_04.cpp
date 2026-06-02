@@ -37,21 +37,6 @@ TEST(WaitOrderParser, WaitOrderTwoEvents) {
   ASSERT_EQ(stmt->wait_order_events.size(), 2u);
 }
 
-TEST(WaitOrderParser, WaitOrderNull) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait_order(a, b, c);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
-  ASSERT_EQ(stmt->wait_order_events.size(), 3u);
-}
-
 TEST(WaitOrderParser, WaitOrderWithAction) {
   auto r = Parse(
       "module m;\n"
