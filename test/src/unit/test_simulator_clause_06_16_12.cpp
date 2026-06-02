@@ -30,4 +30,17 @@ TEST(StringMethods, HextoaOverwritesExisting) {
   EXPECT_EQ(VecToString(var->value), "10");
 }
 
+// §6.16.12: hextoa is the inverse of atohex (§6.16.9). Storing a value's hex
+// spelling and reading it back through atohex recovers the original integer.
+TEST(StringMethods, HextoaIsInverseOfAtohex) {
+  StringFixture f;
+  f.CreateStringVar("s", "");
+  auto* store = f.MakeMethodCall("s", "hextoa", {f.MakeIntLiteral(0xABC)});
+  EvalExpr(store, f.ctx, f.arena);
+
+  auto* readback = f.MakeMethodCall("s", "atohex");
+  auto result = EvalExpr(readback, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0xABCu);
+}
+
 }
