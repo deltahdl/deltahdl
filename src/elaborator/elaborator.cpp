@@ -1915,7 +1915,20 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
     if (!pd.is_resolved && pval) {
       if (pval->kind == ExprKind::kIdentifier && pval->text == "$") {
         pd.is_unbounded = true;
+      } else if (pval->kind == ExprKind::kIdentifier &&
+                 RefersToUnboundedParam(mod, pval->text)) {
+        // §6.20.7: assigning a $ (unbounded) parameter to another parameter is
+        // legal; the assigned-to parameter is itself unbounded.
+        pd.is_unbounded = true;
       } else {
+        if (ContainsDollarSubexpr(pval)) {
+          // §6.20.7: $ must be the entire, self-contained parameter value; it
+          // may not be combined with operators or selects in this context.
+          diag_.Error(pval->range.start,
+                      std::format("'$' may only be assigned to parameter '{}' "
+                                  "as a complete, self-contained expression",
+                                  pname));
+        }
         auto val = ConstEvalInt(pval, scope);
         if (val) {
           pd.resolved_value = *val;

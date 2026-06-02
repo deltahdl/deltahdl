@@ -1065,7 +1065,21 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   if (item->init_expr && item->init_expr->kind == ExprKind::kIdentifier &&
       item->init_expr->text == "$") {
     pd.is_unbounded = true;
+  } else if (item->init_expr &&
+             item->init_expr->kind == ExprKind::kIdentifier &&
+             RefersToUnboundedParam(mod, item->init_expr->text)) {
+    // §6.20.7: it is legal to assign a $ (unbounded) parameter to another
+    // parameter; the assigned-to parameter is itself unbounded.
+    pd.is_unbounded = true;
   } else if (item->init_expr) {
+    if (ContainsDollarSubexpr(item->init_expr)) {
+      // §6.20.7: $ must be the entire, self-contained parameter value; it may
+      // not be combined with operators or selects in this context.
+      diag_.Error(item->loc,
+                  std::format("'$' may only be assigned to parameter '{}' as a "
+                              "complete, self-contained expression",
+                              item->name));
+    }
     ValidateTypenameAsElabConstant(item->init_expr);
     auto scope = BuildParamScope(mod);
     auto val = ConstEvalInt(item->init_expr, scope);
@@ -2986,6 +3000,34 @@ ScopeMap Elaborator::BuildParamScope(const RtlirModule* mod) const {
     }
   }
   return scope;
+}
+
+bool Elaborator::RefersToUnboundedParam(const RtlirModule* mod,
+                                        std::string_view name) const {
+  for (const auto& p : mod->params) {
+    if (p.is_unbounded && p.name == name) return true;
+  }
+  return false;
+}
+
+bool Elaborator::ContainsDollarSubexpr(const Expr* e) const {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kIdentifier && e->text == "$") return true;
+  if (ContainsDollarSubexpr(e->lhs)) return true;
+  if (ContainsDollarSubexpr(e->rhs)) return true;
+  if (ContainsDollarSubexpr(e->condition)) return true;
+  if (ContainsDollarSubexpr(e->true_expr)) return true;
+  if (ContainsDollarSubexpr(e->false_expr)) return true;
+  if (ContainsDollarSubexpr(e->base)) return true;
+  if (ContainsDollarSubexpr(e->index)) return true;
+  if (ContainsDollarSubexpr(e->index_end)) return true;
+  if (ContainsDollarSubexpr(e->with_expr)) return true;
+  if (ContainsDollarSubexpr(e->repeat_count)) return true;
+  for (const Expr* a : e->args)
+    if (ContainsDollarSubexpr(a)) return true;
+  for (const Expr* el : e->elements)
+    if (ContainsDollarSubexpr(el)) return true;
+  return false;
 }
 
 void Elaborator::ProcessPendingGenerate(ModuleItem* item, RtlirModule* mod) {

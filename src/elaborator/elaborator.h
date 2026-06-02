@@ -163,6 +163,16 @@ class Elaborator {
 
   ScopeMap BuildParamScope(const RtlirModule* mod) const;
 
+  // §6.20.7: returns true if `name` matches an already-elaborated parameter of
+  // `mod` that was assigned $ (an unbounded parameter).
+  bool RefersToUnboundedParam(const RtlirModule* mod,
+                              std::string_view name) const;
+
+  // §6.20.7: returns true if a literal $ appears anywhere inside `e`. Used to
+  // reject parameter values where $ is combined with operators or selects
+  // instead of standing alone as the entire (self-contained) expression.
+  bool ContainsDollarSubexpr(const Expr* e) const;
+
   void ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
                            const ScopeMap& scope);
 

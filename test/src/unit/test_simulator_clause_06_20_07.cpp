@@ -20,6 +20,25 @@ TEST(DollarConstantSimulation, UnboundedParameterRegisteredDuringLowering) {
   EXPECT_TRUE(f.ctx.IsUnboundedParam("P"));
 }
 
+// §6.20.7: a parameter assigned another (unbounded) $ parameter is itself
+// unbounded, so lowering registers it as unbounded too.
+TEST(DollarConstantSimulation, ChainedDollarParameterRegisteredAsUnbounded) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter Q = $;\n"
+      "  parameter P = Q;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+
+  EXPECT_TRUE(f.ctx.IsUnboundedParam("Q"));
+  EXPECT_TRUE(f.ctx.IsUnboundedParam("P"));
+}
+
 TEST(DollarConstantSimulation, BoundedParameterNotRegisteredAsUnbounded) {
   SimFixture f;
   auto* design = ElaborateSrc(
