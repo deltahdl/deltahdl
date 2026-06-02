@@ -1391,4 +1391,56 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// §7.12.5 — map() over an associative array. Unlike the locator methods, map
+// does not collapse the array to a queue: it produces an associative array
+// whose set of index values and index type match the source, with each stored
+// value replaced by the value of the with expression. The with clause is
+// required, and each result element takes the self-determined type of that
+// expression (carried by the width of the evaluated value). Only the
+// integer-keyed index type is representable through this path; string-keyed
+// sources are left to the caller, mirroring the locator-result limitation.
+bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
+                              AssocArrayObject& out) {
+  MethodCallParts parts;
+  if (!ExtractLocatorParts(expr, parts)) return false;
+  if (parts.method_name != "map") return false;
+  auto* aa = ctx.FindAssocArray(parts.var_name);
+  if (!aa) return false;
+  if (!expr->with_expr) {
+    ctx.GetDiag().Error({}, "array method 'map' requires a 'with' clause");
+    return false;
+  }
+  if (aa->is_string_key) return false;  // index type not representable here
+
+  // The returned array's range and index type match the source: carry over the
+  // index metadata and reuse the source keys unchanged.
+  out.index_width = aa->index_width;
+  out.is_index_signed = aa->is_index_signed;
+  out.is_wildcard = aa->is_wildcard;
+  out.is_string_key = false;
+  out.int_data.clear();
+
+  std::vector<int64_t> keys;
+  std::vector<Logic4Vec> vals;
+  for (const auto& [k, v] : aa->int_data) {
+    keys.push_back(k);
+    vals.push_back(v);
+  }
+  LocatorCtx lc = MakeLocatorCtx(vals, /*is_str=*/false, expr, ctx, arena);
+  const uint32_t iw = aa->index_width;
+  for (size_t i = 0; i < vals.size(); ++i) {
+    ctx.PushScope();
+    auto* item_var = ctx.CreateLocalVariable(lc.iter_name, vals[i].width);
+    item_var->value = vals[i];
+    auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, iw);
+    idx_var->value =
+        MakeLogic4VecVal(arena, iw, static_cast<uint64_t>(keys[i]));
+    Logic4Vec mapped = EvalExpr(lc.with_expr, ctx, arena);
+    ctx.PopScope();
+    out.int_data[keys[i]] = mapped;
+    out.elem_width = mapped.width;
+  }
+  return true;
+}
+
 }

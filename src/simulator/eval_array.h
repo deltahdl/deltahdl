@@ -7,6 +7,7 @@
 namespace delta {
 
 struct Expr;
+struct AssocArrayObject;
 class SimContext;
 class Arena;
 
@@ -39,5 +40,8 @@ bool TryExecAssocPropertyStmt(std::string_view var_name, std::string_view prop,
 
 bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::vector<Logic4Vec>& out);
+
+bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
+                              AssocArrayObject& out);
 
 }
