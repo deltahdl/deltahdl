@@ -486,7 +486,10 @@ static bool DispatchQueueEval(std::string_view method, QueueObject* q,
   }
   if (method == "pop_back") {
     if (q->elements.empty()) {
-      out = MakeAllX(arena, q->elem_width);
+      // Empty queue: yield the value of a nonexistent element of the queue's
+      // element type (Table 7-1, see 7.4.5) and leave the queue unchanged.
+      out = q->is_4state ? MakeAllX(arena, q->elem_width)
+                         : MakeLogic4VecVal(arena, q->elem_width, 0);
     } else {
       out = q->elements.back();
       q->elements.pop_back();

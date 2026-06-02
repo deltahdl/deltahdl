@@ -42,6 +42,35 @@ TEST(QueuePopBack, EmptyQueueReturnsAllX) {
   EXPECT_TRUE(HasUnknownBits(out));
 }
 
+TEST(QueuePopBack, SuccessiveCallsRemoveFromBack) {
+  SimFixture f;
+  auto* q = MakeQueue(f, "q", {10, 20, 30});
+  Logic4Vec out{};
+
+  auto* call = MakeMethodCall(f.arena, "q", "pop_back", {});
+  ASSERT_TRUE(TryEvalQueueMethodCall(call, f.ctx, f.arena, out));
+  EXPECT_EQ(out.ToUint64(), 30u);
+
+  ASSERT_TRUE(TryEvalQueueMethodCall(call, f.ctx, f.arena, out));
+  EXPECT_EQ(out.ToUint64(), 20u);
+
+  ASSERT_EQ(q->elements.size(), 1u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
+}
+
+TEST(QueuePopBack, EmptyTwoStateQueueReturnsZero) {
+  SimFixture f;
+  // 2-state element type: an absent element reads as 0 (Table 7-1, 7.4.5),
+  // not x.
+  f.ctx.CreateQueue("q", 32, /*max_size=*/-1, /*is_4state=*/false);
+  Logic4Vec out{};
+  auto* call = MakeMethodCall(f.arena, "q", "pop_back", {});
+  bool ok = TryEvalQueueMethodCall(call, f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_FALSE(HasUnknownBits(out));
+  EXPECT_EQ(out.ToUint64(), 0u);
+}
+
 TEST(QueuePopBack, EmptyQueueRemainsEmpty) {
   SimFixture f;
   auto* q = f.ctx.CreateQueue("q", 32);
