@@ -196,4 +196,53 @@ TEST(AlwaysLatchElaboration, TwoAlwaysLatchDifferentSignalsNoError) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §9.2.2.3 inherits §9.2.2.2's single-driver rule, which also forbids an
+// always_latch output from being driven by a continuous assignment. This
+// exercises the process-vs-continuous-assign conflict path, distinct from the
+// process-vs-process path covered above.
+TEST(AlwaysLatchElaboration, ContinuousAssignAndAlwaysLatchSameVarErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic en, a, b, q;\n"
+      "  assign q = b;\n"
+      "  always_latch if (en) q = a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.2.2.3 inherits §9.2.2.2's statement restrictions; a blocking wait control
+// is not permitted in an always_latch body.
+TEST(AlwaysLatchElaboration, WaitStatementInAlwaysLatchErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic en, d, q;\n"
+      "  always_latch begin\n"
+      "    wait (en) q = d;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// The latch-inference check recurses into begin-end blocks: an incomplete if
+// nested inside a block still infers a latch, so no "does not represent latched
+// logic" warning is raised.
+TEST(AlwaysLatchElaboration, BlockWrappingIncompleteIfNoWarning) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic en, d, q;\n"
+      "  always_latch begin\n"
+      "    if (en) q = d;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
 }
