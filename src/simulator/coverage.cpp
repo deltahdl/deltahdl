@@ -768,6 +768,62 @@ std::vector<std::vector<size_t>> CoverageDB::RetainedAutoCrossProducts(
   return retained;
 }
 
+// --- LRM 19.6.1.2: cross bin with covergroup expressions --------------------
+
+uint64_t CoverageDB::CountSatisfyingValueTuples(
+    const std::vector<std::vector<int64_t>>& bin_tuple_value_sets,
+    const std::function<bool(const std::vector<int64_t>&)>& pred) {
+  // No coverpoints, or any coverpoint with an empty value set, yields no value
+  // tuples, hence nothing can satisfy the expression.
+  if (bin_tuple_value_sets.empty()) return 0;
+  for (const auto& values : bin_tuple_value_sets) {
+    if (values.empty()) return 0;
+  }
+  uint64_t satisfying = 0;
+  std::vector<size_t> idx(bin_tuple_value_sets.size(), 0);
+  std::vector<int64_t> tuple(bin_tuple_value_sets.size());
+  while (true) {
+    for (size_t i = 0; i < bin_tuple_value_sets.size(); ++i) {
+      tuple[i] = bin_tuple_value_sets[i][idx[i]];
+    }
+    if (pred(tuple)) ++satisfying;
+    size_t pos = bin_tuple_value_sets.size();
+    while (true) {
+      --pos;
+      if (++idx[pos] < bin_tuple_value_sets[pos].size()) break;
+      idx[pos] = 0;
+      if (pos == 0) return satisfying;
+    }
+  }
+}
+
+std::vector<size_t> CoverageDB::SelectCrossBinTuples(
+    const std::vector<std::vector<std::vector<int64_t>>>& candidate_bin_tuples,
+    const std::function<bool(const std::vector<int64_t>&)>* pred,
+    const CrossWithMatchPolicy& policy) {
+  std::vector<size_t> selected;
+  for (size_t c = 0; c < candidate_bin_tuples.size(); ++c) {
+    // A bare cross_identifier (no with clause) keeps every candidate bin tuple.
+    if (pred == nullptr) {
+      selected.push_back(c);
+      continue;
+    }
+    const auto& sets = candidate_bin_tuples[c];
+    uint64_t satisfying = CountSatisfyingValueTuples(sets, *pred);
+    bool keep;
+    if (policy.require_all) {
+      // The $ form requires every value tuple to satisfy the expression.
+      uint64_t total = sets.empty() ? 0 : 1;
+      for (const auto& values : sets) total *= values.size();
+      keep = total > 0 && satisfying == total;
+    } else {
+      keep = satisfying >= policy.min_count;
+    }
+    if (keep) selected.push_back(c);
+  }
+  return selected;
+}
+
 // --- LRM 19.5.1: specifying bins for values ---------------------------------
 
 std::string CoverageDB::StateBinName(std::string_view base, int64_t index) {

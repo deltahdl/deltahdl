@@ -41,6 +41,7 @@ add_library(deltahdl_lib STATIC
     elaborator/checker_context_inference.cpp
     elaborator/covergroup_in_checker.cpp
     elaborator/covergroup_inheritance.cpp
+    elaborator/cross_bin_with_covergroup.cpp
     elaborator/concurrent_assertion_expr.cpp
     elaborator/function_in_checker.cpp
     elaborator/checker_procedures.cpp

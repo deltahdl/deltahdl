@@ -123,6 +123,17 @@ struct CrossCover {
   bool excluded_from_coverage = false;
 };
 
+// The matches selection policy of a select_expression "with" clause: the
+// minimum number of a candidate bin tuple's value tuples that must satisfy the
+// with_covergroup_expression for the bin tuple to be selected. require_all
+// models the $ token, which requires every value tuple to satisfy; otherwise at
+// least min_count must, which defaults to one when no matches clause is written
+// (LRM 19.6.1.2).
+struct CrossWithMatchPolicy {
+  bool require_all = false;
+  uint64_t min_count = 1;
+};
+
 // Instance options of a covergroup, as organized in LRM 19.10. The legacy
 // fields (at_least, weight, goal, auto_bin_max) are kept so existing coverage
 // computations continue to work unchanged.
@@ -372,6 +383,31 @@ class CoverageDB {
       const std::vector<size_t>& per_point_bin_counts,
       const std::vector<std::vector<size_t>>& user_selected_products,
       bool retain_auto_bins);
+
+  // --- LRM 19.6.1.2: cross bin with covergroup expressions ------------------
+
+  // Counts how many value tuples of a candidate bin tuple satisfy the
+  // with_covergroup_expression. The candidate bin tuple is given as one value
+  // set per coverpoint; its value tuples are the Cartesian product of those
+  // sets. The predicate receives one value tuple at a time — the value each
+  // cross_item takes in that tuple — because the cross_items occurring in the
+  // with_covergroup_expression stand for those per-tuple values (LRM 19.6.1.2).
+  static uint64_t CountSatisfyingValueTuples(
+      const std::vector<std::vector<int64_t>>& bin_tuple_value_sets,
+      const std::function<bool(const std::vector<int64_t>&)>& pred);
+
+  // Selects, from a list of candidate bin tuples, those a select_expression
+  // keeps. Each candidate is one value set per coverpoint. When pred is null the
+  // select_expression is a bare cross_identifier, which selects every candidate
+  // bin tuple. When pred is given (a with clause) a candidate is kept only when
+  // its satisfying value tuple count meets the matches policy: every value tuple
+  // for the $ form (require_all), otherwise at least min_count, which is one
+  // when no matches clause was written. Returns the indices of the kept
+  // candidates, in order (LRM 19.6.1.2).
+  static std::vector<size_t> SelectCrossBinTuples(
+      const std::vector<std::vector<std::vector<int64_t>>>& candidate_bin_tuples,
+      const std::function<bool(const std::vector<int64_t>&)>* pred,
+      const CrossWithMatchPolicy& policy);
 
   // --- LRM 19.5.1: specifying bins for values -------------------------------
 
