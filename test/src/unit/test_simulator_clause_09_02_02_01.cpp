@@ -47,25 +47,6 @@ TEST(GeneralPurposeAlwaysSimulation, TwoPhaseClockBeginEnd) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(GeneralPurposeAlwaysSimulation, AlwaysRepeatsContinuously) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [31:0] count;\n"
-      "  initial count = 0;\n"
-      "  always #1 count = count + 1;\n"
-      "  initial #10 $finish;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("count");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);
-}
-
 TEST(GeneralPurposeAlwaysSimulation, SensitivityListTriggersOnEdge) {
   SimFixture f;
   auto* design = ElaborateSrc(

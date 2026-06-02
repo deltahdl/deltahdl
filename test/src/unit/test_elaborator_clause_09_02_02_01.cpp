@@ -28,6 +28,20 @@ TEST(GeneralPurposeAlwaysElaboration, AlwaysWithSensitivityNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
+TEST(GeneralPurposeAlwaysElaboration, AlwaysWithStarSensitivityNoWarning) {
+  // A general purpose always whose implicit @(*) supplies a sensitivity is
+  // not flagged as a potential zero-delay loop: the trigger lets time advance.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, y;\n"
+      "  always @* y = a & b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
 TEST(GeneralPurposeAlwaysElaboration, AlwaysWithoutTimingWarns) {
   ElabFixture f;
   auto* design = ElaborateSrc(
