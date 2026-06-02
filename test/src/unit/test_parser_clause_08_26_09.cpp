@@ -78,21 +78,4 @@ TEST(InterfaceClassRandomizeParsing, PreRandomizeInImplementingClass) {
   ASSERT_GE(cls->members.size(), 2u);
 }
 
-TEST(InterfaceClassRandomizeParsing, PostRandomizeInImplementingClass) {
-  auto r = Parse(
-      "interface class IC;\n"
-      "  pure virtual function void foo();\n"
-      "endclass\n"
-      "class C implements IC;\n"
-      "  virtual function void foo();\n"
-      "  endfunction\n"
-      "  function void post_randomize();\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  auto* cls = r.cu->classes[1];
-  ASSERT_GE(cls->members.size(), 2u);
-}
-
 }

@@ -60,6 +60,45 @@ TEST(InterfaceClassRandomizeSim, RandomizeReturnValue) {
       "endmodule\n", "result"), 1u);
 }
 
+TEST(InterfaceClassRandomizeSim, InlineConstraintViaInterfaceHandleRandomizes) {
+  // §8.26.9: an inline constraint (randomize() with {...}) is legal through an
+  // interface class handle. An interface class holds no data members, so the
+  // inline block cannot name the object's rand fields; an empty block is the
+  // representative legal form. It must still drive a successful randomization
+  // that honors the implementing class's own constraint block.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "class C implements IC;\n"
+      "  rand int x;\n"
+      "  constraint c { x >= 1; x <= 50; }\n"
+      "  virtual function void foo();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C obj = new;\n"
+      "    IC iref = obj;\n"
+      "    void'(iref.randomize() with { });\n"
+      "    result = obj.x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_FALSE(f.has_errors);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  uint64_t val = var->value.ToUint64();
+  EXPECT_GE(val, 1u);
+  EXPECT_LE(val, 50u);
+}
+
 TEST(InterfaceClassPrePostRandomizeSim, PreRandomizeCalledBeforeRandomize) {
   EXPECT_EQ(RunAndGet(
       "interface class IC;\n"
