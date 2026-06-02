@@ -140,16 +140,4 @@ TEST(InterfaceClassTypeAccess, ScopeResolutionOnParameterizedInterfaceClass) {
              "endmodule\n"));
 }
 
-TEST(InterfaceClassTypeAccess, ParamsAreStaticAccessibleWithoutInstance) {
-  EXPECT_TRUE(
-      ElabOk("interface class IC;\n"
-             "  parameter int SIZE = 64;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "module m;\n"
-             "  int x;\n"
-             "  initial x = IC::SIZE;\n"
-             "endmodule\n"));
-}
-
 }

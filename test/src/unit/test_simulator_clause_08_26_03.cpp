@@ -104,4 +104,134 @@ TEST(InterfaceClassTypeAccess, ImplementingClassDoesNotInheritStaticProps) {
   EXPECT_EQ(it, impl->static_properties.end());
 }
 
+// §8.26.3: a parameter declared in an interface class is inherited by an
+// extending interface class, so it can be read through the extending class
+// name with the scope resolution operator.
+TEST(InterfaceClassTypeAccess, ParamInheritedByExtendingInterfaceEndToEnd) {
+  EXPECT_EQ(RunAndGet(
+      "interface class IA;\n"
+      "  parameter int SIZE = 64;\n"
+      "  pure virtual function void fa();\n"
+      "endclass\n"
+      "interface class IB extends IA;\n"
+      "  pure virtual function void fb();\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial result = IB::SIZE;\n"
+      "endmodule\n", "result"), 64u);
+}
+
+// §8.26.3: typedefs (here, the enumeration constants of a member typedef) are
+// likewise inherited through extends and reachable via the extending class.
+TEST(InterfaceClassTypeAccess, EnumValueInheritedByExtendingInterfaceEndToEnd) {
+  EXPECT_EQ(RunAndGet(
+      "interface class IA;\n"
+      "  typedef enum {ONE, TWO, THREE} t1_t;\n"
+      "  pure virtual function void fa();\n"
+      "endclass\n"
+      "interface class IB extends IA;\n"
+      "  pure virtual function void fb();\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial result = IB::THREE;\n"
+      "endmodule\n", "result"), 2u);
+}
+
+// §8.26.3: the inheritance is transitive across a chain of extending interface
+// classes, so a parameter from the root is reachable through the leaf.
+TEST(InterfaceClassTypeAccess, ParamInheritedThroughChainedExtends) {
+  EXPECT_EQ(RunAndGet(
+      "interface class IA;\n"
+      "  parameter int WIDTH = 8;\n"
+      "  pure virtual function void fa();\n"
+      "endclass\n"
+      "interface class IB extends IA;\n"
+      "  pure virtual function void fb();\n"
+      "endclass\n"
+      "interface class IC extends IB;\n"
+      "  pure virtual function void fc();\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial result = IC::WIDTH;\n"
+      "endmodule\n", "result"), 8u);
+}
+
+// §8.26.3: the lowerer itself performs the extends-inheritance — after lowering,
+// the extending interface's type carries the base parameter as a static
+// property. Observing the lowered ClassTypeInfo exercises that production path
+// directly (not a hand-built type).
+TEST(InterfaceClassTypeAccess, LowererCopiesInheritedParamIntoExtendingInterface) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface class IA;\n"
+      "  parameter int SIZE = 64;\n"
+      "  pure virtual function void fa();\n"
+      "endclass\n"
+      "interface class IB extends IA;\n"
+      "  pure virtual function void fb();\n"
+      "endclass\n"
+      "module t;\n"
+      "endmodule\n", f);
+  ASSERT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* ib = f.ctx.FindClassType("IB");
+  ASSERT_NE(ib, nullptr);
+  auto it = ib->static_properties.find("SIZE");
+  ASSERT_NE(it, ib->static_properties.end());
+  EXPECT_EQ(it->second.ToUint64(), 64u);
+}
+
+// §8.26.3: typedef enumeration constants are inherited through extends too; the
+// lowered extending interface carries the base enum members.
+TEST(InterfaceClassTypeAccess, LowererCopiesInheritedEnumMembersIntoExtendingInterface) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface class IA;\n"
+      "  typedef enum {ONE, TWO, THREE} t1_t;\n"
+      "  pure virtual function void fa();\n"
+      "endclass\n"
+      "interface class IB extends IA;\n"
+      "  pure virtual function void fb();\n"
+      "endclass\n"
+      "module t;\n"
+      "endmodule\n", f);
+  ASSERT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* ib = f.ctx.FindClassType("IB");
+  ASSERT_NE(ib, nullptr);
+  auto it = ib->enum_members.find("THREE");
+  ASSERT_NE(it, ib->enum_members.end());
+  EXPECT_EQ(it->second, 2u);
+}
+
+// §8.26.3: parameters and typedefs are NOT inherited through implements. After
+// lowering, the implementing class does not carry the interface's parameter as
+// a static property, while the interface class itself still does. This observes
+// the lowerer's interface-only inheritance guard rather than a hand-built type.
+TEST(InterfaceClassTypeAccess, LowererDoesNotCopyParamIntoImplementingClass) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface class IC;\n"
+      "  parameter int SIZE = 64;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "class C implements IC;\n"
+      "  virtual function void foo();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "endmodule\n", f);
+  ASSERT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* ic = f.ctx.FindClassType("IC");
+  ASSERT_NE(ic, nullptr);
+  EXPECT_NE(ic->static_properties.find("SIZE"), ic->static_properties.end());
+  auto* c = f.ctx.FindClassType("C");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->static_properties.find("SIZE"), c->static_properties.end());
+}
+
 }
