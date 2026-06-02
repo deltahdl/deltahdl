@@ -1352,12 +1352,20 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
     return true;
   }
 
+  // §7.12.5 — map() replaces each element with the value of its with clause,
+  // and that clause is required: there is nothing to evaluate without it, so a
+  // bare map() is illegal rather than a silent no-op.
+  if (parts.method_name == "map" && !expr->with_expr) {
+    ctx.GetDiag().Error({},
+                        "array method 'map' requires a 'with' clause");
+    return false;
+  }
+
   if (!expr->with_expr) {
     // §7.12.1 — the with clause is mandatory for the element- and
     // index-finding locators; it carries the Boolean predicate they filter on.
     // A bare find* call is illegal, so flag it instead of silently yielding
-    // nothing. (Reduction methods such as map are governed elsewhere and keep
-    // the quiet fall-through.)
+    // nothing.
     if (parts.method_name == "find" || parts.method_name == "find_index" ||
         parts.method_name == "find_first" ||
         parts.method_name == "find_first_index" ||
