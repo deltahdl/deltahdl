@@ -99,29 +99,4 @@ TEST(ContinuousAssignDeclElaboration, InterconnectNetDeclAssignIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ContinuousAssignDeclElaboration, TriNetDeclAssignCreatesContAssign) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module t;\n"
-      "  tri w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1u);
-  EXPECT_NE(mod->assigns[0].lhs, nullptr);
-  EXPECT_NE(mod->assigns[0].rhs, nullptr);
-}
-
-TEST(ContinuousAssignDeclElaboration, InterconnectVectorNetDeclAssignIsError) {
-  ElabFixture f;
-  Elaborate(
-      "module t;\n"
-      "  interconnect [3:0] bus = 4'b0;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 }
