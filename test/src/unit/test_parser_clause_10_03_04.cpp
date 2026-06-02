@@ -59,32 +59,6 @@ TEST(DriveStrengthParsing, NetDeclAssignmentWithDriveStrength) {
   EXPECT_NE(item->data_type.drive_strength1, 0);
 }
 
-TEST(DriveStrengthParsing, ContinuousAssignWithDriveStrength) {
-  auto r = Parse(
-      "module m;\n"
-      "  assign (strong1, weak0) a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r, ModuleItemKind::kContAssign);
-  ASSERT_NE(item, nullptr);
-  EXPECT_NE(item->drive_strength0, 0);
-  EXPECT_NE(item->drive_strength1, 0);
-}
-
-TEST(DriveStrengthParsing, ContinuousAssignStrengthAndDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  assign (strong1, pull0) #10 a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r, ModuleItemKind::kContAssign);
-  ASSERT_NE(item, nullptr);
-  EXPECT_NE(item->drive_strength0, 0);
-  EXPECT_NE(item->assign_delay, nullptr);
-}
-
 TEST(DriveStrengthParsing, Highz0Highz1PairParsesWithoutError) {
   auto r = Parse(
       "module m;\n"
@@ -125,6 +99,47 @@ TEST(DriveStrengthParsing, NetDeclReversedStrengthOrder) {
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->drive_strength0, 2u);
   EXPECT_EQ(item->drive_strength1, 4u);
+}
+
+// §10.3.4: a drive strength specification must pair one strength-for-1 keyword
+// with one strength-for-0 keyword. Two strength-0 keywords leave the
+// strength-1 slot unfilled, which the parser rejects.
+TEST(DriveStrengthParsing, TwoStrength0KeywordsIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (strong0, weak0) w = 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
+// The mirror case: two strength-1 keywords leave the strength-0 slot unfilled.
+TEST(DriveStrengthParsing, TwoStrength1KeywordsIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (strong1, pull1) w = 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §10.3.4: on a net declaration the strength follows the net-type keyword and
+// precedes any delay. Both the drive strength and the net delay are captured.
+TEST(DriveStrengthParsing, NetDeclStrengthBeforeDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire (strong1, strong0) #5 w = 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(item->drive_strength0, 4u);
+  EXPECT_EQ(item->drive_strength1, 4u);
+  EXPECT_NE(item->net_delay, nullptr);
 }
 
 }

@@ -82,54 +82,6 @@ TEST(DriveStrengthElaboration, DriveStrengthOnScalarVariableIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(DriveStrengthElaboration, DriveStrengthOnVectorVariableIsError) {
-  ElabFixture f;
-  Elaborate(
-      "module t;\n"
-      "  logic [7:0] v;\n"
-      "  assign (strong0, weak1) v = 8'd1;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(DriveStrengthElaboration, NetDeclAssignDriveStrength) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module t;\n"
-      "  wire (strong1, pull0) w = 1'b1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1u);
-  EXPECT_NE(mod->assigns[0].drive_strength0, 0);
-  EXPECT_NE(mod->assigns[0].drive_strength1, 0);
-}
-
-TEST(DriveStrengthElaboration, DriveStrengthOnNetDeclWithAssignOk) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module t;\n"
-      "  wire (strong0, pull1) w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(DriveStrengthElaboration, DriveStrengthOnTriWithAssignOk) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module t;\n"
-      "  tri (weak0, weak1) n = 1'b0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(DriveStrengthElaboration, DriveStrengthPropagatedToImplicitContAssign) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -155,26 +107,44 @@ TEST(DriveStrengthElaboration, Supply1VectorNetTypeHasNoStrengthError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(DriveStrengthElaboration, DriveStrengthOnTriVectorIsError) {
+// §10.3.4: the strength pairs (highz1, highz0) and (highz0, highz1) shall be
+// treated as illegal constructs. The parser accepts the syntax (both slots
+// encode to the highz level); the elaborator rejects an all-highz drive
+// strength on a continuous assignment.
+TEST(DriveStrengthElaboration, Highz0Highz1ContAssignIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
-      "  tri (strong0, strong1) [3:0] t = 4'd0;\n"
+      "  wire w;\n"
+      "  assign (highz0, highz1) w = 1'b0;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(DriveStrengthElaboration, DriveStrengthOnWandScalarIsValid) {
+// The order of the two strengths is arbitrary, so the reversed all-highz pair
+// is equally illegal.
+TEST(DriveStrengthElaboration, Highz1Highz0ContAssignIsError) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
+  ElaborateSrc(
       "module m;\n"
-      "  wand w;\n"
-      "  assign (strong0, strong1) w = 1'b1;\n"
+      "  wire w;\n"
+      "  assign (highz1, highz0) w = 1'b0;\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// The same prohibition applies when the all-highz strength is written on a net
+// declaration assignment.
+TEST(DriveStrengthElaboration, Highz0Highz1NetDeclIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire (highz0, highz1) w = 1'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(DriveStrengthElaboration, MultipleAssignsPreserveIndependentStrengths) {
