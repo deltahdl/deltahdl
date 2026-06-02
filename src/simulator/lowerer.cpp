@@ -246,7 +246,15 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
           if (expired) break;
           auto new_val = EvalExpr(params.rhs, ctx, arena, params.width);
           if (!Logic4VecEqual(new_val, val)) {
+            // The operand changed again before the pending value could
+            // propagate, so the previously scheduled event is dropped.
             val = new_val;
+            if (Logic4VecEqual(new_val, old_val)) {
+              // The re-evaluated right-hand side now matches the value already
+              // present on the left-hand side, so no replacement event is
+              // scheduled and the pending transition collapses immediately.
+              break;
+            }
             ticks = SelectContAssignDelay(old_val, val, d, params.width);
             target = ctx.CurrentTime() + SimTime{ticks};
           }

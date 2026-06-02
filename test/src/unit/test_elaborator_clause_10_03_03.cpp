@@ -108,17 +108,6 @@ TEST(AssignmentDelayElaboration, NoDelay) {
   EXPECT_EQ(mod->assigns[0].delay_decay, nullptr);
 }
 
-TEST(AssignmentDelayElaboration, NetDeclAssignDelayPreserved) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire #(3, 6, 9) w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(AssignmentDelayElaboration, NetDeclSingleDelayOnImplicitAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(

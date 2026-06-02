@@ -172,6 +172,28 @@ TEST(AssignmentDelaySim, VectorNonzeroToZeroUsesFall) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 55u);
 }
 
+TEST(AssignmentDelaySim, VectorTransitionToZUsesTurnoff) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] src;\n"
+      "  wire [7:0] y;\n"
+      "  assign #(20, 5, 8) y = src;\n"
+      "  initial begin\n"
+      "    src = 8'hFF;\n"
+      "    #50 src = 8'hzz;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  // The vector drives all-z, so the turn-off (third) delay of 8 governs the
+  // assignment rather than the rise (20) or fall (5) delay: 50 + 8 == 58.
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 58u);
+}
+
 TEST(AssignmentDelaySim, NetDeclSingleDelayApplied) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -228,6 +250,35 @@ TEST(AssignmentDelaySim, InertialDelayCancelsPending) {
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 15u);
+}
+
+TEST(AssignmentDelaySim, InertialReturnToCurrentValueSchedulesNoEvent) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic src;\n"
+      "  wire y;\n"
+      "  assign #10 y = src;\n"
+      "  initial begin\n"
+      "    src = 1'b0;\n"
+      "    #20 src = 1'b1;\n"
+      "    #5 src = 1'b0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("y");
+  ASSERT_NE(var, nullptr);
+  // y settles to 0 early, then the operand pulses high at t20 (scheduling a
+  // y=1 event for t30) and returns to 0 at t25 before that event fires. Since
+  // the re-evaluated right-hand side again equals the current left-hand side
+  // value, the pending event is dropped and none is rescheduled, so the run
+  // stops at t25 rather than advancing to the cancelled event time of 35.
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 25u);
 }
 
 TEST(AssignmentDelaySim, InertialDelayNoIntermediateGlitch) {
