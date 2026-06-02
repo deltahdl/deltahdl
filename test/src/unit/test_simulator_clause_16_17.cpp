@@ -27,6 +27,23 @@ TEST(ExpectStatement, SuccessTakesPassArm) {
   EXPECT_FALSE(ExpectProcessRemainsBlocked(PropertyResult::kPass));
 }
 
+// §16.17: the process blocks until the property succeeds or fails. While the
+// outcome is still pending, the action block is never entered and the process
+// keeps waiting — independent of whether an else clause is present, since the
+// arm is only chosen once the property resolves.
+TEST(ExpectStatement, PendingBlocksRegardlessOfElseClause) {
+  EXPECT_EQ(ResolveExpectAction(PropertyResult::kPending, /*has_else=*/false),
+            ExpectActionKind::kBlock);
+  EXPECT_EQ(ResolveExpectAction(PropertyResult::kPending, /*has_else=*/true),
+            ExpectActionKind::kBlock);
+}
+
+// §16.17: success unblocks the process and runs the pass arm. A vacuous pass is
+// a success, so it likewise unblocks the process rather than keeping it waiting.
+TEST(ExpectStatement, VacuousPassUnblocksProcess) {
+  EXPECT_FALSE(ExpectProcessRemainsBlocked(PropertyResult::kVacuousPass));
+}
+
 // §16.17: if the property fails at its clocking event, the optional else clause
 // of the action block is executed.
 TEST(ExpectStatement, FailureWithElseTakesElseArm) {
