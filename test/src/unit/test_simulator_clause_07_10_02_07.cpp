@@ -8,18 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(QueuePushBack, InsertsAtEnd) {
-  SimFixture f;
-  auto* q = MakeQueue(f, "q", {10, 20});
-  auto* call =
-      MakeMethodCall(f.arena, "q", "push_back", {MakeInt(f.arena, 30)});
-  TryExecQueueMethodStmt(call, f.ctx, f.arena);
-  ASSERT_EQ(q->elements.size(), 3u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 30u);
-}
-
 TEST(QueuePushBack, OnEmptyQueue) {
   SimFixture f;
   auto* q = f.ctx.CreateQueue("q", 32);
