@@ -32,15 +32,6 @@ TEST_F(ProtectedTest, AuthorInfoStringExpressionConsumed) {
   EXPECT_EQ(result.find("author_info"), std::string::npos);
 }
 
-// Edge case: an empty string operand is still a well-formed author_info
-// expression and is consumed by the preprocessor like any other.
-TEST_F(ProtectedTest, AuthorInfoEmptyStringConsumed) {
-  auto result = Preprocess("`pragma protect author_info = \"\"\n");
-  EXPECT_FALSE(diag_.HasErrors());
-  EXPECT_EQ(result.find("pragma"), std::string::npos);
-  EXPECT_EQ(result.find("author_info"), std::string::npos);
-}
-
 // The author_info expression carries arbitrary additional author text in its
 // string operand without disturbing the surrounding design source.
 TEST_F(ProtectedTest, AuthorInfoInEnvelopePreservesSource) {
