@@ -50,11 +50,13 @@ _MAX_ARG_LEN = 80
 
 _CONTENT_FILTER_MARKER = "blocked by content filtering"
 
-# Substrings that mark a transient transport failure on the API socket.
-# Node/undici phrasing — distinct from the gh CLI's transport errors — so
-# the list lives here rather than in the shared retry module. Matched only
-# against a non-zero-exit run, never against normative model output (which
-# legitimately discusses "EOF"/"5xx"), so substring matching is safe here.
+# Substrings that mark a transient, self-resolving failure: a transport drop
+# on the API socket (Node/undici phrasing, distinct from the gh CLI's transport
+# errors) or a server-side 529 Overloaded. Both are recoverable by re-running
+# the same invocation after backoff. The list lives here rather than in the
+# shared retry module. Matched only against a non-zero-exit run, never against
+# normative model output (which legitimately discusses "EOF"/"5xx"/"529"), so
+# substring matching is safe here.
 _TRANSIENT_NETWORK_MARKERS = (
     "socket connection was closed",
     "socket hang up",
@@ -63,17 +65,21 @@ _TRANSIENT_NETWORK_MARKERS = (
     "econnreset",
     "etimedout",
     "enotfound",
+    "529 overloaded",
+    "api error: 529",
 )
 
 MAX_CONTENT_FILTER_RETRIES = 2
 
 MAX_MISSING_RESULT_RETRIES = 1
 
-# Re-run the same invocation as-is on a transient socket drop. A drop can
-# happen before any server-side session exists, so --continue has no safe
-# precondition; a fresh re-run does. DEFAULT_MAX_ATTEMPTS total attempts =
-# initial + MAX_NETWORK_RETRIES, matching the gh wrapper's budget.
-MAX_NETWORK_RETRIES = DEFAULT_MAX_ATTEMPTS - 1
+# Re-run the same invocation as-is on a transient socket drop or a 529
+# Overloaded. Either can happen before any server-side session exists, so
+# --continue has no safe precondition; a fresh re-run does. The full
+# DEFAULT_MAX_ATTEMPTS retries give full-jitter backoff that doubles each
+# retry, the final one waiting up to a 2**9-second window — long enough to
+# ride out a server-side overload before giving up.
+MAX_NETWORK_RETRIES = DEFAULT_MAX_ATTEMPTS
 
 COPYRIGHT_REASON = (
     "The IEEE 1800-2023 LRM is copyrighted; paraphrase rather than"
@@ -850,7 +856,7 @@ def run_claude_streaming_with_retry(
                     exc.stderr,
                 )
             print(
-                f"WARNING: {role} transient network error (attempt"
+                f"WARNING: {role} transient network/overload error (attempt"
                 f" {network_attempts}); re-running after backoff.",
                 file=sys.stderr,
             )

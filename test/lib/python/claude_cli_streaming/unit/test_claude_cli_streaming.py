@@ -806,6 +806,14 @@ def test_filter_and_missing_result_have_independent_budgets(streaming: ModuleTyp
 
 _SOCKET_STDERR = "API Error: the socket connection was closed unexpectedly"
 
+# The exact line the Claude CLI prints to stdout on a server-side 529, observed
+# during a satisfy_subclauses run: text on stdout, exit code 1, empty stderr.
+_OVERLOAD_STDOUT = (
+    "API Error: 529 Overloaded. This is a server-side issue, usually"
+    " temporary — try again in a moment. If it persists, check"
+    " https://status.claude.com."
+)
+
 
 def test_transient_network_error_carries_stderr(streaming: ModuleType) -> None:
     """The exception preserves the CLI stderr for the loud-fatal."""
@@ -813,8 +821,8 @@ def test_transient_network_error_carries_stderr(streaming: ModuleType) -> None:
 
 
 def test_max_network_retries_matches_attempt_budget(streaming: ModuleType) -> None:
-    """The network budget mirrors the shared attempt budget minus the initial try."""
-    assert streaming.MAX_NETWORK_RETRIES == streaming.DEFAULT_MAX_ATTEMPTS - 1
+    """The network budget spans the full shared attempt budget (backoff up to 2^9)."""
+    assert streaming.MAX_NETWORK_RETRIES == streaming.DEFAULT_MAX_ATTEMPTS
 
 
 def test_run_claude_streaming_raises_transient_on_stderr_marker(
@@ -830,6 +838,15 @@ def test_run_claude_streaming_raises_transient_on_stream_marker(
 ) -> None:
     """A socket marker on a streamed line raises even when stderr is empty."""
     lines = [_SOCKET_STDERR + "\n"] + _OK_STREAM
+    with pytest.raises(streaming.TransientNetworkError):
+        _run(streaming, lines, returncode=1, stderr="")
+
+
+def test_run_claude_streaming_raises_transient_on_overload_marker(
+    streaming: ModuleType,
+) -> None:
+    """A 529 Overloaded stdout line with exit 1 and empty stderr is recoverable."""
+    lines = [_OVERLOAD_STDOUT + "\n"] + _OK_STREAM
     with pytest.raises(streaming.TransientNetworkError):
         _run(streaming, lines, returncode=1, stderr="")
 
@@ -876,6 +893,14 @@ def test_retry_network_first_backoff_uses_attempt_zero(streaming: ModuleType) ->
     assert sleep.call_args_list[0][0][0] == 0
 
 
+def test_retry_network_last_backoff_reaches_two_pow_nine(
+    streaming: ModuleType,
+) -> None:
+    """The final retry backs off with attempt index 9 (jitter window up to 2^9)."""
+    _, _, _, sleep = _run_network_retry(streaming, streaming.MAX_NETWORK_RETRIES)
+    assert sleep.call_args_list[-1][0][0] == streaming.DEFAULT_MAX_ATTEMPTS - 1
+
+
 def test_retry_network_reuses_original_cmd(streaming: ModuleType) -> None:
     """The re-run uses the original cmd, not retry_cmd (--continue is unsafe)."""
     retry_cmd = ["claude", "--continue", "--marker"]
@@ -905,8 +930,8 @@ def test_retry_network_exits_after_budget(streaming: ModuleType) -> None:
     assert exc is not None
 
 
-def test_retry_network_makes_ten_calls_before_exit(streaming: ModuleType) -> None:
-    """Persistent transient failure makes DEFAULT_MAX_ATTEMPTS inner calls."""
+def test_retry_network_makes_eleven_calls_before_exit(streaming: ModuleType) -> None:
+    """Persistent transient failure makes initial + MAX_NETWORK_RETRIES inner calls."""
     inner, _, _, _ = _run_network_retry(
         streaming, streaming.MAX_NETWORK_RETRIES + 1, trailing=[],
     )

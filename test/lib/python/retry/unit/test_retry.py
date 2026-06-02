@@ -74,6 +74,16 @@ def test_sleep_before_retry_upper_bound_is_two_pow_attempt(
     assert sleeps == [8]
 
 
+def test_sleep_before_retry_upper_bound_at_attempt_nine_is_two_pow_nine(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The top of the schedule (attempt 9) bounds jitter at 2**9 = 512."""
+    sleeps = _stub_sleep(monkeypatch)
+    monkeypatch.setattr(_rng, "uniform", lambda _a, b: b)
+    sleep_before_retry(9)
+    assert sleeps == [512]
+
+
 def test_sleep_before_retry_lower_bound_is_zero(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
