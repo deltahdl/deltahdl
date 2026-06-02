@@ -231,6 +231,41 @@ TEST(Coverage, LoadCumulativeCoverageMergesCrosses) {
   EXPECT_EQ(crosses[1].name, "zw");
 }
 
+// LRM 19.9: $get_coverage() reports the overall coverage of *all* coverage
+// group types, so its value aggregates across more than one covergroup type. A
+// fully covered type and a half-covered type of equal weight average to 75.
+TEST(Coverage, GetCoverageAggregatesAcrossTypes) {
+  CoverageDB db;
+
+  auto* a = db.CreateGroup("cg_a");
+  auto* acp = CoverageDB::AddCoverPoint(a, "x");
+  CoverBin ab0;
+  ab0.name = "b0";
+  ab0.values = {0};
+  CoverageDB::AddBin(acp, ab0);
+  CoverBin ab1;
+  ab1.name = "b1";
+  ab1.values = {1};
+  CoverageDB::AddBin(acp, ab1);
+  db.Sample(a, {{"x", 0}});
+  db.Sample(a, {{"x", 1}});  // both bins hit -> cg_a is 100% covered
+
+  auto* b = db.CreateGroup("cg_b");
+  auto* bcp = CoverageDB::AddCoverPoint(b, "y");
+  CoverBin bb0;
+  bb0.name = "b0";
+  bb0.values = {0};
+  CoverageDB::AddBin(bcp, bb0);
+  CoverBin bb1;
+  bb1.name = "b1";
+  bb1.values = {1};
+  CoverageDB::AddBin(bcp, bb1);
+  db.Sample(b, {{"y", 0}});  // only one of two bins hit -> cg_b is 50% covered
+
+  // Overall coverage spans both types: (100 + 50) / 2 with equal weights.
+  EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 75.0);
+}
+
 // LRM 19.9: $load_coverage_db loads cumulative coverage for all coverage group
 // types, so a single load can touch more than one type at once.
 TEST(Coverage, LoadCumulativeCoverageHandlesMultipleTypes) {
