@@ -3092,7 +3092,20 @@ static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
     const auto& impl_args = impl->func_args;
     size_t n = std::min(iface_args.size(), impl_args.size());
     for (size_t i = 0; i < n; ++i) {
-      if (!iface_args[i].default_value || !impl_args[i].default_value) continue;
+      bool iface_has = iface_args[i].default_value != nullptr;
+      bool impl_has = impl_args[i].default_value != nullptr;
+      // §8.26.8: the default argument value of an interface class method must
+      // be the same for every class that implements it. A default present on
+      // one side but absent on the other cannot yield a common value, so the
+      // implementing method's defaults must mirror the interface prototype's.
+      if (iface_has != impl_has) {
+        diag.Error(impl->loc,
+                   std::format("method '{}' argument '{}': default value "
+                               "presence does not match interface '{}'",
+                               impl->name, impl_args[i].name, iface_name));
+        continue;
+      }
+      if (!iface_has) continue;
       auto iface_val = ConstEvalInt(iface_args[i].default_value);
       auto impl_val = ConstEvalInt(impl_args[i].default_value);
       if (iface_val && impl_val && *iface_val != *impl_val) {

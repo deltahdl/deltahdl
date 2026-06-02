@@ -157,4 +157,57 @@ TEST(InterfaceClassMethodDefaults, ConstantExpressionDefaultValueOk) {
              "endmodule\n"));
 }
 
+// The default value must be the same for *every* implementing class; a second
+// implementor whose default differs from the interface prototype is rejected.
+TEST(InterfaceClassMethodDefaults, SecondImplementorMismatchedDefaultError) {
+  EXPECT_FALSE(
+      ElabOk("interface class IC;\n"
+             "  pure virtual function int get(int a = 10);\n"
+             "endclass\n"
+             "class A implements IC;\n"
+             "  virtual function int get(int a = 10);\n"
+             "    return a;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "class B implements IC;\n"
+             "  virtual function int get(int a = 20);\n"
+             "    return a;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// Equality is judged on the evaluated constant, not the source text: a literal
+// default and a syntactically different expression of equal value agree.
+TEST(InterfaceClassMethodDefaults, EquivalentConstantExpressionDefaultsOk) {
+  EXPECT_TRUE(
+      ElabOk("interface class IC;\n"
+             "  pure virtual function int foo(int a = 5);\n"
+             "endclass\n"
+             "class C implements IC;\n"
+             "  virtual function int foo(int a = 2 + 3);\n"
+             "    return a;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// Conversely, two constant expressions that evaluate to different values are a
+// mismatch even though both are well-formed constant expressions.
+TEST(InterfaceClassMethodDefaults, ConstantExpressionDefaultValueMismatchError) {
+  EXPECT_FALSE(
+      ElabOk("interface class IC;\n"
+             "  pure virtual function int foo(int a = 5);\n"
+             "endclass\n"
+             "class C implements IC;\n"
+             "  virtual function int foo(int a = 2 + 2);\n"
+             "    return a;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 }
