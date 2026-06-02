@@ -67,4 +67,17 @@ TEST(CheckerSchedulingSemantics, ConcurrentAssertionSchedulingIsInvariant) {
   }
 }
 
+// §17.7.3: the invariance holds for *every* region, not just a sampled few.
+// A concurrent assertion scheduled in any design-code region (e.g., Active,
+// NBA, Observed, Postponed) keeps that same region when it appears in a
+// checker, so the production mapping must be the identity across the entire
+// region domain.
+TEST(CheckerSchedulingSemantics,
+     ConcurrentAssertionSchedulingInvariantAcrossAllRegions) {
+  for (int i = 0; i < static_cast<int>(Region::kCOUNT); ++i) {
+    const Region r = static_cast<Region>(i);
+    EXPECT_EQ(ConcurrentAssertionRegionInChecker(r), r);
+  }
+}
+
 }  // namespace
