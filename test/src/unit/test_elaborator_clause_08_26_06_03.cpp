@@ -140,4 +140,26 @@ TEST(InterfaceClassDiamond, DifferentSpecializationsWithOverrideOk) {
              "endmodule\n"));
 }
 
+// Boundary of the specialization rule: identical parameterizations of a
+// parameterized base reached through two paths denote the same interface
+// class type, so they still form a diamond and merge to a single copy
+// rather than colliding. Mirror of DifferentSpecializationsNotDiamondError
+// with matching #(bit) arguments on both branches.
+TEST(InterfaceClassDiamond, SameSpecializationIsDiamondMergesOneCopy) {
+  EXPECT_TRUE(
+      ElabOk("interface class IntfBase #(type T = int);\n"
+             "  pure virtual function bit funcBase();\n"
+             "endclass\n"
+             "interface class IntfExt1 extends IntfBase#(bit);\n"
+             "  pure virtual function bit funcExt1();\n"
+             "endclass\n"
+             "interface class IntfExt2 extends IntfBase#(bit);\n"
+             "  pure virtual function bit funcExt2();\n"
+             "endclass\n"
+             "interface class IntfFinal extends IntfExt1, IntfExt2;\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 }
