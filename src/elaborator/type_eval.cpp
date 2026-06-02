@@ -495,6 +495,26 @@ bool IsCastCompatible(const DataType& a, const DataType& b) {
   return false;
 }
 
+// §6.22.5: a chandle is one of the handle types the clause singles out as
+// type-incompatible with every type other than itself. (Class handles and
+// interface class handles are spelled with named types and are covered by the
+// residual rule below: a named type is never integral, real, or an enum, so it
+// is cast-compatible only with the same named type and incompatible with all
+// others.)
+static bool IsHandleType(const DataType& dtype) {
+  return dtype.kind == DataTypeKind::kChandle;
+}
+
+bool IsTypeIncompatible(const DataType& a, const DataType& b) {
+  // The handle types named by §6.22.5 are incompatible with every type that is
+  // not the same handle type; no implicit or explicit cast can bridge them.
+  if (IsHandleType(a) || IsHandleType(b)) return !TypesMatch(a, b);
+
+  // Otherwise type-incompatible is the residual: the nonequivalent types with
+  // no implicit or explicit casting rule, i.e. anything not cast-compatible.
+  return !IsCastCompatible(a, b);
+}
+
 static bool IsOneBitResultOp(TokenKind op) {
   return op == TokenKind::kEqEq || op == TokenKind::kBangEq ||
          op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq ||

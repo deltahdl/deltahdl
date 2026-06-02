@@ -64,6 +64,8 @@ bool IsAssignmentCompatible(const DataType& a, const DataType& b);
 
 bool IsCastCompatible(const DataType& a, const DataType& b);
 
+bool IsTypeIncompatible(const DataType& a, const DataType& b);
+
 uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs);
 
 uint32_t ContextWidth(const Expr* expr, uint32_t ctx_width,
