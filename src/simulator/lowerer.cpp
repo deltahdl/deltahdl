@@ -553,7 +553,7 @@ static void ApplyStructMemberDefaults(const RtlirVariable& var, Variable* v,
 
 void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
   if (var.is_queue) {
-    ctx_.CreateQueue(var.name, var.width, var.queue_max_size);
+    ctx_.CreateQueue(var.name, var.width, var.queue_max_size, var.is_4state);
   } else if (var.is_dynamic) {
 
     ctx_.CreateQueue(var.name, var.width);

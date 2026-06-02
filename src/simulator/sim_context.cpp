@@ -608,9 +608,10 @@ void QueueObject::AssignFreshIds() {
 }
 
 QueueObject* SimContext::CreateQueue(std::string_view name, uint32_t elem_width,
-                                     int32_t max_size) {
+                                     int32_t max_size, bool is_4state) {
   auto* q = arena_.Create<QueueObject>();
   q->elem_width = elem_width;
+  q->is_4state = is_4state;
   q->max_size = max_size;
   queues_[name] = q;
   return q;

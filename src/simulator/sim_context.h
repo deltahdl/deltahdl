@@ -58,6 +58,10 @@ struct QueueObject {
   std::vector<Logic4Vec> elements;
   std::vector<uint64_t> element_ids;
   uint32_t elem_width = 32;
+  // Whether the element type is 4-state. Fixes the value yielded when an
+  // element of the queue is absent (Table 7-1, see 7.4.5): x for 4-state
+  // element types, 0 for 2-state ones.
+  bool is_4state = true;
   int32_t max_size = -1;
   uint32_t generation = 0;
 
@@ -372,7 +376,7 @@ class SimContext {
   const ArrayInfo* FindArrayInfo(std::string_view name) const;
 
   QueueObject* CreateQueue(std::string_view name, uint32_t elem_width,
-                           int32_t max_size = -1);
+                           int32_t max_size = -1, bool is_4state = true);
   QueueObject* FindQueue(std::string_view name);
 
   AssocArrayObject* CreateAssocArray(std::string_view name, uint32_t elem_width,
