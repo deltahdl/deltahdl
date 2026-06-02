@@ -38,18 +38,6 @@ TEST(ChandleDataType, ChandleMultipleDecls) {
               "endmodule\n"));
 }
 
-TEST(ChandleDataType, ChandleVarDeclSimple) {
-  auto r = Parse(
-      "module t;\n"
-      "  chandle ch;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kChandle);
-  EXPECT_EQ(item->name, "ch");
-}
-
 TEST(ChandleDataType, ChandleFunctionReturn) {
   auto r = Parse(
       "module m;\n"

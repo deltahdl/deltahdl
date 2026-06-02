@@ -65,17 +65,6 @@ TEST(ChandleDataType, ChandleIsChandle) {
   EXPECT_TRUE(mod->variables[0].is_chandle);
 }
 
-TEST(ChandleDataType, ChandleVarDecl_OK) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  chandle ch;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(ChandleDataType, ChandleToChandleAssign_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -204,6 +193,20 @@ TEST(ChandleDataType, ChandleUnaryNot_Error) {
       "  chandle h;\n"
       "  int r;\n"
       "  initial r = ~h;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(ChandleDataType, ChandleRelational_Error) {
+  // §6.14: only equality/inequality operators are valid on chandles; a
+  // relational operator such as < is not in the permitted set.
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  chandle a, b;\n"
+      "  int r;\n"
+      "  initial r = (a < b) ? 1 : 0;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
