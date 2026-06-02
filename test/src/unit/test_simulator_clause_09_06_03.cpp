@@ -141,6 +141,30 @@ TEST(DisableForkExecution, DisableForkWithNoChildrenIsNoop) {
   LowerRunAndCheck(f, design, {{"x", 1u}});
 }
 
+// Terminating every descendant must also retire the calling process's
+// outstanding-children bookkeeping: once disable fork has killed the spawned
+// subprocesses there is nothing left for a subsequent wait fork to block on, so
+// it returns immediately and the following statement runs. Were the tally left
+// standing, wait fork would suspend forever (the killed child can never resume
+// to decrement it) and y would never be written.
+TEST(DisableForkExecution, WaitForkAfterDisableForkDoesNotBlock) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, y;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin #10; x = 8'd99; end\n"
+      "    join_none\n"
+      "    disable fork;\n"
+      "    wait fork;\n"
+      "    y = 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 0u}, {"y", 1u}});
+}
+
 TEST(DisableForkExecution, ExecutionContinuesAfterDisableFork) {
   SimFixture f;
   auto* design = ElaborateSrc(
