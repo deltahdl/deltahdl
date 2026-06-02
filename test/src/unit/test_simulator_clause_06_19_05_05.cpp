@@ -41,6 +41,18 @@ TEST(EnumMethods, NumLargeEnum) {
   EXPECT_EQ(result.ToUint64(), 256u);
 }
 
+// num() reports how many members the enumeration has, not anything derived
+// from the members' assigned values; a sparse, non-contiguous value set still
+// yields the member count.
+TEST(EnumMethods, NumCountsMembersNotValues) {
+  EnumFixture f;
+  f.RegisterEnum("sparse", "sparse_t",
+                 {{"LOW", 2}, {"MID", 50}, {"HIGH", 9999}});
+  auto* call = f.MakeEnumMethodCall("sparse", "num");
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 3u);
+}
+
 TEST(EnumMethods, NumIndependentOfCurrentValue) {
   EnumFixture f;
   auto* var = f.RegisterEnum("color", "color_t",
