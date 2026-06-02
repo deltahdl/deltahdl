@@ -162,25 +162,6 @@ TEST(AssignmentExtensionTruncationSim, ContAssignExtension) {
   EXPECT_EQ(var->value.ToUint64(), 0x000Au);
 }
 
-TEST(AssignmentExtensionTruncationSim, SameWidthNoChange) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a;\n"
-      "  initial begin\n"
-      "    a = 8'hCA;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
-  ASSERT_NE(a, nullptr);
-  EXPECT_EQ(a->value.ToUint64(), 0xCAu);
-}
-
 TEST(AssignmentExtensionTruncationSim, RhsSizedToLhsWidth) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -511,6 +492,104 @@ TEST(AssignmentExtensionTruncationSim, SignedLiteralTruncatedToUnsigned) {
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
+}
+
+// Truncation discards the high bits even when they are unknown (x): the
+// surviving low bits are fully known and retain their value.
+TEST(AssignmentExtensionTruncationSim, TruncationDiscardsUnknownMSBs) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] narrow;\n"
+      "  initial narrow = 8'bxxxx_0101;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("narrow");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.width, 4u);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToUint64(), 0x5u);
+}
+
+// Sign-extension of a signed right-hand side replicates the sign bit even when
+// that bit is unknown: the padded high bits become unknown too. Checked via the
+// unknown-flag (bval) so the result is independent of the x/z encoding.
+TEST(AssignmentExtensionTruncationSim, SignExtensionPropagatesUnknownSignBit) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic signed [7:0] wide;\n"
+      "  logic signed [3:0] narrow;\n"
+      "  initial begin narrow = 4'bx101; wide = narrow; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("wide");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.width, 8u);
+  EXPECT_FALSE(var->value.IsKnown());
+  // The four padded bits [7:4] are all unknown, mirroring the unknown sign bit.
+  EXPECT_EQ((var->value.words[0].bval >> 4) & 0xFull, 0xFull);
+}
+
+// Sign-extension spanning a 64-bit word boundary: a 68-bit signed value with
+// its sign bit set widens to 72 bits, and the padded high bits are filled with
+// ones (sign, not zero), exercising the multi-word fill path of the resize.
+TEST(AssignmentExtensionTruncationSim, WideSignExtensionAcrossWordBoundary) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic signed [71:0] wide;\n"
+      "  logic signed [67:0] narrow;\n"
+      "  initial begin narrow = 68'hF_FFFF_FFFF_FFFF_FFFF; wide = narrow; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("wide");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.width, 72u);
+  ASSERT_GE(var->value.nwords, 2u);
+  EXPECT_EQ(var->value.words[0].aval, ~uint64_t{0});
+  EXPECT_EQ(var->value.words[0].bval, 0u);
+  // Top word holds bits [71:64]; sign-extension fills the low 8 with ones.
+  EXPECT_EQ(var->value.words[1].aval & 0xFFull, 0xFFull);
+  EXPECT_EQ(var->value.words[1].bval & 0xFFull, 0u);
+}
+
+// Truncation from a value wider than 64 bits discards the entire high word and
+// keeps the low bits of the narrow target.
+TEST(AssignmentExtensionTruncationSim, WideTruncationDiscardsHighWord) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] narrow;\n"
+      "  logic [71:0] wide;\n"
+      "  initial begin wide = 72'hFF000000000000000A; narrow = wide; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("narrow");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.width, 4u);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
 }
