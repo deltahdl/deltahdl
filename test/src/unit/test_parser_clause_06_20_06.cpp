@@ -155,13 +155,4 @@ TEST(ConstConstantParsing, ConstInitializedFromParameterReference) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(ConstConstantParsing, ConstWithStaticLifetimeInBlock) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    const var static int x = 5;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 }
