@@ -124,6 +124,21 @@ TEST(AlwaysFFElaboration, PosedgeClockNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
+// A negedge-triggered clock is just as sequential as a posedge one, so the
+// not-sequential warning must stay silent for the negedge branch too.
+TEST(AlwaysFFElaboration, NegedgeClockNoWarning) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, d, q;\n"
+      "  always_ff @(negedge clk) q <= d;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
 TEST(AlwaysFFElaboration, MultiDriverTwoAlwaysFFErrors) {
   ElabFixture f;
   ElaborateSrc(
