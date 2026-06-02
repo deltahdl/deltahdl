@@ -87,4 +87,61 @@ TEST(PackageImportInHeader, InterfaceHeaderImportVisibleInBody) {
              "endmodule\n"));
 }
 
+// §26.4 lists port declarations explicitly among the places a header import is
+// visible, and names the interface as one of the three header kinds. Here the
+// imported type names an interface port; resolving that port type proves the
+// header import reached the port list, not just the body.
+TEST(PackageImportInHeader, InterfaceHeaderImportVisibleInPortType) {
+  EXPECT_TRUE(
+      ElabOk("package pkg;\n"
+             "  typedef logic [7:0] byte_t;\n"
+             "endpackage\n"
+             "interface ifc import pkg::byte_t; (input byte_t a);\n"
+             "  byte_t shadow;\n"
+             "  assign shadow = a;\n"
+             "endinterface\n"));
+}
+
+// Mirrors the §26.4 example: a single header mixes an explicit import with a
+// wildcard import from a second package, and both imported types are consumed
+// by ports while an imported-independent parameter sits between them.
+TEST(PackageImportInHeader, MixedExplicitAndWildcardHeaderImports) {
+  EXPECT_TRUE(
+      ElabOk("package A;\n"
+             "  typedef logic [7:0] opcode_t;\n"
+             "endpackage\n"
+             "package B;\n"
+             "  typedef logic flag_t;\n"
+             "endpackage\n"
+             "module m import A::opcode_t, B::*; #(parameter int WIDTH = 4)\n"
+             "    (input opcode_t a, output flag_t ok);\n"
+             "  assign ok = |a;\n"
+             "endmodule\n"));
+}
+
+// §26.4 names module, interface, AND program as headers whose imports are
+// visible throughout the declaration, including in port declarations. The
+// imported type names the port and a body variable; if header import did not
+// make it visible, elaboration would fail to resolve the type.
+TEST(PackageImportInHeader, ProgramHeaderImportVisibleInPortAndBody) {
+  EXPECT_TRUE(
+      ElabOk("package pkg;\n"
+             "  typedef logic [7:0] byte_t;\n"
+             "endpackage\n"
+             "program p import pkg::byte_t; (input byte_t a);\n"
+             "  byte_t local_b;\n"
+             "  initial local_b = a;\n"
+             "endprogram\n"));
+}
+
+TEST(PackageImportInHeader, WildcardProgramHeaderImportVisibleInPort) {
+  EXPECT_TRUE(
+      ElabOk("package pkg;\n"
+             "  typedef logic [15:0] word_t;\n"
+             "endpackage\n"
+             "program p import pkg::*; (input word_t a, output word_t b);\n"
+             "  initial b = a;\n"
+             "endprogram\n"));
+}
+
 }
