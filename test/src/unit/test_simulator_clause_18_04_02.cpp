@@ -123,6 +123,50 @@ TEST(RandcModifierCyclic, ConstrainedRandcYieldsOnlySatisfyingValues) {
   EXPECT_EQ(seen.count(1), 1u);
 }
 
+// 18.4.2 (claim C, "constraints change" trigger): the permutation sequence is
+// recomputed not only when no remaining value can satisfy the constraints but
+// also whenever the constraints on the variable change. Draw an unconstrained
+// randc over 0..3 for a few calls, then add a constraint that excludes the lower
+// half of the range. Every value produced after the change respects the new
+// constraint — the solver re-derives the admissible permutation from the changed
+// constraint set rather than continuing to emit values from the stale, fuller
+// permutation it was cycling through before.
+TEST(RandcModifierCyclic, PermutationRecomputedWhenConstraintsChange) {
+  ConstraintSolver solver(41);
+  solver.AddVariable(MakeRandc("x", 0, 3));
+
+  // A few draws over the full, unconstrained range first.
+  for (int i = 0; i < 3; ++i) {
+    ASSERT_TRUE(solver.Solve());
+    int64_t v = solver.GetValue("x");
+    ASSERT_GE(v, 0);
+    ASSERT_LE(v, 3);
+  }
+
+  // The constraints on x now change: x shall be at least 2.
+  ConstraintBlock block;
+  block.name = "c";
+  ConstraintExpr ge;
+  ge.kind = ConstraintKind::kGreaterEqual;
+  ge.var_name = "x";
+  ge.lo = 2;  // x >= 2
+  block.constraints.push_back(ge);
+  solver.AddConstraintBlock(block);
+
+  // Every subsequent value lies in the recomputed admissible set {2, 3}, and
+  // both of those values are reached as the cycle continues among them.
+  std::unordered_set<int64_t> seen;
+  for (int i = 0; i < 30; ++i) {
+    ASSERT_TRUE(solver.Solve());
+    int64_t v = solver.GetValue("x");
+    EXPECT_GE(v, 2) << "value from the stale pre-change permutation produced";
+    EXPECT_LE(v, 3);
+    seen.insert(v);
+  }
+  EXPECT_EQ(seen.count(2), 1u);
+  EXPECT_EQ(seen.count(3), 1u);
+}
+
 // 18.4.2 (claim F): when a set of random variables mixes rand and randc, the
 // randc variables are solved first. The presence of an ordinary rand variable
 // does not disturb the cyclic variable's permutation: the randc value still
