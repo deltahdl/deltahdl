@@ -75,7 +75,10 @@ struct SemaphoreObject {
 // queue, a run-time error is generated rather than a value retrieved.
 enum class MbxPutStatus : uint8_t { kPlaced, kBlock };
 enum class MbxGetStatus : uint8_t { kRetrieved, kBlock, kTypeError };
-enum class MbxPeekStatus : uint8_t { kCopied, kBlock };
+// §15.4.7 peek() shares get()'s run-time type check: a stored message whose
+// type is not equivalent to the receiving variable's type yields a type error
+// rather than a copy, so kTypeError joins the copied/blocked outcomes.
+enum class MbxPeekStatus : uint8_t { kCopied, kBlock, kTypeError };
 
 struct MailboxObject {
   // §15.4.5: a nonparameterized (typeless) mailbox may carry messages of
@@ -158,8 +161,15 @@ struct MailboxObject {
     return 1;
   }
 
-  MbxPeekStatus Peek(uint64_t& msg) {
+  // §15.4.7: copies the front message but, unlike get(), leaves it in the
+  // queue. An empty mailbox blocks the caller until a message is placed. As in
+  // get(), a stored message whose type is not equivalent to the receiving
+  // variable's type generates a run-time type error and the message is left
+  // untouched rather than copied out.
+  MbxPeekStatus Peek(uint64_t& msg, uint32_t expected_type = kAnyType) {
     if (messages.empty()) return MbxPeekStatus::kBlock;
+    if (!TypesEquivalent(message_types.front(), expected_type))
+      return MbxPeekStatus::kTypeError;
     msg = messages.front();
     return MbxPeekStatus::kCopied;
   }

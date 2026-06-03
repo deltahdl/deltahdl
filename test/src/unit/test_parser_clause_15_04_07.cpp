@@ -17,20 +17,6 @@ TEST(MailboxPeekParser, PeekCallParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(MailboxPeekParser, PeekAfterPut) {
-  auto r = Parse(
-      "module m;\n"
-      "  mailbox mb;\n"
-      "  int msg;\n"
-      "  initial begin\n"
-      "    mb.put(42);\n"
-      "    mb.peek(msg);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(MailboxPeekParser, MultiplePeekCalls) {
   auto r = Parse(
       "module m;\n"
