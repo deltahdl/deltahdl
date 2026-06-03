@@ -72,6 +72,32 @@ TEST(MinTypMaxEval, SubExpressionsAddedPerMode) {
   EXPECT_EQ(EvalExpr(add, f.ctx, f.arena).ToUint64(), 33u);
 }
 
+// §11.11 Example 2: a min:typ:max triplet used as one operand of a larger
+// expression alongside a plain (non-triplet) operand. The plain operand is
+// unaffected by the delay mode while the triplet contributes its selected
+// member, so the surrounding operator sees the per-mode result.
+TEST(MinTypMaxEval, TripletMixedWithPlainOperand) {
+  SimFixture f;
+
+  auto* triplet = f.arena.Create<Expr>();
+  triplet->kind = ExprKind::kMinTypMax;
+  triplet->lhs = MakeInt(f.arena, 50);
+  triplet->condition = MakeInt(f.arena, 75);
+  triplet->rhs = MakeInt(f.arena, 100);
+
+  auto* sub = MakeBinary(f.arena, TokenKind::kMinus, MakeInt(f.arena, 200),
+                         triplet);
+
+  f.ctx.SetDelayMode(DelayMode::kMin);
+  EXPECT_EQ(EvalExpr(sub, f.ctx, f.arena).ToUint64(), 150u);
+
+  f.ctx.SetDelayMode(DelayMode::kTyp);
+  EXPECT_EQ(EvalExpr(sub, f.ctx, f.arena).ToUint64(), 125u);
+
+  f.ctx.SetDelayMode(DelayMode::kMax);
+  EXPECT_EQ(EvalExpr(sub, f.ctx, f.arena).ToUint64(), 100u);
+}
+
 TEST(MinTypMaxEval, SingleExpressionFallthrough) {
   SimFixture f;
   auto* expr = MakeInt(f.arena, 42);
