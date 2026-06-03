@@ -31,6 +31,15 @@ TEST(ClockingScopeElab, ClockingInCheckerElaborates) {
              "endchecker\n"));
 }
 
+TEST(ClockingScopeElab, ClockingInInterfaceElaborates) {
+  EXPECT_TRUE(
+      ElabOk("interface intf(input clk, input data);\n"
+             "  clocking cb @(posedge clk);\n"
+             "    input data;\n"
+             "  endclocking\n"
+             "endinterface\n"));
+}
+
 TEST(ClockingScopeElab, DotAccessToClockvarElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

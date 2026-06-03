@@ -391,6 +391,7 @@ class Parser {
   int class_body_depth_ = 0;
   int package_body_depth_ = 0;
   bool in_cu_scope_param_ = false;
+  bool in_anonymous_program_ = false;
   bool ForceLocalparam() const {
     return InGenerateBlock() || class_body_depth_ > 0 ||
            package_body_depth_ > 0 || in_cu_scope_param_;

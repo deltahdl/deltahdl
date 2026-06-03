@@ -41,6 +41,16 @@ ModuleItem* Parser::ParseClockingDecl() {
   item->kind = ModuleItemKind::kClockingBlock;
   item->loc = CurrentLoc();
 
+  // §14.7: a clocking block can only be declared inside a module, interface,
+  // checker, or program; it shall not be declared inside a package. An
+  // anonymous program (§24.9) may legally appear in a package, and a clocking
+  // block within that program is itself in a program scope, so the package
+  // restriction does not apply there.
+  if (package_body_depth_ > 0 && !in_anonymous_program_) {
+    diag_.Error(item->loc,
+                "a clocking block shall not be declared inside a package");
+  }
+
   if (Match(TokenKind::kKwDefault)) {
     item->is_default_clocking = true;
   } else if (Match(TokenKind::kKwGlobal)) {

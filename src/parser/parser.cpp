@@ -331,6 +331,8 @@ bool Parser::TryParseAnonymousProgram(CompilationUnit* unit) {
     return false;
   }
   Consume();
+  bool prev_anon = in_anonymous_program_;
+  in_anonymous_program_ = true;
   while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
     size_t before = unit->cu_items.size();
@@ -339,6 +341,7 @@ bool Parser::TryParseAnonymousProgram(CompilationUnit* unit) {
       unit->cu_items[i]->from_anonymous_program = true;
     }
   }
+  in_anonymous_program_ = prev_anon;
   Expect(TokenKind::kKwEndprogram);
   return true;
 }
@@ -584,6 +587,8 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwProgram)) {
     Consume();
     Expect(TokenKind::kSemicolon);
+    bool prev_anon = in_anonymous_program_;
+    in_anonymous_program_ = true;
     while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
       if (Match(TokenKind::kSemicolon)) continue;
       size_t before = items.size();
@@ -592,6 +597,7 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
         items[i]->from_anonymous_program = true;
       }
     }
+    in_anonymous_program_ = prev_anon;
     Expect(TokenKind::kKwEndprogram);
     return true;
   }
