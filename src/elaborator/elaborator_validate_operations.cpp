@@ -1359,6 +1359,8 @@ void Elaborator::ValidateStringConcatLvalue(const ModuleDecl* decl) {
   }
 }
 
+static bool ClassHasHiddenMember(const ClassDecl* cls);
+
 void Elaborator::WalkExprForStreamingContext(const Expr* expr,
                                              bool is_valid_context) {
   if (!expr) return;
@@ -1371,6 +1373,42 @@ void Elaborator::WalkExprForStreamingContext(const Expr* expr,
     }
 
     for (auto* elem : expr->elements) {
+      // §11.4.14.1: when a non-null class handle is streamed, its data members
+      // are packed in turn. Streaming a handle whose class exposes local or
+      // protected members is illegal unless those members are accessible at
+      // the streaming operator, approximated here (as in the bit-stream cast
+      // rule of §6.24.3) by allowing only the current instance `this`.
+      if (elem && elem->kind == ExprKind::kIdentifier &&
+          elem->text != "this") {
+        auto it = class_var_types_.find(elem->text);
+        if (it != class_var_types_.end() &&
+            ClassHasHiddenMember(FindClassDecl(it->second, unit_))) {
+          diag_.Error(elem->range.start,
+                      std::format("class handle '{}' is illegal as a streaming "
+                                  "concatenation operand: its class has local "
+                                  "or protected members",
+                                  elem->text));
+        }
+      }
+      // §11.4.14.1: an operand that is none of a bit-stream type, an unpacked
+      // array, a struct, an untagged union, or a class handle cannot be packed
+      // into the stream; such an operand is skipped and an error is issued. The
+      // statically recognizable non-bit-stream scalar types are the real
+      // family, event, chandle, and virtual interface.
+      if (elem && elem->kind == ExprKind::kIdentifier) {
+        auto vt = var_types_.find(elem->text);
+        if (vt != var_types_.end()) {
+          auto k = vt->second;
+          if (IsRealType(k) || k == DataTypeKind::kEvent ||
+              k == DataTypeKind::kChandle ||
+              k == DataTypeKind::kVirtualInterface) {
+            diag_.Error(elem->range.start,
+                        std::format("'{}' is not a bit-stream type and cannot "
+                                    "be a streaming concatenation operand",
+                                    elem->text));
+          }
+        }
+      }
       WalkExprForStreamingContext(elem, true);
     }
 

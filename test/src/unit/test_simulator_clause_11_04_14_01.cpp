@@ -3,6 +3,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
+#include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
@@ -343,6 +344,96 @@ TEST(StreamExpressionConcat, EmptyStreamReturnsMinWidth) {
   EXPECT_GE(result.width, 1u);
 }
 
+// §11.4.14.1: an associative array element is streamed in turn in index-sorted
+// order. Entries are inserted out of key order to prove the stream follows
+// ascending index, not insertion order: key 0 lands at the most-significant
+// (left) end of the generic stream.
+TEST(StreamExpressionConcat, AssocArrayStreamedInIndexSortedOrder) {
+  SimFixture f;
+
+  auto* aa = f.ctx.CreateAssocArray("aa", 8, /*is_string_key=*/false);
+  aa->int_data[2] = MakeLogic4VecVal(f.arena, 8, 0x33);
+  aa->int_data[0] = MakeLogic4VecVal(f.arena, 8, 0x11);
+  aa->int_data[1] = MakeLogic4VecVal(f.arena, 8, 0x22);
+
+  auto* stream = f.arena.Create<Expr>();
+  stream->kind = ExprKind::kStreamingConcat;
+  stream->op = TokenKind::kGtGt;
+  stream->elements.push_back(MakeId(f.arena, "aa"));
+  auto result = EvalExpr(stream, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 24u);
+  EXPECT_EQ(result.ToUint64(), 0x112233u);
+}
+
+// §11.4.14.1: a struct is streamed by applying the procedure to each member in
+// declaration order. The first-declared field 'a' streams first, ending at the
+// most-significant end; were the order reversed the result would be 0xCDAB.
+TEST(StreamExpressionConcat, StructMembersStreamedInDeclarationOrder) {
+  SimFixture f;
+
+  MakeVar(f, "st", 16, 0xABCD);
+  StructTypeInfo info{};
+  info.type_name = "ST";
+  info.total_width = 16;
+  info.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
+  info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
+  f.ctx.RegisterStructType("ST", info);
+  f.ctx.SetVariableStructType("st", "ST");
+
+  auto* stream = f.arena.Create<Expr>();
+  stream->kind = ExprKind::kStreamingConcat;
+  stream->op = TokenKind::kGtGt;
+  stream->elements.push_back(MakeId(f.arena, "st"));
+  auto result = EvalExpr(stream, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 16u);
+  EXPECT_EQ(result.ToUint64(), 0xABCDu);
+}
+
+// §11.4.14.1: an untagged union is streamed by applying the procedure to its
+// first-declared member only. The first member is 8 bits wide and the second
+// 4 bits; a result width of 8 confirms only the first member was streamed.
+TEST(StreamExpressionConcat, UntaggedUnionStreamsFirstMemberOnly) {
+  SimFixture f;
+
+  MakeVar(f, "u", 8, 0xAB);
+  StructTypeInfo info{};
+  info.type_name = "U";
+  info.total_width = 8;
+  info.is_union = true;
+  info.fields.push_back({"first", 0, 8, DataTypeKind::kLogic});
+  info.fields.push_back({"second", 0, 4, DataTypeKind::kLogic});
+  f.ctx.RegisterStructType("U", info);
+  f.ctx.SetVariableStructType("u", "U");
+
+  auto* stream = f.arena.Create<Expr>();
+  stream->kind = ExprKind::kStreamingConcat;
+  stream->op = TokenKind::kGtGt;
+  stream->elements.push_back(MakeId(f.arena, "u"));
+  auto result = EvalExpr(stream, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 8u);
+  EXPECT_EQ(result.ToUint64(), 0xABu);
+}
+
+// §11.4.14.1: a null class handle is skipped (not streamed). The handle here is
+// null and contributes nothing, so the generic stream contains only the trailing
+// scalar's 8 bits.
+TEST(StreamExpressionConcat, NullClassHandleSkipped) {
+  SimFixture f;
+
+  MakeVar(f, "h", 32, kNullClassHandle);
+  f.ctx.SetVariableClassType("h", "C");
+  MakeVar(f, "tail", 8, 0xCD);
+
+  auto* stream = f.arena.Create<Expr>();
+  stream->kind = ExprKind::kStreamingConcat;
+  stream->op = TokenKind::kGtGt;
+  stream->elements.push_back(MakeId(f.arena, "h"));
+  stream->elements.push_back(MakeId(f.arena, "tail"));
+  auto result = EvalExpr(stream, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 8u);
+  EXPECT_EQ(result.ToUint64(), 0xCDu);
+}
+
 TEST(StreamExpressionConcat, ScalarAfterArrayAppendsToRight) {
   SimFixture f;
 
@@ -364,6 +455,64 @@ TEST(StreamExpressionConcat, ScalarAfterArrayAppendsToRight) {
   auto result = EvalExpr(stream, f.ctx, f.arena);
   EXPECT_EQ(result.width, 24u);
   EXPECT_EQ(result.ToUint64(), 0xAABBCCu);
+}
+
+// §11.4.14.1: a queue is an unpacked array, so the procedure is applied to each
+// element in the order a foreach loop would traverse it (ascending index). The
+// element at index 0 lands at the most-significant end of the generic stream.
+TEST(StreamExpressionConcat, QueueStreamedInForeachOrder) {
+  SimFixture f;
+
+  auto* q = f.ctx.CreateQueue("q", 8);
+  q->elements.push_back(MakeLogic4VecVal(f.arena, 8, 0x11));
+  q->elements.push_back(MakeLogic4VecVal(f.arena, 8, 0x22));
+  q->elements.push_back(MakeLogic4VecVal(f.arena, 8, 0x33));
+
+  auto* stream = f.arena.Create<Expr>();
+  stream->kind = ExprKind::kStreamingConcat;
+  stream->op = TokenKind::kGtGt;
+  stream->elements.push_back(MakeId(f.arena, "q"));
+  auto result = EvalExpr(stream, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 24u);
+  EXPECT_EQ(result.ToUint64(), 0x112233u);
+}
+
+// §11.4.14.1: a non-null class handle is streamed by applying the procedure to
+// each data member of the referenced object. Members are taken in declaration
+// order, and an extended class streams its base-class members before its own.
+// Base members b0,b1 precede derived member d, so b0 lands at the
+// most-significant end and d at the least-significant; any other ordering would
+// change the packed value.
+TEST(StreamExpressionConcat, NonNullClassHandleStreamsBaseFirstInDeclOrder) {
+  SimFixture f;
+
+  auto* base = f.arena.Create<ClassTypeInfo>();
+  base->name = "Base";
+  base->properties.push_back({"b0", 8, false});
+  base->properties.push_back({"b1", 8, false});
+
+  auto* derived = f.arena.Create<ClassTypeInfo>();
+  derived->name = "Derived";
+  derived->parent = base;
+  derived->properties.push_back({"d", 8, false});
+
+  auto* obj = f.arena.Create<ClassObject>();
+  obj->type = derived;
+  obj->properties["b0"] = MakeLogic4VecVal(f.arena, 8, 0x11);
+  obj->properties["b1"] = MakeLogic4VecVal(f.arena, 8, 0x22);
+  obj->properties["d"] = MakeLogic4VecVal(f.arena, 8, 0x33);
+  uint64_t handle = f.ctx.AllocateClassObject(obj);
+
+  MakeVar(f, "obj", 64, handle);
+  f.ctx.SetVariableClassType("obj", "Derived");
+
+  auto* stream = f.arena.Create<Expr>();
+  stream->kind = ExprKind::kStreamingConcat;
+  stream->op = TokenKind::kGtGt;
+  stream->elements.push_back(MakeId(f.arena, "obj"));
+  auto result = EvalExpr(stream, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 24u);
+  EXPECT_EQ(result.ToUint64(), 0x112233u);
 }
 
 }
