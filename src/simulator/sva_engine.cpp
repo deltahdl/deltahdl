@@ -225,6 +225,24 @@ PropertyResult EvalWithDisableIff(bool disable_cond, PropertyResult inner) {
   return inner;
 }
 
+PropertyResult EvalPropertyCase(const std::vector<PropertyCaseBranch>& branches,
+                                bool has_default,
+                                PropertyResult default_result) {
+  // §16.12.16: linear search in source order. The first item whose expression
+  // matches the case expression is the only property_expr evaluated, and the
+  // search terminates at that point, so a later matching item never overrides
+  // it. Default items are not part of `branches`, so the scan structurally
+  // ignores any default while looking for a match.
+  for (const auto& branch : branches) {
+    if (branch.selected) return branch.result;
+  }
+  // Every comparison failed. If a default item is given its property_expr is
+  // executed and supplies the verdict; with no default item nothing is
+  // evaluated and the case property holds vacuously.
+  if (has_default) return default_result;
+  return PropertyResult::kVacuousPass;
+}
+
 PropertyResult ResolveNonOverlapping(bool consequent_matched) {
   // §16.12.7: settles a deferred nonoverlapped (|=>) implication at the tick
   // after the antecedent match, where the consequent is finally evaluated;

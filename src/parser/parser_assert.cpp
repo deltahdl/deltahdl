@@ -390,6 +390,11 @@ ModuleItem* Parser::ParsePropertyDecl() {
   // property body, just as in a sequence body. Harvest them before the
   // body skip loop falls through to its existing instance-reference scan.
   bool in_decl_prefix = true;
+  // §16.12.16: track open case property statements so the optional default item
+  // can be policed. Each entry counts the default items seen in the
+  // corresponding `case`..`endcase`; nested case statements stack, so an inner
+  // default is never charged against an outer case.
+  std::vector<int> case_default_counts;
   while (!Check(TokenKind::kKwEndproperty) && !AtEnd()) {
     if (in_decl_prefix &&
         IsBuiltinTypeKwForLocalVar(CurrentToken().kind)) {
@@ -404,6 +409,28 @@ ModuleItem* Parser::ParsePropertyDecl() {
         Consume();
         ++item->prop_disable_iff_count;
       }
+      continue;
+    }
+    if (Check(TokenKind::kKwCase)) {
+      case_default_counts.push_back(0);
+      Consume();
+      continue;
+    }
+    if (Check(TokenKind::kKwEndcase)) {
+      if (!case_default_counts.empty()) case_default_counts.pop_back();
+      Consume();
+      continue;
+    }
+    if (Check(TokenKind::kKwDefault) && !case_default_counts.empty()) {
+      // §16.12.16: the default statement is optional, but using more than one
+      // default in a single property case statement shall be illegal.
+      auto default_loc = CurrentLoc();
+      if (++case_default_counts.back() == 2) {
+        diag_.Error(default_loc,
+                    "property case statement shall have at most one 'default' "
+                    "item");
+      }
+      Consume();
       continue;
     }
     if (Check(TokenKind::kIdentifier)) {

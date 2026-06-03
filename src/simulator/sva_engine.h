@@ -194,6 +194,27 @@ PropertyResult EvalPropertyIfElse(bool cond, PropertyResult then_result,
                                   bool has_else, PropertyResult else_result);
 PropertyResult EvalWithDisableIff(bool disable_cond, PropertyResult inner);
 
+// §16.12.16: one ordinary item of a case property statement as the linear
+// search sees it — whether this item's expression_or_dist matched the case
+// expression (the comparison itself follows the §12.5 rules) and the verdict of
+// the item's property_expr. The default item is never represented here: it is
+// excluded from the scanned list so it cannot be picked up by the search.
+struct PropertyCaseBranch {
+  bool selected = false;
+  PropertyResult result = PropertyResult::kVacuousPass;
+};
+
+// §16.12.16: evaluate a case property statement. The ordinary items are scanned
+// in source order; the first one whose expression matches the case expression
+// is the single property_expr that contributes the verdict, and the search
+// stops there, so later items are never reached. The default item is held apart
+// from the scan and consulted only when no ordinary item matches: when a default
+// is present its property_expr supplies the verdict, and when none is present
+// the case property succeeds vacuously (a true verdict).
+PropertyResult EvalPropertyCase(const std::vector<PropertyCaseBranch>& branches,
+                                bool has_default,
+                                PropertyResult default_result);
+
 // §16.12.7: settles a deferred nonoverlapped (|=>) implication once the clock
 // reaches the tick after the antecedent match, where the consequent is finally
 // evaluated.
