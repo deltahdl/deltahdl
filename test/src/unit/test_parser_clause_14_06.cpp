@@ -53,4 +53,26 @@ TEST(SignalMultiBlockParse, SharedClockSignal) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §14.6 names inouts among the signal directions that may recur across
+// clocking blocks. The parser accepts the same inout signal in two blocks.
+TEST(SignalMultiBlockParse, InoutSignalInTwoBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb1 @(posedge clk);\n"
+      "    inout data;\n"
+      "  endclocking\n"
+      "  clocking cb2 @(negedge clk);\n"
+      "    inout data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules.size(), 1u);
+  int clocking_count = 0;
+  for (const auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kClockingBlock) ++clocking_count;
+  }
+  EXPECT_EQ(clocking_count, 2);
+}
+
 }

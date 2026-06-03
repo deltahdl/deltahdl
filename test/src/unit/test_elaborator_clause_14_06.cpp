@@ -40,14 +40,16 @@ TEST(SignalMultiBlockElab, SharedClockBlocksElaborate) {
              "endmodule\n"));
 }
 
-TEST(SignalMultiBlockElab, ClockSignalSharedAcrossBlocks) {
+// §14.6 lists inouts among the directions a signal may take across several
+// clocking blocks; the same inout signal in two blocks elaborates cleanly.
+TEST(SignalMultiBlockElab, InoutSignalInTwoBlocksElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  clocking cb1 @(posedge clk);\n"
-             "    input a;\n"
+             "    inout data;\n"
              "  endclocking\n"
-             "  clocking cb2 @(posedge clk);\n"
-             "    output a;\n"
+             "  clocking cb2 @(negedge clk);\n"
+             "    inout data;\n"
              "  endclocking\n"
              "endmodule\n"));
 }

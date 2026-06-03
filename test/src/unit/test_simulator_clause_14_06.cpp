@@ -121,4 +121,73 @@ TEST(SignalMultiBlockSim, SharedClockBothBlocksTriggered) {
   EXPECT_EQ(cmgr.GetSampledValue("cb2", "sig_b"), 0x22u);
 }
 
+// §14.6: blocks sharing a clock share its synchronization event. The converse
+// edge of that rule is that the shared event is keyed to the specific clock --
+// a block driven by a different clock is not synchronized by it. Two blocks on
+// clk_a and one on clk_b: pulsing only clk_a samples the clk_a blocks while the
+// clk_b block stays unsampled, even though every block's watcher is attached.
+TEST(SignalMultiBlockSim, DifferentClockBlockNotSynchronized) {
+  ClockingSimFixture f;
+  auto* clk_a = f.ctx.CreateVariable("clk_a", 1);
+  clk_a->value = MakeLogic4VecVal(f.arena, 1, 0);
+  auto* clk_b = f.ctx.CreateVariable("clk_b", 1);
+  clk_b->value = MakeLogic4VecVal(f.arena, 1, 0);
+  auto* sig_a = f.ctx.CreateVariable("sig_a", 8);
+  sig_a->value = MakeLogic4VecVal(f.arena, 8, 0x11);
+  auto* sig_b = f.ctx.CreateVariable("sig_b", 8);
+  sig_b->value = MakeLogic4VecVal(f.arena, 8, 0x22);
+  auto* sig_c = f.ctx.CreateVariable("sig_c", 8);
+  sig_c->value = MakeLogic4VecVal(f.arena, 8, 0x33);
+
+  ClockingManager cmgr;
+
+  ClockingBlock block1;
+  block1.name = "cb1";
+  block1.clock_signal = "clk_a";
+  block1.clock_edge = Edge::kPosedge;
+  block1.default_input_skew = SimTime{0};
+  block1.default_output_skew = SimTime{0};
+  ClockingSignal s1;
+  s1.signal_name = "sig_a";
+  s1.direction = ClockingDir::kInput;
+  block1.signals.push_back(s1);
+  cmgr.Register(block1);
+
+  ClockingBlock block2;
+  block2.name = "cb2";
+  block2.clock_signal = "clk_a";
+  block2.clock_edge = Edge::kPosedge;
+  block2.default_input_skew = SimTime{0};
+  block2.default_output_skew = SimTime{0};
+  ClockingSignal s2;
+  s2.signal_name = "sig_b";
+  s2.direction = ClockingDir::kInput;
+  block2.signals.push_back(s2);
+  cmgr.Register(block2);
+
+  ClockingBlock block3;
+  block3.name = "cb3";
+  block3.clock_signal = "clk_b";
+  block3.clock_edge = Edge::kPosedge;
+  block3.default_input_skew = SimTime{0};
+  block3.default_output_skew = SimTime{0};
+  ClockingSignal s3;
+  s3.signal_name = "sig_c";
+  s3.direction = ClockingDir::kInput;
+  block3.signals.push_back(s3);
+  cmgr.Register(block3);
+
+  cmgr.Attach(f.ctx, f.scheduler);
+
+  SchedulePosedge(f, clk_a, 10);
+  f.scheduler.Run();
+
+  // The two blocks sharing clk_a sample at its edge.
+  EXPECT_EQ(cmgr.GetSampledValue("cb1", "sig_a"), 0x11u);
+  EXPECT_EQ(cmgr.GetSampledValue("cb2", "sig_b"), 0x22u);
+  // The clk_b block was not synchronized by the clk_a edge, so its signal
+  // (nonzero, so 0 means unsampled) was never captured.
+  EXPECT_EQ(cmgr.GetSampledValue("cb3", "sig_c"), 0u);
+}
+
 }
