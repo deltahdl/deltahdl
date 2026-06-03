@@ -490,6 +490,44 @@ uint64_t MulticlockedIfBranchEvalTick(
                                    /*inclusive=*/true);
 }
 
+uint64_t SinglyClockedLocalInitTick(uint64_t attempt_begin) {
+  // §16.13.7: the evaluation attempt of a singly clocked instance always begins at
+  // a tick of the single governing clock, and the initialization assignment is
+  // performed at that beginning — so the init time is the attempt-begin time.
+  return attempt_begin;
+}
+
+uint64_t MulticlockedLocalInitTick(
+    uint64_t attempt_begin, const std::vector<uint64_t>& leading_clock_ticks) {
+  // §16.13.7: schedule the init assignment at the earliest semantic-leading-clock
+  // tick at or after the attempt begin. A tick coincident with the begin qualifies,
+  // reusing the §16.13.2 at-or-after (inclusive) reading.
+  return NearestClockTickAtOrAfter(attempt_begin, leading_clock_ticks,
+                                   /*inclusive=*/true);
+}
+
+size_t LocalVarCopyCount(size_t distinct_semantic_leading_clocks) {
+  // §16.13.7: one copy of the local variable is created per distinct semantic
+  // leading clock of the instance.
+  return distinct_semantic_leading_clocks;
+}
+
+std::vector<LocalVarInitCopy> MulticlockedLocalInitCopies(
+    uint64_t attempt_begin,
+    const std::vector<std::vector<uint64_t>>& per_leading_clock_ticks) {
+  // §16.13.7: build one copy per semantic leading clock. Each copy's init
+  // assignment is scheduled independently at the earliest tick of its own leading
+  // clock at or after the attempt begin; that copy then governs the subproperty
+  // associated with the same leading clock.
+  std::vector<LocalVarInitCopy> copies;
+  copies.reserve(per_leading_clock_ticks.size());
+  for (size_t i = 0; i < per_leading_clock_ticks.size(); ++i) {
+    copies.push_back(
+        {i, MulticlockedLocalInitTick(attempt_begin, per_leading_clock_ticks[i])});
+  }
+  return copies;
+}
+
 bool NonvacuousSequenceForm() {
   // §16.14.8(a)(b)(c): a sequence, strong(sequence_expr), and
   // weak(sequence_expr) attempt are nonvacuous unconditionally.

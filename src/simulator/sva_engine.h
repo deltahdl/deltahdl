@@ -440,6 +440,49 @@ bool MulticlockedImplicationChecksImmediately(
 uint64_t MulticlockedIfBranchEvalTick(
     uint64_t condition_time, const std::vector<uint64_t>& branch_clock_ticks);
 
+// §16.13.7: one copy of a named sequence/property local variable, created for a
+// single semantic leading clock of the instance, together with the time step at
+// which this copy's initialization assignment is performed.
+struct LocalVarInitCopy {
+  // Index of the semantic leading clock (into the per-leading-clock tick lists)
+  // that governs this copy and the subproperty the copy is used in.
+  size_t leading_clock_index;
+  // Earliest tick of that leading clock at or after the start of the evaluation
+  // attempt — the time step where this copy's init assignment is performed.
+  // kNoMulticlockTick when that leading clock has no qualifying tick.
+  uint64_t init_tick;
+};
+
+// §16.13.7: for a singly clocked sequence or property, the local variable
+// initialization assignment of an evaluation attempt is performed when the attempt
+// begins, and such an attempt always begins at a tick of the single governing
+// clock. The init thus happens at the attempt-begin time itself.
+uint64_t SinglyClockedLocalInitTick(uint64_t attempt_begin);
+
+// §16.13.7: for a multiclock instance with a single semantic leading clock (see
+// §16.16.1), the local variable initialization assignment shall be performed at
+// the earliest tick of that leading clock at or after the beginning of the
+// evaluation attempt. A tick coincident with the begin qualifies. Returns
+// kNoMulticlockTick when the leading clock has no qualifying tick.
+uint64_t MulticlockedLocalInitTick(
+    uint64_t attempt_begin, const std::vector<uint64_t>& leading_clock_ticks);
+
+// §16.13.7: the number of copies of a local variable an evaluation attempt holds.
+// A separate copy shall be created for each distinct semantic leading clock of the
+// named property instance, so two or more distinct leading clocks yield two or more
+// independent copies.
+size_t LocalVarCopyCount(size_t distinct_semantic_leading_clocks);
+
+// §16.13.7: the per-copy initialization schedule for a multiclock named property
+// instance. One copy is created for each distinct semantic leading clock (passed as
+// its own tick list, in increasing time order). For each copy the init assignment
+// shall be performed at the earliest tick of its leading clock at or after the
+// attempt begin, and that copy shall be used in evaluating the subproperty governed
+// by the same leading clock.
+std::vector<LocalVarInitCopy> MulticlockedLocalInitCopies(
+    uint64_t attempt_begin,
+    const std::vector<std::vector<uint64_t>>& per_leading_clock_ticks);
+
 // §16.14.8: nonvacuous evaluation. Every evaluation attempt of a property is
 // either vacuous or nonvacuous, and nonvacuity is defined recursively on the
 // structure of the property. The helpers below compute that attribute for one
