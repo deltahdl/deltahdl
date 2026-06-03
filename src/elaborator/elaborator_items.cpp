@@ -1342,6 +1342,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       // declaration: a formal-argument name cannot be redeclared as a
       // body-scope local variable.
       ValidateNoFormalShadowedByBodyLocal(item);
+      // §16.12.17 / §F.7: enforce the restrictions on recursive properties.
+      ValidateRecursiveProperty(item);
       ValidateClockingBlock(item, mod);
       break;
     }

@@ -544,6 +544,19 @@ struct GenerateCaseItem {
   std::string_view label;
 };
 
+// §16.12.17 / §F.7: per-instance metadata for one named-property instantiation
+// found in a property body. The recursive-property restrictions (Restriction 4
+// in particular) inspect the actual argument expressions of each instance.
+struct PropertyInstanceArgInfo {
+  std::string_view callee;
+  // One entry per actual argument, in declaration order. Each holds the set of
+  // identifier tokens that appear textually within that argument expression.
+  std::vector<std::vector<std::string_view>> arg_idents;
+  // Parallel to arg_idents: true when the argument is a single bare identifier
+  // (i.e. the actual argument expression is itself just one name).
+  std::vector<bool> arg_is_single_ident;
+};
+
 struct ClockingSignalDecl {
   Direction direction = Direction::kNone;
   Edge skew_edge = Edge::kNone;
@@ -652,6 +665,22 @@ struct ModuleItem {
   std::vector<std::string_view> prop_formals;
   int prop_disable_iff_count = 0;
   std::vector<std::string_view> prop_instance_refs;
+
+  // §16.12.17 / §F.7 recursive-property restriction metadata, harvested by the
+  // parser body scan and enforced by the elaborator.
+  //   prop_negated_instance_refs: names that are the operand of a prefix
+  //     property-negation/strong operator (not, s_nexttime, s_eventually,
+  //     s_always) or the right operand of s_until/s_until_with — Restriction 1.
+  //   prop_formal_is_local: parallel to prop_formals; true when the formal was
+  //     declared as a local variable formal argument — Restriction 4.
+  //   prop_instance_args: actual-argument shape of each property instance in
+  //     the body — Restriction 4.
+  //   prop_has_untimed_self_recursion: a self-name instantiation occurs in the
+  //     body with no preceding positive time advance — Restriction 3.
+  std::vector<std::string_view> prop_negated_instance_refs;
+  std::vector<bool> prop_formal_is_local;
+  std::vector<PropertyInstanceArgInfo> prop_instance_args;
+  bool prop_has_untimed_self_recursion = false;
 
   // §16.8.2: per-formal direction when the formal is designated as a local
   // variable argument. Length matches the number of local-marked formals in

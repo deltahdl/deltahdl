@@ -44,6 +44,19 @@ class PropertyRegistry {
   // instance references (including self-recursion).
   bool HasCyclicSequenceDependency(const ModuleItem* decl) const;
 
+  // §16.12.17 / §F.7: the dependency digraph has the named properties as its
+  // vertices and a property-to-property instantiation as each edge. A named
+  // property is recursive iff it is in a nontrivial strongly connected
+  // component — equivalently, iff it can be reached from itself by following
+  // those edges (covering both direct self-instantiation and mutual
+  // recursion).
+  bool IsRecursiveProperty(const ModuleItem* decl) const;
+
+  // §F.7 RESTRICTION 1: returns true iff a recursive property can be reached in
+  // the dependency digraph from `decl`, including `decl` itself. This is the
+  // precise notion of "depends on a recursive property".
+  bool ReachesRecursiveProperty(const ModuleItem* decl) const;
+
  private:
   std::unordered_map<std::string_view, const ModuleItem*> by_name_;
 };

@@ -327,7 +327,14 @@ ModuleItem* Parser::ParsePropertyDecl() {
     int depth = 1;
     bool expect_formal_name = true;
     bool saw_local = false;
+    // §16.12.19 / §16.12.17 Restriction 4: track whether the current formal was
+    // declared as a local variable formal argument. `local` qualifies the whole
+    // comma-separated run of names until a fresh type specifier (not directly
+    // following `local`/`input`) begins a new, unqualified item.
+    bool local_run = false;
+    TokenKind prev_kind = TokenKind::kComma;
     while (depth > 0 && !AtEnd()) {
+      TokenKind this_kind = CurrentToken().kind;
       if (Check(TokenKind::kLParen)) {
         Consume();
         ++depth;
@@ -345,6 +352,17 @@ ModuleItem* Parser::ParsePropertyDecl() {
       } else if (depth == 1 && Check(TokenKind::kKwLocal)) {
         Consume();
         saw_local = true;
+        local_run = true;
+      } else if (depth == 1 &&
+                 IsBuiltinTypeKwForLocalVar(CurrentToken().kind)) {
+        // A built-in type keyword that does not directly follow `local` or
+        // `input` starts a fresh formal item whose qualifiers do not include
+        // `local`, so the local-variable run ends here.
+        if (prev_kind != TokenKind::kKwLocal &&
+            prev_kind != TokenKind::kKwInput) {
+          local_run = false;
+        }
+        Consume();
       } else if (depth == 1 &&
                  (Check(TokenKind::kKwOutput) ||
                   Check(TokenKind::kKwInout))) {
@@ -376,11 +394,13 @@ ModuleItem* Parser::ParsePropertyDecl() {
           }
         }
         item->prop_formals.push_back(name_tok.text);
+        item->prop_formal_is_local.push_back(local_run);
         expect_formal_name = false;
         saw_local = false;
       } else {
         Consume();
       }
+      prev_kind = this_kind;
     }
   }
 
@@ -395,6 +415,77 @@ ModuleItem* Parser::ParsePropertyDecl() {
   // corresponding `case`..`endcase`; nested case statements stack, so an inner
   // default is never charged against an outer case.
   std::vector<int> case_default_counts;
+  // §16.12.17 Restriction 1: when a prefix property-negation/strong operator is
+  // seen, the next property instance reached (possibly through opening parens)
+  // is its operand and is recorded so the elaborator can forbid negating a
+  // recursive property.
+  bool expect_negated_operand = false;
+  // §16.12.17 Restriction 3: a recursive instance must occur after a positive
+  // advance in time. Track whether any time-advancing operator has been seen
+  // before a self-name instantiation.
+  bool saw_time_advance = false;
+
+  // §16.12.17 Restriction 4: capture the actual-argument shape of one property
+  // instance. On entry the current token is the opening '(' of the argument
+  // list; on return the matching ')' has been consumed. Nested instance
+  // references found within the arguments are still recorded into
+  // prop_instance_refs so the dependency digraph is unaffected.
+  auto capture_instance_args = [&](std::string_view callee) {
+    PropertyInstanceArgInfo info;
+    info.callee = callee;
+    Consume();  // '('
+    int d = 1;
+    std::vector<std::string_view> cur_idents;
+    int cur_tokens = 0;
+    bool arg_has_content = false;
+    std::string_view prev_ident;
+    bool prev_was_ident = false;
+    auto finalize_arg = [&]() {
+      info.arg_idents.push_back(cur_idents);
+      info.arg_is_single_ident.push_back(cur_tokens == 1 &&
+                                         cur_idents.size() == 1);
+      cur_idents.clear();
+      cur_tokens = 0;
+    };
+    while (d > 0 && !AtEnd()) {
+      if (Check(TokenKind::kLParen)) {
+        if (prev_was_ident) item->prop_instance_refs.push_back(prev_ident);
+        Consume();
+        ++d;
+        ++cur_tokens;
+        arg_has_content = true;
+        prev_was_ident = false;
+      } else if (Check(TokenKind::kRParen)) {
+        Consume();
+        --d;
+        if (d == 0) {
+          if (arg_has_content) finalize_arg();
+          break;
+        }
+        ++cur_tokens;
+        prev_was_ident = false;
+      } else if (d == 1 && Check(TokenKind::kComma)) {
+        Consume();
+        finalize_arg();
+        arg_has_content = true;
+        prev_was_ident = false;
+      } else if (Check(TokenKind::kIdentifier)) {
+        auto t = Consume();
+        cur_idents.push_back(t.text);
+        ++cur_tokens;
+        arg_has_content = true;
+        prev_ident = t.text;
+        prev_was_ident = true;
+      } else {
+        Consume();
+        ++cur_tokens;
+        arg_has_content = true;
+        prev_was_ident = false;
+      }
+    }
+    item->prop_instance_args.push_back(std::move(info));
+  };
+
   while (!Check(TokenKind::kKwEndproperty) && !AtEnd()) {
     if (in_decl_prefix &&
         IsBuiltinTypeKwForLocalVar(CurrentToken().kind)) {
@@ -433,13 +524,49 @@ ModuleItem* Parser::ParsePropertyDecl() {
       Consume();
       continue;
     }
+    // §16.12.17 Restriction 1: the prefix operators not, s_nexttime,
+    // s_eventually, and s_always negate/strongly bind the property expression
+    // that follows. s_until and s_until_with are infix; their right operand is
+    // also a property expression. Mark that the next instance reached is one of
+    // these operands. (s_nexttime also advances time for Restriction 3.)
+    if (Check(TokenKind::kKwNot) || Check(TokenKind::kKwSNexttime) ||
+        Check(TokenKind::kKwSEventually) || Check(TokenKind::kKwSAlways) ||
+        Check(TokenKind::kKwSUntil) || Check(TokenKind::kKwSUntilWith)) {
+      if (Check(TokenKind::kKwSNexttime)) saw_time_advance = true;
+      expect_negated_operand = true;
+      Consume();
+      continue;
+    }
+    // §16.12.17 Restriction 3: ##, |=> (suffix non-overlapping implication),
+    // and (s_)nexttime advance time. |-> (overlapping implication) does not.
+    if (Check(TokenKind::kHashHash) || Check(TokenKind::kPipeEqGt) ||
+        Check(TokenKind::kKwNexttime)) {
+      saw_time_advance = true;
+      Consume();
+      continue;
+    }
     if (Check(TokenKind::kIdentifier)) {
       auto tok = Consume();
       if (Check(TokenKind::kLParen)) {
         item->prop_instance_refs.push_back(tok.text);
+        if (expect_negated_operand) {
+          item->prop_negated_instance_refs.push_back(tok.text);
+        }
+        if (tok.text == item->name && !saw_time_advance) {
+          item->prop_has_untimed_self_recursion = true;
+        }
+        expect_negated_operand = false;
+        capture_instance_args(tok.text);
+      } else {
+        // A bare identifier is not a property instance; if it stood as the
+        // operand of a pending negation, that operand is a simple expression.
+        expect_negated_operand = false;
       }
       continue;
     }
+    // Opening parentheses are skipped so a negation can still reach an instance
+    // wrapped in parentheses; any other token ends a pending negation operand.
+    if (!Check(TokenKind::kLParen)) expect_negated_operand = false;
     Consume();
   }
   Expect(TokenKind::kKwEndproperty);

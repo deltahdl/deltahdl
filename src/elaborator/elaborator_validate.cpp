@@ -4529,6 +4529,100 @@ void Elaborator::ValidateNoFormalShadowedByBodyLocal(ModuleItem* item) {
   }
 }
 
+void Elaborator::ValidateRecursiveProperty(const ModuleItem* item) {
+  if (item == nullptr || item->kind != ModuleItemKind::kPropertyDecl) return;
+
+  const bool recursive = property_registry_.IsRecursiveProperty(item);
+
+  // §16.12.17 Restriction 2 / §F.7 RESTRICTION 2: disable iff cannot be used in
+  // the declaration of a recursive property. (This mirrors the rule that
+  // disable iff cannot be nested.) The accept_on/reject_on family is *not*
+  // affected: those operators may appear inside a recursive property.
+  if (recursive && item->prop_disable_iff_count > 0) {
+    diag_.Error(item->loc,
+                "recursive property \"" + std::string(item->name) +
+                    "\" may not use disable iff (§16.12.17 Restriction 2)");
+  }
+
+  // §16.12.17 Restriction 1 / §F.7 RESTRICTION 1: the negation operator not and
+  // the strong operators (s_nexttime, s_eventually, s_always, s_until,
+  // s_until_with) cannot be applied to a property expression that instantiates
+  // a property from which a recursive property is reachable.
+  for (auto ref : item->prop_negated_instance_refs) {
+    const ModuleItem* callee = property_registry_.Find(ref);
+    if (callee != nullptr &&
+        property_registry_.ReachesRecursiveProperty(callee)) {
+      diag_.Error(item->loc,
+                  "negation or strong operator applied to property \"" +
+                      std::string(ref) +
+                      "\", which reaches a recursive property "
+                      "(§16.12.17 Restriction 1)");
+    }
+  }
+
+  // §16.12.17 Restriction 3 / §F.7 RESTRICTION 3: every recursive instance must
+  // occur after a positive advance in time; a self-instantiation with no
+  // intervening time advance would leave the recursion stuck at one cycle.
+  if (item->prop_has_untimed_self_recursion) {
+    diag_.Error(item->loc,
+                "recursive property \"" + std::string(item->name) +
+                    "\" instantiates itself with no positive advance in time "
+                    "(§16.12.17 Restriction 3)");
+  }
+
+  // §16.12.17 Restriction 4 / §F.7 RESTRICTION 4 applies to every recursive
+  // instance regardless of whether the enclosing property is itself recursive.
+  ValidateRecursivePropertyArguments(item);
+}
+
+void Elaborator::ValidateRecursivePropertyArguments(const ModuleItem* item) {
+  if (item->prop_instance_args.empty()) return;
+
+  // Formal arguments of the enclosing property p.
+  std::unordered_set<std::string_view> p_formals(item->prop_formals.begin(),
+                                                  item->prop_formals.end());
+
+  for (const auto& inst : item->prop_instance_args) {
+    const ModuleItem* q = property_registry_.Find(inst.callee);
+    if (q == nullptr || q->kind != ModuleItemKind::kPropertyDecl) continue;
+    // Restriction 4 constrains only instances of a property that participates
+    // in the recursion (a recursive instance).
+    if (!property_registry_.ReachesRecursiveProperty(q)) continue;
+
+    for (std::size_t i = 0; i < inst.arg_idents.size(); ++i) {
+      const auto& idents = inst.arg_idents[i];
+
+      // (a) the actual argument expression e is itself a formal of p.
+      const bool is_single_formal =
+          i < inst.arg_is_single_ident.size() && inst.arg_is_single_ident[i] &&
+          idents.size() == 1 && p_formals.count(idents[0]) != 0;
+      if (is_single_formal) continue;
+
+      // (b) no formal argument of p appears in e.
+      bool any_p_formal = false;
+      for (auto id : idents) {
+        if (p_formals.count(id) != 0) {
+          any_p_formal = true;
+          break;
+        }
+      }
+      if (!any_p_formal) continue;
+
+      // (c) e is bound to a local variable formal argument of q (positional).
+      const bool bound_to_local_formal =
+          i < q->prop_formal_is_local.size() && q->prop_formal_is_local[i];
+      if (bound_to_local_formal) continue;
+
+      diag_.Error(item->loc,
+                  "recursive instance of \"" + std::string(inst.callee) +
+                      "\" passes an actual argument that contains a formal of "
+                      "\"" + std::string(item->name) +
+                      "\" yet is neither a formal itself nor bound to a local "
+                      "variable formal (§16.12.17 Restriction 4)");
+    }
+  }
+}
+
 void Elaborator::CheckClockvarAccessExpr(const Expr* e, bool is_lvalue) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess && e->lhs &&

@@ -97,4 +97,58 @@ bool PropertyRegistry::HasCyclicSequenceDependency(
   return dfs(dfs, decl);
 }
 
+bool PropertyRegistry::IsRecursiveProperty(const ModuleItem* decl) const {
+  if (decl == nullptr) return false;
+  if (decl->kind != ModuleItemKind::kPropertyDecl) return false;
+
+  // Push every property reachable in one step from `node`. Edges run only
+  // between named properties; instantiations of named sequences are not part
+  // of the property dependency digraph.
+  auto push_property_callees = [&](const ModuleItem* node,
+                                   std::vector<const ModuleItem*>& stack) {
+    for (auto ref : node->prop_instance_refs) {
+      auto it = by_name_.find(ref);
+      if (it == by_name_.end()) continue;
+      if (it->second->kind != ModuleItemKind::kPropertyDecl) continue;
+      stack.push_back(it->second);
+    }
+  };
+
+  // Recursive iff, starting from `decl`'s callees, we can arrive back at
+  // `decl`.
+  std::unordered_set<const ModuleItem*> visited;
+  std::vector<const ModuleItem*> stack;
+  push_property_callees(decl, stack);
+  while (!stack.empty()) {
+    const ModuleItem* cur = stack.back();
+    stack.pop_back();
+    if (cur == decl) return true;
+    if (!visited.insert(cur).second) continue;
+    push_property_callees(cur, stack);
+  }
+  return false;
+}
+
+bool PropertyRegistry::ReachesRecursiveProperty(const ModuleItem* decl) const {
+  if (decl == nullptr) return false;
+  if (decl->kind != ModuleItemKind::kPropertyDecl) return false;
+
+  std::unordered_set<const ModuleItem*> visited;
+  std::vector<const ModuleItem*> stack;
+  stack.push_back(decl);
+  while (!stack.empty()) {
+    const ModuleItem* cur = stack.back();
+    stack.pop_back();
+    if (!visited.insert(cur).second) continue;
+    if (IsRecursiveProperty(cur)) return true;
+    for (auto ref : cur->prop_instance_refs) {
+      auto it = by_name_.find(ref);
+      if (it == by_name_.end()) continue;
+      if (it->second->kind != ModuleItemKind::kPropertyDecl) continue;
+      stack.push_back(it->second);
+    }
+  }
+  return false;
+}
+
 }  // namespace delta

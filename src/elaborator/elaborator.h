@@ -517,6 +517,13 @@ class Elaborator {
   // assertion_variable_declaration. Diagnoses the redeclaration on `item`.
   void ValidateNoFormalShadowedByBodyLocal(ModuleItem* item);
 
+  // §16.12.17 / §F.7: enforce the four restrictions on recursive property
+  // declarations against `item` (a property declaration).
+  void ValidateRecursiveProperty(const ModuleItem* item);
+  // §16.12.17 Restriction 4 / §F.7 RESTRICTION 4: the actual-argument rule on
+  // recursive instances appearing in the body of `item`.
+  void ValidateRecursivePropertyArguments(const ModuleItem* item);
+
   void ValidateClockvarAccess(const ModuleDecl* decl);
   void ValidateCycleDelayDefaultClocking(const ModuleDecl* decl);
   void ValidateIntraAssignCycleDelay(const ModuleDecl* decl);
