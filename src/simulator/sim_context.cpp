@@ -154,13 +154,20 @@ SimContext::SwapScopeStack(
   return old;
 }
 
+std::string_view SimContext::StaticFrameKey(std::string_view name) {
+  if (!current_process_ || current_process_->inst_prefix.empty()) return name;
+  auto* key = arena_.Create<std::string>(current_process_->inst_prefix +
+                                         std::string(name));
+  return *key;
+}
+
 void SimContext::PushStaticScope(std::string_view func_name) {
-  scope_stack_.push_back(static_frames_[func_name]);
+  scope_stack_.push_back(static_frames_[StaticFrameKey(func_name)]);
 }
 
 void SimContext::PopStaticScope(std::string_view func_name) {
   if (!scope_stack_.empty()) {
-    static_frames_[func_name] = scope_stack_.back();
+    static_frames_[StaticFrameKey(func_name)] = scope_stack_.back();
     scope_stack_.pop_back();
   }
 }
@@ -185,7 +192,7 @@ Variable* SimContext::CreateLocalVariable(std::string_view name,
 
 Variable* SimContext::FindStaticFuncVar(std::string_view func_name,
                                         std::string_view var_name) {
-  auto it = static_frames_.find(func_name);
+  auto it = static_frames_.find(StaticFrameKey(func_name));
   if (it == static_frames_.end()) return nullptr;
   auto vit = it->second.find(var_name);
   if (vit == it->second.end()) return nullptr;
@@ -194,7 +201,7 @@ Variable* SimContext::FindStaticFuncVar(std::string_view func_name,
 
 void SimContext::SaveStaticFuncVar(std::string_view func_name,
                                    std::string_view var_name, Variable* var) {
-  static_frames_[func_name][var_name] = var;
+  static_frames_[StaticFrameKey(func_name)][var_name] = var;
 }
 
 void SimContext::AliasLocalVariable(std::string_view name, Variable* var) {

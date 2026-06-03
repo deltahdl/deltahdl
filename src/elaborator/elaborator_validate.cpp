@@ -2502,6 +2502,43 @@ static void CheckFuncBodyStmt(
     CheckFuncBodyStmt(ri.second, is_void, task_names, func_name, diag);
 }
 
+// §13.3.2: an automatic task variable is deallocated when the invocation ends,
+// so a reference to one must not outlive the call. Walk an expression tree
+// looking for any leaf identifier naming such a variable.
+static bool ExprRefsAutoVar(
+    const Expr* e, const std::unordered_set<std::string_view>& auto_vars) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kIdentifier && !e->text.empty() &&
+      auto_vars.count(e->text) != 0)
+    return true;
+  if (ExprRefsAutoVar(e->lhs, auto_vars)) return true;
+  if (ExprRefsAutoVar(e->rhs, auto_vars)) return true;
+  if (ExprRefsAutoVar(e->base, auto_vars)) return true;
+  if (ExprRefsAutoVar(e->index, auto_vars)) return true;
+  if (ExprRefsAutoVar(e->index_end, auto_vars)) return true;
+  if (ExprRefsAutoVar(e->condition, auto_vars)) return true;
+  if (ExprRefsAutoVar(e->true_expr, auto_vars)) return true;
+  if (ExprRefsAutoVar(e->false_expr, auto_vars)) return true;
+  if (ExprRefsAutoVar(e->with_expr, auto_vars)) return true;
+  if (ExprRefsAutoVar(e->repeat_count, auto_vars)) return true;
+  for (auto* a : e->args)
+    if (ExprRefsAutoVar(a, auto_vars)) return true;
+  for (auto* el : e->elements)
+    if (ExprRefsAutoVar(el, auto_vars)) return true;
+  return false;
+}
+
+// §13.3.2: the nonblocking-assignment restriction applies to a write into an
+// automatic task variable's own storage, including a bit-select or part-select
+// of it. A bit/part-select chain is walked down to its root name. Member access
+// is deliberately not traversed: it denotes a write through a handle or
+// reference whose target outlives the automatic variable.
+static std::string_view NbaAutoTargetRoot(const Expr* e) {
+  while (e && e->kind == ExprKind::kSelect) e = e->base;
+  if (e && e->kind == ExprKind::kIdentifier) return e->text;
+  return {};
+}
+
 static void CheckTaskBodyStmt(
     const Stmt* s,
     const std::unordered_set<std::string_view>& auto_vars, DiagEngine& diag) {
@@ -2510,11 +2547,45 @@ static void CheckTaskBodyStmt(
     diag.Error(s->range.start, "task returns a value");
   }
 
-  if (s->kind == StmtKind::kNonblockingAssign && s->lhs &&
-      s->lhs->kind == ExprKind::kIdentifier &&
-      auto_vars.count(s->lhs->text) != 0) {
-    diag.Error(s->range.start,
-               "automatic task variable in nonblocking assignment");
+  if (s->kind == StmtKind::kNonblockingAssign && s->lhs) {
+    auto target = NbaAutoTargetRoot(s->lhs);
+    if (!target.empty() && auto_vars.count(target) != 0) {
+      diag.Error(s->range.start,
+                 "automatic task variable in nonblocking assignment");
+    }
+  }
+
+  // §13.3.2: an automatic task variable shall not appear in the
+  // intra-assignment event control of a nonblocking assignment, since the
+  // event control can defer evaluation past the variable's lifetime.
+  if (s->kind == StmtKind::kNonblockingAssign) {
+    bool in_event_control = ExprRefsAutoVar(s->repeat_event_count, auto_vars);
+    for (const auto& ev : s->events) {
+      if (ExprRefsAutoVar(ev.signal, auto_vars) ||
+          ExprRefsAutoVar(ev.iff_condition, auto_vars)) {
+        in_event_control = true;
+      }
+    }
+    if (in_event_control) {
+      diag.Error(s->range.start,
+                 "automatic task variable in intra-assignment event control "
+                 "of nonblocking assignment");
+    }
+  }
+
+  // §13.3.2: an automatic task variable shall not be traced by continuous
+  // monitoring system tasks such as $monitor and $dumpvars, whose tracing
+  // outlives the invocation.
+  if (s->kind == StmtKind::kExprStmt && s->expr &&
+      s->expr->kind == ExprKind::kSystemCall &&
+      (s->expr->callee == "$monitor" || s->expr->callee == "$dumpvars")) {
+    for (auto* a : s->expr->args) {
+      if (ExprRefsAutoVar(a, auto_vars)) {
+        diag.Error(s->range.start,
+                   "automatic task variable traced by system task");
+        break;
+      }
+    }
   }
 
   if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {

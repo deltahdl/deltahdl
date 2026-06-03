@@ -539,6 +539,12 @@ class SimContext {
   }
 
  private:
+  // §13.3.2: static-task (and named-block) storage is per module instance.
+  // Qualify the bare scope name with the current process's instance path so
+  // that distinct instances of the same module do not share storage. Returns
+  // the bare name unchanged at the top level (empty instance prefix).
+  std::string_view StaticFrameKey(std::string_view name);
+
   Scheduler& scheduler_;
   Arena& arena_;
   DiagEngine& diag_;
