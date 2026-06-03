@@ -141,6 +141,17 @@ int64_t ConstraintSolver::GenerateRandValue(RandVariable& var) {
   return dist(rng_);
 }
 
+double ConstraintSolver::GenerateRandRealValue(RandVariable& var) {
+  // 18.4.1: random real values are uniformly distributed over their range, so
+  // the probability of landing in any subrange is proportional only to its
+  // width. A uniform_real_distribution over [real_min, real_max) realizes that
+  // flat density directly. A degenerate or inverted range collapses to the
+  // lower bound rather than invoking the distribution on an empty interval.
+  if (!(var.real_min < var.real_max)) return var.real_min;
+  std::uniform_real_distribution<double> dist(var.real_min, var.real_max);
+  return dist(rng_);
+}
+
 namespace {
 
 // 18.5.3: the stage-1 weight of a distribution item. The ':=' operator on a
@@ -665,18 +676,30 @@ bool ConstraintSolver::SolveIterative(
   guard_error_ = false;
   for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
     values_.clear();
+    real_values_.clear();
     // 18.8 / 18.5.8: an inactive variable (rand_mode() OFF) is not one of the
     // active random variables, so it is not randomized. The solver instead
     // treats it as a state variable: its current value is seeded as a constant
     // before solving, so a global constraint relating it to an active variable
     // is evaluated against that fixed value rather than dropped.
     for (auto& [name, var] : variables_) {
+      // 18.4.1: a real variable's value lives in real_values_, not the integral
+      // values_ map; an inactive one likewise holds its current real value.
+      if (var.is_real) {
+        if (!var.enabled) real_values_[name] = var.real_value;
+        continue;
+      }
       if (!var.enabled) values_[name] = var.value;
     }
     ApplyDistConstraints();
     ApplyDirectConstraints(extra, include_soft);
     for (auto& [name, var] : variables_) {
       if (!var.enabled) continue;
+      // 18.4.1: draw an active real variable from its uniform real range.
+      if (var.is_real) {
+        real_values_[name] = GenerateRandRealValue(var);
+        continue;
+      }
       if (values_.find(name) != values_.end()) continue;
       values_[name] = GenerateRandValue(var);
     }
@@ -690,6 +713,11 @@ bool ConstraintSolver::SolveIterative(
 int64_t ConstraintSolver::GetValue(std::string_view name) const {
   auto it = values_.find(std::string(name));
   return (it != values_.end()) ? it->second : 0;
+}
+
+double ConstraintSolver::GetRealValue(std::string_view name) const {
+  auto it = real_values_.find(std::string(name));
+  return (it != real_values_.end()) ? it->second : 0.0;
 }
 
 }

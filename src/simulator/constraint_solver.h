@@ -154,6 +154,18 @@ struct RandVariable {
   int64_t max_val = 0xFFFF;
   uint32_t width = 32;
 
+  // 18.4.1: a rand variable may be of real type, in which case its random value
+  // is uniformly distributed over its range rather than over an integral
+  // domain. is_real selects the real generation path; [real_min, real_max) is
+  // the range the value is drawn from with a flat density, so that equal-width
+  // subranges are equally likely (18.4 forbids declaring a real variable randc,
+  // so only the noncyclical rand path applies here). real_value holds the
+  // variable's current real value, kept as a constant when it is inactive.
+  bool is_real = false;
+  double real_min = 0.0;
+  double real_max = 0.0;
+  double real_value = 0.0;
+
   // 18.8: a random variable carries an active state that rand_mode() controls
   // and that is initially ON. 18.5.8: only the active random variables are the
   // ones randomized; every other variable reference is treated as a state
@@ -218,6 +230,10 @@ class ConstraintSolver {
 
   int64_t GetValue(std::string_view name) const;
 
+  // 18.4.1: the real value drawn for a rand real variable by the most recent
+  // solve. Returns 0.0 for an unknown name or a variable that is not real.
+  double GetRealValue(std::string_view name) const;
+
   void SetRandMode(std::string_view name, bool enabled);
   bool GetRandMode(std::string_view name) const;
 
@@ -252,6 +268,11 @@ class ConstraintSolver {
  private:
 
   int64_t GenerateRandValue(RandVariable& var);
+
+  // 18.4.1: draw a uniformly distributed real value over [real_min, real_max).
+  // A flat density makes any two equal-width subranges equally probable, which
+  // is the uniform-distribution guarantee the clause states for rand real.
+  double GenerateRandRealValue(RandVariable& var);
 
   int64_t DistributionSample(const std::vector<DistWeight>& weights,
                              int64_t domain_lo, int64_t domain_hi);
@@ -304,6 +325,9 @@ class ConstraintSolver {
   std::unordered_map<std::string, RandVariable> variables_;
   std::vector<ConstraintBlock> blocks_;
   std::unordered_map<std::string, int64_t> values_;
+  // 18.4.1: solved values for rand real variables, kept apart from the integral
+  // values_ map since their domain is the reals.
+  std::unordered_map<std::string, double> real_values_;
   RandomizeCallback pre_randomize_;
   RandomizeCallback post_randomize_;
 
