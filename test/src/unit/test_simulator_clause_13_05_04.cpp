@@ -160,4 +160,32 @@ TEST(SubroutineCallSim, NamedArgTaskOutputWriteback) {
   EXPECT_EQ(vb->value.ToUint64(), 10u);
 }
 
+// A named binding written with empty parentheses (e.g. .factor()) names the
+// formal but supplies no value, so the formal's default is used. This drives
+// the binding path where the argument index resolves by name yet the actual
+// expression slot is null, falling back to the default -- distinct from
+// omitting the name entirely. Here both arguments default: 5 * 3 == 15.
+TEST(SubroutineCallSim, EmptyNamedBindingUsesDefault) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function logic [7:0] scale(input logic [7:0] val = 8'd5,\n"
+      "                             input logic [7:0] factor = 8'd3);\n"
+      "    return val * factor;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = scale(.factor(), .val());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 15u);
+}
+
 }

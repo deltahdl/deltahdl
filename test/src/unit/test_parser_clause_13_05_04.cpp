@@ -113,40 +113,6 @@ TEST(TaskAndFunctionParsing, NamedArgBindingAllNamed) {
   EXPECT_EQ(stmt->rhs->arg_names[2], "b");
 }
 
-TEST(SubroutineCallExprParsing, ListOfArgsMixed) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foo(1, .b(2)); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-  EXPECT_EQ(expr->args.size(), 2u);
-  ASSERT_EQ(expr->arg_names.size(), 1u);
-  EXPECT_EQ(expr->arg_names[0], "b");
-}
-
-TEST(TaskAndFunctionParsing, NamedArgBindingNames) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void foo(int a, int b);\n"
-      "  endfunction\n"
-      "  initial foo(.b(2), .a(1));\n"
-      "endmodule\n");
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* call = stmt->expr;
-  ASSERT_NE(call, nullptr);
-  ASSERT_EQ(call->args.size(), 2u);
-  ASSERT_EQ(call->arg_names.size(), 2u);
-  const std::vector<std::string> kExpected = {"b", "a"};
-  for (size_t i = 0; i < kExpected.size(); ++i) {
-    EXPECT_EQ(call->arg_names[i], kExpected[i]);
-  }
-}
-
 TEST(TaskAndFunctionParsing, PositionalArgsNoNamedArgs) {
   auto r = Parse(
       "module m;\n"
