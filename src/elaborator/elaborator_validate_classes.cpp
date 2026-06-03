@@ -3560,6 +3560,79 @@ void Elaborator::ValidateConstraintBlockNames() {
   for (const auto* cls : unit_->classes) ValidateOneClassConstraintNames(cls);
 }
 
+// 18.5.7.1: the dimension count of a class property whose dimensions are fully
+// visible on its declaration — its packed dimensions plus its unpacked
+// dimensions.
+static int ConstraintArrayDimCount(const ClassMember* m) {
+  int packed = (m->data_type.packed_dim_left != nullptr ? 1 : 0) +
+               static_cast<int>(m->data_type.extra_packed_dims.size());
+  int unpacked = static_cast<int>(m->unpacked_dims.size());
+  return packed + unpacked;
+}
+
+// 18.5.7.1: a simple integral/vector type whose dimensionality is determined
+// entirely by its own declaration. The loop-variable-count check is confined to
+// these so that a typedef'd or aggregate element type, which may contribute
+// hidden packed dimensions, is conservatively left alone.
+static bool IsSimpleIntegralVectorKind(DataTypeKind k) {
+  switch (k) {
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+    case DataTypeKind::kBit:
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kInteger:
+    case DataTypeKind::kTime:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// 18.5.7.1: in a foreach iterative constraint the number of loop variables
+// shall not exceed the number of dimensions of the iterated array. The array is
+// a class property, possibly inherited, so resolve the name through the class
+// and its base-class chain; a derived declaration shadows a base one. Only
+// simple integral/vector arrays with at least one dimension are checked, which
+// excludes scalars (not array variables, hence outside this rule) and complex
+// types whose dimensionality is not fully visible.
+void Elaborator::ValidateOneClassForeachConstraintDims(const ClassDecl* cls) {
+  std::unordered_map<std::string_view, const ClassMember*> properties;
+  for (const ClassDecl* c = cls; c;
+       c = c->base_class.empty() ? nullptr
+                                 : FindClassDecl(c->base_class, unit_)) {
+    for (const auto* m : c->members) {
+      if (m->kind != ClassMemberKind::kProperty || m->name.empty()) continue;
+      properties.emplace(m->name, m);  // keeps the most-derived binding
+    }
+  }
+
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kConstraint) continue;
+    for (const auto& fe : m->constraint_foreach_refs) {
+      auto it = properties.find(fe.array_name);
+      if (it == properties.end()) continue;
+      if (!IsSimpleIntegralVectorKind(it->second->data_type.kind)) continue;
+      int dims = ConstraintArrayDimCount(it->second);
+      if (dims < 1) continue;  // not an array variable: not this rule's concern
+      if (fe.loop_var_count > dims) {
+        diag_.Error(
+            fe.loc,
+            std::format("foreach iterative constraint lists {} loop "
+                        "variable(s) but array '{}' has only {} dimension(s)",
+                        fe.loop_var_count, fe.array_name, dims));
+      }
+    }
+  }
+}
+
+void Elaborator::ValidateForeachConstraintDims() {
+  for (const auto* cls : unit_->classes)
+    ValidateOneClassForeachConstraintDims(cls);
+}
+
 // 18.8: rand_mode() is built-in and cannot be overridden. A user class
 // therefore shall not declare a method named rand_mode; doing so is reported
 // as an error rather than silently shadowing the built-in method.

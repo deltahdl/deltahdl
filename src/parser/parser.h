@@ -103,6 +103,7 @@ class Parser {
                                const ClassMember* first, const DataType& dtype);
   ClassMember* ParseConstraintStub(ClassMember* member);
   void CheckConstraintExprToken(const Token& tok);
+  void CheckForeachConstraintHeader(ClassMember* member);
   void CheckDistSet();
 
   bool IsAtGateKeyword();

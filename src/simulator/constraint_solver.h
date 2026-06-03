@@ -114,6 +114,16 @@ struct ConstraintExpr {
   int64_t cond_value = 0;
   std::vector<ConstraintExpr> sub_constraints;
 
+  // 18.5.7.1: for a foreach iterative constraint over a dynamically sized array
+  // (dynamic array or queue), size_var names the array's size method. The size
+  // is fixed by the size constraints, which are solved before this iterative
+  // constraint; within the foreach block the size method is therefore a state
+  // variable, so the solver reads its already-committed value and imposes the
+  // per-element constraints (sub_constraints) only on the elements that exist,
+  // i.e. those whose index is below that size. Left empty for a fixed-size
+  // array, in which case every per-element constraint applies.
+  std::string size_var;
+
   // 18.5.5: the antecedent of an implication ("a" in a -> b) may be any
   // integral or real expression, not only an equality test. When cond_fn is
   // set it supplies the truth of the antecedent over the current values and
@@ -203,6 +213,13 @@ struct RandVariable {
   // same cycle. A nonstatic randc leaves this null and keeps its own history.
   bool is_static = false;
   std::shared_ptr<std::unordered_set<int64_t>> shared_randc_state;
+
+  // 18.5.7.1: marks a variable that holds a dynamic array's size method. Such a
+  // variable is committed in a pass that runs before the general rand variables
+  // — mirroring the rule that an array's size constraints are solved before the
+  // iterative (foreach) constraints over that array — so a foreach reading the
+  // size sees the value already chosen and treats it as a state variable.
+  bool is_array_size = false;
 };
 
 using RandomizeCallback = std::function<void()>;

@@ -798,6 +798,20 @@ enum class ClassMemberKind : uint8_t {
   kCovergroup,
 };
 
+// 18.5.7.1: a foreach iterative constraint as seen in a constraint block body.
+// array_name is the (trailing) identifier of the iterated array; loop_var_count
+// is the number of loop variables given, counted up to the last nonempty slot
+// so a trailing run of omittable commas does not inflate it. loc points at the
+// foreach for diagnostics. The parser records these from the constraint body so
+// the elaborator — which can resolve the array's declaration and therefore its
+// dimensionality — can enforce that the loop-variable count does not exceed the
+// array's number of dimensions.
+struct ConstraintForeachRef {
+  std::string_view array_name;
+  int loop_var_count = 0;
+  SourceLoc loc;
+};
+
 struct ClassMember {
   ClassMemberKind kind = ClassMemberKind::kProperty;
   SourceLoc loc;
@@ -820,6 +834,10 @@ struct ClassMember {
   // uses the 'extern' keyword; the implicit form omits it.
   bool is_constraint_prototype = false;
   bool is_constraint_extern = false;
+
+  // 18.5.7.1: the foreach iterative constraints found in this constraint
+  // block's body (empty for non-constraint members).
+  std::vector<ConstraintForeachRef> constraint_foreach_refs;
 
   DataType data_type;
   std::string_view name;

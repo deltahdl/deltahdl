@@ -611,8 +611,23 @@ bool ConstraintSolver::EvalIfElse(const ConstraintExpr& expr) const {
 }
 
 bool ConstraintSolver::EvalForeach(const ConstraintExpr& expr) const {
-  for (const auto& sub : expr.sub_constraints) {
-    if (!EvalConstraint(sub)) return false;
+  // 18.5.7.1: a foreach iterative constraint applies its constraint_set to the
+  // elements of the array. When the array is dynamically sized, its size method
+  // is a state variable within the foreach block: the size constraints are
+  // solved first, so the solver reads the size value already committed and
+  // imposes the per-element constraints only on the elements that exist, i.e.
+  // those whose index is below that size. A foreach over a fixed-size array
+  // leaves size_var empty, in which case every per-element constraint applies.
+  size_t count = expr.sub_constraints.size();
+  if (!expr.size_var.empty()) {
+    auto it = values_.find(expr.size_var);
+    if (it != values_.end()) {
+      int64_t sz = it->second < 0 ? 0 : it->second;
+      if (static_cast<size_t>(sz) < count) count = static_cast<size_t>(sz);
+    }
+  }
+  for (size_t i = 0; i < count; ++i) {
+    if (!EvalConstraint(expr.sub_constraints[i])) return false;
   }
   return true;
 }
@@ -763,6 +778,19 @@ bool ConstraintSolver::SolveIterative(
     for (auto& [name, var] : variables_) {
       if (!var.enabled || var.is_real) continue;
       if (var.qualifier != RandQualifier::kRandc) continue;
+      if (values_.find(name) != values_.end()) continue;
+      values_[name] = GenerateRandValue(var);
+    }
+    // 18.5.7.1: an array's size method is solved with the size constraints,
+    // ahead of the iterative (foreach) constraints over that array. Commit
+    // every active array-size variable here, before the general rand pass
+    // below, so that a foreach reading the size sees the value already chosen
+    // and treats it as a state variable rather than one it may itself
+    // constrain. The general pass then skips these already-committed variables.
+    for (auto& [name, var] : variables_) {
+      if (!var.enabled || var.is_real) continue;
+      if (!var.is_array_size) continue;
+      if (var.qualifier == RandQualifier::kRandc) continue;
       if (values_.find(name) != values_.end()) continue;
       values_[name] = GenerateRandValue(var);
     }

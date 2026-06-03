@@ -483,6 +483,11 @@ class Elaborator {
   void ValidateConstraintBlockNames();
   void ValidateOneClassConstraintNames(const ClassDecl* cls);
 
+  // 18.5.7.1: in a foreach iterative constraint the number of loop variables
+  // shall not exceed the number of dimensions of the iterated array.
+  void ValidateForeachConstraintDims();
+  void ValidateOneClassForeachConstraintDims(const ClassDecl* cls);
+
   // 18.8: rand_mode() is a built-in method and cannot be overridden, so a
   // class shall not declare a method of that name.
   void ValidateBuiltinRandomizationMethods();

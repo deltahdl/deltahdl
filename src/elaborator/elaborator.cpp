@@ -1173,6 +1173,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateConstraintBlockNames();
 
+  ValidateForeachConstraintDims();
+
   ValidateBuiltinRandomizationMethods();
 
   ValidateExternalConstraints();

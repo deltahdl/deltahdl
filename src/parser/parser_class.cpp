@@ -541,7 +541,14 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   Expect(TokenKind::kLBrace);
   int depth = 1;
   while (depth > 0 && !AtEnd()) {
-    if (Check(TokenKind::kKwDist)) {
+    if (Check(TokenKind::kKwForeach)) {
+      // 18.5.7.1: a foreach iterative constraint heads its constraint_set with
+      // 'foreach ( array_id [ loop_variables ] )'. Validate that header (in
+      // particular the loop-variable naming rule) and record it on the member
+      // for the elaborator's dimension check before the surrounding scan
+      // resumes over the constraint_set body.
+      CheckForeachConstraintHeader(member);
+    } else if (Check(TokenKind::kKwDist)) {
       // 18.5.3: 'expression dist { dist_list }'. Hand the brace-enclosed
       // dist_list to a dedicated scan so its default-item rules are enforced.
       Consume();
@@ -602,6 +609,69 @@ static bool LiteralHasFourStateDigit(std::string_view text) {
     if (c == 'x' || c == 'X' || c == 'z' || c == 'Z') return true;
   }
   return false;
+}
+
+// 18.5.7.1: scan the header of a foreach iterative constraint,
+//   foreach ( ps_or_hierarchical_array_identifier [ loop_variables ] )
+// where loop_variables is a comma-separated list of optional index variable
+// identifiers. The clause makes it an error for a loop variable to reuse the
+// identifier of the array being iterated, so take the trailing identifier of
+// the (possibly hierarchical) array reference as the array's name and flag any
+// loop variable that matches it. Empty loop variables and a trailing run of
+// commas are permitted, so an absent identifier between commas is simply
+// skipped. The loop-variable count is taken up to the last named slot — a
+// trailing run of omittable commas does not inflate it — and recorded, with the
+// array name, on the constraint member so the elaborator can check it against
+// the array's dimensionality. The constraint_set that follows the header is
+// left to the surrounding scan.
+void Parser::CheckForeachConstraintHeader(ClassMember* member) {
+  SourceLoc foreach_loc = CurrentLoc();
+  Consume();  // 'foreach'
+  if (!Match(TokenKind::kLParen)) return;
+  std::string_view array_name;
+  while (!Check(TokenKind::kLBracket) && !Check(TokenKind::kRParen) &&
+         !AtEnd()) {
+    Token t = Consume();
+    if (t.kind == TokenKind::kIdentifier) array_name = t.text;
+  }
+  int slot = 0;            // 1-based index of the loop-variable slot in view
+  int loop_var_count = 0;  // index of the last slot that names a variable
+  if (Match(TokenKind::kLBracket)) {
+    slot = 1;
+    int bracket_depth = 1;
+    while (bracket_depth > 0 && !AtEnd()) {
+      if (Check(TokenKind::kLBracket)) {
+        ++bracket_depth;
+        Consume();
+      } else if (Check(TokenKind::kRBracket)) {
+        --bracket_depth;
+        Consume();
+      } else if (bracket_depth == 1 && Check(TokenKind::kComma)) {
+        ++slot;
+        Consume();
+      } else {
+        Token t = Consume();
+        if (bracket_depth == 1 && t.kind == TokenKind::kIdentifier) {
+          loop_var_count = slot;
+          if (!array_name.empty() && t.text == array_name) {
+            diag_.Error(t.loc,
+                        std::string("foreach loop variable '") +
+                            std::string(t.text) +
+                            "' may not have the same name as the array it "
+                            "iterates over");
+          }
+        }
+      }
+    }
+  }
+  Match(TokenKind::kRParen);
+  if (member && !array_name.empty()) {
+    ConstraintForeachRef ref;
+    ref.array_name = array_name;
+    ref.loop_var_count = loop_var_count;
+    ref.loc = foreach_loc;
+    member->constraint_foreach_refs.push_back(ref);
+  }
 }
 
 void Parser::CheckConstraintExprToken(const Token& tok) {
