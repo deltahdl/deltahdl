@@ -175,6 +175,17 @@ struct ConstraintExpr {
 
   std::function<bool(const std::unordered_map<std::string, int64_t>&)> eval_fn;
 
+  // 18.5.11: the random variables this constraint references, used only by the
+  // function-argument priority solve. When a function call gives a random
+  // variable a higher priority, the priority solve commits the higher-priority
+  // variables first and treats them as state variables; it may then enforce a
+  // constraint only once every variable the constraint references has been
+  // committed. ref_vars names those variables so the solver can defer the
+  // constraint until they are all drawn. Left empty when the priority feature is
+  // not in use, in which case the constraint is checked in the final pass like
+  // any other.
+  std::vector<std::string> ref_vars;
+
   // 18.5.12: an optional constraint guard. When has_guard is set, the guard is
   // evaluated before this constraint is imposed: a FALSE guard eliminates the
   // constraint with no error, an ERROR guard makes randomize() fail, and a
@@ -282,6 +293,19 @@ class ConstraintSolver {
   // fail.
   void AddSolveBefore(const std::vector<std::string>& before,
                       const std::vector<std::string>& after);
+
+  // 18.5.11: record that using a random variable as a function argument gives it
+  // a higher priority than the variables of the constraint it appears in. Each
+  // 'higher' variable is solved before each 'lower' variable, and the
+  // higher-priority variables — solved as part of a higher-priority set of
+  // constraints — become state variables to the lower-priority set. Unlike
+  // solve...before (18.5.9), this ordering subdivides the solution space: the
+  // higher-priority constraints are solved without regard to the lower-priority
+  // ones, so the subdivision can make an otherwise solvable set fail. The
+  // ordering is partial and accumulates across calls; a cycle among the implicit
+  // priorities is an error that fails randomize().
+  void AddFunctionArgPriority(const std::vector<std::string>& higher,
+                              const std::vector<std::string>& lower);
 
   bool Solve();
 
@@ -446,6 +470,40 @@ class ConstraintSolver {
                           size_t idx, const std::vector<ConstraintExpr>& extra,
                           bool include_soft);
 
+  // 18.5.11: true when the recorded function-argument priority edges contain a
+  // cycle, i.e. a set of random variables whose implicit priorities are mutually
+  // contradictory. Such a circular dependency is an error and fails randomize().
+  bool HasFunctionArgPriorityCycle() const;
+
+  // 18.5.11: partition the given active variables into priority layers honoring
+  // the function-argument priority edges. Layer 0 holds the highest-priority
+  // variables (those with nothing ordered before them) and is solved first; a
+  // variable falls one layer later than the latest variable that must precede
+  // it. Returned highest-priority-first; empty layers are omitted.
+  std::vector<std::vector<std::string>> ComputePriorityLayers(
+      const std::vector<std::string>& vars) const;
+
+  // 18.5.11: solve the priority layers in order, committing each layer before the
+  // next and never redrawing an earlier layer. Within a layer the variables are
+  // drawn until every constraint all of whose referenced variables are now
+  // committed holds; if no draw satisfies them the solve fails, because the
+  // higher-priority commitment is not reconsidered. This realizes the
+  // solution-space subdivision the clause describes — and its ability to fail —
+  // in contrast to the backtracking solve...before ordering.
+  bool SolvePriorityLayers(const std::vector<std::vector<std::string>>& layers,
+                           const std::vector<ConstraintExpr>& extra,
+                           bool include_soft);
+
+  // 18.5.11: check the subset of constraints (enabled blocks plus 'extra') whose
+  // referenced variables are all present in 'committed'. A constraint that names
+  // a not-yet-committed variable, or that declares no referenced variables, is
+  // skipped so the priority solve does not evaluate it before its operands
+  // exist; the final full check still enforces every constraint.
+  bool CheckCommittedConstraints(const std::vector<ConstraintExpr>& extra,
+                                 bool include_soft,
+                                 const std::unordered_set<std::string>& committed)
+      const;
+
   std::mt19937 rng_;
   std::unordered_map<std::string, RandVariable> variables_;
   std::vector<ConstraintBlock> blocks_;
@@ -462,6 +520,14 @@ class ConstraintSolver {
   // single-pass generate-and-test, which already draws each legal value
   // combination with uniform probability.
   std::vector<std::pair<std::string, std::string>> solve_before_edges_;
+
+  // 18.5.11: the implicit priority edges induced by using a random variable as a
+  // function argument. Each pair (higher, lower) requires 'higher' to be solved
+  // ahead of 'lower' and, unlike solve_before_edges_, makes 'higher' a state
+  // variable to the constraints on 'lower' — a strict subdivision of the
+  // solution space rather than a redistribution within it. Empty when no
+  // function-argument ordering applies.
+  std::vector<std::pair<std::string, std::string>> function_arg_priority_edges_;
 
   // 18.5.12: set when a guard evaluates to ERROR. An ERROR guard generates an
   // unconditional error, so the solve fails outright and is not retried.

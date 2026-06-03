@@ -3770,6 +3770,138 @@ void Elaborator::ValidateSolveBeforeConstraints() {
     ValidateOneClassSolveBeforeConstraints(cls);
 }
 
+// 18.5.11: locate a function method of the given name visible in 'cls' or any of
+// its base classes, returning its ModuleItem (the function declaration) or
+// nullptr. The nearest declaration wins, matching ordinary method lookup.
+static const ModuleItem* FindClassFunction(const ClassDecl* cls,
+                                           std::string_view name,
+                                           const CompilationUnit* unit) {
+  for (const auto* c = cls; c;
+       c = c->base_class.empty() ? nullptr
+                                 : FindClassDecl(c->base_class, unit)) {
+    for (const auto* m : c->members) {
+      if (m->kind == ClassMemberKind::kMethod && m->name == name &&
+          m->method && m->method->kind == ModuleItemKind::kFunctionDecl) {
+        return m->method;
+      }
+    }
+  }
+  return nullptr;
+}
+
+// 18.5.11: a function called in a constraint cannot modify the constraints, for
+// example by calling rand_mode() or constraint_mode(). Search an expression for
+// a member-access call to either built-in method.
+static bool ExprCallsModeMethod(const Expr* e) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kCall) {
+    const Expr* callee = e->lhs;
+    if (callee && callee->kind == ExprKind::kMemberAccess && callee->rhs &&
+        callee->rhs->kind == ExprKind::kIdentifier &&
+        (callee->rhs->text == "rand_mode" ||
+         callee->rhs->text == "constraint_mode")) {
+      return true;
+    }
+  }
+  if (ExprCallsModeMethod(e->lhs)) return true;
+  if (ExprCallsModeMethod(e->rhs)) return true;
+  if (ExprCallsModeMethod(e->base)) return true;
+  if (ExprCallsModeMethod(e->index)) return true;
+  if (ExprCallsModeMethod(e->index_end)) return true;
+  if (ExprCallsModeMethod(e->condition)) return true;
+  if (ExprCallsModeMethod(e->true_expr)) return true;
+  if (ExprCallsModeMethod(e->false_expr)) return true;
+  if (ExprCallsModeMethod(e->repeat_count)) return true;
+  if (ExprCallsModeMethod(e->with_expr)) return true;
+  for (const auto* a : e->args)
+    if (ExprCallsModeMethod(a)) return true;
+  for (const auto* el : e->elements)
+    if (ExprCallsModeMethod(el)) return true;
+  return false;
+}
+
+// 18.5.11: recursively search a statement (and its substatements and
+// subexpressions) for a rand_mode()/constraint_mode() call.
+static bool StmtCallsModeMethod(const Stmt* s) {
+  if (!s) return false;
+  if (ExprCallsModeMethod(s->condition)) return true;
+  if (ExprCallsModeMethod(s->lhs)) return true;
+  if (ExprCallsModeMethod(s->rhs)) return true;
+  if (ExprCallsModeMethod(s->for_cond)) return true;
+  if (ExprCallsModeMethod(s->expr)) return true;
+  if (ExprCallsModeMethod(s->var_init)) return true;
+  for (const auto& ci : s->case_items) {
+    for (const auto* p : ci.patterns)
+      if (ExprCallsModeMethod(p)) return true;
+    if (StmtCallsModeMethod(ci.body)) return true;
+  }
+  for (const auto& [w, body] : s->randcase_items) {
+    if (ExprCallsModeMethod(w)) return true;
+    if (StmtCallsModeMethod(body)) return true;
+  }
+  for (const auto* sub : s->stmts)
+    if (StmtCallsModeMethod(sub)) return true;
+  for (const auto* sub : s->fork_stmts)
+    if (StmtCallsModeMethod(sub)) return true;
+  if (StmtCallsModeMethod(s->then_branch)) return true;
+  if (StmtCallsModeMethod(s->else_branch)) return true;
+  if (StmtCallsModeMethod(s->body)) return true;
+  if (StmtCallsModeMethod(s->for_body)) return true;
+  for (const auto* fi : s->for_inits)
+    if (StmtCallsModeMethod(fi)) return true;
+  for (const auto* fs : s->for_steps)
+    if (StmtCallsModeMethod(fs)) return true;
+  return false;
+}
+
+// 18.5.11: enforce the restrictions on a function used in a constraint:
+//   - It shall not have output, inout, or (non-const) ref arguments — only
+//     input and const ref are permitted, so the call cannot write back into the
+//     solver's variables.
+//   - It cannot modify the constraints, e.g. by calling rand_mode() or
+//     constraint_mode().
+// The parser records every unqualified call in a constraint body; here each
+// callee that resolves to a method of the enclosing class hierarchy is checked.
+// A name that does not resolve to a class function (a free function or an array
+// built-in such as size()) is left to other passes.
+void Elaborator::ValidateOneClassConstraintFunctionArgs(const ClassDecl* cls) {
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kConstraint) continue;
+    for (const auto& ref : m->constraint_function_call_refs) {
+      const ModuleItem* fn = FindClassFunction(cls, ref.callee, unit_);
+      if (!fn) continue;
+      for (const auto& arg : fn->func_args) {
+        bool bad = arg.direction == Direction::kOutput ||
+                   arg.direction == Direction::kInout ||
+                   (arg.direction == Direction::kRef && !arg.is_const);
+        if (bad) {
+          diag_.Error(
+              ref.loc,
+              std::format("function '{}' used in a constraint shall not have "
+                          "output, inout, or non-const ref arguments",
+                          ref.callee));
+          break;
+        }
+      }
+      for (const auto* s : fn->func_body_stmts) {
+        if (StmtCallsModeMethod(s)) {
+          diag_.Error(
+              ref.loc,
+              std::format("function '{}' used in a constraint cannot modify the "
+                          "constraints by calling rand_mode or constraint_mode",
+                          ref.callee));
+          break;
+        }
+      }
+    }
+  }
+}
+
+void Elaborator::ValidateConstraintFunctionArgs() {
+  for (const auto* cls : unit_->classes)
+    ValidateOneClassConstraintFunctionArgs(cls);
+}
+
 // 18.8: rand_mode() is built-in and cannot be overridden. A user class
 // therefore shall not declare a method named rand_mode; doing so is reported
 // as an error rather than silently shadowing the built-in method.

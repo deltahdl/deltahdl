@@ -33,6 +33,21 @@ void ConstraintSolver::AddSolveBefore(const std::vector<std::string>& before,
   }
 }
 
+void ConstraintSolver::AddFunctionArgPriority(
+    const std::vector<std::string>& higher,
+    const std::vector<std::string>& lower) {
+  // 18.5.11: every higher-priority variable is solved before every variable of
+  // the constraint that used it as a function argument, so record the cross
+  // product of priority edges. A variable that is both higher- and lower-named
+  // (it depends on itself) would form a degenerate cycle, which the cycle check
+  // catches and reports.
+  for (const auto& h : higher) {
+    for (const auto& l : lower) {
+      function_arg_priority_edges_.emplace_back(h, l);
+    }
+  }
+}
+
 void ConstraintSolver::SetRandMode(std::string_view name, bool enabled) {
   auto it = variables_.find(std::string(name));
   if (it != variables_.end()) it->second.enabled = enabled;
@@ -825,6 +840,11 @@ bool ConstraintSolver::SolveWith(
   if (HasRandcInUnique()) return false;
   if (UniqueMembersNotEquivalentType()) return false;
 
+  // 18.5.11: a circular dependency among the implicit priorities created by
+  // using random variables as function arguments is an error; randomize() fails
+  // outright rather than attempting to solve a self-contradictory ordering.
+  if (HasFunctionArgPriorityCycle()) return false;
+
   if (pre_randomize_) pre_randomize_();
 
   // 18.5.13: hard constraints shall always be satisfied or randomization fails.
@@ -921,6 +941,151 @@ bool ConstraintSolver::SolveOrderedGroups(
   return false;
 }
 
+bool ConstraintSolver::HasFunctionArgPriorityCycle() const {
+  // Build the priority digraph (higher -> lower) and look for a back edge with a
+  // depth-first walk. A gray (on-stack) successor closes a cycle, e.g. one
+  // variable used as a function argument in a constraint on a second while the
+  // second is used as a function argument in a constraint on the first.
+  std::unordered_map<std::string, std::vector<std::string>> succ;
+  std::unordered_set<std::string> nodes;
+  for (const auto& [h, l] : function_arg_priority_edges_) {
+    succ[h].push_back(l);
+    nodes.insert(h);
+    nodes.insert(l);
+  }
+  std::unordered_map<std::string, int> color;  // 0 white, 1 gray, 2 black
+  bool cycle = false;
+  std::function<void(const std::string&)> dfs = [&](const std::string& v) {
+    color[v] = 1;
+    auto it = succ.find(v);
+    if (it != succ.end()) {
+      for (const auto& w : it->second) {
+        if (color[w] == 1) {
+          cycle = true;
+          return;
+        }
+        if (color[w] == 0) {
+          dfs(w);
+          if (cycle) return;
+        }
+      }
+    }
+    color[v] = 2;
+  };
+  for (const auto& v : nodes) {
+    if (color[v] == 0) {
+      dfs(v);
+      if (cycle) break;
+    }
+  }
+  return cycle;
+}
+
+std::vector<std::vector<std::string>> ConstraintSolver::ComputePriorityLayers(
+    const std::vector<std::string>& vars) const {
+  std::unordered_set<std::string> var_set(vars.begin(), vars.end());
+  // pred -> {successors}, i.e. higher -> lower, restricted to vars in this pass.
+  std::unordered_map<std::string, std::vector<std::string>> succ;
+  for (const auto& [h, l] : function_arg_priority_edges_) {
+    if (var_set.count(h) && var_set.count(l)) succ[h].push_back(l);
+  }
+  // prank(v) = how many variables must be solved before v, i.e. its distance
+  // from a source of the priority digraph. A variable with nothing ordered
+  // before it has rank 0 and is solved in the first (highest-priority) layer;
+  // each successor sits at least one rank past every predecessor. Solving in
+  // ascending rank therefore honors every priority edge and gathers the
+  // unordered variables into layer 0. The rank is computed by relaxing along the
+  // edges from the sources.
+  std::unordered_map<std::string, int> prank;
+  for (const auto& v : vars) prank[v] = 0;
+  // Iteratively relax: a successor's rank is at least one past its predecessor's.
+  // The graph is acyclic here, so |vars| passes suffice to reach the fixpoint.
+  for (size_t pass = 0; pass < vars.size(); ++pass) {
+    bool changed = false;
+    for (const auto& [h, ls] : succ) {
+      for (const auto& l : ls) {
+        if (prank[l] < prank[h] + 1) {
+          prank[l] = prank[h] + 1;
+          changed = true;
+        }
+      }
+    }
+    if (!changed) break;
+  }
+  int max_rank = 0;
+  for (const auto& v : vars) max_rank = std::max(max_rank, prank[v]);
+  std::vector<std::vector<std::string>> layers(max_rank + 1);
+  for (const auto& v : vars) layers[prank[v]].push_back(v);
+  std::vector<std::vector<std::string>> out;
+  for (auto& g : layers) {
+    if (!g.empty()) out.push_back(std::move(g));
+  }
+  return out;
+}
+
+bool ConstraintSolver::CheckCommittedConstraints(
+    const std::vector<ConstraintExpr>& extra, bool include_soft,
+    const std::unordered_set<std::string>& committed) const {
+  std::vector<const ConstraintExpr*> hard;
+  std::vector<const ConstraintExpr*> soft;
+  CollectConstraints(blocks_, extra, hard, soft);
+  auto ready = [&](const ConstraintExpr* c) {
+    if (c->ref_vars.empty()) return false;  // checked only in the final pass
+    for (const auto& v : c->ref_vars) {
+      if (!committed.count(v)) return false;
+    }
+    return true;
+  };
+  for (const auto* c : hard) {
+    if (!ready(c)) continue;
+    if (!EvalConstraint(*c)) return false;
+  }
+  if (include_soft) {
+    for (const auto* c : soft) {
+      if (!ready(c)) continue;
+      const ConstraintExpr* inner = c->inner ? c->inner : nullptr;
+      if (inner && !EvalConstraint(*inner)) return false;
+    }
+  }
+  return true;
+}
+
+bool ConstraintSolver::SolvePriorityLayers(
+    const std::vector<std::vector<std::string>>& layers,
+    const std::vector<ConstraintExpr>& extra, bool include_soft) {
+  static constexpr int kLayerAttempts = 200;
+  // committed starts from every variable already fixed before the general pass —
+  // the inactive (state) variables, the randc draws, the array sizes, and the
+  // real variables — all of which are present in values_/real_values_ by now.
+  std::unordered_set<std::string> committed;
+  for (const auto& kv : values_) committed.insert(kv.first);
+  for (const auto& kv : real_values_) committed.insert(kv.first);
+  for (const auto& layer : layers) {
+    bool ok = false;
+    for (int attempt = 0; attempt < kLayerAttempts; ++attempt) {
+      for (const auto& name : layer) {
+        auto it = variables_.find(name);
+        if (it == variables_.end()) continue;
+        values_[name] = GenerateRandValue(it->second);
+      }
+      std::unordered_set<std::string> with_layer = committed;
+      for (const auto& name : layer) with_layer.insert(name);
+      if (CheckCommittedConstraints(extra, include_soft, with_layer)) {
+        ok = true;
+        break;
+      }
+    }
+    // 18.5.11: an earlier, higher-priority layer is never reconsidered. If no
+    // draw of this layer satisfies the constraints that have become checkable,
+    // the overall solve fails — the subdivision can make the set unsolvable.
+    if (!ok) return false;
+    for (const auto& name : layer) committed.insert(name);
+  }
+  // Every layer committed: accept only if the complete assignment satisfies all
+  // constraints, including any whose referenced variables were left unlisted.
+  return CheckAllConstraints(extra, include_soft);
+}
+
 bool ConstraintSolver::SolveIterative(
     const std::vector<ConstraintExpr>& extra, bool include_soft) {
   static constexpr int kMaxAttempts = 500;
@@ -976,6 +1141,30 @@ bool ConstraintSolver::SolveIterative(
     // set of legal solutions unchanged. With no ordering the default single pass
     // below is used unchanged, and it already draws each legal value combination
     // with uniform probability.
+    // 18.5.11: when random variables are used as function arguments, the implied
+    // priority is solved in layers — the higher-priority variables first, each
+    // layer committed as state variables to the next without backtracking. This
+    // subdivides the solution space (and can fail), distinct from the
+    // solution-space-preserving solve...before ordering handled below.
+    if (!function_arg_priority_edges_.empty()) {
+      for (auto& [name, var] : variables_) {
+        if (var.enabled && var.is_real) {
+          real_values_[name] = GenerateRandRealValue(var);
+        }
+      }
+      std::vector<std::string> general;
+      for (auto& [name, var] : variables_) {
+        if (!var.enabled || var.is_real) continue;
+        // randc, array-size, and inactive variables are already committed; the
+        // cyclical ones in particular are solved first, as the clause requires.
+        if (values_.find(name) != values_.end()) continue;
+        general.push_back(name);
+      }
+      auto layers = ComputePriorityLayers(general);
+      if (SolvePriorityLayers(layers, extra, include_soft)) return true;
+      if (guard_error_) return false;
+      continue;
+    }
     if (!solve_before_edges_.empty()) {
       // Real variables are committed first (as in the flat pass), so any ordered
       // integral group is completed against them.

@@ -494,6 +494,11 @@ class Elaborator {
   void ValidateOneClassSolveBeforeConstraints(const ClassDecl* cls);
   bool IsSolveOrderableType(const DataType& dt) const;
 
+  // 18.5.11: a function called from a constraint expression shall not have
+  // output, inout, or non-const ref arguments (const ref is allowed).
+  void ValidateConstraintFunctionArgs();
+  void ValidateOneClassConstraintFunctionArgs(const ClassDecl* cls);
+
   // 18.8: rand_mode() is a built-in method and cannot be overridden, so a
   // class shall not declare a method of that name.
   void ValidateBuiltinRandomizationMethods();

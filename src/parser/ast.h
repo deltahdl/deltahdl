@@ -836,6 +836,17 @@ struct ConstraintSolveBeforeRef {
   SourceLoc loc;
 };
 
+// 18.5.11: a function call appearing in a constraint block body. 'callee' is the
+// leaf identifier named immediately before the '(' (the function name); loc
+// points at that name for diagnostics. Only an unqualified call is recorded —
+// one not preceded by a '.' or '::' member/scope qualifier — so the elaborator
+// resolves it against the enclosing class hierarchy and applies the restrictions
+// on functions used in constraints (no output/inout/non-const-ref arguments).
+struct ConstraintFunctionCallRef {
+  std::string_view callee;
+  SourceLoc loc;
+};
+
 struct ClassMember {
   ClassMemberKind kind = ClassMemberKind::kProperty;
   SourceLoc loc;
@@ -866,6 +877,11 @@ struct ClassMember {
   // 18.5.9: the solve...before ordering constraints found in this constraint
   // block's body (empty for non-constraint members).
   std::vector<ConstraintSolveBeforeRef> constraint_solve_before_refs;
+
+  // 18.5.11: the function calls found in this constraint block's body (empty for
+  // non-constraint members), recorded so the elaborator can resolve each callee
+  // and apply the restrictions on functions used in constraints.
+  std::vector<ConstraintFunctionCallRef> constraint_function_call_refs;
 
   DataType data_type;
   std::string_view name;

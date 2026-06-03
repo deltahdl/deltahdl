@@ -540,6 +540,10 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   }
   Expect(TokenKind::kLBrace);
   int depth = 1;
+  // 18.5.11: track whether the token just before the current identifier was a
+  // '.' or '::' qualifier, so a member/scope-qualified name (obj.f, pkg::f) is
+  // not mistaken for an unqualified call on the enclosing class.
+  bool prev_was_qualifier = false;
   while (depth > 0 && !AtEnd()) {
     if (Check(TokenKind::kKwForeach)) {
       // 18.5.7.1: a foreach iterative constraint heads its constraint_set with
@@ -548,6 +552,7 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
       // for the elaborator's dimension check before the surrounding scan
       // resumes over the constraint_set body.
       CheckForeachConstraintHeader(member);
+      prev_was_qualifier = false;
     } else if (Check(TokenKind::kKwSolve)) {
       // 18.5.9: 'solve solve_before_list before solve_before_list ;' defines a
       // partial ordering on the evaluation of random variables. Record the two
@@ -555,18 +560,36 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
       // restrictions and reject circular dependencies; the statement is consumed
       // through its terminating ';' before the surrounding scan resumes.
       CheckSolveBeforeConstraint(member);
+      prev_was_qualifier = false;
     } else if (Check(TokenKind::kKwDist)) {
       // 18.5.3: 'expression dist { dist_list }'. Hand the brace-enclosed
       // dist_list to a dedicated scan so its default-item rules are enforced.
       Consume();
       CheckDistSet();
+      prev_was_qualifier = false;
     } else if (Match(TokenKind::kLBrace)) {
       ++depth;
+      prev_was_qualifier = false;
     } else if (Match(TokenKind::kRBrace)) {
       --depth;
+      prev_was_qualifier = false;
     } else {
-      CheckConstraintExprToken(CurrentToken());
+      Token t = CurrentToken();
+      CheckConstraintExprToken(t);
       Consume();
+      // 18.5.11: an unqualified 'identifier (' opens a function call (a
+      // user-defined function or an array built-in such as size()). Record the
+      // callee so the elaborator can resolve it and, when it is a class method,
+      // apply the argument restrictions on functions used in constraints.
+      if (t.kind == TokenKind::kIdentifier && !prev_was_qualifier &&
+          Check(TokenKind::kLParen)) {
+        ConstraintFunctionCallRef ref;
+        ref.callee = t.text;
+        ref.loc = t.loc;
+        if (member) member->constraint_function_call_refs.push_back(ref);
+      }
+      prev_was_qualifier =
+          t.kind == TokenKind::kDot || t.kind == TokenKind::kColonColon;
     }
   }
   return member;
