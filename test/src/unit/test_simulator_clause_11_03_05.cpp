@@ -177,4 +177,16 @@ TEST(ShortCircuit, EqualityAlwaysExecutesRhsSideEffect) {
   EXPECT_EQ(f.ctx.FindVariable("se")->value.ToUint64(), 42u);
 }
 
+// Logical equivalence (<->) is a logical operator that is deliberately not
+// part of the short-circuiting set, so it must always evaluate both operands.
+TEST(ShortCircuit, EquivalenceAlwaysExecutesRhsSideEffect) {
+  SimFixture f;
+  MakeVar(f, "a", 8, 0);
+  MakeVar(f, "se", 8, 99);
+  EvalExpr(MakeBinary(f.arena, TokenKind::kLtDashGt, MakeId(f.arena, "a"),
+                      MakeAssignExpr(f.arena, "se", 42)),
+           f.ctx, f.arena);
+  EXPECT_EQ(f.ctx.FindVariable("se")->value.ToUint64(), 42u);
+}
+
 }
