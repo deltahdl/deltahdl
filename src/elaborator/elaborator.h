@@ -321,6 +321,10 @@ class Elaborator {
   // have a known type that is the same as the type of the pattern in each item.
   void ValidateMatchesCaseSelectorType(const ModuleDecl* decl);
 
+  // §12.6.2: in each `e matches p` clause of an if-else predicate, e and p
+  // shall have the same statically known type.
+  void ValidateMatchesIfPredicateType(const ModuleDecl* decl);
+
   void ValidateProceduralNetAssign();
   void ValidateDynamicArrayNba(const ModuleDecl* decl);
   void ValidateArrayQueryOnDynamicType(const ModuleDecl* decl);

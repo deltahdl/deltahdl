@@ -1658,6 +1658,65 @@ void Elaborator::ValidateMatchesCaseSelectorType(const ModuleDecl* decl) {
   }
 }
 
+// §12.6.2: in each `e matches p` clause of an if-else predicate, e and p shall
+// have the same statically known type. A real-valued left side cannot share a
+// type with an integral constant pattern, so that pairing is a static type
+// error. The predicate is a sequential conjunction of clauses joined by `&&&`,
+// so each matches operator is reached by descending the `&&&` chain. Identifier
+// and wildcard patterns impose no integral type and are left alone.
+static void CheckMatchesIfPredicate(const Expr* pred, const TypeMap& types,
+                                    DiagEngine& diag) {
+  if (!pred || pred->kind != ExprKind::kBinary) return;
+  if (pred->op == TokenKind::kAmpAmpAmp) {
+    CheckMatchesIfPredicate(pred->lhs, types, diag);
+    CheckMatchesIfPredicate(pred->rhs, types, diag);
+    return;
+  }
+  if (pred->op != TokenKind::kKwMatches) return;
+  auto name = ExprIdent(pred->lhs);
+  auto it = types.find(name);
+  if (!name.empty() && it != types.end() && IsRealType(it->second) &&
+      IsIntegralLiteralPattern(pred->rhs)) {
+    diag.Error(pred->range.start,
+               "pattern-matching if predicate value type differs from the "
+               "type of its integral pattern");
+  }
+}
+
+static void CheckMatchesIfPredicateStmt(const Stmt* s, const TypeMap& types,
+                                        DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kIf && s->condition) {
+    CheckMatchesIfPredicate(s->condition, types, diag);
+  }
+  for (auto* sub : s->stmts) CheckMatchesIfPredicateStmt(sub, types, diag);
+  for (auto* sub : s->fork_stmts) CheckMatchesIfPredicateStmt(sub, types, diag);
+  CheckMatchesIfPredicateStmt(s->then_branch, types, diag);
+  CheckMatchesIfPredicateStmt(s->else_branch, types, diag);
+  CheckMatchesIfPredicateStmt(s->body, types, diag);
+  CheckMatchesIfPredicateStmt(s->for_body, types, diag);
+  for (const auto& ci : s->case_items)
+    CheckMatchesIfPredicateStmt(ci.body, types, diag);
+}
+
+void Elaborator::ValidateMatchesIfPredicateType(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock ||
+        item->kind == ModuleItemKind::kFinalBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      if (item->body) CheckMatchesIfPredicateStmt(item->body, var_types_, diag_);
+    }
+    if (item->kind == ModuleItemKind::kTaskDecl ||
+        item->kind == ModuleItemKind::kFunctionDecl) {
+      for (auto* s : item->func_body_stmts)
+        CheckMatchesIfPredicateStmt(s, var_types_, diag_);
+    }
+  }
+}
+
 void Elaborator::ValidateMixedAssignments() {
   for (const auto& [name, loc] : cont_assign_targets_) {
     if (proc_assign_targets_.find(name) != proc_assign_targets_.end()) {

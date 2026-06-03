@@ -23,6 +23,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateMixedAssignments();
   ValidateMatchesPatternIntegral(decl);
   ValidateMatchesCaseSelectorType(decl);
+  ValidateMatchesIfPredicateType(decl);
   ValidateDisableTargets(decl);
   ValidateProceduralNetAssign();
   ValidateDynamicArrayNba(decl);
