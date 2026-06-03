@@ -13,20 +13,6 @@
 
 namespace {
 
-TEST(IpcSync, SemaphoreTryGetSucceeds) {
-  SemaphoreObject sem(3);
-  int32_t result = sem.TryGet(2);
-  EXPECT_EQ(result, 1);
-  EXPECT_EQ(sem.key_count, 1);
-}
-
-TEST(IpcSync, SemaphoreTryGetFails) {
-  SemaphoreObject sem(1);
-  int32_t result = sem.TryGet(2);
-  EXPECT_EQ(result, 0);
-  EXPECT_EQ(sem.key_count, 1);
-}
-
 TEST(IpcSync, SemaphoreTryGetDefaultOne) {
   SemaphoreObject sem(1);
   int32_t result = sem.TryGet();
@@ -48,10 +34,34 @@ TEST(IpcSync, SemaphoreTryGetZeroCount) {
   EXPECT_EQ(sem.key_count, 0);
 }
 
-TEST(IpcSync, SemaphoreTryGetNegativeCountReturnsZero) {
+// §15.3.4: a negative keyCount returns 0 and shall result in an error. The
+// error is distinct from the ordinary keys-unavailable 0, so the error channel
+// is set only on the negative path and the bucket is left unchanged.
+TEST(IpcSync, SemaphoreTryGetNegativeCountIsError) {
   SemaphoreObject sem(5);
-  EXPECT_EQ(sem.TryGet(-1), 0);
+  bool error = false;
+  EXPECT_EQ(sem.TryGet(-2, &error), 0);
+  EXPECT_TRUE(error);
   EXPECT_EQ(sem.key_count, 5);
+}
+
+// The keys-unavailable path also returns 0, but it is not an error: a caller
+// observing the error channel must be able to tell the two zero results apart.
+TEST(IpcSync, SemaphoreTryGetUnavailableIsNotError) {
+  SemaphoreObject sem(1);
+  bool error = false;
+  EXPECT_EQ(sem.TryGet(2, &error), 0);
+  EXPECT_FALSE(error);
+  EXPECT_EQ(sem.key_count, 1);
+}
+
+// A successful non-blocking procure is likewise not an error.
+TEST(IpcSync, SemaphoreTryGetSuccessIsNotError) {
+  SemaphoreObject sem(3);
+  bool error = false;
+  EXPECT_EQ(sem.TryGet(2, &error), 1);
+  EXPECT_FALSE(error);
+  EXPECT_EQ(sem.key_count, 1);
 }
 
 TEST(IpcSync, SemaphoreTryGetAfterPut) {

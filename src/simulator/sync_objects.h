@@ -35,8 +35,17 @@ struct SemaphoreObject {
     return SemGetStatus::kBlock;
   }
 
-  int32_t TryGet(int32_t count = 1) {
-    if (count < 0) return 0;
+  // §15.3.4: non-blocking procure. When enough keys are available the bucket is
+  // drained by count and a positive value is returned; otherwise 0 is returned
+  // and the bucket is left untouched (no blocking, unlike get()). A negative
+  // count yields 0 as well, but is additionally an error — distinct from the
+  // ordinary keys-unavailable 0 — surfaced through the optional out-parameter so
+  // a caller can tell the two zero results apart.
+  int32_t TryGet(int32_t count = 1, bool* error = nullptr) {
+    if (count < 0) {
+      if (error) *error = true;
+      return 0;
+    }
     if (key_count >= count) {
       key_count -= count;
       return 1;
