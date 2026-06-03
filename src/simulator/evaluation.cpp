@@ -280,7 +280,12 @@ static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                         : ((lhs.width > rhs.width) ? lhs.width : rhs.width);
   uint32_t width = (context_width > self_w) ? context_width : self_w;
   if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) {
-    return MakeAllX(arena, width);
+    // §11.8.4: any x/z bit in an operand makes a nonlogical operation produce
+    // an entirely unknown result whose type stays consistent with the
+    // expression's type, so a signed result must remain signed.
+    auto result = MakeAllX(arena, width);
+    result.is_signed = lhs.is_signed && rhs.is_signed;
+    return result;
   }
 
   if (lhs.is_signed && rhs.is_signed) {

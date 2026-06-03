@@ -1,6 +1,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "simulator/evaluation.h"
+#include "simulator/statement_assign.h"
 
 using namespace delta;
 
@@ -37,19 +38,6 @@ TEST(SignedXZ, SignBitZFillsWithZ) {
   auto result = EvalExpr(expr, f.ctx, f.arena, 8);
 
   EXPECT_NE(result.words[0].bval & 0xF0u, 0u);
-}
-
-TEST(SignedXZ, NonlogicalOpWithXZYieldsX) {
-  SimFixture f;
-
-  auto* var = MakeVar4(f, "nx", 4, 0b0101, 0b0010);
-  var->is_signed = true;
-  MakeSignedVarAdv(f, "n1", 4, 1);
-  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "nx"),
-                          MakeId(f.arena, "n1"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-
-  EXPECT_NE(result.words[0].bval, 0u);
 }
 
 TEST(SignedXZ, KnownSignedNormalExtension) {
@@ -93,6 +81,36 @@ TEST(SignedXZ, TernarySignExtZFillsWithZ) {
   tern->true_expr = MakeId(f.arena, "tz");
   tern->false_expr = MakeId(f.arena, "fv2");
   auto result = EvalExpr(tern, f.ctx, f.arena);
+
+  EXPECT_EQ(result.words[0].aval & 0xF0u, 0x00u);
+  EXPECT_EQ(result.words[0].bval & 0xF0u, 0xF0u);
+}
+
+// Claims 1 & 2 are also carried by the assignment-widening path
+// (ResizeToWidth), distinct from the ternary/extension path (ExtendVec)
+// exercised above. Drive that production helper directly so the resize
+// sign-fill is observed there too.
+TEST(SignedXZ, ResizeWidensSignBitXFillsWithX) {
+  SimFixture f;
+
+  auto val = MakeLogic4Vec(f.arena, 4);
+  val.is_signed = true;
+  val.words[0].aval = 0b1000;  // sign bit a=1, b=1 -> x
+  val.words[0].bval = 0b1000;
+  auto result = ResizeToWidth(val, 8, f.arena);
+
+  EXPECT_EQ(result.words[0].aval & 0xF0u, 0xF0u);
+  EXPECT_EQ(result.words[0].bval & 0xF0u, 0xF0u);
+}
+
+TEST(SignedXZ, ResizeWidensSignBitZFillsWithZ) {
+  SimFixture f;
+
+  auto val = MakeLogic4Vec(f.arena, 4);
+  val.is_signed = true;
+  val.words[0].aval = 0b0000;  // sign bit a=0, b=1 -> z
+  val.words[0].bval = 0b1000;
+  auto result = ResizeToWidth(val, 8, f.arena);
 
   EXPECT_EQ(result.words[0].aval & 0xF0u, 0x00u);
   EXPECT_EQ(result.words[0].bval & 0xF0u, 0xF0u);
@@ -166,6 +184,21 @@ TEST(SignedXZ, ModulusWithXZYieldsAllX) {
   MakeSignedVarAdv(f, "p1", 4, 3);
   auto* expr = MakeBinary(f.arena, TokenKind::kPercent, MakeId(f.arena, "px"),
                           MakeId(f.arena, "p1"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+
+  uint64_t mask = (uint64_t{1} << result.width) - 1;
+  EXPECT_EQ(result.words[0].aval & mask, mask);
+  EXPECT_EQ(result.words[0].bval & mask, mask);
+}
+
+TEST(SignedXZ, PowerWithXZYieldsAllX) {
+  SimFixture f;
+
+  auto* var = MakeVar4(f, "ex", 4, 0b0101, 0b0010);
+  var->is_signed = true;
+  MakeSignedVarAdv(f, "e1", 4, 2);
+  auto* expr = MakeBinary(f.arena, TokenKind::kPower, MakeId(f.arena, "ex"),
+                          MakeId(f.arena, "e1"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
 
   uint64_t mask = (uint64_t{1} << result.width) - 1;
