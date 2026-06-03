@@ -706,11 +706,25 @@ static ExecTask ExecForever(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
+// §12.7.2: derive how many times a repeat-loop body runs from the count
+// expression, already evaluated once before the loop begins. An unknown or
+// high-impedance value, or a negative value of a signed expression, yields no
+// iterations.
+static uint64_t RepeatIterationCount(const Logic4Vec& count_val) {
+  if (!count_val.IsKnown()) return 0;
+  if (count_val.is_signed && count_val.width > 0) {
+    uint32_t msb_word = (count_val.width - 1) / 64;
+    uint64_t msb_mask = uint64_t{1} << ((count_val.width - 1) % 64);
+    if (count_val.words[msb_word].aval & msb_mask) return 0;
+  }
+  return count_val.ToUint64();
+}
+
 static ExecTask ExecRepeat(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
   auto count_val = EvalExpr(stmt->condition, ctx, arena);
-  uint64_t count = count_val.IsKnown() ? count_val.ToUint64() : 0;
+  uint64_t count = RepeatIterationCount(count_val);
   for (uint64_t i = 0; i < count && !ctx.StopRequested(); ++i) {
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;
