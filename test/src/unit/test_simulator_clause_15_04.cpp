@@ -191,4 +191,59 @@ TEST(IpcSync, MailboxUnboundedPutNeverSuspendsSender) {
   putter.h.destroy();
 }
 
+// §15.4: only a *full* mailbox suspends a sender. A bounded mailbox that still
+// has room behaves like the non-blocking case — the put is stored on the ready
+// path and the sender runs to completion without ever parking.
+TEST(IpcSync, MailboxBoundedPutWithRoomDoesNotSuspend) {
+  MailboxObject mb(2);  // bounded, but room remains
+  std::vector<int> ran;
+  auto putter = SpawnPutter(mb, 0x11, ran, 5);
+  putter.h.resume();  // room available -> stored on the ready path, no suspend
+
+  EXPECT_TRUE(mb.put_waiters.empty());
+  ASSERT_EQ(ran.size(), 1u);
+  EXPECT_EQ(ran[0], 5);
+  EXPECT_EQ(mb.Num(), 1);
+  uint64_t msg = 0;
+  ASSERT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);
+  EXPECT_EQ(msg, 0x11u);
+
+  putter.h.destroy();
+}
+
+// §15.4: a sender stays suspended until *enough* room becomes available. With
+// two senders blocked on a full bound-1 mailbox, freeing a single slot admits
+// exactly one of them; the mailbox is full again, so the other remains
+// suspended until a further get() frees the next slot.
+TEST(IpcSync, MailboxFullKeepsExtraSendersSuspendedUntilRoomFrees) {
+  MailboxObject mb(1);
+  EXPECT_EQ(mb.Put(10), MbxPutStatus::kPlaced);  // mailbox full (bound 1)
+
+  std::vector<int> ran;
+  auto p1 = SpawnPutter(mb, 20, ran, 1);
+  auto p2 = SpawnPutter(mb, 30, ran, 2);
+  p1.h.resume();  // full -> suspends
+  p2.h.resume();  // full -> suspends
+  ASSERT_EQ(mb.put_waiters.size(), 2u);
+  EXPECT_TRUE(ran.empty());
+
+  uint64_t msg = 0;
+  ASSERT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);  // frees one slot
+  EXPECT_EQ(msg, 10u);  // the originally stored message exits
+  ASSERT_EQ(ran.size(), 1u);  // exactly one suspended sender admitted
+  EXPECT_EQ(mb.put_waiters.size(), 1u);  // other stays suspended (still full)
+  EXPECT_EQ(mb.Num(), 1);
+
+  ASSERT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);  // frees the next slot
+  ASSERT_EQ(ran.size(), 2u);  // the remaining sender now admitted
+  EXPECT_TRUE(mb.put_waiters.empty());
+  EXPECT_EQ(mb.Num(), 1);
+
+  ASSERT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);  // drains the last message
+  EXPECT_EQ(mb.Num(), 0);
+
+  p1.h.destroy();
+  p2.h.destroy();
+}
+
 }
