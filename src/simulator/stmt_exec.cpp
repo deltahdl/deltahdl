@@ -22,9 +22,17 @@
 namespace delta {
 
 static ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  // §18.16: each branch's weight expression is evaluated at most once, in
+  // declaration order. Cache the drawn weights so a side-effecting expression
+  // runs a single time and the same value feeds both the sum and the
+  // selection. Weights are summed as unsigned values.
+  std::vector<uint64_t> weights;
+  weights.reserve(stmt->randcase_items.size());
   uint64_t total_weight = 0;
   for (const auto& item : stmt->randcase_items) {
-    total_weight += EvalExpr(item.first, ctx, arena).ToUint64();
+    uint64_t w = EvalExpr(item.first, ctx, arena).ToUint64();
+    weights.push_back(w);
+    total_weight += w;
   }
   if (total_weight == 0) {
     ctx.GetDiag().Warning(stmt->range.start,
@@ -32,12 +40,25 @@ static ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     co_return StmtResult::kDone;
   }
 
-  uint64_t pick = ctx.Urandom32() % total_weight;
+  // §18.16: one random number in [0, sum); branches are selected in
+  // declaration order, with smaller numbers landing on the earlier (top)
+  // weights. A zero-weight branch leaves the cumulative total unchanged and so
+  // can never be selected. A sum wider than 32 bits cannot be covered by a
+  // single 32-bit draw, so compose the random number from more than one draw
+  // to reach the full [0, sum) range.
+  uint64_t pick;
+  if (total_weight > 0xFFFFFFFFull) {
+    uint64_t hi = ctx.Urandom32();
+    uint64_t lo = ctx.Urandom32();
+    pick = ((hi << 32) | lo) % total_weight;
+  } else {
+    pick = ctx.Urandom32() % total_weight;
+  }
   uint64_t cumulative = 0;
-  for (const auto& item : stmt->randcase_items) {
-    cumulative += EvalExpr(item.first, ctx, arena).ToUint64();
+  for (size_t i = 0; i < stmt->randcase_items.size(); ++i) {
+    cumulative += weights[i];
     if (pick < cumulative) {
-      co_return co_await ExecStmt(item.second, ctx, arena);
+      co_return co_await ExecStmt(stmt->randcase_items[i].second, ctx, arena);
     }
   }
   co_return StmtResult::kDone;
