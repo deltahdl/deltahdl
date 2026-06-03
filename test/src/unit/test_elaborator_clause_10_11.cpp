@@ -189,6 +189,21 @@ TEST(NetAliasingElaboration, AliasDuplicateSpecificationIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// Restating an existing alias with its operands swapped is still the same
+// alias and must be rejected. This exercises the operand-order normalization
+// in the duplicate check, which a same-order repeat would not reach.
+TEST(NetAliasingElaboration, AliasDuplicateReversedOrderIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  alias a = b;\n"
+      "  alias b = a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(NetAliasingElaboration, AliasUndeclaredIdentifierCreatesImplicitNet) {
   ElabFixture f;
   auto* design = ElaborateSrc(

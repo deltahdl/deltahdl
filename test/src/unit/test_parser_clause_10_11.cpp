@@ -57,17 +57,6 @@ TEST(NetAliasingParsing, NetAliasBitSelect) {
   ASSERT_EQ(alias->alias_nets.size(), 2u);
 }
 
-TEST(NetAliasingParsing, NetAliasAsModuleItem) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  alias a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAlias));
-}
-
 TEST(NetAliasingParsing, NetAliasPartSelect) {
   auto r = Parse(
       "module m;\n"
