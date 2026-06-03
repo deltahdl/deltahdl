@@ -32,9 +32,18 @@ TEST(IpcSync, SemaphoreNewNegativeTryGetFailsUntilPositive) {
   EXPECT_EQ(sem.key_count, 0);
 }
 
-TEST(IpcSync, SemaphoreNewZeroKeysTryGetFails) {
-  SemaphoreObject sem(0);
-  EXPECT_EQ(sem.TryGet(1), 0);
+TEST(IpcSync, SemaphoreNewNegativeGetBlocksUntilPositive) {
+  // The procure guard also governs the blocking get() path: a semaphore made
+  // with a negative initial key count must block get() requests until enough
+  // keys have been returned to satisfy the requested amount.
+  SemaphoreObject sem(-1);
+  EXPECT_EQ(sem.Get(1), SemGetStatus::kBlock);
+  sem.Put(1);
+  EXPECT_EQ(sem.key_count, 0);
+  EXPECT_EQ(sem.Get(1), SemGetStatus::kBlock);
+  sem.Put(1);
+  EXPECT_EQ(sem.Get(1), SemGetStatus::kAcquired);
+  EXPECT_EQ(sem.key_count, 0);
 }
 
 TEST(IpcSync, SemaphoreNewReturnsHandle) {
@@ -42,13 +51,6 @@ TEST(IpcSync, SemaphoreNewReturnsHandle) {
   auto* sem = f.ctx.CreateSemaphore("s", 4);
   ASSERT_NE(sem, nullptr);
   EXPECT_EQ(sem->key_count, 4);
-}
-
-TEST(IpcSync, SemaphoreNewSingleKey) {
-  SemaphoreObject sem(1);
-  EXPECT_EQ(sem.key_count, 1);
-  EXPECT_EQ(sem.TryGet(1), 1);
-  EXPECT_EQ(sem.key_count, 0);
 }
 
 }

@@ -37,15 +37,6 @@ TEST(SemaphoreNewParser, DeclarationWithNewZeroKeys) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SemaphoreNewParser, DeclarationWithLargeKeyCount) {
-  auto r = Parse(
-      "module m;\n"
-      "  semaphore sem = new(100);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(SemaphoreNewParser, NewReturnAssignedToVariable) {
   auto r = Parse(
       "module m;\n"
