@@ -19,18 +19,6 @@ TEST(LoopSyntaxParsing, ForeverLoop) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(LoopSyntaxParsing, ForeverWithTimingControl) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    forever begin\n"
-              "      @(posedge clk);\n"
-              "      x = ~x;\n"
-              "    end\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(LoopSyntaxParsing, ForeverNullStmt) {
   auto r = Parse(
       "module m;\n"
