@@ -114,6 +114,23 @@ bool EvalSequenceIntersect(bool a_match, bool b_match, uint32_t a_len,
 bool EvalThroughout(const std::function<bool(uint64_t)>& check,
                     const std::vector<uint64_t>& values);
 
+// §16.9.10: the containment `seq1 within seq2` is an abbreviation for
+// (1[*0:$] ##1 seq1 ##1 1[*0:$]) intersect seq2. The composite matches along a
+// finite interval of consecutive clock ticks when seq2 matches along the whole
+// interval and seq1 matches along some subinterval of it. Both operands shall
+// therefore match, and the match of seq1 shall be contained in the match of
+// seq2: seq1 shall start no earlier than seq2 starts and shall complete no later
+// than seq2 completes. The intersection forces the composite to span seq2's
+// interval, so the containment completes at seq2's match point. This carries the
+// composite end-time alongside the match decision.
+struct SequenceWithinMatch {
+  bool matched = false;
+  uint32_t end_time = 0;
+};
+SequenceWithinMatch EvalSequenceWithin(bool inner_match, uint32_t inner_start,
+                                       uint32_t inner_end, bool outer_match,
+                                       uint32_t outer_start, uint32_t outer_end);
+
 // §16.12.7: an implication `sequence_expr |-> property_expr` (overlapped) or
 // `sequence_expr |=> property_expr` (nonoverlapped) preconditions the consequent
 // property_expr on a match of the antecedent sequence_expr. When the antecedent
