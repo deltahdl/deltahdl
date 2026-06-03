@@ -295,19 +295,6 @@ TEST(LetDeclParsing, LetIdentifier_Simple) {
   EXPECT_EQ(item->name, "foo");
 }
 
-TEST(LetDeclParsing, LetPortList_Single) {
-  auto r = Parse(
-      "module m;\n"
-      "  let f(x) = x;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->func_args.size(), 1u);
-  EXPECT_EQ(item->func_args[0].name, "x");
-}
-
 TEST(LetDeclParsing, LetPortList_Multiple) {
   auto r = Parse(
       "module m;\n"

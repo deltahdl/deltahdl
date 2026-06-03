@@ -1236,6 +1236,7 @@ RtlirDesign* Elaborator::ElaborateTops(
         item->kind == ModuleItemKind::kTaskDecl) {
       design->cu_function_decls.push_back(item);
     } else if (item->kind == ModuleItemKind::kLetDecl) {
+      ValidateLetDecl(item);
       design->cu_let_decls.push_back(item);
     }
   }

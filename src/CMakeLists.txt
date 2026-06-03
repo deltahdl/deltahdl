@@ -72,6 +72,7 @@ add_library(deltahdl_lib STATIC
     elaborator/abort_property.cpp
     elaborator/typed_sequence_formal.cpp
     elaborator/typed_property_formal.cpp
+    elaborator/let_construct.cpp
     elaborator/rewrite_item.cpp
     elaborator/annex_f_notation.cpp
     elaborator/annex_f_grammar.cpp

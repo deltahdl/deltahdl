@@ -14,6 +14,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/let_construct.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
@@ -386,6 +387,55 @@ void Elaborator::ValidateElabSystemTask(const ModuleItem* item,
   elab_last_severity_loc_ = item->loc;
   if (is_fatal || is_error) {
     elab_simulation_blocked_ = true;
+  }
+}
+
+// §11.12: map an explicitly-typed let formal's data type onto the categories
+// the type rule cares about. An implicit type (a bare name, signing, or range,
+// and also the `untyped` keyword, which leaves the type implicit) is not a
+// "typed" formal, so it is reported separately by the caller. `event` is its
+// own category; the integral, real, string, and user-defined types stand in
+// for the §16.6-allowed type list; chandle, void, virtual interface, and the
+// net kinds are outside that list.
+static LetFormalTypeKind ClassifyLetFormalType(const DataType& dt) {
+  switch (dt.kind) {
+    case DataTypeKind::kImplicit:
+      return LetFormalTypeKind::kUntyped;
+    case DataTypeKind::kEvent:
+      return LetFormalTypeKind::kEvent;
+    case DataTypeKind::kVoid:
+    case DataTypeKind::kChandle:
+    case DataTypeKind::kVirtualInterface:
+    case DataTypeKind::kWire:
+    case DataTypeKind::kTri:
+    case DataTypeKind::kWand:
+    case DataTypeKind::kWor:
+    case DataTypeKind::kTriand:
+    case DataTypeKind::kTrior:
+    case DataTypeKind::kTri0:
+    case DataTypeKind::kTri1:
+    case DataTypeKind::kTrireg:
+    case DataTypeKind::kSupply0:
+    case DataTypeKind::kSupply1:
+    case DataTypeKind::kUwire:
+      return LetFormalTypeKind::kForbidden;
+    default:
+      // Integral, real, string, named, enum, struct, and union types are all
+      // usable in the §16.6 contexts a let body forms.
+      return LetFormalTypeKind::kTypeAllowedIn16_6;
+  }
+}
+
+void Elaborator::ValidateLetDecl(const ModuleItem* item) {
+  for (const auto& arg : item->func_args) {
+    LetFormalTypeKind kind = ClassifyLetFormalType(arg.data_type);
+    if (!IsLetFormalTypeAllowed(kind)) {
+      diag_.Error(item->loc,
+                  std::format("let formal argument '{}' must be of type event "
+                              "or a type allowed in a Boolean expression "
+                              "(§11.12)",
+                              arg.name));
+    }
   }
 }
 
@@ -1310,10 +1360,13 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       ValidateDpiImport(item);
       mod->let_decls.push_back(item);
       break;
+    case ModuleItemKind::kLetDecl:
+      ValidateLetDecl(item);
+      mod->let_decls.push_back(item);
+      break;
     case ModuleItemKind::kCovergroupDecl:
     case ModuleItemKind::kSpecifyBlock:
     case ModuleItemKind::kDpiExport:
-    case ModuleItemKind::kLetDecl:
       mod->let_decls.push_back(item);
       break;
     case ModuleItemKind::kDefaultDisableIff:

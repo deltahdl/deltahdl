@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "elaborator/let_construct.h"
 
 using namespace delta;
 
@@ -189,11 +190,111 @@ TEST(LetDeclElaboration, LetDeclInTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(LetDeclElaboration, LetDeclWithTernaryBodyElaborates) {
+// §11.12: a typed let formal shall be `event` or one of the types allowed in
+// §16.6. `untyped` is the non-typed case and so is also accepted; `sequence`
+// and `property` are not — that is what sets the let list apart from the
+// sequence (§16.8.1) and property (§16.12.18) formal lists.
+TEST(LetConstructRules, TypedFormalMustBeEventOrAllowedDataType) {
+  EXPECT_TRUE(IsLetFormalTypeAllowed(LetFormalTypeKind::kUntyped));
+  EXPECT_TRUE(IsLetFormalTypeAllowed(LetFormalTypeKind::kEvent));
+  EXPECT_TRUE(IsLetFormalTypeAllowed(LetFormalTypeKind::kTypeAllowedIn16_6));
+  EXPECT_FALSE(IsLetFormalTypeAllowed(LetFormalTypeKind::kForbidden));
+}
+
+// §11.12, rule 1: the actual for an event-typed formal shall be an
+// event_expression.
+TEST(LetConstructRules, EventFormalRequiresEventExpressionActual) {
+  EXPECT_TRUE(IsLetEventFormalActualLegal(/*actual_is_event_expression=*/true));
+  EXPECT_FALSE(
+      IsLetEventFormalActualLegal(/*actual_is_event_expression=*/false));
+}
+
+// §11.12, rule 1: a reference to an event-typed formal is legal only where an
+// event_expression may be written.
+TEST(LetConstructRules, EventTypedFormalReferenceMustBeEventExpressionPlace) {
+  EXPECT_TRUE(
+      IsLetEventTypedFormalRefLegal(/*in_event_expression_position=*/true));
+  EXPECT_FALSE(
+      IsLetEventTypedFormalRefLegal(/*in_event_expression_position=*/false));
+}
+
+// §11.12, rule 2: a non-event typed formal requires its actual's
+// self-determined result type to be cast compatible (§6.22.4) with the formal
+// type.
+TEST(LetConstructRules, NonEventFormalRequiresCastCompatibleActual) {
+  EXPECT_TRUE(IsLetNonEventFormalActualLegal(
+      /*self_determined_type_cast_compatible=*/true));
+  EXPECT_FALSE(IsLetNonEventFormalActualLegal(
+      /*self_determined_type_cast_compatible=*/false));
+}
+
+// §11.12: an event formal is substituted as an event_expression, while a
+// non-event typed formal's actual is cast to the formal type before being
+// substituted in the rewriting algorithm (§F.4).
+TEST(LetConstructRules, SubstitutionCastsOnlyNonEventFormals) {
+  EXPECT_EQ(LetTypedFormalSubstitution(/*formal_is_event=*/true),
+            LetTypedFormalSubstitutionMode::kEventExpressionSubstitution);
+  EXPECT_EQ(LetTypedFormalSubstitution(/*formal_is_event=*/false),
+            LetTypedFormalSubstitutionMode::kCastBeforeSubstitution);
+}
+
+// §11.12: in the declaring scope, the let body shall be defined before it is
+// used.
+TEST(LetConstructRules, BodyMustBeDefinedBeforeUse) {
+  EXPECT_TRUE(IsLetUseAfterDeclarationLegal(/*declared_before_use=*/true));
+  EXPECT_FALSE(IsLetUseAfterDeclarationLegal(/*declared_before_use=*/false));
+}
+
+// §11.12: no hierarchical references to let declarations are allowed.
+TEST(LetConstructRules, HierarchicalReferenceToLetIsIllegal) {
+  EXPECT_TRUE(IsLetReferenceLegal(/*is_hierarchical_reference=*/false));
+  EXPECT_FALSE(IsLetReferenceLegal(/*is_hierarchical_reference=*/true));
+}
+
+// §11.12: a sampled value call in a let body inherits the instantiation
+// context's clock; it is an error if a clock is required but cannot be
+// inferred there.
+TEST(LetConstructRules, SampledValueClockMustBeResolvableInContext) {
+  EXPECT_TRUE(
+      IsLetSampledValueClockResolved(LetSampledValueClockStatus::kExplicit));
+  EXPECT_TRUE(IsLetSampledValueClockResolved(
+      LetSampledValueClockStatus::kInferredFromContext));
+  EXPECT_FALSE(IsLetSampledValueClockResolved(
+      LetSampledValueClockStatus::kRequiredButNotInferable));
+}
+
+// §11.12: the elaborator applies the typed-formal rule on the real path. A
+// chandle is not a type allowed in a Boolean expression, so a chandle-typed
+// formal is rejected during elaboration.
+TEST(LetDeclElaboration, LetFormalWithChandleTypeIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  let f(chandle x) = x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §11.12: a void-typed formal is likewise outside the allowed type list and is
+// rejected.
+TEST(LetDeclElaboration, LetFormalWithVoidTypeIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  let f(void x) = x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §11.12: an integral typed formal is a type allowed in a Boolean expression,
+// so the same validation accepts it without error.
+TEST(LetDeclElaboration, LetFormalWithAllowedTypeElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
-      "  let clamp(v, lo, hi) = (v < lo) ? lo : ((v > hi) ? hi : v);\n"
+      "  let f(int x) = x;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

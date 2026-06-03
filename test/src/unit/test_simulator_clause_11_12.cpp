@@ -421,6 +421,49 @@ TEST(LetExpansionSimulation, LetExpandNamedArgs) {
   EXPECT_EQ(result.ToUint64(), 7u);
 }
 
+TEST(LetExpansionSimulation, EndToEndTypedFormalCastsActualToFormalWidth) {
+  SimFixture f;
+  // §11.12 rule 2: the actual for a non-event typed formal is cast to the
+  // formal's type before it is substituted into the body. The 4-bit formal
+  // narrows 8'd255 to 4'hF, so the let body sees 15, not 255.
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  let low4(logic [3:0] x) = x;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    result = low4(8'd255);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 15u);
+}
+
+TEST(LetExpansionSimulation, EndToEndUntypedFormalDoesNotCastActual) {
+  SimFixture f;
+  // §11.12: the cast applies only to typed formals. An untyped formal carries
+  // the full actual value through unchanged, so all 8 bits of 8'd255 survive.
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  let pass(x) = x;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    result = pass(8'd255);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 255u);
+}
+
 TEST(LetExpansionSimulation, LetDeclarativeScopeIgnoresInstantiationVar) {
   SimFixture f;
 
@@ -440,6 +483,72 @@ TEST(LetExpansionSimulation, LetDeclarativeScopeIgnoresInstantiationVar) {
   f.ctx.PopScope();
 
   EXPECT_EQ(result.ToUint64(), 42u);
+}
+
+TEST(LetExpansionSimulation, EndToEndLetNamedArgs) {
+  SimFixture f;
+  // §11.12: expansion binds each actual to its formal. Here the actuals are
+  // supplied by name out of declaration order, so correct binding requires
+  // matching on formal name, not position: sub = a - b = 10 - 3 = 7.
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  let sub(a, b) = a - b;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    result = sub(.b(3), .a(10));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
+TEST(LetExpansionSimulation, EndToEndLetMixedPositionalAndNamedArgs) {
+  SimFixture f;
+  // §11.12: a let call may mix a leading positional actual with trailing named
+  // actuals; each still binds to the intended formal. a=1 (positional), b=2,
+  // c=3 (named) → 1 + 2 + 3 = 6.
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  let f(a, b, c) = a + b + c;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    result = f(1, .c(3), .b(2));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 6u);
+}
+
+TEST(LetExpansionSimulation, EndToEndLetNamedActualLeavesDefaultInPlace) {
+  SimFixture f;
+  // §11.12: a default actual declared in the let fills any formal the call
+  // omits, including when the supplied actuals are named. Calling with only
+  // .a(5) leaves b at its default 10, so the body yields 15.
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  let f(a, b = 10) = a + b;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    result = f(.a(5));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
 }
