@@ -84,6 +84,40 @@ TEST(StateOps, TwoStateBitwiseXorResult) {
   EXPECT_EQ(result.ToUint64(), 0xFFu);
 }
 
+TEST(StateOps, TwoStateDivideResult) {
+  SimFixture f;
+  MakeVar(f, "a", 8, 20);
+  MakeVar(f, "b", 8, 4);
+  auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kSlash,
+                                    MakeId(f.arena, "a"), MakeId(f.arena, "b")),
+                         f.ctx, f.arena);
+  EXPECT_TRUE(result.IsKnown());
+  EXPECT_EQ(result.ToUint64(), 5u);
+}
+
+TEST(StateOps, TwoStateModuloResult) {
+  SimFixture f;
+  MakeVar(f, "a", 8, 23);
+  MakeVar(f, "b", 8, 5);
+  auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kPercent,
+                                    MakeId(f.arena, "a"), MakeId(f.arena, "b")),
+                         f.ctx, f.arena);
+  EXPECT_TRUE(result.IsKnown());
+  EXPECT_EQ(result.ToUint64(), 3u);
+}
+
+// Modulo by zero is another operator that yields x for 2-state operands, the
+// same exception class the clause illustrates with division by zero.
+TEST(StateOps, ModuloByZeroProducesX) {
+  SimFixture f;
+  MakeVar(f, "a", 8, 7);
+  MakeVar(f, "b", 8, 0);
+  auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kPercent,
+                                    MakeId(f.arena, "a"), MakeId(f.arena, "b")),
+                         f.ctx, f.arena);
+  EXPECT_FALSE(result.IsKnown());
+}
+
 TEST(StateOps, XPlusKnownProducesX) {
   SimFixture f;
   auto* a_var = MakeVar(f, "a", 8, 0);
