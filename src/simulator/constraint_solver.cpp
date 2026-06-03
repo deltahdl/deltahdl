@@ -857,6 +857,13 @@ bool ConstraintSolver::SolveWith(
 
   if (pre_randomize_) pre_randomize_();
 
+  // 18.6.3: if randomize() fails, the random variables retain their previous
+  // values. The iterative solver overwrites the solved-value maps in place as it
+  // searches, so capture them here and restore them should the solve fail, so a
+  // failed randomize() leaves the variables exactly as the caller last saw them.
+  const std::unordered_map<std::string, int64_t> prev_values = values_;
+  const std::unordered_map<std::string, double> prev_real_values = real_values_;
+
   // 18.5.13.2: resolve the 'disable soft' directives before solving. Each
   // discards the lower-priority soft constraints that directly reference its
   // variable; those stay discarded for the whole call, independent of and ahead
@@ -886,8 +893,28 @@ bool ConstraintSolver::SolveWith(
   // directive never carries into a later solve or checker evaluation.
   disabled_soft_.clear();
 
+  if (solved) {
+    // 18.6.3: a static random variable is shared by every instance; publish the
+    // values just drawn so the other instances observe the change.
+    CommitStaticSharedValues();
+  } else {
+    // 18.6.3: the solve failed, so restore the values the variables held before
+    // this call rather than leaving the solver's partial search state behind.
+    values_ = prev_values;
+    real_values_ = prev_real_values;
+  }
+
+  // 18.6.3: post_randomize() is not called when randomize() fails.
   if (solved && post_randomize_) post_randomize_();
   return solved;
+}
+
+void ConstraintSolver::CommitStaticSharedValues() {
+  for (auto& [name, var] : variables_) {
+    if (!var.is_static || !var.shared_value) continue;
+    auto it = values_.find(name);
+    if (it != values_.end()) *var.shared_value = it->second;
+  }
 }
 
 void ConstraintSolver::ComputeDisabledSoft(
@@ -1324,6 +1351,15 @@ bool ConstraintSolver::SolveIterative(
 }
 
 int64_t ConstraintSolver::GetValue(std::string_view name) const {
+  // 18.6.3: a static random variable is shared by all instances of its class, so
+  // its committed value lives in the shared cell. Read it there when one is
+  // attached, so this instance observes the value another instance most recently
+  // drew rather than only the value this instance itself last solved.
+  auto vit = variables_.find(std::string(name));
+  if (vit != variables_.end() && vit->second.is_static &&
+      vit->second.shared_value) {
+    return *vit->second.shared_value;
+  }
   auto it = values_.find(std::string(name));
   return (it != values_.end()) ? it->second : 0;
 }

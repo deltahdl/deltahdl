@@ -3957,6 +3957,14 @@ void Elaborator::ValidateOneClassBuiltinMethods(const ClassDecl* cls) {
           m->loc,
           "'constraint_mode' is a built-in method and cannot be overridden");
     }
+    // 18.6.3: randomize() is a built-in method and cannot be overridden, so a
+    // user class shall not declare a method named randomize. (pre_randomize and
+    // post_randomize are different: 18.6.2 permits overriding those, subject to
+    // the prototype check below.)
+    if (m->name == "randomize") {
+      diag_.Error(m->loc,
+                  "'randomize' is a built-in method and cannot be overridden");
+    }
     // 18.6.2: pre_randomize() and post_randomize() are built-in methods with a
     // fixed prototype, 'function void <name>();'. Unlike rand_mode and
     // constraint_mode a user may override them, but an override shall match

@@ -270,6 +270,15 @@ struct RandVariable {
   bool is_static = false;
   std::shared_ptr<std::unordered_set<int64_t>> shared_randc_state;
 
+  // 18.6.3: a random variable declared static is shared by every instance of
+  // the class in which it is declared, so the instances name one storage cell
+  // rather than one apiece. When is_static is set, shared_value holds that one
+  // cell: each randomize() that draws a value for the variable writes it there,
+  // so the change is seen by every instance, and reading the variable consults
+  // the cell rather than the per-instance solved map. A nonstatic variable
+  // leaves this null and keeps its value solely in its own solver's values_.
+  std::shared_ptr<int64_t> shared_value;
+
   // 18.5.7.1: marks a variable that holds a dynamic array's size method. Such a
   // variable is committed in a pass that runs before the general rand variables
   // — mirroring the rule that an array's size constraints are solved before the
@@ -477,6 +486,13 @@ class ConstraintSolver {
 
   bool SolveIterative(const std::vector<ConstraintExpr>& extra,
                       bool include_soft);
+
+  // 18.6.3: publish the values of the static random variables into their shared
+  // cells after a successful solve, so that the value this instance just drew is
+  // the one every other instance of the class now observes. Called only when the
+  // solve succeeds; a failed randomize() leaves the shared cells untouched, in
+  // keeping with the rule that the variables retain their previous values.
+  void CommitStaticSharedValues();
 
   // 18.5.9: partition the given active rand variables into ordered solve groups
   // honoring the recorded solve...before constraints. Each group is solved in
