@@ -1004,25 +1004,102 @@ static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var,
                           std::string_view func_name, SimContext& ctx,
                           Arena& arena);
 
+// Returns the trailing unconditional else of an if/else-if chain, or null when
+// the chain has no final else.
+static const Stmt* FuncFindFinalElse(const Stmt* stmt) {
+  const Stmt* cur = stmt;
+  while (cur->else_branch && cur->else_branch->kind == StmtKind::kIf) {
+    cur = cur->else_branch;
+  }
+  return cur->else_branch;
+}
+
+// A unique/unique0/priority if encountered while running a function or task body
+// performs the same violation checks as one in a process body (§12.4.2). Because
+// the report queue is keyed on the calling process (§12.4.2.2), routing the
+// report through AddPendingViolation attributes it to whichever process invoked
+// the subroutine; separate callers therefore accumulate and flush independently.
+static bool ExecFuncUniqueIf(const Stmt* stmt, CaseQualifier qual,
+                             Variable* ret_var, std::string_view func_name,
+                             SimContext& ctx, Arena& arena) {
+  int match_count = 0;
+  const Stmt* first_match = nullptr;
+  bool has_final_else = false;
+  for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
+       cur = cur->else_branch) {
+    if (EvalExpr(cur->condition, ctx, arena).IsTruthy()) {
+      match_count++;
+      if (!first_match) first_match = cur;
+    }
+    if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
+      has_final_else = true;
+    }
+  }
+  if (match_count > 1) {
+    ctx.AddPendingViolation("unique if: multiple conditions matched");
+  }
+  if (first_match) {
+    return ExecFuncStmt(first_match->then_branch, ret_var, func_name, ctx,
+                        arena);
+  }
+  if (has_final_else) {
+    const Stmt* final_else = FuncFindFinalElse(stmt);
+    if (final_else)
+      return ExecFuncStmt(final_else, ret_var, func_name, ctx, arena);
+  } else if (qual == CaseQualifier::kUnique) {
+    ctx.AddPendingViolation("unique if: no condition matched");
+  }
+  return false;
+}
+
+static bool ExecFuncPriorityIf(const Stmt* stmt, Variable* ret_var,
+                               std::string_view func_name, SimContext& ctx,
+                               Arena& arena) {
+  bool has_final_else = false;
+  for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
+       cur = cur->else_branch) {
+    if (EvalExpr(cur->condition, ctx, arena).IsTruthy()) {
+      return ExecFuncStmt(cur->then_branch, ret_var, func_name, ctx, arena);
+    }
+    if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
+      has_final_else = true;
+    }
+  }
+  if (has_final_else) {
+    const Stmt* final_else = FuncFindFinalElse(stmt);
+    if (final_else)
+      return ExecFuncStmt(final_else, ret_var, func_name, ctx, arena);
+  } else {
+    ctx.AddPendingViolation("priority if: no condition matched");
+  }
+  return false;
+}
+
 static bool ExecFuncIf(const Stmt* stmt, Variable* ret_var,
                        std::string_view func_name, SimContext& ctx,
                        Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
-  auto cond = EvalExpr(stmt->condition, ctx, arena);
-  bool taken = cond.ToUint64() != 0;
-  if (taken) {
-    bool r = ExecFuncStmt(stmt->then_branch, ret_var, func_name, ctx, arena);
-    if (labeled) ctx.PopStaticScope(stmt->label);
-    return r;
+
+  auto qual = stmt->qualifier;
+  bool r;
+  if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
+    r = ExecFuncUniqueIf(stmt, qual, ret_var, func_name, ctx, arena);
+  } else if (qual == CaseQualifier::kPriority) {
+    r = ExecFuncPriorityIf(stmt, ret_var, func_name, ctx, arena);
+  } else {
+    auto cond = EvalExpr(stmt->condition, ctx, arena);
+    if (cond.ToUint64() != 0) {
+      r = ExecFuncStmt(stmt->then_branch, ret_var, func_name, ctx, arena);
+    } else if (stmt->else_branch) {
+      r = ExecFuncStmt(stmt->else_branch, ret_var, func_name, ctx, arena);
+    } else {
+      r = false;
+    }
   }
-  if (stmt->else_branch) {
-    bool r = ExecFuncStmt(stmt->else_branch, ret_var, func_name, ctx, arena);
-    if (labeled) ctx.PopStaticScope(stmt->label);
-    return r;
-  }
+
   if (labeled) ctx.PopStaticScope(stmt->label);
-  return false;
+  return r;
 }
 
 static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var,
