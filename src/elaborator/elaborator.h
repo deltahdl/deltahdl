@@ -249,6 +249,11 @@ class Elaborator {
 
   void WalkStmtsForVirtualInterfaceOps(const Stmt* s);
 
+  // §15.5.5.3: restrict the operators allowed on event variables.
+  void ValidateEventOps(const ModuleDecl* decl);
+
+  void WalkStmtsForEventOps(const Stmt* s);
+
   void ValidateVirtualInterfaceClocking(const ModuleDecl* decl);
 
   void WalkStmtsForVirtualInterfaceClocking(const Stmt* s);

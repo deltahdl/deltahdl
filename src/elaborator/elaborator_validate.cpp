@@ -846,6 +846,87 @@ void Elaborator::ValidateVirtualInterfaceOps(const ModuleDecl* decl) {
   }
 }
 
+static bool IsEventVar(const Expr* e, const TypeMap& types) {
+  auto name = ExprIdent(e);
+  if (name.empty()) return false;
+  auto it = types.find(name);
+  return it != types.end() && it->second == DataTypeKind::kEvent;
+}
+
+// §15.5.5.3: an event variable may be compared against another event or null
+// only with equality (==), inequality (!=), case equality (===), or case
+// inequality (!==). The four case/logical equality operators are the only
+// binary operators allowed on an event operand.
+static bool IsAllowedEventBinaryOp(TokenKind op) {
+  return op == TokenKind::kEqEq || op == TokenKind::kBangEq ||
+         op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq;
+}
+
+// §15.5.5.3: reject any operator applied to an event variable other than the
+// permitted comparisons (and the implicit Boolean test, which uses the event
+// directly rather than through an operator node). Arithmetic, relational,
+// bitwise, unary, and select operators on events are all illegal.
+static void CheckEventExpr(const Expr* e, const TypeMap& types,
+                           DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kBinary) {
+    bool lhs_ev = e->lhs && IsEventVar(e->lhs, types);
+    bool rhs_ev = e->rhs && IsEventVar(e->rhs, types);
+    if ((lhs_ev || rhs_ev) && !IsAllowedEventBinaryOp(e->op)) {
+      diag.Error(e->range.start, "operator is not allowed on event variable");
+    }
+  }
+  if (e->kind == ExprKind::kUnary && IsEventVar(e->lhs, types)) {
+    diag.Error(e->range.start, "operator is not allowed on event variable");
+  }
+  if (e->kind == ExprKind::kPostfixUnary && IsEventVar(e->lhs, types)) {
+    diag.Error(e->range.start, "operator is not allowed on event variable");
+  }
+  CheckEventExpr(e->lhs, types, diag);
+  CheckEventExpr(e->rhs, types, diag);
+  CheckEventExpr(e->base, types, diag);
+  CheckEventExpr(e->index, types, diag);
+  CheckEventExpr(e->condition, types, diag);
+  CheckEventExpr(e->true_expr, types, diag);
+  CheckEventExpr(e->false_expr, types, diag);
+  for (const auto* elem : e->elements) {
+    CheckEventExpr(elem, types, diag);
+  }
+}
+
+void Elaborator::WalkStmtsForEventOps(const Stmt* s) {
+  if (!s) return;
+  // Event-control event lists (s->events) are not operator expressions and are
+  // intentionally left untouched here; only value expressions are inspected.
+  CheckEventExpr(s->rhs, var_types_, diag_);
+  CheckEventExpr(s->expr, var_types_, diag_);
+  CheckEventExpr(s->condition, var_types_, diag_);
+  for (auto* sub : s->stmts) WalkStmtsForEventOps(sub);
+  WalkStmtsForEventOps(s->then_branch);
+  WalkStmtsForEventOps(s->else_branch);
+  WalkStmtsForEventOps(s->body);
+  WalkStmtsForEventOps(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForEventOps(ci.body);
+}
+
+void Elaborator::ValidateEventOps(const ModuleDecl* decl) {
+  bool has_event = false;
+  for (const auto& [name, kind] : var_types_) {
+    if (kind == DataTypeKind::kEvent) {
+      has_event = true;
+      break;
+    }
+  }
+  if (!has_event) return;
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForEventOps(item->body);
+    }
+  }
+}
+
 namespace {
 
 using VifTypeMap = std::unordered_map<std::string_view, std::string_view>;
