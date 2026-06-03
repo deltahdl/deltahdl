@@ -104,6 +104,8 @@ class Parser {
   ClassMember* ParseConstraintStub(ClassMember* member);
   void CheckConstraintExprToken(const Token& tok);
   void CheckForeachConstraintHeader(ClassMember* member);
+  void CheckSolveBeforeConstraint(ClassMember* member);
+  void ParseSolveBeforeList(std::vector<ConstraintSolveBeforeEntry>& out);
   void CheckDistSet();
 
   bool IsAtGateKeyword();

@@ -488,6 +488,12 @@ class Elaborator {
   void ValidateForeachConstraintDims();
   void ValidateOneClassForeachConstraintDims(const ClassDecl* cls);
 
+  // 18.5.9: a solve...before ordering constraint may name only rand variables
+  // (never randc), each integral or real, with no circular dependency.
+  void ValidateSolveBeforeConstraints();
+  void ValidateOneClassSolveBeforeConstraints(const ClassDecl* cls);
+  bool IsSolveOrderableType(const DataType& dt) const;
+
   // 18.8: rand_mode() is a built-in method and cannot be overridden, so a
   // class shall not declare a method of that name.
   void ValidateBuiltinRandomizationMethods();

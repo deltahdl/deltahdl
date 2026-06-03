@@ -264,6 +264,16 @@ class ConstraintSolver {
 
   void AddConstraintBlock(const ConstraintBlock& block);
 
+  // 18.5.9: record a 'solve before_list before after_list' ordering constraint.
+  // Every variable in 'before' is to be solved before every variable in 'after',
+  // which alters the probability distribution over legal value combinations
+  // without changing the set of legal combinations. The ordering is partial:
+  // calling this more than once accumulates the constraints. A solve...before
+  // ordering never removes a solution, so it cannot by itself cause a solve to
+  // fail.
+  void AddSolveBefore(const std::vector<std::string>& before,
+                      const std::vector<std::string>& after);
+
   bool Solve();
 
   bool SolveWith(const std::vector<ConstraintExpr>& inline_constraints);
@@ -400,6 +410,28 @@ class ConstraintSolver {
   bool SolveIterative(const std::vector<ConstraintExpr>& extra,
                       bool include_soft);
 
+  // 18.5.9: partition the given active rand variables into ordered solve groups
+  // honoring the recorded solve...before constraints. Each group is solved in
+  // turn, earliest first; a variable is placed as late as the ordering allows
+  // (its distance to the end of the longest chain that depends on it), so that
+  // variables with nothing ordered after them — including every variable that is
+  // not explicitly ordered — fall into the final group and are solved last. The
+  // groups are returned earliest-first; empty groups are omitted.
+  std::vector<std::vector<std::string>> ComputeSolveGroups(
+      const std::vector<std::string>& vars) const;
+
+  // 18.5.9: solve the ordered groups by staged generate-and-test. Variables in
+  // an earlier group are drawn and committed before the later groups are solved
+  // against them, so an earlier variable's value is held fixed while the later
+  // variables are completed. An earlier value is kept whenever some completion of
+  // the remaining groups satisfies every constraint; only when no completion
+  // exists is it redrawn. This reproduces the solve...before distribution (an
+  // ordered variable is chosen over its own legal values, then the dependent
+  // variables subject to it) while preserving the full solution space.
+  bool SolveOrderedGroups(const std::vector<std::vector<std::string>>& groups,
+                          size_t idx, const std::vector<ConstraintExpr>& extra,
+                          bool include_soft);
+
   std::mt19937 rng_;
   std::unordered_map<std::string, RandVariable> variables_;
   std::vector<ConstraintBlock> blocks_;
@@ -409,6 +441,13 @@ class ConstraintSolver {
   std::unordered_map<std::string, double> real_values_;
   RandomizeCallback pre_randomize_;
   RandomizeCallback post_randomize_;
+
+  // 18.5.9: the recorded solve...before ordering edges. Each pair (before,
+  // after) requires 'before' to be solved ahead of 'after'. Empty when no
+  // ordering constraint applies, in which case the solver uses its default
+  // single-pass generate-and-test, which already draws each legal value
+  // combination with uniform probability.
+  std::vector<std::pair<std::string, std::string>> solve_before_edges_;
 
   // 18.5.12: set when a guard evaluates to ERROR. An ERROR guard generates an
   // unconditional error, so the solve fails outright and is not retried.

@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
+#include <functional>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
@@ -3631,6 +3632,142 @@ void Elaborator::ValidateOneClassForeachConstraintDims(const ClassDecl* cls) {
 void Elaborator::ValidateForeachConstraintDims() {
   for (const auto* cls : unit_->classes)
     ValidateOneClassForeachConstraintDims(cls);
+}
+
+// 18.5.9: a variable named in a solve...before ordering shall be of integral or
+// real type. Reject the types that are plainly neither — strings, events,
+// chandles, virtual interfaces, void, and class handles. A typedef name is left
+// alone (its underlying type is assumed orderable), keeping the check
+// conservative so it never flags a legitimate integral or real variable.
+bool Elaborator::IsSolveOrderableType(const DataType& dt) const {
+  switch (dt.kind) {
+    case DataTypeKind::kString:
+    case DataTypeKind::kEvent:
+    case DataTypeKind::kChandle:
+    case DataTypeKind::kVirtualInterface:
+    case DataTypeKind::kVoid:
+      return false;
+    case DataTypeKind::kNamed:
+      return FindClassDecl(dt.type_name, unit_) == nullptr;
+    default:
+      return true;
+  }
+}
+
+// 18.5.9: the restrictions that apply to solve...before variable ordering:
+//   - only random variables are allowed (they shall be rand);
+//   - randc variables are not allowed (they are always solved before any other);
+//   - the variables shall be integral or real;
+//   - there shall be no circular dependency in the ordering.
+// As with the foreach dimension check, resolve each named variable against the
+// class and its base chain (a derived declaration shadows a base one), and apply
+// the rand/integral restrictions only to simple local identifiers that resolve
+// to a property — a hierarchical reference or an array.size() method (expressly
+// allowed as an ordering variable) is left alone.
+void Elaborator::ValidateOneClassSolveBeforeConstraints(const ClassDecl* cls) {
+  std::unordered_map<std::string_view, const ClassMember*> properties;
+  for (const ClassDecl* c = cls; c;
+       c = c->base_class.empty() ? nullptr
+                                 : FindClassDecl(c->base_class, unit_)) {
+    for (const auto* m : c->members) {
+      if (m->kind != ClassMemberKind::kProperty || m->name.empty()) continue;
+      properties.emplace(m->name, m);  // keeps the most-derived binding
+    }
+  }
+
+  // Aggregate every ordering edge (a variable solved before another) across the
+  // class's constraint blocks so a circular dependency that spans more than one
+  // solve statement is still detected.
+  std::unordered_map<std::string_view, std::vector<std::string_view>> succ;
+  std::unordered_set<std::string_view> nodes;
+  bool have_loc = false;
+  SourceLoc report_loc;
+
+  auto check_entry = [&](const ConstraintSolveBeforeEntry& e,
+                         const SourceLoc& loc) {
+    if (!e.is_simple) return;  // hierarchical ref or array.size(): allowed
+    auto it = properties.find(e.name);
+    if (it == properties.end()) return;  // not a local property: leave alone
+    const ClassMember* prop = it->second;
+    if (prop->is_randc) {
+      diag_.Error(loc, std::format("randc variable '{}' is not allowed in a "
+                                   "solve...before ordering constraint",
+                                   e.name));
+      return;
+    }
+    if (!prop->is_rand) {
+      diag_.Error(loc, std::format("'{}' is not a random variable and cannot "
+                                   "appear in a solve...before ordering "
+                                   "constraint",
+                                   e.name));
+      return;
+    }
+    if (!IsSolveOrderableType(prop->data_type)) {
+      diag_.Error(loc,
+                  std::format("solve...before ordering variable '{}' shall be "
+                              "of integral or real type",
+                              e.name));
+    }
+  };
+
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kConstraint) continue;
+    for (const auto& ref : m->constraint_solve_before_refs) {
+      if (!have_loc) {
+        report_loc = ref.loc;
+        have_loc = true;
+      }
+      for (const auto& e : ref.before) check_entry(e, ref.loc);
+      for (const auto& e : ref.after) check_entry(e, ref.loc);
+      // Build the ordering graph only over plain variable names. A qualified or
+      // array-method primary (e.g. two different arrays' size() both reduce to
+      // the leaf 'size') could otherwise collide into a spurious cycle.
+      for (const auto& b : ref.before) {
+        if (!b.is_simple) continue;
+        for (const auto& a : ref.after) {
+          if (!a.is_simple) continue;
+          succ[b.name].push_back(a.name);
+          nodes.insert(b.name);
+          nodes.insert(a.name);
+        }
+      }
+    }
+  }
+
+  // Depth-first cycle detection over the ordering graph. A gray (on-stack)
+  // successor closes a cycle, such as 'solve a before b' combined with 'solve b
+  // before a' (or a degenerate 'solve a before a').
+  std::unordered_map<std::string_view, int> color;  // 0 white, 1 gray, 2 black
+  bool has_cycle = false;
+  std::function<void(std::string_view)> dfs = [&](std::string_view v) {
+    color[v] = 1;
+    for (std::string_view w : succ[v]) {
+      if (color[w] == 1) {
+        has_cycle = true;
+        return;
+      }
+      if (color[w] == 0) {
+        dfs(w);
+        if (has_cycle) return;
+      }
+    }
+    color[v] = 2;
+  };
+  for (std::string_view v : nodes) {
+    if (color[v] == 0) {
+      dfs(v);
+      if (has_cycle) break;
+    }
+  }
+  if (has_cycle) {
+    diag_.Error(report_loc,
+                "circular dependency in solve...before variable ordering");
+  }
+}
+
+void Elaborator::ValidateSolveBeforeConstraints() {
+  for (const auto* cls : unit_->classes)
+    ValidateOneClassSolveBeforeConstraints(cls);
 }
 
 // 18.8: rand_mode() is built-in and cannot be overridden. A user class

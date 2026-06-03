@@ -812,6 +812,30 @@ struct ConstraintForeachRef {
   SourceLoc loc;
 };
 
+// 18.5.9: one constraint_primary appearing in a solve...before list. 'name' is
+// the trailing (leaf) identifier of the reference. is_simple marks a bare local
+// identifier — no class_scope/implicit_class_handle qualifier and no trailing
+// '()' array-method call (such as size()). The elaborator only applies the
+// solve...before variable restrictions (must be rand, not randc, integral or
+// real) to simple entries it can resolve to a class property; a qualified or
+// array-method primary is left alone, since array.size() is expressly allowed as
+// an ordering variable.
+struct ConstraintSolveBeforeEntry {
+  std::string_view name;
+  bool is_simple = true;
+};
+
+// 18.5.9: a 'solve solve_before_list before solve_before_list ;' ordering
+// constraint as seen in a constraint block body. 'before' holds the variables to
+// be solved first; 'after' holds those solved afterward. loc points at the solve
+// keyword for diagnostics. The parser records these so the elaborator can enforce
+// the variable-ordering restrictions and reject circular dependencies.
+struct ConstraintSolveBeforeRef {
+  std::vector<ConstraintSolveBeforeEntry> before;
+  std::vector<ConstraintSolveBeforeEntry> after;
+  SourceLoc loc;
+};
+
 struct ClassMember {
   ClassMemberKind kind = ClassMemberKind::kProperty;
   SourceLoc loc;
@@ -838,6 +862,10 @@ struct ClassMember {
   // 18.5.7.1: the foreach iterative constraints found in this constraint
   // block's body (empty for non-constraint members).
   std::vector<ConstraintForeachRef> constraint_foreach_refs;
+
+  // 18.5.9: the solve...before ordering constraints found in this constraint
+  // block's body (empty for non-constraint members).
+  std::vector<ConstraintSolveBeforeRef> constraint_solve_before_refs;
 
   DataType data_type;
   std::string_view name;

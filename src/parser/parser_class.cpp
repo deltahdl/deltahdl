@@ -548,6 +548,13 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
       // for the elaborator's dimension check before the surrounding scan
       // resumes over the constraint_set body.
       CheckForeachConstraintHeader(member);
+    } else if (Check(TokenKind::kKwSolve)) {
+      // 18.5.9: 'solve solve_before_list before solve_before_list ;' defines a
+      // partial ordering on the evaluation of random variables. Record the two
+      // lists on the member so the elaborator can enforce the ordering
+      // restrictions and reject circular dependencies; the statement is consumed
+      // through its terminating ';' before the surrounding scan resumes.
+      CheckSolveBeforeConstraint(member);
     } else if (Check(TokenKind::kKwDist)) {
       // 18.5.3: 'expression dist { dist_list }'. Hand the brace-enclosed
       // dist_list to a dedicated scan so its default-item rules are enforced.
@@ -672,6 +679,53 @@ void Parser::CheckForeachConstraintHeader(ClassMember* member) {
     ref.loc = foreach_loc;
     member->constraint_foreach_refs.push_back(ref);
   }
+}
+
+// 18.5.9: scan one solve_before_list,
+//   solve_before_list ::= constraint_primary { , constraint_primary }
+//   constraint_primary ::= [ implicit_class_handle . | class_scope ]
+//                          hierarchical_identifier select [ ( ) ]
+// recording each constraint_primary's trailing identifier and whether it is a
+// bare local variable. A primary that carries a class_scope/implicit-handle
+// qualifier (a '.' or '::') or an array-method call ('()', allowed only for an
+// array built-in such as size()) is not a simple local variable; the elaborator
+// uses that flag to confine the rand/integral restrictions to ordinary
+// variables. The list ends at 'before', ';', or the constraint block's '}'.
+void Parser::ParseSolveBeforeList(std::vector<ConstraintSolveBeforeEntry>& out) {
+  while (!AtEnd()) {
+    ConstraintSolveBeforeEntry entry;
+    bool qualified = false;  // a '.' or '::' qualifier was seen
+    bool method = false;     // a trailing '()' was seen
+    while (!Check(TokenKind::kComma) && !Check(TokenKind::kKwBefore) &&
+           !Check(TokenKind::kSemicolon) && !Check(TokenKind::kRBrace) &&
+           !AtEnd()) {
+      Token t = Consume();
+      if (t.kind == TokenKind::kIdentifier) {
+        entry.name = t.text;
+      } else if (t.kind == TokenKind::kDot ||
+                 t.kind == TokenKind::kColonColon) {
+        qualified = true;
+      } else if (t.kind == TokenKind::kLParen) {
+        method = true;
+      }
+    }
+    entry.is_simple = !qualified && !method;
+    if (!entry.name.empty()) out.push_back(entry);
+    if (!Match(TokenKind::kComma)) break;
+  }
+}
+
+void Parser::CheckSolveBeforeConstraint(ClassMember* member) {
+  ConstraintSolveBeforeRef ref;
+  ref.loc = CurrentLoc();
+  Consume();  // 'solve'
+  ParseSolveBeforeList(ref.before);
+  // The 'before' keyword separates the two lists; without it the statement is
+  // malformed, so leave the recovery to the surrounding block scan.
+  if (!Match(TokenKind::kKwBefore)) return;
+  ParseSolveBeforeList(ref.after);
+  Match(TokenKind::kSemicolon);
+  if (member) member->constraint_solve_before_refs.push_back(std::move(ref));
 }
 
 void Parser::CheckConstraintExprToken(const Token& tok) {

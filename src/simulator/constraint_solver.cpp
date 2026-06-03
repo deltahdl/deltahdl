@@ -21,6 +21,18 @@ void ConstraintSolver::AddConstraintBlock(const ConstraintBlock& block) {
   blocks_.push_back(block);
 }
 
+void ConstraintSolver::AddSolveBefore(const std::vector<std::string>& before,
+                                      const std::vector<std::string>& after) {
+  // 18.5.9: 'solve before_list before after_list' constrains every variable of
+  // the first list to be solved ahead of every variable of the second, so record
+  // the cross product of ordering edges.
+  for (const auto& b : before) {
+    for (const auto& a : after) {
+      solve_before_edges_.emplace_back(b, a);
+    }
+  }
+}
+
 void ConstraintSolver::SetRandMode(std::string_view name, bool enabled) {
   auto it = variables_.find(std::string(name));
   if (it != variables_.end()) it->second.enabled = enabled;
@@ -819,6 +831,75 @@ void ConstraintSolver::ApplyDistConstraints() {
   }
 }
 
+std::vector<std::vector<std::string>> ConstraintSolver::ComputeSolveGroups(
+    const std::vector<std::string>& vars) const {
+  std::unordered_set<std::string> var_set(vars.begin(), vars.end());
+  // before -> {afters}, restricted to the variables being solved in this pass.
+  std::unordered_map<std::string, std::vector<std::string>> succ;
+  for (const auto& [b, a] : solve_before_edges_) {
+    if (var_set.count(b) && var_set.count(a)) succ[b].push_back(a);
+  }
+  // depth(v) = the longest chain of variables that must be solved after v.
+  // Variables with nothing ordered after them have depth 0; a variable solved
+  // before others has a strictly greater depth than each of them. Solving in
+  // descending depth therefore honors every ordering edge while deferring each
+  // variable as late as the ordering allows.
+  std::unordered_map<std::string, int> depth;
+  std::function<int(const std::string&, std::unordered_set<std::string>&)> dfs =
+      [&](const std::string& v,
+          std::unordered_set<std::string>& on_stack) -> int {
+    auto cached = depth.find(v);
+    if (cached != depth.end()) return cached->second;
+    if (on_stack.count(v)) return 0;  // cycle guard (elaborator rejects cycles)
+    on_stack.insert(v);
+    int best = 0;
+    auto it = succ.find(v);
+    if (it != succ.end()) {
+      for (const auto& w : it->second) {
+        best = std::max(best, 1 + dfs(w, on_stack));
+      }
+    }
+    on_stack.erase(v);
+    depth[v] = best;
+    return best;
+  };
+  int max_depth = 0;
+  for (const auto& v : vars) {
+    std::unordered_set<std::string> on_stack;
+    max_depth = std::max(max_depth, dfs(v, on_stack));
+  }
+  // Bucket by depth, highest depth (solved first) into the earliest group; the
+  // unordered variables sit at depth 0 and so form the final, last-solved group.
+  std::vector<std::vector<std::string>> buckets(max_depth + 1);
+  for (const auto& v : vars) buckets[max_depth - depth[v]].push_back(v);
+  std::vector<std::vector<std::string>> groups;
+  for (auto& g : buckets) {
+    if (!g.empty()) groups.push_back(std::move(g));
+  }
+  return groups;
+}
+
+bool ConstraintSolver::SolveOrderedGroups(
+    const std::vector<std::vector<std::string>>& groups, size_t idx,
+    const std::vector<ConstraintExpr>& extra, bool include_soft) {
+  // Every group committed: the assignment is complete, so accept it only if all
+  // constraints hold against the fully populated value set.
+  if (idx == groups.size()) return CheckAllConstraints(extra, include_soft);
+  static constexpr int kGroupAttempts = 200;
+  for (int attempt = 0; attempt < kGroupAttempts; ++attempt) {
+    for (const auto& name : groups[idx]) {
+      auto it = variables_.find(name);
+      if (it == variables_.end()) continue;
+      values_[name] = GenerateRandValue(it->second);
+    }
+    // Hold this group's draw fixed and try to complete the remaining groups.
+    if (SolveOrderedGroups(groups, idx + 1, extra, include_soft)) return true;
+    // 18.5.12: an ERROR guard fails randomize() outright; do not keep retrying.
+    if (guard_error_) return false;
+  }
+  return false;
+}
+
 bool ConstraintSolver::SolveIterative(
     const std::vector<ConstraintExpr>& extra, bool include_soft) {
   static constexpr int kMaxAttempts = 500;
@@ -866,6 +947,33 @@ bool ConstraintSolver::SolveIterative(
       if (var.qualifier == RandQualifier::kRandc) continue;
       if (values_.find(name) != values_.end()) continue;
       values_[name] = GenerateRandValue(var);
+    }
+    // 18.5.9: when a solve...before ordering applies, solve the active integral
+    // rand variables in ordered groups rather than in one flat pass. An earlier
+    // group is committed before the later groups are solved against it, which
+    // shifts the probability distribution to match the ordering while leaving the
+    // set of legal solutions unchanged. With no ordering the default single pass
+    // below is used unchanged, and it already draws each legal value combination
+    // with uniform probability.
+    if (!solve_before_edges_.empty()) {
+      // Real variables are committed first (as in the flat pass), so any ordered
+      // integral group is completed against them.
+      for (auto& [name, var] : variables_) {
+        if (var.enabled && var.is_real) {
+          real_values_[name] = GenerateRandRealValue(var);
+        }
+      }
+      std::vector<std::string> general;
+      for (auto& [name, var] : variables_) {
+        if (!var.enabled || var.is_real) continue;
+        // randc, array-size, and inactive variables are already committed.
+        if (values_.find(name) != values_.end()) continue;
+        general.push_back(name);
+      }
+      auto groups = ComputeSolveGroups(general);
+      if (SolveOrderedGroups(groups, 0, extra, include_soft)) return true;
+      if (guard_error_) return false;
+      continue;
     }
     for (auto& [name, var] : variables_) {
       if (!var.enabled) continue;
