@@ -888,6 +888,10 @@ static ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx,
     } else {
       co_await EventAwaiter{ctx, stmt->events, arena};
     }
+    // §12.4.2.1: a process that suspended on an event control reaches a
+    // violation report flush point when it resumes; any unique/priority
+    // reports accumulated before the suspension are discarded.
+    ctx.FlushPendingViolations();
   }
   if (stmt->body) {
     co_return co_await ExecStmt(stmt->body, ctx, arena);
@@ -1021,6 +1025,7 @@ static ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   for (const auto& r : seq_removes) reads.erase(r);
   for (auto& a : seq_adds) reads.insert(std::move(a));
   std::vector<std::string_view> read_vars(reads.begin(), reads.end());
+  bool suspended = false;
   while (!ctx.StopRequested()) {
     auto cond = EvalExpr(stmt->condition, ctx, arena);
     if (cond.IsTruthy()) break;
@@ -1028,8 +1033,12 @@ static ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       if (labeled) ctx.PopStaticScope(stmt->label);
       co_return StmtResult::kDone;
     }
+    suspended = true;
     co_await AnyChangeAwaiter{ctx, read_vars};
   }
+  // §12.4.2.1: resuming after suspending on a wait statement is a violation
+  // report flush point; drop any reports pending from before the wait.
+  if (suspended) ctx.FlushPendingViolations();
   if (stmt->body) {
     auto r = co_await ExecStmt(stmt->body, ctx, arena);
     if (labeled) ctx.PopStaticScope(stmt->label);
