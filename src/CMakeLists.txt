@@ -22,6 +22,7 @@ add_library(deltahdl_lib STATIC
     parser/expr_parser_patterns.cpp
     parser/parser_stmt.cpp
     parser/parser_assert.cpp
+    parser/sequence_operator_precedence.cpp
     parser/parser_clocking.cpp
     parser/parser_verify.cpp
     parser/parser_specify.cpp
