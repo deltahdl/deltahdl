@@ -15,11 +15,11 @@
 
 namespace {
 
-// Minimal coroutine modelling a process that performs a mailbox put(). It starts
-// suspended; the first resume() runs it to the co_await, where MailboxPutAwaiter
-// either stores the message right away (room available) or parks the handle on
-// the mailbox's put-waiter queue. A later get() that frees a slot resumes it via
-// WakePutWaiters(), and the body records that it ran.
+// Minimal coroutine modelling a process that performs a mailbox put(). It
+// starts suspended; the first resume() runs it to the co_await, where
+// MailboxPutAwaiter either stores the message right away (room available) or
+// parks the handle on the mailbox's put-waiter queue. A later get() that frees
+// a slot resumes it via WakePutWaiters(), and the body records that it ran.
 struct BlockingPutter {
   struct promise_type {
     BlockingPutter get_return_object() {
@@ -143,7 +143,7 @@ TEST(IpcSync, MailboxBoundedPutRejectedWhenFull) {
 // until enough room becomes available. The mailbox (bound 1) is filled, so the
 // putter blocks — its message is not stored and the process stays parked on the
 // put-waiter queue. Only when a get() removes the existing message does room
-// open up and WakePutWaiters() resume the putter, which then stores its message.
+// open up; WakePutWaiters() then resumes the putter, which stores its message.
 TEST(IpcSync, MailboxFullPutSuspendsSenderUntilRoomAvailable) {
   MailboxObject mb(1);
   EXPECT_EQ(mb.Put(1), MbxPutStatus::kPlaced);  // mailbox now full
@@ -156,9 +156,10 @@ TEST(IpcSync, MailboxFullPutSuspendsSenderUntilRoomAvailable) {
   EXPECT_EQ(mb.Num(), 1);
 
   uint64_t msg = 0;
-  ASSERT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);  // frees a slot, wakes putter
-  EXPECT_EQ(msg, 1u);                                // FIFO: first message first
-  ASSERT_EQ(ran.size(), 1u);                         // suspended sender resumed
+  // Removing the stored message frees a slot and wakes the parked putter.
+  ASSERT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);
+  EXPECT_EQ(msg, 1u);         // FIFO: the originally stored message exits first
+  ASSERT_EQ(ran.size(), 1u);  // the suspended sender resumed
   EXPECT_EQ(ran[0], 7);
   EXPECT_TRUE(mb.put_waiters.empty());
   EXPECT_EQ(mb.Num(), 1);  // putter's deferred message is now stored
