@@ -96,6 +96,31 @@ TEST(StringLiteralPaddingSim, PaddingIndistinguishableFromNul) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+TEST(StringLiteralPaddingSim, LeadingNulStringCharsMatchPadding) {
+  // A string literal whose high-order characters are explicit NUL escapes packs
+  // the same bits as a shorter literal that the assignment left-pads with zeros.
+  // Equality must not tell the two sources of zero bytes apart.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  bit [8*3:1] s;\n"
+      "  logic result;\n"
+      "  initial begin\n"
+      "    s = \"A\";\n"
+      "    result = (s == \"\\0\\0A\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 TEST(StringLiteralPaddingSim, PaddedConcatPreservesZeroBits) {
   SimFixture f;
   auto* design = ElaborateSrc(
