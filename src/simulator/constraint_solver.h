@@ -188,6 +188,15 @@ struct ConstraintBlock {
   std::string name;
   bool enabled = true;
   std::vector<ConstraintExpr> constraints;
+
+  // 18.5.10: a constraint block declared static shares one on/off state across
+  // every instance of the class, so a constraint_mode() call on any instance
+  // turns the constraint on or off for all of them. is_static marks such a
+  // block; shared_enabled, when set, holds that one shared state and is
+  // consulted in place of the per-instance 'enabled' flag. A nonstatic block
+  // leaves shared_enabled null and keeps its own independent state.
+  bool is_static = false;
+  std::shared_ptr<bool> shared_enabled;
 };
 
 struct RandVariable {
@@ -401,6 +410,11 @@ class ConstraintSolver {
   bool EvalArrayReduction(const ConstraintExpr& expr) const;
 
   bool EvalUnique(const ConstraintExpr& expr) const;
+
+  // 18.5.10: refresh each static block's per-instance 'enabled' flag from its
+  // shared state, so a constraint_mode() call routed through another instance of
+  // the class is observed here before the constraints are evaluated.
+  void RefreshStaticBlockState();
 
   void ApplyDistConstraints();
 

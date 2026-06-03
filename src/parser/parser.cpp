@@ -257,7 +257,10 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
   // its location so elaboration can pair it with a prototype and check its
   // placement.
   SourceLoc loc = CurrentLoc();
-  Match(TokenKind::kKwStatic);
+  // 18.5.10: an external constraint block may be qualified 'static'. Record
+  // whether the keyword is present so elaboration can check that it agrees with
+  // the completing prototype's qualification.
+  bool is_static = Match(TokenKind::kKwStatic);
   Expect(TokenKind::kKwConstraint);
 
   // 18.5.2: capture the dynamic override specifiers so elaboration can check
@@ -289,8 +292,9 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
       Consume();
     }
   }
-  unit->external_constraints.push_back(
-      {class_name, constraint_name, loc, is_initial, is_extends, is_final});
+  unit->external_constraints.push_back({class_name, constraint_name, loc,
+                                        is_initial, is_extends, is_final,
+                                        is_static});
 }
 
 bool Parser::TryParseSecondaryTopLevel(CompilationUnit* unit) {

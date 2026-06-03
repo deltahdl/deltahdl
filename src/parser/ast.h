@@ -1151,6 +1151,10 @@ struct ExternalConstraintBlock {
   bool is_initial = false;
   bool is_extends = false;
   bool is_final = false;
+  // 18.5.10: whether the external constraint block was qualified 'static'. The
+  // 'static' qualification must match the completing prototype's, or be absent
+  // on both.
+  bool is_static = false;
 };
 
 struct CompilationUnit {

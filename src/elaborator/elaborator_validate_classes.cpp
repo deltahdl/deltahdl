@@ -3923,7 +3923,29 @@ void Elaborator::ValidateOneConstraintOverride(const ClassDecl* cls,
                             m->name));
   }
 
+  // 18.5.10: it is illegal to use the dynamic override specifiers ':initial',
+  // ':extends', or ':final' on a constraint that is qualified 'static'.
+  if (m->is_static &&
+      (m->is_constraint_initial || m->is_constraint_extends ||
+       m->is_constraint_final)) {
+    diag_.Error(m->loc,
+                std::format("static constraint '{}' shall not carry a dynamic "
+                            "override specifier",
+                            m->name));
+  }
+
   const auto* base = FindBaseConstraint(cls, m->name, unit_);
+
+  // 18.5.10: a pure constraint may be qualified 'static', and an overriding
+  // constraint shall match that qualification — static if the pure constraint
+  // is static, non-static if it is not.
+  if (base != nullptr && base->is_pure_virtual && !m->is_pure_virtual &&
+      m->is_static != base->is_static) {
+    diag_.Error(m->loc,
+                std::format("constraint '{}' overriding a pure constraint shall "
+                            "match its 'static' qualification",
+                            m->name));
+  }
 
   if (m->is_constraint_initial && base) {
     diag_.Error(m->loc,
@@ -4007,6 +4029,15 @@ void Elaborator::ValidateConstraintSpecifierParity(const ClassDecl* cls,
           ext.loc,
           std::format("external constraint block '{}::{}' and its prototype "
                       "disagree on dynamic override specifiers",
+                      cls->name, m->name));
+    }
+    // 18.5.10: the 'static' keyword shall be applied to both the constraint
+    // prototype and the external constraint block, or to neither.
+    if (m->is_static != ext.is_static) {
+      diag_.Error(
+          ext.loc,
+          std::format("external constraint block '{}::{}' and its prototype "
+                      "disagree on the 'static' qualifier",
                       cls->name, m->name));
     }
   }

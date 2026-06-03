@@ -68,15 +68,29 @@ void ConstraintSolver::SetValue(std::string_view name, int64_t value) {
 void ConstraintSolver::SetConstraintMode(std::string_view block_name,
                                          bool enabled) {
   for (auto& block : blocks_) {
-    if (block.name == block_name) block.enabled = enabled;
+    if (block.name != block_name) continue;
+    block.enabled = enabled;
+    // 18.5.10: turning a static constraint on or off affects every instance of
+    // the class, so record the change in the shared state the other instances
+    // read from.
+    if (block.shared_enabled) *block.shared_enabled = enabled;
   }
 }
 
 bool ConstraintSolver::GetConstraintMode(std::string_view block_name) const {
   for (const auto& block : blocks_) {
-    if (block.name == block_name) return block.enabled;
+    if (block.name != block_name) continue;
+    // 18.5.10: a static constraint's on/off state is the one shared across all
+    // instances; report that rather than this instance's cached flag.
+    return block.shared_enabled ? *block.shared_enabled : block.enabled;
   }
   return false;
+}
+
+void ConstraintSolver::RefreshStaticBlockState() {
+  for (auto& block : blocks_) {
+    if (block.shared_enabled) block.enabled = *block.shared_enabled;
+  }
 }
 
 void ConstraintSolver::SetPreRandomize(RandomizeCallback cb) {
@@ -737,6 +751,9 @@ bool ConstraintSolver::Check(const std::vector<ConstraintExpr>& constraints) {
   // values. Every constraint expression is evaluated and the call fails the
   // moment one of them is false, succeeding only when every one holds.
   guard_error_ = false;
+  // 18.5.10: a static block's shared on/off state may have been changed through
+  // another instance; reflect it before evaluating the constraints.
+  RefreshStaticBlockState();
   for (const auto& [name, var] : variables_) {
     values_[name] = var.value;
   }
@@ -792,6 +809,10 @@ void ConstraintSolver::ApplyDirectConstraints(
 
 bool ConstraintSolver::SolveWith(
     const std::vector<ConstraintExpr>& inline_constraints) {
+  // 18.5.10: pick up any constraint_mode() change made through another instance
+  // of the class via a shared static block before deciding which blocks apply.
+  RefreshStaticBlockState();
+
   // 18.5.3: a dist operation shall not be applied to a randc variable, and a
   // dist expression requires at least one rand variable. A distribution that
   // violates either limitation makes randomization fail outright.
