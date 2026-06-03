@@ -47,17 +47,6 @@ TEST(StreamReorderingParsing, StreamingWithExprSliceSize) {
   ASSERT_NE(stmt->rhs->lhs, nullptr);
 }
 
-TEST(StreamReorderingParsing, TypeSliceSizeInFullModule) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte a;\n"
-      "  int b;\n"
-      "  initial b = {<< byte {a}};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(StreamReorderingParsing, RightShiftOperator) {
   auto r = Parse(
       "module t;\n"

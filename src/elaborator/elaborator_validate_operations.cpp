@@ -1,3 +1,4 @@
+#include <charconv>
 #include <format>
 #include <unordered_set>
 
@@ -1410,6 +1411,30 @@ void Elaborator::WalkExprForStreamingContext(const Expr* expr,
         }
       }
       WalkExprForStreamingContext(elem, true);
+    }
+
+    // §11.4.14.2: a slice_size written as a constant integral expression names
+    // the block width used to re-order the generic stream, so its value must be
+    // positive; a zero or negative slice size is illegal. A slice_size given as
+    // a simple type instead names a block width equal to that type's size,
+    // which is inherently positive and therefore exempt from this check. The
+    // parser records a bare numeric slice_size as an identifier carrying the
+    // literal text, while a non-numeric identifier names a type.
+    if (const Expr* slice = expr->lhs) {
+      std::optional<int64_t> value;
+      if (slice->kind == ExprKind::kIdentifier) {
+        int64_t parsed = 0;
+        const char* begin = slice->text.data();
+        const char* end = begin + slice->text.size();
+        auto [ptr, ec] = std::from_chars(begin, end, parsed);
+        if (ec == std::errc() && ptr == end) value = parsed;
+      } else {
+        value = ConstEvalInt(slice);
+      }
+      if (value && *value <= 0) {
+        diag_.Error(slice->range.start,
+                    "streaming slice_size shall be a positive constant");
+      }
     }
 
     WalkExprForStreamingContext(expr->lhs, false);
