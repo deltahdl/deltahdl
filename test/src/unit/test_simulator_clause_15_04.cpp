@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <coroutine>
 #include <cstdint>
 #include <string_view>
+#include <vector>
 
 #include "fixture_simulator.h"
 #include "simulator/awaiters.h"
@@ -12,6 +14,31 @@
 #include "simulator/sync_objects.h"
 
 namespace {
+
+// Minimal coroutine modelling a process that performs a mailbox put(). It starts
+// suspended; the first resume() runs it to the co_await, where MailboxPutAwaiter
+// either stores the message right away (room available) or parks the handle on
+// the mailbox's put-waiter queue. A later get() that frees a slot resumes it via
+// WakePutWaiters(), and the body records that it ran.
+struct BlockingPutter {
+  struct promise_type {
+    BlockingPutter get_return_object() {
+      return BlockingPutter{
+          std::coroutine_handle<promise_type>::from_promise(*this)};
+    }
+    std::suspend_always initial_suspend() noexcept { return {}; }
+    std::suspend_always final_suspend() noexcept { return {}; }
+    void return_void() {}
+    void unhandled_exception() {}
+  };
+  std::coroutine_handle<promise_type> h;
+};
+
+inline BlockingPutter SpawnPutter(delta::MailboxObject& mbx, uint64_t msg,
+                                  std::vector<int>& ran, int id) {
+  co_await delta::MailboxPutAwaiter{mbx, msg};
+  ran.push_back(id);
+}
 
 TEST(IpcSync, MailboxTryGetFifoOrder) {
   MailboxObject mb;
@@ -110,6 +137,57 @@ TEST(IpcSync, MailboxBoundedPutRejectedWhenFull) {
   EXPECT_EQ(mb.TryPut(42), 1);
   EXPECT_EQ(mb.TryPut(99), 0);
   EXPECT_EQ(mb.Num(), 1);
+}
+
+// §15.4: a process placing a message into a full mailbox shall be suspended
+// until enough room becomes available. The mailbox (bound 1) is filled, so the
+// putter blocks — its message is not stored and the process stays parked on the
+// put-waiter queue. Only when a get() removes the existing message does room
+// open up and WakePutWaiters() resume the putter, which then stores its message.
+TEST(IpcSync, MailboxFullPutSuspendsSenderUntilRoomAvailable) {
+  MailboxObject mb(1);
+  EXPECT_EQ(mb.Put(1), MbxPutStatus::kPlaced);  // mailbox now full
+
+  std::vector<int> ran;
+  auto putter = SpawnPutter(mb, 2, ran, 7);
+  putter.h.resume();  // runs to the co_await; full -> parks, message not stored
+  ASSERT_EQ(mb.put_waiters.size(), 1u);
+  EXPECT_TRUE(ran.empty());
+  EXPECT_EQ(mb.Num(), 1);
+
+  uint64_t msg = 0;
+  ASSERT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);  // frees a slot, wakes putter
+  EXPECT_EQ(msg, 1u);                                // FIFO: first message first
+  ASSERT_EQ(ran.size(), 1u);                         // suspended sender resumed
+  EXPECT_EQ(ran[0], 7);
+  EXPECT_TRUE(mb.put_waiters.empty());
+  EXPECT_EQ(mb.Num(), 1);  // putter's deferred message is now stored
+
+  ASSERT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);
+  EXPECT_EQ(msg, 2u);
+
+  putter.h.destroy();
+}
+
+// §15.4: unbounded mailboxes never suspend a thread in a send operation. The
+// putter targets an unbounded mailbox, so the put completes immediately on the
+// ready path — it never parks on the put-waiter queue and runs to completion at
+// the first resume().
+TEST(IpcSync, MailboxUnboundedPutNeverSuspendsSender) {
+  MailboxObject mb;  // bound 0 -> unbounded
+  std::vector<int> ran;
+  auto putter = SpawnPutter(mb, 0xABC, ran, 3);
+  putter.h.resume();  // never full -> stores immediately, no suspension
+
+  EXPECT_TRUE(mb.put_waiters.empty());
+  ASSERT_EQ(ran.size(), 1u);
+  EXPECT_EQ(ran[0], 3);
+  EXPECT_EQ(mb.Num(), 1);
+  uint64_t msg = 0;
+  ASSERT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);
+  EXPECT_EQ(msg, 0xABCu);
+
+  putter.h.destroy();
 }
 
 }

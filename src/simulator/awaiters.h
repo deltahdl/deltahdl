@@ -626,4 +626,24 @@ struct SemaphoreGetAwaiter {
   void await_resume() const noexcept {}
 };
 
+// §15.4: a process that places a message into a full mailbox shall be suspended
+// until enough room becomes available in the queue. When there is room the
+// message is stored immediately and the process continues without suspending
+// (and an unbounded mailbox, never being full, never suspends a sender). When
+// the mailbox is full the handle is parked on the put-waiter queue; the runtime
+// resumes it from WakePutWaiters() once a get/try_get frees a slot, at which
+// point the awaiter stores the deferred message.
+struct MailboxPutAwaiter {
+  MailboxObject& mbx;
+  uint64_t msg;
+
+  bool await_ready() { return mbx.Put(msg) == MbxPutStatus::kPlaced; }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    mbx.put_waiters.push_back(h);
+  }
+
+  void await_resume() { mbx.Put(msg); }
+};
+
 }
