@@ -305,6 +305,18 @@ class ConstraintSolver {
   // qualifier).
   bool DistLacksRandVariable() const;
 
+  // 18.5.4: no randc variable shall appear in the group of a uniqueness
+  // constraint. True if any enabled unique constraint names a variable that is
+  // declared randc, in which case randomization fails outright.
+  bool HasRandcInUnique() const;
+
+  // 18.5.4: all members of a uniqueness constraint group shall be of equivalent
+  // type. The solver characterizes a member's type by whether it is real and by
+  // its bit width, so members that disagree on either are not of equivalent
+  // type. True if any enabled unique constraint mixes such members, which is an
+  // illegal group and makes randomization fail.
+  bool UniqueMembersNotEquivalentType() const;
+
   bool ApplyConstraint(const ConstraintExpr& expr);
 
   // 18.5.13: when include_soft is set, the soft constraints are enforced

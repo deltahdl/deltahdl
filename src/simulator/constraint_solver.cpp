@@ -284,6 +284,53 @@ bool ConstraintSolver::DistLacksRandVariable() const {
   return false;
 }
 
+// 18.5.4: no randc variable shall appear in the group of a uniqueness
+// constraint. Scan every enabled unique constraint and report a randc member.
+bool ConstraintSolver::HasRandcInUnique() const {
+  for (const auto& block : blocks_) {
+    if (!block.enabled) continue;
+    for (const auto& c : block.constraints) {
+      if (c.kind != ConstraintKind::kUnique) continue;
+      for (const auto& name : c.unique_vars) {
+        auto it = variables_.find(name);
+        if (it != variables_.end() &&
+            it->second.qualifier == RandQualifier::kRandc) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+// 18.5.4: all members of a uniqueness constraint group shall be of equivalent
+// type. Compare the known members of each enabled unique constraint against the
+// first known member: a difference in real-ness or bit width means the group
+// mixes inequivalent types. Members the solver does not know are left out of the
+// comparison, mirroring the lenient treatment elsewhere in the solver.
+bool ConstraintSolver::UniqueMembersNotEquivalentType() const {
+  for (const auto& block : blocks_) {
+    if (!block.enabled) continue;
+    for (const auto& c : block.constraints) {
+      if (c.kind != ConstraintKind::kUnique) continue;
+      const RandVariable* ref = nullptr;
+      for (const auto& name : c.unique_vars) {
+        auto it = variables_.find(name);
+        if (it == variables_.end()) continue;
+        if (ref == nullptr) {
+          ref = &it->second;
+          continue;
+        }
+        if (it->second.is_real != ref->is_real ||
+            it->second.width != ref->width) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 GuardValue GuardAnd(GuardValue a, GuardValue b) {
   // Figure 18-3 conjunction: a FALSE subexpression forces FALSE; otherwise an
   // ERROR subexpression forces ERROR; otherwise a RANDOM subexpression yields
@@ -650,6 +697,12 @@ bool ConstraintSolver::SolveWith(
   // violates either limitation makes randomization fail outright.
   if (HasDistOnRandc()) return false;
   if (DistLacksRandVariable()) return false;
+
+  // 18.5.4: a uniqueness constraint group may not contain a randc variable and
+  // all of its members shall be of equivalent type. An illegal group makes
+  // randomization fail outright.
+  if (HasRandcInUnique()) return false;
+  if (UniqueMembersNotEquivalentType()) return false;
 
   if (pre_randomize_) pre_randomize_();
 
