@@ -102,16 +102,28 @@ static ExecTask ExecRsProdRepeat(const Stmt* stmt, const RsProd& prod,
 
 static ExecTask ExecRsProdCase(const Stmt* stmt, const RsProd& prod,
                                SimContext& ctx, Arena& arena) {
+  // 18.17.3: evaluate the case expression once, then compare it against each
+  // case item expression in the order written. Items separated by commas share
+  // a production, so any pattern matching wins for that item. The first item
+  // whose expression matches generates its production. The default item is a
+  // fallback used only when no case item expression matches, regardless of
+  // where it appears in the list, so remember it and resolve it after the scan.
   auto val = EvalExpr(prod.case_expr, ctx, arena).ToUint64();
+  const RsCaseItem* default_item = nullptr;
   for (const auto& ci : prod.case_items) {
     if (ci.is_default) {
-      co_return co_await ExecRsProduction(stmt, ci.item.name, ctx, arena);
+      if (!default_item) default_item = &ci;
+      continue;
     }
     for (auto* pat : ci.patterns) {
       if (EvalExpr(pat, ctx, arena).ToUint64() == val) {
         co_return co_await ExecRsProduction(stmt, ci.item.name, ctx, arena);
       }
     }
+  }
+  if (default_item) {
+    co_return co_await ExecRsProduction(stmt, default_item->item.name, ctx,
+                                        arena);
   }
   co_return StmtResult::kDone;
 }

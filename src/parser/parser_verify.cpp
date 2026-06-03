@@ -128,8 +128,20 @@ RsProd Parser::ParseRsProd() {
     Expect(TokenKind::kLParen);
     prod.case_expr = ParseExpr();
     Expect(TokenKind::kRParen);
+    bool seen_default = false;
     while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
+      auto item_loc = CurrentLoc();
+      bool is_default_here = Check(TokenKind::kKwDefault);
       prod.case_items.push_back(ParseRsCaseItem());
+      if (is_default_here) {
+        // 18.17.3: a case production statement shall contain at most one
+        // default item; flag any additional default as illegal.
+        if (seen_default) {
+          diag_.Error(item_loc,
+                      "case production shall have at most one 'default' item");
+        }
+        seen_default = true;
+      }
     }
     Expect(TokenKind::kKwEndcase);
     return prod;
