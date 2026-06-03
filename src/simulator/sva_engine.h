@@ -731,6 +731,22 @@ enum class ClockingInputSkew : uint8_t {
 
 bool IsClockingBlockInputSamplingValid(ClockingInputSkew skew);
 
+// §16.18: when a variable used in a concurrent assertion is a clocking block
+// variable, it is sampled only in the clocking block. The assertion observes
+// the value the clocking block already captured at its own clocking event
+// (with that block's clock and skew); it does not take a second, independent
+// concurrent-assertion sample of the underlying signal. A reference to a plain
+// variable that is not a clocking block variable instead uses the ordinary
+// concurrent-assertion sample defined in §16.5. This selects, for a variable
+// referenced in a concurrent assertion, the sampled value the assertion uses.
+// Because the single clocking-block sample is what every such reference reads,
+// distinct ways of naming the same clocking variable (directly, through the
+// clocking block, or through a property declared inside it) all observe the
+// same value.
+SampledValue ConcurrentAssertionVariableSample(
+    bool is_clocking_block_variable, uint64_t clocking_block_sampled_value,
+    SampledValue ordinary_assertion_sample);
+
 struct DeferredAssertion {
   uint64_t condition_val = 0;
   std::string instance_name;

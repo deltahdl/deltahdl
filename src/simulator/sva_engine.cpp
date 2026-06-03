@@ -756,6 +756,20 @@ bool IsClockingBlockInputSamplingValid(ClockingInputSkew skew) {
   return skew == ClockingInputSkew::kStep1;
 }
 
+SampledValue ConcurrentAssertionVariableSample(
+    bool is_clocking_block_variable, uint64_t clocking_block_sampled_value,
+    SampledValue ordinary_assertion_sample) {
+  // §16.18: a clocking block variable is sampled only in the clocking block, so
+  // the assertion reuses the value the block captured at its clocking event
+  // rather than sampling the underlying signal again. That captured value is a
+  // preponed sample taken at the block's clocking event.
+  if (is_clocking_block_variable) {
+    return SampledValue{clocking_block_sampled_value, SampleMode::kPreponed};
+  }
+  // A non-clocking-block variable falls back to the ordinary §16.5 sample.
+  return ordinary_assertion_sample;
+}
+
 bool InterpretAssertionExprAsBoolean(uint64_t aval, uint64_t bval) {
   // §16.6: x and z bits make the expression false; an all-zero known value
   // is also false. Otherwise the expression is true. The bval rail carries
