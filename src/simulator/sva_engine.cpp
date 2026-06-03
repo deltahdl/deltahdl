@@ -118,6 +118,20 @@ SequenceAndMatch EvalSequenceAndMatch(bool a_match, uint32_t a_end_time,
 
 bool EvalSequenceOr(bool a_match, bool b_match) { return a_match || b_match; }
 
+SequenceOrMatches EvalSequenceOrMatches(
+    const std::vector<uint32_t>& a_end_times,
+    const std::vector<uint32_t>& b_end_times) {
+  SequenceOrMatches result;
+  // The match set is the union of the two operands' matches: each operand match
+  // carries through unchanged, keeping its own end time. Matches are not merged,
+  // so both operands matching on the same tick yields two separate entries.
+  result.end_times = a_end_times;
+  result.end_times.insert(result.end_times.end(), b_end_times.begin(),
+                          b_end_times.end());
+  result.matched = !result.end_times.empty();
+  return result;
+}
+
 bool EvalSequenceIntersect(bool a_match, bool b_match, uint32_t a_len,
                            uint32_t b_len) {
   return a_match && b_match && a_len == b_len;

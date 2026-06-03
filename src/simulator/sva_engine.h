@@ -109,6 +109,23 @@ SequenceAndMatch EvalSequenceAndMatch(bool a_match, uint32_t a_end_time,
                                       bool b_match, uint32_t b_end_time);
 
 bool EvalSequenceOr(bool a_match, bool b_match);
+
+// §16.9.7: `e1 or e2` matches whenever at least one operand matches. Unlike
+// `and` and `intersect`, the operand matches are not fused into a single
+// composite match: every match of either operand is, by itself, a match of the
+// composite, and it ends exactly where that operand's match ends. The
+// composite's match set is therefore the union of the two operands' match sets,
+// so an `or` can yield several matches — including two ending on the same clock
+// tick when both operands match there. This carries that union of end-times
+// alongside the match decision that EvalSequenceOr reports.
+struct SequenceOrMatches {
+  bool matched = false;
+  std::vector<uint32_t> end_times;
+};
+SequenceOrMatches EvalSequenceOrMatches(
+    const std::vector<uint32_t>& a_end_times,
+    const std::vector<uint32_t>& b_end_times);
+
 bool EvalSequenceIntersect(bool a_match, bool b_match, uint32_t a_len,
                            uint32_t b_len);
 bool EvalThroughout(const std::function<bool(uint64_t)>& check,
