@@ -46,6 +46,15 @@ TEST(IpcSync, SemaphoreNewNegativeGetBlocksUntilPositive) {
   EXPECT_EQ(sem.key_count, 0);
 }
 
+TEST(IpcSync, SemaphoreNewKeyCountIsInitialNotCap) {
+  // new()'s keyCount is the starting number of keys, not an upper bound: once
+  // created, the bucket may hold more keys than were initially allocated.
+  SemaphoreObject sem(3);
+  EXPECT_EQ(sem.key_count, 3);
+  sem.Put(4);
+  EXPECT_EQ(sem.key_count, 7);
+}
+
 TEST(IpcSync, SemaphoreNewReturnsHandle) {
   SyncFixture f;
   auto* sem = f.ctx.CreateSemaphore("s", 4);

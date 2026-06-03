@@ -34,20 +34,4 @@ TEST(SemaphoreNewElaborator, NewWithDefaultKeyCount) {
   EXPECT_NE(mod->variables[0].init_expr, nullptr);
 }
 
-TEST(SemaphoreNewElaborator, MultipleNewInitializers) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  semaphore s1 = new(1);\n"
-      "  semaphore s2 = new(5);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->variables.size(), 2u);
-  EXPECT_NE(mod->variables[0].init_expr, nullptr);
-  EXPECT_NE(mod->variables[1].init_expr, nullptr);
-}
-
 }

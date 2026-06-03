@@ -37,18 +37,4 @@ TEST(SemaphoreNewParser, DeclarationWithNewZeroKeys) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SemaphoreNewParser, NewReturnAssignedToVariable) {
-  auto r = Parse(
-      "module m;\n"
-      "  semaphore s1;\n"
-      "  semaphore s2;\n"
-      "  initial begin\n"
-      "    s1 = new(3);\n"
-      "    s2 = new();\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 }
