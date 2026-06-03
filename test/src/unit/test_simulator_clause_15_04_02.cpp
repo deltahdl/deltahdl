@@ -27,11 +27,6 @@ TEST(IpcSync, MailboxNumReflectsState) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-TEST(IpcSync, MailboxNumEmptyReturnsZero) {
-  MailboxObject mb;
-  EXPECT_EQ(mb.Num(), 0);
-}
-
 TEST(IpcSync, MailboxNumAtBound) {
   MailboxObject mb(3);
   mb.TryPut(1);
