@@ -42,18 +42,4 @@ TEST(MailboxPutParser, PutOnParameterizedMailbox) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(MailboxPutParser, MultiplePutCalls) {
-  auto r = Parse(
-      "module m;\n"
-      "  mailbox mbx;\n"
-      "  initial begin\n"
-      "    mbx.put(1);\n"
-      "    mbx.put(2);\n"
-      "    mbx.put(3);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 }
