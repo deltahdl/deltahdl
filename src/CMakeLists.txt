@@ -35,6 +35,7 @@ add_library(deltahdl_lib STATIC
     parser/assertion_control_task.cpp
     elaborator/elaborator.cpp
     elaborator/elaborator_items.cpp
+    elaborator/inline_constraint_scope_resolution.cpp
     elaborator/interface_syntax.cpp
     elaborator/property_rewrite.cpp
     elaborator/checker_rewrite.cpp
