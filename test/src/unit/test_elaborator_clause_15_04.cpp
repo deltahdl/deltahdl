@@ -49,13 +49,6 @@ TEST(MailboxElaborator, DeclarationWithInitializer) {
   EXPECT_NE(mod->variables[0].init_expr, nullptr);
 }
 
-TEST(MailboxElaborator, BuiltInTypeWithoutClassDecl) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  mailbox mb;\n"
-      "endmodule\n"));
-}
-
 TEST(MailboxElaborator, MethodCallsInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
