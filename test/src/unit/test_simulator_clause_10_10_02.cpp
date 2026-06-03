@@ -64,4 +64,41 @@ TEST(ConcatDisambiguationSim, QueueTargetYieldsElementValues) {
   EXPECT_EQ(q->elements[1].ToUint64(), 4u);
 }
 
+// §10.10.2: one brace expression takes on different meanings purely from the
+// target type. Feeding {4'h6, 4'hf} to a scalar byte makes it a vector
+// concatenation, so the two nibbles pack into a single byte (8'h6f). Feeding
+// the identical expression to an unpacked byte array makes it an array
+// concatenation, so each item becomes one element zero-extended to the element
+// width, leaving the nibbles in separate bytes (8'h06, 8'h0f). Observing both
+// outcomes from the same right-hand side pins the disambiguation itself, not
+// just element distribution.
+TEST(ConcatDisambiguationSim, ScalarPacksWhileArrayExtendsPerElement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte B;\n"
+      "  byte BA[2];\n"
+      "  initial begin\n"
+      "    B = {4'h6, 4'hf};\n"
+      "    BA = {4'h6, 4'hf};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* b = f.ctx.FindVariable("B");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->value.ToUint64(), 0x6fu);
+
+  auto* ba0 = f.ctx.FindVariable("BA[0]");
+  auto* ba1 = f.ctx.FindVariable("BA[1]");
+  ASSERT_NE(ba0, nullptr);
+  ASSERT_NE(ba1, nullptr);
+  EXPECT_EQ(ba0->value.ToUint64(), 0x06u);
+  EXPECT_EQ(ba1->value.ToUint64(), 0x0fu);
+}
+
 }
