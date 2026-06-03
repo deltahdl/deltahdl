@@ -79,6 +79,30 @@ TEST(ExpressionParsing, NoParen_PostfixDecInBinaryExpr) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kMinusMinus);
 }
 
+TEST(ExpressionParsing, NoParen_PostfixIncInBinaryExpr) {
+  auto r = Parse("module m; initial x = y++ + 1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kPostfixUnary);
+  EXPECT_EQ(rhs->lhs->op, TokenKind::kPlusPlus);
+}
+
+TEST(ExpressionParsing, NoParen_PrefixDecInBinaryExpr) {
+  auto r = Parse("module m; initial x = --y + 1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->lhs->op, TokenKind::kMinusMinus);
+}
+
 TEST(LvalueParsing, VarLvaluePreIncrement) {
   auto r = Parse("module m; int x; initial ++x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

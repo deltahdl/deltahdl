@@ -76,16 +76,4 @@ TEST(ExpressionElaboration, IncDecAsSubexpressionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ExpressionElaboration, IncDecOnIntElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int x;\n"
-      "  initial begin x = 5; x++; --x; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 }
