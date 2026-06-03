@@ -4,6 +4,7 @@
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 
@@ -264,6 +265,93 @@ TEST(StreamingUnpack, SourceNarrowerThanTargetErrors) {
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
 
   EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §11.4.14.3: the "and vice versa" direction of the cast rule — a 4-state
+// target keeps the stream's unknown bits rather than coercing them. The lower
+// byte of the source is all-X; because the target is 4-state, the X bits must
+// survive (bval stays set), distinguishing this path from the 2-state cast.
+TEST(StreamingUnpack, FourStateStreamPreservedInFourStateTarget) {
+  SimFixture f;
+
+  auto* a = f.ctx.CreateVariable("fs_a", 8);
+  a->is_4state = true;
+  auto* b = f.ctx.CreateVariable("fs_b", 8);
+  b->is_4state = true;
+
+  // Source: upper byte known 0xAB, lower byte all-X (aval=0xFF, bval=0xFF).
+  auto* src = f.ctx.CreateVariable("fs_src", 16);
+  src->value = MakeLogic4Vec(f.arena, 16);
+  src->value.words[0].aval = 0xABFFu;
+  src->value.words[0].bval = 0x00FFu;
+  src->is_4state = true;
+
+  auto* lhs = MakeStreamConcat(f.arena, TokenKind::kGtGt,
+                               {MakeId(f.arena, "fs_a"), MakeId(f.arena, "fs_b")});
+  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, MakeId(f.arena, "fs_src"));
+  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
+
+  auto* va = f.ctx.FindVariable("fs_a");
+  auto* vb = f.ctx.FindVariable("fs_b");
+  // Known upper byte unpacks normally, with no unknown bits.
+  EXPECT_EQ(va->value.ToUint64(), 0xABu);
+  EXPECT_EQ(va->value.words[0].bval, 0u);
+  // X bits are retained in the 4-state target, not cast away.
+  EXPECT_EQ(vb->value.words[0].bval, 0xFFu);
+}
+
+// §11.4.14.3: unpacking a 4-state stream into a 2-state target is done by
+// casting to a 2-state type. The lower byte of the source carries X bits
+// (aval and bval both set); after the cast into a 2-state target those bits
+// collapse to 0 rather than surviving as the raw aval value 0xFF.
+TEST(StreamingUnpack, FourStateStreamCastIntoTwoStateTarget) {
+  SimFixture f;
+
+  auto* a = f.ctx.CreateVariable("us_a", 8);
+  a->is_4state = false;
+  auto* b = f.ctx.CreateVariable("us_b", 8);
+  b->is_4state = false;
+
+  // Source: upper byte known 0xAB, lower byte all-X (aval=0xFF, bval=0xFF).
+  auto* src = f.ctx.CreateVariable("us_src", 16);
+  src->value = MakeLogic4Vec(f.arena, 16);
+  src->value.words[0].aval = 0xABFFu;
+  src->value.words[0].bval = 0x00FFu;
+  src->is_4state = true;
+
+  auto* lhs = MakeStreamConcat(f.arena, TokenKind::kGtGt,
+                               {MakeId(f.arena, "us_a"), MakeId(f.arena, "us_b")});
+  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, MakeId(f.arena, "us_src"));
+  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
+
+  EXPECT_EQ(f.ctx.FindVariable("us_a")->value.ToUint64(), 0xABu);
+  // X bits cast away to 0 in the 2-state target, not preserved as 0xFF.
+  EXPECT_EQ(f.ctx.FindVariable("us_b")->value.ToUint64(), 0x00u);
+  EXPECT_EQ(f.ctx.FindVariable("us_b")->value.words[0].bval, 0u);
+}
+
+// §11.4.14.3: the reverse (unpack) operation applies to a streaming target of
+// a nonblocking assignment, not just a blocking one. Driven through the full
+// pipeline so the deferred NBA-region unpack is exercised; without it the
+// targets would keep their initial value.
+TEST(StreamingUnpack, NonblockingStreamingUnpackIntegration) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial {>> {a, b}} <= 16'hABCD;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.ToUint64(), 0xABu);
+  EXPECT_EQ(vb->value.ToUint64(), 0xCDu);
 }
 
 TEST(StreamingUnpack, SourceWiderConsumesMsbWithMixedWidths) {

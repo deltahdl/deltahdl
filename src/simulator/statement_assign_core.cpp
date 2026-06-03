@@ -1135,6 +1135,24 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
                                uint64_t delay_ticks, SimContext& ctx,
                                Arena& arena) {
   if (!stmt->lhs) return;
+
+  // §11.4.14.3: a streaming_concatenation can be the target of a nonblocking
+  // assignment too, performing the same reverse (unpack) operation. The source
+  // is sampled now; defer the per-target writes to the NBA region so the
+  // streaming semantics match the blocking form.
+  if (stmt->lhs->kind == ExprKind::kStreamingConcat) {
+    auto* stream_event = ctx.GetScheduler().GetEventPool().Acquire();
+    stream_event->kind = EventKind::kUpdate;
+    const Expr* lhs = stmt->lhs;
+    stream_event->callback = [lhs, rhs_val, &ctx, &arena]() {
+      UnpackStreamingConcatLhs(lhs, rhs_val, ctx, arena);
+    };
+    auto stream_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
+    auto stream_time = ctx.CurrentTime() + SimTime{delay_ticks};
+    ctx.GetScheduler().ScheduleEvent(stream_time, stream_region, stream_event);
+    return;
+  }
+
   bool is_select = (stmt->lhs->kind == ExprKind::kSelect);
   auto* elem = is_select ? TryResolveArrayElement(stmt->lhs, ctx) : nullptr;
   auto* var = elem ? elem : ResolveLhsVariable(stmt->lhs, ctx);
