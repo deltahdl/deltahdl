@@ -48,4 +48,25 @@ TEST(MailboxTryPutElaborator, TryPutWithVariableArg) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §15.4.4: the try_put() message may be any singular expression, explicitly
+// including object handles. A class handle passed as the argument elaborates
+// without error, just like the integral cases above.
+TEST(MailboxTryPutElaborator, TryPutWithObjectHandleArg) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module m;\n"
+      "  mailbox mb;\n"
+      "  C obj = new;\n"
+      "  initial begin\n"
+      "    mb.try_put(obj);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }
