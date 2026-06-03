@@ -81,31 +81,39 @@ const std::unordered_map<std::string, int64_t>& ConstraintSolver::GetValues()
 }
 
 int64_t ConstraintSolver::GenerateRandValue(RandVariable& var) {
+  // 18.4.2: a static randc variable shares one cyclic permutation across every
+  // instance of the class, so its history lives in the shared state when one is
+  // attached; a nonstatic randc keeps its own per-instance history. Bind the
+  // active history once here and advance it below, so the same draw-and-reject
+  // logic serves both cases.
+  std::unordered_set<int64_t>& history =
+      (var.is_static && var.shared_randc_state) ? *var.shared_randc_state
+                                                : var.randc_history;
   // 18.3: a random variable of enum type must take one of the enum's named
   // constants. The 18.4 exception (an enum member of a packed struct/union)
   // clears apply_enum_restriction, in which case the named set is ignored and
   // the value is drawn from the full declared range below.
   if (!var.enum_values.empty() && var.apply_enum_restriction) {
     if (var.qualifier == RandQualifier::kRandc) {
-      if (var.randc_history.size() >= var.enum_values.size()) {
-        var.randc_history.clear();
+      if (history.size() >= var.enum_values.size()) {
+        history.clear();
       }
       for (int attempt = 0; attempt < 1000; ++attempt) {
         std::uniform_int_distribution<size_t> pick(0, var.enum_values.size() - 1);
         int64_t val = var.enum_values[pick(rng_)];
-        if (var.randc_history.find(val) == var.randc_history.end()) {
-          var.randc_history.insert(val);
+        if (history.find(val) == history.end()) {
+          history.insert(val);
           return val;
         }
       }
       for (int64_t v : var.enum_values) {
-        if (var.randc_history.find(v) == var.randc_history.end()) {
-          var.randc_history.insert(v);
+        if (history.find(v) == history.end()) {
+          history.insert(v);
           return v;
         }
       }
-      var.randc_history.clear();
-      var.randc_history.insert(var.enum_values.front());
+      history.clear();
+      history.insert(var.enum_values.front());
       return var.enum_values.front();
     }
     std::uniform_int_distribution<size_t> pick(0, var.enum_values.size() - 1);
@@ -114,27 +122,27 @@ int64_t ConstraintSolver::GenerateRandValue(RandVariable& var) {
   if (var.qualifier == RandQualifier::kRandc) {
     int64_t range_size = var.max_val - var.min_val + 1;
 
-    if (static_cast<int64_t>(var.randc_history.size()) >= range_size) {
-      var.randc_history.clear();
+    if (static_cast<int64_t>(history.size()) >= range_size) {
+      history.clear();
     }
 
     for (int attempt = 0; attempt < 1000; ++attempt) {
       std::uniform_int_distribution<int64_t> dist(var.min_val, var.max_val);
       int64_t val = dist(rng_);
-      if (var.randc_history.find(val) == var.randc_history.end()) {
-        var.randc_history.insert(val);
+      if (history.find(val) == history.end()) {
+        history.insert(val);
         return val;
       }
     }
 
     for (int64_t v = var.min_val; v <= var.max_val; ++v) {
-      if (var.randc_history.find(v) == var.randc_history.end()) {
-        var.randc_history.insert(v);
+      if (history.find(v) == history.end()) {
+        history.insert(v);
         return v;
       }
     }
-    var.randc_history.clear();
-    var.randc_history.insert(var.min_val);
+    history.clear();
+    history.insert(var.min_val);
     return var.min_val;
   }
   std::uniform_int_distribution<int64_t> dist(var.min_val, var.max_val);
@@ -693,6 +701,18 @@ bool ConstraintSolver::SolveIterative(
     }
     ApplyDistConstraints();
     ApplyDirectConstraints(extra, include_soft);
+    // 18.4.2: the cyclic (randc) variables shall be solved before the
+    // noncyclical rand variables. Draw every active randc value first so that
+    // the rand variables that follow are solved with the cyclic values already
+    // committed for this attempt; a constraint set that mixes rand and randc
+    // therefore resolves the randc variables first, as the cyclic semantics
+    // require.
+    for (auto& [name, var] : variables_) {
+      if (!var.enabled || var.is_real) continue;
+      if (var.qualifier != RandQualifier::kRandc) continue;
+      if (values_.find(name) != values_.end()) continue;
+      values_[name] = GenerateRandValue(var);
+    }
     for (auto& [name, var] : variables_) {
       if (!var.enabled) continue;
       // 18.4.1: draw an active real variable from its uniform real range.
@@ -700,6 +720,7 @@ bool ConstraintSolver::SolveIterative(
         real_values_[name] = GenerateRandRealValue(var);
         continue;
       }
+      // randc variables are already committed above; skip them here.
       if (values_.find(name) != values_.end()) continue;
       values_[name] = GenerateRandValue(var);
     }

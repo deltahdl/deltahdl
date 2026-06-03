@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <random>
 #include <string>
 #include <string_view>
@@ -192,6 +193,16 @@ struct RandVariable {
   bool apply_enum_restriction = true;
 
   std::unordered_set<int64_t> randc_history;
+
+  // 18.4.2: when a random variable is declared static, its randc state is
+  // static as well — a single cyclic permutation is shared by every instance of
+  // the class, so randomize() advances that one sequence no matter which
+  // instance drives it. is_static marks such a variable. shared_randc_state,
+  // when set, is the one shared permutation history; it is used in place of the
+  // per-instance randc_history above so all instances draw from and advance the
+  // same cycle. A nonstatic randc leaves this null and keeps its own history.
+  bool is_static = false;
+  std::shared_ptr<std::unordered_set<int64_t>> shared_randc_state;
 };
 
 using RandomizeCallback = std::function<void()>;
