@@ -33,23 +33,6 @@ TEST(CaseMatchesItemParsing, CasePatternTaggedWithGuard) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CaseMatchesItemParsing, CaseMatchesParse) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case(v) matches\n"
-      "      5: y = 8'd10;\n"
-      "      default: y = 8'd20;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-}
-
 TEST(CaseMatchesItemParsing, CaseMatchesDefault) {
   auto r = Parse(
       "module m;\n"

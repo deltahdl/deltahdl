@@ -317,6 +317,10 @@ class Elaborator {
   // §12.6: a constant expression pattern shall be of integral type.
   void ValidateMatchesPatternIntegral(const ModuleDecl* decl);
 
+  // §12.6.1: the tested expression of a pattern-matching case statement shall
+  // have a known type that is the same as the type of the pattern in each item.
+  void ValidateMatchesCaseSelectorType(const ModuleDecl* decl);
+
   void ValidateProceduralNetAssign();
   void ValidateDynamicArrayNba(const ModuleDecl* decl);
   void ValidateArrayQueryOnDynamicType(const ModuleDecl* decl);

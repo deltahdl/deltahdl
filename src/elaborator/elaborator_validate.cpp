@@ -1595,6 +1595,69 @@ void Elaborator::ValidateMatchesPatternIntegral(const ModuleDecl* decl) {
   }
 }
 
+// §12.6.1: a pattern-matching case statement compares its tested expression
+// against the patterns of each item, so the tested expression and the patterns
+// must share a known type. A real-valued selector cannot have the same type as
+// an integral constant pattern, so the pairing is a static type error. Identifier
+// and wildcard patterns (§12.6) match any value and impose no integral type, so
+// they are left alone here.
+static bool IsIntegralLiteralPattern(const Expr* pat) {
+  if (!pat) return false;
+  const Expr* p = pat;
+  if (p->kind == ExprKind::kBinary && p->op == TokenKind::kAmpAmpAmp) {
+    p = p->lhs;
+  }
+  return p && p->kind == ExprKind::kIntegerLiteral;
+}
+
+static void CheckMatchesCaseSelectorType(const Stmt* s, const TypeMap& types,
+                                         DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kCase && s->case_matches && s->condition) {
+    auto name = ExprIdent(s->condition);
+    auto it = types.find(name);
+    if (!name.empty() && it != types.end() && IsRealType(it->second)) {
+      for (const auto& ci : s->case_items) {
+        if (ci.is_default) continue;
+        for (const auto* pat : ci.patterns) {
+          if (IsIntegralLiteralPattern(pat)) {
+            diag.Error(s->condition->range.start,
+                       "pattern-matching case selector type differs from the "
+                       "type of its integral pattern");
+            break;
+          }
+        }
+      }
+    }
+  }
+  for (auto* sub : s->stmts) CheckMatchesCaseSelectorType(sub, types, diag);
+  for (auto* sub : s->fork_stmts) CheckMatchesCaseSelectorType(sub, types, diag);
+  CheckMatchesCaseSelectorType(s->then_branch, types, diag);
+  CheckMatchesCaseSelectorType(s->else_branch, types, diag);
+  CheckMatchesCaseSelectorType(s->body, types, diag);
+  CheckMatchesCaseSelectorType(s->for_body, types, diag);
+  for (const auto& ci : s->case_items)
+    CheckMatchesCaseSelectorType(ci.body, types, diag);
+}
+
+void Elaborator::ValidateMatchesCaseSelectorType(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock ||
+        item->kind == ModuleItemKind::kFinalBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      if (item->body) CheckMatchesCaseSelectorType(item->body, var_types_, diag_);
+    }
+    if (item->kind == ModuleItemKind::kTaskDecl ||
+        item->kind == ModuleItemKind::kFunctionDecl) {
+      for (auto* s : item->func_body_stmts)
+        CheckMatchesCaseSelectorType(s, var_types_, diag_);
+    }
+  }
+}
+
 void Elaborator::ValidateMixedAssignments() {
   for (const auto& [name, loc] : cont_assign_targets_) {
     if (proc_assign_targets_.find(name) != proc_assign_targets_.end()) {
