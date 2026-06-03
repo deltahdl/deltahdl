@@ -1346,6 +1346,20 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     }
     case ModuleItemKind::kAssertProperty:
+      // §16.4.3: a deferred immediate assertion (assert/assume/cover with #0
+      // or final) written directly as a module item, outside any procedure, is
+      // a static deferred assertion. It is treated as if it were the sole
+      // statement of an always_comb procedure, so build that implicit process
+      // here rather than routing it through the concurrent-assertion path. The
+      // parser wraps every module-level deferred immediate form under the
+      // kAssertProperty kind, distinguished by a deferred statement body.
+      if (item->body && item->body->is_deferred) {
+        AddProcess(RtlirProcessKind::kAlwaysComb, item, mod, arena_, diag_,
+                   &func_decls_);
+        break;
+      }
+      ValidateClockingBlock(item, mod);
+      break;
     case ModuleItemKind::kAssumeProperty:
     case ModuleItemKind::kCoverProperty:
     case ModuleItemKind::kCoverSequence:
