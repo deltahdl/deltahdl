@@ -578,8 +578,128 @@ static Logic4Vec ExtractStreamBits(const Logic4Vec& stream,
   return result;
 }
 
+// Whether `e` (or any operand it is built from) names one of `names`.
+static bool ExprRefsIdentifierIn(const Expr* e,
+                                 const std::vector<std::string_view>& names) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kIdentifier) {
+    for (auto n : names)
+      if (n == e->text) return true;
+  }
+  return ExprRefsIdentifierIn(e->index, names) ||
+         ExprRefsIdentifierIn(e->index_end, names) ||
+         ExprRefsIdentifierIn(e->lhs, names) ||
+         ExprRefsIdentifierIn(e->rhs, names) ||
+         ExprRefsIdentifierIn(e->base, names);
+}
+
+// §11.4.14.4: a with-range expression is evaluated immediately before its array
+// is unpacked, so when it refers to a field that this same operator unpacks to
+// its left, the just-unpacked value must drive the range. The default unpack
+// pass resolves every with-range up front (before any write-back), which only
+// satisfies the complementary case — a reference to a field unpacked to the
+// right uses that field's previous value. This predicate detects the
+// left-reference case (a with-range naming an earlier scalar target) so it can
+// be routed to a forward, write-as-you-go unpack instead. It is limited to the
+// right-shift form with no greedy dynamic operand, where stream bits map
+// MSB-first onto elements in order and the forward pass is exact.
+static bool ShouldForwardResolveUnpack(const Expr* lhs, SimContext& ctx) {
+  if (lhs->op == TokenKind::kLtLt) return false;
+  std::vector<std::string_view> earlier;
+  bool dependency = false;
+  for (auto* elem : lhs->elements) {
+    if (elem->kind == ExprKind::kIdentifier && !elem->with_expr &&
+        ctx.FindQueue(elem->text)) {
+      // A bare dynamic queue triggers greedy sizing; leave that to the
+      // established pass.
+      return false;
+    }
+    if (elem->with_expr && elem->kind == ExprKind::kIdentifier &&
+        ExprRefsIdentifierIn(elem->with_expr, earlier)) {
+      dependency = true;
+    }
+    if (!elem->with_expr && elem->kind == ExprKind::kIdentifier &&
+        !ctx.FindArrayInfo(elem->text) && !ctx.FindQueue(elem->text)) {
+      earlier.push_back(elem->text);
+    }
+  }
+  return dependency;
+}
+
+// Forward unpack for the right-shift form: walk elements in stream order and
+// write each target before resolving the next element's with-range, consuming
+// bits from the most-significant end of the stream as we go. This makes an
+// earlier-unpacked field visible to a later array's with-range (§11.4.14.4).
+static void UnpackStreamingConcatLhsForward(const Expr* lhs,
+                                            const Logic4Vec& rhs_val,
+                                            SimContext& ctx, Arena& arena) {
+  uint32_t total = rhs_val.width;
+  uint32_t cursor = 0;  // bits already consumed from the MSB end
+  auto take = [&](uint32_t w) -> Logic4Vec {
+    if (cursor + w <= total)
+      return ExtractStreamBits(rhs_val, total - cursor - w, w, total, arena);
+    return MakeLogic4Vec(arena, w);
+  };
+  for (auto* elem : lhs->elements) {
+    if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
+      if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
+        uint32_t start = 0, count = 0;
+        bool in_range = ResolveWithRangeForUnpack(elem->with_expr, ctx, arena,
+                                                  ainfo->size, ainfo->lo, start,
+                                                  count);
+        if (!in_range || start + count > ainfo->size) {
+          ctx.GetDiag().Error(
+              {}, "streaming unpack with-range exceeds fixed array bounds");
+          count = (start < ainfo->size) ? ainfo->size - start : 0;
+        }
+        for (uint32_t i = 0; i < count; ++i) {
+          std::string name = std::string(elem->text) + "[" +
+                             std::to_string(ainfo->lo + start + i) + "]";
+          auto* var = ctx.FindVariable(name);
+          if (!var)
+            var = ctx.CreateVariable(*arena.Create<std::string>(name),
+                                     ainfo->elem_width);
+          var->value = take(ainfo->elem_width);
+          if (!var->is_4state) CoerceTo2State(var->value);
+          var->NotifyWatchers();
+          cursor += ainfo->elem_width;
+        }
+        continue;
+      }
+      if (auto* queue = ctx.FindQueue(elem->text)) {
+        uint32_t start = 0, count = 0;
+        ResolveWithRangeForUnpack(
+            elem->with_expr, ctx, arena,
+            static_cast<uint32_t>(queue->elements.size()), 0, start, count);
+        uint32_t needed = start + count;
+        while (queue->elements.size() < needed)
+          queue->elements.push_back(MakeLogic4Vec(arena, queue->elem_width));
+        for (uint32_t i = 0; i < count; ++i) {
+          Logic4Vec v = take(queue->elem_width);
+          if (start + i < queue->elements.size()) queue->elements[start + i] = v;
+          cursor += queue->elem_width;
+        }
+        continue;
+      }
+    }
+    auto* var = ResolveLhsVariable(elem, ctx);
+    if (!var) continue;
+    uint32_t w = var->value.width;
+    var->value = take(w);
+    if (!var->is_4state) CoerceTo2State(var->value);
+    var->NotifyWatchers();
+    cursor += w;
+  }
+  if (cursor > total)
+    ctx.GetDiag().Error({}, "too few bits in stream for streaming unpack");
+}
+
 static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                                      SimContext& ctx, Arena& arena) {
+  if (ShouldForwardResolveUnpack(lhs, ctx)) {
+    UnpackStreamingConcatLhsForward(lhs, rhs_val, ctx, arena);
+    return;
+  }
   std::vector<StreamElemInfo> elems;
   uint32_t total_width = CollectStreamElements(lhs, ctx, arena, elems,
                                                  rhs_val.width);

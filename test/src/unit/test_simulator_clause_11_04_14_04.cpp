@@ -208,6 +208,11 @@ TEST(StreamingDynamicDataSim, GreedyUnpackRemainingDynamicLeftEmpty) {
   }
 }
 
+// §11.4.14.4: a with-range that refers to a field unpacked to the left of its
+// array (earlier in stream order) is evaluated with the value that this same
+// operator just unpacked into that field. Here `len` is unpacked as 3, so the
+// range [0 +: len] sizes the payload slice to exactly three bytes that receive
+// the next three stream bytes; the trailing payload positions stay untouched.
 TEST(StreamingDynamicDataSim, WithExprReferencesEarlierUnpackedData) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -224,9 +229,11 @@ TEST(StreamingDynamicDataSim, WithExprReferencesEarlierUnpackedData) {
   lowerer.Lower(design);
   f.scheduler.Run();
   auto* vlen = f.ctx.FindVariable("len");
-  if (vlen) {
-    EXPECT_EQ(vlen->value.ToUint64(), 3u);
-  }
+  ASSERT_NE(vlen, nullptr);
+  EXPECT_EQ(vlen->value.ToUint64(), 3u);
+  EXPECT_EQ(f.ctx.FindVariable("payload[0]")->value.ToUint64(), 0xAAu);
+  EXPECT_EQ(f.ctx.FindVariable("payload[1]")->value.ToUint64(), 0xBBu);
+  EXPECT_EQ(f.ctx.FindVariable("payload[2]")->value.ToUint64(), 0xCCu);
 }
 
 TEST(StreamingDynamicDataSim, PackLeftShiftWithClause) {
@@ -270,7 +277,126 @@ TEST(StreamingDynamicDataSim, PackWithRangeLargerThanArrayUsesDefault) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
+  // §11.4.14.4: in a pack, a with-range wider than the array streams the whole
+  // array and pads the surplus positions with the nonexistent-entry value
+  // (§7.4.5). Both real bytes appear in the high half of the 32-bit result;
+  // the two absent positions contribute the padding value in the low half.
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xAABB0000u);
+}
 
+// §11.4.14.4: a with-range expression that refers to a field unpacked to the
+// right of its array (i.e. after the array in stream order) is evaluated with
+// that field's previous value, not the value it receives during this unpack.
+// Here `n` is 2 before the unpack, so the range [0 +: n] selects exactly two
+// payload elements even though `n` itself is overwritten with 5 by the same
+// operator. Using the post-unpack value (5) would change the element count and
+// the bit alignment, so the asserted result pins the previous-value rule.
+TEST(StreamingDynamicDataSim, WithRangeUsesPreviousValueOfLaterUnpackedField) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] payload[8];\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    n = 2;\n"
+      "    {>> {payload with [0 +: n], n}} = 48'hAABB00000005;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("payload[0]")->value.ToUint64(), 0xAAu);
+  EXPECT_EQ(f.ctx.FindVariable("payload[1]")->value.ToUint64(), 0xBBu);
+  EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 5u);
+}
+
+// §11.4.14.4: the expression before `with` may be a queue (a one-dimensional
+// unpacked array). In a pack, a with-range selects the named slice of the
+// queue exactly as it would for a fixed array, so only the two requested
+// elements reach the stream.
+TEST(StreamingDynamicDataSim, PackQueueWithRangeSelectsSubset) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte q[$];\n"
+      "  logic [15:0] result;\n"
+      "  initial begin\n"
+      "    q.push_back(8'hAA);\n"
+      "    q.push_back(8'hBB);\n"
+      "    q.push_back(8'hCC);\n"
+      "    result = {>> byte {q with [0 +: 2]}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xAABBu);
+}
+
+// §11.4.14.4: packing a queue with a with-range wider than its current size
+// streams the whole queue and fills the surplus positions with the
+// nonexistent-entry value (§7.4.5) — zero for a 2-state byte element. The two
+// live bytes occupy the high half of the result; the two absent positions
+// contribute the padding in the low half.
+TEST(StreamingDynamicDataSim, PackQueueWithRangeBeyondSizeUsesDefault) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte q[$];\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    q.push_back(8'hAA);\n"
+      "    q.push_back(8'hBB);\n"
+      "    result = {>> byte {q with [0 +: 4]}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xAABB0000u);
+}
+
+// §11.4.14.4: when an unpack with-range is smaller than the extent of a
+// variable-size array, only the designated locations are written and the rest
+// of the array is left unmodified. Here [1 +: 2] rewrites q[1] and q[2] while
+// q[0] and q[3] keep their prior contents and the queue does not grow.
+TEST(StreamingDynamicDataSim, UnpackQueuePartialRangeKeepsRemainder) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte q[$];\n"
+      "  initial begin\n"
+      "    q.push_back(8'h11);\n"
+      "    q.push_back(8'h22);\n"
+      "    q.push_back(8'h33);\n"
+      "    q.push_back(8'h44);\n"
+      "    {>> byte {q with [1 +: 2]}} = 16'hEEFF;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 4u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 0x11u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 0xEEu);
+  EXPECT_EQ(q->elements[2].ToUint64(), 0xFFu);
+  EXPECT_EQ(q->elements[3].ToUint64(), 0x44u);
 }
 
 }
