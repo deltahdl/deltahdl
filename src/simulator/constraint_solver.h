@@ -34,7 +34,19 @@ enum class ConstraintKind : uint8_t {
   kUnique,
   kDist,
   kSoft,
+  kArrayReduction,
   kCustom,
+};
+
+// 18.5.7.2: the operand by which an array reduction method joins the elements.
+// sum folds with addition, product with multiplication, and/or/xor with the
+// corresponding bitwise operator — the "relevant operand for each method".
+enum class ArrayReductionOp : uint8_t {
+  kSum,
+  kProduct,
+  kAnd,
+  kOr,
+  kXor,
 };
 
 // 18.5.3: one entry of a distribution's weighted-value set. A plain integral
@@ -138,6 +150,26 @@ struct ConstraintExpr {
   std::vector<ConstraintExpr> else_constraints;
 
   std::vector<std::string> unique_vars;
+
+  // 18.5.7.2: an array reduction iterative constraint. In a constraint, an array
+  // reduction method is treated as an expression iterated over each element of
+  // the array, joined by the operand for that method (reduce_op). reduce_vars
+  // names the array's element variables in index order; reduce_with, when set,
+  // is the with-clause expression applied to each element value (the with-clause
+  // 'item') before it is folded, defaulting to the element value itself. The
+  // folded result — a single value — is compared against 'lo' under the relation
+  // reduce_cmp. reduce_width is the bit width of that result's type: the array
+  // element type by default, or the type of the with-clause expression when one
+  // is given, so the fold is truncated to that width exactly as the result type
+  // demands. As with a foreach iterative constraint, when the array is
+  // dynamically sized size_var names its size method; the size constraints are
+  // solved first, so only the elements whose index is below the committed size
+  // take part in the reduction.
+  ArrayReductionOp reduce_op = ArrayReductionOp::kSum;
+  std::vector<std::string> reduce_vars;
+  std::function<int64_t(int64_t)> reduce_with;
+  ConstraintKind reduce_cmp = ConstraintKind::kLessThan;
+  uint32_t reduce_width = 32;
 
   ConstraintExpr* inner = nullptr;
 
@@ -350,6 +382,13 @@ class ConstraintSolver {
   bool EvalIfElse(const ConstraintExpr& expr) const;
 
   bool EvalForeach(const ConstraintExpr& expr) const;
+
+  // 18.5.7.2: evaluate an array reduction iterative constraint. Fold the array's
+  // existing elements (those below the committed size when the array is
+  // dynamically sized) with the method's operand, applying the with-clause
+  // expression to each element first, then truncate to the result type's width
+  // and test the configured relation against the target value.
+  bool EvalArrayReduction(const ConstraintExpr& expr) const;
 
   bool EvalUnique(const ConstraintExpr& expr) const;
 

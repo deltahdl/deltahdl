@@ -476,6 +476,8 @@ bool ConstraintSolver::EvalConstraint(const ConstraintExpr& expr) const {
       return EvalIfElse(expr);
     case ConstraintKind::kForeach:
       return EvalForeach(expr);
+    case ConstraintKind::kArrayReduction:
+      return EvalArrayReduction(expr);
     case ConstraintKind::kUnique:
       return EvalUnique(expr);
     case ConstraintKind::kDist:
@@ -630,6 +632,77 @@ bool ConstraintSolver::EvalForeach(const ConstraintExpr& expr) const {
     if (!EvalConstraint(expr.sub_constraints[i])) return false;
   }
   return true;
+}
+
+bool ConstraintSolver::EvalArrayReduction(const ConstraintExpr& expr) const {
+  // 18.5.7.2: an array reduction method in a constraint is treated as an
+  // expression iterated over each element of the array, joined by the relevant
+  // operand for the method. Begin from the operand's identity so a fold over any
+  // number of elements is well defined, then combine each element in turn.
+  int64_t acc = 0;
+  switch (expr.reduce_op) {
+    case ArrayReductionOp::kSum:
+    case ArrayReductionOp::kOr:
+    case ArrayReductionOp::kXor:
+      acc = 0;
+      break;
+    case ArrayReductionOp::kProduct:
+      acc = 1;
+      break;
+    case ArrayReductionOp::kAnd:
+      acc = -1;  // all ones: the identity of bitwise AND
+      break;
+  }
+
+  // As with a foreach iterative constraint, an array's size method is a state
+  // variable here: the size constraints are solved first, so only the elements
+  // whose index is below the committed size participate in the reduction. A
+  // fixed-size array leaves size_var empty, so every named element is folded.
+  size_t count = expr.reduce_vars.size();
+  if (!expr.size_var.empty()) {
+    auto sit = values_.find(expr.size_var);
+    if (sit != values_.end()) {
+      int64_t sz = sit->second < 0 ? 0 : sit->second;
+      if (static_cast<size_t>(sz) < count) count = static_cast<size_t>(sz);
+    }
+  }
+
+  for (size_t i = 0; i < count; ++i) {
+    auto it = values_.find(expr.reduce_vars[i]);
+    if (it == values_.end()) continue;
+    // The with-clause expression maps each element value (the 'item') to the
+    // value folded into the reduction; absent a with clause the element value
+    // itself is folded.
+    int64_t v = expr.reduce_with ? expr.reduce_with(it->second) : it->second;
+    switch (expr.reduce_op) {
+      case ArrayReductionOp::kSum:
+        acc += v;
+        break;
+      case ArrayReductionOp::kProduct:
+        acc *= v;
+        break;
+      case ArrayReductionOp::kAnd:
+        acc &= v;
+        break;
+      case ArrayReductionOp::kOr:
+        acc |= v;
+        break;
+      case ArrayReductionOp::kXor:
+        acc ^= v;
+        break;
+    }
+  }
+
+  // 18.5.7.2: the reduction returns a single value of the array element type, or
+  // the type of the with-clause expression when one is specified. Truncate the
+  // fold to that result type's width so a sum that would overflow the element
+  // type wraps, while a wider with-clause type (e.g. int'(item)) preserves it.
+  if (expr.reduce_width > 0 && expr.reduce_width < 64) {
+    uint64_t mask = (static_cast<uint64_t>(1) << expr.reduce_width) - 1;
+    acc = static_cast<int64_t>(static_cast<uint64_t>(acc) & mask);
+  }
+
+  return EvalComparison(expr.reduce_cmp, acc, expr.lo);
 }
 
 bool ConstraintSolver::EvalUnique(const ConstraintExpr& expr) const {
