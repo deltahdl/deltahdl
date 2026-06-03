@@ -44,17 +44,19 @@ struct SemaphoreObject {
     return 0;
   }
 
+  // §15.3.3: the waiting queue is FIFO and arrival order shall be preserved.
+  // Drain strictly from the head: if the earliest-arrived waiter cannot yet be
+  // satisfied, stop — a later, smaller request must not jump ahead of it. This
+  // is the wakeup path invoked by put() (§15.3.2) to resume a process that was
+  // suspended in get() (§15.3.3) once enough keys have been returned.
   void WakeWaiters() {
-    auto it = waiters.begin();
-    while (it != waiters.end()) {
-      if (key_count >= it->first) {
-        key_count -= it->first;
-        auto h = it->second;
-        it = waiters.erase(it);
-        h.resume();
-      } else {
-        ++it;
-      }
+    while (!waiters.empty()) {
+      auto& front = waiters.front();
+      if (key_count < front.first) break;
+      key_count -= front.first;
+      auto h = front.second;
+      waiters.erase(waiters.begin());
+      h.resume();
     }
   }
 };
