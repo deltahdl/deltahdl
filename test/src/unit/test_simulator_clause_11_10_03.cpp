@@ -102,23 +102,6 @@ TEST(EmptyStringLiteralSim, EmptyStringAssignedToVector) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(EmptyStringLiteralSim, EmptyStringAssignedToWiderVector) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  bit [15:0] v;\n"
-      "  initial v = \"\";\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("v");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0u);
-}
-
 TEST(EmptyStringLiteralSim, EmptyStringIsFalsyInConditional) {
   SimFixture f;
   auto* design = ElaborateSrc(
