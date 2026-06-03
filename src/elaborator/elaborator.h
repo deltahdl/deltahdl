@@ -494,6 +494,11 @@ class Elaborator {
   void ValidateOneClassSolveBeforeConstraints(const ClassDecl* cls);
   bool IsSolveOrderableType(const DataType& dt) const;
 
+  // 18.5.13.1: a soft constraint may be specified only on a random variable;
+  // it may not be specified for a randc variable.
+  void ValidateSoftConstraintVariables();
+  void ValidateOneClassSoftConstraintVariables(const ClassDecl* cls);
+
   // 18.5.11: a function called from a constraint expression shall not have
   // output, inout, or non-const ref arguments (const ref is allowed).
   void ValidateConstraintFunctionArgs();

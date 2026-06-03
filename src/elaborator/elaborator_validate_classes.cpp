@@ -3770,6 +3770,44 @@ void Elaborator::ValidateSolveBeforeConstraints() {
     ValidateOneClassSolveBeforeConstraints(cls);
 }
 
+// 18.5.13.1: soft constraints can only be specified on random variables; they
+// may not be specified for randc variables. Resolve each bare local variable
+// named in a soft constraint expression against the class and its base chain
+// (a derived declaration shadows a base one) and reject one that resolves to a
+// randc property. As with the solve...before and foreach checks, only simple
+// local identifiers the parser recorded are considered; a qualified reference
+// or one that does not resolve to a local property is left alone.
+void Elaborator::ValidateOneClassSoftConstraintVariables(const ClassDecl* cls) {
+  std::unordered_map<std::string_view, const ClassMember*> properties;
+  for (const ClassDecl* c = cls; c;
+       c = c->base_class.empty() ? nullptr
+                                 : FindClassDecl(c->base_class, unit_)) {
+    for (const auto* m : c->members) {
+      if (m->kind != ClassMemberKind::kProperty || m->name.empty()) continue;
+      properties.emplace(m->name, m);  // keeps the most-derived binding
+    }
+  }
+
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kConstraint) continue;
+    for (const auto& ref : m->constraint_soft_refs) {
+      auto it = properties.find(ref.name);
+      if (it == properties.end()) continue;  // not a local property
+      if (it->second->is_randc) {
+        diag_.Error(ref.loc,
+                    std::format("a soft constraint may not be specified on "
+                                "randc variable '{}'",
+                                ref.name));
+      }
+    }
+  }
+}
+
+void Elaborator::ValidateSoftConstraintVariables() {
+  for (const auto* cls : unit_->classes)
+    ValidateOneClassSoftConstraintVariables(cls);
+}
+
 // 18.5.11: locate a function method of the given name visible in 'cls' or any of
 // its base classes, returning its ModuleItem (the function declaration) or
 // nullptr. The nearest declaration wins, matching ordinary method lookup.

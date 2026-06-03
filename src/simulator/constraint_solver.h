@@ -414,9 +414,24 @@ class ConstraintSolver {
   // 18.5.13: when include_soft is set, the soft constraints are enforced
   // alongside the hard constraints; when clear, the soft constraints are
   // discarded (each treated as the value true) and only the hard constraints
-  // are checked.
+  // are checked. 18.5.13.1: even when include_soft is set, a soft constraint
+  // listed in dropped_soft_ has been discarded by the priority resolution and
+  // is treated as true as well.
   bool CheckAllConstraints(const std::vector<ConstraintExpr>& extra,
                            bool include_soft);
+
+  // 18.5.13.1: resolve a soft constraint set that has no joint solution by
+  // discarding constraints according to their priority. Each soft constraint
+  // carries a priority fixed by declaration order — a constraint declared later
+  // in a construct, and a constraint in an inline (with) block over one in the
+  // class, has higher priority — and the solver keeps the highest-priority
+  // preferences it can. The constraints are reinstated one at a time from
+  // highest priority to lowest and each is retained only while the reinstated
+  // set stays jointly satisfiable with the hard constraints, realizing the
+  // clause's conceptual model (prefer both c1 and c2, then c1 only, then c2
+  // only, then neither). Returns true when a solution honoring the retained set
+  // is committed; only an unsatisfiable hard set makes it fail.
+  bool SolveBySoftPriority(const std::vector<ConstraintExpr>& extra);
 
   bool EvalConstraint(const ConstraintExpr& expr) const;
 
@@ -532,6 +547,14 @@ class ConstraintSolver {
   // 18.5.12: set when a guard evaluates to ERROR. An ERROR guard generates an
   // unconditional error, so the solve fails outright and is not retried.
   bool guard_error_ = false;
+
+  // 18.5.13.1: the soft constraints the priority resolution has discarded for
+  // the current solve. A discarded soft constraint is treated as true: its
+  // inner relation is neither enforced nor seeded, exactly as if it were not
+  // present. Empty for the common case where every soft constraint is honored
+  // (or the whole soft set is satisfiable together with the hard constraints),
+  // so that path is left byte-identical to the 18.5.13 behavior.
+  std::unordered_set<const ConstraintExpr*> dropped_soft_;
 };
 
 }

@@ -847,6 +847,17 @@ struct ConstraintFunctionCallRef {
   SourceLoc loc;
 };
 
+// 18.5.13.1: a bare local variable named within a soft constraint expression.
+// 'name' is the identifier and 'loc' points at it for diagnostics. The parser
+// records only simple local references — an identifier that is neither the leaf
+// of a '.'/'::' qualified reference nor a function call — so the elaborator can
+// resolve each against the class and reject a soft constraint specified on a
+// randc variable, which the clause forbids.
+struct ConstraintSoftVarRef {
+  std::string_view name;
+  SourceLoc loc;
+};
+
 struct ClassMember {
   ClassMemberKind kind = ClassMemberKind::kProperty;
   SourceLoc loc;
@@ -882,6 +893,12 @@ struct ClassMember {
   // non-constraint members), recorded so the elaborator can resolve each callee
   // and apply the restrictions on functions used in constraints.
   std::vector<ConstraintFunctionCallRef> constraint_function_call_refs;
+
+  // 18.5.13.1: the bare local variables named within soft constraint
+  // expressions in this constraint block's body (empty for non-constraint
+  // members), recorded so the elaborator can reject a soft constraint specified
+  // on a randc variable.
+  std::vector<ConstraintSoftVarRef> constraint_soft_refs;
 
   DataType data_type;
   std::string_view name;

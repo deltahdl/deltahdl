@@ -1177,6 +1177,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateSolveBeforeConstraints();
 
+  ValidateSoftConstraintVariables();
+
   ValidateConstraintFunctionArgs();
 
   ValidateBuiltinRandomizationMethods();

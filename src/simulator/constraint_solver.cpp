@@ -597,6 +597,9 @@ bool ConstraintSolver::CheckAllConstraints(
     // jointly unsatisfiable the caller drops the soft constraints and retries
     // with include_soft clear.
     for (const auto* c : soft) {
+      // 18.5.13.1: a soft constraint discarded by the priority resolution is
+      // treated as true, so its inner relation imposes nothing.
+      if (dropped_soft_.count(c)) continue;
       const ConstraintExpr* inner = c->inner ? c->inner : nullptr;
       if (inner && !EvalConstraint(*inner)) return false;
     }
@@ -809,7 +812,10 @@ void ConstraintSolver::ApplyDirectConstraints(
   // and overwrites any conflicting soft seed, leaving the conflicting soft to
   // be discarded by the include_soft-clear retry.
   auto seed = [&](const ConstraintExpr& c) {
-    if (include_soft && c.kind == ConstraintKind::kSoft && c.inner) {
+    // 18.5.13.1: a soft constraint discarded by the priority resolution is not
+    // seeded — it must not bias the result toward its preferred value.
+    if (include_soft && c.kind == ConstraintKind::kSoft && c.inner &&
+        !dropped_soft_.count(&c)) {
       apply(*c.inner);
     } else {
       apply(c);
@@ -848,17 +854,70 @@ bool ConstraintSolver::SolveWith(
   if (pre_randomize_) pre_randomize_();
 
   // 18.5.13: hard constraints shall always be satisfied or randomization fails.
-  // First try to satisfy them together with the soft constraints. If no such
-  // solution exists, discard the soft constraints — a discarded soft constraint
-  // is treated as if replaced by the value 1 (true): it need not hold and has
-  // no effect on the solution distribution — and solve the remaining hard set.
+  // First try to satisfy them together with the full soft set. With no soft
+  // constraint discarded this is the original 18.5.13 path, kept intact for the
+  // common case where every soft constraint can be honored.
+  dropped_soft_.clear();
   bool solved = SolveIterative(inline_constraints, /*include_soft=*/true);
+
+  // 18.5.13.1: when the full soft set has no joint solution, the soft
+  // constraints are not all dropped at once; they are discarded by priority so
+  // the highest-priority preferences still hold. A guard ERROR, by contrast,
+  // fails randomize() outright regardless of any soft constraint.
   if (!solved && !guard_error_) {
-    solved = SolveIterative(inline_constraints, /*include_soft=*/false);
+    solved = SolveBySoftPriority(inline_constraints);
   }
+
+  // The discarded-soft set is meaningful only while resolving this call's
+  // priorities; clear it so it never carries into a later checker evaluation,
+  // which would otherwise skip the soft constraints it lists.
+  dropped_soft_.clear();
 
   if (solved && post_randomize_) post_randomize_();
   return solved;
+}
+
+bool ConstraintSolver::SolveBySoftPriority(
+    const std::vector<ConstraintExpr>& extra) {
+  // Collect the soft constraints in syntactic declaration order. 18.5.13.1
+  // fixes priority by that order: within one construct a constraint declared
+  // later has higher priority, and a constraint in an inline (with) block
+  // outranks the class constraints. CollectConstraints walks every block in
+  // declaration order and then the inline constraints last, so higher-priority
+  // constraints come later in 'soft'; iterating from the back therefore visits
+  // them highest priority first.
+  std::vector<const ConstraintExpr*> hard;
+  std::vector<const ConstraintExpr*> soft;
+  CollectConstraints(blocks_, extra, hard, soft);
+
+  // Start with every soft constraint discarded, then reinstate them one at a
+  // time from highest priority to lowest, retaining each only while the
+  // reinstated set stays jointly satisfiable with the hard constraints. A
+  // higher-priority constraint that cannot be honored is left discarded but
+  // does not block a lower-priority one that can be — this reproduces the
+  // clause's conceptual model exactly: for two soft constraints c1 (higher) and
+  // c2 (lower) the retained set is {c1,c2} when both hold, else {c1}, else
+  // {c2}, else {}.
+  dropped_soft_.clear();
+  dropped_soft_.insert(soft.begin(), soft.end());
+  for (auto it = soft.rbegin(); it != soft.rend(); ++it) {
+    dropped_soft_.erase(*it);  // tentatively reinstate this constraint
+    if (!SolveIterative(extra, /*include_soft=*/true)) {
+      // A hard-constraint guard error is unaffected by discarding soft
+      // constraints, so it fails the call outright rather than being retried.
+      if (guard_error_) return false;
+      dropped_soft_.insert(*it);  // not satisfiable together: discard it again
+    }
+  }
+
+  // Commit a final solution honoring exactly the retained soft set. Each
+  // retention step above kept the set satisfiable, so the retained set has a
+  // solution; the call fails only if the hard constraints alone are
+  // unsatisfiable. When the soft set involves only soft constraints this can
+  // never fail — the empty retained set is always solvable — which is the
+  // property the clause guarantees for a randomize() call over soft
+  // constraints only.
+  return SolveIterative(extra, /*include_soft=*/true);
 }
 
 void ConstraintSolver::ApplyDistConstraints() {

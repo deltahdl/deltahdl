@@ -544,6 +544,11 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   // '.' or '::' qualifier, so a member/scope-qualified name (obj.f, pkg::f) is
   // not mistaken for an unqualified call on the enclosing class.
   bool prev_was_qualifier = false;
+  // 18.5.13.1: true while scanning the expression of a soft constraint, between
+  // its 'soft' keyword and the terminating ';'. The bare local variables named
+  // in that span are recorded so the elaborator can reject a soft constraint
+  // specified on a randc variable.
+  bool in_soft = false;
   while (depth > 0 && !AtEnd()) {
     if (Check(TokenKind::kKwForeach)) {
       // 18.5.7.1: a foreach iterative constraint heads its constraint_set with
@@ -560,6 +565,13 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
       // restrictions and reject circular dependencies; the statement is consumed
       // through its terminating ';' before the surrounding scan resumes.
       CheckSolveBeforeConstraint(member);
+      prev_was_qualifier = false;
+    } else if (Check(TokenKind::kKwSoft)) {
+      // 18.5.13.1: 'soft' introduces a soft constraint ('soft expression_or_dist
+      // ;'). Begin collecting the bare local variables its expression names; the
+      // collection ends at the constraint_expression's terminating ';'.
+      Consume();
+      in_soft = true;
       prev_was_qualifier = false;
     } else if (Check(TokenKind::kKwDist)) {
       // 18.5.3: 'expression dist { dist_list }'. Hand the brace-enclosed
@@ -588,6 +600,22 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
         ref.loc = t.loc;
         if (member) member->constraint_function_call_refs.push_back(ref);
       }
+      // 18.5.13.1: record a bare local variable named in a soft constraint
+      // expression — an identifier that is not the leaf of a qualified
+      // reference (no preceding '.'/'::'), not the head of one (no following
+      // '.'/'::'), and not a function call (no following '(').
+      if (in_soft && t.kind == TokenKind::kIdentifier && !prev_was_qualifier &&
+          !Check(TokenKind::kLParen) && !Check(TokenKind::kDot) &&
+          !Check(TokenKind::kColonColon)) {
+        if (member) {
+          ConstraintSoftVarRef sref;
+          sref.name = t.text;
+          sref.loc = t.loc;
+          member->constraint_soft_refs.push_back(sref);
+        }
+      }
+      // The soft constraint's expression ends at its ';'.
+      if (t.kind == TokenKind::kSemicolon) in_soft = false;
       prev_was_qualifier =
           t.kind == TokenKind::kDot || t.kind == TokenKind::kColonColon;
     }
