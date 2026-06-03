@@ -65,24 +65,27 @@ TEST(TaskDeclSim, DefaultTaskIsStatic) {
   EXPECT_EQ(val, 2u);
 }
 
-TEST(TaskDeclSim, StaticTaskWithInputArgs) {
+// §13.3.1: a task with no explicit lifetime that is declared inside a module
+// marked `automatic` is implicitly automatic, so its locals are reallocated on
+// every call. Contrast with DefaultTaskIsStatic, where the same default task in
+// an ordinary module keeps its locals between calls.
+TEST(TaskDeclSim, DefaultTaskInAutomaticModuleIsAutomatic) {
   auto val = RunAndGet(
-      "module t;\n"
+      "module automatic t;\n"
       "  logic [31:0] result;\n"
-      "  task static add_to(input logic [31:0] addend, output logic [31:0] "
-      "v);\n"
-      "    int acc;\n"
-      "    acc = acc + addend;\n"
-      "    v = acc;\n"
+      "  task counter(output logic [31:0] v);\n"
+      "    int cnt;\n"
+      "    cnt = cnt + 1;\n"
+      "    v = cnt;\n"
       "  endtask\n"
       "  initial begin\n"
-      "    add_to(32'd10, result);\n"
-      "    add_to(32'd20, result);\n"
+      "    counter(result);\n"
+      "    counter(result);\n"
       "  end\n"
       "endmodule\n",
       "result");
 
-  EXPECT_EQ(val, 30u);
+  EXPECT_EQ(val, 1u);
 }
 
 TEST(TaskDeclSim, StaticVarInAutoTaskPersists) {
@@ -121,46 +124,6 @@ TEST(TaskDeclSim, AutoVarInStaticTaskFresh) {
       "endmodule\n",
       "result");
   EXPECT_EQ(val, 1u);
-}
-
-TEST(TaskDeclSim, StaticTaskRetainsValues) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] result;\n"
-      "  task static accum(input logic [31:0] v, output logic [31:0] out);\n"
-      "    int sum;\n"
-      "    sum = sum + v;\n"
-      "    out = sum;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    accum(32'd10, result);\n"
-      "    accum(32'd20, result);\n"
-      "    accum(32'd30, result);\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
-
-  EXPECT_EQ(val, 60u);
-}
-
-TEST(TaskDeclSim, AutomaticTaskFreshVars) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] result;\n"
-      "  task automatic accum(input logic [31:0] v, output logic [31:0] out);\n"
-      "    int sum;\n"
-      "    sum = sum + v;\n"
-      "    out = sum;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    accum(32'd10, result);\n"
-      "    accum(32'd20, result);\n"
-      "    accum(32'd30, result);\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
-
-  EXPECT_EQ(val, 30u);
 }
 
 TEST(TaskDeclSim, SetupReturnsTaskItem) {

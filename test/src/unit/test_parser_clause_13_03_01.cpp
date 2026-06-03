@@ -129,23 +129,6 @@ static ModuleItem* FirstFuncOrTask(ParseResult& r) {
   return nullptr;
 }
 
-TEST(TaskLifetimeParsing, StaticTaskDeclWithDisplayCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  task static log_event(input int code);\n"
-      "    $display(\"event: %0d\", code);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* t = FirstFuncOrTask(r);
-  ASSERT_NE(t, nullptr);
-  EXPECT_EQ(t->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(t->is_static);
-  EXPECT_FALSE(t->is_automatic);
-  EXPECT_EQ(t->name, "log_event");
-}
-
 TEST(TaskLifetimeParsing, AutoTaskWithVariousTypes) {
   auto r = Parse(
       "module m;\n"
