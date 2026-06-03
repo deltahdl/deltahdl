@@ -112,6 +112,43 @@ TEST(IpcSync, ProcessBlockedBeforeMergeDoesNotUnblock) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
+// A single trigger on one merged name must reach processes waiting on every
+// other name merged into the same synchronization object, not just one. This
+// observes the watcher list of the shared Variable being drained for multiple
+// distinct alias names (the "also triggers a and b" multi-target case).
+TEST(IpcSync, MergedTriggerWakesAllAliasWaiters) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event a, b, c;\n"
+      "  logic [31:0] r1, r2;\n"
+      "  initial begin\n"
+      "    r1 = 0; r2 = 0;\n"
+      "    a = c;\n"
+      "    b = a;\n"
+      "    fork\n"
+      "      begin @a; r1 = 1; end\n"
+      "      begin @b; r2 = 1; end\n"
+      "      begin #1 -> c; end\n"
+      "    join\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* r1 = f.ctx.FindVariable("r1");
+  auto* r2 = f.ctx.FindVariable("r2");
+  ASSERT_NE(r1, nullptr);
+  ASSERT_NE(r2, nullptr);
+  EXPECT_EQ(r1->value.ToUint64(), 1u);
+  EXPECT_EQ(r2->value.ToUint64(), 1u);
+}
+
 TEST(IpcSync, MergedEventTriggeredStateShared) {
   LowerFixture f;
   auto* design = ElaborateSrc(
