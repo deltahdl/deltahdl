@@ -132,6 +132,24 @@ SequenceOrMatches EvalSequenceOrMatches(
   return result;
 }
 
+FirstMatchMatches EvalFirstMatch(
+    const std::vector<uint32_t>& operand_end_times) {
+  FirstMatchMatches result;
+  // No match of the operand means no match of first_match.
+  if (operand_end_times.empty()) return result;
+  // The earliest ending clock tick among the operand's matches selects the
+  // first match; every match ending later is discarded.
+  uint32_t earliest = *std::min_element(operand_end_times.begin(),
+                                        operand_end_times.end());
+  // Ties at the earliest ending tick are all retained: when several operand
+  // matches end on that tick, each one is a match of first_match.
+  for (uint32_t end_time : operand_end_times) {
+    if (end_time == earliest) result.end_times.push_back(end_time);
+  }
+  result.matched = true;
+  return result;
+}
+
 bool EvalSequenceIntersect(bool a_match, bool b_match, uint32_t a_len,
                            uint32_t b_len) {
   return a_match && b_match && a_len == b_len;

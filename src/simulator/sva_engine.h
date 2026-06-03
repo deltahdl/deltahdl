@@ -126,6 +126,20 @@ SequenceOrMatches EvalSequenceOrMatches(
     const std::vector<uint32_t>& a_end_times,
     const std::vector<uint32_t>& b_end_times);
 
+// §16.9.8: first_match(seq) starts an evaluation attempt of the operand seq at
+// the same clock tick and reduces seq's possibly-many matches to the ones that
+// end earliest, discarding all subsequent matches. When seq has no match,
+// first_match(seq) has none either. Otherwise the operand match(es) with the
+// earliest ending clock tick are the matches of first_match(seq); every
+// later-ending match is dropped. When more than one operand match shares that
+// earliest ending tick, all of them are kept. This carries the surviving
+// end-times alongside the match decision.
+struct FirstMatchMatches {
+  bool matched = false;
+  std::vector<uint32_t> end_times;
+};
+FirstMatchMatches EvalFirstMatch(const std::vector<uint32_t>& operand_end_times);
+
 bool EvalSequenceIntersect(bool a_match, bool b_match, uint32_t a_len,
                            uint32_t b_len);
 bool EvalThroughout(const std::function<bool(uint64_t)>& check,

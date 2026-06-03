@@ -33,4 +33,31 @@ TEST(SvaEngine, SequenceOperatorIntersect) {
   EXPECT_FALSE(EvalSequenceIntersect(true, false, 3, 3));
 }
 
+// §16.9.8: when the operand sequence has no match, first_match has no match.
+TEST(SvaEngine, FirstMatchHasNoMatchWhenOperandDoesNotMatch) {
+  auto fm = EvalFirstMatch({});
+  EXPECT_FALSE(fm.matched);
+  EXPECT_TRUE(fm.end_times.empty());
+}
+
+// §16.9.8: the operand match with the earliest ending clock tick is the match
+// of first_match; every later-ending match is discarded. The variable-delay
+// example te1 ##[2:5] te2 can end on ticks 2, 3, 4, or 5 after the start, so
+// first_match keeps only the soonest completion.
+TEST(SvaEngine, FirstMatchKeepsOnlyEarliestEndingMatch) {
+  auto fm = EvalFirstMatch({5, 3, 4, 2});
+  EXPECT_TRUE(fm.matched);
+  EXPECT_EQ(fm.end_times, std::vector<uint32_t>{2});
+}
+
+// §16.9.8: when several operand matches share the earliest ending clock tick,
+// all of them are matches of first_match. The (a ##2 b) or (c ##2 d) example
+// can have a ##2 b and c ##2 d ending on the same tick, so both survive.
+TEST(SvaEngine, FirstMatchKeepsAllMatchesSharingEarliestEndTick) {
+  auto fm = EvalFirstMatch({4, 4, 6});
+  EXPECT_TRUE(fm.matched);
+  std::vector<uint32_t> expected{4, 4};
+  EXPECT_EQ(fm.end_times, expected);
+}
+
 }
