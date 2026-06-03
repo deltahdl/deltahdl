@@ -4776,6 +4776,55 @@ void Elaborator::ValidateContAssignToClockvar(const ModuleDecl* decl) {
   }
 }
 
+bool Elaborator::IsOutputClockvarSignal(std::string_view name) const {
+  // §14.16.2: a clocking output/inout is implicitly tied to a same-named signal
+  // in the enclosing scope (§14.3). Match the bare variable name against the
+  // output/inout clockvar members collected across every clocking block.
+  for (const auto& [block_name, sigs] : clocking_signals_) {
+    auto it = sigs.find(name);
+    if (it != sigs.end() &&
+        (it->second.direction == Direction::kOutput ||
+         it->second.direction == Direction::kInout)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void Elaborator::ValidatePrimitiveDriveToClockvar(const ModuleDecl* decl) {
+  if (clocking_signals_.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kGateInst) continue;
+    const auto& terms = item->gate_terminals;
+    if (terms.empty()) continue;
+
+    auto check = [&](const Expr* t) {
+      // §14.16.2: it shall be illegal to drive a variable associated with an
+      // output clockvar from a primitive.
+      const Expr* root = t;
+      while (root != nullptr && root->kind == ExprKind::kSelect)
+        root = root->base;
+      if (root != nullptr && root->kind == ExprKind::kIdentifier &&
+          IsOutputClockvarSignal(root->text)) {
+        diag_.Error(
+            root->range.start,
+            std::format("primitive output drives variable '{}', which is "
+                        "associated with a clocking output",
+                        root->text));
+      }
+    };
+
+    // For buf/not gates every terminal but the last is an output; for the
+    // other driving gates the first terminal is the single output.
+    if (item->gate_kind == GateKind::kBuf ||
+        item->gate_kind == GateKind::kNot) {
+      for (size_t i = 0; i + 1 < terms.size(); ++i) check(terms[i]);
+    } else {
+      check(terms[0]);
+    }
+  }
+}
+
 // §14.16: a synchronous drive reaches a clocking-block output (or inout)
 // through a member access such as cb.sig, optionally wrapped in a bit-select
 // or slice (cb.sig[2], cb.sig[8:2]). Returns true when `e` designates such a
@@ -4834,6 +4883,21 @@ void Elaborator::WalkStmtsForSyncDriveForm(const Stmt* s) {
       diag_.Error(s->lhs->range.start,
                   "procedural continuous assignment (assign/force) to a "
                   "clocking output variable is not allowed");
+    } else if (s->lhs != nullptr) {
+      // §14.16.2: it is likewise illegal to write the underlying variable that
+      // an output clockvar is tied to with a procedural continuous assignment.
+      const Expr* root = s->lhs;
+      while (root != nullptr && root->kind == ExprKind::kSelect)
+        root = root->base;
+      if (root != nullptr && root->kind == ExprKind::kIdentifier &&
+          IsOutputClockvarSignal(root->text)) {
+        diag_.Error(
+            root->range.start,
+            std::format("procedural continuous assignment (assign/force) to "
+                        "variable '{}', which is associated with a clocking "
+                        "output, is not allowed",
+                        root->text));
+      }
     }
   }
   for (auto* sub : s->stmts) WalkStmtsForSyncDriveForm(sub);

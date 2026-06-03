@@ -1922,6 +1922,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ValidateDuplicateGlobalClocking(decl);
   ValidateGlobalClockReference(decl);
   ValidateContAssignToClockvar(decl);
+  ValidatePrimitiveDriveToClockvar(decl);
   ValidateSyncDriveForm(decl);
   ValidateConstantFunctionCalls(decl);
   ValidateDpiOpenArrayArgs(decl);

@@ -526,6 +526,15 @@ class Elaborator {
   void WalkStmtsForSyncDriveForm(const Stmt* s);
   bool ExprTargetsWritableClockvar(const Expr* e) const;
 
+  // §14.16.2: true when `name` is a plain variable that is associated with an
+  // output (or inout) clockvar -- i.e. the underlying signal driven by a
+  // clocking-block output. Writing to such a variable by any external driver is
+  // illegal.
+  bool IsOutputClockvarSignal(std::string_view name) const;
+  // §14.16.2: it is illegal to drive a variable associated with an output
+  // clockvar from a primitive (gate) output terminal.
+  void ValidatePrimitiveDriveToClockvar(const ModuleDecl* decl);
+
   void ValidateAssocConcatTarget(const ModuleDecl* decl);
   void WalkStmtsForAssocConcatTarget(const Stmt* s);
   void CheckAssocConcatTargetInAssign(const Stmt* s);
