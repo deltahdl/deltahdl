@@ -121,28 +121,6 @@ TEST(FunctionLifetimeParsing, StaticFunctionWithLocalVar) {
   EXPECT_EQ(fn->name, "count");
 }
 
-TEST(FunctionLifetimeParsing, AutomaticFunctionWithLocalVars) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int compute(int x);\n"
-      "    int temp;\n"
-      "    int result;\n"
-      "    temp = x * 2;\n"
-      "    result = temp + 1;\n"
-      "    return result;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(item->is_automatic);
-  ASSERT_GE(item->func_body_stmts.size(), 2u);
-  EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(item->func_body_stmts[1]->kind, StmtKind::kVarDecl);
-}
-
 TEST(FunctionLifetimeParsing, FunctionInAutomaticModule) {
   auto r = Parse(
       "module automatic m;\n"
@@ -204,6 +182,48 @@ TEST(FunctionLifetimeParsing, AutomaticFunctionMultipleVarTypes) {
   EXPECT_EQ(item->func_body_stmts[1]->var_decl_type.kind, DataTypeKind::kLogic);
   EXPECT_EQ(item->func_body_stmts[2]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(item->func_body_stmts[2]->var_decl_type.kind, DataTypeKind::kReal);
+}
+
+// §13.4.2: a local variable inside a static function may itself be declared
+// with the automatic keyword, overriding the enclosing function's lifetime.
+TEST(FunctionLifetimeParsing, AutomaticLocalInStaticFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  function static int count(int x);\n"
+      "    automatic int tmp;\n"
+      "    tmp = x + 1;\n"
+      "    return tmp;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_static);
+  ASSERT_GE(item->func_body_stmts.size(), 1u);
+  EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(item->func_body_stmts[0]->var_is_automatic);
+}
+
+// §13.4.2: conversely, a local variable inside an automatic function may be
+// declared static, overriding the enclosing function's lifetime.
+TEST(FunctionLifetimeParsing, StaticLocalInAutomaticFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int tally(int x);\n"
+      "    static int acc;\n"
+      "    acc = acc + x;\n"
+      "    return acc;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_automatic);
+  ASSERT_GE(item->func_body_stmts.size(), 1u);
+  EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(item->func_body_stmts[0]->var_is_static);
 }
 
 TEST(FunctionLifetimeParsing, FunctionInInterface) {
