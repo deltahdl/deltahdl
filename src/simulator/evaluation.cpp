@@ -796,7 +796,12 @@ static Logic4Vec EvalAssignInExpr(const Expr* expr, SimContext& ctx,
   uint32_t lhs_w = AssignExprLhsWidth(expr->lhs, ctx);
   if (lhs_w == 0) return rhs_val;
   PerformBlockingAssign(expr->lhs, rhs_val, ctx, arena);
-  if (lhs_w == rhs_val.width) return rhs_val;
+  // §11.3.6: a concatenation target yields an unsigned integral result whose
+  // width is the sum of its operand widths. Re-pack the value rather than
+  // forwarding the right-hand side so the result never inherits the
+  // right-hand side's signedness, even when the widths already match.
+  bool lhs_is_concat = expr->lhs->kind == ExprKind::kConcatenation;
+  if (lhs_w == rhs_val.width && !lhs_is_concat) return rhs_val;
   uint64_t v = rhs_val.ToUint64();
   if (lhs_w < 64) v &= (uint64_t{1} << lhs_w) - 1;
   return MakeLogic4VecVal(arena, lhs_w, v);

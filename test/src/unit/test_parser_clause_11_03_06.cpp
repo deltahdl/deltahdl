@@ -4,15 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(OperatorAndExpressionParsing, AssignInExprParenthesized) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial if ((a = b)) x = 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(OperatorAndExpressionParsing, CompoundAssignInExpr) {
   auto r = Parse(
       "module t;\n"
@@ -66,6 +57,18 @@ TEST(OperatorAndExpressionParsing, AssignInExprAsIfCondition) {
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->condition->kind, ExprKind::kBinary);
   EXPECT_EQ(stmt->condition->op, TokenKind::kEq);
+}
+
+// §11.3.6: a blocking assignment within an expression is permitted only when it
+// carries no timing control. An intra-assignment delay inside the parentheses
+// is therefore not accepted by the expression grammar.
+TEST(OperatorAndExpressionParsing, AssignWithTimingControlInExprIsRejected) {
+  auto r = Parse(
+      "module t;\n"
+      "  int a, b, c;\n"
+      "  initial b = (a = #5 c);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }
