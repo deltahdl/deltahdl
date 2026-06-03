@@ -34,6 +34,10 @@ enum class ConstraintKind : uint8_t {
   kUnique,
   kDist,
   kSoft,
+  // 18.5.13.2: a 'disable soft' directive. It names a random variable in
+  // var_name and imposes no relation of its own; instead it discards the
+  // lower-priority soft constraints that directly reference that variable.
+  kDisableSoft,
   kArrayReduction,
   kCustom,
 };
@@ -433,6 +437,17 @@ class ConstraintSolver {
   // is committed; only an unsatisfiable hard set makes it fail.
   bool SolveBySoftPriority(const std::vector<ConstraintExpr>& extra);
 
+  // 18.5.13.2: resolve the 'disable soft' directives for the current solve.
+  // Walking every enabled block and then the inline (with) constraints in
+  // declaration order — the same order that fixes soft-constraint priority in
+  // 18.5.13.1 — each directive discards the soft constraints already seen (those
+  // of lower priority) that directly reference the directive's variable. A
+  // discarded soft constraint is recorded in disabled_soft_ and treated as true
+  // for the rest of the solve, unconditionally: it is removed whether or not it
+  // contradicts anything, and ahead of the priority resolution among the soft
+  // constraints that remain. Recomputed per call into a cleared set.
+  void ComputeDisabledSoft(const std::vector<ConstraintExpr>& extra);
+
   bool EvalConstraint(const ConstraintExpr& expr) const;
 
   bool EvalImplication(const ConstraintExpr& expr) const;
@@ -555,6 +570,15 @@ class ConstraintSolver {
   // (or the whole soft set is satisfiable together with the hard constraints),
   // so that path is left byte-identical to the 18.5.13 behavior.
   std::unordered_set<const ConstraintExpr*> dropped_soft_;
+
+  // 18.5.13.2: the soft constraints discarded by a 'disable soft' directive for
+  // the current solve. Distinct from dropped_soft_, which the priority
+  // resolution fills and clears as it reinstates constraints: a directive's
+  // discard is permanent for the call, so an entry here is treated as true (its
+  // inner relation neither enforced nor seeded) throughout the solve and is
+  // never reconsidered by the priority resolution. Empty when no 'disable soft'
+  // directive applies, leaving the 18.5.13 / 18.5.13.1 behavior unchanged.
+  std::unordered_set<const ConstraintExpr*> disabled_soft_;
 };
 
 }

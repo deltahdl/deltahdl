@@ -523,6 +523,9 @@ bool ConstraintSolver::EvalConstraint(const ConstraintExpr& expr) const {
       return EvalUnique(expr);
     case ConstraintKind::kDist:
     case ConstraintKind::kSoft:
+    // 18.5.13.2: a 'disable soft' directive imposes no relation; it only
+    // discards other soft constraints, so it is satisfied by any assignment.
+    case ConstraintKind::kDisableSoft:
 
       return true;
     case ConstraintKind::kCustom:
@@ -543,23 +546,22 @@ static void CollectConstraints(const std::vector<ConstraintBlock>& blocks,
                                const std::vector<ConstraintExpr>& extra,
                                std::vector<const ConstraintExpr*>& hard,
                                std::vector<const ConstraintExpr*>& soft) {
-  for (const auto& block : blocks) {
-    if (!block.enabled) continue;
-    for (const auto& c : block.constraints) {
-      if (c.kind == ConstraintKind::kSoft) {
-        soft.push_back(&c);
-      } else {
-        hard.push_back(&c);
-      }
-    }
-  }
-  for (const auto& c : extra) {
+  // 18.5.13.2: a 'disable soft' directive is neither a hard relation to satisfy
+  // nor a soft preference to honor; it is resolved separately (see
+  // ComputeDisabledSoft), so it is omitted from both lists here.
+  auto classify = [&](const ConstraintExpr& c) {
+    if (c.kind == ConstraintKind::kDisableSoft) return;
     if (c.kind == ConstraintKind::kSoft) {
       soft.push_back(&c);
     } else {
       hard.push_back(&c);
     }
+  };
+  for (const auto& block : blocks) {
+    if (!block.enabled) continue;
+    for (const auto& c : block.constraints) classify(c);
   }
+  for (const auto& c : extra) classify(c);
 }
 
 bool ConstraintSolver::CheckAllConstraints(
@@ -597,9 +599,10 @@ bool ConstraintSolver::CheckAllConstraints(
     // jointly unsatisfiable the caller drops the soft constraints and retries
     // with include_soft clear.
     for (const auto* c : soft) {
-      // 18.5.13.1: a soft constraint discarded by the priority resolution is
-      // treated as true, so its inner relation imposes nothing.
-      if (dropped_soft_.count(c)) continue;
+      // 18.5.13.1 / 18.5.13.2: a soft constraint discarded by the priority
+      // resolution, or by a 'disable soft' directive, is treated as true, so its
+      // inner relation imposes nothing.
+      if (dropped_soft_.count(c) || disabled_soft_.count(c)) continue;
       const ConstraintExpr* inner = c->inner ? c->inner : nullptr;
       if (inner && !EvalConstraint(*inner)) return false;
     }
@@ -812,10 +815,11 @@ void ConstraintSolver::ApplyDirectConstraints(
   // and overwrites any conflicting soft seed, leaving the conflicting soft to
   // be discarded by the include_soft-clear retry.
   auto seed = [&](const ConstraintExpr& c) {
-    // 18.5.13.1: a soft constraint discarded by the priority resolution is not
-    // seeded — it must not bias the result toward its preferred value.
+    // 18.5.13.1 / 18.5.13.2: a soft constraint discarded by the priority
+    // resolution or by a 'disable soft' directive is not seeded — it must not
+    // bias the result toward its preferred value.
     if (include_soft && c.kind == ConstraintKind::kSoft && c.inner &&
-        !dropped_soft_.count(&c)) {
+        !dropped_soft_.count(&c) && !disabled_soft_.count(&c)) {
       apply(*c.inner);
     } else {
       apply(c);
@@ -853,6 +857,12 @@ bool ConstraintSolver::SolveWith(
 
   if (pre_randomize_) pre_randomize_();
 
+  // 18.5.13.2: resolve the 'disable soft' directives before solving. Each
+  // discards the lower-priority soft constraints that directly reference its
+  // variable; those stay discarded for the whole call, independent of and ahead
+  // of the priority resolution among the soft constraints that remain.
+  ComputeDisabledSoft(inline_constraints);
+
   // 18.5.13: hard constraints shall always be satisfied or randomization fails.
   // First try to satisfy them together with the full soft set. With no soft
   // constraint discarded this is the original 18.5.13 path, kept intact for the
@@ -872,9 +882,57 @@ bool ConstraintSolver::SolveWith(
   // priorities; clear it so it never carries into a later checker evaluation,
   // which would otherwise skip the soft constraints it lists.
   dropped_soft_.clear();
+  // 18.5.13.2: likewise scoped to this call; clear it so a 'disable soft'
+  // directive never carries into a later solve or checker evaluation.
+  disabled_soft_.clear();
 
   if (solved && post_randomize_) post_randomize_();
   return solved;
+}
+
+void ConstraintSolver::ComputeDisabledSoft(
+    const std::vector<ConstraintExpr>& extra) {
+  disabled_soft_.clear();
+
+  // The variables that directly appear in a soft constraint's relation: the
+  // single variable a simple relation names, plus any variables the relation
+  // records as referenced (and likewise of its inner expression_or_dist). A
+  // variable that only gates the constraint — for instance the antecedent p of
+  // p -> soft q — is not among these, so 'disable soft' on such a variable
+  // leaves the soft constraint in place, as the clause requires.
+  auto directly_references = [](const ConstraintExpr& soft,
+                                const std::string& var) {
+    if (soft.var_name == var) return true;
+    for (const auto& r : soft.ref_vars)
+      if (r == var) return true;
+    if (soft.inner) {
+      if (soft.inner->var_name == var) return true;
+      for (const auto& r : soft.inner->ref_vars)
+        if (r == var) return true;
+    }
+    return false;
+  };
+
+  // Walk the soft constraints and 'disable soft' directives in declaration
+  // order (every enabled block, then the inline constraints last) — the order
+  // that fixes priority in 18.5.13.1. A directive discards the soft constraints
+  // seen before it, which are exactly the ones of lower priority, that directly
+  // reference the directive's variable.
+  std::vector<const ConstraintExpr*> seen_soft;
+  auto visit = [&](const ConstraintExpr& c) {
+    if (c.kind == ConstraintKind::kSoft) {
+      seen_soft.push_back(&c);
+    } else if (c.kind == ConstraintKind::kDisableSoft) {
+      for (const auto* s : seen_soft) {
+        if (directly_references(*s, c.var_name)) disabled_soft_.insert(s);
+      }
+    }
+  };
+  for (const auto& block : blocks_) {
+    if (!block.enabled) continue;
+    for (const auto& c : block.constraints) visit(c);
+  }
+  for (const auto& c : extra) visit(c);
 }
 
 bool ConstraintSolver::SolveBySoftPriority(
@@ -901,6 +959,9 @@ bool ConstraintSolver::SolveBySoftPriority(
   dropped_soft_.clear();
   dropped_soft_.insert(soft.begin(), soft.end());
   for (auto it = soft.rbegin(); it != soft.rend(); ++it) {
+    // 18.5.13.2: a soft constraint already discarded by a 'disable soft'
+    // directive stays discarded — the priority resolution never reinstates it.
+    if (disabled_soft_.count(*it)) continue;
     dropped_soft_.erase(*it);  // tentatively reinstate this constraint
     if (!SolveIterative(extra, /*include_soft=*/true)) {
       // A hard-constraint guard error is unaffected by discarding soft
