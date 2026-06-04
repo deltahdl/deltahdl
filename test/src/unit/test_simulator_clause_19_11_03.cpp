@@ -94,6 +94,34 @@ TEST(TypeCoverage, MergeSumsCountsOfOverlappingBins) {
       CoverageDB::ComputeTypeCoverage(insts, /*merge_instances=*/true), 100.0);
 }
 
+// LRM 19.11.3: when same-named bins overlap across instances, a bin covered in
+// any instance is covered in the union, while the union denominator still counts
+// each distinct bin name once. This mirrors the standard's "gt" example: two
+// instances share the bins b0, b1, b2; one instance covers b0 and the other
+// covers b1, leaving b2 uncovered everywhere. The merged coverage is therefore
+// 2/3, strictly more than either instance alone (each covers only 1/3).
+TEST(TypeCoverage, MergeUnionExceedsIndividualInstancesFractionally) {
+  CoverGroup a = GroupWithPoint({
+      ValueBin("b0", 0, 1),
+      ValueBin("b1", 1, 0),
+      ValueBin("b2", 2, 0),
+  });
+  CoverGroup b = GroupWithPoint({
+      ValueBin("b0", 0, 0),
+      ValueBin("b1", 1, 1),
+      ValueBin("b2", 2, 0),
+  });
+  std::vector<const CoverGroup*> insts = {&a, &b};
+  // Each instance alone covers only one of its three bins.
+  EXPECT_DOUBLE_EQ(
+      CoverageDB::ComputeTypeCoverage(insts, /*merge_instances=*/false),
+      100.0 / 3.0);
+  // The union covers b0 and b1 but not b2: two of three distinct bins.
+  EXPECT_DOUBLE_EQ(
+      CoverageDB::ComputeTypeCoverage(insts, /*merge_instances=*/true),
+      100.0 * 2.0 / 3.0);
+}
+
 // LRM 19.11.3: bins with distinct names are distinct members of the union, so
 // instances whose bin layouts differ enlarge the union rather than collapse.
 // This mirrors the standard's "ga" example, where two instances with different
