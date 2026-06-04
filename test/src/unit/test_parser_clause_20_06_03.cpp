@@ -18,13 +18,16 @@ TEST(UtilitySystemTaskParsing, IsUnboundedInConditional) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(UtilitySystemTaskParsing, IsUnboundedWithBoundedParam) {
+// §20.6.3 BNF (Syntax 20-8): the argument may be a hierarchical_parameter_
+// identifier, not just a simple ps_parameter_identifier. A dotted reference to
+// a parameter inside an instantiated submodule shall parse cleanly here.
+TEST(UtilitySystemTaskParsing, IsUnboundedWithHierarchicalParam) {
   auto r = Parse(
-      "module m #(parameter int P = 42);\n"
-      "  initial begin\n"
-      "    if ($isunbounded(P)) $display(\"yes\");\n"
-      "    else $display(\"no\");\n"
-      "  end\n"
+      "module sub #(parameter int P = $);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub s();\n"
+      "  initial if ($isunbounded(s.P)) $display(\"unbounded\");\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
