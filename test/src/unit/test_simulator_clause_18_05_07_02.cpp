@@ -217,6 +217,89 @@ TEST(ArrayReductionConstraint, ProductReductionJoinsByMultiplication) {
   EXPECT_TRUE(solver.Solve());
 }
 
+// 18.5.7.2: "the relevant operand for each method" — an and() reduction joins
+// the elements by bitwise AND. {0xFF, 0x0F, 0x3C} folds to 0x0C. The all-ones
+// identity means a fold over the listed elements leaves only the bits common to
+// all of them set.
+TEST(ArrayReductionConstraint, AndReductionJoinsByBitwiseAnd) {
+  ConstraintSolver solver(21);
+  const std::vector<std::string> elems = {"e0", "e1", "e2"};
+  for (const auto& e : elems) solver.AddVariable(MakeVar(e, 0, 255, 8));
+
+  ConstraintBlock pins;
+  pins.name = "pins";
+  pins.constraints.push_back(Pin("e0", 0xFF));
+  pins.constraints.push_back(Pin("e1", 0x0F));
+  pins.constraints.push_back(Pin("e2", 0x3C));  // 0xFF & 0x0F & 0x3C == 0x0C
+  solver.AddConstraintBlock(pins);
+
+  ConstraintBlock rc;
+  rc.name = "reduce";
+  rc.constraints.push_back(Reduction(ArrayReductionOp::kAnd, elems,
+                                     ConstraintKind::kEqual, 0x0C));
+  solver.AddConstraintBlock(rc);
+
+  EXPECT_TRUE(solver.Solve());
+
+  // A different target must fail, confirming the AND fold is what is computed.
+  ConstraintSolver solver2(21);
+  for (const auto& e : elems) solver2.AddVariable(MakeVar(e, 0, 255, 8));
+  solver2.AddConstraintBlock(pins);
+  ConstraintBlock rc2;
+  rc2.name = "reduce";
+  rc2.constraints.push_back(Reduction(ArrayReductionOp::kAnd, elems,
+                                      ConstraintKind::kEqual, 0x0F));
+  solver2.AddConstraintBlock(rc2);
+  EXPECT_FALSE(solver2.Solve());
+}
+
+// 18.5.7.2: "the relevant operand for each method" — an or() reduction joins the
+// elements by bitwise OR. {0x01, 0x02, 0x04} folds to 0x07.
+TEST(ArrayReductionConstraint, OrReductionJoinsByBitwiseOr) {
+  ConstraintSolver solver(22);
+  const std::vector<std::string> elems = {"e0", "e1", "e2"};
+  for (const auto& e : elems) solver.AddVariable(MakeVar(e, 0, 255, 8));
+
+  ConstraintBlock pins;
+  pins.name = "pins";
+  pins.constraints.push_back(Pin("e0", 0x01));
+  pins.constraints.push_back(Pin("e1", 0x02));
+  pins.constraints.push_back(Pin("e2", 0x04));  // 0x01 | 0x02 | 0x04 == 0x07
+  solver.AddConstraintBlock(pins);
+
+  ConstraintBlock rc;
+  rc.name = "reduce";
+  rc.constraints.push_back(Reduction(ArrayReductionOp::kOr, elems,
+                                     ConstraintKind::kEqual, 0x07));
+  solver.AddConstraintBlock(rc);
+
+  EXPECT_TRUE(solver.Solve());
+}
+
+// 18.5.7.2: "the relevant operand for each method" — an xor() reduction joins the
+// elements by bitwise XOR. {0x0F, 0x03, 0x01} folds to 0x0D, and the zero
+// identity makes an even pairing of a bit cancel out.
+TEST(ArrayReductionConstraint, XorReductionJoinsByBitwiseXor) {
+  ConstraintSolver solver(23);
+  const std::vector<std::string> elems = {"e0", "e1", "e2"};
+  for (const auto& e : elems) solver.AddVariable(MakeVar(e, 0, 255, 8));
+
+  ConstraintBlock pins;
+  pins.name = "pins";
+  pins.constraints.push_back(Pin("e0", 0x0F));
+  pins.constraints.push_back(Pin("e1", 0x03));
+  pins.constraints.push_back(Pin("e2", 0x01));  // 0x0F ^ 0x03 ^ 0x01 == 0x0D
+  solver.AddConstraintBlock(pins);
+
+  ConstraintBlock rc;
+  rc.name = "reduce";
+  rc.constraints.push_back(Reduction(ArrayReductionOp::kXor, elems,
+                                     ConstraintKind::kEqual, 0x0D));
+  solver.AddConstraintBlock(rc);
+
+  EXPECT_TRUE(solver.Solve());
+}
+
 // 18.5.7.2: as with foreach iterative constraints, when an array has both size
 // constraints and array-reduction iterative constraints the size is solved first
 // and the reduction next, so only the elements that exist take part. The size is
