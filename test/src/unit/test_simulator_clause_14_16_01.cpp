@@ -101,4 +101,63 @@ TEST(SyncDriveVsNba, InoutInputReflectsDriveOnlyAfterNextSample) {
   EXPECT_NE(sampled_cycle1, sampled_cycle2);
 }
 
+// §14.16.1: the worked example in the clause has an inout `a` and an output `b`
+// in one clocking block, with `cb.a <= c` and `cb.b <= cb.a` driven together in
+// the same block. Because a drive never updates the clocking block input, the
+// `cb.a` read on the right-hand side of the second drive yields a's sampled
+// input value -- the value it held *before* the concurrent drive to `cb.a`
+// matures -- so `b` ends up with a's pre-drive value, not the value just driven
+// onto a. This test models a two-clockvar block to confirm that an input read
+// feeding another drive observes the sampled value rather than the pending one.
+TEST(SyncDriveVsNba, InoutInputReadOnRhsYieldsSampledNotDrivenValue) {
+  ClockingSimFixture f;
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+  auto* a = f.ctx.CreateVariable("a", 8);
+  a->value = MakeLogic4VecVal(f.arena, 8, 0xAA);
+  auto* b = f.ctx.CreateVariable("b", 8);
+  b->value = MakeLogic4VecVal(f.arena, 8, 0x00);
+
+  // One block carrying both clockvars: `a` is inout (sampled on input, drivable
+  // on output) and `b` is output-only. The single-signal helper cannot express
+  // this, so the block is built directly.
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kPosedge;
+  ClockingSignal sig_a;
+  sig_a.signal_name = "a";
+  sig_a.direction = ClockingDir::kInout;
+  block.signals.push_back(sig_a);
+  ClockingSignal sig_b;
+  sig_b.signal_name = "b";
+  sig_b.direction = ClockingDir::kOutput;
+  block.signals.push_back(sig_b);
+  cmgr.Register(block);
+  cmgr.Attach(f.ctx, f.scheduler);
+
+  uint64_t rhs_source = 0;
+  cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler, [&]() {
+    // cb.a <= c : drive a's output side to a fresh value, maturing this cycle.
+    cmgr.ScheduleOutputDrive("cb", "a", 0x55, f.ctx, f.scheduler);
+    // cb.b <= cb.a : the right-hand side reads a's clocking block input, which
+    // is the sampled value, unaffected by the drive scheduled just above.
+    rhs_source = cmgr.GetSampledValue("cb", "a");
+    cmgr.ScheduleOutputDrive("cb", "b", rhs_source, f.ctx, f.scheduler);
+  });
+
+  SchedulePosedge(f, clk, 10);
+  f.scheduler.Run();
+
+  // The RHS read saw a's sampled input, not the value being driven onto a.
+  EXPECT_EQ(rhs_source, 0xAAu);
+  // a's output drive matured to the new value...
+  EXPECT_EQ(a->value.ToUint64(), 0x55u);
+  // ...while b received a's pre-drive sampled value, distinct from a's driven
+  // value -- exactly the clause's "value of a before the change" outcome.
+  EXPECT_EQ(b->value.ToUint64(), 0xAAu);
+  EXPECT_NE(b->value.ToUint64(), a->value.ToUint64());
+}
+
 }
