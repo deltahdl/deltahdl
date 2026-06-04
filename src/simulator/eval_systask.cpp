@@ -566,9 +566,9 @@ static void WriteQueueOutput(const Expr* out_arg, uint64_t value,
 // stochastic-analysis queue task/function. The queue type/capacity validated
 // at $q_initialize and the occupancy tracked across $q_add/$q_remove supply
 // the error conditions. $q_remove additionally returns its removed entry's
-// job_id/inform_id outputs (§20.15.3); the remaining non-status outputs (the
-// fullness result, the statistics value) are the descendant subclauses' rules
-// and are left to their own stubs here.
+// job_id/inform_id outputs (§20.15.3), $q_full its fullness result (§20.15.4),
+// and $q_exam its requested statistic (§20.15.5) through the q_stat_value
+// output.
 static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
                                      Arena& arena, std::string_view name) {
   auto& queues = ctx.StochasticQueues();
@@ -610,8 +610,17 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
       // user-defined).
       uint64_t job_id = EvalExpr(args[1], ctx, arena).ToUint64();
       uint64_t inform_id = EvalExpr(args[2], ctx, arena).ToUint64();
-      it->second.entries.push_back(StochasticQueueEntry{job_id, inform_id});
-      ++it->second.count;
+      // §20.15.5: stamp the arrival time and fold it into the queue's activity
+      // statistics so $q_exam can report mean interarrival time, peak occupancy
+      // and wait times.
+      uint64_t now = ctx.CurrentTime().ticks;
+      auto& q = it->second;
+      q.entries.push_back(StochasticQueueEntry{job_id, inform_id, now});
+      if (q.arrivals == 0) q.first_arrival_tick = now;
+      q.last_arrival_tick = now;
+      ++q.arrivals;
+      ++q.count;
+      if (q.count > q.max_count) q.max_count = q.count;
       status = kQOk;
     }
     WriteQueueStatus(args[3], status, ctx, arena);
@@ -644,6 +653,14 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
         q.entries.pop_front();
       }
       --q.count;
+      // §20.15.5: a removed entry's residence time completes a wait sample,
+      // feeding the shortest-ever and average wait-time statistics reported by
+      // $q_exam.
+      uint64_t now = ctx.CurrentTime().ticks;
+      uint64_t wait = now >= entry.arrival_tick ? now - entry.arrival_tick : 0;
+      if (q.departures == 0 || wait < q.shortest_wait) q.shortest_wait = wait;
+      q.total_wait += wait;
+      ++q.departures;
       WriteQueueOutput(args[1], entry.job_id, ctx, arena);
       WriteQueueOutput(args[2], entry.inform_id, ctx, arena);
       status = kQOk;
@@ -672,14 +689,56 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
   }
 
   if (name == "$q_exam") {
-    // The statistics value is §20.15.5's output; here only the status code is
-    // resolved, whose sole applicable error is an undefined q_id.
-    if (args.size() >= 4) {
-      uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
-      WriteQueueStatus(args[3],
-                       queues.count(q_id) ? kQOk : kQUndefinedId, ctx, arena);
+    // §20.15.5 $q_exam(q_id, q_stat_code, q_stat_value, status): report a
+    // statistic about activity on the queue named by q_id. The q_stat_code
+    // selects which statistic is delivered through the q_stat_value output, per
+    // Table 20-10. An undefined q_id is the only applicable error (§20.15.6).
+    if (args.size() < 4) return MakeLogic4VecVal(arena, 32, 0);
+    uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
+    auto it = queues.find(q_id);
+    if (it == queues.end()) {
+      WriteQueueStatus(args[3], kQUndefinedId, ctx, arena);
+      return MakeLogic4VecVal(arena, 32, kQUndefinedId);
     }
-    return MakeLogic4VecVal(arena, 32, 0);
+    const auto& q = it->second;
+    int64_t code = QueueSignedArg(EvalExpr(args[1], ctx, arena));
+    uint64_t now = ctx.CurrentTime().ticks;
+    uint64_t value = 0;
+    switch (code) {
+      case 1:  // Current queue length.
+        value = q.count;
+        break;
+      case 2:  // Mean interarrival time: total span between the first and last
+               // arrival divided by the number of gaps between arrivals.
+        value = q.arrivals > 1
+                    ? (q.last_arrival_tick - q.first_arrival_tick) /
+                          (q.arrivals - 1)
+                    : 0;
+        break;
+      case 3:  // Maximum queue length ever reached.
+        value = q.max_count;
+        break;
+      case 4:  // Shortest wait time ever, across removed entries.
+        value = q.departures ? q.shortest_wait : 0;
+        break;
+      case 5:  // Longest wait among entries still queued: the oldest entry is at
+               // the front, as $q_add appends in arrival order.
+        value = q.entries.empty()
+                    ? 0
+                    : (now >= q.entries.front().arrival_tick
+                           ? now - q.entries.front().arrival_tick
+                           : 0);
+        break;
+      case 6:  // Average wait time over removed entries.
+        value = q.departures ? q.total_wait / q.departures : 0;
+        break;
+      default:
+        value = 0;
+        break;
+    }
+    WriteQueueOutput(args[2], value, ctx, arena);
+    WriteQueueStatus(args[3], kQOk, ctx, arena);
+    return MakeLogic4VecVal(arena, 32, kQOk);
   }
 
   return MakeLogic4VecVal(arena, 32, 0);

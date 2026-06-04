@@ -120,10 +120,13 @@ struct ArrayInfo {
 
 // §20.15.3: a queued entry as the queue manager retains it. $q_add records the
 // job_id and the user-defined inform_id; $q_remove hands both back through its
-// output arguments when the entry is taken off the queue.
+// output arguments when the entry is taken off the queue. §20.15.5 additionally
+// stamps each entry with the simulation time it was placed, so the queue's
+// wait-time statistics can be derived when an entry leaves or is examined.
 struct StochasticQueueEntry {
   uint64_t job_id = 0;
   uint64_t inform_id = 0;
+  uint64_t arrival_tick = 0;
 };
 
 // §20.15: per-queue bookkeeping for the stochastic-analysis queue tasks.
@@ -132,11 +135,25 @@ struct StochasticQueueEntry {
 // 20-11). `entries` holds the stored entries in arrival order so that
 // §20.15.3 $q_remove can return the job_id/inform_id of the entry it removes,
 // selected per the FIFO/LIFO discipline fixed by the q_type (see §20.15.1).
+//
+// The remaining fields accumulate the activity statistics that §20.15.5
+// $q_exam reports through Table 20-10: the peak occupancy ever reached, the
+// span and number of arrivals (for the mean interarrival time), and the
+// completed-wait totals (count, sum and minimum) gathered as entries are
+// removed.
 struct StochasticQueue {
   int64_t q_type = 0;
   int64_t max_length = 0;
   uint64_t count = 0;
   std::deque<StochasticQueueEntry> entries;
+
+  uint64_t max_count = 0;
+  uint64_t arrivals = 0;
+  uint64_t first_arrival_tick = 0;
+  uint64_t last_arrival_tick = 0;
+  uint64_t departures = 0;
+  uint64_t total_wait = 0;
+  uint64_t shortest_wait = 0;
 };
 
 enum class DelayMode : uint8_t { kMin, kTyp, kMax };
