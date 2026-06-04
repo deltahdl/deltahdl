@@ -1,5 +1,4 @@
 #include "fixture_parser.h"
-#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -38,14 +37,15 @@ TEST(IoSystemTaskParsing, ReadmembWithAddresses) {
               "endmodule\n"));
 }
 
-TEST_F(ApiParseTest, ReadmemhSystemCall) {
-  auto* unit = Parse(R"(
-    module m;
-      logic [7:0] mem [0:255];
-      initial $readmemh("data.hex", mem);
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
+// Syntax 21-12: the finish_addr is nested inside the start_addr option, so a
+// three-argument call (filename, memory_name, start_addr) is a distinct,
+// legal form of the production.
+TEST(IoSystemTaskParsing, ReadmemhWithStartAddrOnly) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  reg [7:0] mem [0:255];\n"
+              "  initial $readmemh(\"data.hex\", mem, 16);\n"
+              "endmodule\n"));
 }
 
 }

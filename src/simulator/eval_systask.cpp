@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <bit>
 #include <cstdint>
 #include <cstdio>
@@ -5,6 +6,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -1033,39 +1035,226 @@ static Logic4Vec EvalFdisplayWrite(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-static uint64_t ParseHexLine(const std::string& line) {
-  return std::strtoull(line.c_str(), nullptr, 16);
+// §21.4: a number in the load file carries neither a length nor a base; the
+// task name fixes the radix (binary for $readmemb, hexadecimal for $readmemh).
+// The unknown value (x), the high-impedance value (z), and underscores may
+// appear within a number, so the token is parsed into a 4-state element value
+// rather than a plain integer. Underscores are discarded separators; x/z
+// preserve their per-bit nature in the loaded word.
+static Logic4Vec ParseMemNumber(Arena& arena, const std::string& tok,
+                                bool is_hex, uint32_t width) {
+  std::vector<std::pair<bool, bool>> bits;  // (aval, bval), least bit first
+  int per_char = is_hex ? 4 : 1;
+  for (auto it = tok.rbegin(); it != tok.rend(); ++it) {
+    char c = *it;
+    if (c == '_') continue;
+    uint8_t aval = 0;
+    uint8_t bval = 0;
+    if (c == 'x' || c == 'X') {
+      aval = is_hex ? 0xF : 0x1;
+      bval = aval;
+    } else if (c == 'z' || c == 'Z' || c == '?') {
+      bval = is_hex ? 0xF : 0x1;
+    } else {
+      int digit = -1;
+      if (c >= '0' && c <= '9') {
+        digit = c - '0';
+      } else if (c >= 'a' && c <= 'f') {
+        digit = c - 'a' + 10;
+      } else if (c >= 'A' && c <= 'F') {
+        digit = c - 'A' + 10;
+      }
+      if (digit < 0) continue;
+      aval = static_cast<uint8_t>(digit);
+    }
+    for (int b = 0; b < per_char; ++b) {
+      bits.push_back({(aval >> b) & 1, (bval >> b) & 1});
+    }
+  }
+  auto vec = MakeLogic4Vec(arena, width);
+  for (uint32_t i = 0; i < width && i < bits.size(); ++i) {
+    if (bits[i].first) vec.words[i / 64].aval |= uint64_t{1} << (i % 64);
+    if (bits[i].second) vec.words[i / 64].bval |= uint64_t{1} << (i % 64);
+  }
+  return vec;
 }
 
-static uint64_t ParseBinLine(const std::string& line) {
-  return std::strtoull(line.c_str(), nullptr, 2);
-}
-
+// §21.4: $readmemb / $readmemh read a text file of white space, comments, and
+// unsized numbers into the successive word elements of an unpacked array. The
+// optional start_addr and finish_addr arguments — together with any @-address
+// specifications embedded in the file — control which addresses receive data
+// and in which direction the load proceeds.
 static Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
                              bool is_hex) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 1, 0);
-  std::string filename = ExtractStrArg(expr->args[0]);
+  // §21.4: the filename may be a string literal, a string-typed value, or an
+  // integral value whose bytes spell the name; EvalStringArg covers all three.
+  std::string filename = EvalStringArg(expr->args[0], ctx, arena);
 
   std::ifstream ifs(filename);
   if (!ifs.is_open()) {
-    std::cerr << "WARNING: $readmem" << (is_hex ? "h" : "b")
-              << ": cannot open file: " << filename << "\n";
+    ctx.GetDiag().Warning(
+        {}, "$readmem" + std::string(is_hex ? "h" : "b") +
+                ": cannot open file: " + filename);
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  std::string content((std::istreambuf_iterator<char>(ifs)),
+                      std::istreambuf_iterator<char>());
+
+  // §21.4: memory_name is a bare unpacked array or a slice of one (the lowest
+  // dimension may be written with slice syntax, see 7.4.5). The selected index
+  // range is the address space the load works over.
+  const Expr* mn = expr->args[1];
+  const Expr* base_id = nullptr;
+  bool is_slice = false;
+  int64_t slice_lo = 0;
+  int64_t slice_hi = 0;
+  if (mn->kind == ExprKind::kIdentifier) {
+    base_id = mn;
+  } else if (mn->kind == ExprKind::kSelect && mn->index_end != nullptr &&
+             !mn->is_part_select_plus && !mn->is_part_select_minus &&
+             mn->base != nullptr && mn->base->kind == ExprKind::kIdentifier) {
+    base_id = mn->base;
+    is_slice = true;
+    int64_t a = static_cast<int64_t>(EvalExpr(mn->index, ctx, arena).ToUint64());
+    int64_t b =
+        static_cast<int64_t>(EvalExpr(mn->index_end, ctx, arena).ToUint64());
+    slice_lo = std::min(a, b);
+    slice_hi = std::max(a, b);
+  } else {
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  std::string mem_name(base_id->text);
+  const ArrayInfo* ai = ctx.FindArrayInfo(mem_name);
+  if (!ai) return MakeLogic4VecVal(arena, 1, 0);
+
+  int64_t arr_lo = ai->lo;
+  int64_t arr_hi = ai->lo + static_cast<int64_t>(ai->size) - 1;
+  // A slice narrows the load window to its own bounds (clamped to the array).
+  int64_t low_addr = is_slice ? std::max(slice_lo, arr_lo) : arr_lo;
+  int64_t high_addr = is_slice ? std::min(slice_hi, arr_hi) : arr_hi;
+  uint32_t elem_width = ai->elem_width;
+
+  bool has_start = expr->args.size() >= 3;
+  bool has_finish = expr->args.size() >= 4;
+  int64_t start_addr =
+      has_start
+          ? static_cast<int64_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64())
+          : low_addr;
+  int64_t finish_addr =
+      has_finish
+          ? static_cast<int64_t>(EvalExpr(expr->args[3], ctx, arena).ToUint64())
+          : high_addr;
+
+  // §21.4: the direction of the highest dimension's entries follows the
+  // relative magnitudes of start_addr and finish_addr. Loading runs downward
+  // only when both bounds are supplied and start exceeds finish; otherwise it
+  // runs upward. The chosen direction persists even past an @-address in the
+  // file.
+  bool descending = has_start && has_finish && start_addr > finish_addr;
+  int64_t cursor = has_start ? start_addr : low_addr;
+
+  // The address window the system-task arguments permit. When the task names a
+  // start (and optionally a finish), addresses appearing in the file must lie
+  // within this window.
+  int64_t task_lo = has_finish ? std::min(start_addr, finish_addr) : start_addr;
+  int64_t task_hi = has_finish ? std::max(start_addr, finish_addr) : high_addr;
+
+  // §21.4: when slice syntax names the memory, the start_addr and finish_addr
+  // arguments must fall within the slice's bounds.
+  if (is_slice && has_start &&
+      (start_addr < low_addr || start_addr > high_addr ||
+       (has_finish && (finish_addr < low_addr || finish_addr > high_addr)))) {
+    ctx.GetDiag().Error(
+        {}, "$readmem" + std::string(is_hex ? "h" : "b") +
+                ": start/finish address outside the slice bounds");
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
-  Variable* target = nullptr;
-  if (expr->args[1]->kind == ExprKind::kIdentifier) {
-    target = ctx.FindVariable(expr->args[1]->text);
+  auto write_word = [&](int64_t addr, const Logic4Vec& v) {
+    if (addr < low_addr || addr > high_addr) return;
+    std::string elem = mem_name + "[" + std::to_string(addr) + "]";
+    if (auto* var = ctx.FindVariable(elem)) var->value = v;
+  };
+
+  auto is_space = [](char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' ||
+           c == '\v';
+  };
+
+  bool addr_in_file = false;
+  uint64_t data_words = 0;
+  size_t pos = 0;
+  size_t n = content.size();
+  while (pos < n) {
+    char c = content[pos];
+    if (is_space(c)) {
+      ++pos;
+      continue;
+    }
+    // §21.4: both comment forms are permitted between numbers.
+    if (c == '/' && pos + 1 < n && content[pos + 1] == '/') {
+      pos += 2;
+      while (pos < n && content[pos] != '\n') ++pos;
+      continue;
+    }
+    if (c == '/' && pos + 1 < n && content[pos + 1] == '*') {
+      pos += 2;
+      while (pos + 1 < n && !(content[pos] == '*' && content[pos + 1] == '/')) {
+        ++pos;
+      }
+      pos = (pos + 1 < n) ? pos + 2 : n;
+      continue;
+    }
+    // A token is a maximal run of characters bounded by white space or a
+    // comment.
+    size_t begin = pos;
+    while (pos < n) {
+      char t = content[pos];
+      if (is_space(t)) break;
+      if (t == '/' && pos + 1 < n &&
+          (content[pos + 1] == '/' || content[pos + 1] == '*')) {
+        break;
+      }
+      ++pos;
+    }
+    std::string tok = content.substr(begin, pos - begin);
+    if (tok.empty()) continue;
+
+    if (tok[0] == '@') {
+      // §21.4: an @-address is a hexadecimal index that repositions the load
+      // cursor; no white space separates the '@' from its digits.
+      int64_t addr =
+          static_cast<int64_t>(std::strtoull(tok.c_str() + 1, nullptr, 16));
+      addr_in_file = true;
+      if (has_start && (addr < task_lo || addr > task_hi)) {
+        // §21.4: a file address outside the task-specified window is an error
+        // and ends the load.
+        ctx.GetDiag().Error(
+            {}, "$readmem" + std::string(is_hex ? "h" : "b") +
+                    ": file address outside the range given by the task");
+        return MakeLogic4VecVal(arena, 1, 0);
+      }
+      cursor = addr;
+      continue;
+    }
+
+    write_word(cursor, ParseMemNumber(arena, tok, is_hex, elem_width));
+    ++data_words;
+    cursor += descending ? -1 : 1;
   }
-  if (!target) return MakeLogic4VecVal(arena, 1, 0);
 
-  std::string line;
-  while (std::getline(ifs, line)) {
-
-    if (line.empty() || line[0] == '/' || line[0] == '#') continue;
-    uint64_t val = is_hex ? ParseHexLine(line) : ParseBinLine(line);
-    target->value = MakeLogic4VecVal(arena, target->value.width, val);
-    break;
+  // §21.4: with an explicit start-through-finish window and no addresses in the
+  // file, the data-word count must match the window size, else a warning is
+  // issued. Addresses not covered by the file are left unmodified, which the
+  // write loop above already guarantees.
+  if (has_start && has_finish && !addr_in_file) {
+    uint64_t span = static_cast<uint64_t>(task_hi - task_lo + 1);
+    if (data_words != span) {
+      ctx.GetDiag().Warning(
+          {}, "$readmem" + std::string(is_hex ? "h" : "b") +
+                  ": number of data words differs from the address range");
+    }
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }
