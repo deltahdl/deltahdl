@@ -45,6 +45,7 @@ add_library(deltahdl_lib STATIC
     elaborator/covergroup_inheritance.cpp
     elaborator/cross_bin_with_covergroup.cpp
     elaborator/cross_automatic_types.cpp
+    elaborator/cross_set_expression.cpp
     elaborator/coverpoint_bin_set_expression.cpp
     elaborator/concurrent_assertion_expr.cpp
     elaborator/function_in_checker.cpp
