@@ -75,4 +75,17 @@ TEST(SyncEventParse, InoutSignalSyncEvent) {
               "endmodule\n"));
 }
 
+TEST(SyncEventParse, WaitForClockingBlockEvent) {
+  // §14.15: an @ expression that names a clocking block on its own (rather than
+  // one of its signals) waits for that block's next clocking event, e.g.
+  // @(ram_bus);.
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  clocking ram_bus @(posedge clk);\n"
+              "    input ack_l;\n"
+              "  endclocking\n"
+              "  initial @(ram_bus) $display(\"tick\");\n"
+              "endmodule\n"));
+}
+
 }
