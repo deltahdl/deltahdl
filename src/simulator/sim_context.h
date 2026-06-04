@@ -117,6 +117,16 @@ struct ArrayInfo {
   DataTypeKind elem_type_kind = DataTypeKind::kImplicit;
 };
 
+// §20.15: per-queue bookkeeping for the stochastic-analysis queue tasks.
+// Only the state needed to resolve the §20.15.6 status codes is kept: the
+// queue type and capacity validated at creation, and the running occupancy
+// used to detect the full and empty error conditions of Table 20-11.
+struct StochasticQueue {
+  int64_t q_type = 0;
+  int64_t max_length = 0;
+  uint64_t count = 0;
+};
+
 enum class DelayMode : uint8_t { kMin, kTyp, kMax };
 
 // State block governed by $timeformat (see 20.4.3). The four members map
@@ -304,6 +314,14 @@ class SimContext {
 
   const std::unordered_map<std::string_view, Variable*>& GetVariables() const {
     return variables_;
+  }
+
+  // §20.15.6: the live registry of stochastic-analysis queues, keyed by the
+  // q_id supplied to $q_initialize. Its membership drives the "undefined
+  // q_id" status, and each entry's capacity and occupancy drive the "queue
+  // full" and "queue empty" statuses.
+  std::unordered_map<uint64_t, StochasticQueue>& StochasticQueues() {
+    return stochastic_queues_;
   }
 
   int32_t Random32();
@@ -620,6 +638,7 @@ class SimContext {
   std::unordered_map<std::string_view, ArrayInfo> array_infos_;
 
   std::unordered_map<std::string_view, QueueObject*> queues_;
+  std::unordered_map<uint64_t, StochasticQueue> stochastic_queues_;
 
   std::unordered_map<std::string_view, AssocArrayObject*> assoc_arrays_;
 

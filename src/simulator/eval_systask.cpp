@@ -517,6 +517,134 @@ Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return as_int(q.size);  // $size
 }
 
+// §20.15.6 Table 20-11 status code values returned through the trailing
+// `status` output argument of every stochastic-analysis queue task and
+// function. Value 7 ("not enough memory, cannot create queue") is defined by
+// the table but has no deterministic trigger in the model, so nothing emits
+// it.
+enum QueueStatus : uint64_t {
+  kQOk = 0,                 // OK
+  kQFullCannotAdd = 1,      // queue full, cannot add
+  kQUndefinedId = 2,        // undefined q_id
+  kQEmptyCannotRemove = 3,  // queue empty, cannot remove
+  kQUnsupportedType = 4,    // unsupported queue type, cannot create
+  kQNonPositiveLength = 5,  // specified length <= 0, cannot create
+  kQDuplicateId = 6,        // duplicate q_id, cannot create
+};
+
+// Read an argument as a signed value, sign-extending from its own width so a
+// negative max_length is recognized as such (Table 20-11 status 5 keys on
+// length <= 0).
+static int64_t QueueSignedArg(const Logic4Vec& v) {
+  uint64_t raw = v.ToUint64();
+  uint32_t w = v.width;
+  if (w == 0 || w >= 64) return static_cast<int64_t>(raw);
+  uint64_t sign_bit = 1ull << (w - 1);
+  if (raw & sign_bit) raw |= ~((1ull << w) - 1);
+  return static_cast<int64_t>(raw);
+}
+
+// §20.15.6: deliver the resolved status code into the queue task's `status`
+// output argument, which every queue task and function returns.
+static void WriteQueueStatus(const Expr* status_arg, uint64_t status,
+                             SimContext& ctx, Arena& arena) {
+  if (!status_arg || status_arg->kind != ExprKind::kIdentifier) return;
+  auto* var = ctx.FindVariable(status_arg->text);
+  if (var) var->value = MakeLogic4VecVal(arena, var->value.width, status);
+}
+
+// §20.15.6: resolve and report the Table 20-11 status code for each
+// stochastic-analysis queue task/function. The queue type/capacity validated
+// at $q_initialize and the occupancy tracked across $q_add/$q_remove supply
+// the error conditions; the non-status outputs (job/inform ids, the
+// fullness result, the statistics value) are the descendant subclauses' rules
+// and are left to their own stubs here.
+static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
+                                     Arena& arena, std::string_view name) {
+  auto& queues = ctx.StochasticQueues();
+  const auto& args = expr->args;
+
+  if (name == "$q_initialize") {
+    if (args.size() < 4) return MakeLogic4VecVal(arena, 32, 0);
+    uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
+    int64_t q_type = QueueSignedArg(EvalExpr(args[1], ctx, arena));
+    int64_t max_length = QueueSignedArg(EvalExpr(args[2], ctx, arena));
+    uint64_t status;
+    if (q_type != 1 && q_type != 2) {
+      status = kQUnsupportedType;
+    } else if (max_length <= 0) {
+      status = kQNonPositiveLength;
+    } else if (queues.count(q_id)) {
+      status = kQDuplicateId;
+    } else {
+      queues[q_id] = StochasticQueue{q_type, max_length, 0};
+      status = kQOk;
+    }
+    WriteQueueStatus(args[3], status, ctx, arena);
+    return MakeLogic4VecVal(arena, 32, status);
+  }
+
+  if (name == "$q_add") {
+    if (args.size() < 4) return MakeLogic4VecVal(arena, 32, 0);
+    uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
+    auto it = queues.find(q_id);
+    uint64_t status;
+    if (it == queues.end()) {
+      status = kQUndefinedId;
+    } else if (static_cast<int64_t>(it->second.count) >=
+               it->second.max_length) {
+      status = kQFullCannotAdd;
+    } else {
+      ++it->second.count;
+      status = kQOk;
+    }
+    WriteQueueStatus(args[3], status, ctx, arena);
+    return MakeLogic4VecVal(arena, 32, status);
+  }
+
+  if (name == "$q_remove") {
+    if (args.size() < 4) return MakeLogic4VecVal(arena, 32, 0);
+    uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
+    auto it = queues.find(q_id);
+    uint64_t status;
+    if (it == queues.end()) {
+      status = kQUndefinedId;
+    } else if (it->second.count == 0) {
+      status = kQEmptyCannotRemove;
+    } else {
+      --it->second.count;
+      status = kQOk;
+    }
+    WriteQueueStatus(args[3], status, ctx, arena);
+    return MakeLogic4VecVal(arena, 32, status);
+  }
+
+  if (name == "$q_full") {
+    // The 0/1 fullness result is §20.15.4's output; only the status code is
+    // resolved here. The single applicable error condition is an undefined
+    // q_id.
+    if (args.size() >= 2) {
+      uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
+      WriteQueueStatus(args[1],
+                       queues.count(q_id) ? kQOk : kQUndefinedId, ctx, arena);
+    }
+    return MakeLogic4VecVal(arena, 32, 0);
+  }
+
+  if (name == "$q_exam") {
+    // The statistics value is §20.15.5's output; here only the status code is
+    // resolved, whose sole applicable error is an undefined q_id.
+    if (args.size() >= 4) {
+      uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
+      WriteQueueStatus(args[3],
+                       queues.count(q_id) ? kQOk : kQUndefinedId, ctx, arena);
+    }
+    return MakeLogic4VecVal(arena, 32, 0);
+  }
+
+  return MakeLogic4VecVal(arena, 32, 0);
+}
+
 Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            std::string_view name) {
 
@@ -552,7 +680,8 @@ Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
   if (name.starts_with("$coverage")) return MakeLogic4VecVal(arena, 32, 0);
 
-  if (name.starts_with("$q_")) return MakeLogic4VecVal(arena, 32, 0);
+  if (name.starts_with("$q_"))
+    return EvalStochasticQueue(expr, ctx, arena, name);
 
   return MakeLogic4VecVal(arena, 32, 0);
 }
