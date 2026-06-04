@@ -64,6 +64,24 @@ TEST(ClockingScopeElab, MultipleBlocksSameModuleElaborates) {
              "endmodule\n"));
 }
 
+TEST(ClockingScopeElab, SameBlockNameAcrossInstantiatedScopesElaborates) {
+  // §14.7: a clocking block's scope is local to its enclosing module, so the
+  // same clocking block name can appear in a module and in a submodule it
+  // instantiates without the two colliding during elaboration.
+  EXPECT_TRUE(
+      ElabOk("module sub;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    input data;\n"
+             "  endclocking\n"
+             "endmodule\n"
+             "module top;\n"
+             "  sub u_sub();\n"
+             "  clocking cb @(posedge clk);\n"
+             "    input data;\n"
+             "  endclocking\n"
+             "endmodule\n"));
+}
+
 TEST(ClockingScopeElab, StaticLifetimeInModule) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

@@ -143,6 +143,32 @@ TEST(ClockingScopeParse, NestedClockingRejected) {
               "endmodule\n"));
 }
 
+TEST(ClockingScopeParse, InClassRejected) {
+  // §14.7: a clocking block may be declared only inside a module, interface,
+  // checker, or program. A class is none of these, so a clocking block in a
+  // class body is not accepted.
+  EXPECT_FALSE(
+      ParseOk("class c;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "  endclocking\n"
+              "endclass\n"));
+}
+
+TEST(ClockingScopeParse, InProceduralBlockRejected) {
+  // §14.7: a clocking block is a declaration at module/interface/checker/
+  // program level, not a procedural statement, so it cannot appear inside an
+  // initial block.
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    clocking cb @(posedge clk);\n"
+              "      input data;\n"
+              "    endclocking\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 TEST(ClockingScopeParse, MultipleBlocksInModule) {
   auto r = Parse(
       "module m;\n"
