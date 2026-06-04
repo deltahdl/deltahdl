@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <deque>
 #include <map>
 #include <random>
 #include <string>
@@ -117,14 +118,25 @@ struct ArrayInfo {
   DataTypeKind elem_type_kind = DataTypeKind::kImplicit;
 };
 
+// §20.15.3: a queued entry as the queue manager retains it. $q_add records the
+// job_id and the user-defined inform_id; $q_remove hands both back through its
+// output arguments when the entry is taken off the queue.
+struct StochasticQueueEntry {
+  uint64_t job_id = 0;
+  uint64_t inform_id = 0;
+};
+
 // §20.15: per-queue bookkeeping for the stochastic-analysis queue tasks.
-// Only the state needed to resolve the §20.15.6 status codes is kept: the
-// queue type and capacity validated at creation, and the running occupancy
-// used to detect the full and empty error conditions of Table 20-11.
+// The queue type and capacity validated at creation and the running occupancy
+// drive the §20.15.6 status codes (the full and empty conditions of Table
+// 20-11). `entries` holds the stored entries in arrival order so that
+// §20.15.3 $q_remove can return the job_id/inform_id of the entry it removes,
+// selected per the FIFO/LIFO discipline fixed by the q_type (see §20.15.1).
 struct StochasticQueue {
   int64_t q_type = 0;
   int64_t max_length = 0;
   uint64_t count = 0;
+  std::deque<StochasticQueueEntry> entries;
 };
 
 enum class DelayMode : uint8_t { kMin, kTyp, kMax };

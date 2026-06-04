@@ -553,10 +553,20 @@ static void WriteQueueStatus(const Expr* status_arg, uint64_t status,
   if (var) var->value = MakeLogic4VecVal(arena, var->value.width, status);
 }
 
+// §20.15.3: write an integer value back through one of $q_remove's output
+// arguments (job_id, inform_id), keeping the destination variable's own width.
+static void WriteQueueOutput(const Expr* out_arg, uint64_t value,
+                             SimContext& ctx, Arena& arena) {
+  if (!out_arg || out_arg->kind != ExprKind::kIdentifier) return;
+  auto* var = ctx.FindVariable(out_arg->text);
+  if (var) var->value = MakeLogic4VecVal(arena, var->value.width, value);
+}
+
 // §20.15.6: resolve and report the Table 20-11 status code for each
 // stochastic-analysis queue task/function. The queue type/capacity validated
 // at $q_initialize and the occupancy tracked across $q_add/$q_remove supply
-// the error conditions; the non-status outputs (job/inform ids, the
+// the error conditions. $q_remove additionally returns its removed entry's
+// job_id/inform_id outputs (§20.15.3); the remaining non-status outputs (the
 // fullness result, the statistics value) are the descendant subclauses' rules
 // and are left to their own stubs here.
 static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
@@ -595,6 +605,12 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
                it->second.max_length) {
       status = kQFullCannotAdd;
     } else {
+      // Retain the entry's identifiers so §20.15.3 $q_remove can return them;
+      // the inform_id holds whatever value $q_add was handed (its meaning is
+      // user-defined).
+      uint64_t job_id = EvalExpr(args[1], ctx, arena).ToUint64();
+      uint64_t inform_id = EvalExpr(args[2], ctx, arena).ToUint64();
+      it->second.entries.push_back(StochasticQueueEntry{job_id, inform_id});
       ++it->second.count;
       status = kQOk;
     }
@@ -603,6 +619,9 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
   }
 
   if (name == "$q_remove") {
+    // §20.15.3 $q_remove(q_id, job_id, inform_id, status): take an entry off
+    // the queue selected by q_id (an integer input) and report the removed
+    // entry's identifiers through the job_id and inform_id outputs.
     if (args.size() < 4) return MakeLogic4VecVal(arena, 32, 0);
     uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
     auto it = queues.find(q_id);
@@ -612,7 +631,21 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
     } else if (it->second.count == 0) {
       status = kQEmptyCannotRemove;
     } else {
-      --it->second.count;
+      // Choose the entry per the discipline fixed at $q_initialize: q_type 2
+      // (LIFO) returns the most recently added entry, otherwise q_type 1
+      // (FIFO) returns the oldest. $q_add always appends to the back.
+      auto& q = it->second;
+      StochasticQueueEntry entry;
+      if (q.q_type == 2) {
+        entry = q.entries.back();
+        q.entries.pop_back();
+      } else {
+        entry = q.entries.front();
+        q.entries.pop_front();
+      }
+      --q.count;
+      WriteQueueOutput(args[1], entry.job_id, ctx, arena);
+      WriteQueueOutput(args[2], entry.inform_id, ctx, arena);
       status = kQOk;
     }
     WriteQueueStatus(args[3], status, ctx, arena);
