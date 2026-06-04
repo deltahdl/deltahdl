@@ -858,9 +858,12 @@ class CoverageDB {
   // --- LRM 19.7.1: covergroup type options ----------------------------------
 
   // Computes type (cumulative) coverage over the instances of a covergroup
-  // type. With merge_instances the bins are unioned across instances (a bin is
-  // covered if any instance covered it); otherwise the per-instance coverage is
-  // combined as a weighted average (LRM 19.7.1).
+  // type. With merge_instances false the per-instance coverage is combined as a
+  // weighted average (LRM 19.11.3). With merge_instances true the bins of every
+  // instance are unioned by name: same-named bins overlap and their hit counts
+  // sum, while differently named bins are distinct members of the union, so
+  // instances with different bin layouts enlarge it rather than collapse onto
+  // one another (LRM 19.11.3).
   static double ComputeTypeCoverage(
       const std::vector<const CoverGroup*>& instances, bool merge_instances);
 
@@ -959,6 +962,25 @@ class CoverageDB {
   // 19.11.2).
   static double GetCrossCoverage(const CrossCover* cross, int32_t& covered_bins,
                                  int32_t& total_bins);
+
+  // --- LRM 19.11.3: type coverage computation -------------------------------
+
+  // The type coverage of a single coverpoint, computed across the instances of
+  // its covergroup type. With merge_instances false it is the weighted average
+  // of the coverpoint's coverage in each instance, weighted by the coverpoint's
+  // own option.weight in that instance. With merge_instances true it is the
+  // union of the coverpoint's bins across instances: bins that share a name
+  // overlap and their hit counts sum, while differently named bins are distinct
+  // members of the union (LRM 19.11.3).
+  static double ComputePointTypeCoverage(
+      const std::vector<const CoverPoint*>& instances, bool merge_instances);
+
+  // The type coverage of a single cross, computed across the instances of its
+  // covergroup type, by the same two rules as ComputePointTypeCoverage but
+  // weighted by the cross's own option.weight and unioning cross bins by their
+  // cross-product name (LRM 19.11.3).
+  static double ComputeCrossTypeCoverage(
+      const std::vector<const CrossCover*>& instances, bool merge_instances);
 
   // --- LRM 19.4.1: embedded covergroup inheritance --------------------------
 
