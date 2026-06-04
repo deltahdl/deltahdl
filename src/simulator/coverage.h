@@ -413,6 +413,15 @@ class CoverageDB {
       const std::vector<std::vector<size_t>>& user_selected_products,
       bool retain_auto_bins);
 
+  // --- LRM 19.6.1.1: select expressions on transition bins ------------------
+
+  // The value set a select expression's binsof operator intersects against for
+  // one bin. An ordinary value bin contributes its values directly; for a
+  // transition bin binsof uses the last value of each transition sequence the
+  // bin carries (LRM 19.6.1.1), since a transition has no single value of its
+  // own. Returns an empty set for a transition bin that carries no sequence.
+  static std::vector<int64_t> BinsofBinValues(const CoverBin& bin);
+
   // --- LRM 19.6.1.2: cross bin with covergroup expressions ------------------
 
   // Counts how many value tuples of a candidate bin tuple satisfy the

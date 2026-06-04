@@ -659,6 +659,19 @@ bool CoverageDB::CrossBareVariableAllowed(bool variable_is_real) {
 
 // --- LRM 19.6.1: defining cross coverage bins -------------------------------
 
+std::vector<int64_t> CoverageDB::BinsofBinValues(const CoverBin& bin) {
+  // A transition bin has no value set of its own; binsof intersects against the
+  // last value of each of its transition sequences (LRM 19.6.1.1).
+  if (!bin.transitions.empty()) {
+    std::vector<int64_t> last_values;
+    for (const auto& seq : bin.transitions) {
+      if (!seq.empty()) last_values.push_back(seq.back());
+    }
+    return last_values;
+  }
+  return bin.values;
+}
+
 std::vector<std::vector<int64_t>> CoverageDB::BinsofYield(const CoverPoint* cp,
                                                           int64_t bin_index) {
   std::vector<std::vector<int64_t>> yielded;
@@ -666,13 +679,13 @@ std::vector<std::vector<int64_t>> CoverageDB::BinsofYield(const CoverPoint* cp,
   if (bin_index >= 0) {
     // binsof(cp.bin) yields the single named coverpoint bin.
     if (static_cast<size_t>(bin_index) < cp->bins.size()) {
-      yielded.push_back(cp->bins[static_cast<size_t>(bin_index)].values);
+      yielded.push_back(BinsofBinValues(cp->bins[static_cast<size_t>(bin_index)]));
     }
     return yielded;
   }
   // binsof(cp) yields every bin of the coverpoint.
   for (const auto& bin : cp->bins) {
-    yielded.push_back(bin.values);
+    yielded.push_back(BinsofBinValues(bin));
   }
   return yielded;
 }
