@@ -84,6 +84,32 @@ TEST(RandsequenceSim, IfWithoutElseFalseGeneratesNothing) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
+// 18.17.2: the else branch is optional, but its absence does not affect the
+// then branch. With no else and a true condition, the then production is still
+// generated.
+TEST(RandsequenceSim, IfWithoutElseTrueGeneratesThen) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd5;\n"
+      "    randsequence(main)\n"
+      "      main : if (1) a;\n"
+      "      a : { x = 8'd1; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 // 18.17.2: the condition is treated as a Boolean. Any non-zero value is true,
 // not just literal 1, so a condition of 5 still selects the then production.
 TEST(RandsequenceSim, NonOneTruthyConditionSelectsThen) {
