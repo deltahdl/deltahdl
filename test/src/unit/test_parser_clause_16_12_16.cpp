@@ -136,4 +136,22 @@ TEST(PropertyCaseParsing, NestedCaseDefaultsCountedPerCase) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §16.12.16 (property_case_item + default optional): a default item is itself a
+// valid property_case_item, so a case property whose sole item is the default
+// parses cleanly. A single default is legal — the at-most-one-default rule only
+// rejects a second one — so this exercises the boundary between "no error" and
+// the multiple-default error.
+TEST(PropertyCaseParsing, CaseWithOnlyDefaultItemParses) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p(logic [1:0] sel);\n"
+      "    case (sel)\n"
+      "      default : a;\n"
+      "    endcase\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

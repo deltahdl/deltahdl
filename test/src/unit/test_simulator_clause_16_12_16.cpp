@@ -92,4 +92,26 @@ TEST(PropertyCase, NoDefaultAllComparisonsFailSucceedsVacuously) {
             PropertyResult::kVacuousPass);
 }
 
+// §16.12.16: the empty-ordinary-item boundary — a case property whose only item
+// is the default. With no ordinary items the linear search finds no match, so
+// the default item's property statement supplies the verdict.
+TEST(PropertyCase, EmptyItemListWithDefaultExecutesDefault) {
+  std::vector<PropertyCaseBranch> branches;
+  EXPECT_EQ(EvalPropertyCase(branches, /*has_default=*/true,
+                             /*default_result=*/PropertyResult::kFail),
+            PropertyResult::kFail);
+  EXPECT_EQ(EvalPropertyCase(branches, /*has_default=*/true,
+                             /*default_result=*/PropertyResult::kPass),
+            PropertyResult::kPass);
+}
+
+// §16.12.16: the empty-ordinary-item boundary with no default — the search has
+// nothing to evaluate, so the case property holds vacuously.
+TEST(PropertyCase, EmptyItemListWithoutDefaultSucceedsVacuously) {
+  std::vector<PropertyCaseBranch> branches;
+  EXPECT_EQ(EvalPropertyCase(branches, /*has_default=*/false,
+                             PropertyResult::kFail),
+            PropertyResult::kVacuousPass);
+}
+
 }  // namespace
