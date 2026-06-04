@@ -138,6 +138,33 @@ TEST(RandsequenceSim, CaseProductionDefaultIsFallbackRegardlessOfPosition) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
+// 18.17.3: when several case item expressions match the case expression, the
+// first one written wins. Both items below match the value 5, but the earlier
+// production (a) is the one generated, not b.
+TEST(RandsequenceSim, CaseProductionFirstMatchingItemWinsWhenSeveralMatch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    randsequence(main)\n"
+      "      main : case (5) 5: a; 5: b; endcase;\n"
+      "      a : { x = 8'd10; };\n"
+      "      b : { x = 8'd20; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
 // 18.17.3: with no match and no default item, nothing is generated.
 TEST(RandsequenceSim, CaseProductionNoMatchNoDefaultGeneratesNothing) {
   SimFixture f;
