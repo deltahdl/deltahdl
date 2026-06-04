@@ -1995,6 +1995,101 @@ void Elaborator::ValidateArrayQueryOnDynamicType(const ModuleDecl* decl) {
 
 namespace {
 
+// §20.7.1: a single unpacked dimension is "variable-sized" when it is a dynamic
+// array ([], stored as a null dimension), a queue ([$]), or a wildcard
+// associative array ([*]) — the same classification §20.7 uses for a
+// dynamically sized dimension.
+bool DimIsVariableSized(const Expr* d) {
+  if (d == nullptr) return true;
+  return d->kind == ExprKind::kIdentifier && (d->text == "$" || d->text == "*");
+}
+
+using VarDimMap =
+    std::unordered_map<std::string_view, const std::vector<Expr*>*>;
+
+// §20.7.1: when a §20.7 query function is called as (v, n) on an array variable
+// v with a constant dimension index n greater than 1, it is an error if the
+// n-th dimension is variable-sized. The slowest-varying unpacked dimension is
+// dimension 1, so unpacked_dims[n-1] names dimension n. Dimension 1 (or a query
+// with no dimension argument) stays legal even when it is variable-sized, since
+// a query on the outermost dynamic dimension still has a well-defined extent;
+// an inner variable-sized dimension does not, because each element of the
+// slower-varying dimension can hold a differently sized object. $dimensions and
+// $unpacked_dimensions take no second argument, so they never reach this check.
+void CheckArrayQueryOnVarDimExpr(const Expr* e, const VarDimMap& vars,
+                                 DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kSystemCall && IsArrayQueryFunc(e->callee) &&
+      e->args.size() >= 2 && e->args[0] && e->args[1] &&
+      e->args[0]->kind == ExprKind::kIdentifier &&
+      e->args[1]->kind == ExprKind::kIntegerLiteral) {
+    auto it = vars.find(e->args[0]->text);
+    uint64_t n = e->args[1]->int_val;
+    if (it != vars.end() && n > 1) {
+      const std::vector<Expr*>& dims = *it->second;
+      if (n <= dims.size() && DimIsVariableSized(dims[n - 1])) {
+        diag.Error(e->range.start,
+                   std::format("array query function '{}' cannot query "
+                               "variable-sized dimension {} of array '{}'",
+                               e->callee, n, e->args[0]->text));
+      }
+    }
+  }
+  CheckArrayQueryOnVarDimExpr(e->lhs, vars, diag);
+  CheckArrayQueryOnVarDimExpr(e->rhs, vars, diag);
+  CheckArrayQueryOnVarDimExpr(e->condition, vars, diag);
+  CheckArrayQueryOnVarDimExpr(e->true_expr, vars, diag);
+  CheckArrayQueryOnVarDimExpr(e->false_expr, vars, diag);
+  CheckArrayQueryOnVarDimExpr(e->base, vars, diag);
+  CheckArrayQueryOnVarDimExpr(e->index, vars, diag);
+  CheckArrayQueryOnVarDimExpr(e->index_end, vars, diag);
+  CheckArrayQueryOnVarDimExpr(e->repeat_count, vars, diag);
+  CheckArrayQueryOnVarDimExpr(e->with_expr, vars, diag);
+  for (auto* a : e->args) CheckArrayQueryOnVarDimExpr(a, vars, diag);
+  for (auto* el : e->elements) CheckArrayQueryOnVarDimExpr(el, vars, diag);
+}
+
+void CheckArrayQueryOnVarDimStmt(const Stmt* s, const VarDimMap& vars,
+                                 DiagEngine& diag) {
+  if (!s) return;
+  CheckArrayQueryOnVarDimExpr(s->condition, vars, diag);
+  CheckArrayQueryOnVarDimExpr(s->lhs, vars, diag);
+  CheckArrayQueryOnVarDimExpr(s->rhs, vars, diag);
+  CheckArrayQueryOnVarDimExpr(s->expr, vars, diag);
+  CheckArrayQueryOnVarDimExpr(s->delay, vars, diag);
+  CheckArrayQueryOnVarDimExpr(s->var_init, vars, diag);
+  for (auto* sub : s->stmts) CheckArrayQueryOnVarDimStmt(sub, vars, diag);
+  for (auto* sub : s->fork_stmts) CheckArrayQueryOnVarDimStmt(sub, vars, diag);
+  CheckArrayQueryOnVarDimStmt(s->then_branch, vars, diag);
+  CheckArrayQueryOnVarDimStmt(s->else_branch, vars, diag);
+  CheckArrayQueryOnVarDimStmt(s->body, vars, diag);
+  CheckArrayQueryOnVarDimStmt(s->for_body, vars, diag);
+  for (auto* init : s->for_inits) CheckArrayQueryOnVarDimStmt(init, vars, diag);
+  for (auto& ci : s->case_items)
+    CheckArrayQueryOnVarDimStmt(ci.body, vars, diag);
+}
+
+}  // namespace
+
+void Elaborator::ValidateArrayQueryOnVariableDim(const ModuleDecl* decl) {
+  // Map every array variable in the module to its unpacked dimension list, then
+  // reject any (v, n>1) query whose n-th dimension is variable-sized.
+  VarDimMap vars;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kVarDecl && !item->unpacked_dims.empty())
+      vars.emplace(item->name, &item->unpacked_dims);
+  }
+  if (vars.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->body) CheckArrayQueryOnVarDimStmt(item->body, vars, diag_);
+    for (auto* s : item->func_body_stmts)
+      CheckArrayQueryOnVarDimStmt(s, vars, diag_);
+    CheckArrayQueryOnVarDimExpr(item->init_expr, vars, diag_);
+  }
+}
+
+namespace {
+
 bool IsBitsCall(const Expr* e) {
   return e && e->kind == ExprKind::kSystemCall && e->callee == "$bits" &&
          e->args.size() == 1 && e->args[0];

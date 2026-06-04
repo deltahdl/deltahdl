@@ -28,6 +28,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateProceduralNetAssign();
   ValidateDynamicArrayNba(decl);
   ValidateArrayQueryOnDynamicType(decl);
+  ValidateArrayQueryOnVariableDim(decl);
   ValidateBitsCallRestrictions(decl);
   ValidateAutomaticVarProcWrites(decl);
   ValidateJumpStatements(decl);
