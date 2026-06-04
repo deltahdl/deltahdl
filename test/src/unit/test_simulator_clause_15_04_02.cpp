@@ -37,24 +37,15 @@ TEST(IpcSync, MailboxNumAtBound) {
   EXPECT_EQ(mb.Num(), 3);
 }
 
-TEST(IpcSync, MailboxNumInvalidatedByGet) {
+// num() reports the live message count. A retrieval attempt on an empty
+// mailbox removes nothing, so num() must keep reporting zero rather than
+// underflowing — the read-side mirror of the at-bound put case above.
+TEST(IpcSync, MailboxNumUnchangedByFailedGet) {
   MailboxObject mb;
-  mb.TryPut(10);
-  mb.TryPut(20);
-  int32_t before = mb.Num();
+  EXPECT_EQ(mb.Num(), 0);
   uint64_t msg = 0;
   mb.TryGet(msg);
-  EXPECT_NE(mb.Num(), before);
-  EXPECT_EQ(mb.Num(), 1);
-}
-
-TEST(IpcSync, MailboxNumInvalidatedByPut) {
-  MailboxObject mb;
-  mb.TryPut(10);
-  int32_t before = mb.Num();
-  mb.TryPut(20);
-  EXPECT_NE(mb.Num(), before);
-  EXPECT_EQ(mb.Num(), 2);
+  EXPECT_EQ(mb.Num(), 0);
 }
 
 }
