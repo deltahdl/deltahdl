@@ -195,6 +195,13 @@ class SimContext {
   void SetCurrentTimeScale(const TimeScale& ts) { current_timescale_ = ts; }
   const TimeScale& CurrentTimeScale() const { return current_timescale_; }
 
+  // Name of the design element that is the current scope. $printtimescale with
+  // no argument prints this name in its report line (see 20.4.2).
+  void SetCurrentScopeName(std::string_view name) {
+    current_scope_name_ = std::string(name);
+  }
+  const std::string& CurrentScopeName() const { return current_scope_name_; }
+
   // Timescale of the compilation unit, reported when the $unit argument is
   // passed to $timeunit/$timeprecision.
   void SetCompUnitTimeScale(const TimeScale& ts) { compunit_timescale_ = ts; }
@@ -588,6 +595,7 @@ class SimContext {
   TimeFormatSpec time_format_;
   bool time_format_explicit_ = false;
   TimeScale current_timescale_;
+  std::string current_scope_name_;
   TimeScale compunit_timescale_;
   std::unordered_map<std::string, TimeScale> scope_timescales_;
   std::vector<std::string> plus_args_;

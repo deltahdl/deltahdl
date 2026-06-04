@@ -547,8 +547,72 @@ static bool IsIOSysCall(std::string_view n) {
   return false;
 }
 
-static bool IsNoOpSysCall(std::string_view n) {
-  return n == "$printtimescale";
+// Render a Table 20-2 base-10 order (in the range 2 .. -15) as the
+// magnitude-and-unit text used in $printtimescale output, e.g. -7 -> "100ns",
+// -12 -> "1ps", -15 -> "1fs". The SI unit comes from the nearest multiple of
+// three at or below the order; the remainder selects the 1/10/100 mantissa.
+static std::string TimeOrderToUnitString(int order) {
+  int base = (order >= 0) ? (order / 3) * 3 : -(((-order) + 2) / 3) * 3;
+  int diff = order - base;  // 0, 1, or 2
+  const char* mantissa = diff == 2 ? "100" : (diff == 1 ? "10" : "1");
+  const char* unit;
+  switch (base) {
+    case 0: unit = "s"; break;
+    case -3: unit = "ms"; break;
+    case -6: unit = "us"; break;
+    case -9: unit = "ns"; break;
+    case -12: unit = "ps"; break;
+    default: unit = "fs"; break;  // -15
+  }
+  return std::string(mantissa) + unit;
+}
+
+// §20.4.2: assemble the line $printtimescale displays for `expr`, reading the
+// timescale model in `ctx`. The output names the targeted design element and
+// reports its time unit and precision in the fixed format
+// "Time scale of (<name>) is <unit> / <precision>". With no argument the
+// current scope is described; a named argument selects that element; the
+// special $unit and $root arguments select the compilation unit and the
+// simulation time unit, and in those two cases the literal "$unit"/"$root" is
+// shown in place of a design-element name.
+std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx) {
+  std::string name;
+  const TimeScale* scale = &ctx.CurrentTimeScale();
+  bool use_sim_time_unit = false;
+  if (!expr->args.empty() && expr->args[0] != nullptr) {
+    std::string_view target = TimescaleArgName(expr->args[0]);
+    if (target == "$root") {
+      use_sim_time_unit = true;
+      name = "$root";
+    } else if (target == "$unit") {
+      scale = &ctx.CompUnitTimeScale();
+      name = "$unit";
+    } else {
+      name = std::string(target);
+      if (const TimeScale* found = ctx.FindScopeTimeScale(target)) scale = found;
+    }
+  } else {
+    name = ctx.CurrentScopeName();
+  }
+  int unit_order;
+  int prec_order;
+  if (use_sim_time_unit) {
+    // The simulation time unit and the global precision are synonymous, so
+    // $root reports the same value for both fields (see 3.14.3).
+    unit_order = static_cast<int>(ctx.StepTimeUnit());
+    prec_order = unit_order;
+  } else {
+    unit_order = EffectiveTimeOrder(scale->unit, scale->magnitude);
+    prec_order = EffectiveTimeOrder(scale->precision, scale->prec_magnitude);
+  }
+  return "Time scale of (" + name + ") is " + TimeOrderToUnitString(unit_order) +
+         " / " + TimeOrderToUnitString(prec_order);
+}
+
+static Logic4Vec EvalPrinttimescaleTask(const Expr* expr, SimContext& ctx,
+                                        Arena& arena) {
+  std::cout << BuildPrinttimescaleReport(expr, ctx) << "\n";
+  return MakeLogic4VecVal(arena, 1, 0);
 }
 
 // $timeformat (20.4.3) shall accept units_number and precision_number values
@@ -628,7 +692,8 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
     return EvalMonitorFlag(ctx, arena, name);
   }
   if (name == "$timeformat") return EvalTimeformatTask(expr, ctx, arena);
-  if (IsNoOpSysCall(name)) return MakeLogic4VecVal(arena, 1, 0);
+  if (name == "$printtimescale")
+    return EvalPrinttimescaleTask(expr, ctx, arena);
   if (name == "$system") return EvalSystemCommand(expr, arena);
   if (name == "$stacktrace") {
     std::cerr << "stacktrace not available\n";

@@ -90,6 +90,10 @@ Logic4Vec EvalStructPattern(const Expr* expr, const StructTypeInfo* info,
 Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena);
 
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena);
+
+// §20.4.2: build the report line $printtimescale displays for `expr` against
+// the timescale state in `ctx` (see eval_function.cpp for the format).
+std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx);
 Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena);
 
 void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,
