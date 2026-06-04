@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
@@ -226,6 +227,60 @@ static Logic4Vec EvalDistGeneric(const Expr* , SimContext& ctx,
   return MakeLogic4VecVal(arena, 32, ctx.Urandom32());
 }
 
+// §20.14.2: the leading argument of every distribution function is an inout
+// seed. Reseeding the active generator from the caller's seed before drawing
+// makes the function repeatable — the same seed always yields the same value —
+// the way $random (§20.14.1) uses a seed to select a stream.
+static void SeedDistFromArg(const Expr* seed_arg, SimContext& ctx,
+                            Arena& arena) {
+  ctx.SeedUrandom(
+      static_cast<uint32_t>(EvalExpr(seed_arg, ctx, arena).ToUint64()));
+}
+
+// §20.14.2: the seed is an inout argument — a value goes in and a different
+// value comes back. When the seed names a variable it is advanced to the
+// generator's next state so consecutive calls walk the stream, while a run that
+// re-initializes the seed to its original value replays identically.
+static void AdvanceDistSeed(const Expr* seed_arg, SimContext& ctx,
+                            Arena& arena) {
+  if (seed_arg->kind != ExprKind::kIdentifier) return;
+  Variable* var = ctx.FindVariable(seed_arg->text);
+  if (var == nullptr) return;
+  uint32_t next = ctx.Urandom32();
+  var->value = MakeLogic4VecVal(arena, var->value.width, next);
+}
+
+// §20.14.2: mean, degree_of_freedom, and k_stage shall be greater than 0 for the
+// distributions that consume them. A non-positive value leaves the distribution
+// undefined, so it is reported; the draw still proceeds.
+static void RequirePositiveDistArg(const Expr* arg, SimContext& ctx,
+                                   Arena& arena, std::string_view what) {
+  auto v = static_cast<int32_t>(EvalExpr(arg, ctx, arena).ToUint64());
+  if (v <= 0) {
+    ctx.GetDiag().Warning(
+        {}, std::string(what) +
+                " argument of a distribution function shall be greater than 0");
+  }
+}
+
+static void ValidateDistArgs(const Expr* expr, SimContext& ctx, Arena& arena,
+                             std::string_view name) {
+  const auto& args = expr->args;
+  if (name == "$dist_erlang") {
+    if (args.size() > 1) RequirePositiveDistArg(args[1], ctx, arena, "k_stage");
+    if (args.size() > 2) RequirePositiveDistArg(args[2], ctx, arena, "mean");
+    return;
+  }
+  // The positivity requirement covers exponential, poisson, chi-square, t, and
+  // erlang — not $dist_normal, whose mean may take any value.
+  if (args.size() <= 1) return;
+  if (name == "$dist_exponential" || name == "$dist_poisson") {
+    RequirePositiveDistArg(args[1], ctx, arena, "mean");
+  } else if (name == "$dist_chi_square" || name == "$dist_t") {
+    RequirePositiveDistArg(args[1], ctx, arena, "degree_of_freedom");
+  }
+}
+
 static Logic4Vec EvalBasicMath(const Expr* expr, SimContext& ctx, Arena& arena,
                                std::string_view name) {
   if (name == "$ln") return EvalLn(expr, ctx, arena);
@@ -264,11 +319,28 @@ static Logic4Vec EvalHyperbolicSysCall(const Expr* expr, SimContext& ctx,
 
 static Logic4Vec EvalDistSysCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::string_view name) {
-  if (name == "$dist_uniform") return EvalDistUniform(expr, ctx, arena);
-  if (name == "$dist_normal") return EvalDistNormal(expr, ctx, arena);
-  if (name == "$dist_exponential") return EvalDistExponential(expr, ctx, arena);
-  if (name == "$dist_poisson") return EvalDistPoisson(expr, ctx, arena);
-  return EvalDistGeneric(expr, ctx, arena);
+  if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
+  // Reseed from the inout seed (args[0]) so the function is repeatable, then
+  // check the arguments the distribution requires to be positive.
+  SeedDistFromArg(expr->args[0], ctx, arena);
+  ValidateDistArgs(expr, ctx, arena, name);
+
+  Logic4Vec result;
+  if (name == "$dist_uniform") {
+    result = EvalDistUniform(expr, ctx, arena);
+  } else if (name == "$dist_normal") {
+    result = EvalDistNormal(expr, ctx, arena);
+  } else if (name == "$dist_exponential") {
+    result = EvalDistExponential(expr, ctx, arena);
+  } else if (name == "$dist_poisson") {
+    result = EvalDistPoisson(expr, ctx, arena);
+  } else {
+    result = EvalDistGeneric(expr, ctx, arena);
+  }
+
+  // The seed is inout: hand back a different value so the next call advances.
+  AdvanceDistSeed(expr->args[0], ctx, arena);
+  return result;
 }
 
 static bool IsBasicMathCall(std::string_view n) {
