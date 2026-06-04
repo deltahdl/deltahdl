@@ -60,4 +60,21 @@ TEST(SvaEngine, FirstMatchKeepsAllMatchesSharingEarliestEndTick) {
   EXPECT_EQ(fm.end_times, expected);
 }
 
+// §16.9.8 edge case: an operand with a single match has nothing later to
+// discard, so first_match yields that one match unchanged.
+TEST(SvaEngine, FirstMatchKeepsSingleOperandMatch) {
+  auto fm = EvalFirstMatch({7});
+  EXPECT_TRUE(fm.matched);
+  EXPECT_EQ(fm.end_times, std::vector<uint32_t>{7});
+}
+
+// §16.9.8 edge case: when every operand match ends on the same tick, that tick
+// is the earliest, so none is discarded and all are retained.
+TEST(SvaEngine, FirstMatchRetainsAllWhenEveryMatchTiesOnSameTick) {
+  auto fm = EvalFirstMatch({3, 3, 3});
+  EXPECT_TRUE(fm.matched);
+  std::vector<uint32_t> expected{3, 3, 3};
+  EXPECT_EQ(fm.end_times, expected);
+}
+
 }
