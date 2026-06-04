@@ -1,6 +1,8 @@
 #include "simulator/stmt_exec.h"
 
+#include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <string>
 #include <string_view>
@@ -179,12 +181,133 @@ static const RsRule& SelectRule(const RsProduction& production, SimContext& ctx,
   return production.rules[0];
 }
 
+// 18.17.5: the optional weight following the rand join keywords states, as a
+// real value, how strongly the remaining length of each operand sequence biases
+// which sequence advances next. The standard constrains it to [0.0, 1.0], so
+// clamp any out of range value to that interval, and use the neutral 0.5 when
+// the expression is omitted.
+static double EvalRandJoinBias(Expr* expr, SimContext& ctx, Arena& arena) {
+  if (!expr) return 0.5;
+  auto v = EvalExpr(expr, ctx, arena);
+  double f;
+  if (v.is_real) {
+    if (v.width == 32) {
+      float ff = 0.0f;
+      auto bits = static_cast<uint32_t>(v.ToUint64());
+      std::memcpy(&ff, &bits, sizeof(float));
+      f = static_cast<double>(ff);
+    } else {
+      uint64_t bits = v.ToUint64();
+      std::memcpy(&f, &bits, sizeof(double));
+    }
+  } else {
+    f = static_cast<double>(v.ToUint64());
+  }
+  if (f < 0.0) f = 0.0;
+  if (f > 1.0) f = 1.0;
+  return f;
+}
+
+// One operand of a rand join, expanded one level (to depth 1) into the
+// production items it will contribute. The interleaver emits these items in
+// order; cursor marks how many have already been generated.
+struct RandJoinSeq {
+  std::vector<const RsProd*> steps;
+  size_t cursor = 0;
+  size_t Remaining() const { return steps.size() - cursor; }
+};
+
+// 18.17.5: expanding an operand to depth 1 yields the production items of its
+// selected rule. A nested rand join contributes its own operands as the
+// depth-1 items, so wrap each in a production item step.
+static void CollectRandJoinSteps(const RsRule& rule, Arena& arena,
+                                 std::vector<const RsProd*>& steps) {
+  if (rule.is_rand_join) {
+    for (const auto& item : rule.rand_join_items) {
+      auto* p = arena.New<RsProd>();
+      p->kind = RsProdKind::kItem;
+      p->item = item;
+      steps.push_back(p);
+    }
+    return;
+  }
+  for (const auto& prod : rule.prods) steps.push_back(&prod);
+}
+
 static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
                                   SimContext& ctx, Arena& arena) {
+  // 18.17.5: rand join randomly interleaves its operand sequences while keeping
+  // the productions within each operand in their original relative order. Each
+  // operand is first expanded one level (depth 1) into the production items of
+  // its selected rule; those items are the units that get interleaved.
+  double bias = EvalRandJoinBias(selected.rand_join_expr, ctx, arena);
+
+  std::vector<RandJoinSeq> seqs;
+  seqs.reserve(selected.rand_join_items.size());
   for (const auto& item : selected.rand_join_items) {
-    auto result = co_await ExecRsProduction(stmt, item.name, ctx, arena);
+    const auto* production = FindProduction(stmt, item.name);
+    RandJoinSeq seq;
+    if (production) {
+      const auto& rule = SelectRule(*production, ctx, arena);
+      bool aborted = false;
+      for (auto* s : rule.weight_code) {
+        auto r = co_await ExecStmt(s, ctx, arena);
+        if (r == StmtResult::kBreak) co_return StmtResult::kBreak;
+        if (r == StmtResult::kReturn) {
+          aborted = true;
+          break;
+        }
+      }
+      if (!aborted) CollectRandJoinSteps(rule, arena, seq.steps);
+    }
+    seqs.push_back(std::move(seq));
+  }
+
+  // 18.17.5: at each step choose one operand and emit its next production. A
+  // sequence's length is the number of productions it has not yet contributed.
+  // The bias maps to an exponent on that length: 0.5 (exponent 1) keeps the
+  // choice proportional to remaining length so no length is prioritized, values
+  // toward 0.0 (negative exponent) favor the shortest remaining sequences, and
+  // values toward 1.0 favor the longest.
+  double exponent = 4.0 * bias - 1.0;
+  for (;;) {
+    double total = 0.0;
+    for (const auto& seq : seqs) {
+      if (seq.Remaining() > 0)
+        total += std::pow(static_cast<double>(seq.Remaining()), exponent);
+    }
+    if (total <= 0.0) break;  // every operand sequence has been drained
+
+    double draw = (ctx.Urandom32() / 4294967296.0) * total;
+    double cumulative = 0.0;
+    size_t chosen = seqs.size();
+    for (size_t i = 0; i < seqs.size(); ++i) {
+      if (seqs[i].Remaining() == 0) continue;
+      cumulative += std::pow(static_cast<double>(seqs[i].Remaining()), exponent);
+      if (draw < cumulative) {
+        chosen = i;
+        break;
+      }
+    }
+    if (chosen == seqs.size()) {
+      // Floating point rounding can leave draw just past the running total;
+      // fall back to the last operand that still has productions to emit.
+      for (size_t i = seqs.size(); i-- > 0;) {
+        if (seqs[i].Remaining() > 0) {
+          chosen = i;
+          break;
+        }
+      }
+    }
+
+    const RsProd* step = seqs[chosen].steps[seqs[chosen].cursor++];
+    auto result = co_await ExecRsProd(stmt, *step, ctx, arena);
     if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
-    if (result == StmtResult::kReturn) co_return StmtResult::kDone;
+    if (result == StmtResult::kReturn) {
+      // 18.17.6: return aborts the current production; drop the remainder of
+      // this operand's sequence and keep interleaving the others.
+      seqs[chosen].cursor = seqs[chosen].steps.size();
+    }
   }
   co_return StmtResult::kDone;
 }
