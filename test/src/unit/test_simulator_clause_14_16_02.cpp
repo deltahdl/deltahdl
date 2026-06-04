@@ -4,6 +4,7 @@
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
 #include "simulator/clocking.h"
+#include "simulator/net.h"
 #include "simulator/variable.h"
 
 using namespace delta;
@@ -209,6 +210,85 @@ TEST(SyncDriveSignals, ProceduralValueHeldUntilSynchronousDrive) {
   EXPECT_EQ(held, 0x33u);
   // The synchronous drive at the clocking event then replaces it.
   EXPECT_EQ(after_drive, 0x77u);
+}
+
+// §14.16.2: when several clocking-block outputs drive the same net, each one is
+// a driver on that net (the strong1/strong0 driver created per §14.16). Their
+// values, together with any other drivers on the net, are resolved according to
+// the net's type -- the clockvar drivers are ordinary participants in net
+// resolution, not a last-writer-wins overwrite. Here two clocking-output
+// drivers and one further driver are combined first on a wand and then a wor
+// net; only the net type changes between the two resolutions, and the resolved
+// value follows it.
+TEST(SyncDriveSignals, MultipleClockingOutputsOnNetResolveByNetType) {
+  ClockingSimFixture f;
+  auto* n = f.ctx.CreateVariable("n", 4);
+  n->value = MakeLogic4VecVal(f.arena, 4, 0);
+
+  Net net;
+  net.resolved = n;
+  // Two drivers stand for two clocking outputs; both carry the (strong1,
+  // strong0) strength §14.16 assigns to a clockvar net driver. The third
+  // driver represents "any other drivers on the net."
+  net.drivers.push_back(MakeLogic4VecVal(f.arena, 4, 0b0001));  // clocking out A
+  net.drivers.push_back(MakeLogic4VecVal(f.arena, 4, 0b0001));  // clocking out B
+  net.drivers.push_back(MakeLogic4VecVal(f.arena, 4, 0b0000));  // other driver
+  net.driver_strengths.push_back(ClockvarNetDriverStrength());
+  net.driver_strengths.push_back(ClockvarNetDriverStrength());
+  net.driver_strengths.push_back(ClockvarNetDriverStrength());
+
+  // wand: the lone 0 driver pulls the resolved value to 0.
+  net.type = NetType::kWand;
+  net.Resolve(f.arena);
+  EXPECT_EQ(n->value.ToUint64() & 0xFu, 0b0000u);
+
+  // wor on the identical driver set: the 1 drivers pull it to 1. The only
+  // difference from the wand case is the net's type.
+  net.type = NetType::kWor;
+  net.Resolve(f.arena);
+  EXPECT_EQ(n->value.ToUint64() & 0xFu, 0b0001u);
+}
+
+// §14.16.2: when a synchronous drive and a procedural nonblocking assignment
+// write the same variable in the same time step, the writes are permitted to
+// take place in an arbitrary order. This implementation realizes one such valid
+// order -- the nonblocking assignment matures in the NBA region and the drive
+// in the later Re-NBA region -- so both writes are applied (neither is dropped)
+// and the drive's value is the one that survives.
+TEST(SyncDriveSignals, DriveAndNonblockingAssignToSameVariableBothApply) {
+  ClockingSimFixture f;
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+  auto* v = f.ctx.CreateVariable("v", 8);
+  v->value = MakeLogic4VecVal(f.arena, 8, 0);
+
+  ClockingManager cmgr;
+  SetupClockingBlock(
+      f, cmgr, {"cb", Edge::kPosedge, {0}, {0}, "v", ClockingDir::kOutput});
+
+  bool nba_ran = false;
+  cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler, [&]() {
+    // Synchronous drive of 0x55 -> matures in the Re-NBA region.
+    cmgr.ScheduleOutputDrive("cb", "v", 0x55, f.ctx, f.scheduler);
+    // Procedural nonblocking assignment of 0xAA to the same variable in the
+    // same time step -> matures in the earlier NBA region.
+    auto* nba = f.scheduler.GetEventPool().Acquire();
+    nba->callback = [&]() {
+      nba_ran = true;
+      v->value = MakeLogic4VecVal(f.arena, 8, 0xAA);
+    };
+    f.scheduler.ScheduleEvent(f.scheduler.CurrentTime(), Region::kNBA, nba);
+  });
+
+  uint64_t after = 0;
+  SchedulePosedge(f, clk, 10);
+  ProbeAt(f, v, 12, &after);
+  f.scheduler.Run();
+
+  // The nonblocking write was applied...
+  EXPECT_TRUE(nba_ran);
+  // ...and the Re-NBA drive, ordered after it, is the surviving value.
+  EXPECT_EQ(after, 0x55u);
 }
 
 }  // namespace

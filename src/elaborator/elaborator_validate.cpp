@@ -4933,20 +4933,21 @@ void Elaborator::ValidateContAssignToClockvar(const ModuleDecl* decl) {
   if (clocking_signals_.empty()) return;
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kContAssign) continue;
-    if (!item->assign_lhs || item->assign_lhs->kind != ExprKind::kIdentifier)
-      continue;
-    auto target = item->assign_lhs->text;
-    for (const auto& [block_name, sigs] : clocking_signals_) {
-      auto it = sigs.find(target);
-      if (it != sigs.end() &&
-          (it->second.direction == Direction::kOutput ||
-           it->second.direction == Direction::kInout)) {
-        diag_.Error(item->loc,
-                    std::format("continuous assignment to clocking output "
-                                "variable '{}'",
-                                target));
-        break;
-      }
+    if (!item->assign_lhs) continue;
+    // §14.16.2: a continuous assignment to a variable that is associated with
+    // an output (or inout) clockvar is illegal. The target may be the whole
+    // variable or a bit-/part-select of it, so resolve through any selects to
+    // the root identifier; a select target is rejected exactly as the whole
+    // variable would be. This mirrors the root resolution the primitive and
+    // procedural-continuous checks already perform for the same prohibition.
+    const Expr* root = item->assign_lhs;
+    while (root != nullptr && root->kind == ExprKind::kSelect) root = root->base;
+    if (root == nullptr || root->kind != ExprKind::kIdentifier) continue;
+    if (IsOutputClockvarSignal(root->text)) {
+      diag_.Error(item->loc,
+                  std::format("continuous assignment to clocking output "
+                              "variable '{}'",
+                              root->text));
     }
   }
 }

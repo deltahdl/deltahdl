@@ -32,6 +32,23 @@ TEST(SyncDriveSignalsElab, ContinuousAssignToInoutSignalErrors) {
              "endmodule\n"));
 }
 
+// §14.16.2: the continuous-assignment prohibition also covers a bit-select of
+// the underlying signal -- the selected variable is still associated with an
+// output clockvar, so the assignment is illegal. This pins the elaborator's
+// resolution of a select target down to its root variable.
+TEST(SyncDriveSignalsElab, ContinuousAssignToOutputSignalBitSelectErrors) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic [7:0] data;\n"
+             "  logic r;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    output data;\n"
+             "  endclocking\n"
+             "  assign data[2] = r;\n"
+             "endmodule\n"));
+}
+
 // §14.16.2: a procedural continuous assignment (assign) to the underlying
 // signal of an output clockvar is illegal.
 TEST(SyncDriveSignalsElab, ProceduralAssignToOutputSignalErrors) {
