@@ -378,11 +378,33 @@ static bool IsExtFileIOSysCall(std::string_view n) {
          n == "$ungetc" || n == "$fscanf" || n == "$fread";
 }
 
+// §20.3.1: $time reports the current simulation time as a 64-bit integer
+// expressed in the time unit of the module that invoked it. The scheduler
+// keeps time in ticks of the global precision (the finest precision in the
+// design), so converting to the invoking module's unit divides the tick count
+// by the number of precision steps that make up one unit. Because $time has an
+// integer return type, the quotient is rounded to the nearest integer; the
+// design's time precision itself plays no part in that rounding.
+static uint64_t CurrentTimeInModuleUnits(SimContext& ctx) {
+  uint64_t ticks = ctx.CurrentTime().ticks;
+  const TimeScale& scale = ctx.CurrentTimeScale();
+  int unit_order = EffectiveTimeOrder(scale.unit, scale.magnitude);
+  int prec_order = static_cast<int>(ctx.StepTimeUnit());
+  int exp = unit_order - prec_order;  // >= 0: the unit is no finer than a tick
+  if (exp <= 0) return ticks;
+  uint64_t steps_per_unit = 1;
+  for (int i = 0; i < exp; ++i) steps_per_unit *= 10;
+  return (ticks + steps_per_unit / 2) / steps_per_unit;  // round to nearest
+}
+
 static Logic4Vec EvalTimeSysCall(SimContext& ctx, Arena& arena,
                                  std::string_view name) {
   if (name == "$stime") {
     auto ticks = ctx.CurrentTime().ticks & 0xFFFFFFFF;
     return MakeLogic4VecVal(arena, 32, ticks);
+  }
+  if (name == "$time") {
+    return MakeLogic4VecVal(arena, 64, CurrentTimeInModuleUnits(ctx));
   }
   return MakeLogic4VecVal(arena, 64, ctx.CurrentTime().ticks);
 }
