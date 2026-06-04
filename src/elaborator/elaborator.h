@@ -334,6 +334,7 @@ class Elaborator {
   void ValidateDynamicArrayNba(const ModuleDecl* decl);
   void ValidateArrayQueryOnDynamicType(const ModuleDecl* decl);
   void ValidateArrayQueryOnVariableDim(const ModuleDecl* decl);
+  void ValidateRandomSeedType(const ModuleDecl* decl);
   void ValidateBitsCallRestrictions(const ModuleDecl* decl);
 
   void ValidateContAssignConstSelect(const ModuleDecl* decl);

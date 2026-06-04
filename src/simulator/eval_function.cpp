@@ -23,6 +23,14 @@ namespace delta {
 static Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
                               std::string_view name) {
   if (name == "$random") {
+    // §20.14.1: an optional seed selects the stream, so different seeds yield
+    // different sequences and a given seed replays identically. Reseed the
+    // active generator from the argument before drawing, mirroring $urandom.
+    if (!expr->args.empty()) {
+      ctx.SeedUrandom(
+          static_cast<uint32_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64()));
+    }
+    // The returned 32-bit number is a signed integer (it may be negative).
     return MakeLogic4VecVal(arena, 32, ctx.Random32());
   }
   if (name == "$urandom") {

@@ -1995,6 +1995,74 @@ void Elaborator::ValidateArrayQueryOnDynamicType(const ModuleDecl* decl) {
 
 namespace {
 
+// §20.14.1: the seed argument to $random shall be an integral variable. A real
+// or string variable cannot hold the integral seed state, so a seed naming one
+// is rejected. Other clearly integral kinds (vectors, enums, packed structs)
+// are left alone to avoid false positives on legitimate seeds.
+bool IsNonIntegralSeedKind(DataTypeKind k) {
+  return IsRealType(k) || k == DataTypeKind::kString;
+}
+
+void CheckRandomSeedExpr(const Expr* e, const TypeMap& types, DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kSystemCall && e->callee == "$random" &&
+      !e->args.empty() && e->args[0]) {
+    auto name = ExprIdent(e->args[0]);
+    if (!name.empty()) {
+      auto it = types.find(name);
+      if (it != types.end() && IsNonIntegralSeedKind(it->second)) {
+        diag.Error(e->range.start,
+                   "seed argument of $random shall be an integral variable");
+      }
+    }
+  }
+  CheckRandomSeedExpr(e->lhs, types, diag);
+  CheckRandomSeedExpr(e->rhs, types, diag);
+  CheckRandomSeedExpr(e->condition, types, diag);
+  CheckRandomSeedExpr(e->true_expr, types, diag);
+  CheckRandomSeedExpr(e->false_expr, types, diag);
+  CheckRandomSeedExpr(e->base, types, diag);
+  CheckRandomSeedExpr(e->index, types, diag);
+  CheckRandomSeedExpr(e->index_end, types, diag);
+  CheckRandomSeedExpr(e->repeat_count, types, diag);
+  CheckRandomSeedExpr(e->with_expr, types, diag);
+  for (auto* a : e->args) CheckRandomSeedExpr(a, types, diag);
+  for (auto* el : e->elements) CheckRandomSeedExpr(el, types, diag);
+}
+
+void CheckRandomSeedStmt(const Stmt* s, const TypeMap& types, DiagEngine& diag) {
+  if (!s) return;
+  CheckRandomSeedExpr(s->condition, types, diag);
+  CheckRandomSeedExpr(s->lhs, types, diag);
+  CheckRandomSeedExpr(s->rhs, types, diag);
+  CheckRandomSeedExpr(s->expr, types, diag);
+  CheckRandomSeedExpr(s->delay, types, diag);
+  CheckRandomSeedExpr(s->var_init, types, diag);
+  for (auto* sub : s->stmts) CheckRandomSeedStmt(sub, types, diag);
+  for (auto* sub : s->fork_stmts) CheckRandomSeedStmt(sub, types, diag);
+  CheckRandomSeedStmt(s->then_branch, types, diag);
+  CheckRandomSeedStmt(s->else_branch, types, diag);
+  CheckRandomSeedStmt(s->body, types, diag);
+  CheckRandomSeedStmt(s->for_body, types, diag);
+  for (auto* init : s->for_inits) CheckRandomSeedStmt(init, types, diag);
+  for (auto& ci : s->case_items) CheckRandomSeedStmt(ci.body, types, diag);
+}
+
+}  // namespace
+
+void Elaborator::ValidateRandomSeedType(const ModuleDecl* decl) {
+  // §20.14.1: enforce that any $random seed argument naming a module variable
+  // refers to an integral variable.
+  for (const auto* item : decl->items) {
+    if (item->body) CheckRandomSeedStmt(item->body, var_types_, diag_);
+    for (auto* s : item->func_body_stmts)
+      CheckRandomSeedStmt(s, var_types_, diag_);
+    CheckRandomSeedExpr(item->init_expr, var_types_, diag_);
+  }
+}
+
+namespace {
+
 // §20.7.1: a single unpacked dimension is "variable-sized" when it is a dynamic
 // array ([], stored as a null dimension), a queue ([$]), or a wildcard
 // associative array ([*]) — the same classification §20.7 uses for a
