@@ -341,4 +341,41 @@ TEST(RandsequenceSim, RandJoinInterleavesThreeSequences) {
   EXPECT_EQ(allran, 300u);
 }
 
+// 18.17.5: at each step the generator interleaves nonterminals only to a depth
+// of one. An operand item that is itself a nonterminal (here `a`, which expands
+// to `p q`) is treated as a single atomic unit: its own sub-productions stay
+// contiguous and are never split apart by the other sequence's productions.
+// `pq` therefore always immediately follows `pp`, while the unit as a whole is
+// still interleaved with `c d` so it does not always lead.
+TEST(RandsequenceSim, RandJoinInterleavesToDepthOne) {
+  const char* src =
+      "module t;\n"
+      "  int pp, pq, step, viol, mid;\n"
+      "  initial begin\n"
+      "    viol = 0; mid = 0;\n"
+      "    repeat (300) begin\n"
+      "      step = 0; pp = 99; pq = 99;\n"
+      "      randsequence(main)\n"
+      "        main : rand join s1 s2;\n"
+      "        s1 : a;\n"
+      "        s2 : c d;\n"
+      "        a : p q;\n"
+      "        p : { pp = step; step = step + 1; };\n"
+      "        q : { pq = step; step = step + 1; };\n"
+      "        c : { step = step + 1; };\n"
+      "        d : { step = step + 1; };\n"
+      "      endsequence\n"
+      "      if (pq != pp + 1) viol = viol + 1;\n"
+      "      if (pp > 0) mid = mid + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  uint64_t viol = RunAndRead(src, "viol");
+  uint64_t mid = RunAndRead(src, "mid");
+  // Depth 1: p and q stay adjacent in every run because `a` runs as one unit.
+  EXPECT_EQ(viol, 0u);
+  // The atomic `a` unit is still genuinely interleaved, not pinned to the front.
+  EXPECT_GT(mid, 0u);
+}
+
 }  // namespace
