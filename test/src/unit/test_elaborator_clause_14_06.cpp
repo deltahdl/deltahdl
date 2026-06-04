@@ -54,4 +54,18 @@ TEST(SignalMultiBlockElab, InoutSignalInTwoBlocksElaborates) {
              "endmodule\n"));
 }
 
+// §14.6 lists outputs among the directions a signal may take across several
+// clocking blocks; the same output signal in two blocks elaborates cleanly.
+TEST(SignalMultiBlockElab, SameOutputSignalInTwoBlocksElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  clocking cb1 @(posedge clk);\n"
+             "    output data;\n"
+             "  endclocking\n"
+             "  clocking cb2 @(negedge clk);\n"
+             "    output data;\n"
+             "  endclocking\n"
+             "endmodule\n"));
+}
+
 }

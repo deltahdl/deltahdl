@@ -190,4 +190,58 @@ TEST(SignalMultiBlockSim, DifferentClockBlockNotSynchronized) {
   EXPECT_EQ(cmgr.GetSampledValue("cb3", "sig_c"), 0u);
 }
 
+// §14.6 ties the shared synchronization event to the same clock, which the LRM
+// parenthesizes as the clocking expression -- i.e. the clocking event, edge
+// included, not merely the clock signal. Two blocks naming the same signal but
+// opposite edges therefore do NOT share a synchronization event: a posedge
+// fires only the posedge block. This pins that production keys the event on the
+// edge (CheckClockEdge), so same-signal/different-edge is a different event.
+TEST(SignalMultiBlockSim, SameClockSignalOppositeEdgesNotShared) {
+  ClockingSimFixture f;
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+  auto* sig_p = f.ctx.CreateVariable("sig_p", 8);
+  sig_p->value = MakeLogic4VecVal(f.arena, 8, 0x44);
+  auto* sig_n = f.ctx.CreateVariable("sig_n", 8);
+  sig_n->value = MakeLogic4VecVal(f.arena, 8, 0x55);
+
+  ClockingManager cmgr;
+
+  ClockingBlock block_pos;
+  block_pos.name = "cb_pos";
+  block_pos.clock_signal = "clk";
+  block_pos.clock_edge = Edge::kPosedge;
+  block_pos.default_input_skew = SimTime{0};
+  block_pos.default_output_skew = SimTime{0};
+  ClockingSignal sp;
+  sp.signal_name = "sig_p";
+  sp.direction = ClockingDir::kInput;
+  block_pos.signals.push_back(sp);
+  cmgr.Register(block_pos);
+
+  ClockingBlock block_neg;
+  block_neg.name = "cb_neg";
+  block_neg.clock_signal = "clk";
+  block_neg.clock_edge = Edge::kNegedge;
+  block_neg.default_input_skew = SimTime{0};
+  block_neg.default_output_skew = SimTime{0};
+  ClockingSignal sn;
+  sn.signal_name = "sig_n";
+  sn.direction = ClockingDir::kInput;
+  block_neg.signals.push_back(sn);
+  cmgr.Register(block_neg);
+
+  cmgr.Attach(f.ctx, f.scheduler);
+
+  SchedulePosedge(f, clk, 10);
+  f.scheduler.Run();
+
+  // The posedge block synchronizes on the rising edge and samples its signal.
+  EXPECT_EQ(cmgr.GetSampledValue("cb_pos", "sig_p"), 0x44u);
+  // The negedge block, though it names the same clock signal, is a distinct
+  // clocking event and is not synchronized by the rising edge (nonzero signal,
+  // so 0 means unsampled).
+  EXPECT_EQ(cmgr.GetSampledValue("cb_neg", "sig_n"), 0u);
+}
+
 }
