@@ -916,6 +916,50 @@ class CoverageDB {
   static uint32_t CumulativeAtLeast(
       const std::vector<uint32_t>& at_least_values);
 
+  // --- LRM 19.11.2: cross coverage computation ------------------------------
+
+  // The number of automatically generated cross bins B_c of a cross. It is the
+  // product of the bin cardinalities B_j of the crossed coverpoints — the total
+  // number of cross products ∏ B_j — less the number of cross products B_b that
+  // are comprised by user-defined cross bins, since those products are accounted
+  // for by the user-defined bins rather than by auto-cross bins. A crossed
+  // coverpoint with no bins makes the product, and therefore B_c, zero (LRM
+  // 19.11.2).
+  static uint64_t CrossAutoBinCount(
+      const std::vector<uint64_t>& per_point_bin_counts,
+      uint64_t user_defined_cross_products);
+
+  // The denominator of the cross coverage equation, B_c + B_u, where B_c is the
+  // number of auto-cross bins (CrossAutoBinCount) and B_u is the number of
+  // significant user-defined cross bins — those that contribute toward coverage.
+  // Cross bins arising from ignore_bins and illegal_bins select expressions do
+  // not contribute and are excluded from B_u by the caller; only counting cross
+  // bins are passed here (LRM 19.11.2).
+  static uint64_t CrossCoverageDenominator(
+      const std::vector<uint64_t>& per_point_bin_counts,
+      uint64_t user_defined_cross_products, uint64_t significant_user_bins);
+
+  // Whether a user-defined cross bin counts toward the significant user-defined
+  // bin total B_u. A cross product selected by an ignore_bins or illegal_bins
+  // select expression contributes no coverage bin, so only a counting outcome
+  // (LRM 19.6.3) raises B_u; ignored and illegal outcomes do not (LRM 19.11.2,
+  // definition of B_u).
+  static bool CrossBinCountsTowardCoverage(CrossSampleOutcome outcome);
+
+  // True when a cross's coverage denominator B_c + B_u is zero: the cross has no
+  // auto-cross bins and no significant user-defined cross bins. Such a cross does
+  // not contribute to the parent covergroup's coverage computation, and its own
+  // get_coverage value depends only on its weight (LRM 19.11.2).
+  static bool CrossCoverageDenominatorZero(const CrossCover* cross);
+
+  // The ref-int pair form of get_coverage()/get_inst_coverage() applied to a
+  // cross: reports the number of covered cross bins and the size of the cross
+  // coverage denominator (the numerator and denominator of the cross coverage).
+  // When the denominator is zero, zero is reported for both counts (LRM
+  // 19.11.2).
+  static double GetCrossCoverage(const CrossCover* cross, int32_t& covered_bins,
+                                 int32_t& total_bins);
+
   // --- LRM 19.4.1: embedded covergroup inheritance --------------------------
 
   // When a derived covergroup defines a coverpoint whose name is identical to a

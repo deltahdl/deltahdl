@@ -322,15 +322,38 @@ double CoverageDB::GetPointCoverage(const CoverPoint* cp) {
 }
 
 double CoverageDB::GetCrossCoverage(const CrossCover* cross) {
-  if (cross->bins.empty()) return 100.0;
+  // The denominator of the cross coverage equation is B_c + B_u (LRM 19.11.2).
+  // In this model every stored cross bin is a coverage bin — an auto-cross bin
+  // (B_c) or a significant user-defined cross bin (B_u) — so the bin count is
+  // exactly that denominator; ignore_bins and illegal_bins products are never
+  // stored as bins (LRM 19.6.2, 19.6.3).
   uint32_t total = 0;
   uint32_t covered = 0;
   for (const auto& bin : cross->bins) {
     ++total;
     if (bin.hit_count >= bin.at_least) ++covered;
   }
-  if (total == 0) return 100.0;
+  if (total == 0) {
+    // A zero denominator reports a weight-dependent value: a nonzero cross
+    // weight gives 0.0, a zero weight gives 100.0 (LRM 19.11.2 b, c).
+    return cross->option.weight == 0 ? 100.0 : 0.0;
+  }
   return 100.0 * static_cast<double>(covered) / static_cast<double>(total);
+}
+
+double CoverageDB::GetCrossCoverage(const CrossCover* cross,
+                                    int32_t& covered_bins, int32_t& total_bins) {
+  covered_bins = 0;
+  total_bins = 0;
+  // When the cross coverage denominator is zero, both reported counts are zero
+  // (LRM 19.11.2 d). Otherwise they are the covered bins (numerator) and the
+  // denominator B_c + B_u, which is the stored cross bin count.
+  if (CrossCoverageDenominatorZero(cross)) return GetCrossCoverage(cross);
+  for (const auto& bin : cross->bins) {
+    ++total_bins;
+    if (bin.hit_count >= bin.at_least) ++covered_bins;
+  }
+  return GetCrossCoverage(cross);
 }
 
 double CoverageDB::GetCoverage(const CoverGroup* group) {
@@ -351,6 +374,10 @@ double CoverageDB::GetCoverage(const CoverGroup* group) {
   }
   for (const auto& cross : group->crosses) {
     if (cross.excluded_from_coverage) continue;
+    // A cross whose own coverage denominator B_c + B_u is zero does not
+    // contribute to the covergroup average; it is dropped from both the
+    // numerator and the denominator (LRM 19.11.2 a).
+    if (CrossCoverageDenominatorZero(&cross)) continue;
     numerator +=
         static_cast<double>(cross.option.weight) * GetCrossCoverage(&cross);
     denominator += cross.option.weight;
@@ -452,6 +479,44 @@ uint32_t CoverageDB::CumulativeAtLeast(
     result = std::max(result, v);
   }
   return result;
+}
+
+// --- LRM 19.11.2: cross coverage computation --------------------------------
+
+uint64_t CoverageDB::CrossAutoBinCount(
+    const std::vector<uint64_t>& per_point_bin_counts,
+    uint64_t user_defined_cross_products) {
+  // B_c = (∏_j B_j) − B_b. The product over the crossed coverpoints is the
+  // total number of cross products; a coverpoint with no bins makes it zero
+  // (LRM 19.11.2).
+  uint64_t total_products = 1;
+  for (uint64_t b_j : per_point_bin_counts) {
+    total_products *= b_j;
+  }
+  // B_b is the subset of cross products comprised by user-defined cross bins, so
+  // it never exceeds the total; guard against an ill-formed argument anyway.
+  if (user_defined_cross_products > total_products) return 0;
+  return total_products - user_defined_cross_products;
+}
+
+uint64_t CoverageDB::CrossCoverageDenominator(
+    const std::vector<uint64_t>& per_point_bin_counts,
+    uint64_t user_defined_cross_products, uint64_t significant_user_bins) {
+  // Denominator = B_c + B_u (LRM 19.11.2).
+  return CrossAutoBinCount(per_point_bin_counts, user_defined_cross_products) +
+         significant_user_bins;
+}
+
+bool CoverageDB::CrossBinCountsTowardCoverage(CrossSampleOutcome outcome) {
+  // Only a counting cross product contributes a coverage bin; ignored and
+  // illegal products (LRM 19.6.2, 19.6.3) are excluded from B_u (LRM 19.11.2).
+  return outcome == CrossSampleOutcome::kCounted;
+}
+
+bool CoverageDB::CrossCoverageDenominatorZero(const CrossCover* cross) {
+  // Every stored cross bin is a coverage bin contributing to B_c + B_u, so the
+  // denominator is zero exactly when the cross has no such bins (LRM 19.11.2).
+  return cross->bins.empty();
 }
 
 double CoverageDB::GetGlobalCoverage() const {
