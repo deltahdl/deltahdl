@@ -53,10 +53,13 @@ TEST(InlineConstraintScopeResolution, SuperBindsToObjectClassScope) {
             InlineConstraintBinding::kObjectClassScope);
 }
 
-// §18.7.1 (C4 / C6): local:: bypasses the object's class scope and resolves the
-// name in the local scope — even when the object's class also declares the
+// §18.7.1 (C4 / C6 / C5): local:: bypasses the object's class scope and resolves
+// the name in the local scope — even when the object's class also declares the
 // name — so local::a denotes the same declaration as the unqualified a in the
-// local scope.
+// local scope. Resolution depends only on the qualifier and the local-scope
+// declaration, never on what the name denotes, so this same call also stands for
+// C5: a local:: name resolves identically whether it is a variable, a type, or a
+// class scope.
 TEST(InlineConstraintScopeResolution, LocalQualifierBindsToLocalScope) {
   EXPECT_EQ(ResolveInlineConstraintName(InlineConstraintQualifier::kLocal,
                                         /*declared_in_object_class=*/true,
@@ -64,9 +67,11 @@ TEST(InlineConstraintScopeResolution, LocalQualifierBindsToLocalScope) {
             InlineConstraintBinding::kLocalScope);
 }
 
-// §18.7.1 (C4): the special name local::this names the local scope's own this,
-// so it resolves to the local scope. A caller treats this/super as always
-// present in a scope, here passing declared_in_local_scope = true.
+// §18.7.1 (C4 / C7): the special name local::this names the local scope's own
+// this, so it resolves to the local scope. A caller treats this/super as always
+// present in a scope, here passing declared_in_local_scope = true. The same call
+// also models C7: for an obj.randomize() with call the object handle obj is
+// itself a local-scope name, so local::obj likewise resolves in the local scope.
 TEST(InlineConstraintScopeResolution, LocalThisBindsToLocalScope) {
   EXPECT_EQ(ResolveInlineConstraintName(InlineConstraintQualifier::kLocal,
                                         /*declared_in_object_class=*/false,
@@ -84,26 +89,24 @@ TEST(InlineConstraintScopeResolution, LocalQualifierIgnoresObjectClassScope) {
             InlineConstraintBinding::kUnresolved);
 }
 
-// §18.7.1 (C7): for obj.randomize() with, the object handle obj is a local-scope
-// name, so local::obj resolves in the local scope to that handle.
-TEST(InlineConstraintScopeResolution, LocalObjectHandleResolvesInLocalScope) {
-  EXPECT_EQ(ResolveInlineConstraintName(InlineConstraintQualifier::kLocal,
-                                        /*declared_in_object_class=*/false,
-                                        /*declared_in_local_scope=*/true),
-            InlineConstraintBinding::kLocalScope);
+// §18.7.1 (C1): when only the object's class declares an unqualified name, it
+// binds there — the object-class scope is searched first, so its match settles
+// the name without the local scope needing to declare it.
+TEST(InlineConstraintScopeResolution, UnqualifiedBindsObjectClassWhenLocalAbsent) {
+  EXPECT_EQ(ResolveInlineConstraintName(InlineConstraintQualifier::kNone,
+                                        /*declared_in_object_class=*/true,
+                                        /*declared_in_local_scope=*/false),
+            InlineConstraintBinding::kObjectClassScope);
 }
 
-// §18.7.1 (C5): the local:: qualifier may prefix any kind of name — a variable,
-// a class scope, or a type name. The resolution is driven solely by the
-// qualifier and the local-scope declaration, never contingent on what the name
-// denotes, so a local-scope name resolves the same regardless of its kind.
-TEST(InlineConstraintScopeResolution, LocalQualifierIsKindAgnostic) {
-  // Whether the local-scope name is a variable, a type, or a class scope, the
-  // same inputs yield the same local-scope binding.
+// §18.7.1 (C2 / C4): local:: searches only the local scope, so a local:: name
+// declared in neither scope is unresolved — the object-class scope is never
+// consulted to rescue it.
+TEST(InlineConstraintScopeResolution, LocalQualifierUnresolvedWhenAbsentEverywhere) {
   EXPECT_EQ(ResolveInlineConstraintName(InlineConstraintQualifier::kLocal,
-                                        /*declared_in_object_class=*/true,
-                                        /*declared_in_local_scope=*/true),
-            InlineConstraintBinding::kLocalScope);
+                                        /*declared_in_object_class=*/false,
+                                        /*declared_in_local_scope=*/false),
+            InlineConstraintBinding::kUnresolved);
 }
 
 // §18.7.1: the qualifier keywords/operators that may head a name in an inline
