@@ -62,6 +62,16 @@ TEST(SysTask, TimeRoundsScaledValueDown) {
   EXPECT_EQ(TimeAtTick(f, 32), 3u);
 }
 
+// §20.3.1 (rounding tie edge case): a scaled value landing exactly halfway
+// between two integers exercises the nearest-integer tie-break. 15 ns over a
+// 10 ns unit is 1.5, which the round-to-nearest conversion resolves upward to 2.
+TEST(SysTask, TimeRoundsHalfwayValueUp) {
+  SysTaskFixture f;
+  f.ctx.SetGlobalPrecision(TimeUnit::kNs);
+  f.ctx.SetCurrentTimeScale(TimeScale{TimeUnit::kNs, 10, TimeUnit::kNs, 1});
+  EXPECT_EQ(TimeAtTick(f, 15), 2u);
+}
+
 // §20.3.1: a different invoking module with a finer (1 ns) unit over the same
 // 1 ns precision applies no scaling, so the same simulation tick reports a
 // different value than the 10 ns module above.
