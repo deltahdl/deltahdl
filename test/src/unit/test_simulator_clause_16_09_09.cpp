@@ -51,6 +51,13 @@ TEST(SvaEngine, SequenceThroughout) {
   // A minimal single-tick interval with the condition held still matches.
   values = {1};
   EXPECT_TRUE(EvalThroughout(check, values));
+
+  // The complementary boundary: a single-tick interval whose only tick violates
+  // the condition does not match. This is the dividing line against the empty
+  // interval — one present tick must satisfy exp, whereas an absent tick cannot
+  // fail it (see SequenceThroughoutEmpty).
+  values = {0};
+  EXPECT_FALSE(EvalThroughout(check, values));
 }
 
 // §16.9.9: the construct abbreviates `(exp)[*0:$] intersect seq`, whose `[*0:$]`
