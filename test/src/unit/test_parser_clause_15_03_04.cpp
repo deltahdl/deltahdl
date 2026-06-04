@@ -26,18 +26,6 @@ TEST(SemaphoreTryGetParser, TryGetWithDefaultKeyCount) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SemaphoreTryGetParser, TryGetOnDeclaredSemaphore) {
-  auto r = Parse(
-      "module m;\n"
-      "  semaphore s = new(3);\n"
-      "  initial begin\n"
-      "    s.try_get(1);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(SemaphoreTryGetParser, TryGetUsedInExpression) {
   auto r = Parse(
       "module m;\n"

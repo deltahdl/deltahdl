@@ -45,6 +45,17 @@ TEST(IpcSync, SemaphoreTryGetNegativeCountIsError) {
   EXPECT_EQ(sem.key_count, 5);
 }
 
+// The LRM prototype (function int try_get(int keyCount = 1)) carries no error
+// out-parameter; the error channel is an implementation extension. Exercised
+// through the bare, prototype-shaped call (no error pointer), a negative count
+// must still return 0 and leave the bucket untouched — the null channel guard
+// must not be dereferenced.
+TEST(IpcSync, SemaphoreTryGetNegativeWithoutErrorChannelReturnsZero) {
+  SemaphoreObject sem(5);
+  EXPECT_EQ(sem.TryGet(-1), 0);
+  EXPECT_EQ(sem.key_count, 5);
+}
+
 // The keys-unavailable path also returns 0, but it is not an error: a caller
 // observing the error channel must be able to tell the two zero results apart.
 TEST(IpcSync, SemaphoreTryGetUnavailableIsNotError) {
@@ -60,6 +71,20 @@ TEST(IpcSync, SemaphoreTryGetSuccessIsNotError) {
   SemaphoreObject sem(3);
   bool error = false;
   EXPECT_EQ(sem.TryGet(2, &error), 1);
+  EXPECT_FALSE(error);
+  EXPECT_EQ(sem.key_count, 1);
+}
+
+// §15.3.4: try_get() is the non-blocking counterpart of get(). On a bucket that
+// cannot satisfy the request, get() reports a block (the caller would suspend),
+// whereas try_get() returns immediately with 0 and leaves the bucket untouched.
+// This contrast pins the defining "without blocking" behavior of the subclause.
+TEST(IpcSync, SemaphoreTryGetDoesNotBlockWhereGetWould) {
+  SemaphoreObject sem(1);
+  EXPECT_EQ(sem.Get(2), SemGetStatus::kBlock);
+  EXPECT_EQ(sem.key_count, 1);
+  bool error = false;
+  EXPECT_EQ(sem.TryGet(2, &error), 0);
   EXPECT_FALSE(error);
   EXPECT_EQ(sem.key_count, 1);
 }
