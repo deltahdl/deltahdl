@@ -994,6 +994,14 @@ bool CoverageDB::WithRangeReferenceAllowed(std::string_view self_name,
   return self_name == referenced_name;
 }
 
+// --- LRM 19.5.1.2: coverpoint bin set covergroup expressions ----------------
+
+uint64_t CoverageDB::SetExpressionEvaluationCount(uint64_t /*sample_count*/) {
+  // The set_covergroup_expression is evaluated once, at construction of the
+  // covergroup instance, not at each sampling point (LRM 19.5.1.2).
+  return 1;
+}
+
 // --- LRM 19.5.2: specifying bins for transitions ----------------------------
 
 bool CoverageDB::TransitionBinAllowed(const CoverPoint* cp) {

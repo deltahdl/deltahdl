@@ -490,6 +490,16 @@ class CoverageDB {
   static bool WithRangeReferenceAllowed(std::string_view self_name,
                                         std::string_view referenced_name);
 
+  // --- LRM 19.5.1.2: coverpoint bin set covergroup expressions --------------
+
+  // The set_covergroup_expression that defines a bin's values is evaluated
+  // once, when the covergroup instance is constructed, rather than being
+  // re-evaluated at each sampling point. Given how many times the instance is
+  // sampled after construction, returns how many times the set expression is
+  // evaluated, which is always one and independent of the sample count
+  // (LRM 19.5.1.2).
+  static uint64_t SetExpressionEvaluationCount(uint64_t sample_count);
+
   // --- LRM 19.5.2: specifying bins for transitions --------------------------
 
   // A trans_list specifies ordered integral value transitions of the coverage
