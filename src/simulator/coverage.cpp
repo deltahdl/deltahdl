@@ -837,6 +837,29 @@ std::vector<size_t> CoverageDB::SelectCrossBinTuples(
   return selected;
 }
 
+// --- LRM 19.6.2: excluding cross products -----------------------------------
+
+std::vector<std::vector<size_t>> CoverageDB::ExcludeIgnoredCrossProducts(
+    const std::vector<std::vector<size_t>>& products,
+    const std::vector<std::vector<size_t>>& ignored) {
+  // Every cross product that satisfies the ignore_bins select expression is
+  // dropped; the rest keep their order (LRM 19.6.2).
+  std::vector<std::vector<size_t>> kept;
+  for (const auto& product : products) {
+    if (std::find(ignored.begin(), ignored.end(), product) == ignored.end()) {
+      kept.push_back(product);
+    }
+  }
+  return kept;
+}
+
+bool CoverageDB::IgnoredCrossProductRetained(bool /*also_in_other_cross_bin*/) {
+  // An ignored cross product is never retained: its exclusion takes precedence
+  // over inclusion in any other cross coverage bin of the enclosing cross
+  // (LRM 19.6.2).
+  return false;
+}
+
 // --- LRM 19.5.1: specifying bins for values ---------------------------------
 
 std::string CoverageDB::StateBinName(std::string_view base, int64_t index) {

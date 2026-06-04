@@ -447,6 +447,26 @@ class CoverageDB {
       const std::function<bool(const std::vector<int64_t>&)>* pred,
       const CrossWithMatchPolicy& policy);
 
+  // --- LRM 19.6.2: excluding cross products ---------------------------------
+
+  // Excludes from coverage every cross product an ignore_bins select expression
+  // selects. The select expression has already been evaluated to its set of
+  // cross products by the LRM 19.6.1 machinery; this removes those products from
+  // a given set, so that all cross products satisfying the select expression are
+  // excluded from coverage. Each cross product is a tuple of chosen bin indices,
+  // one per coverpoint. The surviving products keep their original order
+  // (LRM 19.6.2).
+  static std::vector<std::vector<size_t>> ExcludeIgnoredCrossProducts(
+      const std::vector<std::vector<size_t>>& products,
+      const std::vector<std::vector<size_t>>& ignored);
+
+  // Whether a cross product selected by an ignore_bins select expression is
+  // still retained when some other cross coverage bin of the same cross includes
+  // it. Ignored cross products are excluded even if they are included in another
+  // cross coverage bin of the enclosing cross, so this always returns false
+  // regardless of the other-bin membership (LRM 19.6.2).
+  static bool IgnoredCrossProductRetained(bool also_in_other_cross_bin);
+
   // --- LRM 19.5.1: specifying bins for values -------------------------------
 
   // Distributes a covergroup_range_list's items across a fixed number of bins.
