@@ -653,15 +653,22 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
   }
 
   if (name == "$q_full") {
-    // The 0/1 fullness result is §20.15.4's output; only the status code is
-    // resolved here. The single applicable error condition is an undefined
-    // q_id.
-    if (args.size() >= 2) {
-      uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
-      WriteQueueStatus(args[1],
-                       queues.count(q_id) ? kQOk : kQUndefinedId, ctx, arena);
-    }
-    return MakeLogic4VecVal(arena, 32, 0);
+    // §20.15.4: $q_full checks whether the queue named by q_id has room for
+    // another entry, returning 1 when it is full and 0 when it is not. A queue
+    // is full once its occupancy reaches the capacity fixed at $q_initialize.
+    // The trailing status reports the operation outcome (§20.15.6); the only
+    // error condition that applies is an undefined q_id.
+    if (args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
+    uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
+    auto it = queues.find(q_id);
+    WriteQueueStatus(args[1], it == queues.end() ? kQUndefinedId : kQOk, ctx,
+                     arena);
+    uint64_t full = (it != queues.end() &&
+                     static_cast<int64_t>(it->second.count) >=
+                         it->second.max_length)
+                        ? 1u
+                        : 0u;
+    return MakeLogic4VecVal(arena, 32, full);
   }
 
   if (name == "$q_exam") {
