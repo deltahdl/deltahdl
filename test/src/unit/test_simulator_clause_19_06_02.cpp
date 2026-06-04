@@ -83,6 +83,23 @@ TEST(Coverage, IgnoredProductExcludedFromOtherCrossBin) {
   EXPECT_EQ(effective, expected);
 }
 
+// LRM 19.6.2: only the cross products that satisfy the select expression are
+// excluded. Exclusion matches on the whole cross product (the tuple of chosen
+// bin indices): a near-miss product that differs in a single coverpoint index
+// is kept, and an ignored entry that names a product not present in the cross
+// removes nothing. This pins the boundary of "all products that satisfy" — no
+// more than the satisfying set is dropped.
+TEST(Coverage, OnlyMatchingProductsAreExcluded) {
+  std::vector<std::vector<size_t>> products = {{0, 0}, {0, 1}, {1, 0}};
+  // {1,0} is present and is dropped; {0,2} differs from {0,1} in one index and
+  // {2,2} is absent entirely — neither disturbs the surviving products.
+  std::vector<std::vector<size_t>> ignored = {{1, 0}, {0, 2}, {2, 2}};
+
+  auto kept = CoverageDB::ExcludeIgnoredCrossProducts(products, ignored);
+  std::vector<std::vector<size_t>> expected = {{0, 0}, {0, 1}};
+  EXPECT_EQ(kept, expected);
+}
+
 // The precedence is unconditional: an ignored cross product is never retained,
 // whether or not another cross bin also includes it (LRM 19.6.2).
 TEST(Coverage, IgnoredProductNeverRetained) {
