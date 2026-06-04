@@ -1245,6 +1245,92 @@ bool CoverageDB::IllegalTakesPrecedence(bool /*also_in_other_bin*/) {
   return true;
 }
 
+// --- LRM 19.5.7: value resolution -------------------------------------------
+
+CoverpointEffectiveType CoverageDB::EffectiveCoverpointType(
+    bool has_coverpoint_type, CoverpointEffectiveType coverpoint_type,
+    CoverpointEffectiveType self_determined_type) {
+  // The coverpoint type, when present, governs the comparison; otherwise the
+  // expression resolves its own type (LRM 19.5.7 a).
+  return has_coverpoint_type ? coverpoint_type : self_determined_type;
+}
+
+int64_t CoverageDB::CastToEffectiveType(int64_t value,
+                                        CoverpointEffectiveType eff) {
+  // Keep only the low `width` bits, then sign-extend for a signed type so the
+  // cast matches a normal static cast to the effective type (LRM 19.5.7 b).
+  if (eff.width == 0) return 0;
+  if (eff.width >= 64) return value;
+  uint64_t mask = (uint64_t{1} << eff.width) - 1;
+  uint64_t bits = static_cast<uint64_t>(value) & mask;
+  if (eff.is_signed && (bits & (uint64_t{1} << (eff.width - 1)))) bits |= ~mask;
+  return static_cast<int64_t>(bits);
+}
+
+int64_t CoverageDB::EffectiveTypeMin(CoverpointEffectiveType eff) {
+  if (eff.width == 0 || !eff.is_signed) return 0;
+  if (eff.width >= 64) return INT64_MIN;
+  return -(int64_t{1} << (eff.width - 1));
+}
+
+int64_t CoverageDB::EffectiveTypeMax(CoverpointEffectiveType eff) {
+  if (eff.width == 0) return 0;
+  if (eff.width >= 64) return INT64_MAX;
+  if (eff.is_signed) return (int64_t{1} << (eff.width - 1)) - 1;
+  return (int64_t{1} << eff.width) - 1;
+}
+
+BinValueResolution CoverageDB::ResolveBinValue(int64_t value,
+                                               bool value_is_signed,
+                                               bool value_has_xz,
+                                               bool is_wildcard,
+                                               CoverpointEffectiveType eff) {
+  // Condition 3: a value with x or z bits warns, except for a wildcard bin
+  // whose unknown bits were resolved to 0/1 beforehand (LRM 19.5.7 preamble,
+  // condition 3).
+  if (value_has_xz && !is_wildcard) return BinValueResolution::kUnknownBits;
+  // Condition 1: a negative signed value assigned to an unsigned effective
+  // type (LRM 19.5.7 b, condition 1).
+  if (!eff.is_signed && value_is_signed && value < 0)
+    return BinValueResolution::kUnsignedNegative;
+  // Condition 2: the static cast to the effective type alters the value, i.e.
+  // the value is not expressible in that type (LRM 19.5.7 b, condition 2).
+  if (CastToEffectiveType(value, eff) != value)
+    return BinValueResolution::kValueChanged;
+  return BinValueResolution::kOk;
+}
+
+bool CoverageDB::SingletonValueParticipates(BinValueResolution resolution) {
+  // A singleton that triggers a warning is removed from the bin's values
+  // (LRM 19.5.7, first warning bullet).
+  return resolution == BinValueResolution::kOk;
+}
+
+std::vector<int64_t> CoverageDB::ResolveBinRange(int64_t low, int64_t high,
+                                                 bool low_has_xz,
+                                                 bool high_has_xz,
+                                                 bool is_wildcard,
+                                                 CoverpointEffectiveType eff) {
+  // An x/z bit in either endpoint removes the whole range, unless this is a
+  // wildcard bin whose unknown bits were already resolved (LRM 19.5.7, second
+  // range bullet).
+  if (!is_wildcard && (low_has_xz || high_has_xz)) return {};
+  if (low > high) return {};
+  // The surviving range is the intersection of [low:high] with the domain the
+  // effective type can express. An empty intersection means every value in the
+  // range would warn, so the range drops out (LRM 19.5.7, second and third
+  // range bullets).
+  int64_t lo = std::max(low, EffectiveTypeMin(eff));
+  int64_t hi = std::min(high, EffectiveTypeMax(eff));
+  if (lo > hi) return {};
+  std::vector<int64_t> out;
+  for (int64_t v = lo;; ++v) {
+    out.push_back(v);
+    if (v == hi) break;  // terminate here to stay safe when hi == INT64_MAX
+  }
+  return out;
+}
+
 // --- LRM 19.7: instance coverage options ------------------------------------
 
 bool CoverageDB::OptionWeightValid(int32_t weight) {

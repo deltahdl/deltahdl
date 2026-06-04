@@ -47,6 +47,35 @@ struct RealInterval {
   bool high_inclusive = false;
 };
 
+// Effective type of a coverpoint expression e, used when resolving bin values
+// against e (LRM 19.5.7). It is `width` bits wide and interpreted in
+// two's-complement when `is_signed`. A bin value is reconciled to this type
+// before it is compared with a sampled value: with an explicit coverpoint cast
+// type the effective type is that type, otherwise it is the self-determined
+// type of e (LRM 19.5.7 a).
+struct CoverpointEffectiveType {
+  uint32_t width = 32;
+  bool is_signed = true;
+};
+
+// Outcome of resolving a single bin value b against the effective type of e
+// (LRM 19.5.7 b). Any result other than kOk causes an implementation warning,
+// and the value is then dropped from the bin by the warning rules of LRM
+// 19.5.7.
+enum class BinValueResolution : uint8_t {
+  // b is representable in the effective type and participates in the bin.
+  kOk,
+  // The effective type is unsigned but b is signed and negative (LRM
+  // 19.5.7 b, condition 1).
+  kUnsignedNegative,
+  // Statically casting b to the effective type yields a different value (LRM
+  // 19.5.7 b, condition 2).
+  kValueChanged,
+  // b carries x or z bits and the bin is not a wildcard bin (LRM 19.5.7 b,
+  // condition 3).
+  kUnknownBits,
+};
+
 struct CoverPoint {
   std::string name;
   std::vector<CoverBin> bins;
@@ -677,6 +706,55 @@ class CoverageDB {
   // that hits an illegal bin raises a run-time error even when it is also
   // included in another (legal) bin. Always true (LRM 19.5.6).
   static bool IllegalTakesPrecedence(bool also_in_other_bin);
+
+  // --- LRM 19.5.7: value resolution -----------------------------------------
+
+  // Effective type of the coverpoint expression e that bin values are resolved
+  // against. With an explicit coverpoint cast type the effective type is that
+  // type; with no coverpoint type it is the self-determined type of e
+  // (LRM 19.5.7 a). Enumeration operands are taken at their base type, which is
+  // already reflected in the width/signedness supplied here.
+  static CoverpointEffectiveType EffectiveCoverpointType(
+      bool has_coverpoint_type, CoverpointEffectiveType coverpoint_type,
+      CoverpointEffectiveType self_determined_type);
+
+  // Statically casts a bin value to the effective type of e: the value is
+  // reduced to the type's width and reinterpreted as signed or unsigned. This
+  // is the cast LRM 19.5.7 b requires before a bin value is compared with a
+  // sampled value.
+  static int64_t CastToEffectiveType(int64_t value, CoverpointEffectiveType eff);
+
+  // Lowest and highest value expressible by an effective type — the closed
+  // domain a bin value can occupy after the cast of LRM 19.5.7 b. A range bin
+  // surviving warning resolution is the intersection of its values with this
+  // domain (LRM 19.5.7, third range bullet).
+  static int64_t EffectiveTypeMin(CoverpointEffectiveType eff);
+  static int64_t EffectiveTypeMax(CoverpointEffectiveType eff);
+
+  // Resolves one bin value b against the effective type of e and reports
+  // whether and why a warning is issued. x and z bits of a wildcard bin are
+  // treated as all 0 and 1 before this resolution, so a wildcard bin never
+  // warns for unknown bits (LRM 19.5.7 preamble and condition 3).
+  static BinValueResolution ResolveBinValue(int64_t value, bool value_is_signed,
+                                            bool value_has_xz, bool is_wildcard,
+                                            CoverpointEffectiveType eff);
+
+  // Whether a singleton bin value participates in the bin: a singleton for
+  // which a warning is issued does not participate (LRM 19.5.7, first warning
+  // bullet).
+  static bool SingletonValueParticipates(BinValueResolution resolution);
+
+  // Resolves a bin range [low:high] against the effective type of e, returning
+  // the values that participate in the bin. The range drops out entirely when
+  // an endpoint carries x or z bits or when every value in the range would
+  // warn; otherwise it becomes the intersection of its values with the values
+  // expressible by the effective type (LRM 19.5.7, second and third range
+  // bullets). Wildcard endpoints' x/z bits are resolved beforehand and do not
+  // force the range out.
+  static std::vector<int64_t> ResolveBinRange(int64_t low, int64_t high,
+                                              bool low_has_xz, bool high_has_xz,
+                                              bool is_wildcard,
+                                              CoverpointEffectiveType eff);
 
   // --- LRM 19.7: instance coverage options ----------------------------------
 
