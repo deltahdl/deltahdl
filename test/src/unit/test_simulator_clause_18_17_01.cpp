@@ -193,4 +193,38 @@ TEST(RandsequenceSim, DefaultWeightOfOneRelativeToExplicit) {
   EXPECT_GT(nb->value.ToUint64(), 2u * na->value.ToUint64());
 }
 
+// §18.17.1 claim 5 (edge case): a weight is only meaningful when assigned to
+// alternative production lists separated by '|'. A production with a single
+// list has no alternatives, so its weight is inconsequential — even a weight of
+// 0, which would make a list unreachable when competing against alternatives
+// (see ZeroWeightProductionListNeverSelected), leaves the lone list generated
+// every time. This exercises the single-list short circuit in SelectRule, which
+// returns the only list before the weight is consulted.
+TEST(RandsequenceSim, WeightOnNonAlternativeProductionIsIgnored) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] na;\n"
+      "  integer i;\n"
+      "  initial begin\n"
+      "    na = 0;\n"
+      "    for (i = 0; i < 50; i = i + 1)\n"
+      "      randsequence(main)\n"
+      "        main : a := 0;\n"
+      "        a : { na = na + 1; };\n"
+      "      endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* na = f.ctx.FindVariable("na");
+  ASSERT_NE(na, nullptr);
+
+  // Despite the zero weight, the sole production list is always generated.
+  EXPECT_EQ(na->value.ToUint64(), 50u);
+}
+
 }  // namespace
