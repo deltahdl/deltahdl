@@ -119,4 +119,21 @@ TEST(Coverage, EmptyTransitionSequenceYieldsNoValue) {
   EXPECT_TRUE(CoverageDB::BinsofBinValues(t).empty());
 }
 
+// When a transition bin mixes an empty sequence with non-empty ones, binsof
+// drops the empty sequence (it has no last value) yet still contributes the
+// last value of every non-empty sequence (LRM 19.6.1.1).
+TEST(Coverage, MixedEmptyAndNonEmptyTransitionSequences) {
+  CoverBin t = MakeTransitionBin("t", {{}, {4, 5}, {}, {7, 8, 9}});
+  EXPECT_EQ(CoverageDB::BinsofBinValues(t), (std::vector<int64_t>{5, 9}));
+
+  // End to end: intersect still selects the bin on a surviving last value and
+  // ignores the dropped empty sequence entirely.
+  CoverPoint cp;
+  cp.name = "cp";
+  cp.bins = {t};
+  auto bins = CoverageDB::BinsofYield(&cp);
+  auto hit = CoverageDB::SelectBinsByIntersect(bins, {9}, /*negate=*/false);
+  EXPECT_EQ(hit, (std::vector<size_t>{0}));
+}
+
 }
