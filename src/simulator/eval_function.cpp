@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <string>
 #include <unordered_set>
@@ -397,6 +398,23 @@ static uint64_t CurrentTimeInModuleUnits(SimContext& ctx) {
   return (ticks + steps_per_unit / 2) / steps_per_unit;  // round to nearest
 }
 
+// §20.3.3: $realtime reports the current simulation time scaled to the
+// invoking module's time unit just as $time does, but the result is a real
+// number rather than an integer. Because the return type is real, the scaled
+// value keeps its fractional part instead of being rounded to the nearest
+// integer (e.g. a 16 ns time under a 10 ns unit yields 1.6, not 2).
+static double CurrentTimeInModuleUnitsReal(SimContext& ctx) {
+  uint64_t ticks = ctx.CurrentTime().ticks;
+  const TimeScale& scale = ctx.CurrentTimeScale();
+  int unit_order = EffectiveTimeOrder(scale.unit, scale.magnitude);
+  int prec_order = static_cast<int>(ctx.StepTimeUnit());
+  int exp = unit_order - prec_order;  // >= 0: the unit is no finer than a tick
+  if (exp <= 0) return static_cast<double>(ticks);
+  double steps_per_unit = 1.0;
+  for (int i = 0; i < exp; ++i) steps_per_unit *= 10.0;
+  return static_cast<double>(ticks) / steps_per_unit;
+}
+
 static Logic4Vec EvalTimeSysCall(SimContext& ctx, Arena& arena,
                                  std::string_view name) {
   if (name == "$stime") {
@@ -405,6 +423,14 @@ static Logic4Vec EvalTimeSysCall(SimContext& ctx, Arena& arena,
     // scaled time does not fit in 32 bits, only its low-order 32 bits are
     // returned; the 32-bit result width performs that truncation.
     return MakeLogic4VecVal(arena, 32, CurrentTimeInModuleUnits(ctx));
+  }
+  if (name == "$realtime") {
+    double scaled = CurrentTimeInModuleUnitsReal(ctx);
+    uint64_t bits = 0;
+    std::memcpy(&bits, &scaled, sizeof(double));
+    auto result = MakeLogic4VecVal(arena, 64, bits);
+    result.is_real = true;
+    return result;
   }
   if (name == "$time") {
     return MakeLogic4VecVal(arena, 64, CurrentTimeInModuleUnits(ctx));
