@@ -269,6 +269,17 @@ enum class TransitionRepeatKind : uint8_t {
   kNonconsecutive,  // trans_item [= repeat_range]
 };
 
+// How a sampled cross product is treated once a cross's illegal_bins and
+// ignore_bins select expressions have been evaluated to their product sets
+// (LRM 19.6.3). A counted product contributes to its cross coverage bin; an
+// ignored product is excluded from coverage with no diagnostic; an illegal
+// product is excluded from coverage and raises a run-time error.
+enum class CrossSampleOutcome : uint8_t {
+  kCounted,
+  kIgnored,
+  kIllegalError,
+};
+
 class CoverageDB {
  public:
   CoverGroup* CreateGroup(std::string name);
@@ -466,6 +477,33 @@ class CoverageDB {
   // cross coverage bin of the enclosing cross, so this always returns false
   // regardless of the other-bin membership (LRM 19.6.2).
   static bool IgnoredCrossProductRetained(bool also_in_other_cross_bin);
+
+  // --- LRM 19.6.3: specifying illegal cross products ------------------------
+
+  // Excludes from coverage every cross product an illegal_bins select expression
+  // selects. The select expression has already been evaluated to its set of
+  // cross products by the LRM 19.6.1 machinery; this removes those products from
+  // a given set, exactly as the ignore_bins case does, so that all cross
+  // products satisfying the select expression are excluded from coverage. Each
+  // cross product is a tuple of chosen bin indices, one per coverpoint; the
+  // surviving products keep their original order (LRM 19.6.3).
+  static std::vector<std::vector<size_t>> ExcludeIllegalCrossProducts(
+      const std::vector<std::vector<size_t>>& products,
+      const std::vector<std::vector<size_t>>& illegal);
+
+  // Classifies a sampled cross product against the cross's illegal_bins and
+  // ignore_bins product sets and whether some other cross coverage bin of the
+  // enclosing cross also includes it. A product selected by illegal_bins is
+  // excluded from coverage and raises a run-time error; this takes precedence
+  // over any other treatment, so the error is raised even when the same product
+  // is also named by an ignore_bins select expression or included in another
+  // cross bin. A product that is only ignored is excluded with no error.
+  // Anything else is counted toward its cross product bin (LRM 19.6.3).
+  static CrossSampleOutcome ClassifyCrossSample(
+      const std::vector<size_t>& product,
+      const std::vector<std::vector<size_t>>& illegal,
+      const std::vector<std::vector<size_t>>& ignored,
+      bool also_in_other_cross_bin);
 
   // --- LRM 19.5.1: specifying bins for values -------------------------------
 

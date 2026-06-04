@@ -860,6 +860,43 @@ bool CoverageDB::IgnoredCrossProductRetained(bool /*also_in_other_cross_bin*/) {
   return false;
 }
 
+// --- LRM 19.6.3: specifying illegal cross products --------------------------
+
+std::vector<std::vector<size_t>> CoverageDB::ExcludeIllegalCrossProducts(
+    const std::vector<std::vector<size_t>>& products,
+    const std::vector<std::vector<size_t>>& illegal) {
+  // Every cross product that satisfies the illegal_bins select expression is
+  // excluded from coverage, just as for ignore_bins; the rest keep their order
+  // (LRM 19.6.3).
+  std::vector<std::vector<size_t>> kept;
+  for (const auto& product : products) {
+    if (std::find(illegal.begin(), illegal.end(), product) == illegal.end()) {
+      kept.push_back(product);
+    }
+  }
+  return kept;
+}
+
+CrossSampleOutcome CoverageDB::ClassifyCrossSample(
+    const std::vector<size_t>& product,
+    const std::vector<std::vector<size_t>>& illegal,
+    const std::vector<std::vector<size_t>>& ignored,
+    bool /*also_in_other_cross_bin*/) {
+  // Illegal takes precedence over every other treatment: if the product is
+  // selected by illegal_bins it raises a run-time error and counts toward no
+  // coverage, regardless of whether it is also ignored or included in another
+  // cross bin (LRM 19.6.3).
+  if (std::find(illegal.begin(), illegal.end(), product) != illegal.end()) {
+    return CrossSampleOutcome::kIllegalError;
+  }
+  // A non-illegal product selected by ignore_bins is excluded with no error
+  // (LRM 19.6.2).
+  if (std::find(ignored.begin(), ignored.end(), product) != ignored.end()) {
+    return CrossSampleOutcome::kIgnored;
+  }
+  return CrossSampleOutcome::kCounted;
+}
+
 // --- LRM 19.5.1: specifying bins for values ---------------------------------
 
 std::string CoverageDB::StateBinName(std::string_view base, int64_t index) {
