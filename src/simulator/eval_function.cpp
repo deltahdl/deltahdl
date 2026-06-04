@@ -400,8 +400,11 @@ static uint64_t CurrentTimeInModuleUnits(SimContext& ctx) {
 static Logic4Vec EvalTimeSysCall(SimContext& ctx, Arena& arena,
                                  std::string_view name) {
   if (name == "$stime") {
-    auto ticks = ctx.CurrentTime().ticks & 0xFFFFFFFF;
-    return MakeLogic4VecVal(arena, 32, ticks);
+    // §20.3.2: $stime reports the current time scaled to the invoking module's
+    // time unit just as $time does, but as an unsigned 32-bit value. When the
+    // scaled time does not fit in 32 bits, only its low-order 32 bits are
+    // returned; the 32-bit result width performs that truncation.
+    return MakeLogic4VecVal(arena, 32, CurrentTimeInModuleUnits(ctx));
   }
   if (name == "$time") {
     return MakeLogic4VecVal(arena, 64, CurrentTimeInModuleUnits(ctx));
