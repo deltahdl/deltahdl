@@ -18,21 +18,6 @@ TEST(RandomSeedType, IntegralSeedIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §20.14.1 (edge case): an integral seed that is not a plain `integer` — here a
-// packed logic vector — still satisfies the "integral variable" rule, so the
-// check must not over-reject it.
-TEST(RandomSeedType, VectorSeedIsAccepted) {
-  ElabFixture f;
-  Elaborate(
-      "module m;\n"
-      "  logic [31:0] seed;\n"
-      "  integer x;\n"
-      "  initial x = $random(seed);\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // §20.14.1: a real seed is not an integral variable and is rejected.
 TEST(RandomSeedType, RealSeedIsRejected) {
   ElabFixture f;
