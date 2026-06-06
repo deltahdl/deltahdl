@@ -45,16 +45,6 @@ TEST(SysTask, RealtimeReturnsRealNumber) {
   EXPECT_TRUE(result.is_real);
 }
 
-// §20.3.3: like $time, the reported value is scaled to the invoking module's
-// time unit. With a 10 ns unit over a 1 ns precision, ten ticks make one unit,
-// so simulation time 20 ns (20 ticks) reports as 2.0 rather than 20.
-TEST(SysTask, RealtimeScaledToModuleUnit) {
-  SysTaskFixture f;
-  f.ctx.SetGlobalPrecision(TimeUnit::kNs);
-  f.ctx.SetCurrentTimeScale(TimeScale{TimeUnit::kNs, 10, TimeUnit::kNs, 1});
-  EXPECT_DOUBLE_EQ(RealtimeAtTick(f, 20), 2.0);
-}
-
 // §20.3.3 (LRM example, `timescale 10 ns / 1 ns): event times 16 ns and 32 ns
 // are reported by $realtime as the real numbers 1.6 and 3.2 — multiples of the
 // 10 ns unit, with the fraction preserved rather than rounded. Keeping the
