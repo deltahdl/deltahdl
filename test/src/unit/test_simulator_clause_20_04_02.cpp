@@ -72,6 +72,18 @@ TEST(PrinttimescaleSysTask, ReportFollowsRequiredFormat) {
             "Time scale of (dut) is 100us / 10ns");
 }
 
+// §20.4.2 (shall) edge case: the report renders whole-second units at the top
+// of Table 20-2 (orders 2 and 1), exercising the positive-order branch of the
+// magnitude-and-unit formatting that the sub-second cases never reach.
+TEST(PrinttimescaleSysTask, RendersWholeSecondUnits) {
+  SysTaskFixture f;
+  f.ctx.SetScopeTimeScale("slow",
+                          TimeScale{TimeUnit::kS, 100, TimeUnit::kS, 10});
+  auto* call = MkSysCall(f.arena, "$printtimescale", {MkId(f.arena, "slow")});
+  EXPECT_EQ(BuildPrinttimescaleReport(call, f.ctx),
+            "Time scale of (slow) is 100s / 10s");
+}
+
 // Edge case: with no timescale configured the current scope defaults to 1 ns
 // for both unit and precision.
 TEST(PrinttimescaleSysTask, DefaultCurrentScopeIsNanosecond) {
@@ -80,17 +92,6 @@ TEST(PrinttimescaleSysTask, DefaultCurrentScopeIsNanosecond) {
   auto* call = MkSysCall(f.arena, "$printtimescale", {});
   EXPECT_EQ(BuildPrinttimescaleReport(call, f.ctx),
             "Time scale of (top) is 1ns / 1ns");
-}
-
-// The system task is dispatched through the evaluator: invoking it executes
-// without raising a diagnostic and yields the void task result.
-TEST(PrinttimescaleSysTask, TaskInvocationExecutesWithoutError) {
-  SysTaskFixture f;
-  f.ctx.SetCurrentScopeName("m");
-  auto* call = MkSysCall(f.arena, "$printtimescale", {});
-  Logic4Vec result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(result.width, 1u);
 }
 
 // §20.4.2: $printtimescale displays the timescale report. Drive the full

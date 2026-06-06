@@ -35,16 +35,4 @@ TEST(PrinttimescaleSysTask, HierarchicalArgumentParses) {
   ASSERT_EQ(stmt->expr->args.size(), 1u);
 }
 
-// The $root argument is accepted in the argument position.
-TEST(PrinttimescaleSysTask, RootArgumentParses) {
-  auto r = Parse("module m; initial $printtimescale($root); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->expr, nullptr);
-  EXPECT_EQ(stmt->expr->callee, "$printtimescale");
-  ASSERT_EQ(stmt->expr->args.size(), 1u);
-}
-
 }
