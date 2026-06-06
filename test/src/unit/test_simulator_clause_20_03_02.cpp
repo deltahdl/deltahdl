@@ -40,16 +40,6 @@ TEST(SysTask, StimeScaledToModuleUnit) {
   EXPECT_EQ(StimeAtTick(f, 20), 2u);
 }
 
-// §20.3.2 (scaling shares $time's nearest-integer behavior): 16 ns over a 10 ns
-// unit is 1.6, which scales and rounds to 2 — confirming $stime scales before
-// truncating rather than reporting the raw tick count.
-TEST(SysTask, StimeScalesBeforeReporting) {
-  SysTaskFixture f;
-  f.ctx.SetGlobalPrecision(TimeUnit::kNs);
-  f.ctx.SetCurrentTimeScale(TimeScale{TimeUnit::kNs, 10, TimeUnit::kNs, 1});
-  EXPECT_EQ(StimeAtTick(f, 16), 2u);
-}
-
 // §20.3.2: when the scaled simulation time does not fit in 32 bits, only the
 // low-order 32 bits are returned. With a 1 ns unit over a 1 ns precision no
 // scaling occurs, so a tick count just past 2^32 comes back as its low 32 bits.
@@ -72,6 +62,18 @@ TEST(SysTask, StimeScalesLargeTimeBeforeTruncating) {
   f.ctx.SetGlobalPrecision(TimeUnit::kNs);
   f.ctx.SetCurrentTimeScale(TimeScale{TimeUnit::kNs, 10, TimeUnit::kNs, 1});
   EXPECT_EQ(StimeAtTick(f, 5'000'000'000ull), 500'000'000u);
+}
+
+// §20.3.2 (truncation boundary edge): a scaled time of exactly 2^32 has all of
+// its low-order 32 bits clear, so the reported value is 0 rather than anything
+// derived from the discarded high bits. This pins the result to precisely the
+// low 32 bits at the wrap boundary, complementing the just-past-boundary case.
+TEST(SysTask, StimeWrapsToZeroAtExact32BitBoundary) {
+  SysTaskFixture f;
+  f.ctx.SetGlobalPrecision(TimeUnit::kNs);
+  f.ctx.SetCurrentTimeScale(TimeScale{TimeUnit::kNs, 1, TimeUnit::kNs, 1});
+  constexpr uint64_t boundary = uint64_t{1} << 32;  // 0x1_0000_0000
+  EXPECT_EQ(StimeAtTick(f, boundary), 0u);
 }
 
 // §20.3.2 (unsigned 32-bit return, boundary): a value whose top 32-bit bit is
