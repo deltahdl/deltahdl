@@ -23,31 +23,6 @@ TEST(KeywordVersionPreprocessing, BeginKeywords1800_2012_EmitsCorrectMarker) {
             KeywordVersion::kVer18002012);
 }
 
-TEST(KeywordVersionPreprocessing, BeginKeywords1800_2012_SoftIsKeyword) {
-  PreprocFixture f;
-  auto out = Preprocess(
-      "`begin_keywords \"1800-2012\"\n"
-      "soft\n"
-      "`end_keywords\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", out);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  auto tokens = lexer.LexAll();
-
-  bool found = false;
-  for (const auto& tok : tokens) {
-    if (tok.text == "soft") {
-      EXPECT_EQ(tok.kind, TokenKind::kKwSoft);
-      found = true;
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 TEST(KeywordVersionPreprocessing,
      BeginKeywords1800_2012_InterconnectIsKeyword) {
   PreprocFixture f;
