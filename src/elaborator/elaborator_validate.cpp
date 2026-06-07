@@ -2164,6 +2164,136 @@ void Elaborator::ValidatePlaOutputTerms(const ModuleDecl* decl) {
 
 namespace {
 
+// §20.16.3: the constant-folded declaration ranges of a signal that may be named
+// as a PLA memory or term, used to test the ascending-order requirement.
+struct PlaDeclRanges {
+  std::optional<int64_t> packed_left;
+  std::optional<int64_t> packed_right;
+  // Each unpacked dimension that folds to a constant [left:right] range.
+  std::vector<std::pair<int64_t, int64_t>> unpacked;
+};
+
+using PlaRangeMap = std::unordered_map<std::string_view, PlaDeclRanges>;
+
+// §20.16.3: "PLA input terms, output terms, and memory shall be specified in
+// ascending order." A declared range is ascending when its left index is no
+// greater than its right index; flag a memory or term whose declaration runs the
+// other way. The check uses only the base identifier's declaration, so a term
+// given as a concatenation of scalars or a range that does not fold to a
+// constant is simply left unchecked.
+void CheckPlaArgAscending(const Expr* arg, const PlaRangeMap& ranges,
+                          bool check_unpacked, const char* message,
+                          DiagEngine& diag) {
+  if (!arg) return;
+  auto base = LhsBaseName(arg);
+  if (base.empty()) return;
+  auto it = ranges.find(base);
+  if (it == ranges.end()) return;
+  const PlaDeclRanges& r = it->second;
+  if (r.packed_left && r.packed_right && *r.packed_left > *r.packed_right) {
+    diag.Error(arg->range.start, message);
+    return;
+  }
+  if (check_unpacked) {
+    for (const auto& dim : r.unpacked) {
+      if (dim.first > dim.second) {
+        diag.Error(arg->range.start, message);
+        return;
+      }
+    }
+  }
+}
+
+// §20.16.3: at every PLA system task call, check the memory (first argument) for
+// ascending packed and unpacked ranges and the input/output term arguments for
+// ascending packed ranges.
+void CheckPlaAscendingExpr(const Expr* e, const PlaRangeMap& ranges,
+                           DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kSystemCall && IsPlaSystemTask(e->callee)) {
+    if (e->args.size() >= 1)
+      CheckPlaArgAscending(
+          e->args[0], ranges, /*check_unpacked=*/true,
+          "the memory of a PLA modeling system task shall be declared in "
+          "ascending order",
+          diag);
+    if (e->args.size() >= 2)
+      CheckPlaArgAscending(
+          e->args[1], ranges, /*check_unpacked=*/false,
+          "the input terms of a PLA modeling system task shall be specified in "
+          "ascending order",
+          diag);
+    if (e->args.size() >= 3)
+      CheckPlaArgAscending(
+          e->args[2], ranges, /*check_unpacked=*/false,
+          "the output terms of a PLA modeling system task shall be specified in "
+          "ascending order",
+          diag);
+  }
+  CheckPlaAscendingExpr(e->lhs, ranges, diag);
+  CheckPlaAscendingExpr(e->rhs, ranges, diag);
+  CheckPlaAscendingExpr(e->condition, ranges, diag);
+  CheckPlaAscendingExpr(e->true_expr, ranges, diag);
+  CheckPlaAscendingExpr(e->false_expr, ranges, diag);
+  CheckPlaAscendingExpr(e->base, ranges, diag);
+  CheckPlaAscendingExpr(e->index, ranges, diag);
+  for (auto* a : e->args) CheckPlaAscendingExpr(a, ranges, diag);
+  for (auto* el : e->elements) CheckPlaAscendingExpr(el, ranges, diag);
+}
+
+void CheckPlaAscendingStmt(const Stmt* s, const PlaRangeMap& ranges,
+                           DiagEngine& diag) {
+  if (!s) return;
+  CheckPlaAscendingExpr(s->condition, ranges, diag);
+  CheckPlaAscendingExpr(s->lhs, ranges, diag);
+  CheckPlaAscendingExpr(s->rhs, ranges, diag);
+  CheckPlaAscendingExpr(s->expr, ranges, diag);
+  CheckPlaAscendingExpr(s->var_init, ranges, diag);
+  for (auto* sub : s->stmts) CheckPlaAscendingStmt(sub, ranges, diag);
+  for (auto* sub : s->fork_stmts) CheckPlaAscendingStmt(sub, ranges, diag);
+  CheckPlaAscendingStmt(s->then_branch, ranges, diag);
+  CheckPlaAscendingStmt(s->else_branch, ranges, diag);
+  CheckPlaAscendingStmt(s->body, ranges, diag);
+  CheckPlaAscendingStmt(s->for_body, ranges, diag);
+  for (auto* init : s->for_inits) CheckPlaAscendingStmt(init, ranges, diag);
+  for (auto& ci : s->case_items) CheckPlaAscendingStmt(ci.body, ranges, diag);
+}
+
+}  // namespace
+
+void Elaborator::ValidatePlaAscendingOrder(const ModuleDecl* decl) {
+  // §20.16.3: PLA input terms, output terms, and memory shall be specified in
+  // ascending order. Collect each signal's declared ranges first, then check
+  // every PLA call that names one as its memory or as a term.
+  PlaRangeMap ranges;
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kVarDecl &&
+        item->kind != ModuleItemKind::kNetDecl)
+      continue;
+    PlaDeclRanges r;
+    r.packed_left = ConstEvalInt(item->data_type.packed_dim_left);
+    r.packed_right = ConstEvalInt(item->data_type.packed_dim_right);
+    for (auto* dim : item->unpacked_dims) {
+      if (dim && dim->kind == ExprKind::kBinary &&
+          dim->op == TokenKind::kColon) {
+        auto l = ConstEvalInt(dim->lhs);
+        auto rr = ConstEvalInt(dim->rhs);
+        if (l && rr) r.unpacked.push_back({*l, *rr});
+      }
+    }
+    ranges.emplace(item->name, std::move(r));
+  }
+  if (ranges.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->body) CheckPlaAscendingStmt(item->body, ranges, diag_);
+    for (auto* s : item->func_body_stmts)
+      CheckPlaAscendingStmt(s, ranges, diag_);
+    CheckPlaAscendingExpr(item->init_expr, ranges, diag_);
+  }
+}
+
+namespace {
+
 // §20.7.1: a single unpacked dimension is "variable-sized" when it is a dynamic
 // array ([], stored as a null dimension), a queue ([$]), or a wildcard
 // associative array ([*]) — the same classification §20.7 uses for a
