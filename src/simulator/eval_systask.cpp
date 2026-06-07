@@ -1445,21 +1445,47 @@ void PlaSetBit(Logic4Vec& v, uint32_t pos, Logic4Word bit) {
 }
 
 // §20.16.1: reduce the input terms selected by one personality word into a
-// single output-term bit. The array format selects an input wherever the
-// personality bit is 1; the logic component fixes whether the selected inputs
-// are AND- or OR-reduced, and the complemented forms (nand/nor) invert the
-// result. The plane-format bit codes of §20.16.4 are not yet distinguished, so
-// a plane task is evaluated as if it used the array selection.
+// single output-term bit. The logic component fixes whether the participating
+// inputs are AND- or OR-reduced, and the complemented forms (nand/nor) invert
+// the result.
+//
+// §20.16.4 defines two personality formats, chosen by the format component of
+// the task name (array vs plane). In the array format a personality bit of 1
+// takes the input value and any other bit does not take it. In the plane
+// (Berkeley Espresso) format the bit instead selects how the input
+// participates: 0 takes the complemented input, 1 takes the true input, a
+// don't-care (z, and the equivalent ?) drops the input from the reduction, and
+// x takes the worst case by contributing an unknown. In the 4-state encoding a
+// personality bit holds 0 as {0,0}, 1 as {1,0}, x as {1,1} and z/? as {0,1}.
 Logic4Word PlaReduceWord(const PlaTaskKind& k, const Logic4Vec& mem_word,
                          const Logic4Vec& inputs, uint32_t n) {
   bool is_and = k.logic == PlaTaskKind::Logic::kAnd ||
                 k.logic == PlaTaskKind::Logic::kNand;
   Logic4Word acc = is_and ? Logic4Word{1, 0} : Logic4Word{0, 0};
   for (uint32_t p = 0; p < n; ++p) {
-    Logic4Word sel = PlaBitAt(mem_word, p);
-    if (sel.aval == 1 && sel.bval == 0) {  // input is taken
-      Logic4Word in_bit = PlaBitAt(inputs, p);
-      acc = is_and ? Logic4And(acc, in_bit) : Logic4Or(acc, in_bit);
+    Logic4Word code = PlaBitAt(mem_word, p);
+    Logic4Word in_bit = PlaBitAt(inputs, p);
+    Logic4Word term;
+    bool participates = true;
+    if (k.is_plane) {
+      // §20.16.4 plane-format (Espresso) personality codes.
+      if (code.bval == 0) {
+        // 1 takes the true input value, 0 takes the complemented input value.
+        term = code.aval == 1 ? in_bit : Logic4Not(in_bit);
+      } else if (code.aval == 1) {
+        // x: take the worst case of the input value - contribute an unknown.
+        term = Logic4Word{0, 1};
+      } else {
+        // z (and the equivalent ?): do-not-care, the input does not participate.
+        participates = false;
+      }
+    } else {
+      // §20.16.4 array-format personality codes: 1 takes the input value.
+      participates = code.aval == 1 && code.bval == 0;
+      term = in_bit;
+    }
+    if (participates) {
+      acc = is_and ? Logic4And(acc, term) : Logic4Or(acc, term);
     }
   }
   bool invert = k.logic == PlaTaskKind::Logic::kNand ||
