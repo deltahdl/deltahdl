@@ -496,9 +496,44 @@ static std::string ResolveDumpportsFileName(const Expr* expr) {
   return "dumpports.vcd";
 }
 
+// §21.7.3.7: the extended VCD control tasks each act on a $dumpports dump and
+// share the general rules for filename matching and no-argument default actions.
+static bool IsDumpportsControlTask(std::string_view name) {
+  return name == "$dumpportsoff" || name == "$dumpportson" ||
+         name == "$dumpportsall" || name == "$dumpportslimit" ||
+         name == "$dumpportsflush";
+}
+
+// §21.7.3.7: a control task's optional filename is its trailing string-literal
+// argument and names which $dumpports output the task targets. Returns the
+// unquoted filename, or an empty string when the call carries no such argument
+// (for $dumpportslimit the trailing argument is the filesize, not a literal).
+static std::string DumpportsControlFileArg(const Expr* expr) {
+  if (expr->args.empty()) return {};
+  const Expr* last = expr->args.back();
+  if (!last || last->kind != ExprKind::kStringLiteral) return {};
+  auto text = last->text;
+  if (text.size() >= 2 && text.front() == '"') {
+    return std::string(text.substr(1, text.size() - 2));
+  }
+  return std::string(text);
+}
+
 static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 std::string_view name) {
   auto* vcd = ctx.GetVcdWriter();
+  // §21.7.3.7: if an extended VCD control task names a file that no $dumpports
+  // call opened, the task is ignored. The match is against the files explicitly
+  // named by $dumpports; with no filename argument the default action runs
+  // against every such file. Under this single-writer model, when no $dumpports
+  // call has named a file there is nothing to mismatch, so the lone dump is the
+  // implicit target and the task proceeds.
+  if (IsDumpportsControlTask(name) && ctx.HasDumpportsFiles()) {
+    std::string file = DumpportsControlFileArg(expr);
+    if (!file.empty() && !ctx.IsDumpportsFile(file)) {
+      return MakeLogic4VecVal(arena, 1, 0);
+    }
+  }
   if (name == "$dumpfile") {
     ctx.SetDumpFileName(ResolveDumpFileName(expr, ctx, arena));
   } else if (name == "$dumpvars") {

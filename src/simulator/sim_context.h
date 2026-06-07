@@ -336,6 +336,15 @@ class SimContext {
   bool RegisterDumpportsFile(const std::string& file) {
     return dumpports_files_.insert(file).second;
   }
+  // §21.7.3.7: an extended VCD control task may name the $dumpports output it
+  // targets; the name matches only when some $dumpports call explicitly
+  // specified that file. Returns true when the name was so registered.
+  bool IsDumpportsFile(const std::string& file) const {
+    return dumpports_files_.count(file) != 0;
+  }
+  // §21.7.3.7: true once at least one $dumpports call has explicitly named an
+  // output file, so a control task's filename can be matched against the set.
+  bool HasDumpportsFiles() const { return !dumpports_files_.empty(); }
 
   void SetDpiContext(DpiContext* dpi) { dpi_context_ = dpi; }
   DpiContext* GetDpiContext() { return dpi_context_; }
