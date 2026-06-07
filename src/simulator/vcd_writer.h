@@ -20,6 +20,13 @@ struct VcdSignal {
   // Net type of the dumped object, used to pick the $var var_type keyword
   // (§21.7.2.3): a uwire net is recorded as wire.
   NetType net_type = NetType::kWire;
+  // Extended VCD node information (§21.7.4.2): the declared index range of a
+  // port and the integer identifier code used in its $var declaration. msb/lsb
+  // are negative when no vector_index applies, in which case the port is a
+  // 1-bit scalar.
+  int32_t msb = -1;
+  int32_t lsb = -1;
+  uint32_t port_id = 0;
 };
 
 class VcdWriter {
@@ -40,7 +47,8 @@ class VcdWriter {
   void BeginScope(std::string_view name);
   void EndScope();
   void RegisterSignal(std::string_view name, uint32_t width, Variable* var,
-                      NetType net_type = NetType::kWire);
+                      NetType net_type = NetType::kWire, int32_t msb = -1,
+                      int32_t lsb = -1);
   void EndDefinitions();
 
   void WriteTimestamp(uint64_t time);
@@ -77,6 +85,15 @@ class VcdWriter {
   // only an extended writer emits it.
   void SetExtended() { extended_ = true; }
 
+  // Emit the node information section in the extended VCD form (§21.7.4.2). The
+  // $dumpports task records ports rather than the 4-state nets/variables, so
+  // each $var declaration uses the var_type keyword port, prints the port's
+  // declared index range (or 1 for a scalar) as its size, and identifies the
+  // port with an integer code preceded by < that ascends from zero in
+  // declaration order. This is independent of the 4-state declaration form used
+  // by a plain writer.
+  void SetExtendedPortNodes() { port_nodes_ = true; }
+
   // Emit the $vcdclose keyword command (§21.7.3.6.1): when an extended VCD file
   // is closed, record the final simulation time so a reader knows the end time
   // regardless of whether any signal changed at that time. Syntax 21-26:
@@ -104,6 +121,8 @@ class VcdWriter {
   uint64_t size_limit_ = 0;
   bool limit_reached_ = false;
   bool extended_ = false;
+  bool port_nodes_ = false;
+  uint32_t next_port_id_ = 0;
 };
 
 }

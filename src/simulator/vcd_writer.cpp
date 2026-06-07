@@ -51,20 +51,40 @@ static const char* VcdVarTypeKeyword(const VcdSignal& sig) {
 }
 
 void VcdWriter::RegisterSignal(std::string_view name, uint32_t width,
-                               Variable* var, NetType net_type) {
+                               Variable* var, NetType net_type, int32_t msb,
+                               int32_t lsb) {
   VcdSignal sig;
   sig.name = name;
   sig.width = width;
   sig.var = var;
   sig.ident = next_ident_++;
   sig.net_type = net_type;
+  sig.msb = msb;
+  sig.lsb = lsb;
+  // §21.7.4.2: the identifier code of a port is an integer that ascends in
+  // one-unit increments for each port, in the order found in the module
+  // declaration. Each registration is one such port.
+  sig.port_id = next_port_id_++;
 
   if (next_ident_ > '~') next_ident_ = '!';
   signals_.push_back(sig);
-  if (ofs_.is_open()) {
-    ofs_ << "$var " << VcdVarTypeKeyword(sig) << " " << width << " "
-         << sig.ident << " " << name << " $end\n";
+  if (!ofs_.is_open()) return;
+  if (port_nodes_) {
+    // §21.7.4.2 (Syntax 21-28): $var port <size> <<id> <reference> $end. The
+    // var_type keyword is always port; the size is the declared index range of
+    // a bus or 1 for a single-bit port; the identifier code is the integer
+    // preceded by <. At least one space separates each syntactical element.
+    ofs_ << "$var port ";
+    if (sig.msb >= 0 && sig.lsb >= 0) {
+      ofs_ << "[" << sig.msb << ":" << sig.lsb << "]";
+    } else {
+      ofs_ << "1";
+    }
+    ofs_ << " <" << sig.port_id << " " << name << " $end\n";
+    return;
   }
+  ofs_ << "$var " << VcdVarTypeKeyword(sig) << " " << width << " " << sig.ident
+       << " " << name << " $end\n";
 }
 
 void VcdWriter::EndDefinitions() {
