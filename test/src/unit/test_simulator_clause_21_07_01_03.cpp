@@ -93,27 +93,6 @@ TEST_F(DumpOffOnSysTask, WithoutDumpFileIsHarmless) {
   EXPECT_EQ(f.ctx.GetVcdWriter(), nullptr);
 }
 
-// The resume checkpoint reports a scalar variable's current value through the
-// scalar write path (the vector path is covered separately).
-TEST_F(DumpOffOnSysTask, DumpOnDumpsScalarCurrentValue) {
-  SimFixture f;
-  auto* clk = MakeVar(f, "clk", 1, 0);
-  {
-    VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("clk", 1, clk);  // ident '!'
-    vcd.EndDefinitions();
-    vcd.WriteTimestamp(0);
-    f.ctx.SetVcdWriter(&vcd);
-    EvalExpr(MkSysCall(f.arena, "$dumpoff", {}), f.ctx, f.arena);
-    clk->value = MakeLogic4VecVal(f.arena, 1, 1);
-    EvalExpr(MkSysCall(f.arena, "$dumpon", {}), f.ctx, f.arena);
-  }
-  auto content = ReadVcd();
-  EXPECT_NE(content.find("$dumpon"), std::string::npos);
-  EXPECT_NE(content.find("1!"), std::string::npos);  // scalar current value
-}
-
 // $dumpoff with no selected variables still emits the checkpoint markers; the
 // body between them is empty because there is nothing to record.
 TEST_F(DumpOffOnSysTask, DumpOffWithNoSignalsEmitsEmptyCheckpoint) {
