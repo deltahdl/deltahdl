@@ -2063,6 +2063,107 @@ void Elaborator::ValidateRandomSeedType(const ModuleDecl* decl) {
 
 namespace {
 
+// §20.16, Syntax 20-16 and Table 20-12: a PLA modeling system task is named
+// $<array_type>$<logic>$<format>, where array_type is sync or async, logic is
+// one of and/or/nand/nor, and format is array or plane. Matching a callee
+// against those three dollar-separated components recognizes exactly the
+// sixteen tasks the table enumerates and nothing else.
+bool IsPlaSystemTask(std::string_view callee) {
+  if (callee.empty() || callee.front() != '$') return false;
+  std::string_view rest = callee.substr(1);
+  auto take = [&rest]() -> std::string_view {
+    auto pos = rest.find('$');
+    std::string_view tok = rest.substr(0, pos);
+    rest = pos == std::string_view::npos ? std::string_view{}
+                                         : rest.substr(pos + 1);
+    return tok;
+  };
+  std::string_view array_type = take();
+  std::string_view logic = take();
+  std::string_view format = take();
+  if (!rest.empty()) return false;  // more than three components
+  bool ok_type = array_type == "sync" || array_type == "async";
+  bool ok_logic = logic == "and" || logic == "or" || logic == "nand" ||
+                  logic == "nor";
+  bool ok_format = format == "array" || format == "plane";
+  return ok_type && ok_logic && ok_format;
+}
+
+// §20.16: "the output terms shall only be variables." The output-terms argument
+// may be a single lvalue or a concatenation of them; flag every leaf whose base
+// identifier names a net rather than a variable.
+void CheckPlaOutputOperand(
+    const Expr* e, const std::unordered_set<std::string_view>& net_names,
+    SourceLoc loc, DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kConcatenation) {
+    for (auto* el : e->elements)
+      CheckPlaOutputOperand(el, net_names, loc, diag);
+    return;
+  }
+  auto base = LhsBaseName(e);
+  if (!base.empty() && net_names.count(base) != 0) {
+    diag.Error(loc,
+               "output terms of a PLA modeling system task shall be variables, "
+               "not nets");
+  }
+}
+
+void CheckPlaOutputTermsExpr(
+    const Expr* e, const std::unordered_set<std::string_view>& net_names,
+    DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kSystemCall && IsPlaSystemTask(e->callee) &&
+      e->args.size() >= 3 && e->args[2]) {
+    CheckPlaOutputOperand(e->args[2], net_names, e->range.start, diag);
+  }
+  CheckPlaOutputTermsExpr(e->lhs, net_names, diag);
+  CheckPlaOutputTermsExpr(e->rhs, net_names, diag);
+  CheckPlaOutputTermsExpr(e->condition, net_names, diag);
+  CheckPlaOutputTermsExpr(e->true_expr, net_names, diag);
+  CheckPlaOutputTermsExpr(e->false_expr, net_names, diag);
+  CheckPlaOutputTermsExpr(e->base, net_names, diag);
+  CheckPlaOutputTermsExpr(e->index, net_names, diag);
+  for (auto* a : e->args) CheckPlaOutputTermsExpr(a, net_names, diag);
+  for (auto* el : e->elements) CheckPlaOutputTermsExpr(el, net_names, diag);
+}
+
+void CheckPlaOutputTermsStmt(
+    const Stmt* s, const std::unordered_set<std::string_view>& net_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  CheckPlaOutputTermsExpr(s->condition, net_names, diag);
+  CheckPlaOutputTermsExpr(s->lhs, net_names, diag);
+  CheckPlaOutputTermsExpr(s->rhs, net_names, diag);
+  CheckPlaOutputTermsExpr(s->expr, net_names, diag);
+  CheckPlaOutputTermsExpr(s->var_init, net_names, diag);
+  for (auto* sub : s->stmts) CheckPlaOutputTermsStmt(sub, net_names, diag);
+  for (auto* sub : s->fork_stmts) CheckPlaOutputTermsStmt(sub, net_names, diag);
+  CheckPlaOutputTermsStmt(s->then_branch, net_names, diag);
+  CheckPlaOutputTermsStmt(s->else_branch, net_names, diag);
+  CheckPlaOutputTermsStmt(s->body, net_names, diag);
+  CheckPlaOutputTermsStmt(s->for_body, net_names, diag);
+  for (auto* init : s->for_inits) CheckPlaOutputTermsStmt(init, net_names, diag);
+  for (auto& ci : s->case_items) CheckPlaOutputTermsStmt(ci.body, net_names,
+                                                         diag);
+}
+
+}  // namespace
+
+void Elaborator::ValidatePlaOutputTerms(const ModuleDecl* decl) {
+  // §20.16: the output terms of a PLA modeling system task shall be variables,
+  // never nets. Input terms may be nets or variables, so only the output-terms
+  // argument is checked.
+  for (const auto* item : decl->items) {
+    if (item->body) CheckPlaOutputTermsStmt(item->body, net_names_, diag_);
+    for (auto* s : item->func_body_stmts)
+      CheckPlaOutputTermsStmt(s, net_names_, diag_);
+    CheckPlaOutputTermsExpr(item->init_expr, net_names_, diag_);
+  }
+}
+
+namespace {
+
 // §20.7.1: a single unpacked dimension is "variable-sized" when it is a dynamic
 // array ([], stored as a null dimension), a queue ([$]), or a wildcard
 // associative array ([*]) — the same classification §20.7 uses for a
