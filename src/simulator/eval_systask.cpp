@@ -101,10 +101,26 @@ static std::string ExtractStrArg(const Expr* arg) {
   return std::string(text);
 }
 
+// §21.6: a plusarg search string is supplied either as a string literal or as
+// an integral variable whose packed bytes are read back as text. For the
+// variable form, FormatValueAsString drops the all-zero (high) padding bytes,
+// which discharges the rule that leading nulls are ignored when matching.
+static std::string ResolvePlusargPattern(const Expr* arg, SimContext& ctx,
+                                         Arena& arena) {
+  if (arg->kind == ExprKind::kStringLiteral) {
+    return ExtractStrArg(arg);
+  }
+  return FormatValueAsString(EvalExpr(arg, ctx, arena));
+}
+
 static Logic4Vec EvalTestPlusargs(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
-  std::string prefix = ExtractStrArg(expr->args[0]);
+  // §21.6: the search string never carries the command-line '+' sign; plusargs
+  // are stored without it, so a plain prefix comparison applies.
+  std::string prefix = ResolvePlusargPattern(expr->args[0], ctx, arena);
+  // §21.6: plusargs are examined in the order supplied; a plusarg whose prefix
+  // matches every character of the search string yields a nonzero result.
   for (const auto& arg : ctx.GetPlusArgs()) {
     if (arg.substr(0, prefix.size()) == prefix) {
       return MakeLogic4VecVal(arena, 1, 1);
@@ -113,31 +129,162 @@ static Logic4Vec EvalTestPlusargs(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// §21.6: the user_string of $value$plusargs has the form
+// "plusarg_string format_string", where the trailing format string is a
+// $display-style specifier. Splits off the matching prefix and returns the
+// conversion letter folded to lowercase ('\0' when no specifier is present).
+// Leading-zero and width digits after '%' are accepted but not otherwise acted
+// on, matching the "leading 0 forms are valid" allowance.
+static char SplitUserString(const std::string& user, std::string& prefix_out) {
+  auto pct = user.find('%');
+  if (pct == std::string::npos) {
+    prefix_out = user;
+    return '\0';
+  }
+  prefix_out = user.substr(0, pct);
+  size_t i = pct + 1;
+  while (i < user.size() && user[i] >= '0' && user[i] <= '9') ++i;
+  if (i >= user.size()) return '\0';
+  char c = user[i];
+  if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+  return c;
+}
+
+// §21.6: validate and convert a plusarg remainder under an integer conversion
+// (%d/%o/%h/%x/%b). Returns false if any character is illegal for the radix so
+// the caller can store the 'bx fill the clause mandates.
+static bool ParsePlusargInteger(const std::string& s, char conv, uint64_t& out,
+                                bool& negative) {
+  out = 0;
+  negative = false;
+  int base = 0;
+  switch (conv) {
+    case 'd': base = 10; break;
+    case 'o': base = 8; break;
+    case 'h':
+    case 'x': base = 16; break;
+    case 'b': base = 2; break;
+    default: return false;
+  }
+  size_t i = 0;
+  if (base == 10 && i < s.size() && (s[i] == '+' || s[i] == '-')) {
+    negative = (s[i] == '-');
+    ++i;
+  }
+  if (i >= s.size()) return false;
+  for (; i < s.size(); ++i) {
+    char c = s[i];
+    int digit;
+    if (c >= '0' && c <= '9') digit = c - '0';
+    else if (c >= 'a' && c <= 'f') digit = c - 'a' + 10;
+    else if (c >= 'A' && c <= 'F') digit = c - 'A' + 10;
+    else return false;
+    if (digit >= base) return false;
+    out = out * static_cast<uint64_t>(base) + static_cast<uint64_t>(digit);
+  }
+  return true;
+}
+
+// §21.6: place a converted string remainder into a fixed-width destination,
+// right-justified so the trailing characters occupy the low-order bytes. A
+// remainder longer than the destination is truncated; a shorter one leaves the
+// high bytes zero, giving the zero-padded result the clause requires.
+static Logic4Vec PackStringIntoWidth(Arena& arena, const std::string& s,
+                                     uint32_t width) {
+  auto vec = MakeLogic4Vec(arena, width);
+  uint32_t nbytes = width / 8;
+  for (size_t i = 0; i < s.size() && i < nbytes; ++i) {
+    char ch = s[s.size() - 1 - i];
+    uint32_t bit_off = static_cast<uint32_t>(i) * 8;
+    uint32_t word = bit_off / 64;
+    uint32_t bit = bit_off % 64;
+    vec.words[word].aval |=
+        static_cast<uint64_t>(static_cast<unsigned char>(ch)) << bit;
+  }
+  return vec;
+}
+
+// §21.6: convert the remainder of a matching plusarg into `var` according to the
+// format string's conversion code. The stored value is automatically zero-
+// padded or truncated to the variable width by MakeLogic4VecVal.
+static void StorePlusargValue(Variable* var, const std::string& name, char conv,
+                              const std::string& remainder, SimContext& ctx,
+                              Arena& arena) {
+  if (!var) return;
+  uint32_t width = var->value.width ? var->value.width : 32;
+
+  // §21.6: %s performs no numeric conversion; the characters are stored as is.
+  if (conv == 's') {
+    var->value = PackStringIntoWidth(arena, remainder, width);
+    return;
+  }
+
+  // §21.6: %e/%f/%g convert to a real value, stored as its 64-bit IEEE pattern.
+  if (conv == 'e' || conv == 'f' || conv == 'g') {
+    if (remainder.empty()) {
+      var->value = MakeLogic4VecVal(arena, width, 0);
+      return;
+    }
+    const char* begin = remainder.c_str();
+    char* end = nullptr;
+    double d = std::strtod(begin, &end);
+    if (end != begin + remainder.size()) {
+      var->value = MakeAllX(arena, width);
+      return;
+    }
+    uint64_t bits = 0;
+    std::memcpy(&bits, &d, sizeof(double));
+    auto vec = MakeLogic4VecVal(arena, width, bits);
+    if (ctx.IsRealVariable(name)) vec.is_real = true;
+    var->value = vec;
+    return;
+  }
+
+  // §21.6: an empty remainder stores the value zero for integer conversions.
+  if (remainder.empty()) {
+    var->value = MakeLogic4VecVal(arena, width, 0);
+    return;
+  }
+
+  uint64_t mag = 0;
+  bool negative = false;
+  if (!ParsePlusargInteger(remainder, conv, mag, negative)) {
+    // §21.6: a remainder containing characters illegal for the conversion is
+    // reported by writing the destination with 'bx.
+    var->value = MakeAllX(arena, width);
+    return;
+  }
+  // §21.6: a negative value is treated as larger than the variable, so its
+  // two's-complement low-order bits fall through MakeLogic4VecVal's truncation.
+  uint64_t stored =
+      negative ? static_cast<uint64_t>(-static_cast<int64_t>(mag)) : mag;
+  var->value = MakeLogic4VecVal(arena, width, stored);
+}
+
 static Logic4Vec EvalValuePlusargs(const Expr* expr, SimContext& ctx,
                                    Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 1, 0);
-  std::string pattern = ExtractStrArg(expr->args[0]);
+  std::string user = ResolvePlusargPattern(expr->args[0], ctx, arena);
+  std::string prefix;
+  char conv = SplitUserString(user, prefix);
 
-  auto pct_pos = pattern.find('%');
-  std::string prefix =
-      (pct_pos != std::string::npos) ? pattern.substr(0, pct_pos) : pattern;
+  Variable* var = nullptr;
+  std::string var_name;
+  if (expr->args[1]->kind == ExprKind::kIdentifier) {
+    var_name = std::string(expr->args[1]->text);
+    var = ctx.FindVariable(var_name);
+  }
 
+  // §21.6: the first plusarg (in command-line order) whose prefix matches the
+  // plusarg_string supplies the remainder available for conversion.
   for (const auto& arg : ctx.GetPlusArgs()) {
     if (arg.substr(0, prefix.size()) != prefix) continue;
-    std::string value_str = arg.substr(prefix.size());
-
-    if (!value_str.empty() && value_str[0] == '=') {
-      value_str = value_str.substr(1);
-    }
-    uint64_t parsed_val = std::strtoull(value_str.c_str(), nullptr, 10);
-
-    if (expr->args[1]->kind == ExprKind::kIdentifier) {
-      auto* var = ctx.FindVariable(expr->args[1]->text);
-      if (var)
-        var->value = MakeLogic4VecVal(arena, var->value.width, parsed_val);
-    }
+    std::string remainder = arg.substr(prefix.size());
+    StorePlusargValue(var, var_name, conv, remainder, ctx, arena);
     return MakeLogic4VecVal(arena, 1, 1);
   }
+  // §21.6: with no match the function returns zero, leaves the variable
+  // unmodified, and issues no warning.
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
