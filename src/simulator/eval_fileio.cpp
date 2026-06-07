@@ -90,13 +90,16 @@ static Logic4Vec EvalFerror(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   int err = std::ferror(fp);
 
-  if (err != 0 && expr->args.size() >= 2) {
-    if (expr->args[1]->kind == ExprKind::kIdentifier) {
-      auto* var = ctx.FindVariable(expr->args[1]->text);
-      if (var) {
-        std::string msg = std::strerror(errno);
-        var->value = StringToVec(arena, msg, var->value.width);
-      }
+  // §21.3.7: the str argument receives a textual description of the error
+  // raised by the most recent file I/O operation. When the most recent
+  // operation did not fail, the standard requires the returned code to be zero
+  // and the str variable to be cleared rather than left holding a stale value.
+  if (expr->args.size() >= 2 &&
+      expr->args[1]->kind == ExprKind::kIdentifier) {
+    auto* var = ctx.FindVariable(expr->args[1]->text);
+    if (var) {
+      std::string msg = err != 0 ? std::strerror(errno) : std::string();
+      var->value = StringToVec(arena, msg, var->value.width);
     }
   }
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(err));
