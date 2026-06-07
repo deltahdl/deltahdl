@@ -453,29 +453,138 @@ static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, matched);
 }
 
+// §21.3.4.4: pack the bytes of one memory word big-endian -- the first byte
+// read occupies the most significant byte position of the element. When the
+// file runs out before a full word is read, the bytes that were read still sit
+// in the most significant positions, so the partial value is shifted up to
+// align. The loaded data are 2-value (each set bit becomes 1, each clear bit 0;
+// x and z can never be read), which MakeLogic4VecVal yields directly.
+static Logic4Vec PackWordBigEndian(Arena& arena, const uint8_t* buf,
+                                   size_t nread, uint32_t bytes_per_word,
+                                   uint32_t width) {
+  uint64_t val = 0;
+  for (size_t i = 0; i < nread && i < 8; ++i) val = (val << 8) | buf[i];
+  if (nread < bytes_per_word) val <<= 8 * (bytes_per_word - nread);
+  return MakeLogic4VecVal(arena, width, val);
+}
+
 static Logic4Vec EvalFread(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
+  // §21.3.4.4: the file descriptor is the second argument in every form.
   uint32_t fd = FdFromArg(expr->args[1], ctx, arena);
   FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
 
-  Variable* var = nullptr;
-  if (expr->args[0]->kind == ExprKind::kIdentifier) {
-    var = ctx.FindVariable(expr->args[0]->text);
-  }
-  if (!var) return MakeLogic4VecVal(arena, 32, 0);
+  const Expr* dst = expr->args[0];
+  // §21.3.4.4: a destination that names an unpacked array selects the memory
+  // form; anything else is the integral-variable form, which the standard
+  // defines as the one applied for all packed data.
+  const ArrayInfo* ai = (dst->kind == ExprKind::kIdentifier)
+                            ? ctx.FindArrayInfo(dst->text)
+                            : nullptr;
 
-  uint32_t nbytes = (var->value.width + 7) / 8;
-  auto* buf = new uint8_t[nbytes];
-  size_t nread = std::fread(buf, 1, nbytes, fp);
+  if (!ai) {
+    // §21.3.4.4: an unpacked struct is read as though a separate $fread were
+    // performed on each member in declaration order; an unpacked union reads
+    // only its first member. Each member therefore takes its own whole number
+    // of bytes. A packed aggregate is not handled here -- it falls through to
+    // the integral-variable form, which loads the whole value at once.
+    const StructTypeInfo* sinfo = (dst->kind == ExprKind::kIdentifier)
+                                      ? ctx.GetVariableStructType(dst->text)
+                                      : nullptr;
+    if (sinfo && !sinfo->is_packed && !sinfo->fields.empty()) {
+      Variable* var = ctx.FindVariable(dst->text);
+      if (!var) return MakeLogic4VecVal(arena, 32, 0);
 
-  uint64_t val = 0;
-  for (size_t i = 0; i < nread && i < 8; ++i) {
-    val = (val << 8) | buf[i];
+      size_t count = sinfo->is_union ? 1 : sinfo->fields.size();
+      uint64_t whole = var->value.ToUint64();
+      uint64_t total_bytes = 0;
+      for (size_t i = 0; i < count; ++i) {
+        const StructFieldInfo& fld = sinfo->fields[i];
+        uint32_t fbytes = (fld.width + 7) / 8;
+        if (fbytes == 0) fbytes = 1;
+        auto* fbuf = new uint8_t[fbytes];
+        size_t fread_n = std::fread(fbuf, 1, fbytes, fp);
+        Logic4Vec fv =
+            PackWordBigEndian(arena, fbuf, fread_n, fbytes, fld.width);
+        delete[] fbuf;
+
+        uint64_t fmask = (fld.width >= 64) ? ~uint64_t{0}
+                                           : (uint64_t{1} << fld.width) - 1;
+        whole &= ~(fmask << fld.bit_offset);
+        whole |= (fv.ToUint64() & fmask) << fld.bit_offset;
+        total_bytes += fread_n;
+        if (fread_n < fbytes) break;  // file ran out mid-member
+      }
+      var->value = MakeLogic4VecVal(arena, var->value.width, whole);
+      return MakeLogic4VecVal(arena, 32, total_bytes);
+    }
+
+    // Integral-variable variant: $fread(integral_var, fd). Any start/count
+    // arguments are ignored when loading a single packed value.
+    Variable* var = (dst->kind == ExprKind::kIdentifier)
+                        ? ctx.FindVariable(dst->text)
+                        : nullptr;
+    if (!var) return MakeLogic4VecVal(arena, 32, 0);
+
+    uint32_t nbytes = (var->value.width + 7) / 8;
+    if (nbytes == 0) nbytes = 1;
+    auto* buf = new uint8_t[nbytes];
+    size_t nread = std::fread(buf, 1, nbytes, fp);
+    var->value = PackWordBigEndian(arena, buf, nread, nbytes, var->value.width);
+    delete[] buf;
+    return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(nread));
   }
-  var->value = MakeLogic4VecVal(arena, var->value.width, val);
+
+  // Memory variant: $fread(mem, fd [, start [, count]]), including the
+  // $fread(mem, fd, , count) form whose start argument is omitted (a null arg).
+  std::string mem_name(dst->text);
+  int64_t low_addr = ai->lo;
+  int64_t high_addr = ai->lo + static_cast<int64_t>(ai->size) - 1;
+  // §21.3.4.4: the data are read byte by byte; the number of bytes that fill a
+  // word is the word width rounded up to a whole number of bytes (an 8-bit word
+  // uses one byte, a 9-bit word two).
+  uint32_t elem_width = ai->elem_width;
+  uint32_t bytes_per_word = (elem_width + 7) / 8;
+  if (bytes_per_word == 0) bytes_per_word = 1;
+
+  // §21.3.4.4: start, when present, is the address of the first element loaded;
+  // otherwise the lowest-numbered location is used. The omitted-start form
+  // (`, ,`) reaches here as a null third argument and likewise defaults.
+  bool has_start = expr->args.size() >= 3 && expr->args[2] != nullptr;
+  int64_t start_addr =
+      has_start
+          ? static_cast<int64_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64())
+          : low_addr;
+
+  // §21.3.4.4: count, when present, caps how many locations are loaded;
+  // otherwise the memory is filled with whatever data are available.
+  bool has_count = expr->args.size() >= 4 && expr->args[3] != nullptr;
+  uint64_t max_words =
+      has_count ? EvalExpr(expr->args[3], ctx, arena).ToUint64() : 0;
+
+  // §21.3.4.4: consecutive words are loaded toward the highest address
+  // (increasing index), regardless of the array's declared direction, until the
+  // memory is full, the count is reached, or the file is exhausted.
+  uint64_t total_bytes = 0;
+  uint64_t words_done = 0;
+  auto* buf = new uint8_t[bytes_per_word];
+  for (int64_t addr = start_addr;
+       addr <= high_addr && (!has_count || words_done < max_words); ++addr) {
+    if (addr < low_addr) continue;
+    size_t nread = std::fread(buf, 1, bytes_per_word, fp);
+    if (nread == 0) break;
+    std::string elem = mem_name + "[" + std::to_string(addr) + "]";
+    if (auto* v = ctx.FindVariable(elem)) {
+      v->value =
+          PackWordBigEndian(arena, buf, nread, bytes_per_word, v->value.width);
+    }
+    total_bytes += nread;
+    ++words_done;
+    if (nread < bytes_per_word) break;  // file ran out mid-word
+  }
   delete[] buf;
-  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(nread));
+  return MakeLogic4VecVal(arena, 32, total_bytes);
 }
 
 Logic4Vec EvalFileIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
