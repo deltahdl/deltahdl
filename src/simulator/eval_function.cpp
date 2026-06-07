@@ -620,6 +620,20 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     // file opened by $dumpports. The checkpoint reuses the 4-state machinery the
     // extended VCD file inherits (§21.7.1.4).
     if (vcd) vcd->DumpAll();
+  } else if (name == "$dumpportslimit") {
+    // §21.7.3.4: bound the extended VCD file size. The required leading filesize
+    // argument gives the maximum number of bytes; once the dump reaches it,
+    // recording stops and a comment noting the limit is inserted. A trailing
+    // filename argument may denote which $dumpports output the limit applies to;
+    // with no filename the limit covers every file opened by $dumpports. With
+    // this single-file writer both cases bound the one dump, so the optional
+    // filename is parsed but does not change which dump is limited. The byte
+    // budget reuses the 4-state size-limit machinery the extended VCD file
+    // inherits (§21.7.1.5).
+    if (vcd && !expr->args.empty()) {
+      uint64_t limit = EvalExpr(expr->args[0], ctx, arena).ToUint64();
+      vcd->SetSizeLimit(limit);
+    }
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }
