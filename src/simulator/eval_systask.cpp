@@ -1521,9 +1521,10 @@ static Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
 
 // §21.5: $writememb / $writememh dump a memory array's words to a file in a
 // form the matching $readmemb / $readmemh can load back. Each word is written
-// on its own line in binary ($writememb) or hexadecimal ($writememh); no
-// @-address specifiers are emitted, so an unpacked array round-trips through a
-// plain sequential read.
+// on its own line in binary ($writememb) or hexadecimal ($writememh).
+// §21.5.3 fixes whether @-address specifiers accompany the words: an unpacked
+// or dynamic array is written as a bare sequence (a sequential read reloads
+// it), while an associative array prefixes every entry with its @-address.
 static Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
                               bool is_hex) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 1, 0);
@@ -1549,6 +1550,50 @@ static Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
   auto emit = [&](const Logic4Vec& v) {
     ofs << FormatArg(v, is_hex ? 'h' : 'b') << "\n";
   };
+
+  // §21.5.3: an associative array's keys are sparse, so a plain sequential read
+  // could not place its words. Each entry is therefore written with an
+  // @-address ahead of its value. The keys are integral (§21.4.1) and emitted
+  // in ascending order as hexadecimal, matching the @-address form $readmem
+  // parses.
+  if (const AssocArrayObject* aa = ctx.FindAssocArray(mem_name)) {
+    for (const auto& entry : aa->int_data) {
+      char addr_buf[20];
+      std::snprintf(addr_buf, sizeof(addr_buf), "%llx",
+                    static_cast<unsigned long long>(entry.first));
+      ofs << "@" << addr_buf << "\n";
+      emit(entry.second);
+    }
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+
+  // §21.5.3: a dynamic array or queue is written as a bare sequence of words
+  // with no @-address specifiers, exactly like a fixed unpacked array, so a
+  // sequential $readmem reloads it. The optional start_addr / finish_addr
+  // bound the element indices that are written.
+  if (const QueueObject* q = ctx.FindQueue(mem_name)) {
+    int64_t arr_lo = 0;
+    int64_t arr_hi = static_cast<int64_t>(q->elements.size()) - 1;
+    bool has_start = expr->args.size() >= 3;
+    bool has_finish = expr->args.size() >= 4;
+    int64_t start_addr =
+        has_start
+            ? static_cast<int64_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64())
+            : arr_lo;
+    int64_t finish_addr =
+        has_finish
+            ? static_cast<int64_t>(EvalExpr(expr->args[3], ctx, arena).ToUint64())
+            : arr_hi;
+    if (arr_hi < arr_lo) return MakeLogic4VecVal(arena, 1, 0);
+    int64_t step = (start_addr <= finish_addr) ? 1 : -1;
+    for (int64_t addr = start_addr;; addr += step) {
+      if (addr >= arr_lo && addr <= arr_hi) {
+        emit(q->elements[static_cast<size_t>(addr)]);
+      }
+      if (addr == finish_addr) break;
+    }
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
 
   if (const ArrayInfo* ai = ctx.FindArrayInfo(mem_name)) {
     int64_t arr_lo = ai->lo;
