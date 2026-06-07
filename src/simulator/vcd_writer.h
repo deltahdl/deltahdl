@@ -54,11 +54,18 @@ class VcdWriter {
   void SetEnabled(bool enabled) { enabled_ = enabled; }
   bool IsEnabled() const { return enabled_; }
 
+  // Limit the dump file size (§21.7.1.5): once the file reaches limit_bytes the
+  // dumper stops recording and inserts a comment noting the limit was reached.
+  void SetSizeLimit(uint64_t limit_bytes) { size_limit_ = limit_bytes; }
+
  private:
   void WriteScalarChange(const VcdSignal& sig);
   void WriteVectorChange(const VcdSignal& sig);
   void WriteSignalChange(const VcdSignal& sig);
   void WriteSignalAllX(const VcdSignal& sig);
+  // Returns true once the configured size limit has been reached, emitting the
+  // limit comment exactly once when the threshold is first crossed.
+  bool AtSizeLimit();
 
   std::ofstream ofs_;
   std::vector<VcdSignal> signals_;
@@ -66,6 +73,8 @@ class VcdWriter {
   bool enabled_ = true;
   uint64_t last_time_ = 0;
   bool header_written_ = false;
+  uint64_t size_limit_ = 0;
+  bool limit_reached_ = false;
 };
 
 }

@@ -49,8 +49,24 @@ void VcdWriter::EndDefinitions() {
   ofs_ << "$enddefinitions $end\n";
 }
 
+bool VcdWriter::AtSizeLimit() {
+  if (size_limit_ == 0) return false;  // no limit configured
+  if (limit_reached_) return true;     // already stopped
+  if (!ofs_.is_open()) return false;
+  std::streampos pos = ofs_.tellp();
+  if (pos == std::streampos(-1)) return false;
+  if (static_cast<uint64_t>(pos) < size_limit_) return false;
+  // The file has reached the requested byte count: note it in the dump and stop
+  // recording any further value changes.
+  ofs_ << "$comment\n  Dump limit of " << size_limit_
+       << " bytes reached, dumping stopped.\n$end\n";
+  limit_reached_ = true;
+  return true;
+}
+
 void VcdWriter::WriteTimestamp(uint64_t time) {
   if (!ofs_.is_open() || !enabled_) return;
+  if (AtSizeLimit()) return;
   ofs_ << "#" << time << "\n";
   last_time_ = time;
 }
@@ -127,6 +143,7 @@ static bool HasValueChanged(const VcdSignal& sig) {
 
 void VcdWriter::DumpAllValues() {
   if (!ofs_.is_open() || !enabled_) return;
+  if (AtSizeLimit()) return;
   ofs_ << "$dumpvars\n";
   for (const auto& sig : signals_) {
     WriteSignalChange(sig);
@@ -137,6 +154,7 @@ void VcdWriter::DumpAllValues() {
 void VcdWriter::DumpSelectedValues(
     const std::vector<std::string_view>& names) {
   if (!ofs_.is_open() || !enabled_) return;
+  if (AtSizeLimit()) return;
   ofs_ << "$dumpvars\n";
   for (const auto& sig : signals_) {
     bool wanted = false;
@@ -153,6 +171,7 @@ void VcdWriter::DumpSelectedValues(
 
 void VcdWriter::DumpAll() {
   if (!ofs_.is_open() || !enabled_) return;
+  if (AtSizeLimit()) return;
   // The checkpoint records the present value of every selected variable,
   // regardless of whether that value changed during the current time step.
   ofs_ << "$dumpall\n";
@@ -188,6 +207,7 @@ void VcdWriter::DumpOn() {
 
 void VcdWriter::DumpChangedValues(uint64_t ) {
   if (!ofs_.is_open() || !enabled_) return;
+  if (AtSizeLimit()) return;
   for (const auto& sig : signals_) {
     if (!sig.var) continue;
     if (!HasValueChanged(sig)) continue;

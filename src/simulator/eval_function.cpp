@@ -509,6 +509,12 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   } else if (name == "$dumpon") {
     // Resume dumping with a checkpoint of current values (§21.7.1.3).
     if (vcd) vcd->DumpOn();
+  } else if (name == "$dumplimit") {
+    // §21.7.1.5: the single argument bounds the VCD file size in bytes.
+    if (vcd && !expr->args.empty()) {
+      uint64_t limit = EvalExpr(expr->args[0], ctx, arena).ToUint64();
+      vcd->SetSizeLimit(limit);
+    }
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }
