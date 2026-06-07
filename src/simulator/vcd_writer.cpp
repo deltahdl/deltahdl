@@ -95,9 +95,20 @@ void VcdWriter::WriteScalarChange(const VcdSignal& sig) {
   ofs_ << val << sig.ident << "\n";
 }
 
+// Table 21-8: a shortened vector value is reconstructed by left-extending it
+// according to its most significant retained digit. The values 0 and 1 extend
+// with 0, an x extends with x, and a z extends with z.
+static char VcdLeftExtendFill(char digit) {
+  if (digit == 'x') return 'x';
+  if (digit == 'z') return 'z';
+  return '0';
+}
+
 void VcdWriter::WriteVectorChange(const VcdSignal& sig) {
   if (!sig.var) return;
-  ofs_ << "b";
+  // Build the full-width value with the most significant bit first.
+  std::string digits;
+  digits.reserve(sig.width);
   for (int32_t i = static_cast<int32_t>(sig.width) - 1; i >= 0; --i) {
     uint32_t word_idx = static_cast<uint32_t>(i) / 64;
     uint32_t bit_idx = static_cast<uint32_t>(i) % 64;
@@ -109,16 +120,27 @@ void VcdWriter::WriteVectorChange(const VcdSignal& sig) {
       b = (sig.var->value.words[word_idx].bval & mask) != 0;
     }
     if (!b && !a) {
-      ofs_ << '0';
+      digits.push_back('0');
     } else if (!b && a) {
-      ofs_ << '1';
+      digits.push_back('1');
     } else if (b && !a) {
-      ofs_ << 'x';
+      digits.push_back('x');
     } else {
-      ofs_ << 'z';
+      digits.push_back('z');
     }
   }
-  ofs_ << " " << sig.ident << "\n";
+  // §21.7.2.2: vectors are written in the shortest right-justified form. A
+  // leading digit is redundant when the left-extension rule applied to the digit
+  // that would replace it regenerates that leading digit, so drop such digits
+  // while always keeping at least one.
+  size_t start = 0;
+  while (start + 1 < digits.size() &&
+         digits[start] == VcdLeftExtendFill(digits[start + 1])) {
+    ++start;
+  }
+  // No white space between the base letter and the value digits, and exactly one
+  // white space between the value digits and the identifier code.
+  ofs_ << 'b' << (digits.c_str() + start) << ' ' << sig.ident << "\n";
 }
 
 void VcdWriter::WriteRealChange(const VcdSignal& sig) {
