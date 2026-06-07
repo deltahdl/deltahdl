@@ -515,6 +515,10 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
       uint64_t limit = EvalExpr(expr->args[0], ctx, arena).ToUint64();
       vcd->SetSizeLimit(limit);
     }
+  } else if (name == "$dumpflush") {
+    // §21.7.1.6: flush buffered output to the dump file, then continue dumping
+    // as before so no value changes are lost.
+    if (vcd) vcd->Flush();
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }

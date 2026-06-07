@@ -205,6 +205,14 @@ void VcdWriter::DumpOn() {
   ofs_ << "$end\n";
 }
 
+void VcdWriter::Flush() {
+  if (!ofs_.is_open()) return;
+  // Empty the stream's buffer into the file so its current contents are
+  // observable to an external reader. No dump command is written and the
+  // enabled state is left as it was, so dumping resumes seamlessly.
+  ofs_.flush();
+}
+
 void VcdWriter::DumpChangedValues(uint64_t ) {
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;

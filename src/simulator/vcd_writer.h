@@ -54,6 +54,12 @@ class VcdWriter {
   void SetEnabled(bool enabled) { enabled_ = enabled; }
   bool IsEnabled() const { return enabled_; }
 
+  // Read the dump file during simulation (§21.7.1.6): push any buffered output
+  // out to the file so an application reading the file mid-simulation sees every
+  // value change recorded so far. The dump state is untouched, so dumping
+  // continues afterward exactly as before and no value changes are lost.
+  void Flush();
+
   // Limit the dump file size (§21.7.1.5): once the file reaches limit_bytes the
   // dumper stops recording and inserts a comment noting the limit was reached.
   void SetSizeLimit(uint64_t limit_bytes) { size_limit_ = limit_bytes; }
