@@ -479,6 +479,23 @@ static std::string_view DumpvarsScopeName(const Expr* arg) {
   return text;
 }
 
+// Resolves the $dumpports output filename (§21.7.3.1). The filename is the
+// trailing argument when it is given as a string literal; when no filename is
+// supplied the output defaults to dumpports.vcd in the working directory.
+static std::string ResolveDumpportsFileName(const Expr* expr) {
+  if (!expr->args.empty()) {
+    const Expr* last = expr->args.back();
+    if (last && last->kind == ExprKind::kStringLiteral) {
+      auto text = last->text;
+      if (text.size() >= 2 && text.front() == '"') {
+        return std::string(text.substr(1, text.size() - 2));
+      }
+      return std::string(text);
+    }
+  }
+  return "dumpports.vcd";
+}
+
 static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 std::string_view name) {
   auto* vcd = ctx.GetVcdWriter();
@@ -519,6 +536,41 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     // §21.7.1.6: flush buffered output to the dump file, then continue dumping
     // as before so no value changes are lost.
     if (vcd) vcd->Flush();
+  } else if (name == "$dumpports") {
+    // §21.7.3.1: name the (extended) VCD output and start dumping the ports in
+    // scope. A trailing string-literal argument names the file, defaulting to
+    // dumpports.vcd when omitted. The leading arguments form the scope_list
+    // naming the modules whose ports are dumped; with no scope_list the scope
+    // is the calling module, so every port registered from the point of the
+    // call is treated as a primary I/O pin and dumped. Dumping reuses the
+    // 4-state VCD machinery, which the extended VCD file inherits unless
+    // otherwise stated.
+    ctx.SetDumpFileName(ResolveDumpportsFileName(expr));
+    if (vcd) {
+      bool last_is_file = !expr->args.empty() && expr->args.back() &&
+                          expr->args.back()->kind == ExprKind::kStringLiteral;
+      size_t scope_end = expr->args.size() - (last_is_file ? 1 : 0);
+      std::vector<std::string_view> scopes;
+      for (size_t i = 0; i < scope_end; ++i) {
+        if (!expr->args[i]) continue;
+        // §21.7.3.1: scope_list entries name modules; a string literal is not a
+        // valid module_identifier, so reject it rather than treating it as a
+        // scope name.
+        if (expr->args[i]->kind == ExprKind::kStringLiteral) {
+          ctx.GetDiag().Error(
+              {}, "$dumpports scope_list entry must be a module, not a string "
+                  "literal");
+          continue;
+        }
+        auto scope = DumpvarsScopeName(expr->args[i]);
+        if (!scope.empty()) scopes.push_back(scope);
+      }
+      if (scopes.empty()) {
+        vcd->DumpAllValues();
+      } else {
+        vcd->DumpSelectedValues(scopes);
+      }
+    }
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }
