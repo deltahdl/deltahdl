@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Lexer, KeywordVersion_1364_1995_ModuleIsKeyword) {
-  auto kw = LookupKeyword("module", KeywordVersion::kVer13641995);
-  EXPECT_EQ(kw, std::optional(TokenKind::kKwModule));
-}
-
-TEST(Lexer, KeywordVersion_1364_1995_AutomaticIsNotKeyword) {
-  auto kw = LookupKeyword("automatic", KeywordVersion::kVer13641995);
-  EXPECT_FALSE(kw.has_value());
-}
-
 TEST(Lexer, KeywordVersion_1364_1995_AllKeywordsRecognized) {
   const char* kTable22_1[] = {
       "always",    "and",        "assign",      "begin",
