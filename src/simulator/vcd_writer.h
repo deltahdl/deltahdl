@@ -40,6 +40,13 @@ class VcdWriter {
   void DumpSelectedValues(const std::vector<std::string_view>& names);
   void DumpChangedValues(uint64_t prev_time);
 
+  // Suspend the dump (§21.7.1.3): emit a checkpoint that records every selected
+  // variable as x and then stop recording further value changes.
+  void DumpOff();
+  // Resume the dump (§21.7.1.3): re-enable recording and emit a checkpoint of
+  // each variable's current value.
+  void DumpOn();
+
   void SetEnabled(bool enabled) { enabled_ = enabled; }
   bool IsEnabled() const { return enabled_; }
 
@@ -47,6 +54,7 @@ class VcdWriter {
   void WriteScalarChange(const VcdSignal& sig);
   void WriteVectorChange(const VcdSignal& sig);
   void WriteSignalChange(const VcdSignal& sig);
+  void WriteSignalAllX(const VcdSignal& sig);
 
   std::ofstream ofs_;
   std::vector<VcdSignal> signals_;

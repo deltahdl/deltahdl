@@ -503,9 +503,11 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   } else if (name == "$dumpall") {
     if (vcd) vcd->DumpAllValues();
   } else if (name == "$dumpoff") {
-    if (vcd) vcd->SetEnabled(false);
+    // Suspend dumping with an all-x checkpoint (§21.7.1.3).
+    if (vcd) vcd->DumpOff();
   } else if (name == "$dumpon") {
-    if (vcd) vcd->SetEnabled(true);
+    // Resume dumping with a checkpoint of current values (§21.7.1.3).
+    if (vcd) vcd->DumpOn();
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }

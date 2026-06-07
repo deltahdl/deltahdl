@@ -107,6 +107,14 @@ void VcdWriter::WriteSignalChange(const VcdSignal& sig) {
   }
 }
 
+void VcdWriter::WriteSignalAllX(const VcdSignal& sig) {
+  if (sig.width == 1) {
+    ofs_ << "x" << sig.ident << "\n";
+  } else {
+    ofs_ << "bx " << sig.ident << "\n";
+  }
+}
+
 static bool HasValueChanged(const VcdSignal& sig) {
   for (uint32_t w = 0; w < sig.var->value.nwords; ++w) {
     if (sig.var->value.words[w].aval != sig.var->prev_value.words[w].aval ||
@@ -139,6 +147,30 @@ void VcdWriter::DumpSelectedValues(
       }
     }
     if (wanted) WriteSignalChange(sig);
+  }
+  ofs_ << "$end\n";
+}
+
+void VcdWriter::DumpOff() {
+  if (!ofs_.is_open()) return;
+  // The checkpoint records every selected variable as x, then dumping stops so
+  // that no value changes are recorded until $dumpon is executed.
+  ofs_ << "$dumpoff\n";
+  for (const auto& sig : signals_) {
+    WriteSignalAllX(sig);
+  }
+  ofs_ << "$end\n";
+  enabled_ = false;
+}
+
+void VcdWriter::DumpOn() {
+  if (!ofs_.is_open()) return;
+  // Recording resumes and a checkpoint of each variable's value at this time is
+  // emitted so the dump reflects the current state.
+  enabled_ = true;
+  ofs_ << "$dumpon\n";
+  for (const auto& sig : signals_) {
+    WriteSignalChange(sig);
   }
   ofs_ << "$end\n";
 }
