@@ -204,6 +204,64 @@ std::string FormatStrength(const NetStrength& ns) {
          static_cast<char>('0' + lo) + known;
 }
 
+// §21.2.1.2: the minimal-width ("significant figures") rendering of a value for
+// a given radix, before any explicit field width is applied. The decimal,
+// string, and character forms already carry no leading fill, so they defer to
+// the auto-sized rendering; the hex/octal/binary radices, whose auto rendering
+// pads out to the full bit width with leading zeros, drop those zeros here.
+static std::string FormatArgMinimal(const Logic4Vec& val, char spec) {
+  uint64_t v = val.ToUint64();
+  char buf[64];
+  switch (spec) {
+    case 'h':
+    case 'x':
+      std::snprintf(buf, sizeof(buf), "%llx",
+                    static_cast<unsigned long long>(v));
+      return buf;
+    case 'o':
+      std::snprintf(buf, sizeof(buf), "%llo",
+                    static_cast<unsigned long long>(v));
+      return buf;
+    case 'b': {
+      // Each bit prints separately; trim only the leading zeros, keeping at
+      // least one character so a zero value still shows a digit.
+      std::string full = val.ToString();
+      size_t start = full.find_first_not_of('0');
+      if (start == std::string::npos) return "0";
+      return full.substr(start);
+    }
+    default:
+      return FormatArg(val, spec);
+  }
+}
+
+// §21.2.1.2: render a value while honoring an explicit field width taken from
+// the format specifier (e.g. "%3d" or "%0h"). With no width the value is
+// auto-sized exactly as FormatArg does. A width of zero selects the minimum
+// width with no leading fill. A non-zero width left-pads the minimal rendering
+// to that many columns -- spaces for the decimal, string, and character forms,
+// leading zeros for the hex/octal/binary radices. A value already wider than
+// the field is expanded rather than truncated.
+static std::string FormatArgWidth(const Logic4Vec& val, char spec,
+                                  bool has_width, uint32_t width) {
+  if (!has_width) return FormatArg(val, spec);
+
+  char norm = spec;
+  if (norm >= 'A' && norm <= 'Z') norm = static_cast<char>(norm - 'A' + 'a');
+
+  // The real and time renderings are sized by their own rules, not by this
+  // subclause; leave them to the auto-sized path.
+  if (norm == 'e' || norm == 'f' || norm == 'g' || norm == 't')
+    return FormatArg(val, spec);
+
+  std::string core = FormatArgMinimal(val, norm);
+  if (width == 0 || core.size() >= width) return core;
+
+  char pad = (norm == 'h' || norm == 'x' || norm == 'o' || norm == 'b') ? '0'
+                                                                        : ' ';
+  return std::string(width - core.size(), pad) + core;
+}
+
 static void AppendLiteralChar(const std::string& fmt, size_t& i,
                               std::string& out) {
   if (fmt[i] == '\\' && i + 1 < fmt.size()) {
@@ -222,8 +280,17 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
     return false;
   }
 
+  // §21.2.1.2: an optional field width may sit between the '%' and the radix
+  // letter. It shall be a non-negative decimal integer constant; collect it
+  // here so the value rendering below can size its result accordingly.
   size_t j = i + 1;
-  while (j < fmt.size() && (fmt[j] >= '0' && fmt[j] <= '9')) ++j;
+  bool has_width = false;
+  uint32_t width = 0;
+  while (j < fmt.size() && fmt[j] >= '0' && fmt[j] <= '9') {
+    has_width = true;
+    width = width * 10 + static_cast<uint32_t>(fmt[j] - '0');
+    ++j;
+  }
   char spec = (j < fmt.size()) ? fmt[j] : 'd';
 
   // Table 21-1 and Table 21-2 give each specifier in both cases (e.g.
@@ -266,7 +333,7 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
       out += FormatTimeUnderTimeformat(args.vals[args.vi++],
                                        *args.time_format);
     } else {
-      out += FormatArg(args.vals[args.vi++], spec);
+      out += FormatArgWidth(args.vals[args.vi++], spec, has_width, width);
     }
   }
   i = j;
