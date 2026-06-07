@@ -634,6 +634,18 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
       uint64_t limit = EvalExpr(expr->args[0], ctx, arena).ToUint64();
       vcd->SetSizeLimit(limit);
     }
+  } else if (name == "$dumpportsflush") {
+    // §21.7.3.5: push the buffered extended-VCD port values out to the dump
+    // file, clearing the simulator's VCD buffer so a reader sees everything
+    // dumped so far while the simulation keeps running. The optional filename
+    // argument denotes the $dumpports output to flush; with this single-file
+    // writer it selects that one dump, and with no filename the buffers for
+    // every file opened by $dumpports are flushed. Either way the one writer is
+    // flushed, so the filename is parsed but does not change which dump is
+    // emptied. The flush reuses the buffer-flushing machinery the extended VCD
+    // file inherits (§21.7.1.6): no VCD command is written and the dump state is
+    // left untouched so dumping continues exactly as before.
+    if (vcd) vcd->Flush();
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }
