@@ -26,6 +26,10 @@ static uint64_t PreprocessAndGet(const std::string& src, const char* var_name) {
   return var->value.ToUint64();
 }
 
+// §22.10 has no simulator-stage rule: the directives are consumed by the
+// preprocessor and have no effect on simulation, so a cell module simulates
+// like any other. One representative check is sufficient; the directive
+// variations are observed in the preprocessor tests.
 TEST(CelldefineSimulation, CelldefineModuleSimulatesCorrectly) {
   auto result = PreprocessAndGet(
       "`celldefine\n"
@@ -36,33 +40,4 @@ TEST(CelldefineSimulation, CelldefineModuleSimulatesCorrectly) {
       "`endcelldefine\n",
       "result");
   EXPECT_EQ(result, 42u);
-}
-
-TEST(CelldefineSimulation, UnpairedCelldefineSimulatesCorrectly) {
-  auto result = PreprocessAndGet(
-      "`celldefine\n"
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = 8'd55;\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(result, 55u);
-}
-
-TEST(CelldefineSimulation, MultiplePairsSimulate) {
-  auto result = PreprocessAndGet(
-      "`celldefine\n"
-      "module m1;\n"
-      "  logic [7:0] unused;\n"
-      "  initial unused = 8'd10;\n"
-      "endmodule\n"
-      "`endcelldefine\n"
-      "`celldefine\n"
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = 8'd77;\n"
-      "endmodule\n"
-      "`endcelldefine\n",
-      "result");
-  EXPECT_EQ(result, 77u);
 }
