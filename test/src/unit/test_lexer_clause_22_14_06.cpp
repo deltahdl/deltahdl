@@ -7,11 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Lexer, KeywordVersion_1800_2005_LogicIsKeyword) {
-  auto kw = LookupKeyword("logic", KeywordVersion::kVer18002005);
-  EXPECT_EQ(kw, std::optional(TokenKind::kKwLogic));
-}
-
 TEST(Lexer, KeywordVersion_1800_2005_AllAdditionalKeywordsRecognized) {
   const char* kTable22_4[] = {
       "alias",       "always_comb",   "always_ff",    "always_latch",
@@ -44,6 +39,14 @@ TEST(Lexer, KeywordVersion_1800_2005_AllAdditionalKeywordsRecognized) {
     auto result = LookupKeyword(kw, KeywordVersion::kVer18002005);
     EXPECT_TRUE(result.has_value())
         << kw << " should be a keyword in 1800-2005";
+  }
+}
+
+TEST(Lexer, KeywordVersion_1800_2005_AdditionalKeywordsAreNewIn1800_2005) {
+
+  for (const char* kw : {"logic", "class", "bit"}) {
+    EXPECT_FALSE(LookupKeyword(kw, KeywordVersion::kVer13642005).has_value())
+        << kw << " is additional in 1800-2005 and not reserved in 1364-2005";
   }
 }
 

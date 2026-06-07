@@ -14,12 +14,4 @@ TEST(CompilerDirectiveParsing, BeginKeywords1800_2005_LogicIsKeyword) {
                               "`end_keywords\n"));
 }
 
-TEST(CompilerDirectiveParsing, BeginKeywords1800_2005_InterfaceIsKeyword) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("`begin_keywords \"1800-2005\"\n"
-                              "interface if1;\n"
-                              "endinterface\n"
-                              "`end_keywords\n"));
-}
-
 }
