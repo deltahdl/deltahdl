@@ -593,6 +593,24 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
         vcd->DumpSelectedValues(scopes);
       }
     }
+  } else if (name == "$dumpportsoff") {
+    // §21.7.3.2: suspend the extended VCD port dump. A checkpoint marking every
+    // selected port as x is written and recording stops from this simulation
+    // time forward. The optional filename argument denotes the $dumpports output
+    // file; with this single-file writer it selects that one dump, and with no
+    // argument every $dumpports file is suspended. The suspend checkpoint reuses
+    // the 4-state machinery the extended VCD file inherits (§21.7.1.3). If port
+    // dumping is already suspended for the file the task is ignored, so no
+    // second checkpoint is written.
+    if (vcd && vcd->IsEnabled()) vcd->DumpOff();
+  } else if (name == "$dumpportson") {
+    // §21.7.3.2: resume the extended VCD port dump, emitting a checkpoint of
+    // every selected port's current value. The optional filename argument names
+    // the $dumpports file to resume; with no argument every stopped $dumpports
+    // file resumes. The resume checkpoint reuses the inherited 4-state machinery
+    // (§21.7.1.3). If the ports are already being dumped the task is ignored, so
+    // no checkpoint is written.
+    if (vcd && !vcd->IsEnabled()) vcd->DumpOn();
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }
