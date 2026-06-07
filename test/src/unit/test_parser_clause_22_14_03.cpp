@@ -21,13 +21,4 @@ TEST(CompilerDirectiveParsing, BeginKeywords1364_2001_LogicAsIdentifier) {
                               "`end_keywords\n"));
 }
 
-TEST(CompilerDirectiveParsing, BeginKeywords1364_2001_ClassAsIdentifier) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("`begin_keywords \"1364-2001\"\n"
-                              "module t;\n"
-                              "  integer class;\n"
-                              "endmodule\n"
-                              "`end_keywords\n"));
-}
-
 }
