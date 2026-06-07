@@ -12,6 +12,7 @@ TEST(IoSystemTaskParsing, FtellFseek) {
               "    fd = $fopen(\"data.txt\", \"r\");\n"
               "    pos = $ftell(fd);\n"
               "    $fseek(fd, 10, 0);\n"
+              "    $rewind(fd);\n"
               "    $fclose(fd);\n"
               "  end\n"
               "endmodule\n"));

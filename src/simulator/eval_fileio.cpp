@@ -127,16 +127,46 @@ static Logic4Vec EvalFerror(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(err));
 }
 
+// §21.3.5: the new position is the signed distance "offset" from the chosen
+// origin. The argument is read as a signed quantity of its own width, so a
+// narrow negative value (e.g. a 32-bit -2) seeks backward rather than being
+// zero-extended into a huge forward offset.
+static long SignedOffset(const Logic4Vec& vec) {
+  uint64_t raw = vec.ToUint64();
+  uint32_t width = vec.width;
+  if (width > 0 && width < 64) {
+    uint64_t sign_bit = uint64_t{1} << (width - 1);
+    if (raw & sign_bit) raw |= ~((uint64_t{1} << width) - 1);
+  }
+  return static_cast<long>(raw);
+}
+
 static Logic4Vec EvalFseek(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 32, 0);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
+  // §21.3.5: a failed reposition reports the error code -1.
   if (!fp) return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(-1));
 
-  auto offset =
-      static_cast<long>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
-  auto whence =
+  long offset = SignedOffset(EvalExpr(expr->args[1], ctx, arena));
+
+  // §21.3.5: the operation argument selects the origin -- 0 is the start of
+  // the file, 1 the current position, and 2 the end of file. Map these to the
+  // host's seek constants explicitly rather than assuming the platform's
+  // SEEK_* macros share those numeric values.
+  auto operation =
       static_cast<int>(EvalExpr(expr->args[2], ctx, arena).ToUint64());
+  int whence = SEEK_SET;
+  if (operation == 1) {
+    whence = SEEK_CUR;
+  } else if (operation == 2) {
+    whence = SEEK_END;
+  } else if (operation != 0) {
+    return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(-1));
+  }
+
+  // §21.3.5: a successful $fseek cancels any $ungetc push-back; the host's
+  // std::fseek discards pushed-back characters for the stream as required.
   int result = std::fseek(fp, offset, whence);
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(result));
 }
@@ -154,8 +184,12 @@ static Logic4Vec EvalRewind(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
-  if (fp) std::fseek(fp, 0, SEEK_SET);
-  return MakeLogic4VecVal(arena, 32, 0);
+  // §21.3.5: $rewind is equivalent to $fseek(fd, 0, 0) and, like $fseek,
+  // reports -1 when the reposition fails. The host reposition also discards
+  // any $ungetc push-back, satisfying the cancellation requirement.
+  if (!fp) return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(-1));
+  int result = std::fseek(fp, 0, SEEK_SET);
+  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(result));
 }
 
 static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
