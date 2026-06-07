@@ -511,6 +511,9 @@ int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
 
   scheduler.Run();
   sim_ctx.RunFinalBlocks();
+  // §21.7.3.6.1: close the extended VCD file by recording the final simulation
+  // time. This is a no-op for a plain 4-state VCD file.
+  if (vcd) vcd->WriteVcdClose(sim_ctx.CurrentTime().ticks);
   return diag.HasErrors() ? 1 : 0;
 }
 

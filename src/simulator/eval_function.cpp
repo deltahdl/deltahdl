@@ -556,6 +556,9 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
           {}, "$dumpports may not name the same output file more than once");
     }
     if (vcd) {
+      // $dumpports produces an extended VCD file, which closes with the
+      // $vcdclose keyword command (§21.7.3.6.1).
+      vcd->SetExtended();
       size_t scope_end = expr->args.size() - (last_is_file ? 1 : 0);
       std::vector<std::string_view> scopes;
       for (size_t i = 0; i < scope_end; ++i) {

@@ -273,6 +273,15 @@ void VcdWriter::Flush() {
   ofs_.flush();
 }
 
+void VcdWriter::WriteVcdClose(uint64_t final_time) {
+  if (!ofs_.is_open() || !extended_) return;
+  // §21.7.3.6.1: the final keyword command of an extended VCD file marks the end
+  // simulation time at the moment the file is closed. The time is written as a
+  // value-change-style timestamp (#<time>), so the recorded end time stands on
+  // its own even when no signal changed at that time.
+  ofs_ << "$vcdclose #" << final_time << " $end\n";
+}
+
 void VcdWriter::DumpChangedValues(uint64_t ) {
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;

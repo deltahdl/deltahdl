@@ -72,6 +72,17 @@ class VcdWriter {
   // dumper stops recording and inserts a comment noting the limit was reached.
   void SetSizeLimit(uint64_t limit_bytes) { size_limit_ = limit_bytes; }
 
+  // Mark this writer as producing an extended VCD file (§21.7.3). The extended
+  // VCD format adds the $vcdclose keyword command over the 4-state format, so
+  // only an extended writer emits it.
+  void SetExtended() { extended_ = true; }
+
+  // Emit the $vcdclose keyword command (§21.7.3.6.1): when an extended VCD file
+  // is closed, record the final simulation time so a reader knows the end time
+  // regardless of whether any signal changed at that time. Syntax 21-26:
+  // $vcdclose <final_simulation_time> $end. A 4-state writer emits nothing.
+  void WriteVcdClose(uint64_t final_time);
+
  private:
   void WriteScalarChange(const VcdSignal& sig);
   void WriteVectorChange(const VcdSignal& sig);
@@ -92,6 +103,7 @@ class VcdWriter {
   bool header_written_ = false;
   uint64_t size_limit_ = 0;
   bool limit_reached_ = false;
+  bool extended_ = false;
 };
 
 }
