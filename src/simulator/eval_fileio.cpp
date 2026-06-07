@@ -1,6 +1,7 @@
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -206,11 +207,16 @@ static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, 0);
 }
 
+// §21.3.4.3: the integer conversion codes are case-insensitive (%d or %D, and
+// so on). Returns the numeric base for an integer code, or 0 for a code this
+// reader does not treat as an integer field.
 static int SpecToBase(char spec) {
-  if (spec == 'd') return 10;
-  if (spec == 'h' || spec == 'x') return 16;
-  if (spec == 'b') return 2;
-  if (spec == 'o') return 8;
+  char c = (spec >= 'A' && spec <= 'Z') ? static_cast<char>(spec - 'A' + 'a')
+                                        : spec;
+  if (c == 'd') return 10;
+  if (c == 'h' || c == 'x') return 16;
+  if (c == 'b') return 2;
+  if (c == 'o') return 8;
   return 0;
 }
 
@@ -230,27 +236,195 @@ static std::string ExtractFmtStr(std::string_view text) {
   return std::string(text);
 }
 
-struct ScanState {
-  size_t input_pos = 0;
-  uint32_t matched = 0;
-};
-
-static bool ScanOneField(const std::string& input, ScanState& state, int base,
-                         Variable* var, Arena& arena) {
-  while (state.input_pos < input.size() && input[state.input_pos] == ' ') {
-    ++state.input_pos;
+// §21.3.4.3: the control string is parsed as ASCII, so a four-state value with
+// any unknown bit (x or z) cannot be interpreted. Only a non-literal argument
+// can carry such bits; a string literal never does.
+static bool ScanArgHasUnknownBits(const Expr* arg, SimContext& ctx,
+                                  Arena& arena) {
+  if (!arg || arg->kind == ExprKind::kStringLiteral) return false;
+  Logic4Vec v = EvalExpr(arg, ctx, arena);
+  for (uint32_t w = 0; w < v.nwords; ++w) {
+    if (v.words[w].bval != 0) return true;
   }
-  char* end = nullptr;
-  auto val = std::strtoull(input.c_str() + state.input_pos, &end, base);
-  if (end == input.c_str() + state.input_pos) return false;
-  state.input_pos = static_cast<size_t>(end - input.c_str());
-  if (var) var->value = MakeLogic4VecVal(arena, var->value.width, val);
-  ++state.matched;
-  return true;
+  return false;
+}
+
+// §21.3.4.3: leading white space in front of an input field is ignored. The
+// set covers blanks, tabs, newlines, and formfeeds (plus the related vertical
+// tab and carriage return).
+static bool IsScanSpace(char c) {
+  return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' ||
+         c == '\v';
+}
+
+// §21.3.4.3: store the converted real value (its IEEE-754 bit pattern) into a
+// real destination variable.
+static void StoreRealField(Variable* var, Arena& arena, double d) {
+  if (!var) return;
+  uint64_t bits = 0;
+  std::memcpy(&bits, &d, sizeof(double));
+  uint32_t width = var->value.width ? var->value.width : 64;
+  auto vec = MakeLogic4VecVal(arena, width, bits);
+  vec.is_real = true;
+  var->value = vec;
+}
+
+// §21.3.4.3 scan engine shared by $fscanf (here) and $sscanf. Interprets the
+// control string `fmt` against `input`, assigning converted fields to the
+// destination arguments. Returns the number of items assigned and reports, via
+// `consumed`, how many input characters were used.
+static uint32_t RunScanf(const std::string& input, const std::string& fmt,
+                         Expr* const* dest, size_t ndest, SimContext& ctx,
+                         Arena& arena, size_t& consumed) {
+  size_t pos = 0;  // input cursor
+  size_t ai = 0;   // next destination argument
+  uint32_t matched = 0;
+
+  auto field_var = [&](bool suppress) -> Variable* {
+    if (suppress || ai >= ndest) return nullptr;
+    const Expr* a = dest[ai];
+    if (a->kind == ExprKind::kIdentifier) return ctx.FindVariable(a->text);
+    return nullptr;
+  };
+  auto upper_limit = [&](int width) -> size_t {
+    if (width > 0 && pos + static_cast<size_t>(width) < input.size())
+      return pos + static_cast<size_t>(width);
+    return input.size();
+  };
+
+  for (size_t fi = 0; fi < fmt.size(); ++fi) {
+    char fc = fmt[fi];
+
+    // §21.3.4.3 (a): white space in the control string skips a run of input
+    // white space.
+    if (IsScanSpace(fc)) {
+      while (pos < input.size() && IsScanSpace(input[pos])) ++pos;
+      continue;
+    }
+
+    // §21.3.4.3 (b): an ordinary character must match the next input character;
+    // a mismatch ends the scan with the offending character left unread.
+    if (fc != '%') {
+      if (pos >= input.size() || input[pos] != fc) break;
+      ++pos;
+      continue;
+    }
+
+    if (fi + 1 >= fmt.size()) break;
+    ++fi;
+    // §21.3.4.3 (c): optional assignment-suppression character.
+    bool suppress = false;
+    if (fmt[fi] == '*') {
+      suppress = true;
+      if (++fi >= fmt.size()) break;
+    }
+    // §21.3.4.3 (c): optional maximum field width.
+    int width = 0;
+    while (fi < fmt.size() && fmt[fi] >= '0' && fmt[fi] <= '9') {
+      width = width * 10 + (fmt[fi] - '0');
+      ++fi;
+    }
+    if (fi >= fmt.size()) break;
+    char code = fmt[fi];
+    char lc = (code >= 'A' && code <= 'Z') ? static_cast<char>(code - 'A' + 'a')
+                                           : code;
+
+    if (lc == '%') {
+      if (pos >= input.size() || input[pos] != '%') break;
+      ++pos;
+      continue;
+    }
+
+    if (lc == 'c') {
+      // §21.3.4.3: the character conversion does not skip leading white space;
+      // it takes the next character(s) verbatim.
+      int cnt = width > 0 ? width : 1;
+      if (pos >= input.size()) break;
+      std::string chars;
+      for (int k = 0; k < cnt && pos < input.size(); ++k) chars += input[pos++];
+      Variable* var = field_var(suppress);
+      if (var) {
+        if (chars.size() == 1) {
+          var->value = MakeLogic4VecVal(arena, var->value.width,
+                                        static_cast<uint8_t>(chars[0]));
+        } else {
+          var->value = StringToVec(arena, chars, var->value.width);
+        }
+      }
+      if (!suppress) {
+        ++matched;
+        ++ai;
+      }
+      continue;
+    }
+
+    // §21.3.4.3: every remaining conversion ignores white space leading the
+    // input field.
+    while (pos < input.size() && IsScanSpace(input[pos])) ++pos;
+
+    if (lc == 's') {
+      size_t limit = upper_limit(width);
+      std::string s;
+      while (pos < limit && !IsScanSpace(input[pos])) s += input[pos++];
+      if (s.empty()) break;
+      Variable* var = field_var(suppress);
+      if (var) var->value = StringToVec(arena, s, var->value.width);
+      if (!suppress) {
+        ++matched;
+        ++ai;
+      }
+      continue;
+    }
+
+    if (lc == 'f' || lc == 'e' || lc == 'g' || lc == 't') {
+      size_t limit = upper_limit(width);
+      std::string sub = input.substr(pos, limit - pos);
+      const char* c = sub.c_str();
+      char* end = nullptr;
+      double d = std::strtod(c, &end);
+      if (end == c) break;
+      pos += static_cast<size_t>(end - c);
+      StoreRealField(field_var(suppress), arena, d);
+      if (!suppress) {
+        ++matched;
+        ++ai;
+      }
+      continue;
+    }
+
+    int base = SpecToBase(lc);
+    if (base == 0) break;  // unsupported conversion code: stop scanning
+    size_t limit = upper_limit(width);
+    std::string sub = input.substr(pos, limit - pos);
+    const char* c = sub.c_str();
+    char* end = nullptr;
+    unsigned long long v = std::strtoull(c, &end, base);
+    if (end == c) break;
+    pos += static_cast<size_t>(end - c);
+    Variable* var = field_var(suppress);
+    if (var) {
+      var->value =
+          MakeLogic4VecVal(arena, var->value.width, static_cast<uint64_t>(v));
+    }
+    if (!suppress) {
+      ++matched;
+      ++ai;
+    }
+  }
+
+  consumed = pos;
+  return matched;
 }
 
 static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 32, 0);
+
+  // §21.3.4.3: an unknown bit (x or z) in the format string makes the function
+  // report EOF (-1).
+  if (ScanArgHasUnknownBits(expr->args[1], ctx, arena)) {
+    return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
+  }
+
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
@@ -260,22 +434,23 @@ static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::fseek(fp, start, SEEK_SET);
 
   std::string fmt = ExtractFmtStr(expr->args[1]->text);
-  ScanState state;
-  size_t arg_idx = 2;
+  size_t consumed = 0;
+  uint32_t matched = RunScanf(input, fmt, expr->args.data() + 2,
+                              expr->args.size() - 2, ctx, arena, consumed);
 
-  for (size_t fi = 0; fi < fmt.size(); ++fi) {
-    if (fmt[fi] != '%' || fi + 1 >= fmt.size()) continue;
-    int base = SpecToBase(fmt[++fi]);
-    if (base == 0 || arg_idx >= expr->args.size()) break;
-    Variable* var = nullptr;
-    if (expr->args[arg_idx]->kind == ExprKind::kIdentifier) {
-      var = ctx.FindVariable(expr->args[arg_idx]->text);
-    }
-    if (!ScanOneField(input, state, base, var, arena)) break;
-    ++arg_idx;
+  // §21.3.4.3: leave the descriptor positioned just past the consumed input so
+  // a later read continues where the scan stopped.
+  std::fseek(fp, start + static_cast<long>(consumed), SEEK_SET);
+
+  // §21.3.4.3: a return of zero means an input character failed to match the
+  // control string, whereas EOF (-1) is reported when the input runs out before
+  // any field could be converted.
+  if (matched == 0) {
+    size_t p = consumed;
+    while (p < input.size() && IsScanSpace(input[p])) ++p;
+    if (p >= input.size()) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
   }
-  std::fseek(fp, start + static_cast<long>(state.input_pos), SEEK_SET);
-  return MakeLogic4VecVal(arena, 32, state.matched);
+  return MakeLogic4VecVal(arena, 32, matched);
 }
 
 static Logic4Vec EvalFread(const Expr* expr, SimContext& ctx, Arena& arena) {
