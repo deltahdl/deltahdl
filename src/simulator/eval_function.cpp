@@ -491,16 +491,28 @@ static Logic4Vec EvalTimescaleQuery(const Expr* expr, SimContext& ctx,
 }
 
 static Logic4Vec EvalSystemCommand(const Expr* expr, Arena& arena) {
-  if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
-  auto text = expr->args[0]->text;
-  std::string cmd;
-  if (text.size() >= 2 && text.front() == '"') {
-    cmd = std::string(text.substr(1, text.size() - 2));
+  int ret;
+  if (expr->args.empty()) {
+    // §20.17.1: invoked with no string argument, $system calls the C system()
+    // with the NULL string rather than executing any command.
+    ret = std::system(nullptr);
   } else {
-    cmd = std::string(text);
+    auto text = expr->args[0]->text;
+    std::string cmd;
+    if (text.size() >= 2 && text.front() == '"') {
+      cmd = std::string(text.substr(1, text.size() - 2));
+    } else {
+      cmd = std::string(text);
+    }
+    // §20.17.1: the argument is handed to C system() as if executed from the
+    // terminal.
+    ret = std::system(cmd.c_str());
   }
-  int ret = std::system(cmd.c_str());
-  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(ret));
+  // §20.17.1: as a function, $system returns the system() result with the
+  // signed data type int.
+  auto result = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(ret));
+  result.is_signed = true;
+  return result;
 }
 
 static bool IsUtilitySysCall(std::string_view n) {
