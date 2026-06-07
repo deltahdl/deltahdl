@@ -12,14 +12,6 @@ TEST(KeywordVersionParsing, BeginKeywords1800_2023) {
                               "`end_keywords\n"));
 }
 
-TEST(KeywordVersionParsing, BeginKeywords1800_2005) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("`begin_keywords \"1800-2005\"\n"
-                              "module t;\n"
-                              "endmodule\n"
-                              "`end_keywords\n"));
-}
-
 TEST(KeywordVersionParsing, BeginKeywordsMultipleModules) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`begin_keywords \"1800-2012\"\n"

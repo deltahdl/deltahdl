@@ -86,6 +86,16 @@ TEST(KeywordVersionLexing, MarkerAtInputStart) {
   EXPECT_TRUE(found_module);
 }
 
+// §22.14: when no `begin_keywords directive is in effect (no version marker
+// precedes the source), the lexer applies the implementation's default reserved
+// keyword set. This implementation's default is IEEE 1800-2023, so a word that
+// is reserved there lexes as a keyword with no marker present at all.
+TEST(KeywordVersionLexing, NoDirectiveUsesDefaultKeywordSet) {
+  auto tokens = Lex("logic");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwLogic);
+}
+
 TEST(KeywordVersionLexing, ConsecutiveMarkersSwitchVersion) {
   std::string input;
   input += kKeywordMarker;

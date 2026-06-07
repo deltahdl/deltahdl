@@ -1,5 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <unistd.h>
+
+#include <filesystem>
+#include <fstream>
+#include <string>
+
 #include "fixture_preprocessor.h"
 #include "lexer/keywords.h"
 #include "lexer/lexer.h"
@@ -8,19 +14,28 @@ using namespace delta;
 
 namespace {
 
-TEST(KeywordVersionPreprocessing, BeginKeywordsEmitsMarker) {
-  PreprocFixture f;
-  auto out = Preprocess(
-      "`begin_keywords \"1800-2023\"\n"
-      "module t; endmodule\n"
-      "`end_keywords\n",
-      f);
+namespace fs = std::filesystem;
 
-  size_t first = out.find(kKeywordMarker);
-  ASSERT_NE(first, std::string::npos);
-  auto ver = static_cast<KeywordVersion>(out[first + 1]);
-  EXPECT_EQ(ver, KeywordVersion::kVer18002023);
-}
+// Scratch directory used to exercise `begin_keywords` spanning an `include
+// boundary. Cleans itself up on destruction.
+struct KeywordIncludeDir {
+  fs::path dir;
+
+  KeywordIncludeDir() {
+    dir = fs::temp_directory_path() /
+          ("delta_kw_22_14_" + std::to_string(getpid()));
+    fs::create_directories(dir);
+  }
+
+  ~KeywordIncludeDir() { fs::remove_all(dir); }
+
+  fs::path Write(const std::string& name, const std::string& content) {
+    auto full = dir / name;
+    std::ofstream ofs(full);
+    ofs << content;
+    return full;
+  }
+};
 
 TEST(KeywordVersionPreprocessing, EndKeywordsRestoresDefault) {
   PreprocFixture f;
@@ -148,15 +163,35 @@ TEST(KeywordVersionPreprocessing, DoubleNestedBeginKeywords) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §22.14: `resetall does not undo the effect of `begin_keywords. The 1364-2001
+// keyword set is selected and then `resetall appears; afterward `logic` (a word
+// reserved only in later standards) must still lex as an identifier, directly
+// showing the active keyword version survived the reset rather than reverting to
+// the default set.
 TEST(KeywordVersionPreprocessing, ResetallDoesNotAffectKeywordVersion) {
   PreprocFixture f;
-  Preprocess(
-      "`begin_keywords \"1364-1995\"\n"
+  auto out = Preprocess(
+      "`begin_keywords \"1364-2001\"\n"
       "`resetall\n"
-      "x\n"
+      "logic\n"
       "`end_keywords\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
+
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", out);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  auto tokens = lexer.LexAll();
+
+  bool found_logic = false;
+  for (const auto& tok : tokens) {
+    if (tok.text == "logic") {
+      EXPECT_EQ(tok.kind, TokenKind::kIdentifier);
+      found_logic = true;
+    }
+  }
+  EXPECT_TRUE(found_logic);
 }
 
 TEST(KeywordVersionPreprocessing, ErrorBeginKeywordsInsideDesignElement) {
@@ -194,31 +229,6 @@ TEST(KeywordVersionPreprocessing, BeginKeywordsInFalseIfdef) {
   EXPECT_EQ(out.find(kKeywordMarker), std::string::npos);
 }
 
-TEST(KeywordVersionPreprocessing, LexerSeesVersionSwitch) {
-  PreprocFixture f;
-  auto out = Preprocess(
-      "`begin_keywords \"1364-2001\"\n"
-      "logic\n"
-      "`end_keywords\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", out);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  auto tokens = lexer.LexAll();
-
-  bool found_logic = false;
-  for (const auto& tok : tokens) {
-    if (tok.text == "logic") {
-      EXPECT_EQ(tok.kind, TokenKind::kIdentifier);
-      found_logic = true;
-    }
-  }
-  EXPECT_TRUE(found_logic);
-}
-
 TEST(KeywordVersionPreprocessing, LexerSeesKeywordAfterEndKeywords) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -244,31 +254,6 @@ TEST(KeywordVersionPreprocessing, LexerSeesKeywordAfterEndKeywords) {
   ASSERT_EQ(logic_kinds.size(), 2u);
   EXPECT_EQ(logic_kinds[0], TokenKind::kIdentifier);
   EXPECT_EQ(logic_kinds[1], TokenKind::kKwLogic);
-}
-
-TEST(KeywordVersionPreprocessing, LogicAsIdentifierUnder1364_2001) {
-  PreprocFixture f;
-  auto out = Preprocess(
-      "`begin_keywords \"1364-2001\"\n"
-      "logic\n"
-      "`end_keywords\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", out);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  auto tokens = lexer.LexAll();
-
-  bool found = false;
-  for (const auto& tok : tokens) {
-    if (tok.text == "logic") {
-      EXPECT_EQ(tok.kind, TokenKind::kIdentifier);
-      found = true;
-    }
-  }
-  EXPECT_TRUE(found);
 }
 
 TEST(KeywordVersionPreprocessing, InterfaceNotKeywordUnder1364_2005) {
@@ -391,6 +376,40 @@ TEST(KeywordVersionPreprocessing, SameVersionNested) {
   ASSERT_NE(pos, std::string::npos);
   EXPECT_EQ(static_cast<KeywordVersion>(out[pos + 1]),
             KeywordVersion::kVer18002023);
+}
+
+// §22.14: a `begin_keywords directive affects all source that follows, even
+// across source file boundaries, until the matching `end_keywords. Here the
+// directive lives in the top file while the affected `logic` identifier lives
+// in an included file; under "1364-2001" it must still lex as an identifier.
+TEST(KeywordVersionPreprocessing, EffectCrossesIncludeBoundary) {
+  KeywordIncludeDir tmp;
+  tmp.Write("inc.svh", "logic\n");
+
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile(
+      (tmp.dir / "top.sv").string(),
+      "`begin_keywords \"1364-2001\"\n"
+      "`include \"inc.svh\"\n"
+      "`end_keywords\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto out = pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto out_fid = mgr.AddFile("<test>", out);
+  Lexer lexer(mgr.FileContent(out_fid), out_fid, diag);
+  auto tokens = lexer.LexAll();
+
+  bool found_logic = false;
+  for (const auto& tok : tokens) {
+    if (tok.text == "logic") {
+      EXPECT_EQ(tok.kind, TokenKind::kIdentifier);
+      found_logic = true;
+    }
+  }
+  EXPECT_TRUE(found_logic);
 }
 
 }

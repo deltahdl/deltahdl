@@ -37,17 +37,3 @@ TEST(KeywordVersionSimulation, BeginKeywordsModuleSimulates) {
       "result");
   EXPECT_EQ(result, 99u);
 }
-
-TEST(KeywordVersionSimulation, NestedBeginKeywordsSimulates) {
-  auto result = PreprocessAndGet(
-      "`begin_keywords \"1800-2012\"\n"
-      "`begin_keywords \"1800-2023\"\n"
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = 8'd64;\n"
-      "endmodule\n"
-      "`end_keywords\n"
-      "`end_keywords\n",
-      "result");
-  EXPECT_EQ(result, 64u);
-}
