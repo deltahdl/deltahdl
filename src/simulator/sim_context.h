@@ -325,6 +325,18 @@ class SimContext {
   void SetDumpFileName(std::string name) { dump_file_name_ = std::move(name); }
   const std::string& GetDumpFileName() const { return dump_file_name_; }
 
+  // §21.7.3.1: scope names supplied to $dumpports must be unique across every
+  // call. Records the scope and returns false when it repeats one already used
+  // by an earlier $dumpports call.
+  bool RegisterDumpportsScope(const std::string& scope) {
+    return dumpports_scopes_.insert(scope).second;
+  }
+  // §21.7.3.1: an explicitly named $dumpports output file may not be named by
+  // more than one call. Records the name and returns false on a repeat.
+  bool RegisterDumpportsFile(const std::string& file) {
+    return dumpports_files_.insert(file).second;
+  }
+
   void SetDpiContext(DpiContext* dpi) { dpi_context_ = dpi; }
   DpiContext* GetDpiContext() { return dpi_context_; }
 
@@ -636,6 +648,10 @@ class SimContext {
   static const std::vector<Process*> kEmptyProcessList;
   VcdWriter* vcd_writer_ = nullptr;
   std::string dump_file_name_ = "dump.vcd";
+  // §21.7.3.1 cross-call $dumpports bookkeeping: scope names and explicitly
+  // specified file names must each be unique across all $dumpports calls.
+  std::unordered_set<std::string> dumpports_scopes_;
+  std::unordered_set<std::string> dumpports_files_;
   DpiContext* dpi_context_ = nullptr;
   Process* current_process_ = nullptr;
   bool stop_requested_ = false;

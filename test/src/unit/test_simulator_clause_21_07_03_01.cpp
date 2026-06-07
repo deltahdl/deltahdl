@@ -58,29 +58,6 @@ TEST_F(DumpportsSysTask, IncludesRegisteredPortsWhenScopeOmitted) {
   EXPECT_NE(content.find("0\""), std::string::npos);  // b dumped
 }
 
-// §21.7.3.1: when a scope_list is given, the ports in those scopes are dumped
-// and ports outside them are not.
-TEST_F(DumpportsSysTask, DumpsOnlyNamedScope) {
-  SimFixture f;
-  auto* a = MakeVar(f, "a", 1, 1);
-  auto* b = MakeVar(f, "b", 1, 0);
-  VcdWriter vcd(tmp_path_);
-  vcd.WriteHeader("1ns");
-  vcd.RegisterSignal("a", 1, a);  // ident '!'
-  vcd.RegisterSignal("b", 1, b);  // ident '"'
-  vcd.EndDefinitions();
-  vcd.WriteTimestamp(0);
-  f.ctx.SetVcdWriter(&vcd);
-
-  EvalExpr(MkSysCall(f.arena, "$dumpports",
-                     {MkId(f.arena, "a"), MkStr(f.arena, "ports.vcd")}),
-           f.ctx, f.arena);
-
-  auto content = ReadVcd();
-  EXPECT_NE(content.find("1!"), std::string::npos);   // a dumped
-  EXPECT_EQ(content.find("0\""), std::string::npos);  // b not dumped
-}
-
 // §21.7.3.1: a scope_list may name more than one module, separated by commas.
 // Every named scope is dumped and a scope not listed is excluded.
 TEST_F(DumpportsSysTask, DumpsMultipleNamedScopes) {
@@ -168,6 +145,72 @@ TEST_F(DumpportsSysTask, RejectsStringLiteralScope) {
            f.ctx, f.arena);
 
   EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §21.7.3.1: each scope named in the scope_list shall be unique; naming the
+// same scope twice in one call is reported as an error.
+TEST_F(DumpportsSysTask, RejectsDuplicateScope) {
+  SimFixture f;
+  auto* sig = MakeVar(f, "sig", 1, 1);
+  VcdWriter vcd(tmp_path_);
+  vcd.WriteHeader("1ns");
+  vcd.RegisterSignal("sig", 1, sig);
+  vcd.EndDefinitions();
+  vcd.WriteTimestamp(0);
+  f.ctx.SetVcdWriter(&vcd);
+
+  EvalExpr(MkSysCall(f.arena, "$dumpports",
+                     {MkId(f.arena, "sig"), MkId(f.arena, "sig"),
+                      MkStr(f.arena, "ports.vcd")}),
+           f.ctx, f.arena);
+
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §21.7.3.1: scope uniqueness spans separate $dumpports calls, not just one
+// call; a scope named by an earlier call may not be named again.
+TEST_F(DumpportsSysTask, RejectsDuplicateScopeAcrossCalls) {
+  SimFixture f;
+  auto* a = MakeVar(f, "a", 1, 1);
+  VcdWriter vcd(tmp_path_);
+  vcd.WriteHeader("1ns");
+  vcd.RegisterSignal("a", 1, a);
+  vcd.EndDefinitions();
+  vcd.WriteTimestamp(0);
+  f.ctx.SetVcdWriter(&vcd);
+
+  EvalExpr(MkSysCall(f.arena, "$dumpports", {MkId(f.arena, "a")}), f.ctx,
+           f.arena);
+  EXPECT_FALSE(f.diag.HasErrors());  // first naming of scope "a" is fine
+
+  EvalExpr(MkSysCall(f.arena, "$dumpports", {MkId(f.arena, "a")}), f.ctx,
+           f.arena);
+  EXPECT_TRUE(f.diag.HasErrors());  // scope "a" named a second time
+}
+
+// §21.7.3.1: an explicitly specified output file name may not be reused by a
+// later $dumpports call, even when the scopes differ.
+TEST_F(DumpportsSysTask, RejectsDuplicateFileNameAcrossCalls) {
+  SimFixture f;
+  auto* a = MakeVar(f, "a", 1, 1);
+  auto* b = MakeVar(f, "b", 1, 0);
+  VcdWriter vcd(tmp_path_);
+  vcd.WriteHeader("1ns");
+  vcd.RegisterSignal("a", 1, a);
+  vcd.RegisterSignal("b", 1, b);
+  vcd.EndDefinitions();
+  vcd.WriteTimestamp(0);
+  f.ctx.SetVcdWriter(&vcd);
+
+  EvalExpr(MkSysCall(f.arena, "$dumpports",
+                     {MkId(f.arena, "a"), MkStr(f.arena, "ports.vcd")}),
+           f.ctx, f.arena);
+  EXPECT_FALSE(f.diag.HasErrors());  // file named once
+
+  EvalExpr(MkSysCall(f.arena, "$dumpports",
+                     {MkId(f.arena, "b"), MkStr(f.arena, "ports.vcd")}),
+           f.ctx, f.arena);
+  EXPECT_TRUE(f.diag.HasErrors());  // same file name specified again
 }
 
 }  // namespace

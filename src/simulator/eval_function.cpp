@@ -546,9 +546,16 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     // 4-state VCD machinery, which the extended VCD file inherits unless
     // otherwise stated.
     ctx.SetDumpFileName(ResolveDumpportsFileName(expr));
+    bool last_is_file = !expr->args.empty() && expr->args.back() &&
+                        expr->args.back()->kind == ExprKind::kStringLiteral;
+    // §21.7.3.1: a file name spelled out in the call may not be reused by a
+    // later $dumpports call. A defaulted name is not "specified", so repeated
+    // default calls are allowed.
+    if (last_is_file && !ctx.RegisterDumpportsFile(ctx.GetDumpFileName())) {
+      ctx.GetDiag().Error(
+          {}, "$dumpports may not name the same output file more than once");
+    }
     if (vcd) {
-      bool last_is_file = !expr->args.empty() && expr->args.back() &&
-                          expr->args.back()->kind == ExprKind::kStringLiteral;
       size_t scope_end = expr->args.size() - (last_is_file ? 1 : 0);
       std::vector<std::string_view> scopes;
       for (size_t i = 0; i < scope_end; ++i) {
@@ -563,7 +570,22 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
           continue;
         }
         auto scope = DumpvarsScopeName(expr->args[i]);
-        if (!scope.empty()) scopes.push_back(scope);
+        if (scope.empty()) continue;
+        // §21.7.3.1: each scope named in a $dumpports scope_list shall be
+        // unique; a repeated scope is reported rather than dumped twice.
+        if (std::find(scopes.begin(), scopes.end(), scope) != scopes.end()) {
+          ctx.GetDiag().Error(
+              {}, "$dumpports scope_list entries must be unique");
+          continue;
+        }
+        // §21.7.3.1: scope names must also be unique across separate $dumpports
+        // calls, not just within one call.
+        if (!ctx.RegisterDumpportsScope(std::string(scope))) {
+          ctx.GetDiag().Error(
+              {}, "$dumpports scope already named by an earlier call");
+          continue;
+        }
+        scopes.push_back(scope);
       }
       if (scopes.empty()) {
         vcd->DumpAllValues();
