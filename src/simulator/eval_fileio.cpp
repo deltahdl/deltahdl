@@ -45,18 +45,32 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
   FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
 
-  char buf[4096];
-  char* result = std::fgets(buf, sizeof(buf), fp);
-  if (!result) return MakeLogic4VecVal(arena, 32, 0);
+  // §21.3.4.2: the destination variable bounds how much one line can hold. Its
+  // capacity is its number of whole bytes -- a most-significant partial byte
+  // (a width that is not a multiple of eight) does not count toward the size.
+  Variable* var = nullptr;
+  if (expr->args[0]->kind == ExprKind::kIdentifier)
+    var = ctx.FindVariable(expr->args[0]->text);
+  uint32_t capacity = var ? var->value.width / 8 : 0;
+  if (capacity == 0) return MakeLogic4VecVal(arena, 32, 0);
 
-  std::string line(buf);
-  auto nchars = static_cast<uint64_t>(line.size());
-
-  if (expr->args[0]->kind == ExprKind::kIdentifier) {
-    auto* var = ctx.FindVariable(expr->args[0]->text);
-    if (var) var->value = StringToVec(arena, line, var->value.width);
+  // §21.3.4.2: characters are read until the variable is filled, a newline is
+  // read (the newline itself is kept), or end-of-file is reached.
+  std::string line;
+  line.reserve(capacity);
+  while (line.size() < capacity) {
+    int ch = std::fgetc(fp);
+    if (ch == EOF) break;
+    line.push_back(static_cast<char>(ch));
+    if (ch == '\n') break;
   }
-  return MakeLogic4VecVal(arena, 32, nchars);
+
+  // §21.3.4.2: a read that returns no characters (error/EOF) yields a count of
+  // zero; otherwise the count of characters read is returned.
+  if (line.empty()) return MakeLogic4VecVal(arena, 32, 0);
+
+  if (var) var->value = StringToVec(arena, line, var->value.width);
+  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(line.size()));
 }
 
 static Logic4Vec EvalFgetc(const Expr* expr, SimContext& ctx, Arena& arena) {
