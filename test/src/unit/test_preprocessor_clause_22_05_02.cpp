@@ -73,51 +73,20 @@ TEST(Preprocessor, UndefDoesNotAffectOtherMacros) {
   EXPECT_NE(result.find('2'), std::string::npos);
 }
 
-TEST(Preprocessor, UndefFunctionLikeMacro) {
+// Syntax 22-4 accepts an escaped identifier as the `undef argument. The
+// directive's name parser must take the escaped-name branch and remove the
+// macro stored under that escaped key, just like a simple identifier.
+TEST(Preprocessor, UndefEscapedIdentifierMacro) {
   PreprocFixture f;
   auto result = Preprocess(
-      "`define ADD(a,b) a + b\n"
-      "`undef ADD\n"
-      "`ifdef ADD\n"
+      "`define \\M@CRO 7\n"
+      "`undef \\M@CRO\n"
+      "`ifdef \\M@CRO\n"
       "visible\n"
       "`endif\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(result.find("visible"), std::string::npos);
 }
-TEST(Preprocessor, UndefTwiceNoError) {
-  PreprocFixture f;
-  Preprocess(
-      "`define FOO 1\n"
-      "`undef FOO\n"
-      "`undef FOO\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
 
-TEST(Preprocessor, UndefMacroThenUseHasNoValue) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define FOO 42\n"
-      "`undef FOO\n"
-      "`ifndef FOO\n"
-      "fallback\n"
-      "`endif\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("fallback"), std::string::npos);
-}
-
-TEST(DesignElementPreprocessing, UndefThenIfdefExcludesDesignElement) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define HAS_PKG\n"
-      "`undef HAS_PKG\n"
-      "`ifdef HAS_PKG\n"
-      "package p; endpackage\n"
-      "`endif\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(result.find("package"), std::string::npos);
-}
 

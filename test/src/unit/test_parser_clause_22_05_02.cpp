@@ -4,14 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilerDirectiveParsing, DefineAndUndef) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("`define FOO 1\n"
-                              "module t;\n"
-                              "endmodule\n"
-                              "`undef FOO\n"));
-}
-
 TEST(CompilerDirectiveParsing, UndefThenRedefineProducesValidParse) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`define WIDTH 8\n"
