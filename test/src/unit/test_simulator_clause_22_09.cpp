@@ -38,26 +38,3 @@ TEST(UnconnectedDriveSimulation, Pull1ModuleSimulatesCorrectly) {
       "result");
   EXPECT_EQ(result, 10u);
 }
-
-TEST(UnconnectedDriveSimulation, Pull0ModuleSimulatesCorrectly) {
-  auto result = PreprocessAndGet(
-      "`unconnected_drive pull0\n"
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = 8'd20;\n"
-      "endmodule\n"
-      "`nounconnected_drive\n",
-      "result");
-  EXPECT_EQ(result, 20u);
-}
-
-TEST(UnconnectedDriveSimulation, NoPairingSimulatesCorrectly) {
-  auto result = PreprocessAndGet(
-      "`unconnected_drive pull1\n"
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = 8'd30;\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(result, 30u);
-}

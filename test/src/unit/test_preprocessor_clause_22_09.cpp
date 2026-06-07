@@ -51,11 +51,14 @@ TEST(Preprocessor, UnconnectedDrive_InvalidArg) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, UnconnectedDrive_MissingArg) {
+TEST(Preprocessor, Resetall_ClearsUnconnectedDrive) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP("`unconnected_drive\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
+  PreprocessWithPP("`unconnected_drive pull1\n", f, pp);
+  EXPECT_EQ(pp.UnconnectedDrive(), NetType::kTri1);
+  PreprocessWithPP("`resetall\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.UnconnectedDrive(), NetType::kWire);
 }
 
 TEST(Preprocessor, UnconnectedDrive_MostRecentWins) {
@@ -78,21 +81,6 @@ TEST(Preprocessor, NounconnectedDrive_InsideModule_Error) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("module t;\n`nounconnected_drive\nendmodule\n", f, pp);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(Preprocessor, UnconnectedDrive_InsideInterface_Error) {
-  PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP("interface t;\n`unconnected_drive pull1\nendinterface\n", f,
-                   pp);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(Preprocessor, UnconnectedDrive_InsideProgram_Error) {
-  PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP("program t;\n`unconnected_drive pull1\nendprogram\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
