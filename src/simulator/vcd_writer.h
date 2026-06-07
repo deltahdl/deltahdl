@@ -106,6 +106,11 @@ class VcdWriter {
   // Emit a real value change (§21.7.2.1): real variables are dumped as real
   // numbers using a %.16g format so all 53 mantissa bits are preserved.
   void WriteRealChange(const VcdSignal& sig);
+  // Emit a port value change in the extended VCD form (§21.7.4.3, Syntax 21-29):
+  // the key character p, the port_value state character(s), the strength0 and
+  // strength1 strength components, then the port's identifier code (< followed by
+  // its integer code as written in the $var declaration).
+  void WritePortValueChange(const VcdSignal& sig);
   void WriteSignalChange(const VcdSignal& sig);
   void WriteSignalAllX(const VcdSignal& sig);
   // Returns true once the configured size limit has been reached, emitting the

@@ -193,9 +193,59 @@ void VcdWriter::WriteRealChange(const VcdSignal& sig) {
   ofs_ << "r" << buf << " " << sig.ident << "\n";
 }
 
+void VcdWriter::WritePortValueChange(const VcdSignal& sig) {
+  if (!sig.var) return;
+  // §21.7.4.3 (Syntax 21-29): value ::= p port_value 0_strength_component
+  // 1_strength_component. The key character p marks a port and is written with no
+  // space before the port_value.
+  ofs_ << 'p';
+  // port_value: the binary state of the port (§21.7.4.1 — port values are given
+  // in binary form as 0, 1, x, or z). The extended format dumps the whole vector,
+  // most significant bit first; a scalar contributes a single state character.
+  bool driven = false;
+  for (int32_t i = static_cast<int32_t>(sig.width) - 1; i >= 0; --i) {
+    uint32_t word_idx = static_cast<uint32_t>(i) / 64;
+    uint32_t bit_idx = static_cast<uint32_t>(i) % 64;
+    uint64_t mask = uint64_t{1} << bit_idx;
+    bool a = false;
+    bool b = false;
+    if (word_idx < sig.var->value.nwords) {
+      a = (sig.var->value.words[word_idx].aval & mask) != 0;
+      b = (sig.var->value.words[word_idx].bval & mask) != 0;
+    }
+    char c;
+    if (!b && !a) {
+      c = '0';
+    } else if (!b && a) {
+      c = '1';
+    } else if (b && !a) {
+      c = 'x';
+    } else {
+      c = 'z';
+    }
+    if (c != 'z') driven = true;
+    ofs_ << c;
+  }
+  // The strength0 and strength1 components are each one of the eight SystemVerilog
+  // strength values, encoded as the digit 0 highz, 1 small, 2 medium, 3 weak,
+  // 4 large, 5 pull, 6 strong, 7 supply. The model does not track per-port drive
+  // strength, so a driven port is reported at strong strength and a
+  // high-impedance port at highz strength for both components.
+  char strength = driven ? '6' : '0';
+  ofs_ << strength << strength;
+  // identifier_code: the port's integer code preceded by <, exactly as written in
+  // its $var declaration (§21.7.4.2). One space separates the value from it.
+  ofs_ << " <" << sig.port_id << "\n";
+}
+
 void VcdWriter::WriteSignalChange(const VcdSignal& sig) {
   if (sig.var && sig.var->value.is_real) {
     WriteRealChange(sig);
+  } else if (port_nodes_) {
+    // §21.7.4.3: an extended VCD file produced by $dumpports records value
+    // changes in the port form (p<port_value> with strength components and the
+    // integer identifier code) rather than the 4-state form.
+    WritePortValueChange(sig);
   } else if (sig.width == 1) {
     WriteScalarChange(sig);
   } else {
