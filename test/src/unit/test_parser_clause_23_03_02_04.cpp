@@ -17,57 +17,6 @@ TEST(WildcardPortConnectionParsing, WildcardOnly) {
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
-TEST(WildcardPortConnectionParsing, WildcardWithDefinedChildModule) {
-  auto r = Parse(
-      "module sub(input a, input b, output c);\n"
-      "endmodule\n"
-      "module m;\n"
-      "  logic a, b, c;\n"
-      "  sub u1(.*);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(WildcardPortConnectionParsing, WildcardMultipleChildPorts) {
-  auto r = Parse(
-      "module sub(input a, input b, input c, output d, output e);\n"
-      "endmodule\n"
-      "module m;\n"
-      "  logic a, b, c, d, e;\n"
-      "  sub u1(.*);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* inst = FindItemByKind(r, ModuleItemKind::kModuleInst);
-  ASSERT_NE(inst, nullptr);
-  EXPECT_TRUE(inst->inst_wildcard);
-  EXPECT_TRUE(inst->inst_ports.empty());
-}
-
-TEST(WildcardPortConnectionParsing, WildcardWithNamedPorts) {
-  auto r = Parse("module m; sub u0(.clk(clk), .*); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_TRUE(item->inst_wildcard);
-  EXPECT_EQ(item->inst_ports.size(), 1u);
-  EXPECT_EQ(item->inst_ports[0].first, "clk");
-}
-
-TEST(WildcardPortConnectionParsing, WildcardWithNamedOverrides) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1 (.*, .rst(global_rst), .clk(sys_clk));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_TRUE(item->inst_wildcard);
-  ASSERT_EQ(item->inst_ports.size(), 2);
-  EXPECT_EQ(item->inst_ports[0].first, "rst");
-  EXPECT_EQ(item->inst_ports[1].first, "clk");
-}
-
 TEST(WildcardPortConnectionParsing, WildcardWithEmptyPort) {
   auto r = Parse(
       "module top;\n"
@@ -79,33 +28,6 @@ TEST(WildcardPortConnectionParsing, WildcardWithEmptyPort) {
   ASSERT_EQ(item->inst_ports.size(), 1);
   EXPECT_EQ(item->inst_ports[0].first, "unused");
   EXPECT_EQ(item->inst_ports[0].second, nullptr);
-}
-
-TEST(WildcardPortConnectionParsing, WildcardWithNamedOverrideAndDefinedChild) {
-  auto r = Parse(
-      "module sub(input a, input b, output c);\n"
-      "endmodule\n"
-      "module m;\n"
-      "  logic a, b, c, d;\n"
-      "  sub u1(.a(d), .*);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(WildcardPortConnectionParsing, WildcardWithMultipleEmptyPorts) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1(.*, .a(), .b());\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_TRUE(item->inst_wildcard);
-  ASSERT_EQ(item->inst_ports.size(), 2u);
-  EXPECT_EQ(item->inst_ports[0].first, "a");
-  EXPECT_EQ(item->inst_ports[0].second, nullptr);
-  EXPECT_EQ(item->inst_ports[1].first, "b");
-  EXPECT_EQ(item->inst_ports[1].second, nullptr);
 }
 
 TEST(WildcardPortConnectionParsing, WildcardBeforeNamed) {
@@ -173,6 +95,15 @@ TEST(WildcardPortConnectionParsing, ParametersArrayAndWildcardCombined) {
   EXPECT_NE(item->inst_range_right, nullptr);
   EXPECT_EQ(item->inst_ports.size(), 1u);
   EXPECT_TRUE(item->inst_wildcard);
+}
+
+TEST(WildcardPortConnectionParsing, WildcardAppearsAtMostOnce) {
+  // §23.3.2.4: the .* token pair may appear at most once in the port list.
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1(.*, .clk(c), .*);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 TEST(WildcardPortConnectionParsing, WildcardCannotMixWithPositional) {

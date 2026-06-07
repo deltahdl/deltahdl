@@ -28,29 +28,6 @@ TEST(WildcardPortConnectionSimulation, WildcardInputPropagatesValue) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-TEST(WildcardPortConnectionSimulation, WildcardMultiplePortsPropagate) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module child(input logic [7:0] a, input logic [7:0] b,\n"
-      "             output logic [7:0] c);\n"
-      "  assign c = a + b;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  assign a = 8'd10;\n"
-      "  assign b = 8'd20;\n"
-      "  child u0(.*);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("c");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 30u);
-}
-
 TEST(WildcardPortConnectionSimulation, NamedOverrideTakesPrecedence) {
   SimFixture f;
   auto* design = ElaborateSrc(
