@@ -74,6 +74,19 @@ TEST_F(VcdValueFormatSim, ShortensRedundantLeadingZ) {
   EXPECT_EQ(content.find("bzz"), std::string::npos);
 }
 
+// C5 edge case (Table 21-8: 1 left-extends with 0): because a 1 is reconstructed
+// by extending with 0 rather than 1, a high-order 1 can never be redundant, so a
+// value composed entirely of ones is already in shortest form and no digits are
+// dropped. This exercises the path where the leading-digit elimination makes no
+// progress, the complement of every other case here, and confirms shortening is
+// not sign-extension.
+TEST_F(VcdValueFormatSim, RetainsLeadingOnes) {
+  auto content = DumpOne(4, MakeVec(arena_, 4, 0b1111, 0));
+  EXPECT_NE(content.find("b1111 !"), std::string::npos);
+  // The ones must not be collapsed as if 1 extended with 1.
+  EXPECT_EQ(content.find("b1 !"), std::string::npos);
+}
+
 // C5/C6 edge case: the shortest-form rule must hold for vectors wider than a
 // single machine word. A 70-bit value of 101 spans two storage words (the high
 // word is all zeros); after the redundant leading zeros across the word boundary
