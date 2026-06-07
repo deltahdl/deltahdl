@@ -1573,6 +1573,15 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
     co_return StmtResult::kDone;
   }
 
+  // §20.17.2: invoked as a task, $stacktrace displays the call stack of the
+  // context calling it, up to the top-level process. The function form, which
+  // instead returns the same text as a string, is evaluated as an expression.
+  if (expr && expr->kind == ExprKind::kSystemCall &&
+      expr->callee == "$stacktrace") {
+    std::cout << BuildStackTraceReport(ctx) << "\n";
+    co_return StmtResult::kDone;
+  }
+
   {
     MethodCallParts parts;
     if (ExtractMethodCallParts(expr, parts) &&

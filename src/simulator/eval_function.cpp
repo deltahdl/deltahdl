@@ -515,6 +515,21 @@ static Logic4Vec EvalSystemCommand(const Expr* expr, Arena& arena) {
   return result;
 }
 
+// §20.17.2: build the call-stack text reported by $stacktrace. The chain runs
+// from the context that invoked $stacktrace up to the top-level process, so the
+// innermost active subroutine is listed first and each enclosing caller follows
+// on its own line. The exact content is implementation dependent; here it is
+// the names of the subroutine frames currently on the call stack.
+std::string BuildStackTraceReport(const SimContext& ctx) {
+  const auto& frames = ctx.FuncNameStack();
+  std::string report;
+  for (auto it = frames.rbegin(); it != frames.rend(); ++it) {
+    if (!report.empty()) report += '\n';
+    report += std::string(*it);
+  }
+  return report;
+}
+
 static bool IsUtilitySysCall(std::string_view n) {
   return n == "$clog2" || n == "$bits" || n == "$unsigned" || n == "$signed" ||
          n == "$countones" || n == "$onehot" || n == "$onehot0" ||
@@ -715,9 +730,11 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
   if (name == "$printtimescale")
     return EvalPrinttimescaleTask(expr, ctx, arena);
   if (name == "$system") return EvalSystemCommand(expr, arena);
+  // §20.17.2: called as a function, $stacktrace returns a string holding the
+  // call stack of the invoking context. (The task form, which displays the
+  // same information, is handled where statements execute.)
   if (name == "$stacktrace") {
-    std::cerr << "stacktrace not available\n";
-    return MakeLogic4VecVal(arena, 1, 0);
+    return StringToLogic4Vec(arena, BuildStackTraceReport(ctx));
   }
   if (name.starts_with("$dump")) return EvalVcdSysCall(expr, ctx, arena, name);
   if (IsMathSysCall(name)) return EvalMathSysCall(expr, ctx, arena, name);

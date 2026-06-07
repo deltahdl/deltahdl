@@ -100,6 +100,11 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena);
 // §20.4.2: build the report line $printtimescale displays for `expr` against
 // the timescale state in `ctx` (see eval_function.cpp for the format).
 std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx);
+
+// §20.17.2: assemble the call-stack text $stacktrace reports for the context
+// invoking it, working from that context up to the top-level process. The
+// content is implementation dependent (see eval_function.cpp for the format).
+std::string BuildStackTraceReport(const SimContext& ctx);
 Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena);
 
 void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,

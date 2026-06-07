@@ -294,6 +294,11 @@ class SimContext {
   void PushFuncName(std::string_view name);
   void PopFuncName();
   std::string_view CurrentFuncName() const;
+  // The active subroutine call chain, outermost frame first. Used to report the
+  // call stack for $stacktrace (§20.17.2).
+  const std::vector<std::string_view>& FuncNameStack() const {
+    return func_name_stack_;
+  }
 
   void EnterFunction() { ++function_depth_; }
   void ExitFunction() { if (function_depth_ > 0) --function_depth_; }
