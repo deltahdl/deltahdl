@@ -611,6 +611,15 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     // (§21.7.1.3). If the ports are already being dumped the task is ignored, so
     // no checkpoint is written.
     if (vcd && !vcd->IsEnabled()) vcd->DumpOn();
+  } else if (name == "$dumpportsall") {
+    // §21.7.3.3: write an extended-VCD checkpoint recording the current value of
+    // every selected port at this simulation time, regardless of whether the
+    // values changed since the previous time step. The optional filename names
+    // the $dumpports output to checkpoint; with this single-file writer it
+    // selects that one dump, and with no filename the checkpoint covers every
+    // file opened by $dumpports. The checkpoint reuses the 4-state machinery the
+    // extended VCD file inherits (§21.7.1.4).
+    if (vcd) vcd->DumpAll();
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }
