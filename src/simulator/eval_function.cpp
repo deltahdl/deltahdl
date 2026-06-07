@@ -58,13 +58,151 @@ static Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-static std::string BuildFormatP(const Expr* arg, SimContext& ctx) {
-  if (arg->kind != ExprKind::kIdentifier) return "";
-  auto tag = ctx.GetVariableTag(arg->text);
-  if (tag.empty()) return "";
-  auto* var = ctx.FindVariable(arg->text);
-  uint64_t val = var ? var->value.ToUint64() : 0;
-  return "'{" + std::string(tag) + ":" + std::to_string(val) + "}";
+// The integer kinds whose unformatted decimal rendering is signed, so a member
+// or element holding a negative value shows its sign.
+static bool IsSignedIntegerKind(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kInteger:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §21.2.1.6: render a singular value the way it appears as one element of an
+// assignment pattern. A string-typed element is enclosed in quotes (C7c); every
+// other singular type prints as it would unformatted (C7e) -- the default
+// decimal form, with x/z status characters carried through by FormatArg and the
+// sign shown for the signed integer kinds.
+static std::string FormatSingularForP(const Logic4Vec& val, DataTypeKind kind) {
+  if (kind == DataTypeKind::kString || val.is_string) {
+    return "\"" + FormatValueAsString(val) + "\"";
+  }
+  Logic4Vec v = val;
+  if (IsSignedIntegerKind(kind)) v.is_signed = true;
+  return FormatArg(v, 'd');
+}
+
+// §21.2.1.6: copy the [offset, offset+width) bit field out of a packed aggregate
+// into its own vector, preserving unknown/high-impedance bits so a member that
+// holds x or z renders as such.
+static Logic4Vec SliceField(const Logic4Vec& val, uint32_t offset,
+                            uint32_t width, DataTypeKind kind, Arena& arena) {
+  Logic4Vec out = MakeLogic4Vec(arena, width == 0 ? 1 : width);
+  for (uint32_t i = 0; i < width; ++i) {
+    uint32_t src = offset + i;
+    uint32_t sw = src / 64, sb = src % 64;
+    if (sw >= val.nwords) continue;
+    uint32_t dw = i / 64, db = i % 64;
+    if ((val.words[sw].aval >> sb) & 1) out.words[dw].aval |= uint64_t{1} << db;
+    if ((val.words[sw].bval >> sb) & 1) out.words[dw].bval |= uint64_t{1} << db;
+  }
+  out.is_signed = IsSignedIntegerKind(kind);
+  return out;
+}
+
+// §21.2.1.6 (C2/C7a): render one struct or union member as "name:value", its
+// value formatted by the singular rules.
+static std::string FormatMember(const StructFieldInfo& f, const Logic4Vec& val,
+                                Arena& arena) {
+  Logic4Vec slice = SliceField(val, f.bit_offset, f.width, f.type_kind, arena);
+  return std::string(f.name) + ":" + FormatSingularForP(slice, f.type_kind);
+}
+
+// §21.2.1.6: build the text the %p (and %0p) format specifier substitutes for
+// an argument. An aggregate operand prints as an assignment pattern; a singular
+// operand prints as a single element of one. The use of white space is left to
+// the implementation, but the result is a legal assignment-pattern form (C6).
+static std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
+                                SimContext& ctx) {
+  Arena& arena = ctx.GetArena();
+  std::string_view name = (arg->kind == ExprKind::kIdentifier)
+                              ? std::string_view(arg->text)
+                              : std::string_view{};
+
+  if (!name.empty()) {
+    // §21.2.1.6 (C4): a tagged union prints its currently valid member as
+    // "tag:value". The active member's width and type come from the union type.
+    auto tag = ctx.GetVariableTag(name);
+    if (!tag.empty()) {
+      DataTypeKind kind = DataTypeKind::kImplicit;
+      uint32_t width = val.width;
+      if (auto* st = ctx.GetVariableStructType(name)) {
+        for (const auto& f : st->fields) {
+          if (f.name == tag) {
+            kind = f.type_kind;
+            width = f.width;
+            break;
+          }
+        }
+      }
+      Logic4Vec slice = SliceField(val, 0, width, kind, arena);
+      return "'{" + std::string(tag) + ":" + FormatSingularForP(slice, kind) +
+             "}";
+    }
+
+    // §21.2.1.6 (C2/C3/C7a): a struct prints every member as "name:value"; a
+    // plain (untagged) union prints only its first declared member.
+    if (auto* st = ctx.GetVariableStructType(name)) {
+      std::string out = "'{";
+      size_t count = st->is_union ? std::min<size_t>(1, st->fields.size())
+                                  : st->fields.size();
+      for (size_t i = 0; i < count; ++i) {
+        if (i) out += ", ";
+        out += FormatMember(st->fields[i], val, arena);
+      }
+      out += "}";
+      return out;
+    }
+
+    // §21.2.1.6 (C5): an unpacked array prints as an assignment pattern of its
+    // elements in index order. Elements live as their own variables, named
+    // "arr[idx]" by the lowerer.
+    if (auto* ai = ctx.FindArrayInfo(name); ai != nullptr && ai->size > 0) {
+      std::string out = "'{";
+      for (uint32_t i = 0; i < ai->size; ++i) {
+        if (i) out += ", ";
+        uint32_t idx = ai->lo + i;
+        std::string elem_name =
+            std::string(name) + "[" + std::to_string(idx) + "]";
+        Variable* elem = ctx.FindVariable(elem_name);
+        Logic4Vec ev = elem ? elem->value
+                            : MakeLogic4VecVal(arena, ai->elem_width, 0);
+        out += FormatSingularForP(ev, ai->elem_type_kind);
+      }
+      out += "}";
+      return out;
+    }
+
+    // §21.2.1.6 (C7d): a class handle prints in an implementation-dependent
+    // form, except that a null handle prints the word "null". A null handle is
+    // the known zero value.
+    if (!ctx.GetVariableClassType(name).empty()) {
+      if (val.IsKnown() && val.ToUint64() == 0) return "null";
+      return FormatArg(val, 'd');
+    }
+
+    // §21.2.1.6 (C7b): an enumerated value prints as the matching member name
+    // when the value is one named by the type; otherwise it prints in the base
+    // type's (decimal) form.
+    if (auto* et = ctx.GetVariableEnumType(name)) {
+      if (val.IsKnown()) {
+        uint64_t v = val.ToUint64();
+        for (const auto& m : et->members) {
+          if (m.value == v) return std::string(m.name);
+        }
+      }
+      return FormatArg(val, 'd');
+    }
+  }
+
+  // §21.2.1.6 (C10): %p on a singular expression formats it as one element of an
+  // aggregate would be formatted.
+  return FormatSingularForP(val, DataTypeKind::kImplicit);
 }
 
 // §21.2.1.4: %v reports the strength of a scalar net, so the operand is looked
@@ -126,8 +264,9 @@ static void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
       while (i + 1 < n && expr->args[i + 1] != nullptr &&
              expr->args[i + 1]->kind != ExprKind::kStringLiteral) {
         const Expr* val_arg = expr->args[++i];
-        arg_vals.push_back(EvalExpr(val_arg, ctx, arena));
-        p_fmts.push_back(BuildFormatP(val_arg, ctx));
+        auto v = EvalExpr(val_arg, ctx, arena);
+        arg_vals.push_back(v);
+        p_fmts.push_back(BuildFormatP(val_arg, v, ctx));
         v_fmts.push_back(BuildFormatV(val_arg, ctx));
       }
       output += FormatDisplay(fmt, arg_vals, p_fmts, nullptr, v_fmts, &ctx);
