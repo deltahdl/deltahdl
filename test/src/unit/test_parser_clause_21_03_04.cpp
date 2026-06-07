@@ -101,4 +101,19 @@ TEST(FileReadFunctions, FreadMemoryFormWithStartOnly) {
               "endmodule\n"));
 }
 
+// The nested optional brackets in Syntax 21-7 also permit the start position to
+// be skipped while a count is still given, written with an empty argument slot
+// between the commas. The system-call grammar accepts the elided argument.
+TEST(FileReadFunctions, FreadMemoryFormWithCountButNoStart) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  integer fd, code;\n"
+              "  reg [7:0] mem [0:15];\n"
+              "  initial begin\n"
+              "    fd = $fopen(\"f.txt\", \"r\");\n"
+              "    code = $fread(mem, fd, , 8);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }
