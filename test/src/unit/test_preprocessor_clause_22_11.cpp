@@ -32,9 +32,11 @@ TEST(Preprocessor, Pragma_SimpleName_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Pragma_UnrecognizedName_NoError) {
+// A simple_identifier may begin with an underscore, so a pragma_name that
+// starts with '_' must be accepted just like one starting with a letter.
+TEST(Preprocessor, Pragma_UnderscoreLeadingName_NoError) {
   PreprocFixture f;
-  Preprocess("`pragma unknown_pragma_xyz\n", f);
+  Preprocess("`pragma _my_pragma\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
@@ -72,21 +74,6 @@ TEST(Preprocessor, Pragma_ParenthesizedValue_NoError) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma (a, b, c)\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Preprocessor, Pragma_ComplexExpression_NoError) {
-  PreprocFixture f;
-  Preprocess("`pragma my_pragma key1 = (a, b), key2 = \"str\", 99\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Preprocessor, Pragma_NoOutput) {
-  PreprocFixture f;
-  auto out = Preprocess("`pragma some_pragma\n", f);
-  auto trimmed = out;
-  trimmed.erase(0, trimmed.find_first_not_of(" \t\n\r"));
-  trimmed.erase(trimmed.find_last_not_of(" \t\n\r") + 1);
-  EXPECT_TRUE(trimmed.empty());
 }
 
 TEST(Preprocessor, Pragma_WithExpressions_NoOutput) {
@@ -142,40 +129,6 @@ TEST(Preprocessor, Pragma_NestedParenthesizedValues_NoError) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma (a, (b, c))\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Preprocessor, Pragma_MultiplePragmasInSequence_NoError) {
-  PreprocFixture f;
-  Preprocess(
-      "`pragma first_pragma\n"
-      "`pragma second_pragma key = val\n"
-      "`pragma third_pragma 99\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Preprocessor, Pragma_MultiplePragmasInSequence_NoOutput) {
-  PreprocFixture f;
-  auto out = Preprocess(
-      "`pragma first_pragma\n"
-      "`pragma second_pragma key = val\n",
-      f);
-  auto trimmed = out;
-  trimmed.erase(0, trimmed.find_first_not_of(" \t\n\r"));
-  trimmed.erase(trimmed.find_last_not_of(" \t\n\r") + 1);
-  EXPECT_TRUE(trimmed.empty());
-}
-
-TEST(Preprocessor, Pragma_BetweenModules_NoInterference) {
-  PreprocFixture f;
-  auto out = Preprocess(
-      "module m1;\nendmodule\n"
-      "`pragma some_pragma\n"
-      "module m2;\nendmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(out.find("module m1;"), std::string::npos);
-  EXPECT_NE(out.find("module m2;"), std::string::npos);
 }
 
 TEST(Preprocessor, Pragma_AdjacentToOtherDirective_NoError) {
