@@ -1330,6 +1330,89 @@ static void EvalReadmemAssoc(const Expr* expr, SimContext& ctx, Arena& arena,
       });
 }
 
+// §21.4.3: loads a multidimensional unpacked array. The file is read in
+// row-major order: the lowest (rightmost-declared) dimension varies the most
+// rapidly, and each higher dimension's word entirely encloses the lower-
+// dimension words beneath it. Every dimension's entries run from low to high
+// address, so reversing the ascending/descending sense of a dimension's
+// declaration does not change the file layout. An @-address in the file
+// exclusively names a word of the highest (leftmost-declared) dimension and
+// repositions the load to the first subword of that word. With or without
+// addresses, when the file runs out of data the load stops and any array words
+// or subwords not yet reached are left unchanged.
+static void EvalReadmemMultiDim(const Expr* expr, SimContext& ctx, Arena& arena,
+                                bool is_hex, const std::string& content,
+                                const std::string& mem_name, const ArrayInfo* ai,
+                                bool two_state,
+                                const EnumTypeInfo* enum_info) {
+  const std::vector<uint32_t>& los = ai->dim_los;
+  const std::vector<uint32_t>& sizes = ai->dim_sizes;
+  const size_t ndim = sizes.size();
+
+  // §21.4.3: the number of subwords enclosed by a single highest-dimension word
+  // is the product of every lower dimension's extent.
+  uint64_t inner = 1;
+  for (size_t d = 1; d < ndim; ++d) inner *= sizes[d];
+  if (inner == 0) return;
+
+  const int64_t top_lo = static_cast<int64_t>(los[0]);
+  const int64_t top_hi = top_lo + static_cast<int64_t>(sizes[0]) - 1;
+
+  // §21.4.3: a global position numbers every element of the array in row-major
+  // order, so a sequential file fills element 0, 1, 2, ... regardless of how the
+  // dimensions nest. The element name carries one bracketed subscript per
+  // dimension (mem[i0][i1]...), each running from its dimension's low address.
+  auto element_at = [&](uint64_t global) -> std::string {
+    uint64_t top = global / inner;
+    uint64_t flat = global % inner;
+    std::string nm = mem_name + "[" + std::to_string(top_lo + static_cast<int64_t>(top)) + "]";
+    // Decompose the within-word position into per-dimension subscripts,
+    // innermost first (it varies fastest), then emit them outer-to-inner.
+    std::vector<int64_t> subs(ndim - 1);
+    for (size_t d = ndim - 1; d >= 1; --d) {
+      subs[d - 1] = static_cast<int64_t>(los[d]) +
+                    static_cast<int64_t>(flat % sizes[d]);
+      flat /= sizes[d];
+    }
+    for (size_t d = 1; d < ndim; ++d) {
+      nm += "[" + std::to_string(subs[d - 1]) + "]";
+    }
+    return nm;
+  };
+
+  const uint64_t total = static_cast<uint64_t>(sizes[0]) * inner;
+  uint64_t cursor = 0;
+
+  ScanMemFile(
+      content,
+      [&](int64_t addr) -> bool {
+        // §21.4.3: an address entry names a highest-dimension word. Loading
+        // resumes at the first subword enclosed by that word.
+        if (addr < top_lo || addr > top_hi) {
+          ctx.GetDiag().Error(
+              {}, "$readmem" + std::string(is_hex ? "h" : "b") +
+                      ": file address outside the highest dimension's range");
+          return false;
+        }
+        cursor = static_cast<uint64_t>(addr - top_lo) * inner;
+        return true;
+      },
+      [&](const std::string& tok) -> bool {
+        if (cursor >= total) return false;  // array full; nothing more to fill
+        Logic4Vec word = ParseMemNumber(arena, tok, is_hex, ai->elem_width);
+        if (two_state) CoerceToTwoState(word);
+        if (enum_info && !EnumValueInRange(enum_info, word)) {
+          ctx.GetDiag().Error(
+              {}, "$readmem" + std::string(is_hex ? "h" : "b") +
+                      ": value out of range for the enumerated type");
+          return false;
+        }
+        if (auto* var = ctx.FindVariable(element_at(cursor))) var->value = word;
+        ++cursor;
+        return true;
+      });
+}
+
 // §21.4: $readmemb / $readmemh read a text file of white space, comments, and
 // unsized numbers into the word elements of an unpacked array. §21.4.1 extends
 // the same tasks to dynamic arrays and queues (whose size is fixed for the
@@ -1409,6 +1492,16 @@ static Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
 
   const ArrayInfo* ai = ctx.FindArrayInfo(mem_name);
   if (!ai) return MakeLogic4VecVal(arena, 1, 0);
+
+  // §21.4.3: a memory with more than one unpacked dimension is filled in
+  // row-major order, with @-addresses naming highest-dimension words. (A slice
+  // memory_name resolves to a single lower dimension, see §7.4.5, and is handled
+  // by the single-dimension path below.)
+  if (!is_slice && ai->dim_sizes.size() >= 2) {
+    EvalReadmemMultiDim(expr, ctx, arena, is_hex, content, mem_name, ai,
+                        !ai->is_4state, enum_info);
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
 
   int64_t arr_lo = ai->lo;
   int64_t arr_hi = ai->lo + static_cast<int64_t>(ai->size) - 1;

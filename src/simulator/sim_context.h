@@ -116,6 +116,13 @@ struct ArrayInfo {
   bool is_queue = false;
   bool is_4state = true;
   DataTypeKind elem_type_kind = DataTypeKind::kImplicit;
+  // §21.4.3: address extents of each unpacked dimension, outermost (leftmost in
+  // the declaration) first, for a multidimensional unpacked array. Empty when
+  // the array has a single unpacked dimension, in which case lo/size above
+  // describe it. $readmemb/$readmemh consult these to fill the array in
+  // row-major order and to resolve an @-address against the highest dimension.
+  std::vector<uint32_t> dim_los;
+  std::vector<uint32_t> dim_sizes;
 };
 
 // §20.15.3: a queued entry as the queue manager retains it. $q_add records the
