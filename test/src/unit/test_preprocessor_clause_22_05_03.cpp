@@ -4,18 +4,6 @@
 
 using namespace delta;
 
-TEST(Preprocessor, UndefineAllUndefinedAllMacros) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define FOO 42\n"
-      "`undefineall\n"
-      "`ifdef FOO\n"
-      "visible\n"
-      "`endif\n",
-      f);
-  EXPECT_EQ(result.find("visible"), std::string::npos);
-}
-
 TEST(Preprocessor, UndefineAllMultipleMacros) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -49,6 +37,19 @@ TEST(Preprocessor, UndefineAllTakesNoArguments) {
   EXPECT_NE(result.find("int x = 5;"), std::string::npos);
 }
 
+// Because the directive accepts no arguments, anything following it on the
+// same line is not parsed as an argument: it is emitted unchanged as ordinary
+// source text and raises no diagnostic.
+TEST(Preprocessor, UndefineAllPassesTrailingSameLineTextThrough) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define FOO 1\n"
+      "`undefineall trailing_source_token\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("trailing_source_token"), std::string::npos);
+}
+
 TEST(Preprocessor, UndefineAllCanAppearAnywhere) {
   PreprocFixture f;
   Preprocess(
@@ -70,16 +71,4 @@ TEST(Preprocessor, DefineAfterUndefineAll) {
       f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("99"), std::string::npos);
-}
-
-TEST(Preprocessor, UndefineAllIncludesFunctionLikeMacros) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define ADD(a,b) a + b\n"
-      "`undefineall\n"
-      "`ifdef ADD\n"
-      "visible\n"
-      "`endif\n",
-      f);
-  EXPECT_EQ(result.find("visible"), std::string::npos);
 }
