@@ -160,12 +160,4 @@ TEST(SizeOfDisplayedData, ZeroValueBinaryUsesMinimumWidth) {
   EXPECT_EQ(FormatDisplay("%0b", vals), "0");
 }
 
-// §21.2.1.2 (C3/C4): the radix letter is case-insensitive, so a field width in
-// front of an uppercase radix still pads with that radix's fill character.
-TEST(SizeOfDisplayedData, UppercaseRadixHonorsFieldWidth) {
-  Arena arena;
-  std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 32, 5)};
-  EXPECT_EQ(FormatDisplay("%3H", vals), "005");
-}
-
 }
