@@ -54,6 +54,12 @@ Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
 Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            std::string_view name);
 
+// §20.16 / §20.16.1: evaluate a PLA modeling system task. Returns false when
+// the callee does not name one of the sixteen Table 20-12 tasks; otherwise it
+// evaluates the array, drives the output terms, and (for the asynchronous
+// forms) installs the change-driven re-evaluation watchers, returning true.
+bool TryEvalPlaSystemTask(const Expr* expr, SimContext& ctx, Arena& arena);
+
 bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              Logic4Vec& out);
 

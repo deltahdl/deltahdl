@@ -758,6 +758,12 @@ static void EmitSimControlDiagnostic(const Expr* expr, SimContext& ctx,
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto name = expr->callee;
 
+  // §20.16.1: a PLA modeling system task evaluates the array and drives its
+  // output terms; it produces no value of its own.
+  if (TryEvalPlaSystemTask(expr, ctx, arena)) {
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+
   if (IsDisplayOrWriteTask(name)) {
     ExecDisplayWrite(expr, ctx, arena);
     return MakeLogic4VecVal(arena, 1, 0);
