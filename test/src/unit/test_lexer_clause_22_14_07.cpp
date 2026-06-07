@@ -35,7 +35,23 @@ TEST(Lexer, KeywordVersion_1800_2009_NewKeywordsNotIn1800_2005) {
   }
 }
 
-TEST(Lexer, KeywordVersion_1800_2009_Includes1800_2005Keywords) {
+TEST(Lexer, KeywordVersion_1800_2009_IncludesAllEarlierKeywords) {
+  // The 1800-2009 set is cumulative: every identifier reserved by any earlier
+  // version stays reserved here. Witness a keyword from each predecessor era so
+  // the "all previous versions" rule is observed directly, not merely inferred
+  // from the monotonic version gate.
+  // 1364-1995 era:
+  EXPECT_TRUE(
+      LookupKeyword("module", KeywordVersion::kVer18002009).has_value());
+  EXPECT_TRUE(LookupKeyword("wire", KeywordVersion::kVer18002009).has_value());
+  // 1364-2001 era:
+  EXPECT_TRUE(
+      LookupKeyword("automatic", KeywordVersion::kVer18002009).has_value());
+  EXPECT_TRUE(
+      LookupKeyword("generate", KeywordVersion::kVer18002009).has_value());
+  // 1364-2005 era:
+  EXPECT_TRUE(LookupKeyword("uwire", KeywordVersion::kVer18002009).has_value());
+  // 1800-2005 era:
   EXPECT_TRUE(LookupKeyword("logic", KeywordVersion::kVer18002009).has_value());
   EXPECT_TRUE(
       LookupKeyword("interface", KeywordVersion::kVer18002009).has_value());
