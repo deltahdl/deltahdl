@@ -1519,32 +1519,65 @@ static Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// §21.5: $writememb / $writememh dump a memory array's words to a file in a
+// form the matching $readmemb / $readmemh can load back. Each word is written
+// on its own line in binary ($writememb) or hexadecimal ($writememh); no
+// @-address specifiers are emitted, so an unpacked array round-trips through a
+// plain sequential read.
 static Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
                               bool is_hex) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 1, 0);
   std::string filename = ExtractStrArg(expr->args[0]);
 
-  Variable* target = nullptr;
-  if (expr->args[1]->kind == ExprKind::kIdentifier) {
-    target = ctx.FindVariable(expr->args[1]->text);
+  if (expr->args[1]->kind != ExprKind::kIdentifier) {
+    return MakeLogic4VecVal(arena, 1, 0);
   }
-  if (!target) return MakeLogic4VecVal(arena, 1, 0);
+  std::string mem_name(expr->args[1]->text);
 
-  std::ofstream ofs(filename);
+  // §21.5: an existing file is overwritten; there is no append mode, so open
+  // with truncation and discard any prior contents.
+  std::ofstream ofs(filename, std::ios::out | std::ios::trunc);
   if (!ofs.is_open()) {
     std::cerr << "WARNING: $writemem" << (is_hex ? "h" : "b")
               << ": cannot open file: " << filename << "\n";
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
-  if (is_hex) {
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "%llx",
-                  static_cast<unsigned long long>(target->value.ToUint64()));
-    ofs << buf << "\n";
-  } else {
-    ofs << target->value.ToString() << "\n";
+  // Render one word in the radix the companion read task expects. FormatArg
+  // carries arbitrary widths and preserves x/z bits, so the output stays
+  // readable for vectors wider than a machine word.
+  auto emit = [&](const Logic4Vec& v) {
+    ofs << FormatArg(v, is_hex ? 'h' : 'b') << "\n";
+  };
+
+  if (const ArrayInfo* ai = ctx.FindArrayInfo(mem_name)) {
+    int64_t arr_lo = ai->lo;
+    int64_t arr_hi = ai->lo + static_cast<int64_t>(ai->size) - 1;
+    // The optional start_addr / finish_addr bound the range that is written;
+    // a finish below start emits the words in descending address order.
+    bool has_start = expr->args.size() >= 3;
+    bool has_finish = expr->args.size() >= 4;
+    int64_t start_addr =
+        has_start
+            ? static_cast<int64_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64())
+            : arr_lo;
+    int64_t finish_addr =
+        has_finish
+            ? static_cast<int64_t>(EvalExpr(expr->args[3], ctx, arena).ToUint64())
+            : arr_hi;
+    int64_t step = (start_addr <= finish_addr) ? 1 : -1;
+    for (int64_t addr = start_addr;; addr += step) {
+      if (addr >= arr_lo && addr <= arr_hi) {
+        std::string elem = mem_name + "[" + std::to_string(addr) + "]";
+        if (auto* var = ctx.FindVariable(elem)) emit(var->value);
+      }
+      if (addr == finish_addr) break;
+    }
+    return MakeLogic4VecVal(arena, 1, 0);
   }
+
+  // A plain variable names a single memory word.
+  if (auto* target = ctx.FindVariable(mem_name)) emit(target->value);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
