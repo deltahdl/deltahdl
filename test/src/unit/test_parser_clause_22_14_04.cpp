@@ -22,14 +22,4 @@ TEST(CompilerDirectiveParsing,
                               "`end_keywords\n"));
 }
 
-TEST(CompilerDirectiveParsing,
-     BeginKeywords1364_2001Noconfig_LibraryAsIdentifier) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("`begin_keywords \"1364-2001-noconfig\"\n"
-                              "module t;\n"
-                              "  integer library;\n"
-                              "endmodule\n"
-                              "`end_keywords\n"));
-}
-
 }

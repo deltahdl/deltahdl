@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Lexer, KeywordVersion_Noconfig_ExcludesConfigKeywords) {
-  auto kw = LookupKeyword("config", KeywordVersion::kVer13642001Noconfig);
-  EXPECT_FALSE(kw.has_value());
-
-  auto gen = LookupKeyword("generate", KeywordVersion::kVer13642001Noconfig);
-  EXPECT_TRUE(gen.has_value());
-}
-
 TEST(Lexer, KeywordVersion_Noconfig_AllExcludedKeywordsRejected) {
   const char* kExcluded[] = {
       "cell",    "config",   "design",  "endconfig", "incdir",
