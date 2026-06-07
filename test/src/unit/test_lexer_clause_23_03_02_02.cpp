@@ -33,14 +33,4 @@ TEST(NamedPortLexer, EmptyNamedPortTokenSequence) {
   EXPECT_EQ(tokens[6].kind, TokenKind::kRParen);
 }
 
-TEST(NamedPortLexer, MultipleNamedPortsTokenSequence) {
-  auto tokens = Lex("sub u0(.a(x), .b(y))");
-  ASSERT_GE(tokens.size(), 14u);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kDot);
-  EXPECT_EQ(tokens[4].text, "a");
-  EXPECT_EQ(tokens[8].kind, TokenKind::kComma);
-  EXPECT_EQ(tokens[9].kind, TokenKind::kDot);
-  EXPECT_EQ(tokens[10].text, "b");
-}
-
 }

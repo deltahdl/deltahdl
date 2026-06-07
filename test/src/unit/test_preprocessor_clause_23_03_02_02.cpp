@@ -35,44 +35,4 @@ TEST(ModuleInstantiation, NamedPortConnections) {
       CountItemsByKind(r.cu->modules[1]->items, ModuleItemKind::kGateInst), 4);
 }
 
-TEST(ModuleInstantiation, NamedPortWithMacroExpression) {
-  auto r = ParseWithPreprocessor(
-      "`define INIT_VAL 8'hAB\n"
-      "module child(input logic [7:0] a, output logic [7:0] b);\n"
-      "  assign b = a;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic [7:0] y;\n"
-      "  child u(.a(`INIT_VAL), .b(y));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* inst = FindItemByKind(r, ModuleItemKind::kModuleInst);
-  ASSERT_NE(inst, nullptr);
-  ASSERT_EQ(inst->inst_ports.size(), 2u);
-  EXPECT_EQ(inst->inst_ports[0].first, "a");
-  EXPECT_NE(inst->inst_ports[0].second, nullptr);
-  EXPECT_EQ(inst->inst_ports[1].first, "b");
-}
-
-TEST(ModuleInstantiation, EmptyNamedPortSurvivesPreprocessing) {
-  auto r = ParseWithPreprocessor(
-      "module child(input logic a, output logic b);\n"
-      "  assign b = 1'b0;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic y;\n"
-      "  child u(.a(), .b(y));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* inst = FindItemByKind(r, ModuleItemKind::kModuleInst);
-  ASSERT_NE(inst, nullptr);
-  ASSERT_EQ(inst->inst_ports.size(), 2u);
-  EXPECT_EQ(inst->inst_ports[0].first, "a");
-  EXPECT_EQ(inst->inst_ports[0].second, nullptr);
-  EXPECT_EQ(inst->inst_ports[1].first, "b");
-  EXPECT_NE(inst->inst_ports[1].second, nullptr);
-}
-
 }

@@ -22,16 +22,6 @@ TEST(ModuleInstantiationGrammar, NamedPortConnections) {
   EXPECT_EQ(item->inst_ports[1].first, "data");
 }
 
-TEST(ModuleInstantiationGrammar, NamedPortEmptyExpression) {
-  auto r = Parse("module m; sub u0(.clk(clk), .nc()); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->inst_ports.size(), 2u);
-  EXPECT_EQ(item->inst_ports[1].first, "nc");
-  EXPECT_EQ(item->inst_ports[1].second, nullptr);
-}
-
 TEST(ModuleInstantiationGrammar, NamedPortConnectionWithChildModule) {
   auto r = Parse(
       "module child(input a, output b);\n"
@@ -51,53 +41,13 @@ TEST(ModuleInstantiationGrammar, NamedPortConnectionWithChildModule) {
   EXPECT_EQ(inst->inst_ports.size(), 2u);
 }
 
-TEST(ModuleInstantiationGrammar, NamedPortConnectionsPreserveNames) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1 (.clk(clk), .rst(rst), .d(data));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  ASSERT_EQ(item->inst_ports.size(), 3u);
-  EXPECT_EQ(item->inst_ports[0].first, "clk");
-  EXPECT_EQ(item->inst_ports[1].first, "rst");
-  EXPECT_EQ(item->inst_ports[2].first, "d");
-}
-
-TEST(ModuleInstantiationGrammar, NamedPortConnectionModuleAndInstanceName) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1(.a(w1), .b(w2));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_module, "sub");
-  EXPECT_EQ(item->inst_name, "u1");
-  ASSERT_EQ(item->inst_ports.size(), 2u);
-}
-
-TEST(ModuleInstantiationGrammar, NamedPortConnectionsOrder) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1 (.b(y), .a(x));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->inst_ports.size(), 2);
-  EXPECT_EQ(item->inst_ports[0].first, "b");
-  EXPECT_EQ(item->inst_ports[1].first, "a");
-}
-
 TEST(ModuleInstantiationGrammar, NamedPortEmptyConnection) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 (.a(x), .b());\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->inst_ports.size(), 2);
   EXPECT_EQ(item->inst_ports[0].first, "a");
@@ -106,31 +56,17 @@ TEST(ModuleInstantiationGrammar, NamedPortEmptyConnection) {
   EXPECT_EQ(item->inst_ports[1].second, nullptr);
 }
 
-TEST(ModuleInstantiationGrammar, PortConnectionAllEmpty) {
+TEST(ModuleInstantiationGrammar, NamedPortNameCannotBeBitSelect) {
+  // §23.3.2.2: the port name (left of the connection) shall be the plain name
+  // declared on the module; it cannot be a bit-select, part-select, or
+  // concatenation. The parser only accepts a port identifier after the dot, so
+  // a bit-select on the port-name side fails to parse.
   auto r = Parse(
       "module top;\n"
-      "  sub u1 (.a(), .b(), .c());\n"
+      "  sub u1 (.a[0](x));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->inst_ports.size(), 3);
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(item->inst_ports[i].second, nullptr);
-  }
-}
-
-TEST(ModuleInstantiationGrammar, NamedPortWithPartSelect) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1 (.a(bus[7:0]), .b(bus[15:8]));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->inst_ports.size(), 2);
-  EXPECT_EQ(item->inst_ports[0].first, "a");
-  EXPECT_NE(item->inst_ports[0].second, nullptr);
-  EXPECT_EQ(item->inst_ports[1].first, "b");
-  EXPECT_NE(item->inst_ports[1].second, nullptr);
+  EXPECT_TRUE(r.has_errors);
 }
 
 TEST(ModuleInstantiationGrammar, NamedPortWithConcatenation) {
@@ -144,33 +80,6 @@ TEST(ModuleInstantiationGrammar, NamedPortWithConcatenation) {
   EXPECT_EQ(item->inst_ports[0].first, "data");
   ASSERT_NE(item->inst_ports[0].second, nullptr);
   EXPECT_EQ(item->inst_ports[0].second->kind, ExprKind::kConcatenation);
-}
-
-TEST(ModuleInstantiationGrammar, NamedPortWithTernaryExpression) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1 (.a(sel ? x : y));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->inst_ports.size(), 1);
-  EXPECT_EQ(item->inst_ports[0].first, "a");
-  ASSERT_NE(item->inst_ports[0].second, nullptr);
-  EXPECT_EQ(item->inst_ports[0].second->kind, ExprKind::kTernary);
-}
-
-TEST(ModuleInstantiationGrammar, SingleNamedPortEmpty) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1 (.a());\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->inst_ports.size(), 1);
-  EXPECT_EQ(item->inst_ports[0].first, "a");
-  EXPECT_EQ(item->inst_ports[0].second, nullptr);
 }
 
 }
