@@ -17,6 +17,9 @@ struct VcdSignal {
   uint32_t width = 1;
   Variable* var = nullptr;
   char ident = '!';
+  // Net type of the dumped object, used to pick the $var var_type keyword
+  // (§21.7.2.3): a uwire net is recorded as wire.
+  NetType net_type = NetType::kWire;
 };
 
 class VcdWriter {
@@ -29,10 +32,15 @@ class VcdWriter {
 
   bool IsOpen() const { return ofs_.is_open(); }
 
-  void WriteHeader(std::string_view timescale);
+  // Emit the VCD header (§21.7.2.3 keyword sections). When the $dumpfile
+  // filename was given by a variable or expression, dumpfile_literal carries
+  // that unevaluated literal so it can be reproduced in the $version section.
+  void WriteHeader(std::string_view timescale,
+                   std::string_view dumpfile_literal = {});
   void BeginScope(std::string_view name);
   void EndScope();
-  void RegisterSignal(std::string_view name, uint32_t width, Variable* var);
+  void RegisterSignal(std::string_view name, uint32_t width, Variable* var,
+                      NetType net_type = NetType::kWire);
   void EndDefinitions();
 
   void WriteTimestamp(uint64_t time);

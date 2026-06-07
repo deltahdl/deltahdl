@@ -396,9 +396,12 @@ delta::CompilationUnit* ParseSource(const std::string& source,
 }
 
 void SetupVcd(delta::VcdWriter& vcd, delta::SimContext& ctx,
-              delta::Scheduler& scheduler, const std::string& top) {
+              delta::Scheduler& scheduler, const std::string& top,
+              const std::string& vcd_file) {
   ctx.SetVcdWriter(&vcd);
-  vcd.WriteHeader("1ns");
+  // Reproduce the $dumpfile call that named the output in the $version section
+  // (§21.7.2.3).
+  vcd.WriteHeader("1ns", "\"" + vcd_file + "\"");
   vcd.BeginScope(top);
   for (const auto& [name, var] : ctx.GetVariables()) {
     vcd.RegisterSignal(name, var->value.width, var);
@@ -503,7 +506,7 @@ int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
   std::unique_ptr<delta::VcdWriter> vcd;
   if (!opts.vcd_file.empty()) {
     vcd = std::make_unique<delta::VcdWriter>(opts.vcd_file);
-    SetupVcd(*vcd, sim_ctx, scheduler, top);
+    SetupVcd(*vcd, sim_ctx, scheduler, top, opts.vcd_file);
   }
 
   scheduler.Run();
