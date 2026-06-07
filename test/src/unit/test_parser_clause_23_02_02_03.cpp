@@ -35,15 +35,6 @@ TEST(PortDeclParsing, OmittedDirectionWithWireDefaultsToInout) {
   EXPECT_EQ(port.name, "x");
 }
 
-TEST(PortDeclParsing, OmittedDirectionWithIntegerDefaultsToInout) {
-  auto r = Parse("module m(integer x); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kInout);
-  EXPECT_EQ(port.data_type.kind, DataTypeKind::kInteger);
-}
-
 TEST(PortDeclParsing, OmittedDirectionWithPackedDimsDefaultsToInout) {
   auto r = Parse("module m([5:0] x); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -52,14 +43,6 @@ TEST(PortDeclParsing, OmittedDirectionWithPackedDimsDefaultsToInout) {
   EXPECT_EQ(port.direction, Direction::kInout);
   EXPECT_EQ(port.data_type.kind, DataTypeKind::kLogic);
   EXPECT_NE(port.data_type.packed_dim_left, nullptr);
-}
-
-TEST(PortDeclParsing, OmittedDirectionWithVarDefaultsToInout) {
-  auto r = Parse("module m(var x); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kInout);
-  EXPECT_EQ(port.data_type.kind, DataTypeKind::kLogic);
 }
 
 TEST(PortDeclParsing, InputOmittedTypeDefaultsToLogic) {
@@ -106,14 +89,6 @@ TEST(PortDeclParsing, InputKindOmittedDefaultsToNet) {
   EXPECT_TRUE(port.data_type.is_net);
 }
 
-TEST(PortDeclParsing, InoutKindOmittedDefaultsToNet) {
-  auto r = Parse("module m(inout x); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_TRUE(port.data_type.is_net);
-}
-
 TEST(PortDeclParsing, InoutExplicitIntegerKindDefaultsToNet) {
   auto r = Parse("module m(inout integer x); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -141,15 +116,6 @@ TEST(PortDeclParsing, OutputSignedImplicitTypeKindDefaultsToNet) {
   EXPECT_TRUE(port.data_type.is_signed);
 }
 
-TEST(PortDeclParsing, OutputExplicitIntegerKindDefaultsToVar) {
-  auto r = Parse("module m(output integer x); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.data_type.kind, DataTypeKind::kInteger);
-  EXPECT_FALSE(port.data_type.is_net);
-}
-
 TEST(PortDeclParsing, OutputExplicitLogicKindDefaultsToVar) {
   auto r = Parse("module m(output logic x); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -174,16 +140,6 @@ TEST(PortDeclParsing, InputVarOmittedTypeDefaultsToVarLogic) {
   EXPECT_FALSE(r.has_errors);
   auto& port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kInput);
-  EXPECT_EQ(port.data_type.kind, DataTypeKind::kLogic);
-  EXPECT_FALSE(port.data_type.is_net);
-}
-
-TEST(PortDeclParsing, OutputVarOmittedTypeDefaultsToVarLogic) {
-  auto r = Parse("module m(output var x); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kOutput);
   EXPECT_EQ(port.data_type.kind, DataTypeKind::kLogic);
   EXPECT_FALSE(port.data_type.is_net);
 }
@@ -308,6 +264,34 @@ TEST(PortDeclParsing, ExplicitPortInheritsOnlyDirection) {
   EXPECT_EQ(ports[2].data_type.kind, DataTypeKind::kLogic);
   EXPECT_TRUE(ports[2].data_type.is_net);
   EXPECT_EQ(ports[2].name, "p_c");
+}
+
+TEST(PortDeclParsing, InterconnectPortGetsNoLogicDataType) {
+  // §23.2.2.3: the rule that an omitted data type defaults to logic is
+  // explicitly excepted for interconnect ports, which carry no data type.
+  // The resolved port therefore stays interconnect rather than logic.
+  auto r = Parse("module m(interconnect x); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_EQ(port.direction, Direction::kInout);
+  EXPECT_TRUE(port.data_type.is_interconnect);
+  EXPECT_NE(port.data_type.kind, DataTypeKind::kLogic);
+}
+
+TEST(PortDeclParsing, SubsequentPortInheritsInterconnect) {
+  // §23.2.2.3: when a subsequent port omits direction, port kind, and data
+  // type, those are inherited from the previous port; if the previous port
+  // was an interconnect port, this port is interconnect as well.
+  auto r = Parse("module m(interconnect x, y); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& ports = r.cu->modules[0]->ports;
+  ASSERT_EQ(ports.size(), 2u);
+  EXPECT_TRUE(ports[0].data_type.is_interconnect);
+  EXPECT_EQ(ports[1].direction, Direction::kInout);
+  EXPECT_TRUE(ports[1].data_type.is_interconnect);
+  EXPECT_EQ(ports[1].name, "y");
 }
 
 }

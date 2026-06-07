@@ -68,4 +68,22 @@ TEST(PortKindDataTypeDirection, SignedImplicitTypeElaboratesCorrectly) {
   EXPECT_TRUE(port.is_signed);
 }
 
+TEST(PortKindDataTypeDirection, ExplicitPortTakesExpressionDataType) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input integer p_a, .p_b(s_b), p_c);\n"
+      "  logic [5:0] s_b;\n"
+      "endmodule",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto& ports = design->top_modules[0]->ports;
+  ASSERT_EQ(ports.size(), 3u);
+  // §23.2.2.3: the explicitly named port p_b takes the self-determined data
+  // type of its connection expression s_b, a 6-bit value declared in the body.
+  EXPECT_EQ(ports[1].direction, Direction::kInput);
+  EXPECT_EQ(ports[1].type_kind, DataTypeKind::kLogic);
+  EXPECT_EQ(ports[1].width, 6u);
+}
+
 }

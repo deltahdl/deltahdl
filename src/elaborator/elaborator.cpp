@@ -1875,6 +1875,60 @@ void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
   }
 }
 
+// §23.2.2.3: an explicitly named port (.name(expr)) takes the self-determined
+// data type of its connection expression. Resolve the expression's width
+// against the module's already-elaborated variables and nets. Returns 0 when
+// the width cannot be determined here, leaving the port's default untouched.
+static uint32_t ExplicitPortExprWidth(const Expr* expr, const RtlirModule* mod) {
+  if (!expr) return 0;
+  switch (expr->kind) {
+    case ExprKind::kIdentifier:
+      for (const auto& v : mod->variables)
+        if (v.name == expr->text) return v.width;
+      for (const auto& n : mod->nets)
+        if (n.name == expr->text) return n.width;
+      return 0;
+    case ExprKind::kConcatenation: {
+      uint32_t total = 0;
+      for (const auto* el : expr->elements)
+        total += ExplicitPortExprWidth(el, mod);
+      return total;
+    }
+    default:
+      return 0;
+  }
+}
+
+// The self-determined signedness of an explicit port expression: a simple
+// reference adopts the referenced object's signedness; composite expressions
+// such as concatenations are unsigned.
+static bool ExplicitPortExprSigned(const Expr* expr, const RtlirModule* mod) {
+  if (!expr || expr->kind != ExprKind::kIdentifier) return false;
+  for (const auto& v : mod->variables)
+    if (v.name == expr->text) return v.is_signed;
+  for (const auto& n : mod->nets)
+    if (n.name == expr->text) return n.is_signed;
+  return false;
+}
+
+// §23.2.2.3: apply the self-determined type of each explicitly named port's
+// connection expression to the resolved port. The referenced declarations live
+// in the module body, so this runs after the items have been elaborated.
+static void ResolveExplicitPortTypes(const ModuleDecl* decl, RtlirModule* mod) {
+  for (const auto& src : decl->ports) {
+    if (!src.is_explicit_named || !src.port_expr || src.name.empty()) continue;
+    uint32_t w = ExplicitPortExprWidth(src.port_expr, mod);
+    if (w == 0) continue;
+    for (auto& rp : mod->ports) {
+      if (rp.name != src.name) continue;
+      rp.type_kind = DataTypeKind::kLogic;
+      rp.width = w;
+      rp.is_signed = ExplicitPortExprSigned(src.port_expr, mod);
+      break;
+    }
+  }
+}
+
 RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
   auto* mod = arena_.Create<RtlirModule>();
@@ -1975,6 +2029,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   CheckConditionalGenerateNaming(decl);
   AssignGenerateBlockNames(decl);
   ElaborateItems(decl, mod);
+  ResolveExplicitPortTypes(decl, mod);
   current_library_ = std::move(saved_library);
   return mod;
 }
