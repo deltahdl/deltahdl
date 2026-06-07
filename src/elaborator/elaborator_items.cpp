@@ -2407,8 +2407,14 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
         NetType pnet = PortNetType(it->type_kind);
         if (pnet != NetType::kNone) {
           NetType snet = FindSignalNetType(conn_expr->text, parent_mod);
-          if (snet != NetType::kNone && snet != pnet &&
-              snet != NetType::kInterconnect && !it->is_interconnect) {
+          // 23.3.2.3: the implicit .name form escalates to an error precisely
+          // in the cases where the equivalent explicit named connection would
+          // merely warn (23.3.3.7). Net types that are equivalent (for example
+          // the wire/tri aliases) are not dissimilar, so they neither warn nor
+          // error here.
+          if (snet != NetType::kNone && snet != NetType::kInterconnect &&
+              !it->is_interconnect &&
+              DissimilarNetTypeRequiresWarning(pnet, snet)) {
             diag_.Error(
                 item->loc,
                 std::format("implicit named port connection '.{}' between "

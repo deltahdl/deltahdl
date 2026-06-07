@@ -4,16 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ImplicitNamedPortConnectionParsing, NamedPortWithoutParens) {
-  auto r = Parse("module m; sub u0(.clk, .data); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->inst_ports.size(), 2u);
-  EXPECT_EQ(item->inst_ports[0].first, "clk");
-  EXPECT_EQ(item->inst_ports[1].first, "data");
-}
-
 TEST(ImplicitNamedPortConnectionParsing, ImplicitAndExplicitNamedPorts) {
   auto r = Parse("module m; sub u0(.a, .b(x), .c); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -45,6 +35,22 @@ TEST(ImplicitNamedPortConnectionParsing, ImplicitConnectionDistinctFromEmptyExpl
   EXPECT_EQ(item_explicit->inst_ports[0].second, nullptr);
   EXPECT_NE(item_implicit->inst_ports[0].second,
             item_explicit->inst_ports[0].second);
+}
+
+TEST(ImplicitNamedPortConnectionParsing, ImplicitNameSynthesizesSelfReference) {
+  // 23.3.2.3: an implicit .name connection is the explicit form .name(name).
+  // The parser marks the entry implicit and synthesizes a connection
+  // expression that references the identically named signal.
+  auto r = Parse("module m; sub u0(.clk); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->inst_ports.size(), 1u);
+  ASSERT_EQ(item->inst_ports_implicit.size(), 1u);
+  EXPECT_TRUE(item->inst_ports_implicit[0]);
+  ASSERT_NE(item->inst_ports[0].second, nullptr);
+  EXPECT_EQ(item->inst_ports[0].second->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(item->inst_ports[0].second->text, "clk");
 }
 
 }
