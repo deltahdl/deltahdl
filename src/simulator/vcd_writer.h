@@ -67,6 +67,9 @@ class VcdWriter {
  private:
   void WriteScalarChange(const VcdSignal& sig);
   void WriteVectorChange(const VcdSignal& sig);
+  // Emit a real value change (§21.7.2.1): real variables are dumped as real
+  // numbers using a %.16g format so all 53 mantissa bits are preserved.
+  void WriteRealChange(const VcdSignal& sig);
   void WriteSignalChange(const VcdSignal& sig);
   void WriteSignalAllX(const VcdSignal& sig);
   // Returns true once the configured size limit has been reached, emitting the

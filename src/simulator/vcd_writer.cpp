@@ -1,5 +1,8 @@
 #include "simulator/vcd_writer.h"
 
+#include <cstdio>
+#include <cstring>
+
 #include "simulator/variable.h"
 
 namespace delta {
@@ -39,8 +42,11 @@ void VcdWriter::RegisterSignal(std::string_view name, uint32_t width,
   if (next_ident_ > '~') next_ident_ = '!';
   signals_.push_back(sig);
   if (ofs_.is_open()) {
-    ofs_ << "$var wire " << width << " " << sig.ident << " " << name
-         << " $end\n";
+    // The var_type keyword distinguishes real variables, which are dumped as
+    // real numbers, from the binary-valued nets dumped as wires.
+    const char* var_type = (var && var->value.is_real) ? "real" : "wire";
+    ofs_ << "$var " << var_type << " " << width << " " << sig.ident << " "
+         << name << " $end\n";
   }
 }
 
@@ -115,8 +121,23 @@ void VcdWriter::WriteVectorChange(const VcdSignal& sig) {
   ofs_ << " " << sig.ident << "\n";
 }
 
+void VcdWriter::WriteRealChange(const VcdSignal& sig) {
+  if (!sig.var) return;
+  // The stored value is the IEEE Std 754 double-precision bit pattern; recover
+  // the number and print it with %.16g so the full 53-bit mantissa survives the
+  // round-trip through the dump file.
+  uint64_t bits = sig.var->value.ToUint64();
+  double d = 0.0;
+  std::memcpy(&d, &bits, sizeof(double));
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "%.16g", d);
+  ofs_ << "r" << buf << " " << sig.ident << "\n";
+}
+
 void VcdWriter::WriteSignalChange(const VcdSignal& sig) {
-  if (sig.width == 1) {
+  if (sig.var && sig.var->value.is_real) {
+    WriteRealChange(sig);
+  } else if (sig.width == 1) {
     WriteScalarChange(sig);
   } else {
     WriteVectorChange(sig);
