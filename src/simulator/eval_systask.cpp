@@ -1081,6 +1081,31 @@ static Logic4Vec ParseMemNumber(Arena& arena, const std::string& tok,
   return vec;
 }
 
+// §21.4.2: a 2-state destination — such as an int or bit vector, or an
+// enumerated type with a 2-state base — cannot hold x or z, so any unknown or
+// high-impedance bit read from the load file is turned into 0. In the 4-state
+// encoding an x bit is aval=bval=1 and a z bit is aval=0/bval=1; clearing every
+// bit whose bval is set and then dropping bval reduces both to a plain 0, while
+// 0 and 1 bits are left unchanged. Reading otherwise proceeds exactly as for a
+// 4-state element type.
+static void CoerceToTwoState(Logic4Vec& v) {
+  for (uint32_t i = 0; i < v.nwords; ++i) {
+    v.words[i].aval &= ~v.words[i].bval;
+    v.words[i].bval = 0;
+  }
+}
+
+// §21.4.2: file data for an enumerated destination is the numeric value of one
+// of the type's elements (see 6.19). A number matching no element is out of
+// range for the type.
+static bool EnumValueInRange(const EnumTypeInfo* info, const Logic4Vec& v) {
+  uint64_t val = v.ToUint64();
+  for (const auto& m : info->members) {
+    if (m.value == val) return true;
+  }
+  return false;
+}
+
 // §21.4: walks a memory-load text file in file order. White space and both
 // comment styles separate tokens. Each @-address (a hexadecimal index with no
 // intervening white space) is handed to on_addr; each unsized number is handed
@@ -1153,6 +1178,7 @@ static void EvalReadmemIndexed(const Expr* expr, SimContext& ctx, Arena& arena,
                                bool is_hex, const std::string& content,
                                int64_t low_addr, int64_t high_addr,
                                bool is_slice, uint32_t elem_width,
+                               bool two_state, const EnumTypeInfo* enum_info,
                                StoreFn store) {
   bool has_start = expr->args.size() >= 3;
   bool has_finish = expr->args.size() >= 4;
@@ -1214,7 +1240,19 @@ static void EvalReadmemIndexed(const Expr* expr, SimContext& ctx, Arena& arena,
         return true;
       },
       [&](const std::string& tok) -> bool {
-        write_word(cursor, ParseMemNumber(arena, tok, is_hex, elem_width));
+        Logic4Vec word = ParseMemNumber(arena, tok, is_hex, elem_width);
+        // §21.4.2: a 2-state element retains no x/z; convert them to 0.
+        if (two_state) CoerceToTwoState(word);
+        // §21.4.2 (shall): a value outside the range of the enumerated element
+        // type is an error, and no further data is read.
+        if (enum_info && !EnumValueInRange(enum_info, word)) {
+          ctx.GetDiag().Error(
+              {}, "$readmem" + std::string(is_hex ? "h" : "b") +
+                      ": value out of range for the enumerated type");
+          aborted = true;
+          return false;
+        }
+        write_word(cursor, word);
         ++data_words;
         cursor += descending ? -1 : 1;
         return true;
@@ -1242,7 +1280,8 @@ static void EvalReadmemIndexed(const Expr* expr, SimContext& ctx, Arena& arena,
 // enumeration element (see 6.19).
 static void EvalReadmemAssoc(const Expr* expr, SimContext& ctx, Arena& arena,
                              bool is_hex, const std::string& content,
-                             AssocArrayObject* aa) {
+                             AssocArrayObject* aa, bool two_state,
+                             const EnumTypeInfo* enum_info) {
   // §21.4.1: the index of an associative array loaded this way shall be of an
   // integral type. A string-keyed array has no numeric address form, so it
   // cannot be loaded.
@@ -1273,9 +1312,19 @@ static void EvalReadmemAssoc(const Expr* expr, SimContext& ctx, Arena& arena,
         return true;
       },
       [&](const std::string& tok) -> bool {
+        Logic4Vec word = ParseMemNumber(arena, tok, is_hex, aa->elem_width);
+        // §21.4.2: a 2-state element retains no x/z; convert them to 0.
+        if (two_state) CoerceToTwoState(word);
+        // §21.4.2 (shall): an out-of-range value for an enumerated element type
+        // is an error that ends the load.
+        if (enum_info && !EnumValueInRange(enum_info, word)) {
+          ctx.GetDiag().Error(
+              {}, "$readmem" + std::string(is_hex ? "h" : "b") +
+                      ": value out of range for the enumerated type");
+          return false;
+        }
         // §21.4.1: loading an address creates its element if absent.
-        aa->int_data[cursor] =
-            ParseMemNumber(arena, tok, is_hex, aa->elem_width);
+        aa->int_data[cursor] = word;
         cursor += descending ? -1 : 1;
         return true;
       });
@@ -1327,10 +1376,16 @@ static Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
   }
   std::string mem_name(base_id->text);
 
+  // §21.4.2: when the memory's element type is enumerated, the file numbers are
+  // the underlying numeric values of the type's elements and each must name a
+  // valid element. A null result means the destination is not enum-typed.
+  const EnumTypeInfo* enum_info = ctx.GetVariableEnumType(mem_name);
+
   // §21.4.1: an associative array is addressed by an integral key; addresses
   // create their elements on demand rather than indexing a fixed window.
   if (AssocArrayObject* aa = ctx.FindAssocArray(mem_name)) {
-    EvalReadmemAssoc(expr, ctx, arena, is_hex, content, aa);
+    EvalReadmemAssoc(expr, ctx, arena, is_hex, content, aa, !aa->is_4state,
+                     enum_info);
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
@@ -1345,7 +1400,7 @@ static Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
       high_addr = std::min(slice_hi, high_addr);
     }
     EvalReadmemIndexed(expr, ctx, arena, is_hex, content, low_addr, high_addr,
-                       is_slice, q->elem_width,
+                       is_slice, q->elem_width, !q->is_4state, enum_info,
                        [&](int64_t addr, const Logic4Vec& v) {
                          q->elements[static_cast<size_t>(addr)] = v;
                        });
@@ -1362,7 +1417,7 @@ static Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
   int64_t high_addr = is_slice ? std::min(slice_hi, arr_hi) : arr_hi;
 
   EvalReadmemIndexed(expr, ctx, arena, is_hex, content, low_addr, high_addr,
-                     is_slice, ai->elem_width,
+                     is_slice, ai->elem_width, !ai->is_4state, enum_info,
                      [&](int64_t addr, const Logic4Vec& v) {
                        std::string elem =
                            mem_name + "[" + std::to_string(addr) + "]";
