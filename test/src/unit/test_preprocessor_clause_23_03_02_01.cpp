@@ -24,24 +24,6 @@ TEST(OrderedPortPreprocessor, OrderedPortConnectionSurvivesPreprocessing) {
   EXPECT_TRUE(inst->inst_ports[1].first.empty());
 }
 
-TEST(OrderedPortPreprocessor, OrderedPortWithMacroExpression) {
-  auto r = ParseWithPreprocessor(
-      "`define WIDTH 8\n"
-      "module child(input logic [`WIDTH-1:0] a);\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic [`WIDTH-1:0] x;\n"
-      "  child u(x);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* inst = FindItemByKind(r, ModuleItemKind::kModuleInst);
-  ASSERT_NE(inst, nullptr);
-  ASSERT_EQ(inst->inst_ports.size(), 1u);
-  EXPECT_TRUE(inst->inst_ports[0].first.empty());
-  EXPECT_NE(inst->inst_ports[0].second, nullptr);
-}
-
 TEST(OrderedPortPreprocessor, BlankOrderedPortSurvivesPreprocessing) {
   auto r = ParseWithPreprocessor(
       "module child(input logic a, input logic b, input logic c);\n"

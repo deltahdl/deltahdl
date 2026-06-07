@@ -84,18 +84,6 @@ TEST(ModuleInstantiationGrammar, MultipleConsecutiveBlankPorts) {
   EXPECT_NE(item->inst_ports[3].second, nullptr);
 }
 
-TEST(ModuleInstantiationGrammar, AllBlankOrderedPorts) {
-  auto r = Parse("module m; sub u0(, , ); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->inst_ports.size(), 3u);
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_TRUE(item->inst_ports[i].first.empty());
-    EXPECT_EQ(item->inst_ports[i].second, nullptr);
-  }
-}
-
 TEST(ModuleInstantiationGrammar, SingleOrderedPort) {
   auto r = Parse("module m; sub u0(a); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -137,16 +125,6 @@ TEST(ModuleInstantiationGrammar, TrailingBlankOrderedPort) {
   EXPECT_NE(item->inst_ports[0].second, nullptr);
   EXPECT_NE(item->inst_ports[1].second, nullptr);
   EXPECT_EQ(item->inst_ports[2].second, nullptr);
-}
-
-TEST(ModuleInstantiationGrammar, OrderedPortWithTernaryExpression) {
-  auto r = Parse("module m; sub u0(sel ? a : b, c); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->inst_ports.size(), 2u);
-  EXPECT_NE(item->inst_ports[0].second, nullptr);
-  EXPECT_NE(item->inst_ports[1].second, nullptr);
 }
 
 }

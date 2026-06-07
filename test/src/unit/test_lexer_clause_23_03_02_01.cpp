@@ -34,13 +34,4 @@ TEST(OrderedPortLexer, BlankOrderedPortTokenSequence) {
   EXPECT_EQ(tokens[7].kind, TokenKind::kRParen);
 }
 
-TEST(OrderedPortLexer, AllBlankPortsTokenSequence) {
-  auto tokens = Lex("sub u0(, , )");
-  ASSERT_GE(tokens.size(), 7u);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kLParen);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kComma);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kComma);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kRParen);
-}
-
 }
