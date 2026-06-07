@@ -150,8 +150,12 @@ static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t fd = FdFromArg(expr->args[1], ctx, arena);
   FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
+  // §21.3.4.1: the result of a push back is zero on success and EOF when the
+  // character could not be pushed onto the descriptor. The host library returns
+  // the pushed character (not zero) on success, so normalize the codes here.
   int result = std::ungetc(ch, fp);
-  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(result));
+  if (result == EOF) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
+  return MakeLogic4VecVal(arena, 32, 0);
 }
 
 static int SpecToBase(char spec) {
