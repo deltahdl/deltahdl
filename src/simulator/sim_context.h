@@ -486,6 +486,10 @@ class SimContext {
   uint32_t OpenMcd(std::string_view filename);
   void CloseFile(uint32_t descriptor);
   FILE* GetFileHandle(uint32_t fd);
+  // §21.3.4: a file descriptor may be read from only when it was opened with a
+  // read or read-update type ("r" or "r+"); the pre-opened STDIN channel is
+  // also readable. Write/append descriptors report false.
+  bool IsFdReadable(uint32_t fd) const;
   std::vector<FILE*> GetMcdFiles(uint32_t mcd);
 
   SemaphoreObject* CreateSemaphore(std::string_view name, int32_t keys);
@@ -652,6 +656,8 @@ class SimContext {
   std::unordered_map<std::string, TimeScale> scope_timescales_;
   std::vector<std::string> plus_args_;
   std::unordered_map<uint32_t, FILE*> file_descriptors_;
+  // §21.3.4: descriptors whose open type permits reading ("r"/"r+" families).
+  std::unordered_set<uint32_t> readable_fds_;
   // Bit i in mcd_channels_[i] tracks the file opened on channel i (1..30).
   std::array<FILE*, 31> mcd_channels_ = {};
   bool stdio_descriptors_ready_ = false;

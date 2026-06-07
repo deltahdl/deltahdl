@@ -124,6 +124,141 @@ TEST(SysTask, FscanfReadsFormatted) {
   std::remove(tmp.c_str());
 }
 
+// §21.3.4: a descriptor opened for writing/appending cannot be read. Each read
+// function must report its normal failure value when handed a write-only fd.
+
+// Opens `tmp` (creating it with `seed` content first when reading is expected)
+// and returns the fd for the given type string.
+static uint64_t OpenWith(SysTaskFixture& f, const std::string& tmp,
+                         const char* type) {
+  auto* open_expr = MkSysCall(f.arena, "$fopen",
+                              {MkStr(f.arena, tmp), MkStr(f.arena, type)});
+  return EvalExpr(open_expr, f.ctx, f.arena).ToUint64();
+}
+
+TEST(SysTask, FgetcOnWriteOnlyFdReturnsEof) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_test_wronly_fgetc.txt";
+  uint64_t fd = OpenWith(f, tmp, "w");
+  ASSERT_NE(fd, 0u);
+
+  auto* expr = MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0xFFFFFFFFu);
+
+  EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
+  std::remove(tmp.c_str());
+}
+
+TEST(SysTask, FgetsOnWriteOnlyFdReturnsZero) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_test_wronly_fgets.txt";
+  uint64_t fd = OpenWith(f, tmp, "w");
+  ASSERT_NE(fd, 0u);
+
+  auto* dest = f.ctx.CreateVariable("wline", 256);
+  dest->value = MakeLogic4VecVal(f.arena, 256, 0);
+  auto* expr = MkSysCall(f.arena, "$fgets",
+                         {MkId(f.arena, "wline"), MkInt(f.arena, fd)});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 0u);
+
+  EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
+  std::remove(tmp.c_str());
+}
+
+TEST(SysTask, UngetcOnWriteOnlyFdReturnsZero) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_test_wronly_ungetc.txt";
+  uint64_t fd = OpenWith(f, tmp, "w");
+  ASSERT_NE(fd, 0u);
+
+  auto* expr = MkSysCall(
+      f.arena, "$ungetc",
+      {MkInt(f.arena, static_cast<uint64_t>('A')), MkInt(f.arena, fd)});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 0u);
+
+  EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
+  std::remove(tmp.c_str());
+}
+
+TEST(SysTask, FscanfOnWriteOnlyFdReturnsZero) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_test_wronly_fscanf.txt";
+  uint64_t fd = OpenWith(f, tmp, "w");
+  ASSERT_NE(fd, 0u);
+
+  auto* var = f.ctx.CreateVariable("wv", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, 0);
+  auto* expr = MkSysCall(f.arena, "$fscanf",
+                         {MkInt(f.arena, fd), MkStr(f.arena, "%d"),
+                          MkId(f.arena, "wv")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 0u);
+
+  EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
+  std::remove(tmp.c_str());
+}
+
+TEST(SysTask, FreadOnWriteOnlyFdReturnsZero) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_test_wronly_fread.txt";
+  uint64_t fd = OpenWith(f, tmp, "w");
+  ASSERT_NE(fd, 0u);
+
+  auto* var = f.ctx.CreateVariable("wr", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, 0);
+  auto* expr = MkSysCall(f.arena, "$fread",
+                         {MkId(f.arena, "wr"), MkInt(f.arena, fd)});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 0u);
+
+  EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
+  std::remove(tmp.c_str());
+}
+
+TEST(SysTask, ReadUpdateTypeAllowsReading) {
+  // The "r+" type family opens for read-update; reading is permitted (unlike
+  // the "w+"/"a+" update types, which §21.3.4 does not authorize for reading).
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_test_rplus.txt";
+  {
+    std::ofstream ofs(tmp);
+    ofs << "Q";
+  }
+  uint64_t fd = OpenWith(f, tmp, "r+");
+  ASSERT_NE(fd, 0u);
+
+  auto* expr = MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(),
+            static_cast<uint64_t>('Q'));
+
+  EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
+  std::remove(tmp.c_str());
+}
+
+TEST(SysTask, WriteUpdateTypeRejectsReading) {
+  // The "w+" type opens for update (read and write) per Table 21-6, yet
+  // §21.3.4 authorizes reading only for the "r"/"r+" families. A read on a
+  // "w+" descriptor must therefore still report failure.
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_test_wplus.txt";
+  uint64_t fd = OpenWith(f, tmp, "w+");
+  ASSERT_NE(fd, 0u);
+
+  auto* expr = MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 0xFFFFFFFFu);
+
+  EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
+  std::remove(tmp.c_str());
+}
+
+TEST(SysTask, ReadRejectedOnStandardOutputDescriptor) {
+  // STDOUT is pre-opened for append, not reading; a read on its reserved
+  // descriptor must report end-of-file rather than touch the stream.
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$fgetc",
+                         {MkInt(f.arena, SimContext::kStdoutFd)});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 0xFFFFFFFFu);
+}
+
 TEST(SysTask, FreadReadsBinary) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_test_fread.txt";

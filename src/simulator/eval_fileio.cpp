@@ -17,6 +17,14 @@ static uint32_t FdFromArg(const Expr* arg, SimContext& ctx, Arena& arena) {
   return static_cast<uint32_t>(EvalExpr(arg, ctx, arena).ToUint64());
 }
 
+// §21.3.4: a file descriptor may be read from only when it was opened with a
+// read or read-update type. Returning a null handle for a write/append channel
+// makes each read function fall through to its normal failure result.
+static FILE* ReadableHandle(uint32_t fd, SimContext& ctx) {
+  if (!ctx.IsFdReadable(fd)) return nullptr;
+  return ctx.GetFileHandle(fd);
+}
+
 static Logic4Vec StringToVec(Arena& arena, const std::string& str,
                              uint32_t width) {
   auto vec = MakeLogic4VecVal(arena, width, 0);
@@ -34,7 +42,7 @@ static Logic4Vec StringToVec(Arena& arena, const std::string& str,
 static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
   uint32_t fd = FdFromArg(expr->args[1], ctx, arena);
-  FILE* fp = ctx.GetFileHandle(fd);
+  FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
 
   char buf[4096];
@@ -54,7 +62,7 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
 static Logic4Vec EvalFgetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
-  FILE* fp = ctx.GetFileHandle(fd);
+  FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
 
   int ch = std::fgetc(fp);
@@ -140,7 +148,7 @@ static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
   auto ch = static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
   uint32_t fd = FdFromArg(expr->args[1], ctx, arena);
-  FILE* fp = ctx.GetFileHandle(fd);
+  FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
   int result = std::ungetc(ch, fp);
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(result));
@@ -192,7 +200,7 @@ static bool ScanOneField(const std::string& input, ScanState& state, int base,
 static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 32, 0);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
-  FILE* fp = ctx.GetFileHandle(fd);
+  FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
 
   long start = std::ftell(fp);
@@ -221,7 +229,7 @@ static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
 static Logic4Vec EvalFread(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
   uint32_t fd = FdFromArg(expr->args[1], ctx, arena);
-  FILE* fp = ctx.GetFileHandle(fd);
+  FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
 
   Variable* var = nullptr;

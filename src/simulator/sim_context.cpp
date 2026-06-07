@@ -691,6 +691,9 @@ uint32_t SimContext::OpenFile(std::string_view filename, std::string_view mode) 
   while (file_descriptors_.count(kFdMsb | slot) != 0) ++slot;
   uint32_t fd = kFdMsb | slot;
   file_descriptors_[fd] = fp;
+  // §21.3.4: only the "r"/"r+" type families authorize reading. Every such
+  // type string begins with 'r', so track readability by that leading letter.
+  if (!fmode.empty() && fmode.front() == 'r') readable_fds_.insert(fd);
   return fd;
 }
 
@@ -722,6 +725,7 @@ void SimContext::CloseFile(uint32_t descriptor) {
     if (it == file_descriptors_.end()) return;
     std::fclose(it->second);
     file_descriptors_.erase(it);
+    readable_fds_.erase(descriptor);
     return;
   }
   // Multichannel descriptor: every bit set selects a channel to close.
@@ -737,6 +741,13 @@ FILE* SimContext::GetFileHandle(uint32_t fd) {
   EnsureStdioDescriptors();
   auto it = file_descriptors_.find(fd);
   return (it != file_descriptors_.end()) ? it->second : nullptr;
+}
+
+bool SimContext::IsFdReadable(uint32_t fd) const {
+  // §21.3.4: STDIN is pre-opened for reading; STDOUT/STDERR are append-only.
+  if (fd == kStdinFd) return true;
+  if (fd == kStdoutFd || fd == kStderrFd) return false;
+  return readable_fds_.count(fd) != 0;
 }
 
 std::vector<FILE*> SimContext::GetMcdFiles(uint32_t mcd) {
