@@ -86,13 +86,20 @@ static Logic4Vec EvalFgetc(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 static Logic4Vec EvalFflush(const Expr* expr, SimContext& ctx, Arena& arena) {
+  // §21.3.6: with no argument every open file is flushed.
   if (expr->args.empty()) {
     std::fflush(nullptr);
     return MakeLogic4VecVal(arena, 1, 0);
   }
-  uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
-  FILE* fp = ctx.GetFileHandle(fd);
-  if (fp) std::fflush(fp);
+  // §21.3.6: the single argument is either a multi-channel descriptor, whose
+  // every selected channel is flushed, or a single file descriptor. A real fd
+  // carries the reserved high bit; anything else is treated as an mcd.
+  uint32_t descriptor = FdFromArg(expr->args[0], ctx, arena);
+  if ((descriptor & SimContext::kFdMsb) != 0) {
+    if (FILE* fp = ctx.GetFileHandle(descriptor)) std::fflush(fp);
+  } else {
+    for (FILE* fp : ctx.GetMcdFiles(descriptor)) std::fflush(fp);
+  }
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
