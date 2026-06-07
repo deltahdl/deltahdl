@@ -40,6 +40,10 @@ class VcdWriter {
   void DumpSelectedValues(const std::vector<std::string_view>& names);
   void DumpChangedValues(uint64_t prev_time);
 
+  // Generate a checkpoint (§21.7.1.4): emit a $dumpall checkpoint recording the
+  // current value of every selected variable.
+  void DumpAll();
+
   // Suspend the dump (§21.7.1.3): emit a checkpoint that records every selected
   // variable as x and then stop recording further value changes.
   void DumpOff();

@@ -501,7 +501,8 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
       }
     }
   } else if (name == "$dumpall") {
-    if (vcd) vcd->DumpAllValues();
+    // Emit a checkpoint of every selected variable's current value (§21.7.1.4).
+    if (vcd) vcd->DumpAll();
   } else if (name == "$dumpoff") {
     // Suspend dumping with an all-x checkpoint (§21.7.1.3).
     if (vcd) vcd->DumpOff();

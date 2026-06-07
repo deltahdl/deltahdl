@@ -151,6 +151,17 @@ void VcdWriter::DumpSelectedValues(
   ofs_ << "$end\n";
 }
 
+void VcdWriter::DumpAll() {
+  if (!ofs_.is_open() || !enabled_) return;
+  // The checkpoint records the present value of every selected variable,
+  // regardless of whether that value changed during the current time step.
+  ofs_ << "$dumpall\n";
+  for (const auto& sig : signals_) {
+    WriteSignalChange(sig);
+  }
+  ofs_ << "$end\n";
+}
+
 void VcdWriter::DumpOff() {
   if (!ofs_.is_open()) return;
   // The checkpoint records every selected variable as x, then dumping stops so
