@@ -130,7 +130,7 @@ static void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
         p_fmts.push_back(BuildFormatP(val_arg, ctx));
         v_fmts.push_back(BuildFormatV(val_arg, ctx));
       }
-      output += FormatDisplay(fmt, arg_vals, p_fmts, nullptr, v_fmts);
+      output += FormatDisplay(fmt, arg_vals, p_fmts, nullptr, v_fmts, &ctx);
       continue;
     }
     // A bare expression renders under the task's default radix; a value
@@ -176,7 +176,8 @@ static void ExecSeverityTask(const Expr* expr, SimContext& ctx, Arena& arena,
       arg_vals.push_back(val);
     }
   }
-  std::string msg = fmt.empty() ? "" : FormatDisplay(fmt, arg_vals);
+  std::string msg =
+      fmt.empty() ? "" : FormatDisplay(fmt, arg_vals, {}, nullptr, {}, &ctx);
   EmitSeverityHeader(ctx, prefix, msg, os);
 }
 

@@ -217,7 +217,7 @@ static Logic4Vec EvalSformatf(const Expr* expr, SimContext& ctx, Arena& arena) {
     arg_vals.push_back(EvalExpr(expr->args[i], ctx, arena));
   }
   WarnIfArgCountMismatch(ctx, "$sformatf", fmt, arg_vals.size());
-  std::string result = FormatDisplay(fmt, arg_vals);
+  std::string result = FormatDisplay(fmt, arg_vals, {}, nullptr, {}, &ctx);
   return StringToLogic4Vec(arena, result);
 }
 
@@ -242,13 +242,13 @@ static std::string BuildStringTaskOutput(const std::vector<Expr*>& args,
              args[i + 1]->kind != ExprKind::kStringLiteral) {
         vals.push_back(EvalExpr(args[++i], ctx, arena));
       }
-      out += FormatDisplay(fmt, vals);
+      out += FormatDisplay(fmt, vals, {}, nullptr, {}, &ctx);
       continue;
     }
     auto val = EvalExpr(a, ctx, arena);
     char spec = val.is_string ? 's' : default_radix;
     char fmt_buf[3] = {'%', spec, 0};
-    out += FormatDisplay(fmt_buf, {val});
+    out += FormatDisplay(fmt_buf, {val}, {}, nullptr, {}, &ctx);
   }
   return out;
 }
@@ -301,7 +301,7 @@ static Logic4Vec EvalSformatTask(const Expr* expr, SimContext& ctx,
     vals.push_back(EvalExpr(expr->args[i], ctx, arena));
   }
   WarnIfArgCountMismatch(ctx, "$sformat", fmt, vals.size());
-  std::string out = FormatDisplay(fmt, vals);
+  std::string out = FormatDisplay(fmt, vals, {}, nullptr, {}, &ctx);
   if (dst) dst->value = StringToLogic4Vec(arena, out);
   return MakeLogic4VecVal(arena, 1, 0);
 }
@@ -1022,12 +1022,12 @@ static Logic4Vec EvalFdisplayWrite(const Expr* expr, SimContext& ctx,
   }
   std::string output;
   if (!fmt.empty()) {
-    output = FormatDisplay(fmt, arg_vals);
+    output = FormatDisplay(fmt, arg_vals, {}, nullptr, {}, &ctx);
   } else if (suffix != '\0') {
     // §21.3.2 derives b/h/o radix from the task-name suffix when no format
     // string is supplied.
     char fmt_buf[3] = {'%', suffix, 0};
-    output = FormatDisplay(fmt_buf, arg_vals);
+    output = FormatDisplay(fmt_buf, arg_vals, {}, nullptr, {}, &ctx);
   }
   for (FILE* fp : targets) {
     std::fputs(output.c_str(), fp);

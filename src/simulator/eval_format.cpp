@@ -6,6 +6,7 @@
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
+#include "simulator/process.h"
 #include "simulator/sim_context.h"
 
 namespace delta {
@@ -16,7 +17,34 @@ struct FormatArgs {
   const std::vector<std::string>& p_fmts;
   const TimeFormatSpec* time_format = nullptr;
   const std::vector<std::string>& v_fmts;
+  SimContext* ctx = nullptr;
 };
+
+// §21.2.1.5: build the hierarchical name that %m expands to -- the name of the
+// design element, subroutine, named block, or labeled statement that contains
+// the system task being run. The name starts at the top-level module and walks
+// down through the chain of instance names recorded on the running process, then
+// through the active subroutine / named-block / labeled-statement scopes that
+// the statement executor tracks in lexical-nesting order.
+static std::string BuildScopeHierName(SimContext* ctx) {
+  if (ctx == nullptr) return "";
+  // The empty instance prefix is the top level; its registered type name is the
+  // top module's name, which doubles as the top instance name for %m.
+  std::string name(ctx->FindInstanceType(""));
+  if (Process* proc = ctx->CurrentProcess()) {
+    std::string prefix = proc->inst_prefix;  // "u1.u2." form, empty at top
+    if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
+    if (!prefix.empty()) {
+      if (!name.empty()) name += '.';
+      name += prefix;
+    }
+  }
+  for (std::string_view scope : ctx->ActiveNamedScopes()) {
+    if (!name.empty()) name += '.';
+    name += std::string(scope);
+  }
+  return name;
+}
 
 std::string FormatValueAsString(const Logic4Vec& val) {
   std::string result;
@@ -379,8 +407,11 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
   // "%m or %M"); collapse to a single case before deciding what to do.
   if (spec >= 'A' && spec <= 'Z') spec = static_cast<char>(spec - 'A' + 'a');
 
+  // §21.2.1.5: %m takes no argument; it expands to the hierarchical name of the
+  // scope that invokes the system task. Returning false leaves the argument
+  // cursor untouched so no expression value is consumed.
   if (spec == 'm') {
-    out += "<module>";
+    out += BuildScopeHierName(args.ctx);
     i = j;
     return false;
   }
@@ -426,9 +457,10 @@ std::string FormatDisplay(const std::string& fmt,
                           const std::vector<Logic4Vec>& vals,
                           const std::vector<std::string>& p_fmts,
                           const TimeFormatSpec* time_format,
-                          const std::vector<std::string>& v_fmts) {
+                          const std::vector<std::string>& v_fmts,
+                          SimContext* ctx) {
   std::string out;
-  FormatArgs args{vals, 0, p_fmts, time_format, v_fmts};
+  FormatArgs args{vals, 0, p_fmts, time_format, v_fmts, ctx};
   for (size_t i = 0; i < fmt.size(); ++i) {
     if (fmt[i] != '%' || i + 1 >= fmt.size()) {
       AppendLiteralChar(fmt, i, out);
