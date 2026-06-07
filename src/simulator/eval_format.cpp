@@ -73,6 +73,91 @@ static std::string FormatDecimal(const Logic4Vec& val) {
   return buf;
 }
 
+// §21.2.1.3: a bit-range classification used by the decimal, hexadecimal, and
+// octal renderings to decide whether unknown (x) or high-impedance (z) bits
+// force a status character in place of the ordinary digit.
+enum class XZClass { kKnown, kAllX, kAllZ, kSomeX, kSomeZ };
+
+// Read the (aval, bval) pair of a single bit out of a 4-state vector. The
+// encoding matches Logic4Vec::ToString: bval clear is a known bit, bval set
+// with aval clear is x, and bval set with aval set is z.
+static void ReadBit(const Logic4Vec& val, uint32_t i, bool& a, bool& b) {
+  uint32_t w = i / 64;
+  uint64_t mask = uint64_t{1} << (i % 64);
+  a = (val.words[w].aval & mask) != 0;
+  b = (val.words[w].bval & mask) != 0;
+}
+
+// §21.2.1.3: examine the bits in [lo, hi) and report which display rule applies.
+// A fully unknown range maps to a lowercase x and a fully high-impedance range
+// to a lowercase z. Any mix of states yields an uppercase character: an unknown
+// bit always wins (uppercase X), and only a high-impedance bit with no unknown
+// bit present yields uppercase Z.
+static XZClass ClassifyBits(const Logic4Vec& val, uint32_t lo, uint32_t hi) {
+  bool has_known = false, has_x = false, has_z = false;
+  for (uint32_t i = lo; i < hi; ++i) {
+    bool a, b;
+    ReadBit(val, i, a, b);
+    if (!b) has_known = true;
+    else if (!a) has_x = true;
+    else has_z = true;
+  }
+  if (!has_x && !has_z) return XZClass::kKnown;
+  if (has_x && !has_z && !has_known) return XZClass::kAllX;
+  if (has_z && !has_x && !has_known) return XZClass::kAllZ;
+  return has_x ? XZClass::kSomeX : XZClass::kSomeZ;
+}
+
+// Maps a non-known classification to its display character. Returns 0 for a
+// known group, signalling that the caller should render the ordinary value.
+static char XZDigitChar(XZClass c) {
+  switch (c) {
+    case XZClass::kAllX: return 'x';
+    case XZClass::kAllZ: return 'z';
+    case XZClass::kSomeX: return 'X';
+    case XZClass::kSomeZ: return 'Z';
+    default: return 0;
+  }
+}
+
+// §21.2.1.3: render a value in hexadecimal (group_size 4) or octal
+// (group_size 3). Each group of bits collapses to a single digit; a group that
+// carries any x or z bit follows the status-character rules above instead of
+// the plain radix value. Fully known values reproduce the auto-sized,
+// leading-zero rendering of FormatArg.
+static std::string FormatRadixXZ(const Logic4Vec& val, uint32_t group_size) {
+  uint32_t ndigits = (val.width + group_size - 1) / group_size;
+  if (ndigits == 0) ndigits = 1;
+  std::string out;
+  out.reserve(ndigits);
+  for (uint32_t d = ndigits; d > 0; --d) {
+    uint32_t lo = (d - 1) * group_size;
+    uint32_t hi = lo + group_size;
+    if (hi > val.width) hi = val.width;
+    char xz = XZDigitChar(ClassifyBits(val, lo, hi));
+    if (xz != 0) {
+      out += xz;
+      continue;
+    }
+    uint32_t digit = 0;
+    for (uint32_t i = lo; i < hi; ++i) {
+      bool a, b;
+      ReadBit(val, i, a, b);
+      if (a) digit |= (1u << (i - lo));
+    }
+    out += static_cast<char>(digit < 10 ? '0' + digit : 'a' + digit - 10);
+  }
+  return out;
+}
+
+// §21.2.1.3: a decimal field shows a single status character when the value
+// holds unknown or high-impedance bits, rather than a numeral.
+static std::string FormatDecimalXZ(const Logic4Vec& val) {
+  char xz = XZDigitChar(ClassifyBits(val, 0, val.width));
+  if (xz != 0) return std::string(1, xz);
+  return FormatDecimal(val);
+}
+
 // Apply the $timeformat configuration (20.4.3) to a raw time value. The
 // number is rendered with the configured decimal precision, padded with
 // leading spaces to the minimum field width, and tagged with the suffix
@@ -103,24 +188,16 @@ std::string FormatArg(const Logic4Vec& val, char spec) {
   char buf[64];
   switch (spec) {
     case 'd':
-      return FormatDecimal(val);
+      // §21.2.1.3: decimal renders a status character for unknown/high-Z bits.
+      return FormatDecimalXZ(val);
     case 'h':
-    case 'x': {
-
-      uint32_t ndigits = (val.width + 3) / 4;
-      if (ndigits == 0) ndigits = 1;
-      std::snprintf(buf, sizeof(buf), "%0*llx", static_cast<int>(ndigits),
-                    static_cast<unsigned long long>(v));
-      return buf;
-    }
-    case 'o': {
-
-      uint32_t ndigits = (val.width + 2) / 3;
-      if (ndigits == 0) ndigits = 1;
-      std::snprintf(buf, sizeof(buf), "%0*llo", static_cast<int>(ndigits),
-                    static_cast<unsigned long long>(v));
-      return buf;
-    }
+    case 'x':
+      // §21.2.1.3: each group of four bits is one hex digit, with x/z groups
+      // rendered per the unknown/high-impedance rules.
+      return FormatRadixXZ(val, 4);
+    case 'o':
+      // §21.2.1.3: octal groups three bits per digit, otherwise as for hex.
+      return FormatRadixXZ(val, 3);
     case 'b':
       return val.ToString();
     case 'c':
@@ -215,10 +292,15 @@ static std::string FormatArgMinimal(const Logic4Vec& val, char spec) {
   switch (spec) {
     case 'h':
     case 'x':
+      // §21.2.1.3 status characters carry meaning that cannot be stripped down
+      // to a "significant digit", so a value bearing x/z keeps its full digit
+      // string; only purely known values get the minimal rendering.
+      if (!val.IsKnown()) return FormatRadixXZ(val, 4);
       std::snprintf(buf, sizeof(buf), "%llx",
                     static_cast<unsigned long long>(v));
       return buf;
     case 'o':
+      if (!val.IsKnown()) return FormatRadixXZ(val, 3);
       std::snprintf(buf, sizeof(buf), "%llo",
                     static_cast<unsigned long long>(v));
       return buf;
