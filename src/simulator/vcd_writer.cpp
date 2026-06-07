@@ -30,9 +30,12 @@ void VcdWriter::WriteHeader(std::string_view timescale,
   header_written_ = true;
 }
 
-void VcdWriter::BeginScope(std::string_view name) {
+void VcdWriter::BeginScope(std::string_view name, VcdScopeKind kind) {
   if (!ofs_.is_open()) return;
-  ofs_ << "$scope module " << name << " $end\n";
+  // §21.7.5: an unpacked structure appears as a named fork-join block, so its
+  // scope uses the fork keyword rather than module.
+  const char* keyword = kind == VcdScopeKind::kFork ? "fork" : "module";
+  ofs_ << "$scope " << keyword << " " << name << " $end\n";
 }
 
 void VcdWriter::EndScope() {
@@ -50,15 +53,62 @@ static const char* VcdVarTypeKeyword(const VcdSignal& sig) {
   return "wire";
 }
 
+// §21.7.5 (Table 21-11): map a SystemVerilog data type to the 1364-2005 var_type
+// keyword and the size it is dumped with. bit and logic keep the full packed
+// width passed in (Table 21-11: "total size of packed dimension"), which also
+// covers a packed array or structure collapsed to a single reg vector. The
+// fixed-width integer types and the default enum carry the size fixed by the
+// table regardless of the declared width. A net (kNet) keeps the §21.7.2.3
+// keyword and its own width.
+static const char* VcdDataTypeKeyword(VcdDataType type) {
+  switch (type) {
+    case VcdDataType::kBit:
+    case VcdDataType::kLogic:
+    case VcdDataType::kShortint:
+    case VcdDataType::kLongint:
+    case VcdDataType::kByte:
+      return "reg";
+    case VcdDataType::kInt:
+    case VcdDataType::kEnum:
+      return "integer";
+    case VcdDataType::kReal:
+      return "real";
+    case VcdDataType::kNet:
+      break;
+  }
+  return "wire";
+}
+
+static uint32_t VcdDataTypeSize(VcdDataType type, uint32_t width) {
+  switch (type) {
+    case VcdDataType::kInt:
+    case VcdDataType::kEnum:
+      return 32;
+    case VcdDataType::kShortint:
+      return 16;
+    case VcdDataType::kLongint:
+      return 64;
+    case VcdDataType::kByte:
+      return 8;
+    case VcdDataType::kBit:
+    case VcdDataType::kLogic:
+    case VcdDataType::kReal:
+    case VcdDataType::kNet:
+      break;
+  }
+  return width;
+}
+
 void VcdWriter::RegisterSignal(std::string_view name, uint32_t width,
                                Variable* var, NetType net_type, int32_t msb,
-                               int32_t lsb) {
+                               int32_t lsb, VcdDataType data_type) {
   VcdSignal sig;
   sig.name = name;
   sig.width = width;
   sig.var = var;
   sig.ident = next_ident_++;
   sig.net_type = net_type;
+  sig.data_type = data_type;
   sig.msb = msb;
   sig.lsb = lsb;
   // §21.7.4.2: the identifier code of a port is an integer that ascends in
@@ -83,8 +133,15 @@ void VcdWriter::RegisterSignal(std::string_view name, uint32_t width,
     ofs_ << " <" << sig.port_id << " " << name << " $end\n";
     return;
   }
-  ofs_ << "$var " << VcdVarTypeKeyword(sig) << " " << width << " " << sig.ident
-       << " " << name << " $end\n";
+  // §21.7.5 (Table 21-11): a SystemVerilog data type masquerades as a 1364-2005
+  // type. A net keeps the §21.7.2.3 mapping (and a real object dumped through
+  // that path is still detected by its value); a data type uses its table entry.
+  const char* keyword = sig.data_type == VcdDataType::kNet
+                            ? VcdVarTypeKeyword(sig)
+                            : VcdDataTypeKeyword(sig.data_type);
+  uint32_t size = VcdDataTypeSize(sig.data_type, width);
+  ofs_ << "$var " << keyword << " " << size << " " << sig.ident << " " << name
+       << " $end\n";
 }
 
 void VcdWriter::EndDefinitions() {

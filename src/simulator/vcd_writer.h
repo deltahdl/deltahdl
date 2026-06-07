@@ -12,6 +12,30 @@ namespace delta {
 
 struct Variable;
 
+// §21.7.5 (Table 21-11): SystemVerilog does not extend the IEEE Std 1364-2005
+// VCD format, so a SystemVerilog data type is dumped by masquerading as a
+// 1364-2005 type. This selects which type the dumped object maps to. kNet keeps
+// the net mapping of §21.7.2.3 (wire) and is the default so nets and the 4-state
+// objects of the earlier subclauses keep their existing declaration form.
+enum class VcdDataType : uint8_t {
+  kNet,       // a net: var_type wire (§21.7.2.3)
+  kBit,       // -> reg, size = total packed dimension
+  kLogic,     // -> reg, size = total packed dimension
+  kInt,       // -> integer, size 32
+  kShortint,  // -> reg, size 16
+  kLongint,   // -> reg, size 64
+  kByte,      // -> reg, size 8
+  kEnum,      // -> integer, size 32 (default for an untyped enum)
+  kReal,      // -> real (also shortreal)
+};
+
+// §21.7.5: an unpacked structure is dumped as a named fork-join block so it is
+// easy to tell apart from a begin-end block; every other scope is a module.
+enum class VcdScopeKind : uint8_t {
+  kModule,
+  kFork,
+};
+
 struct VcdSignal {
   std::string_view name;
   uint32_t width = 1;
@@ -20,6 +44,9 @@ struct VcdSignal {
   // Net type of the dumped object, used to pick the $var var_type keyword
   // (§21.7.2.3): a uwire net is recorded as wire.
   NetType net_type = NetType::kWire;
+  // §21.7.5 (Table 21-11): the SystemVerilog data type of the dumped object,
+  // used to pick the 1364-2005 var_type keyword and the size it masquerades as.
+  VcdDataType data_type = VcdDataType::kNet;
   // Extended VCD node information (§21.7.4.2): the declared index range of a
   // port and the integer identifier code used in its $var declaration. msb/lsb
   // are negative when no vector_index applies, in which case the port is a
@@ -44,11 +71,15 @@ class VcdWriter {
   // that unevaluated literal so it can be reproduced in the $version section.
   void WriteHeader(std::string_view timescale,
                    std::string_view dumpfile_literal = {});
-  void BeginScope(std::string_view name);
+  // §21.7.5: kModule emits a $scope module section; an unpacked structure is
+  // dumped as a named fork-join block, emitting a $scope fork section instead.
+  void BeginScope(std::string_view name,
+                  VcdScopeKind kind = VcdScopeKind::kModule);
   void EndScope();
   void RegisterSignal(std::string_view name, uint32_t width, Variable* var,
                       NetType net_type = NetType::kWire, int32_t msb = -1,
-                      int32_t lsb = -1);
+                      int32_t lsb = -1,
+                      VcdDataType data_type = VcdDataType::kNet);
   void EndDefinitions();
 
   void WriteTimestamp(uint64_t time);
