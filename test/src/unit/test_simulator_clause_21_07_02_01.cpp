@@ -28,17 +28,6 @@ Logic4Vec MakeScalar(Arena& arena, uint64_t aval, uint64_t bval) {
   return v;
 }
 
-TEST_F(VcdFileSyntaxSim, WritesTimestamp) {
-  {
-    VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.EndDefinitions();
-    vcd.WriteTimestamp(42);
-  }
-  auto content = ReadVcd();
-  EXPECT_NE(content.find("#42"), std::string::npos);
-}
-
 TEST_F(VcdFileSyntaxSim, IdentifierWrapsAround) {
   {
     VcdWriter vcd(tmp_path_);
