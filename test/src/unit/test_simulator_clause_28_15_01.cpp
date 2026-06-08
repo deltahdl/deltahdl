@@ -90,30 +90,37 @@ TEST(Tri0Tri1NetStrengths, Tri1AllZDriverProducesOne) {
   EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
 }
 
-TEST(Tri0Tri1NetStrengths, Tri0MultipleAllZDriversProducesZero) {
+// §28.15.1 qualifies the pulldown/pullup default with "in the absence of an
+// overriding source." That qualifier is per bit: where a driver supplies a real
+// value the source wins, and only the high-impedance bits are pulled to the
+// net-type default. A single driver carrying a mix of driven and z bits
+// exercises the FixupTriPull path that applies this rule bit by bit.
+TEST(Tri0Tri1NetStrengths, Tri0DrivenBitsOverridePulldownOnUndrivenBits) {
   Arena arena;
   Net net = MakeUndrivenNet(arena, NetType::kTri0, 8);
-  net.drivers.push_back(MakeAllZ(arena, 8));
-  net.drivers.push_back(MakeAllZ(arena, 8));
-  net.drivers.push_back(MakeAllZ(arena, 8));
+  auto driver = MakeLogic4Vec(arena, 8);
+  // Low nibble driven to 1 (aval set, bval clear); high nibble z (both set).
+  driver.words[0].aval = 0xFF;
+  driver.words[0].bval = 0xF0;
+  net.drivers.push_back(driver);
   net.Resolve(arena);
   EXPECT_TRUE(AllBitsKnown(net.resolved->value));
-  EXPECT_EQ(net.resolved->value.ToUint64() & 0xFF, 0u);
-  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kPull);
-  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kPull);
+  // Driven bits keep their 1 value; the undriven bits are pulled down to 0.
+  EXPECT_EQ(net.resolved->value.ToUint64() & 0xFF, 0x0Fu);
 }
 
-TEST(Tri0Tri1NetStrengths, Tri1MultipleAllZDriversProducesOne) {
+TEST(Tri0Tri1NetStrengths, Tri1DrivenBitsOverridePullupOnUndrivenBits) {
   Arena arena;
   Net net = MakeUndrivenNet(arena, NetType::kTri1, 8);
-  net.drivers.push_back(MakeAllZ(arena, 8));
-  net.drivers.push_back(MakeAllZ(arena, 8));
-  net.drivers.push_back(MakeAllZ(arena, 8));
+  auto driver = MakeLogic4Vec(arena, 8);
+  // Low nibble driven to 0 (both clear); high nibble z (both set).
+  driver.words[0].aval = 0xF0;
+  driver.words[0].bval = 0xF0;
+  net.drivers.push_back(driver);
   net.Resolve(arena);
   EXPECT_TRUE(AllBitsKnown(net.resolved->value));
-  EXPECT_EQ(net.resolved->value.ToUint64() & 0xFF, 0xFFu);
-  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
-  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kPull);
+  // Driven bits keep their 0 value; the undriven bits are pulled up to 1.
+  EXPECT_EQ(net.resolved->value.ToUint64() & 0xFF, 0xF0u);
 }
 
 TEST(Tri0Tri1NetStrengths, Tri0WideUndrivenAllBitsZero) {
