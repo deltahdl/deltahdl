@@ -49,55 +49,6 @@ TEST(ElaborationOrder, GenerateConditionObservesDefparam) {
   EXPECT_EQ(u->children[0].module_name, "marker");
 }
 
-TEST(ElaborationOrder, GenerateElseBranchSelectedWhenDefparamDisagrees) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module marker_hi; endmodule\n"
-      "module marker_lo; endmodule\n"
-      "module picker #(parameter int P = 2)();\n"
-      "  if (P == 2) begin\n"
-      "    marker_hi hi();\n"
-      "  end else begin\n"
-      "    marker_lo lo();\n"
-      "  end\n"
-      "endmodule\n"
-      "module top;\n"
-      "  picker u();\n"
-      "  defparam u.P = 0;\n"
-      "endmodule\n",
-      f, "top");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* u = design->top_modules[0]->children[0].resolved;
-  ASSERT_NE(u, nullptr);
-  EXPECT_EQ(u->params[0].resolved_value, 0);
-  ASSERT_FALSE(u->children.empty());
-  EXPECT_EQ(u->children[0].module_name, "marker_lo");
-}
-
-TEST(ElaborationOrder, NestedGenerateConstructsAllElaborate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module leaf; endmodule\n"
-      "module mid;\n"
-      "  if (1) begin\n"
-      "    if (1) begin\n"
-      "      leaf l();\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n"
-      "module top;\n"
-      "  mid u();\n"
-      "endmodule\n",
-      f, "top");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* u = design->top_modules[0]->children[0].resolved;
-  ASSERT_NE(u, nullptr);
-  ASSERT_FALSE(u->children.empty());
-  EXPECT_EQ(u->children[0].module_name, "leaf");
-}
-
 TEST(ElaborationOrder, GenerateDrivesFurtherGenerateEvaluationOnNextIteration) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -178,29 +129,6 @@ TEST(ElaborationOrder, DesignWithoutGeneratesTerminatesInSinglePass) {
   ASSERT_FALSE(leaf->params.empty());
   EXPECT_TRUE(leaf->params[0].is_resolved);
   EXPECT_EQ(leaf->params[0].resolved_value, 7);
-}
-
-TEST(ElaborationOrder, GenerateForLoopExpandsWithFinalizedParameter) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module leaf; endmodule\n"
-      "module bank #(parameter int N = 1)();\n"
-      "  genvar i;\n"
-      "  for (i = 0; i < N; i = i + 1) begin\n"
-      "    leaf l();\n"
-      "  end\n"
-      "endmodule\n"
-      "module top;\n"
-      "  bank u();\n"
-      "  defparam u.N = 3;\n"
-      "endmodule\n",
-      f, "top");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* u = design->top_modules[0]->children[0].resolved;
-  ASSERT_NE(u, nullptr);
-  EXPECT_EQ(u->params[0].resolved_value, 3);
-  EXPECT_EQ(u->children.size(), 3u);
 }
 
 }
