@@ -1251,6 +1251,23 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
           for (auto* term : item->gate_terminals) {
             uint32_t w = LookupLhsWidth(term, mod);
             if (w == 0) continue;
+            // §28.3.6: an interconnect port or interconnect net expression
+            // connected to an instance array shall have a bit-length equal to
+            // the instance-array length. Unlike an ordinary scalar terminal it
+            // cannot be broadcast (width 1) across the instances.
+            bool is_interconnect = term &&
+                                   term->kind == ExprKind::kIdentifier &&
+                                   interconnect_names_.count(term->text) != 0;
+            if (is_interconnect) {
+              if (w != array_len) {
+                diag_.Error(item->loc,
+                            "interconnect terminal of a gate instance array "
+                            "must have a bit-length equal to the instance-array "
+                            "length");
+                break;
+              }
+              continue;
+            }
             if (w != 1 && w != array_len) {
               diag_.Error(item->loc,
                           "gate array terminal width does not match either "

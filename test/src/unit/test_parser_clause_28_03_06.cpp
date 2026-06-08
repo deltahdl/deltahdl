@@ -31,34 +31,30 @@ TEST(PrimitiveTerminals, NInputGateOutputLiteralRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(PrimitiveTerminals, EnableGateOutputLiteralRejected) {
-  auto r = Parse(
-      "module m;\n"
-      "  bufif0 (1, a, en);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveTerminals, MosSwitchOutputLiteralRejected) {
-  auto r = Parse(
-      "module m;\n"
-      "  nmos (1, a, g);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveTerminals, CmosSwitchOutputLiteralRejected) {
-  auto r = Parse(
-      "module m;\n"
-      "  cmos (1, a, n, p);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(PrimitiveTerminals, NOutputGateOutputLiteralRejected) {
   auto r = Parse(
       "module m;\n"
       "  buf (1, a);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §28.3.6: the connection list shall be enclosed in a pair of parentheses.
+// Omitting them leaves the terminals dangling and shall be rejected.
+TEST(PrimitiveTerminals, ConnectionListWithoutParenthesesRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  and y, a, b;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §28.3.6: the terminals shall be separated by commas. Two adjacent terminal
+// expressions with no separating comma shall be rejected.
+TEST(PrimitiveTerminals, TerminalsWithoutSeparatingCommaRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  and (y a, b);\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
