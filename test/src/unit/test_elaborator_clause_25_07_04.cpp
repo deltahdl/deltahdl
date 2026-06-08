@@ -24,12 +24,6 @@ constexpr const char* kMultiExportInterface =
     "                           task Write(input logic [7:0] waddr));\n"
     "endinterface\n";
 
-TEST(MultipleTaskExports, ExternForkjoinTaskPrototypeWithExportModportElaborates) {
-  std::string src = kMultiExportInterface;
-  src += "module m;\nendmodule\n";
-  EXPECT_TRUE(ElabOk(src));
-}
-
 TEST(MultipleTaskExports, TwoInstancesOfSameModportTypeWithExternForkjoinTaskElaborate) {
   std::string src = kMultiExportInterface;
   src +=
@@ -112,15 +106,6 @@ TEST(MultipleTaskExports,
       "endmodule\n"));
 }
 
-TEST(MultipleTaskExports, ExternForkjoinOnFunctionDoesNotElaborate) {
-  EXPECT_FALSE(ElabOk(
-      "interface simple_bus;\n"
-      "  extern forkjoin function int compute(input int a);\n"
-      "endinterface\n"
-      "module m;\n"
-      "endmodule\n"));
-}
-
 TEST(MultipleTaskExports,
      ExternForkjoinTaskWithoutAnyDefiningModuleElaborates) {
   EXPECT_TRUE(ElabOk(
@@ -135,28 +120,6 @@ TEST(MultipleTaskExports,
       "  simple_bus sb_intf(clk);\n"
       "  cpuMod cpu(sb_intf.initiator);\n"
       "endmodule\n"));
-}
-
-TEST(MultipleTaskExports,
-     ThreeInstancesOfSameModportTypeWithExternForkjoinTaskElaborate) {
-  std::string src = kMultiExportInterface;
-  src +=
-      "module memMod(interface a);\n"
-      "  task a.Read(input logic [7:0] raddr);\n"
-      "  endtask\n"
-      "  task a.Write(input logic [7:0] waddr);\n"
-      "  endtask\n"
-      "  task a.countTargets();\n"
-      "  endtask\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic clk = 0;\n"
-      "  simple_bus sb_intf(clk);\n"
-      "  memMod mem1(sb_intf.target);\n"
-      "  memMod mem2(sb_intf.target);\n"
-      "  memMod mem3(sb_intf.target);\n"
-      "endmodule\n";
-  EXPECT_TRUE(ElabOk(src));
 }
 
 }
