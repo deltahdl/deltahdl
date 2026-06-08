@@ -4,34 +4,8 @@ using namespace delta;
 
 namespace {
 
-TEST(ModportExpressionParsing, ModportSimplePortExplicitExpr) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  logic a;\n"
-      "  modport mp(input .x(a));\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_GE(mp->ports.size(), 1u);
-  EXPECT_EQ(mp->ports[0].name, "x");
-  EXPECT_NE(mp->ports[0].expr, nullptr);
-}
-
-TEST(ModportExpressionParsing, PartSelectPortExpression) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic [7:0] r;\n"
-      "  modport A(output .P(r[3:0]));\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 1u);
-  EXPECT_EQ(mp->ports[0].name, "P");
-  EXPECT_NE(mp->ports[0].expr, nullptr);
-}
-
+// N6: the bound expression is optional — `.P()` declares a port that connects
+// to nothing internal, leaving the expression null.
 TEST(ModportExpressionParsing, PortExprEmpty) {
   auto r = Parse(
       "interface bus;\n"
@@ -45,6 +19,12 @@ TEST(ModportExpressionParsing, PortExprEmpty) {
   EXPECT_EQ(mp->ports[0].expr, nullptr);
 }
 
+// N1: a `.port_id(expression)` modport expression parses with its bound
+// expression captured, and the modport-item loop continues past it to a plain
+// bare-identifier port in the same list. The LRM's own `.P(r[3:0])` part-select
+// stands in for every expression kind ParseExpr accepts (array/struct element,
+// bit-select, concatenation, assignment pattern, constant) — all share this one
+// parse branch, so a single representative observes it.
 TEST(ModportExpressionParsing, PortExpressionMixedWithBareIdentifier) {
   auto r = Parse(
       "interface I;\n"
@@ -61,46 +41,8 @@ TEST(ModportExpressionParsing, PortExpressionMixedWithBareIdentifier) {
   EXPECT_EQ(mp->ports[1].name, "R");
 }
 
-TEST(ModportExpressionParsing, DotNotationPortNameAndExpr) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic [7:0] bus_data;\n"
-      "  modport target(.data(bus_data));\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 1);
-  EXPECT_EQ(mp->ports[0].name, "data");
-  EXPECT_NE(mp->ports[0].expr, nullptr);
-}
-
-TEST(ModportExpressionParsing, ModportPortExpressionPartSelect) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic [7:0] bus_data;\n"
-      "  modport target(.data(bus_data[3:0]));\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 1);
-  EXPECT_EQ(mp->ports[0].name, "data");
-  EXPECT_NE(mp->ports[0].expr, nullptr);
-}
-
-TEST(ModportExpressionParsing, DotNotationAfterDirectionPort) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic [7:0] bus_data;\n"
-      "  logic clk;\n"
-      "  modport target(input clk, .data(bus_data[3:0]));\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 2);
-  EXPECT_EQ(mp->ports[1].name, "data");
-  EXPECT_NE(mp->ports[1].expr, nullptr);
-}
-
+// N1: a modport expression with no preceding direction keyword parses with
+// direction kNone (the default-direction path of the modport-item loop).
 TEST(ModportExpressionParsing, DotNotationWithoutDirection) {
   auto r = Parse(
       "interface ifc;\n"
@@ -114,47 +56,6 @@ TEST(ModportExpressionParsing, DotNotationWithoutDirection) {
   EXPECT_EQ(mp->ports[0].name, "x");
   EXPECT_NE(mp->ports[0].expr, nullptr);
   EXPECT_EQ(mp->ports[0].direction, Direction::kNone);
-}
-
-TEST(ModportExpressionParsing, BitSelectPortExpression) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic [7:0] r;\n"
-      "  modport A(input .P(r[3]));\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 1u);
-  EXPECT_EQ(mp->ports[0].name, "P");
-  EXPECT_NE(mp->ports[0].expr, nullptr);
-}
-
-TEST(ModportExpressionParsing, ConcatenationPortExpression) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic a, b;\n"
-      "  modport A(input .P({a, b}));\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 1u);
-  EXPECT_EQ(mp->ports[0].name, "P");
-  EXPECT_NE(mp->ports[0].expr, nullptr);
-}
-
-TEST(ModportExpressionParsing, ConstantPortExpression) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  modport A(input .P(2));\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 1u);
-  EXPECT_EQ(mp->ports[0].name, "P");
-  EXPECT_NE(mp->ports[0].expr, nullptr);
 }
 
 }

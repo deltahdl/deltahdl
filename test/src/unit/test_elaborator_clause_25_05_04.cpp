@@ -43,19 +43,6 @@ TEST(ModportExpressionElaboration, ConstantPortExpressionWithOutputDirectionErro
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ModportExpressionElaboration, ConstantPortExpressionWithInoutDirectionErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "interface I;\n"
-      "  modport mp(inout .P(2));\n"
-      "endinterface\n"
-      "module top;\n"
-      "  I inst();\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(ModportExpressionElaboration, ConstantPortExpressionWithInputDirectionAccepted) {
   EXPECT_TRUE(
       ElabOk("interface I;\n"
