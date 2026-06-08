@@ -4,18 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ModuleItemsParsing, ModuleDefinitionWithBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a;\n"
-      "  assign a = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  EXPECT_EQ(mod->name, "m");
-  ASSERT_GE(mod->items.size(), 2);
-}
-
+// Syntax 23-5: "zero" case — a module definition may contain no module items.
 TEST(ModuleItemsParsing, EmptyModuleBody) {
   auto r = Parse("module m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -24,563 +13,8 @@ TEST(ModuleItemsParsing, EmptyModuleBody) {
   EXPECT_TRUE(r.cu->modules[0]->items.empty());
 }
 
-TEST(ModuleItemsParsing, MultipleItemKinds) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a;\n"
-      "  assign a = 1;\n"
-      "  initial begin end\n"
-      "  always_comb begin end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->modules[0]->items.size(), 4u);
-}
-
-TEST(ModuleItemsParsing, ContinuousAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, y;\n"
-      "  assign y = a & b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign));
-}
-
-TEST(ModuleItemsParsing, InitialConstruct) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock));
-}
-
-TEST(ModuleItemsParsing, FinalConstruct) {
-  auto r = Parse(
-      "module m;\n"
-      "  final begin end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock));
-}
-
-TEST(ModuleItemsParsing, AlwaysConstructPlain) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk) begin end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlways));
-}
-
-TEST(ModuleItemsParsing, AlwaysComb) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb begin end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysComb));
-}
-
-TEST(ModuleItemsParsing, AlwaysFF) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_ff @(posedge clk) begin end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysFF));
-}
-
-TEST(ModuleItemsParsing, AlwaysLatch) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_latch begin end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysLatch));
-}
-
-TEST(ModuleItemsParsing, AllAlwaysVariants) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(*) begin end\n"
-      "  always_comb begin end\n"
-      "  always_ff @(posedge clk) begin end\n"
-      "  always_latch begin end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlways));
-  EXPECT_TRUE(
-      HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysComb));
-  EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysFF));
-  EXPECT_TRUE(
-      HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysLatch));
-}
-
-TEST(ModuleItemsParsing, MixedProcedureTypes) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial a = 0;\n"
-      "  always @(posedge clk) q <= d;\n"
-      "  final $display(\"done\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock));
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock));
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock));
-}
-
-TEST(ModuleItemsParsing, LoopGenerateConstruct) {
-  auto r = Parse(
-      "module m;\n"
-      "  genvar i;\n"
-      "  for (i = 0; i < 4; i = i + 1) begin : gen_blk\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateFor));
-}
-
-TEST(ModuleItemsParsing, ConditionalGenerateIf) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (1) begin : yes\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateIf));
-}
-
-TEST(ModuleItemsParsing, ConditionalGenerateCase) {
-  auto r = Parse(
-      "module m;\n"
-      "  case (1)\n"
-      "    0: wire a;\n"
-      "    1: wire b;\n"
-      "  endcase\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateCase));
-}
-
-TEST(ModuleItemsParsing, GenerateIfElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (1) begin : yes\n"
-      "    wire a;\n"
-      "  end else begin : no\n"
-      "    wire b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateIf));
-}
-
-TEST(ModuleItemsParsing, ParameterOverride) {
-  auto r = Parse(
-      "module m;\n"
-      "  defparam u1.W = 16;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kDefparam));
-}
-
-TEST(ModuleItemsParsing, GateInstantiation) {
-  auto r = Parse(
-      "module m;\n"
-      "  and g1(y, a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGateInst));
-}
-
-TEST(ModuleItemsParsing, ModuleInstantiation) {
-  auto r = Parse(
-      "module m;\n"
-      "  sub u1(.a(x), .b(y));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kModuleInst));
-}
-
-TEST(ModuleItemsParsing, ClockingDeclaration) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kClockingBlock));
-}
-
-TEST(ModuleItemsParsing, DefaultClocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "  endclocking\n"
-      "  default clocking cb;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ModuleItemsParsing, DefaultDisableIff) {
-  auto r = Parse(
-      "module m;\n"
-      "  default disable iff rst;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kDefaultDisableIff));
-}
-
-TEST(ModuleItemsParsing, GenerateRegion) {
-  auto r = Parse(
-      "module m;\n"
-      "  generate\n"
-      "    wire w;\n"
-      "  endgenerate\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ModuleItemsParsing, SpecifyBlock) {
-  auto r = Parse(
-      "module m(input a, output y);\n"
-      "  specify\n"
-      "    (a => y) = 1;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kSpecifyBlock));
-}
-
-TEST(ModuleItemsParsing, SpecparamDeclaration) {
-  auto r = Parse(
-      "module m;\n"
-      "  specparam delay = 10;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kSpecparam));
-}
-
-TEST(ModuleItemsParsing, PortDeclAsModuleItem) {
-  auto r = Parse(
-      "module m(a, b, y);\n"
-      "  input a, b;\n"
-      "  output y;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ModuleItemsParsing, AssertionItem) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) a |-> b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty));
-}
-
-TEST(ModuleItemsParsing, InterfaceInstantiation) {
-  auto r = Parse(
-      "module m;\n"
-      "  bus_if bus_inst(.clk(clk));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kModuleInst));
-}
-
-TEST(ModuleItemsParsing, ItemWithAttributes) {
-  auto r = Parse(
-      "module m;\n"
-      "  (* full_case *) wire w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ModuleItemsParsing, GenvarDeclaration) {
-  auto r = Parse(
-      "module m;\n"
-      "  genvar i, j;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ModuleItemsParsing, ElabFatalTask) {
-  auto r = Parse(
-      "module m;\n"
-      "  $fatal(1, \"error message\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kElabSystemTask));
-}
-
-TEST(ModuleItemsParsing, ElabErrorTask) {
-  auto r = Parse(
-      "module m;\n"
-      "  $error(\"something wrong\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ModuleItemsParsing, ElabWarningTask) {
-  auto r = Parse(
-      "module m;\n"
-      "  $warning;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ModuleItemsParsing, ElabInfoTask) {
-  auto r = Parse(
-      "module m;\n"
-      "  $info(\"build info\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ModuleItemsParsing, ClassInsideModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  class inner_cls;\n"
-      "    int x;\n"
-      "  endclass\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* cls = FindClassDeclItem(r.cu->modules[0]->items);
-  ASSERT_NE(cls, nullptr);
-  EXPECT_EQ(cls->name, "inner_cls");
-}
-
-TEST(ParameterOverride, ListOfDefparamAssignmentsThree) {
-  auto r = Parse(
-      "module top;\n"
-      "  defparam u0.A = 1, u0.B = 2, u0.C = 3;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->defparam_assigns.size(), 3u);
-}
-
-TEST(ParameterOverride, DefparamSingleAssignment) {
-  auto r = Parse(
-      "module m;\n"
-      "  defparam u.WIDTH = 32;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
-  EXPECT_EQ(item->defparam_assigns.size(), 1u);
-}
-
-TEST(ModuleItemsParsing, ErrorDefparamMissingSemicolon) {
-  auto r = Parse(
-      "module m;\n"
-      "  defparam u.W = 16\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ModuleItemsParsing, ErrorUnclosedGenerateRegion) {
-  auto r = Parse(
-      "module m;\n"
-      "  generate\n"
-      "    wire w;\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ModuleItemsParsing, NetAlias) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w1, w2;\n"
-      "  alias w1 = w2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAlias));
-}
-
-TEST(ModuleItemsParsing, NetAliasThreeNets) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w1, w2, w3;\n"
-      "  alias w1 = w2 = w3;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAlias);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->alias_nets.size(), 3u);
-}
-
-TEST(ModuleItemsParsing, UdpInstantiation) {
-  auto r = Parse(
-      "primitive my_udp(output y, input a, b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    0 1 : 1;\n"
-      "    1 0 : 1;\n"
-      "    1 1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "module m;\n"
-      "  my_udp u1(y, a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst));
-}
-
-TEST(ModuleItemsParsing, TimeunitAsModuleItem) {
-  auto r = Parse(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
-}
-
-TEST(ModuleItemsParsing, TimeprecisionAsModuleItem) {
-  auto r = Parse(
-      "module m;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
-}
-
-TEST(ModuleItemsParsing, TimeunitWithPrecisionAsModuleItem) {
-  auto r = Parse(
-      "module m;\n"
-      "  timeunit 1ns / 1ps;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
-}
-
-TEST(ModuleItemsParsing, ProgramInstantiationInModule) {
-  auto r = Parse(
-      "program prg;\n"
-      "endprogram\n"
-      "module m;\n"
-      "  prg p1();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kModuleInst));
-}
-
-TEST(ModuleItemsParsing, AssumePropertyInModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  assume property (@(posedge clk) a |-> b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAssumeProperty));
-}
-
-TEST(ModuleItemsParsing, CoverPropertyInModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  cover property (@(posedge clk) a |-> b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kCoverProperty));
-}
-
-TEST(ModuleItemsParsing, RestrictPropertyInModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  restrict property (@(posedge clk) a |-> b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kRestrictProperty));
-}
-
-TEST(ModuleItemsParsing, CoverSequenceInModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  cover sequence (@(posedge clk) a ##1 b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kCoverSequence));
-}
-
+// Syntax 23-5: "more" case — a module definition may contain many module items
+// of several different alternatives at once.
 TEST(ModuleItemsParsing, AllModuleItemAlternatives) {
   auto r = Parse(
       "module m(input a, output y);\n"
@@ -607,6 +41,409 @@ TEST(ModuleItemsParsing, AllModuleItemAlternatives) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 10u);
 }
 
+// module_common_item alternative: continuous_assign.
+TEST(ModuleItemsParsing, ContinuousAssign) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b, y;\n"
+      "  assign y = a & b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign));
+}
+
+// module_common_item alternative: initial_construct.
+TEST(ModuleItemsParsing, InitialConstruct) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock));
+}
+
+// module_common_item alternative: final_construct.
+TEST(ModuleItemsParsing, FinalConstruct) {
+  auto r = Parse(
+      "module m;\n"
+      "  final begin end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock));
+}
+
+// module_common_item alternative: always_construct. The four always_keyword
+// kinds are a §9.2 distinction; §23.2.4 only requires always_construct to be a
+// module item, so a single observer suffices here.
+TEST(ModuleItemsParsing, AlwaysConstructPlain) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk) begin end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlways));
+}
+
+// module_common_item alternative: loop_generate_construct.
+TEST(ModuleItemsParsing, LoopGenerateConstruct) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; i = i + 1) begin : gen_blk\n"
+      "    wire w;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateFor));
+}
+
+// module_common_item alternative: conditional_generate_construct. The if vs
+// case forms are a §27.5 distinction, so one observer covers §23.2.4.
+TEST(ModuleItemsParsing, ConditionalGenerateIf) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (1) begin : yes\n"
+      "    wire w;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateIf));
+}
+
+// module_or_generate_item alternative: parameter_override (BNF-6). The number
+// of defparam assignments is a list_of_defparam_assignments (A.2.4) detail.
+TEST(ModuleItemsParsing, ParameterOverride) {
+  auto r = Parse(
+      "module m;\n"
+      "  defparam u1.W = 16;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kDefparam));
+}
+
+// module_or_generate_item alternative: gate_instantiation.
+TEST(ModuleItemsParsing, GateInstantiation) {
+  auto r = Parse(
+      "module m;\n"
+      "  and g1(y, a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGateInst));
+}
+
+// module_or_generate_item alternative: udp_instantiation.
+TEST(ModuleItemsParsing, UdpInstantiation) {
+  auto r = Parse(
+      "primitive my_udp(output y, input a, b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    0 1 : 1;\n"
+      "    1 0 : 1;\n"
+      "    1 1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  my_udp u1(y, a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst));
+}
+
+// module_or_generate_item alternative: module_instantiation.
+TEST(ModuleItemsParsing, ModuleInstantiation) {
+  auto r = Parse(
+      "module m;\n"
+      "  sub u1(.a(x), .b(y));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kModuleInst));
+}
+
+// module_common_item alternative: interface_instantiation. A distinct Syntax
+// 23-5 alternative even though the parser shares the instantiation AST kind.
+TEST(ModuleItemsParsing, InterfaceInstantiation) {
+  auto r = Parse(
+      "module m;\n"
+      "  bus_if bus_inst(.clk(clk));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kModuleInst));
+}
+
+// module_common_item alternative: program_instantiation.
+TEST(ModuleItemsParsing, ProgramInstantiationInModule) {
+  auto r = Parse(
+      "program prg;\n"
+      "endprogram\n"
+      "module m;\n"
+      "  prg p1();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kModuleInst));
+}
+
+// module_common_item alternative: assertion_item. The assert/assume/cover/
+// restrict forms are a §16.14.6 distinction, so one observer covers §23.2.4.
+TEST(ModuleItemsParsing, AssertionItem) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) a |-> b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty));
+}
+
+// module_common_item alternative: bind_directive. Recorded on the enclosing
+// module rather than its item list.
+TEST(ModuleItemsParsing, BindDirectiveAsModuleItem) {
+  auto r = Parse(
+      "module m;\n"
+      "  bind target_mod chk chk_i(.a(s));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->bind_directives.size(), 1u);
+}
+
+// module_common_item alternative: net_alias. The number of aliased nets is a
+// §10.11 detail, not a §23.2.4 distinction.
+TEST(ModuleItemsParsing, NetAlias) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w1, w2;\n"
+      "  alias w1 = w2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAlias));
+}
+
+// module_or_generate_item_declaration alternative:
+// package_or_generate_item_declaration (here a class declaration).
+TEST(ModuleItemsParsing, ClassInsideModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  class inner_cls;\n"
+      "    int x;\n"
+      "  endclass\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* cls = FindClassDeclItem(r.cu->modules[0]->items);
+  ASSERT_NE(cls, nullptr);
+  EXPECT_EQ(cls->name, "inner_cls");
+}
+
+// module_or_generate_item_declaration alternative: genvar_declaration.
+TEST(ModuleItemsParsing, GenvarDeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i, j;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// module_or_generate_item_declaration alternative: clocking_declaration.
+TEST(ModuleItemsParsing, ClockingDeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kClockingBlock));
+}
+
+// module_or_generate_item_declaration alternative: default clocking ... ;
+TEST(ModuleItemsParsing, DefaultClocking) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "  endclocking\n"
+      "  default clocking cb;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// module_or_generate_item_declaration alternative: default disable iff ... ;
+TEST(ModuleItemsParsing, DefaultDisableIff) {
+  auto r = Parse(
+      "module m;\n"
+      "  default disable iff rst;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
+                            ModuleItemKind::kDefaultDisableIff));
+}
+
+// non_port_module_item alternative: generate_region.
+TEST(ModuleItemsParsing, GenerateRegion) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    wire w;\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// non_port_module_item alternative: specify_block.
+TEST(ModuleItemsParsing, SpecifyBlock) {
+  auto r = Parse(
+      "module m(input a, output y);\n"
+      "  specify\n"
+      "    (a => y) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kSpecifyBlock));
+}
+
+// non_port_module_item alternative: specparam_declaration.
+TEST(ModuleItemsParsing, SpecparamDeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  specparam delay = 10;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kSpecparam));
+}
+
+// non_port_module_item alternative: module_declaration (nested module).
+TEST(ModuleItemsParsing, NestedModuleDeclaration) {
+  auto r = Parse(
+      "module outer;\n"
+      "  module inner;\n"
+      "  endmodule\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kNestedModuleDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->nested_module_decl, nullptr);
+  EXPECT_EQ(item->nested_module_decl->decl_kind, ModuleDeclKind::kModule);
+  EXPECT_EQ(item->nested_module_decl->name, "inner");
+}
+
+// non_port_module_item alternative: interface_declaration (nested interface).
+TEST(ModuleItemsParsing, NestedInterfaceDeclaration) {
+  auto r = Parse(
+      "module outer;\n"
+      "  interface inner_if;\n"
+      "  endinterface\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kNestedModuleDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->nested_module_decl, nullptr);
+  EXPECT_EQ(item->nested_module_decl->decl_kind, ModuleDeclKind::kInterface);
+}
+
+// non_port_module_item alternative: program_declaration (nested program).
+TEST(ModuleItemsParsing, NestedProgramDeclaration) {
+  auto r = Parse(
+      "module outer;\n"
+      "  program inner_pgm;\n"
+      "  endprogram\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kNestedModuleDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->nested_module_decl, nullptr);
+  EXPECT_EQ(item->nested_module_decl->decl_kind, ModuleDeclKind::kProgram);
+}
+
+// module_item alternative: port_declaration ; (non-ANSI port declaration item).
+TEST(ModuleItemsParsing, PortDeclAsModuleItem) {
+  auto r = Parse(
+      "module m(a, b, y);\n"
+      "  input a, b;\n"
+      "  output y;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// Syntax 23-5 attribute_instance prefix on a module_or_generate_item.
+TEST(ModuleItemsParsing, ItemWithAttributes) {
+  auto r = Parse(
+      "module m;\n"
+      "  (* full_case *) wire w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// An elaboration system task accepted as a module item. The particular
+// severity ($fatal/$error/$warning/$info) is a §20.11 distinction.
+TEST(ModuleItemsParsing, ElabFatalTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  $fatal(1, \"error message\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kElabSystemTask));
+}
+
+// non_port_module_item alternative: timeunits_declaration. timeunit, time-
+// precision, and the combined form are a §3.14.2 distinction.
+TEST(ModuleItemsParsing, TimeunitAsModuleItem) {
+  auto r = Parse(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
+}
+
+// Footnote 3: a later timeunits_declaration is legal when it repeats and
+// matches a prior declaration in the same time scope.
 TEST(ModuleItemsParsing, TimeunitRepeatMatches) {
   auto r = Parse(
       "module m;\n"
@@ -618,30 +455,8 @@ TEST(ModuleItemsParsing, TimeunitRepeatMatches) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ModuleItemsParsing, TimeprecisionRepeatMatches) {
-  auto r = Parse(
-      "module m;\n"
-      "  timeprecision 1ps;\n"
-      "  wire w;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ModuleItemsParsing, TimeunitBothHeaderRepeatMatches) {
-  auto r = Parse(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "  wire w;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
+// Footnote 3: a later timeunits_declaration with no prior declaration to repeat
+// is illegal.
 TEST(ModuleItemsParsing, ErrorTimeunitNoPriorDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -651,15 +466,8 @@ TEST(ModuleItemsParsing, ErrorTimeunitNoPriorDeclaration) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ModuleItemsParsing, ErrorTimeprecisionNoPriorDeclaration) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
+// Footnote 3: a repeated timeunits_declaration that does not match the prior
+// one is illegal.
 TEST(ModuleItemsParsing, ErrorTimeunitMismatch) {
   auto r = Parse(
       "module m;\n"
@@ -670,16 +478,26 @@ TEST(ModuleItemsParsing, ErrorTimeunitMismatch) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ModuleItemsParsing, ErrorTimeprecisionMismatch) {
+// parameter_override is terminated by ';' (BNF-6).
+TEST(ModuleItemsParsing, ErrorDefparamMissingSemicolon) {
   auto r = Parse(
       "module m;\n"
-      "  timeprecision 1ps;\n"
-      "  wire w;\n"
-      "  timeprecision 1ns;\n"
+      "  defparam u.W = 16\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
 
+// A generate_region must be closed with endgenerate.
+TEST(ModuleItemsParsing, ErrorUnclosedGenerateRegion) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    wire w;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// A net_alias module item is terminated by ';'.
 TEST(ModuleItemsParsing, ErrorNetAliasMissingSemicolon) {
   auto r = Parse(
       "module m;\n"
@@ -689,6 +507,7 @@ TEST(ModuleItemsParsing, ErrorNetAliasMissingSemicolon) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// A timeunits_declaration module item is terminated by ';'.
 TEST(ModuleItemsParsing, ErrorTimeunitMissingSemicolon) {
   auto r = Parse(
       "module m;\n"

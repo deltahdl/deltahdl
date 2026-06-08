@@ -2,6 +2,7 @@
 
 namespace {
 
+// Syntax 23-5 "more" case: a module with many different module items elaborates.
 TEST(ModuleContents, MixedItemsElaborate) {
   EXPECT_TRUE(
       ElabOk("module m (input logic clk, output logic [7:0] q);\n"
@@ -14,15 +15,18 @@ TEST(ModuleContents, MixedItemsElaborate) {
              "endmodule\n"));
 }
 
-TEST(ModuleContents, DeclarationsAndAssign) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  logic a;\n"
-             "  wire b;\n"
-             "  assign b = a;\n"
-             "endmodule\n"));
+// Syntax 23-5 "zero" case: an empty module body elaborates to no items.
+TEST(ModuleItemsElaboration, EmptyModuleElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate("module m; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(design->top_modules[0]->processes.empty());
+  EXPECT_TRUE(design->top_modules[0]->assigns.empty());
+  EXPECT_TRUE(design->top_modules[0]->children.empty());
 }
 
+// continuous_assign lowers to an assign.
 TEST(ModuleItemsElaboration, ContinuousAssignElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -36,6 +40,7 @@ TEST(ModuleItemsElaboration, ContinuousAssignElaborates) {
   EXPECT_FALSE(design->top_modules[0]->assigns.empty());
 }
 
+// initial_construct lowers to an initial process.
 TEST(ModuleItemsElaboration, InitialBlockElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -50,6 +55,7 @@ TEST(ModuleItemsElaboration, InitialBlockElaborates) {
             RtlirProcessKind::kInitial);
 }
 
+// final_construct lowers to a final process.
 TEST(ModuleItemsElaboration, FinalBlockElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -64,6 +70,8 @@ TEST(ModuleItemsElaboration, FinalBlockElaborates) {
             RtlirProcessKind::kFinal);
 }
 
+// always_construct lowers to a process. The always_keyword kind is a §9.2
+// distinction, so a single observer covers §23.2.4.
 TEST(ModuleItemsElaboration, AlwaysCombProcessKind) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -78,50 +86,7 @@ TEST(ModuleItemsElaboration, AlwaysCombProcessKind) {
             RtlirProcessKind::kAlwaysComb);
 }
 
-TEST(ModuleItemsElaboration, AlwaysFFProcessKind) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  logic clk;\n"
-      "  always_ff @(posedge clk) begin end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_FALSE(design->top_modules[0]->processes.empty());
-  EXPECT_EQ(design->top_modules[0]->processes[0].kind,
-            RtlirProcessKind::kAlwaysFF);
-}
-
-TEST(ModuleItemsElaboration, AlwaysLatchProcessKind) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  always_latch begin end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_FALSE(design->top_modules[0]->processes.empty());
-  EXPECT_EQ(design->top_modules[0]->processes[0].kind,
-            RtlirProcessKind::kAlwaysLatch);
-}
-
-TEST(ModuleItemsElaboration, AlwaysPlainProcessKind) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  logic clk;\n"
-      "  always @(posedge clk) begin end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_FALSE(design->top_modules[0]->processes.empty());
-  EXPECT_EQ(design->top_modules[0]->processes[0].kind,
-            RtlirProcessKind::kAlways);
-}
-
+// module_instantiation lowers to a child instance.
 TEST(ModuleItemsElaboration, ModuleInstantiationElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -137,32 +102,7 @@ TEST(ModuleItemsElaboration, ModuleInstantiationElaborates) {
   EXPECT_EQ(design->top_modules[0]->children[0].inst_name, "u1");
 }
 
-TEST(ModuleItemsElaboration, EmptyModuleElaborates) {
-  ElabFixture f;
-  auto* design = Elaborate("module m; endmodule\n", f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  EXPECT_TRUE(design->top_modules[0]->processes.empty());
-  EXPECT_TRUE(design->top_modules[0]->assigns.empty());
-  EXPECT_TRUE(design->top_modules[0]->children.empty());
-}
-
-TEST(ModuleItemsElaboration, MultipleItemKindsElaborate) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire a;\n"
-      "  assign a = 1;\n"
-      "  initial begin end\n"
-      "  always_comb begin end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  EXPECT_FALSE(design->top_modules[0]->assigns.empty());
-  EXPECT_GE(design->top_modules[0]->processes.size(), 2u);
-}
-
+// conditional_generate_construct elaborates.
 TEST(ModuleItemsElaboration, ConditionalGenerateElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -176,6 +116,7 @@ TEST(ModuleItemsElaboration, ConditionalGenerateElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// loop_generate_construct elaborates.
 TEST(ModuleItemsElaboration, LoopGenerateElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -190,6 +131,7 @@ TEST(ModuleItemsElaboration, LoopGenerateElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// generate_region elaborates.
 TEST(ModuleItemsElaboration, GenerateRegionElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -203,6 +145,7 @@ TEST(ModuleItemsElaboration, GenerateRegionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// net_alias elaborates to an alias. Alias arity is a §10.11 detail.
 TEST(ModuleItemsElaboration, NetAliasElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -216,20 +159,7 @@ TEST(ModuleItemsElaboration, NetAliasElaborates) {
   EXPECT_FALSE(design->top_modules[0]->aliases.empty());
 }
 
-TEST(ModuleItemsElaboration, NetAliasThreeNetsElaborates) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire w1, w2, w3;\n"
-      "  alias w1 = w2 = w3;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules[0]->aliases.size(), 1u);
-  EXPECT_EQ(design->top_modules[0]->aliases[0].nets.size(), 3u);
-}
-
+// gate_instantiation elaborates.
 TEST(ModuleItemsElaboration, GateInstantiationElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -242,6 +172,7 @@ TEST(ModuleItemsElaboration, GateInstantiationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// specparam_declaration elaborates.
 TEST(ModuleItemsElaboration, SpecparamElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -253,6 +184,7 @@ TEST(ModuleItemsElaboration, SpecparamElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// specify_block elaborates.
 TEST(ModuleItemsElaboration, SpecifyBlockElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -267,6 +199,7 @@ TEST(ModuleItemsElaboration, SpecifyBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// clocking_declaration elaborates.
 TEST(ModuleItemsElaboration, ClockingBlockElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -280,6 +213,7 @@ TEST(ModuleItemsElaboration, ClockingBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// An elaboration system task module item elaborates.
 TEST(ModuleItemsElaboration, ElabSystemTaskElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -289,24 +223,6 @@ TEST(ModuleItemsElaboration, ElabSystemTaskElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-}
-
-TEST(ModuleItemsElaboration, AllProcessKindsElaborate) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  logic clk;\n"
-      "  initial begin end\n"
-      "  final begin end\n"
-      "  always @(posedge clk) begin end\n"
-      "  always_comb begin end\n"
-      "  always_ff @(posedge clk) begin end\n"
-      "  always_latch begin end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  EXPECT_EQ(design->top_modules[0]->processes.size(), 6u);
 }
 
 }
