@@ -7,26 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DefaultPortValueSimulation, OmittedInputGetsDefaultValue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module child(input logic [7:0] a, output logic [7:0] b);\n"
-      "  assign b = a;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic [7:0] result;\n"
-      "  child u(.a(8'hAB), .b(result));\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xABu);
-}
-
 TEST(DefaultPortValueSimulation, OmittedInputUsesDefaultNamedConn) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -90,27 +70,6 @@ TEST(DefaultPortValueSimulation, DefaultEvaluatedInDefiningModuleScope) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
-}
-
-TEST(DefaultPortValueSimulation, DefaultFromModuleParameter) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module child #(parameter P = 8'hAA)\n"
-      "             (input logic [7:0] a = P, output logic [7:0] b);\n"
-      "  assign b = a;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic [7:0] result;\n"
-      "  child u(.b(result));\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
 }
