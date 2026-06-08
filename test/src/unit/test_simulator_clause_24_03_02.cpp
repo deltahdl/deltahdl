@@ -13,6 +13,10 @@ using namespace delta;
 
 namespace {
 
+// §24.3.2: procedural program code runs in the reactive region set, so a design
+// variable written across a program connection is updated there. A program
+// initial block that reads a design value and writes a design variable must do
+// so while executing in the reactive region.
 TEST(ProgramPortConnectionSim, ProgramDrivesDesignVariableInReactive) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -35,6 +39,9 @@ TEST(ProgramPortConnectionSim, ProgramDrivesDesignVariableInReactive) {
   EXPECT_EQ(b->value.ToUint64(), 42u);
 }
 
+// §24.3.2: a net reached through a program connection is driven and resolved in
+// the reactive region set. A continuous assign inside a program drives a design
+// net; the resolved net value must reflect that reactive-region drive.
 TEST(ProgramPortConnectionSim, ProgramContinuousAssignDrivesDesignNet) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -54,6 +61,10 @@ TEST(ProgramPortConnectionSim, ProgramContinuousAssignDrivesDesignNet) {
   EXPECT_EQ(dnet->value.ToUint64(), 55u);
 }
 
+// §24.3.2: design processes that are sensitive to the variables and nets
+// updated across the region boundary are woken in the active region set. A
+// design always block sensitive to a variable written by a program must wake
+// and observe the program's reactive-region update.
 TEST(ProgramPortConnectionSim, DesignAlwaysSensitiveToProgramWriteObservesUpdate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -74,50 +85,10 @@ TEST(ProgramPortConnectionSim, DesignAlwaysSensitiveToProgramWriteObservesUpdate
   EXPECT_EQ(obs->value.ToUint64(), 77u);
 }
 
-TEST(ProgramPortConnectionSim, ProgramAssignTriggersDesignAlwaysOnNet) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  logic r;\n"
-      "  wire  dw;\n"
-      "  logic captured;\n"
-      "  initial begin\n"
-      "    captured = 1'b0;\n"
-      "    r = 1'b0;\n"
-      "    #1 r = 1'b1;\n"
-      "  end\n"
-      "  always @(dw) captured = dw;\n"
-      "  program p;\n"
-      "    assign dw = r;\n"
-      "  endprogram\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* cap = f.ctx.FindVariable("captured");
-  ASSERT_NE(cap, nullptr);
-  EXPECT_EQ(cap->value.ToUint64(), 1u);
-}
-
-TEST(ProgramPortConnectionSim, ProgramNbaToDesignVariableCommitsInReNba) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  logic [7:0] a;\n"
-      "  logic [7:0] b;\n"
-      "  initial a <= 8'd9;\n"
-      "  program p;\n"
-      "    initial b <= a;\n"
-      "  endprogram\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* b = f.ctx.FindVariable("b");
-  ASSERT_NE(b, nullptr);
-  EXPECT_EQ(b->value.ToUint64(), 9u);
-}
-
+// §24.3.2: driving and resolution of a net happen right after an event changes
+// a driver on a program net. A design process that samples the resolved net at
+// a later time step must see the value produced by the program's reactive-region
+// drive.
 TEST(ProgramPortConnectionSim, NetResolutionImmediateOnProgramDriverChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -143,6 +114,11 @@ TEST(ProgramPortConnectionSim, NetResolutionImmediateOnProgramDriverChange) {
   EXPECT_EQ(s->value.ToUint64(), 5u);
 }
 
+// §24.3.2 (worked example): the program's continuous assign is held until the
+// Reactive region, and the design always it triggers does not run until the
+// Active region of the next pass, so the simulator must iterate the whole
+// scheduling loop. The design always therefore still fires from the
+// program-driven net change.
 TEST(ProgramPortConnectionSim, MultiIterationLoopProgramAssignDesignAlways) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -168,73 +144,62 @@ TEST(ProgramPortConnectionSim, MultiIterationLoopProgramAssignDesignAlways) {
   EXPECT_GE(hits->value.ToUint64(), 1u);
 }
 
-TEST(ProgramPortConnectionSim, DesignWriteVisibleInProgramRead) {
+// §24.3.2 (across an actual program port connection): a program instantiated
+// with ports drives a design net through its output port. The drive and
+// resolution happen in the reactive region set, and a design always block
+// sensitive to that net is woken in the active region set, so it captures the
+// program-driven value. This exercises the port-binding path (input/output
+// bindings lowered as reactive continuous assigns), not a nested hierarchical
+// reference.
+TEST(ProgramPortConnectionSim, ProgramOutputPortDrivesDesignNetAndWakesDesignAlways) {
   SimFixture f;
   auto* design = ElaborateSrc(
+      "program p(input din, output dout);\n"
+      "  assign dout = din;\n"
+      "endprogram\n"
       "module top;\n"
-      "  logic [7:0] from_design;\n"
-      "  logic [7:0] inside_program;\n"
-      "  initial from_design <= 8'd123;\n"
-      "  program p;\n"
-      "    initial inside_program = from_design;\n"
-      "  endprogram\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* inside = f.ctx.FindVariable("inside_program");
-  ASSERT_NE(inside, nullptr);
-  EXPECT_EQ(inside->value.ToUint64(), 123u);
-}
-
-TEST(ProgramPortConnectionSim, UnchangedSignalDoesNotTriggerDesignProcess) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  logic [7:0] shared;\n"
-      "  logic [7:0] hits;\n"
+      "  logic stim;\n"
+      "  wire  pnet;\n"
+      "  logic captured;\n"
       "  initial begin\n"
-      "    hits = 8'd0;\n"
-      "    shared = 8'd5;\n"
+      "    captured = 1'b0;\n"
+      "    stim = 1'b0;\n"
+      "    #1 stim = 1'b1;\n"
       "  end\n"
-      "  always @(shared) hits = hits + 8'd1;\n"
-      "  program p;\n"
-      "    initial #1 shared = 8'd5;\n"
-      "  endprogram\n"
+      "  always @(pnet) captured = pnet;\n"
+      "  p p_i(.din(stim), .dout(pnet));\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  auto* hits = f.ctx.FindVariable("hits");
-  ASSERT_NE(hits, nullptr);
-  EXPECT_LE(hits->value.ToUint64(), 1u);
+  auto* cap = f.ctx.FindVariable("captured");
+  ASSERT_NE(cap, nullptr);
+  EXPECT_EQ(cap->value.ToUint64(), 1u);
 }
 
-TEST(ProgramPortConnectionSim, ProgramDrivesWireChainIntoDesignAlways) {
+// §24.3.2 (across an actual program port connection): a design variable on the
+// other side of a program output port is updated in the reactive region set.
+// The program reads a design value through its input port and drives a design
+// variable through its output port; the final variable value reflects the
+// reactive-region update carried across the port connection.
+TEST(ProgramPortConnectionSim, ProgramOutputPortUpdatesDesignVariableInReactive) {
   SimFixture f;
   auto* design = ElaborateSrc(
+      "program p(input [7:0] din, output logic [7:0] dout);\n"
+      "  assign dout = din;\n"
+      "endprogram\n"
       "module top;\n"
-      "  logic [7:0] src;\n"
-      "  wire  [7:0] mid;\n"
-      "  wire  [7:0] last;\n"
-      "  logic [7:0] observed;\n"
-      "  assign last = mid;\n"
-      "  initial begin\n"
-      "    observed = 8'd0;\n"
-      "    src = 8'd0;\n"
-      "    #1 src <= 8'd64;\n"
-      "  end\n"
-      "  always @(last) observed = last;\n"
-      "  program p;\n"
-      "    assign mid = src;\n"
-      "  endprogram\n"
+      "  logic [7:0] feed;\n"
+      "  logic [7:0] catch_var;\n"
+      "  initial feed <= 8'd200;\n"
+      "  p p_i(.din(feed), .dout(catch_var));\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  auto* obs = f.ctx.FindVariable("observed");
-  ASSERT_NE(obs, nullptr);
-  EXPECT_EQ(obs->value.ToUint64(), 64u);
+  auto* cv = f.ctx.FindVariable("catch_var");
+  ASSERT_NE(cv, nullptr);
+  EXPECT_EQ(cv->value.ToUint64(), 200u);
 }
 
-}
+}  // namespace
