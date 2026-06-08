@@ -4,6 +4,19 @@ using namespace delta;
 
 namespace {
 
+// Section 25.8 owns one capability claim: an interface definition may take
+// advantage of parameters and parameter redefinition in the same manner as a
+// module definition. The elaborator is where this claim is concretely applied
+// to an interface instance, reusing the generic module-parameter machinery.
+// Two facets, one observer each:
+//   (a) parameters with defaults  -> default applies when not overridden
+//   (b) redefinition              -> an override is applied to the instance
+// The named-override form matches the worked example in the LRM text
+// (simple_bus #(.DWIDTH(16)) wide_intf). Other override mechanics (positional
+// form, multiple/reordered names, empty list, parent-scope expressions,
+// unknown-name errors) are owned by 6.20 / 23.10.2 / 23.10.2.2 and exercised
+// there; re-testing them here would only restate those clauses.
+
 TEST(ParameterizedInterface, DefaultParameterUsedWhenNotOverridden) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -25,24 +38,6 @@ TEST(ParameterizedInterface, DefaultParameterUsedWhenNotOverridden) {
   EXPECT_EQ(u0->params[0].resolved_value, 8);
 }
 
-TEST(ParameterizedInterface, PositionalOverrideAppliedToInterfaceInstance) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "interface ifc #(parameter int WIDTH = 8);\n"
-      "  logic [WIDTH-1:0] data;\n"
-      "endinterface\n"
-      "module top;\n"
-      "  ifc #(16) u0();\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* u0 = design->top_modules[0]->children[0].resolved;
-  ASSERT_NE(u0, nullptr);
-  ASSERT_EQ(u0->params.size(), 1u);
-  EXPECT_EQ(u0->params[0].resolved_value, 16);
-}
-
 TEST(ParameterizedInterface, NamedOverrideAppliedToInterfaceInstance) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -60,95 +55,6 @@ TEST(ParameterizedInterface, NamedOverrideAppliedToInterfaceInstance) {
   ASSERT_EQ(u0->params.size(), 1u);
   EXPECT_EQ(u0->params[0].name, "WIDTH");
   EXPECT_EQ(u0->params[0].resolved_value, 32);
-}
-
-TEST(ParameterizedInterface, TwoInstancesGetIndependentOverrideValues) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "interface ifc #(parameter int WIDTH = 8);\n"
-      "  logic [WIDTH-1:0] data;\n"
-      "endinterface\n"
-      "module top;\n"
-      "  ifc #(4) narrow();\n"
-      "  ifc #(.WIDTH(16)) wide();\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules[0]->children.size(), 2u);
-  auto* narrow = design->top_modules[0]->children[0].resolved;
-  auto* wide = design->top_modules[0]->children[1].resolved;
-  ASSERT_NE(narrow, nullptr);
-  ASSERT_NE(wide, nullptr);
-  EXPECT_EQ(narrow->params[0].resolved_value, 4);
-  EXPECT_EQ(wide->params[0].resolved_value, 16);
-}
-
-TEST(ParameterizedInterface, MultipleParametersOverriddenByName) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "interface ifc #(parameter int A = 2, parameter int B = 3);\n"
-      "endinterface\n"
-      "module top;\n"
-      "  ifc #(.B(30), .A(20)) u0();\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* u0 = design->top_modules[0]->children[0].resolved;
-  ASSERT_NE(u0, nullptr);
-  ASSERT_EQ(u0->params.size(), 2u);
-  EXPECT_EQ(u0->params[0].name, "A");
-  EXPECT_EQ(u0->params[0].resolved_value, 20);
-  EXPECT_EQ(u0->params[1].name, "B");
-  EXPECT_EQ(u0->params[1].resolved_value, 30);
-}
-
-TEST(ParameterizedInterface, EmptyParamListUsesDefaults) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "interface ifc #(parameter int WIDTH = 5);\n"
-      "endinterface\n"
-      "module top;\n"
-      "  ifc #() u0();\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* u0 = design->top_modules[0]->children[0].resolved;
-  ASSERT_NE(u0, nullptr);
-  ASSERT_EQ(u0->params.size(), 1u);
-  EXPECT_EQ(u0->params[0].resolved_value, 5);
-}
-
-TEST(ParameterizedInterface, OverrideExpressionEvaluatedInParentScope) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "interface ifc #(parameter int WIDTH = 1);\n"
-      "endinterface\n"
-      "module top;\n"
-      "  parameter int N = 7;\n"
-      "  ifc #(.WIDTH(N + 1)) u0();\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* u0 = design->top_modules[0]->children[0].resolved;
-  ASSERT_NE(u0, nullptr);
-  ASSERT_EQ(u0->params.size(), 1u);
-  EXPECT_EQ(u0->params[0].resolved_value, 8);
-}
-
-TEST(ParameterizedInterface, UnknownNamedParameterIsError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "interface ifc #(parameter int WIDTH = 8);\n"
-      "endinterface\n"
-      "module top;\n"
-      "  ifc #(.BOGUS(16)) u0();\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
 }
 
 }
