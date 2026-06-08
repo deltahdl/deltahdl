@@ -1239,6 +1239,17 @@ RtlirDesign* Elaborator::ElaborateTops(
     CollectAllModules(top, design->all_modules);
   }
 
+  // §23.10.4.2: detect defparam hierarchical names whose early resolution would
+  // diverge from the fully elaborated hierarchy. all_modules holds each
+  // instantiated module once, so each module's defparams are checked a single
+  // time regardless of how many instances exist.
+  {
+    std::unordered_set<std::string_view> top_names;
+    for (auto* top : design->top_modules) top_names.insert(top->name);
+    for (const auto& entry : design->all_modules)
+      CheckEarlyResolutionAmbiguity(entry.second, top_names);
+  }
+
   for (auto* item : unit_->cu_items) {
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {

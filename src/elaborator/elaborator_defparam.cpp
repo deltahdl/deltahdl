@@ -1,3 +1,5 @@
+#include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -149,6 +151,68 @@ void Elaborator::VerifyEarlyResolvedDefparams() {
       diag_.Error(rec.loc,
                   "defparam hierarchical name resolves differently after "
                   "full elaboration than during early resolution");
+    }
+  }
+}
+
+// Names of the generate blocks a conditional/loop generate construct can
+// introduce directly into the enclosing scope. A conditional construct
+// contributes its then-block name plus, recursively, the names of every
+// else/else-if alternative; a case construct contributes each item label; a
+// loop construct contributes its array name.
+static void CollectLocalGenerateBlockNames(
+    const ModuleItem* item, std::unordered_set<std::string_view>& out) {
+  switch (item->kind) {
+    case ModuleItemKind::kGenerateIf:
+      if (!item->name.empty()) out.insert(item->name);
+      if (item->gen_else) CollectLocalGenerateBlockNames(item->gen_else, out);
+      break;
+    case ModuleItemKind::kGenerateCase:
+      for (const auto& ci : item->gen_case_items)
+        if (!ci.label.empty()) out.insert(ci.label);
+      break;
+    case ModuleItemKind::kGenerateFor:
+      if (!item->name.empty()) out.insert(item->name);
+      break;
+    default:
+      break;
+  }
+}
+
+// §23.10.4.2: a defparam's hierarchical name may have to be resolved before the
+// hierarchy is fully elaborated (so a generate condition that reads the target
+// can be evaluated). If that early resolution would differ from the resolution
+// the completed hierarchy dictates, it is an error. The situation arises when a
+// named generate block in the module holding the defparam shares its name with
+// a scope named by the leading component of the defparam's path: before the
+// block is elaborated the leading name resolves outward (here, to a top-level
+// module of the same name), but once the block exists the same name would bind
+// to the local block instead, changing the target. We flag that collision; per
+// the LRM it is fixed by renaming the generate block.
+void Elaborator::CheckEarlyResolutionAmbiguity(
+    RtlirModule* mod,
+    const std::unordered_set<std::string_view>& top_names) {
+  if (!mod) return;
+  const auto* decl = FindModule(mod->name);
+  if (!decl) return;
+
+  std::unordered_set<std::string_view> block_names;
+  for (const auto* item : decl->items)
+    CollectLocalGenerateBlockNames(item, block_names);
+  if (block_names.empty()) return;
+
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kDefparam) continue;
+    for (const auto& assign : item->defparam_assigns) {
+      std::vector<std::string_view> parts;
+      CollectPathComponents(assign.first, parts);
+      if (parts.size() < 2) continue;
+      auto lead = parts.front();
+      if (block_names.count(lead) && top_names.count(lead)) {
+        diag_.Error(item->loc,
+                    "defparam hierarchical name would resolve differently once "
+                    "the like-named generate block is elaborated");
+      }
     }
   }
 }
