@@ -46,6 +46,29 @@ TEST(PortConnectionRulesForVariablesSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0x55u);
 }
 
+TEST(PortConnectionRulesForVariablesSimulation,
+     UnconnectedInputVarTakesDataTypeDefault) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input var logic [7:0] a, output logic [7:0] b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] result;\n"
+      "  child u(.b(result));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  // The input is a variable left unconnected, so it holds the default initial
+  // value of its data type. For 4-state logic that default is x, which the
+  // child forwards to result -- distinct from the high-Z an unconnected net
+  // input would carry.
+  EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
+}
+
 TEST(PortConnectionRulesForVariablesSimulation, RefPortWriteReflectsInParent) {
   SimFixture f;
   auto* design = ElaborateSrc(

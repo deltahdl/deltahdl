@@ -21,6 +21,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidatePackageImportRules(decl);
   ValidateScopeRules(decl);
   ValidateMixedAssignments();
+  ValidateInputPortAssignments(decl);
   ValidateMatchesPatternIntegral(decl);
   ValidateMatchesCaseSelectorType(decl);
   ValidateMatchesIfPredicateType(decl);

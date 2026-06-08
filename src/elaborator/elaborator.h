@@ -319,6 +319,11 @@ class Elaborator {
 
   void ValidateMixedAssignments();
 
+  // §23.3.3.2: a variable declared as an input port is already driven by the
+  // implied continuous assignment from its port connection, so an additional
+  // continuous or procedural assignment to it inside the module is illegal.
+  void ValidateInputPortAssignments(const ModuleDecl* decl);
+
   // §12.6: a constant expression pattern shall be of integral type.
   void ValidateMatchesPatternIntegral(const ModuleDecl* decl);
 

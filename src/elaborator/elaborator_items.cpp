@@ -2340,6 +2340,17 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
   const bool is_ordered =
       !item->inst_ports.empty() && item->inst_ports[0].first.empty();
 
+  // §23.3.3.2: connecting a child's port variable to an interconnect signal of
+  // the instantiating module is illegal. The interconnect signal may be a local
+  // interconnect net (recorded in interconnect_names_) or one of this module's
+  // own interconnect ports threaded down through the hierarchy.
+  auto connects_to_interconnect = [&](std::string_view conn_name) -> bool {
+    if (interconnect_names_.count(conn_name)) return true;
+    for (const auto& p : parent_mod->ports)
+      if (p.name == conn_name && p.is_interconnect) return true;
+    return false;
+  };
+
   for (size_t i = 0; i < item->inst_ports.size(); ++i) {
     auto& [port_name, conn_expr] = item->inst_ports[i];
     const bool is_implicit =
@@ -2493,10 +2504,10 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                                 conn_expr->text, binding.port_name));
       }
 
-      if (it->is_var && interconnect_names_.count(conn_expr->text)) {
+      if (it->is_var && connects_to_interconnect(conn_expr->text)) {
         diag_.Error(item->loc,
                     std::format("port variable '{}' cannot be connected to "
-                                "interconnect net '{}'",
+                                "interconnect '{}'",
                                 binding.port_name, conn_expr->text));
       }
     }
@@ -2666,10 +2677,10 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                                   port.name, port.name));
         }
 
-        if (port.is_var && interconnect_names_.count(port.name)) {
+        if (port.is_var && connects_to_interconnect(port.name)) {
           diag_.Error(item->loc,
                       std::format("port variable '{}' cannot be connected to "
-                                  "interconnect net '{}'",
+                                  "interconnect '{}'",
                                   port.name, port.name));
         }
 

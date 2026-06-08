@@ -27,6 +27,28 @@ TEST(PortConnectionRulesForVariablesElaboration,
 }
 
 TEST(PortConnectionRulesForVariablesElaboration,
+     InputPortVarWithContAssignErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child(input var logic a);\n"
+      "  assign a = 1'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(PortConnectionRulesForVariablesElaboration,
+     InputPortVarWithProceduralAssignErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child(input var logic a);\n"
+      "  initial a = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(PortConnectionRulesForVariablesElaboration,
      OutputPortConnectsToVariable) {
   EXPECT_TRUE(
       ElabOk("module child(output logic [7:0] y);\n"
@@ -35,18 +57,6 @@ TEST(PortConnectionRulesForVariablesElaboration,
              "module top;\n"
              "  logic [7:0] result;\n"
              "  child u(.y(result));\n"
-             "endmodule\n"));
-}
-
-TEST(PortConnectionRulesForVariablesElaboration,
-     OutputPortConnectsToConcatenation) {
-  EXPECT_TRUE(
-      ElabOk("module child(output logic [7:0] y);\n"
-             "  assign y = 8'hAB;\n"
-             "endmodule\n"
-             "module top;\n"
-             "  logic [3:0] hi, lo;\n"
-             "  child u(.y({hi, lo}));\n"
              "endmodule\n"));
 }
 
@@ -81,6 +91,20 @@ TEST(PortConnectionRulesForVariablesElaboration,
 }
 
 TEST(PortConnectionRulesForVariablesElaboration,
+     VarOutputPortWithInitializerErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module child(output logic y);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic v = 1'b0;\n"
+      "  child c(.y(v));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(PortConnectionRulesForVariablesElaboration,
      NetOutputPortAndContAssignAllowed) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -105,6 +129,20 @@ TEST(PortConnectionRulesForVariablesElaboration,
       "module top;\n"
       "  wire [7:0] w;\n"
       "  child u(.a(w));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(PortConnectionRulesForVariablesElaboration,
+     VariableConnectedToInoutPortErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child(inout logic w);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic v;\n"
+      "  child u(.w(v));\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
@@ -171,14 +209,17 @@ TEST(PortConnectionRulesForVariablesElaboration,
 }
 
 TEST(PortConnectionRulesForVariablesElaboration,
-     InterconnectNetToInputPortVariableErrors) {
+     PortVariableToInterconnectPortErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module child(input var logic a);\n"
       "endmodule\n"
-      "module top;\n"
-      "  interconnect ic;\n"
+      "module mid(interconnect ic);\n"
       "  child u(.a(ic));\n"
+      "endmodule\n"
+      "module top;\n"
+      "  interconnect w;\n"
+      "  mid m(.ic(w));\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);

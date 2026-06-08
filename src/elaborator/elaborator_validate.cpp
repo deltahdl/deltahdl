@@ -1828,6 +1828,33 @@ void Elaborator::ValidateMixedAssignments() {
   }
 }
 
+void Elaborator::ValidateInputPortAssignments(const ModuleDecl* decl) {
+  for (const auto& port : decl->ports) {
+    if (port.direction != Direction::kInput) continue;
+    // §23.3.3.2 frames this rule in terms of a variable input port; a net input
+    // port driven from inside the module falls under the net rules (§23.3.3.3)
+    // instead, so only the variable case is rejected here.
+    bool port_is_var =
+        !port.data_type.is_net && !port.data_type.is_interconnect;
+    if (!port_is_var) continue;
+
+    auto ca = cont_assign_targets_.find(port.name);
+    if (ca != cont_assign_targets_.end()) {
+      diag_.Error(ca->second,
+                  std::format("variable '{}' is declared as an input port and "
+                              "cannot be the target of an assignment",
+                              port.name));
+    }
+    auto pa = proc_assign_targets_.find(port.name);
+    if (pa != proc_assign_targets_.end()) {
+      diag_.Error(pa->second,
+                  std::format("variable '{}' is declared as an input port and "
+                              "cannot be the target of an assignment",
+                              port.name));
+    }
+  }
+}
+
 static void CheckDisableTargets(
     const Stmt* s,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
