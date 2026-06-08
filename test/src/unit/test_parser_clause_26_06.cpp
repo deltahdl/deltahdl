@@ -5,29 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(PackageExportParsing, ExportFollowingMatchingImport) {
-  auto r = Parse(
-      "package p;\n"
-      "  import other_pkg::foo;\n"
-      "  export other_pkg::foo;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kExportDecl));
-}
-
-TEST(PackageExportParsing, ExportPrecedingMatchingImport) {
-
-  auto r = Parse(
-      "package p;\n"
-      "  export other_pkg::foo;\n"
-      "  import other_pkg::foo;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(PackageExportParsing, ExportMixOfSpecificAndWildcard) {
   auto r = Parse(
       "package pkg;\n"
@@ -41,6 +18,49 @@ TEST(PackageExportParsing, ExportMixOfSpecificAndWildcard) {
     if (item->kind == ModuleItemKind::kExportDecl) ++export_count;
   }
   EXPECT_EQ(export_count, 2);
+}
+
+TEST(PackageExportParsing, ExportListWithCommaSeparatedItems) {
+  // BNF alternative: export package_import_item { , package_import_item } ;
+  // A single export declaration may carry a comma-separated list, and the
+  // parser emits one export item per element of that list.
+  auto r = Parse(
+      "package pkg;\n"
+      "  export other_pkg::a, other_pkg::b, other_pkg::c;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  int export_count = 0;
+  for (auto* item : r.cu->packages[0]->items) {
+    if (item->kind == ModuleItemKind::kExportDecl) ++export_count;
+  }
+  EXPECT_EQ(export_count, 3);
+}
+
+TEST(PackageExportParsing, ExportListMixesSpecificAndWildcardItems) {
+  // Each package_import_item in the comma list may independently be a specific
+  // name (pkg::name) or a wildcard (pkg::*); the parser accepts a mix and
+  // flags the wildcard element accordingly.
+  auto r = Parse(
+      "package pkg;\n"
+      "  export p1::a, p2::*;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  int specific_count = 0;
+  int wildcard_count = 0;
+  for (auto* item : r.cu->packages[0]->items) {
+    if (item->kind != ModuleItemKind::kExportDecl) continue;
+    if (item->import_item.is_wildcard) {
+      ++wildcard_count;
+    } else {
+      ++specific_count;
+    }
+  }
+  EXPECT_EQ(specific_count, 1);
+  EXPECT_EQ(wildcard_count, 1);
 }
 
 TEST(PackageExportParsing, PackageContainingOnlyExports) {

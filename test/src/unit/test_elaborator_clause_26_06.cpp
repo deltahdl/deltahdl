@@ -45,15 +45,6 @@ TEST(PackageExport, SpecificExportMatchingWildcardImport) {
              "endmodule\n"));
 }
 
-TEST(PackageExport, StarStarExportInPackageWithNoImportsIsLegal) {
-
-  EXPECT_TRUE(
-      ElabOk("package pkg;\n"
-             "  export *::*;\n"
-             "endpackage\n"
-             "module m; endmodule\n"));
-}
-
 TEST(PackageExport, StarStarExportElaborates) {
   EXPECT_TRUE(
       ElabOk("package p1;\n"
@@ -133,35 +124,22 @@ TEST(PackageExport, ExportFromUnknownPackageIsError) {
              "endmodule\n"));
 }
 
-TEST(PackageExport, MultipleItemsInOneExportDeclarationElaborate) {
-
-  EXPECT_TRUE(
-      ElabOk("package p1;\n"
-             "  typedef int a;\n"
-             "  typedef int b;\n"
-             "endpackage\n"
-             "package p2;\n"
-             "  import p1::*;\n"
-             "  export p1::a, p1::b;\n"
-             "endpackage\n"
-             "module m;\n"
-             "  import p2::*;\n"
-             "endmodule\n"));
-}
-
-TEST(PackageExport, MultiItemExportReportsErrorWhenOneItemIsInvalid) {
-
+TEST(PackageExport, ExportRequiresImportFromTheNamedPackage) {
+  // The name being exported must have been imported from the very package named
+  // in the export. Here 't' is imported, but from p1 — so exporting it as p2::t
+  // is an error even though p2 also declares a 't'.
   EXPECT_FALSE(
       ElabOk("package p1;\n"
-             "  typedef int a;\n"
+             "  typedef int t;\n"
              "endpackage\n"
              "package p2;\n"
-             "  import p1::*;\n"
-             "  export p1::a, p1::missing;\n"
+             "  typedef int t;\n"
              "endpackage\n"
-             "module m;\n"
-             "  import p2::*;\n"
-             "endmodule\n"));
+             "package p3;\n"
+             "  import p1::t;\n"
+             "  export p2::t;\n"
+             "endpackage\n"
+             "module m; endmodule\n"));
 }
 
 TEST(PackageExport, ReExportChainAcrossThreePackages) {

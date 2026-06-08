@@ -132,4 +132,56 @@ TEST(PackageExportSim, MultipleFunctionsExportedViaStarStarResolve) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 22u);
 }
 
+TEST(PackageExportSim, WildcardExportConsumedByWildcardImport) {
+  // A wildcard export (p1::*) is consumed by a wildcard import of the
+  // re-exporting package, so resolution flows through the all-imported lowering
+  // path rather than the single-name path.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p1;\n"
+      "  function automatic int get_val();\n"
+      "    return 55;\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "package p2;\n"
+      "  import p1::*;\n"
+      "  export p1::*;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import p2::*;\n"
+      "  int r;\n"
+      "  initial r = get_val();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 55u);
+}
+
+TEST(PackageExportSim, SpecificExportConsumedByWildcardImport) {
+  // A specific export (p1::get_val) is consumed by a wildcard import of the
+  // re-exporting package; the all-imported lowering path follows the specific
+  // export back to its original declaration.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p1;\n"
+      "  function automatic int get_val();\n"
+      "    return 66;\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "package p2;\n"
+      "  import p1::get_val;\n"
+      "  export p1::get_val;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import p2::*;\n"
+      "  int r;\n"
+      "  initial r = get_val();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 66u);
+}
+
 }
