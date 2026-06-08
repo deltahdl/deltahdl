@@ -3504,6 +3504,29 @@ const ModuleItem* FindOutOfBlockBodyInChild(const ModuleDecl* child,
   return nullptr;
 }
 
+// §25.7: when a modport exports a subroutine using a full prototype, the
+// definition supplied by the connected module shall match that prototype
+// exactly — same kind (task vs function), the same argument types and
+// directions, and, for a function, the same return type.
+bool ExportPrototypeMatchesBody(const ModuleItem* proto,
+                                const ModuleItem* body) {
+  if (proto->kind != body->kind) return false;
+  if (proto->func_args.size() != body->func_args.size()) return false;
+  for (size_t i = 0; i < proto->func_args.size(); ++i) {
+    if (!TypesMatch(proto->func_args[i].data_type,
+                    body->func_args[i].data_type))
+      return false;
+    if (proto->func_args[i].direction != body->func_args[i].direction)
+      return false;
+  }
+  // A modport function prototype keeps its return type in `data_type`, while an
+  // out-of-block body keeps it in `return_type`; compare the matching fields.
+  if (proto->kind == ModuleItemKind::kFunctionDecl &&
+      !TypesMatch(proto->data_type, body->return_type))
+    return false;
+  return true;
+}
+
 }
 
 void Elaborator::ValidateModportExportConflicts(RtlirModule* top) {
@@ -3565,6 +3588,18 @@ void Elaborator::WalkForExportConflicts(
               const auto* body = FindOutOfBlockBodyInChild(
                   child_decl, binding.port_name, pp.name);
               if (!body) continue;
+              // §25.7: an export written as a full prototype pins the signature
+              // the defining module must provide; a definition that does not
+              // match it exactly is an elaboration error.
+              if (pp.prototype &&
+                  !ExportPrototypeMatchesBody(pp.prototype, body)) {
+                diag_.Error(
+                    body->loc,
+                    std::format(
+                        "definition of exported subroutine '{}' in module '{}' "
+                        "does not match the prototype declared in the modport",
+                        pp.name, child.module_name));
+              }
               ExportKey key{iface_inst_name, modport_name, pp.name};
               ExportSite site;
               site.child_inst = child.inst_name;
