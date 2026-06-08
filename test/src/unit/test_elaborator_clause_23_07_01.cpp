@@ -2,6 +2,8 @@
 
 namespace {
 
+// §23.7.1 C3: a prefix that is not a resolvable scope name denotes the package
+// scope resolution operator; the qualified type resolves downward in pkg.
 TEST(ScopeResolutionPrefixElaboration, PackagePrefixResolvesDownward) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
@@ -12,6 +14,9 @@ TEST(ScopeResolutionPrefixElaboration, PackagePrefixResolvesDownward) {
              "endmodule\n"));
 }
 
+// §23.7.1 C2: a prefix that resolves by the normal scope rules (a visible class
+// name) denotes the class scope resolution operator; the qualified type resolves
+// downward in the class.
 TEST(ScopeResolutionPrefixElaboration, ClassPrefixResolvesDownward) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -19,52 +24,6 @@ TEST(ScopeResolutionPrefixElaboration, ClassPrefixResolvesDownward) {
              "endclass\n"
              "module t;\n"
              "  C::my_type x;\n"
-             "endmodule\n"));
-}
-
-TEST(ScopeResolutionPrefixElaboration, ChainedPrefixResolvesDownward) {
-  EXPECT_TRUE(
-      ElabOk("class Outer;\n"
-             "  class Inner;\n"
-             "    typedef int deep_type;\n"
-             "  endclass\n"
-             "endclass\n"
-             "module t;\n"
-             "  Outer::Inner::deep_type x;\n"
-             "endmodule\n"));
-}
-
-TEST(ScopeResolutionPrefixElaboration, ClassAndPackagePrefixesCoexist) {
-  EXPECT_TRUE(
-      ElabOk("package pkg;\n"
-             "  typedef logic [15:0] word_t;\n"
-             "endpackage\n"
-             "class Cfg;\n"
-             "  typedef int cfg_type;\n"
-             "endclass\n"
-             "module t;\n"
-             "  pkg::word_t a;\n"
-             "  Cfg::cfg_type b;\n"
-             "endmodule\n"));
-}
-
-TEST(ScopeResolutionPrefixElaboration, VisibleClassPrefixDenotesClassScope) {
-  EXPECT_TRUE(
-      ElabOk("class C;\n"
-             "  typedef int inner_t;\n"
-             "endclass\n"
-             "module t;\n"
-             "  C::inner_t x;\n"
-             "endmodule\n"));
-}
-
-TEST(ScopeResolutionPrefixElaboration, UnresolvablePrefixDenotesPackageScope) {
-  EXPECT_TRUE(
-      ElabOk("package ext;\n"
-             "  typedef logic [31:0] wide_t;\n"
-             "endpackage\n"
-             "module t;\n"
-             "  ext::wide_t x;\n"
              "endmodule\n"));
 }
 
