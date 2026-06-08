@@ -1131,9 +1131,9 @@ void Lowerer::LowerImports(const RtlirModule* mod) {
     ctx_.AliasVariable(item->name, qname);
   };
 
-  for (const auto& imp : mod->imports) {
+  auto apply_import = [&](const RtlirImport& imp) {
     auto* pkg = FindPackage(imp.package_name);
-    if (!pkg) continue;
+    if (!pkg) return;
     std::unordered_set<const PackageDecl*> visited;
     if (imp.is_wildcard) {
       LowerAllImported(pkg, visited);
@@ -1144,7 +1144,18 @@ void Lowerer::LowerImports(const RtlirModule* mod) {
         if (item->name == imp.item_name) alias_data_item(pkg, item);
       }
     }
-  }
+  };
+
+  // §26.5: an explicit import of a name takes precedence over a wildcard import
+  // of the same name. Because alias_data_item lets the first binding of a name
+  // win, the explicitly imported names must be bound before any wildcard import
+  // is applied, regardless of the order the import declarations appear in the
+  // source. Module-local declarations are materialized before LowerImports runs,
+  // so they already shadow both kinds of import.
+  for (const auto& imp : mod->imports)
+    if (!imp.is_wildcard) apply_import(imp);
+  for (const auto& imp : mod->imports)
+    if (imp.is_wildcard) apply_import(imp);
 }
 
 void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
