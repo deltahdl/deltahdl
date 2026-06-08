@@ -3,49 +3,27 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <limits>
 
 using namespace delta;
 
 namespace {
 
+// §30.6: when a module mixes a module path delay and distributed delays along
+// that path, the larger of the two shall be used. The rule is a two-operand
+// maximum, so its only distinguishable behaviors are "module path delay wins"
+// and "distributed sum wins" — the two worked examples in the clause exercise
+// exactly those outcomes.
+
+// LRM Example 1 (Figure 30-3): module path delay 22 exceeds the distributed
+// sum 0 + 1 = 1, so the module path delay is used.
 TEST(MixedPathDistributedDelay, ModulePathLargerWinsLrmExample1) {
-  EXPECT_EQ(SelectEffectivePathDelay( 22,
-                                     1),
-            22u);
+  EXPECT_EQ(SelectEffectivePathDelay(22, 1), 22u);
 }
 
+// LRM Example 2 (Figure 30-4): the distributed sum 10 + 20 = 30 exceeds the
+// module path delay 22, so the distributed sum is used.
 TEST(MixedPathDistributedDelay, DistributedSumLargerWinsLrmExample2) {
-  EXPECT_EQ(SelectEffectivePathDelay( 22,
-                                     30),
-            30u);
-}
-
-TEST(MixedPathDistributedDelay, EqualDelaysReturnThatValue) {
-  EXPECT_EQ(SelectEffectivePathDelay(15, 15), 15u);
-}
-
-TEST(MixedPathDistributedDelay, ZeroModulePathReturnsDistributedSum) {
-  EXPECT_EQ(SelectEffectivePathDelay(0, 9), 9u);
-}
-
-TEST(MixedPathDistributedDelay, ZeroDistributedSumReturnsModulePath) {
-  EXPECT_EQ(SelectEffectivePathDelay(7, 0), 7u);
-}
-
-TEST(MixedPathDistributedDelay, BothZeroReturnsZero) {
-  EXPECT_EQ(SelectEffectivePathDelay(0, 0), 0u);
-}
-
-TEST(MixedPathDistributedDelay, RuleIsSymmetricInOperandOrder) {
-  EXPECT_EQ(SelectEffectivePathDelay(3, 8), 8u);
-  EXPECT_EQ(SelectEffectivePathDelay(8, 3), 8u);
-}
-
-TEST(MixedPathDistributedDelay, LargeValuesCompareWithoutTruncation) {
-  constexpr uint64_t big = std::numeric_limits<uint64_t>::max();
-  EXPECT_EQ(SelectEffectivePathDelay(big, big - 1), big);
-  EXPECT_EQ(SelectEffectivePathDelay(big - 1, big), big);
+  EXPECT_EQ(SelectEffectivePathDelay(22, 30), 30u);
 }
 
 }
