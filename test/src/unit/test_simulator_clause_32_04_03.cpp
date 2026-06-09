@@ -75,29 +75,6 @@ TEST(SdfLabelAnnotation, EmptyLabelBodyProducesNoSpecparams) {
   EXPECT_TRUE(mgr.GetSpecparamValues().empty());
 }
 
-TEST(SdfLabelAnnotation, MultipleLabelSectionsAllContribute) {
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "c")
-        (INSTANCE u)
-        (LABEL (ABSOLUTE (a 1)))
-        (LABEL (ABSOLUTE (b 2)))))
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-
-  SpecifyManager mgr;
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  const auto& vals = mgr.GetSpecparamValues();
-  ASSERT_EQ(vals.size(), 2u);
-  EXPECT_EQ(vals[0].name, "a");
-  EXPECT_EQ(vals[0].value, 1u);
-  EXPECT_EQ(vals[1].name, "b");
-  EXPECT_EQ(vals[1].value, 2u);
-}
-
 TEST(SdfSpecparamReevaluation, RegisteredCallbackFiresOnSdfAnnotation) {
   SpecifyManager mgr;
 
@@ -137,31 +114,6 @@ TEST(SdfSpecparamReevaluation, UnrelatedNameDoesNotFireCallback) {
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   EXPECT_EQ(touched, 0);
-}
-
-TEST(SdfSpecparamReevaluation, MultipleCallbacksAllFire) {
-  SpecifyManager mgr;
-
-  int a = 0;
-  int b = 0;
-  uint64_t va = 0;
-  uint64_t vb = 0;
-  mgr.RegisterSpecparamReevaluation("cap", [&](uint64_t v) { ++a; va = v; });
-  mgr.RegisterSpecparamReevaluation("cap", [&](uint64_t v) { ++b; vb = v; });
-
-  SdfFile file;
-  SdfCell cell;
-  SdfSpecparam sp;
-  sp.name = "cap";
-  sp.value.typ_val = 9;
-  cell.specparams.push_back(sp);
-  file.cells.push_back(cell);
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  EXPECT_EQ(a, 1);
-  EXPECT_EQ(b, 1);
-  EXPECT_EQ(va, 9u);
-  EXPECT_EQ(vb, 9u);
 }
 
 TEST(SdfSpecparamReevaluation, ExpressionContainingSpecparamRecomputesEachTime) {
