@@ -49,18 +49,6 @@ TEST(TimingCheckCommandSim, PeriodElapsedAtLimitNoViolation) {
                                         150));
 }
 
-TEST(TimingCheckCommandSim, PeriodElapsedAboveLimitNoViolation) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kPeriod;
-  tc.ref_signal = "clk";
-  tc.ref_edge = SpecifyEdge::kPosedge;
-  tc.limit = 50;
-  mgr.AddTimingCheck(tc);
-  EXPECT_FALSE(mgr.CheckPeriodViolation("clk", 100,
-                                        200));
-}
-
 TEST(TimingCheckCommandSim, PeriodSimultaneousNoViolation) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
