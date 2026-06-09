@@ -58,12 +58,16 @@ TEST(Stacktrace, FunctionFormReportsLoneFrameWithoutSeparator) {
   EXPECT_EQ(DecodeString(result), "solo");
 }
 
-// §20.17.2: the call stack is followed only up to the top-level process. When
-// $stacktrace is reached directly from a top-level process, with no enclosing
-// subroutine on the stack, there are no frames to report.
-TEST(Stacktrace, TopLevelContextHasNoSubroutineFrames) {
+// §20.17.2: the function form follows the call stack only up to the top-level
+// process. Evaluated directly from a top-level process, with no enclosing
+// subroutine frame, the function returns an empty call-stack string. This drives
+// the function dispatch (eval_function.cpp) on an empty stack, the edge its
+// frame-bearing counterparts above do not reach.
+TEST(Stacktrace, FunctionFormAtTopLevelReturnsEmptyString) {
   SimFixture f;
-  EXPECT_EQ(BuildStackTraceReport(f.ctx), "");
+  auto* call = MkSysCall(f.arena, "$stacktrace", {});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(DecodeString(result), "");
 }
 
 // §20.17.2: the task form invoked straight from a top-level process likewise
