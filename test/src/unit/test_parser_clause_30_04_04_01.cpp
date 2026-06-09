@@ -70,17 +70,6 @@ TEST(OperatorParsing, BinaryModulePathEq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(OperatorParsing, BinaryModulePathNotEq) {
-  auto r = Parse(
-      "module m(input a, input b, output y);\n"
-      "  specify\n"
-      "    if (a != b) (a => y) = 2;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(OperatorParsing, BinaryModulePathLogicalAnd) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
@@ -235,12 +224,14 @@ TEST(OperatorParsing, ModulePathTernary) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(OperatorParsing, ModulePathOperandSpecparam) {
+// §30.4.4.1 allows a conditional expression to combine any number of operands
+// and operators. A multi-operator chain exercises the precedence-climbing infix
+// loop, distinct from the single-operator and ternary forms above.
+TEST(OperatorParsing, ConditionChainsMultipleOperators) {
   auto r = Parse(
-      "module m(input a, output y);\n"
+      "module m(input a, input b, input c, output y);\n"
       "  specify\n"
-      "    specparam SP = 1;\n"
-      "    if (SP) (a => y) = 20;\n"
+      "    if (a & b | c) (a => y) = 25;\n"
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);

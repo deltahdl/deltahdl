@@ -42,6 +42,13 @@ struct PathCandidate {
 uint64_t SelectPathDelay(const std::vector<PathCandidate>& candidates,
                          uint8_t transition_slot);
 
+// §30.4.4.1: decide whether a state-dependent module path's conditional
+// expression makes the path active. The path is active when the condition is
+// true (1); an x or z result is taken as true; a multi-bit result is
+// represented by its LSB, so the caller passes the least-significant 4-state
+// word. The returned value is what PathCandidate::condition_true holds.
+bool StateDependentPathConditionEnables(Logic4Word condition_lsb);
+
 uint64_t SelectEffectivePathDelay(uint64_t module_path_delay,
                                   uint64_t distributed_delay_sum);
 

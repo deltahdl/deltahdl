@@ -77,6 +77,14 @@ uint64_t SelectPathDelay(const std::vector<PathCandidate>& candidates,
   return have_active ? best : 0;
 }
 
+bool StateDependentPathConditionEnables(Logic4Word condition_lsb) {
+  // An unknown (x or z) condition counts as true; otherwise the path is active
+  // only when the least-significant bit of the result is 1.
+  const bool unknown = (condition_lsb.bval & 1u) != 0u;
+  if (unknown) return true;
+  return (condition_lsb.aval & 1u) != 0u;
+}
+
 uint64_t SelectEffectivePathDelay(uint64_t module_path_delay,
                                   uint64_t distributed_delay_sum) {
   return std::max(module_path_delay, distributed_delay_sum);
