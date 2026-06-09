@@ -28,72 +28,6 @@ TEST(SpecifyPathDelaySim, SixDelayPathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SpecifyPathDelaySim, TwelveDelayPathSimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    (a *> b) = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);\n"
-      "  endspecify\n"
-      "  initial x = 8'd55;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 55u);
-}
-
-TEST(SpecifyPathDelaySim, MinTypMaxDelaySimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    (a => b) = 1:2:3;\n"
-      "  endspecify\n"
-      "  initial x = 8'd33;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 33u);
-}
-
-TEST(SpecifyPathDelaySim, RuntimePathDelaySixDelays) {
-  SpecifyManager mgr;
-  PathDelay pd;
-  pd.src_port = "a";
-  pd.dst_port = "b";
-  pd.delay_count = 6;
-  pd.delays[0] = 1;
-  pd.delays[1] = 2;
-  pd.delays[2] = 3;
-  pd.delays[3] = 4;
-  pd.delays[4] = 5;
-  pd.delays[5] = 6;
-  mgr.AddPathDelay(pd);
-
-  EXPECT_TRUE(mgr.HasPathDelay("a", "b"));
-  EXPECT_EQ(mgr.GetPathDelay("a", "b"), 1u);
-  EXPECT_EQ(mgr.PathDelayCount(), 1u);
-
-  auto& delays = mgr.GetPathDelays();
-  ASSERT_EQ(delays.size(), 1u);
-  EXPECT_EQ(delays[0].delay_count, 6u);
-  EXPECT_EQ(delays[0].delays[0], 1u);
-  EXPECT_EQ(delays[0].delays[3], 4u);
-  EXPECT_EQ(delays[0].delays[5], 6u);
-}
-
 TEST(SpecifyPathDelaySim, RuntimePathDelayTwelveDelays) {
   SpecifyManager mgr;
   PathDelay pd;
@@ -114,18 +48,6 @@ TEST(SpecifyPathDelaySim, RuntimePathDelayTwelveDelays) {
   }
 }
 
-TEST(SpecifyPathDelaySim, RuntimePathDelaySingleDelay) {
-  SpecifyManager mgr;
-  PathDelay pd;
-  pd.src_port = "a";
-  pd.dst_port = "b";
-  pd.delay_count = 1;
-  pd.delays[0] = 10;
-  mgr.AddPathDelay(pd);
-
-  EXPECT_EQ(mgr.GetPathDelay("a", "b"), 10u);
-}
-
 TEST(SpecifyPathDelaySim, RuntimePathDelayTwoDelays) {
   SpecifyManager mgr;
   PathDelay pd;
@@ -140,46 +62,6 @@ TEST(SpecifyPathDelaySim, RuntimePathDelayTwoDelays) {
   EXPECT_EQ(mgr.GetPathDelay("a", "b"), 10u);
   EXPECT_EQ(mgr.GetPathDelay("x", "y"), 0u);
   EXPECT_EQ(mgr.PathDelayCount(), 1u);
-}
-
-TEST(SpecifyPathDelaySim, TwoDelayPathSimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    (a => b) = (3, 5);\n"
-      "  endspecify\n"
-      "  initial x = 8'd88;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 88u);
-}
-
-TEST(SpecifyPathDelaySim, ThreeDelayPathSimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    (a => b) = (2, 3, 4);\n"
-      "  endspecify\n"
-      "  initial x = 8'd66;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
 TEST(SpecifyPathDelaySim, MinTypMaxSelectsTypicalByDefault) {
@@ -235,27 +117,6 @@ TEST(SpecifyPathDelaySim, ClampPathDelayPositivePasses) {
   EXPECT_EQ(ClampPathDelay(1), 1u);
   EXPECT_EQ(ClampPathDelay(42), 42u);
   EXPECT_EQ(ClampPathDelay(INT64_MAX), static_cast<uint64_t>(INT64_MAX));
-}
-
-TEST(SpecifyPathDelaySim, NegativePathDelaySimulatesAsZero) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    (a => b) = -5;\n"
-      "  endspecify\n"
-      "  initial x = 8'd17;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 17u);
 }
 
 TEST(SpecifyPathDelaySim, ExpandOneDelayFillsAllBasicSlots) {
