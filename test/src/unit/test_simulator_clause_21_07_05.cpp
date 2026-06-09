@@ -63,32 +63,38 @@ TEST_F(VcdTypeMappingSim, BitAndLogicDumpAsReg) {
 // Table 21-11: the fixed-width integer types and the default enum each carry the
 // keyword and size fixed by the table, independent of the object's stored width.
 // int -> integer/32, shortint -> reg/16, longint -> reg/64, byte -> reg/8, and
-// an untyped enum -> integer/32. The enum is registered with a narrower stored
-// width to prove the size comes from the table (32) rather than echoing the
-// width (8).
+// an untyped enum -> integer/32. Every object here is registered with a stored
+// width that differs from its table size, so the size written in the declaration
+// can only have come from the table lookup (VcdDataTypeSize) and not from
+// echoing the registered width: if the writer echoed the width, none of these
+// expectations would hold.
 TEST_F(VcdTypeMappingSim, FixedWidthIntegerTypesUseTableSizes) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("myint", 32, MakeVar(arena_, 32), NetType::kWire, -1, -1,
+    vcd.RegisterSignal("myint", 8, MakeVar(arena_, 8), NetType::kWire, -1, -1,
                        VcdDataType::kInt);
-    vcd.RegisterSignal("myshort", 16, MakeVar(arena_, 16), NetType::kWire, -1,
+    vcd.RegisterSignal("myshort", 8, MakeVar(arena_, 8), NetType::kWire, -1,
                        -1, VcdDataType::kShortint);
-    vcd.RegisterSignal("mylong", 64, MakeVar(arena_, 64), NetType::kWire, -1, -1,
+    vcd.RegisterSignal("mylong", 8, MakeVar(arena_, 8), NetType::kWire, -1, -1,
                        VcdDataType::kLongint);
-    vcd.RegisterSignal("mybyte", 8, MakeVar(arena_, 8), NetType::kWire, -1, -1,
+    vcd.RegisterSignal("mybyte", 4, MakeVar(arena_, 4), NetType::kWire, -1, -1,
                        VcdDataType::kByte);
     vcd.RegisterSignal("myenum", 8, MakeVar(arena_, 8), NetType::kWire, -1, -1,
                        VcdDataType::kEnum);
     vcd.EndDefinitions();
   }
   auto content = ReadVcd();
+  // int: table size 32, not the 8-bit stored width.
   EXPECT_NE(content.find("$var integer 32 ! myint $end"), std::string::npos);
+  // shortint: table size 16, not the 8-bit stored width.
   EXPECT_NE(content.find("$var reg 16 \" myshort $end"), std::string::npos);
+  // longint: table size 64, not the 8-bit stored width.
   EXPECT_NE(content.find("$var reg 64 # mylong $end"), std::string::npos);
+  // byte: table size 8, not the 4-bit stored width.
   EXPECT_NE(content.find("$var reg 8 $ mybyte $end"), std::string::npos);
-  // The default enum maps to integer with the table size 32, not its 8-bit
-  // stored width.
+  // The default (untyped) enum maps to integer with the table size 32, not its
+  // 8-bit stored width.
   EXPECT_NE(content.find("$var integer 32 % myenum $end"), std::string::npos);
 }
 
