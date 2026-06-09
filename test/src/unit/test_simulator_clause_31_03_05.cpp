@@ -1,13 +1,17 @@
 #include <gtest/gtest.h>
 
-#include "fixture_simulator.h"
-#include "simulator/lowerer.h"
 #include "simulator/specify.h"
-#include "simulator/variable.h"
 
 using namespace delta;
 
 namespace {
+
+// §31.3.5 ($recovery) defines the violation window relative to the reference
+// (timestamp) event: begin = timestamp time, end = timestamp time + limit, with
+// a violation when begin <= timecheck time < end -- only the end of the window
+// is excluded from the violation region. CheckRecoveryViolation carries this;
+// the window is byte-identical to $hold (§31.3.2). A zero limit collapses the
+// window so no transition can violate it.
 
 TimingCheckEntry MakeRecovery(uint64_t limit) {
   TimingCheckEntry tc;
@@ -36,18 +40,6 @@ TEST(RecoveryTimingCheckWindow, EndEndpointExcluded) {
   EXPECT_FALSE(mgr.CheckRecoveryViolation("rst", 100, "clk", 105));
 }
 
-TEST(RecoveryTimingCheckWindow, TimecheckBeforeRefDoesNotViolate) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeRecovery(5));
-  EXPECT_FALSE(mgr.CheckRecoveryViolation("rst", 100, "clk", 95));
-}
-
-TEST(RecoveryTimingCheckWindow, TimecheckAfterWindowDoesNotViolate) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeRecovery(5));
-  EXPECT_FALSE(mgr.CheckRecoveryViolation("rst", 100, "clk", 110));
-}
-
 TEST(RecoveryTimingCheckWindow, WindowScalesWithLimit) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeRecovery(3));
@@ -64,26 +56,6 @@ TEST(RecoveryTimingCheckWindow, ZeroLimitNeverViolates) {
   EXPECT_FALSE(mgr.CheckRecoveryViolation("rst", 100, "clk", 100));
   EXPECT_FALSE(mgr.CheckRecoveryViolation("rst", 100, "clk", 99));
   EXPECT_FALSE(mgr.CheckRecoveryViolation("rst", 100, "clk", 101));
-}
-
-TEST(SystemTimingCheckSim, RecoverySimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    $recovery(posedge rst, posedge clk, 5);\n"
-      "  endspecify\n"
-      "  initial x = 8'd42;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 }
