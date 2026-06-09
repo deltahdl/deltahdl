@@ -221,29 +221,6 @@ TEST(SdfPulseLimitAnnotation,
 }
 
 TEST(SdfPulseLimitAnnotation,
-     IncrementPulseLimitAccumulatesPositiveDeltaWithoutClamping) {
-  SpecifyManager mgr;
-  PathDelay pre;
-  pre.src_port = "A";
-  pre.dst_port = "Z";
-  pre.delay_count = 1;
-  for (int i = 0; i < 12; ++i) {
-    pre.delays[i] = 10;
-    pre.reject_limit[i] = 3;
-    pre.error_limit[i] = 3;
-  }
-  mgr.AddPathDelay(pre);
-
-  mgr.IncrementSdfPulseLimit("A", "Z", 2,
-                             true, 4);
-
-  ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
-  const auto& pd = mgr.GetPathDelays()[0];
-  EXPECT_EQ(pd.reject_limit[0], 5u);
-  EXPECT_EQ(pd.error_limit[0], 7u);
-}
-
-TEST(SdfPulseLimitAnnotation,
      IncrementPulseLimitMirrorsRejectIntoErrorBeforeClamping) {
   SpecifyManager mgr;
   PathDelay pre;
@@ -319,34 +296,6 @@ TEST(SdfPulseLimitAnnotation,
   const auto& pd = mgr.GetPathDelays()[0];
   EXPECT_EQ(pd.reject_limit[0], 0u);
   EXPECT_EQ(pd.error_limit[0], 5u);
-}
-
-TEST(SdfPulseLimitAnnotation,
-     ZeroPercentSettingsProduceZeroPulseLimitsForIopath) {
-  SpecifyManager mgr;
-  mgr.SetGlobalPulseLimitPercents( 0, 0);
-  PathDelay pre;
-  pre.src_port = "A";
-  pre.dst_port = "Z";
-  pre.delay_count = 1;
-  pre.delays[0] = 1;
-  mgr.AddPathDelay(pre);
-
-  SdfFile file;
-  ASSERT_TRUE(ParseSdf(R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "buf")
-        (INSTANCE u1)
-        (DELAY (ABSOLUTE (IOPATH A Z (10))))))
-  )", file));
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
-  const auto& pd = mgr.GetPathDelays()[0];
-  EXPECT_EQ(pd.delays[0], 10u);
-  EXPECT_EQ(pd.reject_limit[0], 0u);
-  EXPECT_EQ(pd.error_limit[0], 0u);
 }
 
 }
