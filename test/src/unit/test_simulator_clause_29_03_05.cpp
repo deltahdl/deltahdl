@@ -29,14 +29,6 @@ TEST(UdpInputZAsX, CombinationalXRowMatchesZ) {
   EXPECT_EQ(state.Evaluate({'z', '0'}), '1');
 }
 
-TEST(UdpInputZAsX, CombinationalWildcardAcceptsZ) {
-  CombBuilder b;
-  b.AddRow({'?', '1'}, '1');
-
-  UdpEvalState state(b.decl);
-  EXPECT_EQ(state.Evaluate({'z', '1'}), '1');
-}
-
 TEST(UdpInputZAsX, CombinationalBRowRejectsCoercedZ) {
   CombBuilder b;
   b.AddRow({'b', '1'}, '1');

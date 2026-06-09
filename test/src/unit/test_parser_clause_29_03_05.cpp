@@ -56,4 +56,16 @@ TEST(UdpZValues, ZSymbolInParenthesizedEdgeRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// The z-scan flags either endpoint of a parenthesized edge; the case above
+// hits the closing endpoint, this one hits the starting endpoint.
+TEST(UdpZValues, ZSymbolAtStartOfParenthesizedEdgeRejected) {
+  auto r = Parse(
+      "primitive p(output reg q, input a, input b);\n"
+      "  table\n"
+      "    (z0) 0 : ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }
