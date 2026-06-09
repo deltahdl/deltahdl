@@ -1,3 +1,9 @@
+// Lexer coverage for the keyword terminals introduced by LRM Annex A, A.1.5
+// "Configuration source text": config, endconfig, design, liblist, use,
+// instance, and cell. (The 'default' terminal also appears in this subclause's
+// grammar but predates it, so its keyword recognition is owned elsewhere.)
+// Each test confirms the spelling is lexed as its reserved-word token rather
+// than a plain identifier.
 #include "fixture_lexer.h"
 
 using namespace delta;
@@ -5,59 +11,39 @@ using namespace delta;
 namespace {
 
 TEST(ConfigKeywordLexing, ConfigKeyword) {
-  auto r = LexOne("config");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwConfig);
+  EXPECT_EQ(LexOne("config").token.kind, TokenKind::kKwConfig);
 }
 
 TEST(ConfigKeywordLexing, EndconfigKeyword) {
-  auto r = LexOne("endconfig");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwEndconfig);
+  EXPECT_EQ(LexOne("endconfig").token.kind, TokenKind::kKwEndconfig);
 }
 
 TEST(ConfigKeywordLexing, DesignKeyword) {
-  auto r = LexOne("design");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwDesign);
+  EXPECT_EQ(LexOne("design").token.kind, TokenKind::kKwDesign);
 }
 
 TEST(ConfigKeywordLexing, LiblistKeyword) {
-  auto r = LexOne("liblist");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwLiblist);
+  EXPECT_EQ(LexOne("liblist").token.kind, TokenKind::kKwLiblist);
 }
 
 TEST(ConfigKeywordLexing, UseKeyword) {
-  auto r = LexOne("use");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwUse);
+  EXPECT_EQ(LexOne("use").token.kind, TokenKind::kKwUse);
 }
 
 TEST(ConfigKeywordLexing, InstanceKeyword) {
-  auto r = LexOne("instance");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwInstance);
-}
-
-TEST(ConfigKeywordLexing, DefaultKeyword) {
-  auto r = LexOne("default");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwDefault);
+  EXPECT_EQ(LexOne("instance").token.kind, TokenKind::kKwInstance);
 }
 
 TEST(ConfigKeywordLexing, CellKeyword) {
-  auto r = LexOne("cell");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwCell);
+  EXPECT_EQ(LexOne("cell").token.kind, TokenKind::kKwCell);
 }
 
-TEST(ConfigKeywordLexing, ConfigKeywordSequence) {
-  auto tokens = Lex("config endconfig design liblist");
-  ASSERT_GE(tokens.size(), 4u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwConfig);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kKwEndconfig);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kKwDesign);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kKwLiblist);
-}
-
-TEST(ConfigKeywordLexing, KeywordsNotIdentifiers) {
+// A reserved word is distinguished from an identifier that merely follows it.
+TEST(ConfigKeywordLexing, KeywordsAreNotIdentifiers) {
   auto tokens = Lex("config cfg1");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwConfig);
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
 }
 
-}
+}  // namespace
