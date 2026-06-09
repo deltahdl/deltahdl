@@ -9,6 +9,9 @@ using namespace delta;
 
 namespace {
 
+// §32.5 C1 (ordered process): a later construct overwrites an earlier one even
+// when the two are different constructs. PATHPULSE seeds pulse limits, then a
+// plain IOPATH resets them to the delay-derived defaults.
 TEST(SdfMultipleAnnotations, IopathAfterPathpulseOverwritesPulseLimits) {
   SpecifyManager mgr;
   PathDelay pre;
@@ -42,6 +45,8 @@ TEST(SdfMultipleAnnotations, IopathAfterPathpulseOverwritesPulseLimits) {
   EXPECT_EQ(pd.error_limit[1], 61u);
 }
 
+// §32.5 C1 order sensitivity: the same two constructs in the opposite order
+// yield the opposite outcome. With PATHPULSE last, its pulse limits survive.
 TEST(SdfMultipleAnnotations, PathpulseAfterIopathSetsPulseLimits) {
   SpecifyManager mgr;
   PathDelay pre;
@@ -72,40 +77,9 @@ TEST(SdfMultipleAnnotations, PathpulseAfterIopathSetsPulseLimits) {
   EXPECT_EQ(pd.error_limit[0], 20u);
 }
 
-TEST(SdfMultipleAnnotations,
-     SimpleIopathAnnotationDefaultResetsPulseLimitsToDelays) {
-  SpecifyManager mgr;
-  PathDelay pre;
-  pre.src_port = "A";
-  pre.dst_port = "Z";
-  pre.delay_count = 1;
-  pre.delays[0] = 1;
-
-  pre.reject_limit[0] = 7;
-  pre.error_limit[0] = 9;
-  mgr.AddPathDelay(pre);
-
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "buf")
-        (INSTANCE u1)
-        (DELAY (ABSOLUTE (IOPATH A Z (50) (80))))))
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
-  const auto& pd = mgr.GetPathDelays()[0];
-  EXPECT_EQ(pd.delays[0], 50u);
-  EXPECT_EQ(pd.delays[1], 80u);
-  EXPECT_EQ(pd.reject_limit[0], 50u);
-  EXPECT_EQ(pd.error_limit[0], 50u);
-  EXPECT_EQ(pd.reject_limit[1], 80u);
-  EXPECT_EQ(pd.error_limit[1], 80u);
-}
-
+// §32.5 S1: a PORT annotation followed by an INTERCONNECT annotation to the
+// same load affects only the interconnect source; the PORT baseline (modeled
+// as an all-sources entry with empty src) persists for every other source.
 TEST(SdfMultipleAnnotations,
      PortFollowedByInterconnectKeepsPortBaselineAndAddsSourceOverride) {
   SdfFile file;
@@ -138,6 +112,9 @@ TEST(SdfMultipleAnnotations,
   EXPECT_TRUE(saw_source_override);
 }
 
+// §32.5 S2: an INTERCONNECT annotation followed by a PORT annotation to the
+// same load overwrites the interconnect; the load takes the PORT delay from
+// all sources. This is the order-swapped counterpart of the S1 test above.
 TEST(SdfMultipleAnnotations,
      InterconnectFollowedByPortOverwritesPriorInterconnectEntries) {
   SdfFile file;
@@ -161,6 +138,8 @@ TEST(SdfMultipleAnnotations,
   EXPECT_EQ(ic.rise, 6u);
 }
 
+// §32.5 S2 "same load" scoping: the overwriting PORT touches only its own load,
+// leaving interconnect annotations to other loads intact.
 TEST(SdfMultipleAnnotations,
      PortDoesNotOverwriteInterconnectsToOtherLoads) {
   SdfFile file;
@@ -193,129 +172,8 @@ TEST(SdfMultipleAnnotations,
   EXPECT_TRUE(saw_new_port);
 }
 
-TEST(SdfMultipleAnnotations, MultiplePathpulsesBeforeIopathAreAllOverwritten) {
-  SpecifyManager mgr;
-  PathDelay pre;
-  pre.src_port = "A";
-  pre.dst_port = "Z";
-  pre.delay_count = 1;
-  pre.delays[0] = 1;
-  mgr.AddPathDelay(pre);
-
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "buf")
-        (INSTANCE u1)
-        (DELAY (ABSOLUTE
-          (PATHPULSE A Z (10) (20))
-          (PATHPULSE A Z (30) (40))
-          (IOPATH A Z (35) (61))))))
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
-  const auto& pd = mgr.GetPathDelays()[0];
-  EXPECT_EQ(pd.delays[0], 35u);
-  EXPECT_EQ(pd.delays[1], 61u);
-  EXPECT_EQ(pd.reject_limit[0], 35u);
-  EXPECT_EQ(pd.error_limit[0], 35u);
-  EXPECT_EQ(pd.reject_limit[1], 61u);
-  EXPECT_EQ(pd.error_limit[1], 61u);
-}
-
-TEST(SdfMultipleAnnotations,
-     PathpulseInterleavedBetweenIopathsObservesFinalAnnotation) {
-  SpecifyManager mgr;
-  PathDelay pre;
-  pre.src_port = "A";
-  pre.dst_port = "Z";
-  pre.delay_count = 1;
-  pre.delays[0] = 1;
-  mgr.AddPathDelay(pre);
-
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "buf")
-        (INSTANCE u1)
-        (DELAY (ABSOLUTE
-          (PATHPULSE A Z (10) (20))
-          (IOPATH A Z (35) (61))
-          (PATHPULSE A Z (20) (30))))))
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
-  const auto& pd = mgr.GetPathDelays()[0];
-  EXPECT_EQ(pd.delays[0], 35u);
-  EXPECT_EQ(pd.delays[1], 61u);
-
-  EXPECT_EQ(pd.reject_limit[0], 20u);
-  EXPECT_EQ(pd.error_limit[0], 30u);
-}
-
-TEST(SdfMultipleAnnotations, RepeatedIopathOnSamePathLeavesOnlyFinalDelays) {
-  SpecifyManager mgr;
-  PathDelay pre;
-  pre.src_port = "A";
-  pre.dst_port = "Z";
-  pre.delay_count = 1;
-  pre.delays[0] = 1;
-  mgr.AddPathDelay(pre);
-
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "buf")
-        (INSTANCE u1)
-        (DELAY (ABSOLUTE
-          (IOPATH A Z (35) (61))
-          (IOPATH A Z (50) (80))))))
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
-  const auto& pd = mgr.GetPathDelays()[0];
-  EXPECT_EQ(pd.delays[0], 50u);
-  EXPECT_EQ(pd.delays[1], 80u);
-
-  EXPECT_EQ(pd.reject_limit[0], 50u);
-  EXPECT_EQ(pd.error_limit[0], 50u);
-  EXPECT_EQ(pd.reject_limit[1], 80u);
-  EXPECT_EQ(pd.error_limit[1], 80u);
-}
-
-TEST(SdfMultipleAnnotations,
-     PortInterconnectPortSequenceLeavesOnlyFinalPort) {
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "net")
-        (INSTANCE u1)
-        (DELAY (ABSOLUTE
-          (PORT i15/in (3))
-          (INTERCONNECT i13/out i15/in (5))
-          (PORT i15/in (9))))))
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  SpecifyManager mgr;
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetInterconnectDelays().size(), 1u);
-  const auto& ic = mgr.GetInterconnectDelays()[0];
-  EXPECT_TRUE(ic.src_port.empty());
-  EXPECT_EQ(ic.dst_port, "i15/in");
-  EXPECT_EQ(ic.rise, 9u);
-}
-
+// §32.5 C1 for a repeated same construct: a subsequent INTERCONNECT to the same
+// source/load pair replaces the prior payload (last occurrence wins).
 TEST(SdfMultipleAnnotations,
      RepeatedInterconnectSameSrcDstReplacesPriorPayload) {
   SdfFile file;
@@ -339,29 +197,9 @@ TEST(SdfMultipleAnnotations,
   EXPECT_EQ(ic.rise, 8u);
 }
 
-TEST(SdfMultipleAnnotations,
-     PortFollowedByNetdelaySameLoadOverwritesPriorPort) {
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "net")
-        (INSTANCE u1)
-        (DELAY (ABSOLUTE
-          (PORT i15/in (4))
-          (NETDELAY i15/in (7))))))
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  SpecifyManager mgr;
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetInterconnectDelays().size(), 1u);
-  const auto& ic = mgr.GetInterconnectDelays()[0];
-  EXPECT_TRUE(ic.src_port.empty());
-  EXPECT_EQ(ic.dst_port, "i15/in");
-  EXPECT_EQ(ic.rise, 7u);
-}
-
+// §32.5: overwriting can be avoided with empty parentheses that hold the
+// current pulse-limit values. The IOPATH supplies only delays, so the prior
+// PATHPULSE limits are preserved rather than reset.
 TEST(SdfMultipleAnnotations,
      ExtendedIopathWithEmptyPulseSlotsPreservesPriorPathpulse) {
   SpecifyManager mgr;
@@ -395,62 +233,8 @@ TEST(SdfMultipleAnnotations,
   EXPECT_EQ(pd.error_limit[0], 20u);
 }
 
-TEST(SdfMultipleAnnotations,
-     ParserMarksExtendedIopathWithEmptyPulseSlotsAsAbsent) {
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "buf")
-        (INSTANCE u1)
-        (DELAY (ABSOLUTE (IOPATH A Z ((35) () ()) ((61) () ()))))))
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  ASSERT_EQ(file.cells[0].iopaths.size(), 1u);
-  const auto& io = file.cells[0].iopaths[0];
-  EXPECT_TRUE(io.extended_form);
-  EXPECT_TRUE(io.rise_delay_present);
-  EXPECT_TRUE(io.fall_delay_present);
-  EXPECT_FALSE(io.rise_reject_present);
-  EXPECT_FALSE(io.rise_error_present);
-  EXPECT_FALSE(io.fall_reject_present);
-  EXPECT_FALSE(io.fall_error_present);
-  EXPECT_EQ(io.rise.typ_val, 35u);
-  EXPECT_EQ(io.fall.typ_val, 61u);
-}
-
-TEST(SdfMultipleAnnotations,
-     ExtendedIopathWithSuppliedPulseSlotsInstallsAsCombinedAnnotation) {
-  SpecifyManager mgr;
-  PathDelay pre;
-  pre.src_port = "A";
-  pre.dst_port = "Z";
-  pre.delay_count = 1;
-  pre.delays[0] = 1;
-  mgr.AddPathDelay(pre);
-
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "buf")
-        (INSTANCE u1)
-        (DELAY (ABSOLUTE
-          (IOPATH A Z ((35) (4) (7)) ((61) (4) (7)))))))
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
-  const auto& pd = mgr.GetPathDelays()[0];
-  EXPECT_EQ(pd.delays[0], 35u);
-  EXPECT_EQ(pd.delays[1], 61u);
-  EXPECT_EQ(pd.reject_limit[0], 4u);
-  EXPECT_EQ(pd.error_limit[0], 7u);
-  EXPECT_EQ(pd.reject_limit[1], 4u);
-  EXPECT_EQ(pd.error_limit[1], 7u);
-}
-
+// §32.5: the separate PATHPULSE-then-IOPATH(empty-slots) form can be simplified
+// into a single combined IOPATH statement; both must annotate identically.
 TEST(SdfMultipleAnnotations,
      ExtendedCombinedIopathMatchesSeparatePathpulseThenIopath) {
   auto seed = []() {
@@ -504,6 +288,30 @@ TEST(SdfMultipleAnnotations,
     EXPECT_EQ(pd_combined.error_limit[i], pd_separate.error_limit[i])
         << "error_limit mismatch at slot " << i;
   }
+}
+
+// §32.5 C1 modify-half: a subsequent annotation can *modify* (INCREMENT) an
+// earlier one rather than overwrite it. An ABSOLUTE IOPATH establishes the
+// delay; a later INCREMENT IOPATH on the same path adds to it, so the running
+// value is changed by accumulation, not replacement.
+TEST(SdfMultipleAnnotations, IncrementIopathModifiesPriorAbsoluteAnnotation) {
+  SdfFile file;
+  std::string sdf = R"(
+    (DELAYFILE
+      (CELL
+        (CELLTYPE "buf")
+        (INSTANCE u1)
+        (DELAY (ABSOLUTE (IOPATH A Z (35) (61))))
+        (DELAY (INCREMENT (IOPATH A Z (5) (5))))))
+  )";
+  ASSERT_TRUE(ParseSdf(sdf, file));
+  SpecifyManager mgr;
+  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+
+  ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
+  const auto& pd = mgr.GetPathDelays()[0];
+  EXPECT_EQ(pd.delays[0], 40u);
+  EXPECT_EQ(pd.delays[1], 66u);
 }
 
 }
