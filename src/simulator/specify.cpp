@@ -835,6 +835,13 @@ bool NegativeTimingCheckOptionActive(
   return negative_timing_check_option_enabled && !all_timing_checks_disabled;
 }
 
+int64_t EffectiveTimingCheckSignalDelay(int64_t requested_delay,
+                                        bool negative_timing_option_active) {
+
+  if (!negative_timing_option_active) return 0;
+  return requested_delay;
+}
+
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              uint64_t ref_time,
                                              std::string_view data,

@@ -179,6 +179,9 @@ bool NegativeTimingCheckOptionActive(
     bool negative_timing_check_option_enabled,
     bool all_timing_checks_disabled);
 
+int64_t EffectiveTimingCheckSignalDelay(int64_t requested_delay,
+                                        bool negative_timing_option_active);
+
 struct SdfAnnotation {
   std::string sdf_file;
   std::string scope;
