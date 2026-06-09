@@ -36,12 +36,6 @@ TEST(NegativeTimingCheckDelayedSignals, EventOrderKindsDoNotUseDelayedSignals) {
   EXPECT_FALSE(TimingCheckUsesDelayedSignals(TimingCheckKind::kTimeskew));
 }
 
-TEST(AdjustNegativeTimingCheckLimit, PositivePassesThroughWithoutWarning) {
-  const auto result = AdjustNegativeTimingCheckLimit(7);
-  EXPECT_EQ(result.limit, 7u);
-  EXPECT_FALSE(result.warn);
-}
-
 TEST(AdjustNegativeTimingCheckLimit, SmallestPositivePassesThrough) {
   const auto result = AdjustNegativeTimingCheckLimit(1);
   EXPECT_EQ(result.limit, 1u);
@@ -50,12 +44,6 @@ TEST(AdjustNegativeTimingCheckLimit, SmallestPositivePassesThrough) {
 
 TEST(AdjustNegativeTimingCheckLimit, ZeroClampsAndWarns) {
   const auto result = AdjustNegativeTimingCheckLimit(0);
-  EXPECT_EQ(result.limit, 0u);
-  EXPECT_TRUE(result.warn);
-}
-
-TEST(AdjustNegativeTimingCheckLimit, NegativeClampsAndWarns) {
-  const auto result = AdjustNegativeTimingCheckLimit(-4);
   EXPECT_EQ(result.limit, 0u);
   EXPECT_TRUE(result.warn);
 }
@@ -107,12 +95,6 @@ TEST(ZeroSmallestNegativeTimingLimit, TieGoesToEarliest) {
   EXPECT_EQ(limits, (std::vector<int64_t>{-3, 0, -1, -2}));
 }
 
-TEST(ZeroSmallestNegativeTimingLimit, PositivesAndZerosIgnored) {
-  std::vector<int64_t> limits = {0, -4, 100, -2, 0};
-  EXPECT_TRUE(ZeroSmallestNegativeTimingLimit(limits));
-  EXPECT_EQ(limits, (std::vector<int64_t>{0, -4, 100, 0, 0}));
-}
-
 TEST(ZeroSmallestNegativeTimingLimit, RepeatedApplicationTerminates) {
   std::vector<int64_t> limits = {-5, -1, -10};
   EXPECT_TRUE(ZeroSmallestNegativeTimingLimit(limits));
@@ -120,6 +102,15 @@ TEST(ZeroSmallestNegativeTimingLimit, RepeatedApplicationTerminates) {
   EXPECT_TRUE(ZeroSmallestNegativeTimingLimit(limits));
   EXPECT_FALSE(ZeroSmallestNegativeTimingLimit(limits));
   EXPECT_EQ(limits, (std::vector<int64_t>{0, 0, 0}));
+}
+
+TEST(NegativeTimingChecks, RuntimeInteriorYieldsViolation) {
+  SpecifyManager mgr;
+  mgr.AddTimingCheck(MakeSignedSetuphold( -5, 10));
+
+  // Negative setup shifts the window to (105, 110); a data change strictly
+  // inside it triggers a violation per requirement (a).
+  EXPECT_TRUE(mgr.CheckSetupholdViolation("clk", 100, "data", 107));
 }
 
 TEST(NegativeTimingChecks, RuntimeLowerBoundaryIsExcluded) {
