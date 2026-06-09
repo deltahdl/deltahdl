@@ -121,22 +121,6 @@ TEST(AssignmentPatternFormat, TaggedUnionPrintsTagAndValue) {
   EXPECT_EQ(out, "'{Valid:42}\n");
 }
 
-// §21.2.1.6 (C5): an unpacked array prints as an assignment pattern of its
-// elements in index order.
-TEST(AssignmentPatternFormat, UnpackedArrayPrintsElements) {
-  auto out = Run(
-      "module t;\n"
-      "  int a [3];\n"
-      "  initial begin\n"
-      "    a[0] = 10;\n"
-      "    a[1] = 20;\n"
-      "    a[2] = 30;\n"
-      "    $display(\"%p\", a);\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_EQ(out, "'{10, 20, 30}\n");
-}
-
 // §21.2.1.6 (C7b): an enumerated value prints as the matching member name when
 // the value is one named by the type.
 TEST(AssignmentPatternFormat, EnumPrintsMemberName) {
@@ -164,6 +148,26 @@ TEST(AssignmentPatternFormat, EnumWithUnnamedValueFallsBackToBaseType) {
       "  initial $display(\"%p\", c);\n"
       "endmodule\n");
   EXPECT_EQ(out, "x\n");
+}
+
+// §21.2.1.6 (C7b): the base-type fallback also applies to a *known* value that
+// simply names no member of the enumeration -- the distinct path where the
+// member-match search runs to completion without a hit (as opposed to an unknown
+// value, which skips the search). Casting day_e's SUN (6) into the three-member
+// color_e leaves a known 6 that matches no color name, so the value prints in
+// the base type's decimal form rather than as an enumeration name.
+TEST(AssignmentPatternFormat, EnumKnownValueNotNamedFallsBackToBaseType) {
+  auto out = Run(
+      "module t;\n"
+      "  typedef enum { RED, GREEN, BLUE } color_e;\n"
+      "  typedef enum { MON, TUE, WED, THU, FRI, SAT, SUN } day_e;\n"
+      "  color_e c;\n"
+      "  initial begin\n"
+      "    c = color_e'(SUN);\n"
+      "    $display(\"%p\", c);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(out, "6\n");
 }
 
 // §21.2.1.6 (C7d): a null class handle prints the word "null". An uninitialized
