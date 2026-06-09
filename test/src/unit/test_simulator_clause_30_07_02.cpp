@@ -23,15 +23,6 @@ TEST(GlobalPulseLimitScaling, HundredPercentEqualsInertialDefault) {
   }
 }
 
-TEST(GlobalPulseLimitScaling, RejectPercentageScalesAllSlots) {
-  PathDelay pd = MakePathWithUniformDelay(40);
-  ApplyGlobalPulseLimits(pd, 25, 100);
-  for (int i = 0; i < 12; ++i) {
-    EXPECT_EQ(pd.reject_limit[i], 10u);
-    EXPECT_EQ(pd.error_limit[i], 40u);
-  }
-}
-
 TEST(GlobalPulseLimitScaling, ErrorPercentageScalesAllSlots) {
   PathDelay pd = MakePathWithUniformDelay(40);
   ApplyGlobalPulseLimits(pd, 25, 75);
@@ -79,6 +70,14 @@ TEST(GlobalPulseLimitScaling, PathpulseOverridesGlobalLimits) {
     EXPECT_EQ(pd.reject_limit[i], 5u);
     EXPECT_EQ(pd.error_limit[i], 9u);
   }
+}
+
+TEST(GlobalPulseLimitScaling, DefaultGlobalPercentagesAreHundred) {
+  // §30.7.2: when neither global invocation option is present, both the reject
+  // and error limit percentages default to 100%.
+  SpecifyManager mgr;
+  EXPECT_EQ(mgr.RejectPulseLimitPercent(), 100u);
+  EXPECT_EQ(mgr.ErrorPulseLimitPercent(), 100u);
 }
 
 TEST(GlobalPulseLimitScaling, PropagationDelaysPreserved) {
