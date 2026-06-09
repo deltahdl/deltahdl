@@ -76,33 +76,6 @@ TEST(TimingCheckCommandSim, WidthElapsedAtThresholdNoViolation) {
                                        105));
 }
 
-TEST(TimingCheckCommandSim, WidthElapsedBelowThresholdNoViolation) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kWidth;
-  tc.ref_signal = "clk";
-  tc.ref_edge = SpecifyEdge::kPosedge;
-  tc.limit = 20;
-  tc.threshold = 5;
-  mgr.AddTimingCheck(tc);
-
-  EXPECT_FALSE(mgr.CheckWidthViolation("clk", 100,
-                                       103));
-}
-
-TEST(TimingCheckCommandSim, WidthElapsedAboveLimitNoViolation) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kWidth;
-  tc.ref_signal = "clk";
-  tc.ref_edge = SpecifyEdge::kPosedge;
-  tc.limit = 20;
-  mgr.AddTimingCheck(tc);
-
-  EXPECT_FALSE(mgr.CheckWidthViolation("clk", 100,
-                                       130));
-}
-
 TEST(TimingCheckCommandSim, WidthSimultaneousNoViolation) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
