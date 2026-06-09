@@ -493,6 +493,25 @@ static bool ResolveSpecialNet(Net& net, Arena& arena, Scheduler* sched) {
     return true;
   }
   if (net.type == NetType::kTrireg && AllDriversZ(net.drivers)) {
+    // §28.15.2: once every driver goes to high impedance the trireg enters the
+    // charge storage state, retaining its last value. The drive resulting from
+    // that retained value carries the trireg's charge strength -- one of large,
+    // medium, or small, medium by default. Reflect that charge strength on the
+    // resolved drive (on the side matching the held value) so the stored charge
+    // competes with other sources at the correct level.
+    net.resolved_strength = NetStrength{};
+    if (net.resolved->value.nwords > 0) {
+      bool unknown = (net.resolved->value.words[0].bval & 1ull) != 0;
+      bool high = (net.resolved->value.words[0].aval & 1ull) != 0;
+      if (unknown || !high) {
+        net.resolved_strength.s0_hi = net.charge_strength;
+        net.resolved_strength.s0_lo = net.charge_strength;
+      }
+      if (unknown || high) {
+        net.resolved_strength.s1_hi = net.charge_strength;
+        net.resolved_strength.s1_lo = net.charge_strength;
+      }
+    }
     if (net.decay_ticks > 0 && sched != nullptr) {
       ScheduleDecay(net, sched);
     }
