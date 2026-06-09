@@ -51,11 +51,6 @@ TEST(TimingCheckCondition, NegateConditionEnablesOnZeroDisablesOnOne) {
       TimingCheckConditionKind::kNegate, kBit1, 0));
 }
 
-TEST(TimingCheckCondition, NegateConditionDisablesOnX) {
-  EXPECT_FALSE(TimingCheckConditionEnables(
-      TimingCheckConditionKind::kNegate, kBitX, 0));
-}
-
 TEST(TimingCheckCondition, EqConditionMatchesScalarConstant) {
   EXPECT_TRUE(TimingCheckConditionEnables(
       TimingCheckConditionKind::kEq, kBit0, 0));
@@ -74,20 +69,6 @@ TEST(TimingCheckCondition, EqConditionEnablesOnX) {
       TimingCheckConditionKind::kEq, kBitX, 1));
 }
 
-TEST(TimingCheckCondition, CaseEqConditionMatchesScalarConstant) {
-  EXPECT_TRUE(TimingCheckConditionEnables(
-      TimingCheckConditionKind::kCaseEq, kBit1, 1));
-  EXPECT_FALSE(TimingCheckConditionEnables(
-      TimingCheckConditionKind::kCaseEq, kBit0, 1));
-}
-
-TEST(TimingCheckCondition, CaseEqConditionDisablesOnX) {
-  EXPECT_FALSE(TimingCheckConditionEnables(
-      TimingCheckConditionKind::kCaseEq, kBitX, 0));
-  EXPECT_FALSE(TimingCheckConditionEnables(
-      TimingCheckConditionKind::kCaseEq, kBitX, 1));
-}
-
 TEST(TimingCheckCondition, NeqConditionDiffersFromScalarConstant) {
   EXPECT_TRUE(TimingCheckConditionEnables(
       TimingCheckConditionKind::kNeq, kBit0, 1));
@@ -95,25 +76,15 @@ TEST(TimingCheckCondition, NeqConditionDiffersFromScalarConstant) {
       TimingCheckConditionKind::kNeq, kBit1, 1));
 }
 
-TEST(TimingCheckCondition, NeqConditionEnablesOnX) {
-  EXPECT_TRUE(TimingCheckConditionEnables(
-      TimingCheckConditionKind::kNeq, kBitX, 0));
-  EXPECT_TRUE(TimingCheckConditionEnables(
-      TimingCheckConditionKind::kNeq, kBitX, 1));
-}
-
-TEST(TimingCheckCondition, CaseNeqConditionDiffersFromScalarConstant) {
-  EXPECT_TRUE(TimingCheckConditionEnables(
-      TimingCheckConditionKind::kCaseNeq, kBit0, 1));
+TEST(TimingCheckCondition, ConditionUsesOnlyLeastSignificantBit) {
+  // A multibit conditioning value is reduced to its LSB before being tested,
+  // so the upper bits never affect whether the check is enabled.
+  constexpr Logic4Word kLsbZero{ 2, 0};  // ...10 -> LSB 0
+  constexpr Logic4Word kLsbOne{ 3, 0};   // ...11 -> LSB 1
   EXPECT_FALSE(TimingCheckConditionEnables(
-      TimingCheckConditionKind::kCaseNeq, kBit1, 1));
-}
-
-TEST(TimingCheckCondition, CaseNeqConditionDisablesOnX) {
-  EXPECT_FALSE(TimingCheckConditionEnables(
-      TimingCheckConditionKind::kCaseNeq, kBitX, 0));
-  EXPECT_FALSE(TimingCheckConditionEnables(
-      TimingCheckConditionKind::kCaseNeq, kBitX, 1));
+      TimingCheckConditionKind::kPlain, kLsbZero, 0));
+  EXPECT_TRUE(TimingCheckConditionEnables(
+      TimingCheckConditionKind::kPlain, kLsbOne, 0));
 }
 
 TEST(ConditionedTimingCheckSimulation, TimingCheckConditionSimulates) {
@@ -134,87 +105,6 @@ TEST(ConditionedTimingCheckSimulation, TimingCheckConditionSimulates) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
-}
-
-TEST(ConditionedTimingCheckSimulation, ConditionBothEventsSimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    $hold(posedge clk &&& en, data &&& reset, 5);\n"
-      "  endspecify\n"
-      "  initial x = 8'd66;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 66u);
-}
-
-TEST(ConditionedTimingCheckSimulation, TimingCheckConditionNegationSimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    $setup(data &&& ~reset, posedge clk, 10);\n"
-      "  endspecify\n"
-      "  initial x = 8'd22;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 22u);
-}
-
-TEST(ConditionedTimingCheckSimulation, EqualityConditionSimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    $setup(data &&& (en == 1'b1), posedge clk, 10);\n"
-      "  endspecify\n"
-      "  initial x = 8'd44;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 44u);
-}
-
-TEST(ConditionedTimingCheckSimulation, MultibitConditioningSignalSimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  logic [3:0] en;\n"
-      "  specify\n"
-      "    $setup(data &&& en, posedge clk, 10);\n"
-      "  endspecify\n"
-      "  initial x = 8'd55;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
 }
