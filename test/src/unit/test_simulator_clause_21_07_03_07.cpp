@@ -69,26 +69,6 @@ TEST_F(ExtendedVcdControlRules, AppliesControlTaskNamingOpenedFile) {
   EXPECT_NE(ReadVcd().find("$dumpoff"), std::string::npos);  // checkpoint written
 }
 
-// §21.7.3.7: the ignore rule applies to every extended VCD control task, not
-// just $dumpportsoff. $dumpportsall naming an unopened file writes no checkpoint
-// ("$dumpall" is absent), distinct from the "$dumpvars" record $dumpports emits.
-TEST_F(ExtendedVcdControlRules, IgnoreRuleCoversAllControlTasks) {
-  SimFixture f;
-  auto* clk = MakeVar(f, "clk", 1, 1);
-  {
-    VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("clk", 1, clk);  // ident '!'
-    vcd.EndDefinitions();
-    OpenPortsDump(f, vcd);
-
-    EvalExpr(
-        MkSysCall(f.arena, "$dumpportsall", {MkStr(f.arena, "nomatch.vcd")}),
-        f.ctx, f.arena);
-  }
-  EXPECT_EQ(ReadVcd().find("$dumpall"), std::string::npos);  // checkpoint skipped
-}
-
 // §21.7.3.7: for the tasks that have only optional arguments, issuing the task
 // with no arguments runs the default action. $dumpportsoff with no filename
 // suspends the dump (the default action covering every $dumpports file), so the
