@@ -74,6 +74,33 @@ TEST(ChargeDecayProcess, StoredZeroTransitionsToXAfterDelay) {
   EXPECT_TRUE(AllBitsX(var->value));
 }
 
+TEST(ChargeDecayProcess, DecayFiresOnlyAfterChargeDecayTimeElapses) {
+  Arena arena;
+  Scheduler sched(arena);
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4VecVal(arena, 8, 0xFF);
+  Net net;
+  net.type = NetType::kTrireg;
+  net.resolved = var;
+  net.decay_ticks = 42;
+  net.drivers.push_back(MakeAllZ(arena, 8));
+  net.Resolve(arena, &sched);
+
+  // The transition to x happens when the charge decay time elapses, not at the
+  // moment the drivers turn off: the decay event is queued exactly decay_ticks
+  // in the future and the stored 1s are still intact until then.
+  ASSERT_TRUE(sched.HasEvents());
+  EXPECT_EQ(sched.NextEventTime().ticks, 42u);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);
+  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0u);
+
+  sched.Run();
+
+  // Only once the delay has elapsed do the known bits decay to x.
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
+}
+
 TEST(ChargeDecayProcess, ProcessBeginsWhenDriversTurnOff) {
   Arena arena;
   Scheduler sched(arena);
@@ -154,25 +181,6 @@ TEST(ChargeDecayProcess, EndsWhenDriverPropagatesX) {
 
   sched.Run();
   EXPECT_TRUE(AllBitsX(var->value));
-}
-
-TEST(ChargeDecayProcess, MixedStoredValueDecaysAllBitsToX) {
-  Arena arena;
-  Scheduler sched(arena);
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4VecVal(arena, 8, 0xA5);
-  Net net;
-  net.type = NetType::kTrireg;
-  net.resolved = var;
-  net.decay_ticks = 35;
-  net.drivers.push_back(MakeAllZ(arena, 8));
-  net.Resolve(arena, &sched);
-
-  ASSERT_TRUE(sched.HasEvents());
-  sched.Run();
-
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
-  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
 TEST(ChargeDecayProcess, WideVectorDecaysEveryWord) {

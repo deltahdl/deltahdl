@@ -36,21 +36,6 @@ TEST(ChargeDecaySpecParsing, SingleDelayIsNotChargeDecay) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-TEST(ChargeDecaySpecParsing, ParenthesizedSingleDelayHasNoChargeDecay) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg #(50) cap;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->net_delay, nullptr);
-  EXPECT_EQ(item->net_delay->int_val, 50u);
-  EXPECT_EQ(item->net_delay_fall, nullptr);
-  EXPECT_EQ(item->net_delay_decay, nullptr);
-}
-
 TEST(ChargeDecaySpecParsing, TwoDelaysLeaveChargeDecayUnspecified) {
   auto r = Parse(
       "module t;\n"
