@@ -185,4 +185,26 @@ TEST(IoSystemTaskTest, StartFinishBoundsAndOrdersTheDump) {
   std::remove(path.c_str());
 }
 
+// §21.5 (Syntax 21-13): the production nests the optional arguments so that
+// start_addr may appear without finish_addr. In that three-argument form the
+// dump begins at start_addr and runs to the end of the memory, because the
+// task defaults the missing finish bound to the array's highest address.
+TEST(IoSystemTaskTest, StartAddressWithoutFinishDumpsThroughEndOfMemory) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_test_21_05_start_only.txt";
+  SetupMem(f, "src", 0, 4, 8);
+  Cell(f, "src", 0)->value = MakeLogic4VecVal(f.arena, 8, 0x20);
+  Cell(f, "src", 1)->value = MakeLogic4VecVal(f.arena, 8, 0x21);
+  Cell(f, "src", 2)->value = MakeLogic4VecVal(f.arena, 8, 0x22);
+  Cell(f, "src", 3)->value = MakeLogic4VecVal(f.arena, 8, 0x23);
+
+  // Start at address 2 with no finish supplied: words at 2 and 3 are written,
+  // in ascending order, through the last element of the array.
+  Writemem(f, "$writememh", path, "src", {MakeInt(f.arena, 2)});
+
+  std::string contents = ReadFile(path);
+  EXPECT_EQ(contents, "22\n23\n");
+  std::remove(path.c_str());
+}
+
 }  // namespace

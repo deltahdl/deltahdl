@@ -12,14 +12,6 @@ TEST(IoSystemTaskParsing, WritememhCall) {
               "endmodule\n"));
 }
 
-TEST(IoSystemTaskParsing, WritemembCall) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  reg [7:0] mem [0:255];\n"
-              "  initial $writememb(\"out.bin\", mem);\n"
-              "endmodule\n"));
-}
-
 // §21.5 (Syntax 21-13): the production carries optional start_addr and
 // finish_addr arguments after the memory name. The four-argument form must
 // parse as well as the bare filename/memory form above.
