@@ -947,6 +947,56 @@ void Elaborator::ValidateSpecifyBlocks() {
         }
       }
 
+      // §30.4.4.3: Different delays may be assigned to the same edge-sensitive
+      // path only if every port is referenced the same way (entire port,
+      // bit-select, or part-select) across all of those declarations.
+      // Referencing a port as a part-select in one declaration and as a
+      // bit-select in another for the same path is illegal.
+      auto ref_category = [](const SpecifyTerminal& t) -> int {
+        switch (t.range_kind) {
+          case SpecifyRangeKind::kNone:
+            return 0;  // entire port
+          case SpecifyRangeKind::kBitSelect:
+            return 1;  // bit-select
+          default:
+            return 2;  // part-select (including indexed forms)
+        }
+      };
+      auto consistent_refs = [&](const SpecifyPathDecl& a,
+                                  const SpecifyPathDecl& b) {
+        for (size_t i = 0; i < a.src_ports.size(); ++i) {
+          if (ref_category(a.src_ports[i]) != ref_category(b.src_ports[i]))
+            return false;
+        }
+        for (size_t i = 0; i < a.dst_ports.size(); ++i) {
+          if (ref_category(a.dst_ports[i]) != ref_category(b.dst_ports[i]))
+            return false;
+        }
+        return true;
+      };
+      for (auto* item : mod->items) {
+        if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+        std::vector<SpecifyItem*> edge_paths;
+        for (auto* si : item->specify_items) {
+          if (si->kind != SpecifyItemKind::kPathDecl) continue;
+          if (si->path.edge == SpecifyEdge::kNone) continue;
+          edge_paths.push_back(si);
+        }
+        for (size_t j = 0; j < edge_paths.size(); ++j) {
+          for (size_t i = 0; i < j; ++i) {
+            if (!same_endpoints(edge_paths[i]->path, edge_paths[j]->path))
+              continue;
+            if (!consistent_refs(edge_paths[i]->path, edge_paths[j]->path)) {
+              diag_.Error(edge_paths[j]->loc,
+                          "edge-sensitive paths to the same module path must "
+                          "reference each port the same way (entire port, "
+                          "bit-select, or part-select)");
+              break;
+            }
+          }
+        }
+      }
+
       auto terminal_width = [&](const SpecifyTerminal& t) -> uint32_t {
         if (t.range_kind == SpecifyRangeKind::kBitSelect) return 1;
         if (t.range_kind == SpecifyRangeKind::kPartSelect) {
