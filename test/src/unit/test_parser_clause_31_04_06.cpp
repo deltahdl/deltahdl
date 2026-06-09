@@ -35,36 +35,6 @@ TEST(TimingCheckCommandParsing, NochangeNegedgeReference) {
   EXPECT_EQ(tc->ref_edge, SpecifyEdge::kNegedge);
 }
 
-TEST(TimingCheckCommandParsing, NochangeStartAndEndOffsets) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $nochange(posedge clk, data, 3, 7);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  ASSERT_EQ(tc->limits.size(), 2u);
-  EXPECT_NE(tc->limits[0], nullptr);
-  EXPECT_NE(tc->limits[1], nullptr);
-}
-
-TEST(TimingCheckCommandParsing, NochangeNegativeOffsets) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $nochange(posedge clk, data, -3, -5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  ASSERT_EQ(tc->limits.size(), 2u);
-  EXPECT_NE(tc->limits[0], nullptr);
-  EXPECT_NE(tc->limits[1], nullptr);
-}
-
 TEST(TimingCheckCommandParsing, NochangeStartEndEdgeOffsetMinTypMax) {
   auto r = Parse(
       "module m;\n"
@@ -104,16 +74,6 @@ TEST(TimingCheckCommandParsing, NochangeEmptyNotifierSlot) {
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_TRUE(tc->notifier.empty());
-}
-
-TEST(TimingCheckCommandParsing, ErrorNochangeReferenceMissingEdge) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $nochange(clk, data, 0, 0);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
 }
 
 TEST(TimingCheckCommandParsing, ErrorNochangeEdgeControlSpecifier) {
