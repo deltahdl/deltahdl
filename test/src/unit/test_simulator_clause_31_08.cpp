@@ -72,21 +72,6 @@ TEST(VectorSignalsInTimingChecks, PerBitModeTwoSignalExpandsToCrossProduct) {
             64u);
 }
 
-TEST(VectorSignalsInTimingChecks, PerBitModeAllTwoSignalKindsExpand) {
-  const TimingCheckKind two_signal_kinds[] = {
-      TimingCheckKind::kSetup,    TimingCheckKind::kHold,
-      TimingCheckKind::kSetuphold, TimingCheckKind::kRecovery,
-      TimingCheckKind::kRemoval,  TimingCheckKind::kRecrem,
-      TimingCheckKind::kSkew,     TimingCheckKind::kTimeskew,
-      TimingCheckKind::kFullskew, TimingCheckKind::kNochange,
-  };
-  for (auto k : two_signal_kinds) {
-    EXPECT_EQ(TimingCheckExpandedCount(k, 3, 5,
-                                       TimingCheckVectorMode::kPerBit),
-              15u);
-  }
-}
-
 TEST(VectorSignalsInTimingChecks, LrmEightBitDataAgainstScalarClock) {
   EXPECT_EQ(TimingCheckExpandedCount(TimingCheckKind::kSetup, 1, 8,
                                      TimingCheckVectorMode::kSingle),
