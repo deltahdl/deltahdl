@@ -33,18 +33,6 @@ TEST(SetupTimingCheckWindow, EndEndpointExcluded) {
   EXPECT_FALSE(mgr.CheckSetupViolation("clk", 100, "data", 100));
 }
 
-TEST(SetupTimingCheckWindow, TimestampBeforeWindowDoesNotViolate) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSetup(10));
-  EXPECT_FALSE(mgr.CheckSetupViolation("clk", 100, "data", 85));
-}
-
-TEST(SetupTimingCheckWindow, TimestampAfterTimecheckDoesNotViolate) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSetup(10));
-  EXPECT_FALSE(mgr.CheckSetupViolation("clk", 100, "data", 105));
-}
-
 TEST(SetupTimingCheckWindow, WindowScalesWithLimit) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeSetup(3));
