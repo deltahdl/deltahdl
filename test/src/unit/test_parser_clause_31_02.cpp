@@ -28,22 +28,6 @@ TEST(SystemTimingCheckParsing, MultipleTimingChecksInSpecifyBlock) {
             TimingCheckKind::kRecovery);
 }
 
-TEST(SystemTimingCheckParsing, TimingCheckRejectedInAlwaysBlock) {
-  auto r = Parse(
-      "module m(input d, clk);\n"
-      "  always @(posedge clk) $setup(d, posedge clk, 5);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(SystemTimingCheckParsing, TimingCheckRejectedInInitialBlock) {
-  auto r = Parse(
-      "module m(input d, clk);\n"
-      "  initial $hold(posedge clk, d, 3);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(SystemTimingCheckParsing, EveryTimingCheckRejectedInProceduralCode) {
   const char* names[] = {"$setup",    "$hold",     "$setuphold", "$recovery",
                          "$removal",  "$recrem",   "$skew",      "$timeskew",
@@ -62,16 +46,6 @@ TEST(SystemTimingCheckParsing, SystemTaskRejectedInSpecifyBlock) {
       "module m;\n"
       "  specify\n"
       "    $display(\"hi\");\n"
-      "  endspecify\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(SystemTimingCheckParsing, FinishRejectedInSpecifyBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    $finish;\n"
       "  endspecify\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
