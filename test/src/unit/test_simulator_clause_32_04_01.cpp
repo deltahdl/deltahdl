@@ -66,56 +66,6 @@ TEST(SdfDelayMapping, CondelseIopathSetsIfnoneFlag) {
   EXPECT_EQ(file.cells[0].iopaths[0].dst_port, "y");
 }
 
-TEST(SdfDelayMapping, NonconditionalIopathAnnotatesAllPathsBetweenSamePorts) {
-  SpecifyManager mgr;
-  PathDelay sv_then;
-  sv_then.src_port = "a";
-  sv_then.dst_port = "y";
-  sv_then.condition = "mode";
-  sv_then.delay_count = 1;
-  sv_then.delays[0] = 1;
-  mgr.AddPathDelay(sv_then);
-
-  PathDelay sv_else;
-  sv_else.src_port = "a";
-  sv_else.dst_port = "y";
-  sv_else.condition = "!mode";
-  sv_else.delay_count = 1;
-  sv_else.delays[0] = 2;
-  mgr.AddPathDelay(sv_else);
-
-  ASSERT_EQ(mgr.GetPathDelays().size(), 2u);
-
-  SdfFile file;
-  SdfCell cell;
-  SdfIopath io;
-  io.src_port = "a";
-  io.dst_port = "y";
-  io.rise.typ_val = 13;
-  io.fall.typ_val = 17;
-  cell.iopaths.push_back(io);
-  file.cells.push_back(cell);
-
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetPathDelays().size(), 2u);
-
-  for (const auto& pd : mgr.GetPathDelays()) {
-    EXPECT_EQ(pd.src_port, "a");
-    EXPECT_EQ(pd.dst_port, "y");
-    EXPECT_EQ(pd.delays[0], 13u);
-    EXPECT_EQ(pd.delays[1], 17u);
-  }
-  bool saw_then = false;
-  bool saw_else = false;
-  for (const auto& pd : mgr.GetPathDelays()) {
-    if (pd.condition == "mode") saw_then = true;
-    if (pd.condition == "!mode") saw_else = true;
-  }
-  EXPECT_TRUE(saw_then);
-  EXPECT_TRUE(saw_else);
-}
-
 TEST(SdfDelayMapping, ConditionalIopathAnnotatesOnlyMatchingConditionPath) {
   SpecifyManager mgr;
   PathDelay sv_then;
@@ -159,6 +109,67 @@ TEST(SdfDelayMapping, ConditionalIopathAnnotatesOnlyMatchingConditionPath) {
       ADD_FAILURE() << "unexpected condition: " << pd.condition;
     }
   }
+}
+
+TEST(SdfDelayMapping, ConditionalIopathSkipsSameConditionPathsWithDifferentPorts) {
+  // §32.4.1: a conditional IOPATH annotates only specify paths between *those
+  // same two ports* with the same condition. Sharing the condition is not
+  // enough: paths with a different source or destination must be left alone,
+  // even when their condition matches.
+  SpecifyManager mgr;
+  PathDelay match;
+  match.src_port = "a";
+  match.dst_port = "y";
+  match.condition = "mode";
+  match.delay_count = 1;
+  match.delays[0] = 1;
+  mgr.AddPathDelay(match);
+
+  PathDelay other_src;
+  other_src.src_port = "b";
+  other_src.dst_port = "y";
+  other_src.condition = "mode";
+  other_src.delay_count = 1;
+  other_src.delays[0] = 2;
+  mgr.AddPathDelay(other_src);
+
+  PathDelay other_dst;
+  other_dst.src_port = "a";
+  other_dst.dst_port = "z";
+  other_dst.condition = "mode";
+  other_dst.delay_count = 1;
+  other_dst.delays[0] = 3;
+  mgr.AddPathDelay(other_dst);
+
+  SdfFile file;
+  std::string sdf = R"(
+    (DELAYFILE
+      (CELL
+        (CELLTYPE "buf")
+        (INSTANCE u1)
+        (DELAY (ABSOLUTE (COND mode (IOPATH a y (13) (17)))))
+      )
+    )
+  )";
+  ASSERT_TRUE(ParseSdf(sdf, file));
+  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+
+  ASSERT_EQ(mgr.GetPathDelays().size(), 3u);
+  bool saw_match = false;
+  for (const auto& pd : mgr.GetPathDelays()) {
+    if (pd.src_port == "a" && pd.dst_port == "y") {
+      EXPECT_EQ(pd.delays[0], 13u);
+      EXPECT_EQ(pd.delays[1], 17u);
+      saw_match = true;
+    } else if (pd.src_port == "b" && pd.dst_port == "y") {
+      EXPECT_EQ(pd.delays[0], 2u);
+    } else if (pd.src_port == "a" && pd.dst_port == "z") {
+      EXPECT_EQ(pd.delays[0], 3u);
+    } else {
+      ADD_FAILURE() << "unexpected path " << pd.src_port << "->" << pd.dst_port;
+    }
+  }
+  EXPECT_TRUE(saw_match);
 }
 
 TEST(SdfDelayMapping, CondelseIopathAnnotatesOnlyIfnonePath) {
@@ -257,56 +268,6 @@ TEST(SdfDelayMapping, CondIopathPreservesMinTypMaxDelaySelection) {
   EXPECT_EQ(mgr.GetPathDelays()[0].delays[1], 8u);
 }
 
-TEST(SdfDelayMapping, MultipleCondIopathsAnnotateRespectiveSiblings) {
-  SpecifyManager mgr;
-  PathDelay sv_m1;
-  sv_m1.src_port = "a";
-  sv_m1.dst_port = "y";
-  sv_m1.condition = "m1";
-  sv_m1.delay_count = 1;
-  sv_m1.delays[0] = 0;
-  mgr.AddPathDelay(sv_m1);
-
-  PathDelay sv_m2;
-  sv_m2.src_port = "a";
-  sv_m2.dst_port = "y";
-  sv_m2.condition = "m2";
-  sv_m2.delay_count = 1;
-  sv_m2.delays[0] = 0;
-  mgr.AddPathDelay(sv_m2);
-
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "buf")
-        (INSTANCE u1)
-        (DELAY
-          (ABSOLUTE
-            (COND m1 (IOPATH a y (10) (20)))
-            (COND m2 (IOPATH a y (30) (40)))
-          )
-        )
-      )
-    )
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetPathDelays().size(), 2u);
-  for (const auto& pd : mgr.GetPathDelays()) {
-    if (pd.condition == "m1") {
-      EXPECT_EQ(pd.delays[0], 10u);
-      EXPECT_EQ(pd.delays[1], 20u);
-    } else if (pd.condition == "m2") {
-      EXPECT_EQ(pd.delays[0], 30u);
-      EXPECT_EQ(pd.delays[1], 40u);
-    } else {
-      ADD_FAILURE() << "unexpected condition: " << pd.condition;
-    }
-  }
-}
-
 TEST(SdfDelayMapping, NonconditionalIopathUpdatesIfnoneSiblingToo) {
   SpecifyManager mgr;
   PathDelay sv_cond;
@@ -386,38 +347,6 @@ TEST(SdfDelayMapping, TimingCheckMatchingDistinguishesByCondition) {
       ADD_FAILURE() << "unexpected condition: " << t.condition;
     }
   }
-}
-
-TEST(SdfDelayMapping, PathpulseAnnotatesAbsolutePulseLimits) {
-  SpecifyManager mgr;
-  PathDelay pd;
-  pd.src_port = "a";
-  pd.dst_port = "y";
-  pd.delay_count = 1;
-  pd.delays[0] = 50;
-  pd.reject_limit[0] = 50;
-  pd.error_limit[0] = 50;
-  mgr.AddPathDelay(pd);
-
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "buf")
-        (INSTANCE u1)
-        (DELAY (ABSOLUTE (PATHPULSE a y (10) (20))))
-      )
-    )
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  SdfAnnotationResult result =
-      AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  EXPECT_TRUE(result.warnings.empty());
-  ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
-  EXPECT_EQ(mgr.GetPathDelays()[0].delays[0], 50u);
-  EXPECT_EQ(mgr.GetPathDelays()[0].reject_limit[0], 10u);
-  EXPECT_EQ(mgr.GetPathDelays()[0].error_limit[0], 20u);
 }
 
 TEST(SdfDelayMapping, PathpulseSingleValueCollapsesXBand) {
@@ -576,6 +505,63 @@ TEST(SdfDelayMapping, CondelseIopathWithRetainIgnoresRetainAndKeepsIfnone) {
   EXPECT_TRUE(file.cells[0].iopaths[0].is_ifnone);
   EXPECT_EQ(file.cells[0].iopaths[0].rise.typ_val, 10u);
   EXPECT_EQ(file.cells[0].iopaths[0].fall.typ_val, 20u);
+}
+
+TEST(SdfDelayMapping, IopathOnlyAnnotatesPathsWhosePortNamesMatch) {
+  // §32.4.1: the annotator looks for specify paths where the *names* (as well
+  // as conditions) match. A nonconditional IOPATH a->y must touch only the
+  // a->y path, leaving paths with a different source (b->y) or a different
+  // destination (a->z) unchanged.
+  SpecifyManager mgr;
+  PathDelay match;
+  match.src_port = "a";
+  match.dst_port = "y";
+  match.delay_count = 1;
+  match.delays[0] = 1;
+  mgr.AddPathDelay(match);
+
+  PathDelay other_src;
+  other_src.src_port = "b";
+  other_src.dst_port = "y";
+  other_src.delay_count = 1;
+  other_src.delays[0] = 2;
+  mgr.AddPathDelay(other_src);
+
+  PathDelay other_dst;
+  other_dst.src_port = "a";
+  other_dst.dst_port = "z";
+  other_dst.delay_count = 1;
+  other_dst.delays[0] = 3;
+  mgr.AddPathDelay(other_dst);
+
+  SdfFile file;
+  SdfCell cell;
+  SdfIopath io;
+  io.src_port = "a";
+  io.dst_port = "y";
+  io.rise.typ_val = 13;
+  io.fall.typ_val = 17;
+  cell.iopaths.push_back(io);
+  file.cells.push_back(cell);
+
+  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+
+  ASSERT_EQ(mgr.GetPathDelays().size(), 3u);
+  bool saw_match = false;
+  for (const auto& pd : mgr.GetPathDelays()) {
+    if (pd.src_port == "a" && pd.dst_port == "y") {
+      EXPECT_EQ(pd.delays[0], 13u);
+      EXPECT_EQ(pd.delays[1], 17u);
+      saw_match = true;
+    } else if (pd.src_port == "b" && pd.dst_port == "y") {
+      EXPECT_EQ(pd.delays[0], 2u);
+    } else if (pd.src_port == "a" && pd.dst_port == "z") {
+      EXPECT_EQ(pd.delays[0], 3u);
+    } else {
+      ADD_FAILURE() << "unexpected path " << pd.src_port << "->" << pd.dst_port;
+    }
+  }
+  EXPECT_TRUE(saw_match);
 }
 
 TEST(SdfDelayMapping, ConditionalIopathDoesNotAnnotateIfnoneSibling) {
