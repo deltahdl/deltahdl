@@ -313,6 +313,21 @@ TEST(ReadFormattedTest, SscanfStopsOnLiteralMismatch) {
   EXPECT_EQ(dest->value.ToUint64(), 0u);  // nothing assigned
 }
 
+// §21.3.4.3, Table 21-7: a %% conversion expects a literal % in the input and
+// assigns nothing. Here it consumes the leading %, letting the following %d
+// convert the digit -- without the %% match the %d would fail on the % instead.
+TEST(ReadFormattedTest, SscanfMatchesLiteralPercent) {
+  SimFixture f;
+  auto* dest = f.ctx.CreateVariable("pv", 32);
+  dest->value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  auto* expr = MkSysCall(
+      f.arena, "$sscanf",
+      {MkStr(f.arena, "%5"), MkStr(f.arena, "%%%d"), MkId(f.arena, "pv")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);  // only %d assigns
+  EXPECT_EQ(dest->value.ToUint64(), 5u);
+}
+
 // §21.3.4.3: the assignment-suppression character converts a field without
 // consuming a destination argument.
 TEST(ReadFormattedTest, SscanfSuppressesAssignment) {
@@ -353,6 +368,21 @@ TEST(ReadFormattedTest, SscanfReadsCharacter) {
       {MkStr(f.arena, "Q"), MkStr(f.arena, "%c"), MkId(f.arena, "cv")});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);
   EXPECT_EQ(dest->value.ToUint64(), static_cast<uint64_t>('Q'));
+}
+
+// §21.3.4.3: the character conversion is the lone exception to leading
+// white-space skipping -- %c takes the next input character verbatim, so a
+// leading space is read as the character itself.
+TEST(ReadFormattedTest, SscanfCharacterDoesNotSkipLeadingWhitespace) {
+  SimFixture f;
+  auto* dest = f.ctx.CreateVariable("cv", 8);
+  dest->value = MakeLogic4VecVal(f.arena, 8, 0);
+
+  auto* expr = MkSysCall(
+      f.arena, "$sscanf",
+      {MkStr(f.arena, " A"), MkStr(f.arena, "%c"), MkId(f.arena, "cv")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);
+  EXPECT_EQ(dest->value.ToUint64(), static_cast<uint64_t>(' '));  // the space
 }
 
 // §21.3.4.3: %s reads a run of nonwhitespace characters into the destination,
@@ -419,6 +449,136 @@ TEST(ReadFormattedTest, FscanfReadsString) {
       {MkInt(f.arena, fd), MkStr(f.arena, "%s"), MkId(f.arena, "sv")});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);
   EXPECT_EQ(dest->value.ToUint64(), 0x776f726c64u);  // "world"
+
+  EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
+  std::remove(tmp.c_str());
+}
+
+// §21.3.4.3: the str source of $sscanf need not be a literal -- it may be an
+// integral expression whose packed bytes spell the text to scan. Here a 16-bit
+// variable holds the characters "42", read most significant byte first.
+TEST(ReadFormattedTest, SscanfReadsFromIntegralVariable) {
+  SimFixture f;
+  auto* src = f.ctx.CreateVariable("src", 16);
+  src->value = MakeLogic4VecVal(f.arena, 16, ('4' << 8) | '2');  // "42"
+
+  auto* dest = f.ctx.CreateVariable("d", 32);
+  dest->value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  auto* expr = MkSysCall(
+      f.arena, "$sscanf",
+      {MkId(f.arena, "src"), MkStr(f.arena, "%d"), MkId(f.arena, "d")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);
+  EXPECT_EQ(dest->value.ToUint64(), 42u);
+}
+
+// §21.3.4.3: an input field reaches only as far as the next character that does
+// not belong to it. A numeric field stops at the first non-numeric character,
+// which a following %s then picks up.
+TEST(ReadFormattedTest, SscanfNumericFieldStopsAtNonNumericCharacter) {
+  SimFixture f;
+  auto* num = f.ctx.CreateVariable("num", 32);
+  num->value = MakeLogic4VecVal(f.arena, 32, 0);
+  auto* rest = f.ctx.CreateVariable("rest", 16);
+  rest->value = MakeLogic4VecVal(f.arena, 16, 0);
+
+  auto* expr =
+      MkSysCall(f.arena, "$sscanf",
+                {MkStr(f.arena, "12ab"), MkStr(f.arena, "%d%s"),
+                 MkId(f.arena, "num"), MkId(f.arena, "rest")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 2u);
+  EXPECT_EQ(num->value.ToUint64(), 12u);          // digits only
+  EXPECT_EQ(rest->value.ToUint64(), 0x6162u);     // "ab" follows
+}
+
+// §21.3.4.3: a %s field is a run of nonwhite-space characters, so it ends at the
+// first space; the next %s resumes after that space.
+TEST(ReadFormattedTest, SscanfStringFieldStopsAtWhitespace) {
+  SimFixture f;
+  auto* w1 = f.ctx.CreateVariable("w1", 16);
+  w1->value = MakeLogic4VecVal(f.arena, 16, 0);
+  auto* w2 = f.ctx.CreateVariable("w2", 16);
+  w2->value = MakeLogic4VecVal(f.arena, 16, 0);
+
+  auto* expr =
+      MkSysCall(f.arena, "$sscanf",
+                {MkStr(f.arena, "ab cd"), MkStr(f.arena, "%s %s"),
+                 MkId(f.arena, "w1"), MkId(f.arena, "w2")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 2u);
+  EXPECT_EQ(w1->value.ToUint64(), 0x6162u);  // "ab"
+  EXPECT_EQ(w2->value.ToUint64(), 0x6364u);  // "cd"
+}
+
+// §21.3.4.3: when a conversion stops on a conflicting input character, that
+// character is left unread in the stream. After $fscanf consumes "12" and halts
+// at 'x', the descriptor still points at 'x', so the next read returns it.
+TEST(ReadFormattedTest, FscanfLeavesConflictingCharacterUnread) {
+  SimFixture f;
+  std::string tmp = "/tmp/deltahdl_test_fscanf_unread.txt";
+  {
+    std::ofstream ofs(tmp);
+    ofs << "12x";
+  }
+  auto fd = EvalExpr(MkSysCall(f.arena, "$fopen",
+                               {MkStr(f.arena, tmp), MkStr(f.arena, "r")}),
+                     f.ctx, f.arena)
+                .ToUint64();
+
+  auto* d = f.ctx.CreateVariable("d", 32);
+  d->value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  auto* scan = MkSysCall(
+      f.arena, "$fscanf",
+      {MkInt(f.arena, fd), MkStr(f.arena, "%d"), MkId(f.arena, "d")});
+  EXPECT_EQ(EvalExpr(scan, f.ctx, f.arena).ToUint64(), 1u);
+  EXPECT_EQ(d->value.ToUint64(), 12u);
+
+  auto* getc = MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)});
+  EXPECT_EQ(EvalExpr(getc, f.ctx, f.arena).ToUint64(),
+            static_cast<uint64_t>('x'));  // the unread offending character
+
+  EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
+  std::remove(tmp.c_str());
+}
+
+// §21.3.4.3, Table 21-7: %u transfers unformatted 2-value binary data, taking
+// as many raw bytes as the destination needs. A 16-bit target pulls two bytes
+// (here both 0x42, so the result is byte-order independent) and the value
+// carries no x/z.
+TEST(ReadFormattedTest, SscanfReadsUnformattedBinary) {
+  SimFixture f;
+  auto* dest = f.ctx.CreateVariable("uv", 16);
+  dest->value = MakeLogic4VecVal(f.arena, 16, 0);
+
+  auto* expr = MkSysCall(
+      f.arena, "$sscanf",
+      {MkStr(f.arena, "BB"), MkStr(f.arena, "%u"), MkId(f.arena, "uv")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);
+  EXPECT_EQ(dest->value.ToUint64(), 0x4242u);  // two raw bytes
+}
+
+// §21.3.4.3, Table 21-7: the same unformatted-binary transfer applies to the
+// $fscanf engine reading raw bytes from a file descriptor.
+TEST(ReadFormattedTest, FscanfReadsUnformattedBinary) {
+  SimFixture f;
+  std::string tmp = "/tmp/deltahdl_test_fscanf_u.txt";
+  {
+    std::ofstream ofs(tmp);
+    ofs << "BB";
+  }
+  auto fd = EvalExpr(MkSysCall(f.arena, "$fopen",
+                               {MkStr(f.arena, tmp), MkStr(f.arena, "r")}),
+                     f.ctx, f.arena)
+                .ToUint64();
+
+  auto* dest = f.ctx.CreateVariable("uv", 16);
+  dest->value = MakeLogic4VecVal(f.arena, 16, 0);
+
+  auto* expr = MkSysCall(
+      f.arena, "$fscanf",
+      {MkInt(f.arena, fd), MkStr(f.arena, "%u"), MkId(f.arena, "uv")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);
+  EXPECT_EQ(dest->value.ToUint64(), 0x4242u);
 
   EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
   std::remove(tmp.c_str());

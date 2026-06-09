@@ -1980,6 +1980,29 @@ static uint32_t RunScanf(const std::string& input, const std::string& fmt,
       continue;
     }
 
+    if (lc == 'u') {
+      // §21.3.4.3, Table 21-7: %u transfers unformatted 2-value binary data,
+      // pulling enough raw bytes to fill the destination in the host's native
+      // (little-endian) byte order. The bytes are known, so the stored value
+      // carries no x or z.
+      Variable* var = field_var(suppress);
+      uint32_t w = var ? var->value.width : 8;
+      size_t nbytes = (w + 7) / 8;
+      if (pos + nbytes > input.size()) break;  // too little data to fill target
+      uint64_t v = 0;
+      for (size_t k = 0; k < nbytes && k < sizeof(uint64_t); ++k) {
+        v |= static_cast<uint64_t>(static_cast<uint8_t>(input[pos + k]))
+             << (8 * k);
+      }
+      pos += nbytes;
+      if (var) var->value = MakeLogic4VecVal(arena, var->value.width, v);
+      if (!suppress) {
+        ++matched;
+        ++ai;
+      }
+      continue;
+    }
+
     int base = SpecToBase(lc);
     if (base == 0) break;  // unsupported conversion code: stop scanning
     size_t limit = upper_limit(width);
