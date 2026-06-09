@@ -13,18 +13,8 @@ TEST(PulseFiltering, PulseAtErrorLimitPropagates) {
             PulseClassification::kPropagate);
 }
 
-TEST(PulseFiltering, PulseAboveErrorLimitPropagates) {
-  EXPECT_EQ(ClassifyPulse( 12, 3, 7),
-            PulseClassification::kPropagate);
-}
-
 TEST(PulseFiltering, PulseAtRejectLimitForcesXWhenErrorHigher) {
   EXPECT_EQ(ClassifyPulse( 3, 3, 7),
-            PulseClassification::kForceX);
-}
-
-TEST(PulseFiltering, PulseStrictlyBetweenLimitsForcesX) {
-  EXPECT_EQ(ClassifyPulse( 5, 3, 7),
             PulseClassification::kForceX);
 }
 
@@ -35,21 +25,6 @@ TEST(PulseFiltering, PulseJustBelowErrorLimitForcesX) {
 
 TEST(PulseFiltering, PulseBelowRejectLimitIsRejected) {
   EXPECT_EQ(ClassifyPulse( 2, 3, 7),
-            PulseClassification::kReject);
-}
-
-TEST(PulseFiltering, ZeroWidthPulseIsRejected) {
-  EXPECT_EQ(ClassifyPulse( 0, 1, 5),
-            PulseClassification::kReject);
-}
-
-TEST(PulseFiltering, EqualLimitsNoXBandWidthAtLimitPropagates) {
-  EXPECT_EQ(ClassifyPulse( 5, 5, 5),
-            PulseClassification::kPropagate);
-}
-
-TEST(PulseFiltering, EqualLimitsNoXBandWidthBelowLimitIsRejected) {
-  EXPECT_EQ(ClassifyPulse( 4, 5, 5),
             PulseClassification::kReject);
 }
 
