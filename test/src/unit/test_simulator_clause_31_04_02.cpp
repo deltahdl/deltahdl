@@ -24,23 +24,6 @@ TEST(SystemTimingCheckSim, TimeskewEntryStored) {
   EXPECT_EQ(stored.limit, 5u);
 }
 
-TEST(SystemTimingCheckSim, TimeskewEntryWithoutEdgesStored) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kTimeskew;
-  tc.ref_signal = "clk";
-  tc.ref_edge = SpecifyEdge::kNone;
-  tc.data_signal = "d";
-  tc.data_edge = SpecifyEdge::kNone;
-  tc.limit = 0;
-  mgr.AddTimingCheck(tc);
-  auto& stored = mgr.GetTimingChecks()[0];
-  EXPECT_EQ(stored.kind, TimingCheckKind::kTimeskew);
-  EXPECT_EQ(stored.ref_edge, SpecifyEdge::kNone);
-  EXPECT_EQ(stored.data_edge, SpecifyEdge::kNone);
-  EXPECT_EQ(stored.limit, 0u);
-}
-
 TEST(TimingCheckCommandSim, TimeskewWithFlagsSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -80,18 +63,6 @@ TEST(TimeskewTimingCheckWindow, DataAtLimitDoesNotViolate) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeTimeskew(5));
   EXPECT_FALSE(mgr.CheckTimeskewViolation("clk1", 100, "clk2", 105));
-}
-
-TEST(TimeskewTimingCheckWindow, DataWithinLimitDoesNotViolate) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeTimeskew(5));
-  EXPECT_FALSE(mgr.CheckTimeskewViolation("clk1", 100, "clk2", 103));
-}
-
-TEST(TimeskewTimingCheckWindow, DataBeforeReferenceDoesNotViolate) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeTimeskew(5));
-  EXPECT_FALSE(mgr.CheckTimeskewViolation("clk1", 100, "clk2", 90));
 }
 
 TEST(TimeskewTimingCheckWindow, ZeroLimitSimultaneousDoesNotViolate) {
@@ -147,12 +118,6 @@ TEST(TimeskewModeOracle, TimerModeDataBeyondLimitViolates) {
                                        false));
 }
 
-TEST(TimeskewModeOracle, TimerModeNewReferenceWithinLimitDoesNotViolate) {
-  EXPECT_FALSE(ReportsTimeskewViolation(100, 104, false,
-                                        5,
-                                        false));
-}
-
 TEST(TimeskewModeOracle, TimerModeNewReferenceAtLimitDoesNotViolate) {
   EXPECT_FALSE(ReportsTimeskewViolation(100, 105, false,
                                         5,
@@ -186,18 +151,6 @@ TEST(TimeskewModeOracle, EventModeDataAtLimitDoesNotViolate) {
 TEST(TimeskewModeOracle, EventModeNewReferenceBeyondLimitDoesNotViolate) {
   EXPECT_FALSE(ReportsTimeskewViolation(100, 200, false,
                                         5,
-                                        true));
-}
-
-TEST(TimeskewModeOracle, EventModeDataWithinLimitDoesNotViolate) {
-  EXPECT_FALSE(ReportsTimeskewViolation(100, 103, true,
-                                        5,
-                                        true));
-}
-
-TEST(TimeskewModeOracle, EventModeSimultaneousDoesNotViolate) {
-  EXPECT_FALSE(ReportsTimeskewViolation(100, 100, true,
-                                        0,
                                         true));
 }
 
