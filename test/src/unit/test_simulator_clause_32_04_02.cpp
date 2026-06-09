@@ -326,6 +326,38 @@ TEST(SdfTimingCheckMapping, SdfWithRefEdgeAnnotatesOnlyMatchingSvEdge) {
   }
 }
 
+// An edge may sit on the data signal as well as the reference signal; when the
+// SDF check carries a data-signal edge it must match the SystemVerilog check's
+// data edge before annotation. Only the matching-edge sibling is updated.
+TEST(SdfTimingCheckMapping, SdfWithDataEdgeAnnotatesOnlyMatchingSvDataEdge) {
+  SpecifyManager mgr;
+  TimingCheckEntry pos = MakeSv(TimingCheckKind::kSetup, "clk", "d",
+                                SpecifyEdge::kNone, SpecifyEdge::kPosedge);
+  pos.limit = 1;
+  mgr.AddTimingCheck(pos);
+  TimingCheckEntry neg = MakeSv(TimingCheckKind::kSetup, "clk", "d",
+                                SpecifyEdge::kNone, SpecifyEdge::kNegedge);
+  neg.limit = 2;
+  mgr.AddTimingCheck(neg);
+
+  SdfTimingCheck tc;
+  tc.check_type = SdfCheckType::kSetup;
+  tc.ref_port = "clk";
+  tc.data_port = "d";
+  tc.data_edge = SpecifyEdge::kPosedge;
+  tc.limit.typ_val = 99;
+  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
+
+  for (const auto& t : mgr.GetTimingChecks()) {
+    if (t.kind != TimingCheckKind::kSetup) continue;
+    if (t.data_edge == SpecifyEdge::kPosedge) {
+      EXPECT_EQ(t.limit, 99u);
+    } else if (t.data_edge == SpecifyEdge::kNegedge) {
+      EXPECT_EQ(t.limit, 2u);
+    }
+  }
+}
+
 TEST(SdfTimingCheckMapping, SdfWithConditionAnnotatesOnlyMatchingSvCondition) {
   SpecifyManager mgr;
   TimingCheckEntry m = MakeSv(TimingCheckKind::kSetup, "clk", "d",
@@ -412,52 +444,6 @@ TEST(SdfTimingCheckMapping, SdfWithRefEdgeMatchesSvDespiteSvCondition) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].limit2, 4u);
 
   EXPECT_EQ(mgr.GetTimingChecks()[0].condition, "mode");
-}
-
-TEST(SdfTimingCheckMapping,
-     SdfWithBothRefEdgeAndConditionRequiresBothToMatch) {
-  SpecifyManager mgr;
-  TimingCheckEntry mode_pos = MakeSv(TimingCheckKind::kSetuphold, "clk",
-                                     "data", SpecifyEdge::kPosedge,
-                                     SpecifyEdge::kNone, "mode");
-  mode_pos.limit = 11;
-  mode_pos.limit2 = 12;
-  mgr.AddTimingCheck(mode_pos);
-  TimingCheckEntry notmode_neg = MakeSv(TimingCheckKind::kSetuphold, "clk",
-                                        "data", SpecifyEdge::kNegedge,
-                                        SpecifyEdge::kNone, "!mode");
-  notmode_neg.limit = 21;
-  notmode_neg.limit2 = 22;
-  mgr.AddTimingCheck(notmode_neg);
-  TimingCheckEntry edge_only = MakeSv(TimingCheckKind::kSetuphold, "clk",
-                                      "data", SpecifyEdge::kEdge);
-  edge_only.limit = 31;
-  edge_only.limit2 = 32;
-  mgr.AddTimingCheck(edge_only);
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kSetuphold;
-  tc.ref_port = "clk";
-  tc.data_port = "data";
-  tc.ref_edge = SpecifyEdge::kPosedge;
-  tc.condition = "!mode";
-  tc.limit.typ_val = 99;
-  tc.limit2.typ_val = 88;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  for (const auto& t : mgr.GetTimingChecks()) {
-    if (t.ref_edge == SpecifyEdge::kPosedge && t.condition == "mode") {
-      EXPECT_EQ(t.limit, 11u);
-      EXPECT_EQ(t.limit2, 12u);
-    } else if (t.ref_edge == SpecifyEdge::kNegedge &&
-               t.condition == "!mode") {
-      EXPECT_EQ(t.limit, 21u);
-      EXPECT_EQ(t.limit2, 22u);
-    } else if (t.ref_edge == SpecifyEdge::kEdge && t.condition.empty()) {
-      EXPECT_EQ(t.limit, 31u);
-      EXPECT_EQ(t.limit2, 32u);
-    }
-  }
 }
 
 TEST(SdfTimingCheckMapping, BidirectskewKeywordParsesIntoEnum) {
@@ -577,27 +563,6 @@ TEST(SdfTimingCheckMapping,
       EXPECT_EQ(t.limit2, 32u);
     }
   }
-}
-
-TEST(SdfTimingCheckMapping, SetupholdParsesBothLimitValues) {
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "ff")
-        (INSTANCE u1)
-        (TIMINGCHECK
-          (SETUPHOLD d (posedge clk) (3) (4))
-        )
-      )
-    )
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  ASSERT_EQ(file.cells[0].timing_checks.size(), 1u);
-  EXPECT_EQ(file.cells[0].timing_checks[0].check_type,
-            SdfCheckType::kSetuphold);
-  EXPECT_EQ(file.cells[0].timing_checks[0].limit.typ_val, 3u);
-  EXPECT_EQ(file.cells[0].timing_checks[0].limit2.typ_val, 4u);
 }
 
 }
