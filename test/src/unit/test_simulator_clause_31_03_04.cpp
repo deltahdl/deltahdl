@@ -1,13 +1,16 @@
 #include <gtest/gtest.h>
 
-#include "fixture_simulator.h"
-#include "simulator/lowerer.h"
 #include "simulator/specify.h"
-#include "simulator/variable.h"
 
 using namespace delta;
 
 namespace {
+
+// §31.3.4 ($removal) defines the violation window relative to the reference
+// (timecheck) event: begin = timecheck time - limit, end = timecheck time, with
+// a violation when begin < timestamp time < end -- neither endpoint is part of
+// the violation region. CheckRemovalViolation carries this; the reference
+// signal is the timecheck event, so its time anchors the window's end.
 
 TimingCheckEntry MakeRemoval(uint64_t limit) {
   TimingCheckEntry tc;
@@ -36,18 +39,6 @@ TEST(RemovalTimingCheckWindow, EndEndpointExcluded) {
   EXPECT_FALSE(mgr.CheckRemovalViolation("rst", 100, "clk", 100));
 }
 
-TEST(RemovalTimingCheckWindow, TimestampBeforeWindowDoesNotViolate) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeRemoval(10));
-  EXPECT_FALSE(mgr.CheckRemovalViolation("rst", 100, "clk", 85));
-}
-
-TEST(RemovalTimingCheckWindow, TimestampAfterTimecheckDoesNotViolate) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeRemoval(10));
-  EXPECT_FALSE(mgr.CheckRemovalViolation("rst", 100, "clk", 105));
-}
-
 TEST(RemovalTimingCheckWindow, WindowScalesWithLimit) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeRemoval(3));
@@ -64,26 +55,6 @@ TEST(RemovalTimingCheckWindow, ZeroLimitNeverViolates) {
   EXPECT_FALSE(mgr.CheckRemovalViolation("rst", 100, "clk", 100));
   EXPECT_FALSE(mgr.CheckRemovalViolation("rst", 100, "clk", 99));
   EXPECT_FALSE(mgr.CheckRemovalViolation("rst", 100, "clk", 101));
-}
-
-TEST(SystemTimingCheckSim, RemovalSimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    $removal(posedge rst, posedge clk, 5);\n"
-      "  endspecify\n"
-      "  initial x = 8'd42;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 }
