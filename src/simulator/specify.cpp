@@ -635,6 +635,19 @@ bool ReportsFullskewViolation(uint64_t timestamp_time,
   return elapsed > limit;
 }
 
+FullskewWindowAction FullskewSecondTimestampAction(bool timestamp_condition_holds,
+                                                   bool remain_active_flag) {
+  // A timestamp whose condition holds (or that carries no condition) always opens a
+  // fresh timing window, superseding any window in progress and re-arming the check
+  // if it was dormant.
+  if (timestamp_condition_holds) return FullskewWindowAction::kReplaceWindow;
+
+  // With a false condition the remain_active_flag is decisive: when set, the event is
+  // discarded and the existing window stands; when clear, the check turns dormant.
+  if (remain_active_flag) return FullskewWindowAction::kIgnore;
+  return FullskewWindowAction::kGoDormant;
+}
+
 bool ReportsTimeskewViolation(uint64_t ref_time, uint64_t next_event_time,
                               bool next_event_is_data, uint64_t limit,
                               bool event_based_flag) {

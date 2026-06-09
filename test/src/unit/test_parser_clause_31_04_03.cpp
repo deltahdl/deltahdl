@@ -71,18 +71,22 @@ TEST(TimingCheckCommandParsing, FullskewLimitsAreExpressions) {
   ASSERT_EQ(tc->limits.size(), 2u);
 }
 
-TEST(TimingCheckCommandParsing, FullskewZeroLimits) {
+TEST(TimingCheckCommandParsing, FullskewEventFlagWithoutRemainActiveFlag) {
+  // The optional nesting permits event_based_flag while remain_active_flag is
+  // omitted; the extended-arg parser must close out after the event flag.
   auto r = Parse(
       "module m;\n"
       "specify\n"
-      "  $fullskew(posedge clk1, negedge clk2, 0, 0);\n"
+      "  $fullskew(posedge clk1, negedge clk2, 4, 6, ntfr, 1);\n"
       "endspecify\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kFullskew);
-  ASSERT_EQ(tc->limits.size(), 2u);
+  EXPECT_EQ(tc->notifier, "ntfr");
+  ASSERT_NE(tc->event_based_flag, nullptr);
+  EXPECT_EQ(tc->remain_active_flag, nullptr);
 }
 
 TEST(TimingCheckCommandParsing, ErrorFullskewMissingSecondLimit) {

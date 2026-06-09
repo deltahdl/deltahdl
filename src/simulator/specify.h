@@ -104,6 +104,17 @@ bool ReportsFullskewViolation(uint64_t timestamp_time,
                               bool next_event_is_timecheck, uint64_t limit,
                               bool event_based_flag);
 
+// Effect of a fresh timestamp event on a $fullskew check (§31.4.3
+// remain_active_flag semantics; identical in timer-based and event-based modes).
+enum class FullskewWindowAction : uint8_t {
+  kReplaceWindow,  // condition holds: a new window supersedes the open one / re-arms
+  kIgnore,         // condition false but remain_active_flag set: event has no effect
+  kGoDormant,      // condition false and remain_active_flag clear: check goes dormant
+};
+
+FullskewWindowAction FullskewSecondTimestampAction(bool timestamp_condition_holds,
+                                                   bool remain_active_flag);
+
 Logic4Word ToggleNotifierOnViolation(Logic4Word current);
 
 enum class TimingCheckConditionKind : uint8_t {

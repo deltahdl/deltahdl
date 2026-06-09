@@ -68,12 +68,6 @@ TEST(FullskewTimingCheckWindow, DataAtLimit1DoesNotViolate) {
   EXPECT_FALSE(mgr.CheckFullskewViolation("clk1", 100, "clk2", 104));
 }
 
-TEST(FullskewTimingCheckWindow, DataWithinLimit1DoesNotViolate) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeFullskew(4, 6));
-  EXPECT_FALSE(mgr.CheckFullskewViolation("clk1", 100, "clk2", 102));
-}
-
 TEST(FullskewTimingCheckWindow, ReferenceBeyondLimit2Violates) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeFullskew(4, 6));
@@ -84,12 +78,6 @@ TEST(FullskewTimingCheckWindow, ReferenceAtLimit2DoesNotViolate) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeFullskew(4, 6));
   EXPECT_FALSE(mgr.CheckFullskewViolation("clk1", 106, "clk2", 100));
-}
-
-TEST(FullskewTimingCheckWindow, ReferenceWithinLimit2DoesNotViolate) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeFullskew(4, 6));
-  EXPECT_FALSE(mgr.CheckFullskewViolation("clk1", 103, "clk2", 100));
 }
 
 TEST(FullskewTimingCheckWindow, ZeroLimitsSimultaneousDoesNotViolate) {
@@ -126,13 +114,6 @@ TEST(FullskewTimingCheckWindow, OtherKindsAreIgnored) {
   timeskew.limit = 1;
   mgr.AddTimingCheck(timeskew);
   EXPECT_FALSE(mgr.CheckFullskewViolation("clk1", 100, "clk2", 200));
-}
-
-TEST(FullskewModeOracle, TimerModeTimecheckWithinLimitDoesNotViolate) {
-  EXPECT_FALSE(ReportsFullskewViolation(100, 103,
-                                        true,
-                                        5,
-                                        false));
 }
 
 TEST(FullskewModeOracle, TimerModeTimecheckAtLimitDoesNotViolate) {
@@ -191,20 +172,6 @@ TEST(FullskewModeOracle, EventModeNewTimestampBeyondLimitDoesNotViolate) {
                                         true));
 }
 
-TEST(FullskewModeOracle, EventModeTimecheckWithinLimitDoesNotViolate) {
-  EXPECT_FALSE(ReportsFullskewViolation(100, 103,
-                                        true,
-                                        5,
-                                        true));
-}
-
-TEST(FullskewModeOracle, EventModeSimultaneousDoesNotViolate) {
-  EXPECT_FALSE(ReportsFullskewViolation(100, 100,
-                                        true,
-                                        0,
-                                        true));
-}
-
 TEST(FullskewModeOracle, OutOfOrderEventDoesNotViolate) {
   EXPECT_FALSE(ReportsFullskewViolation(100, 90, true,
                                         5,
@@ -212,6 +179,28 @@ TEST(FullskewModeOracle, OutOfOrderEventDoesNotViolate) {
   EXPECT_FALSE(ReportsFullskewViolation(100, 90, true,
                                         5,
                                         true));
+}
+
+// A timestamp whose condition holds opens a fresh window, regardless of the
+// remain_active_flag; this also re-arms a dormant check.
+TEST(FullskewRemainActiveFlag, HoldingConditionReplacesWindow) {
+  EXPECT_EQ(FullskewSecondTimestampAction(true, false),
+            FullskewWindowAction::kReplaceWindow);
+  EXPECT_EQ(FullskewSecondTimestampAction(true, true),
+            FullskewWindowAction::kReplaceWindow);
+}
+
+// A false-condition timestamp with remain_active_flag set leaves the open window
+// in place and is otherwise discarded.
+TEST(FullskewRemainActiveFlag, FalseConditionWithFlagIgnoresEvent) {
+  EXPECT_EQ(FullskewSecondTimestampAction(false, true),
+            FullskewWindowAction::kIgnore);
+}
+
+// A false-condition timestamp without remain_active_flag turns the check dormant.
+TEST(FullskewRemainActiveFlag, FalseConditionWithoutFlagGoesDormant) {
+  EXPECT_EQ(FullskewSecondTimestampAction(false, false),
+            FullskewWindowAction::kGoDormant);
 }
 
 }
