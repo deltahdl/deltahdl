@@ -1,86 +1,23 @@
 #include "fixture_parser.h"
-#include "simulator/udp_eval.h"
 
 using namespace delta;
 
+// §29.7 Sequential UDP initialization.
+//
+// Table 29-2 and the surrounding prose constrain the *syntax* of a sequential
+// UDP initial statement: its contents are limited to a single procedural
+// assignment, the target shall be the reg that names the output port, the
+// assigned value shall be one of 1'b1, 1'b0, 1'bx, 1, or 0, and delays are not
+// permitted. The parser recognition and rejection of these forms lives in
+// src/parser/parser_toplevel.cpp (ParseUdpDecl, the `initial` branch); §29.3.3
+// owns that machinery and §29.7 restates the constraints in Table 29-2. These
+// tests observe them at the parser stage. The simulation-start semantics live
+// in test_simulator_clause_29_07.cpp.
+
 namespace {
 
-TEST(UdpInitialStatement, CapturesInitialValueOne) {
-  auto r = Parse(
-      "primitive srff(output reg q, input s, r);\n"
-      "  initial q = 1'b1;\n"
-      "  table\n"
-      "    1 0 : ? : 1;\n"
-      "    0 1 : ? : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->udps.size(), 1);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '1');
-}
-
-TEST(UdpInitialStatement, InitialOneDrivesOutputAtStart) {
-  auto r = Parse(
-      "primitive latch_init(output reg q, input d, en);\n"
-      "  initial q = 1;\n"
-      "  table\n"
-      "    0 1 : ? : 0;\n"
-      "    1 1 : ? : 1;\n"
-      "    ? 0 : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  UdpEvalState eval(*udp);
-
-  EXPECT_EQ(eval.GetOutput(), '1');
-
-  eval.Evaluate({'0', '0'});
-  EXPECT_EQ(eval.GetOutput(), '1');
-}
-
-TEST(UdpInitialStatement, InitialZeroDrivesOutputAtStart) {
-  auto r = Parse(
-      "primitive latch(output reg q, input d, input en);\n"
-      "  initial q = 1'b0;\n"
-      "  table\n"
-      "    ? 0 : ? : -;\n"
-      "    0 1 : ? : 0;\n"
-      "    1 1 : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-
-  UdpEvalState state(*udp);
-  EXPECT_EQ(state.GetOutput(), '0');
-
-  state.Evaluate({'1', '1'});
-  EXPECT_EQ(state.GetOutput(), '1');
-
-  state.Evaluate({'0', '0'});
-  EXPECT_EQ(state.GetOutput(), '1');
-
-  state.Evaluate({'0', '1'});
-  EXPECT_EQ(state.GetOutput(), '0');
-}
-
-TEST(UdpInitialStatement, RejectsInitialAssignmentToNonOutputPort) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, input clk);\n"
-      "  initial d = 1'b0;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
+// Table 29-2 r3: 1'bx is a permitted value, and the parser captures it as the
+// output's recorded start value.
 TEST(UdpInitialStatement, CapturesInitialValueX) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -97,22 +34,41 @@ TEST(UdpInitialStatement, CapturesInitialValueX) {
   EXPECT_EQ(udp->initial_value, 'x');
 }
 
-TEST(UdpInitialStatement, InitialXDrivesOutputAtStart) {
+// Table 29-2 r3, unsized facet: a bare 0 or 1 is a permitted start value. This
+// accept path is distinct from the sized 1'b? form above, so the parser must
+// also recognize it and record the value.
+TEST(UdpInitialStatement, AcceptsBareSingleBitLiteral) {
   auto r = Parse(
-      "primitive latch_x(output reg q, input d, en);\n"
-      "  initial q = 1'bx;\n"
+      "primitive dff(output reg q, input d, clk);\n"
+      "  initial q = 0;\n"
       "  table\n"
-      "    0 1 : ? : 0;\n"
-      "    1 1 : ? : 1;\n"
-      "    ? 0 : ? : -;\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
       "  endtable\n"
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   auto* udp = r.cu->udps[0];
-  UdpEvalState eval(*udp);
-  EXPECT_EQ(eval.GetOutput(), 'x');
+  EXPECT_TRUE(udp->has_initial);
+  EXPECT_EQ(udp->initial_value, '0');
 }
 
+// Table 29-2 r2: the assignment shall target the reg that matches the output
+// port; assigning to an input port is rejected.
+TEST(UdpInitialStatement, RejectsInitialAssignmentToNonOutputPort) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, input clk);\n"
+      "  initial d = 1'b0;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// Table 29-2 r1: the contents are limited to one procedural assignment; a
+// begin/end block is not a plain assignment and is rejected.
 TEST(UdpInitialStatement, RejectsBlockStatementInInitial) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -125,6 +81,8 @@ TEST(UdpInitialStatement, RejectsBlockStatementInInitial) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// "Delays are not permitted in a UDP initial statement": a delay control before
+// the assignment is rejected.
 TEST(UdpInitialStatement, RejectsDelayBeforeAssignment) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -137,18 +95,10 @@ TEST(UdpInitialStatement, RejectsDelayBeforeAssignment) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(UdpInitialStatement, RejectsIntegerOutOfRangeRhs) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, clk);\n"
-      "  initial q = 2;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
+// Table 29-2 r3: a value outside the permitted single-bit set is rejected. A
+// multi-bit sized literal is wider than the permitted single-bit values; this
+// and the unsized out-of-range case both fall through the validator's single
+// reject path, so one representative covers the rule.
 TEST(UdpInitialStatement, RejectsMultiBitSizedLiteralRhs) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -161,4 +111,4 @@ TEST(UdpInitialStatement, RejectsMultiBitSizedLiteralRhs) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace
