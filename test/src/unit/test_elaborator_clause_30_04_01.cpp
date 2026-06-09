@@ -30,19 +30,6 @@ TEST(SpecifyTerminalElaboration, InoutPortAsInputTerminalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SpecifyTerminalElaboration, OutputPortAsDestinationElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m(input i, output o);\n"
-      "  specify\n"
-      "    (i => o) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(SpecifyTerminalElaboration, InoutPortAsOutputTerminalElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -99,6 +86,20 @@ TEST(SpecifyTerminalElaboration, RefPortAsTerminalErrors) {
       "module m(ref logic r, output o);\n"
       "  specify\n"
       "    (r => o) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(SpecifyTerminalElaboration, RefPortAsDestinationErrors) {
+  // C2: the destination must be connected to an output or inout port; a ref
+  // port is neither, so it is rejected on the destination side of the path.
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input i, ref logic r);\n"
+      "  specify\n"
+      "    (i => r) = 5;\n"
       "  endspecify\n"
       "endmodule\n",
       f);
