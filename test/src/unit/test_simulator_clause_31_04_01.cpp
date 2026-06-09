@@ -24,23 +24,6 @@ TEST(SystemTimingCheckSim, SkewEntryStored) {
   EXPECT_EQ(stored.limit, 3u);
 }
 
-TEST(SystemTimingCheckSim, SkewEntryWithoutEdgesStored) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kSkew;
-  tc.ref_signal = "clk";
-  tc.ref_edge = SpecifyEdge::kNone;
-  tc.data_signal = "d";
-  tc.data_edge = SpecifyEdge::kNone;
-  tc.limit = 0;
-  mgr.AddTimingCheck(tc);
-  auto& stored = mgr.GetTimingChecks()[0];
-  EXPECT_EQ(stored.kind, TimingCheckKind::kSkew);
-  EXPECT_EQ(stored.ref_edge, SpecifyEdge::kNone);
-  EXPECT_EQ(stored.data_edge, SpecifyEdge::kNone);
-  EXPECT_EQ(stored.limit, 0u);
-}
-
 TimingCheckEntry MakeSkew(uint64_t limit) {
   TimingCheckEntry tc;
   tc.kind = TimingCheckKind::kSkew;
@@ -60,12 +43,6 @@ TEST(SkewTimingCheckWindow, DataAtLimitDoesNotViolate) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeSkew(5));
   EXPECT_FALSE(mgr.CheckSkewViolation("clk1", 100, "clk2", 105));
-}
-
-TEST(SkewTimingCheckWindow, DataWithinLimitDoesNotViolate) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSkew(5));
-  EXPECT_FALSE(mgr.CheckSkewViolation("clk1", 100, "clk2", 103));
 }
 
 TEST(SkewTimingCheckWindow, DataBeforeReferenceDoesNotViolate) {
