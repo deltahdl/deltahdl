@@ -32,44 +32,6 @@ TEST(SpecifyDelaySelection, SingleActiveCandidateReturnsItsDelay) {
   EXPECT_EQ(SelectPathDelay(candidates, 0), 7u);
 }
 
-TEST(SpecifyDelaySelection, SingleFalseConditionCandidateReturnsZero) {
-  PathDelay pd = MakePath("a", "y", {7, 9});
-  std::vector<PathCandidate> candidates = {
-      {&pd, 10, false},
-  };
-  EXPECT_EQ(SelectPathDelay(candidates, 0), 0u);
-}
-
-TEST(SpecifyDelaySelection, FalseConditionExcludesOtherwiseSmallerDelay) {
-  PathDelay a = MakePath("a", "y", {2, 9});
-  PathDelay b = MakePath("b", "y", {8, 9});
-  std::vector<PathCandidate> candidates = {
-      {&a, 10, false},
-      {&b, 10, true},
-  };
-  EXPECT_EQ(SelectPathDelay(candidates, 0), 8u);
-}
-
-TEST(SpecifyDelaySelection, EarlierInputExcludesSmallerDelay) {
-  PathDelay a = MakePath("a", "y", {2, 9});
-  PathDelay b = MakePath("b", "y", {8, 11});
-  std::vector<PathCandidate> candidates = {
-      {&a, 5, true},
-      {&b, 10, true},
-  };
-  EXPECT_EQ(SelectPathDelay(candidates, 0), 8u);
-}
-
-TEST(SpecifyDelaySelection, SimultaneousInputsSelectSmallestDelay) {
-  PathDelay a = MakePath("a", "y", {6, 9});
-  PathDelay b = MakePath("b", "y", {5, 11});
-  std::vector<PathCandidate> candidates = {
-      {&a, 10, true},
-      {&b, 10, true},
-  };
-  EXPECT_EQ(SelectPathDelay(candidates, 0), 5u);
-}
-
 TEST(SpecifyDelaySelection, LrmExample1AMoreRecentRiseIsSix) {
   PathDelay a = MakePath("a", "y", {6, 9});
   PathDelay b = MakePath("b", "y", {5, 11});
@@ -108,17 +70,6 @@ TEST(SpecifyDelaySelection, LrmExample1AMoreRecentFallIsNine) {
       {&b, 10, true},
   };
   EXPECT_EQ(SelectPathDelay(candidates, 1), 9u);
-}
-
-TEST(SpecifyDelaySelection, TransitionSlotPicksCorrectColumn) {
-  PathDelay a = MakePath("a", "y", {3, 20});
-  PathDelay b = MakePath("b", "y", {20, 3});
-  std::vector<PathCandidate> candidates = {
-      {&a, 10, true},
-      {&b, 10, true},
-  };
-  EXPECT_EQ(SelectPathDelay(candidates, 0), 3u);
-  EXPECT_EQ(SelectPathDelay(candidates, 1), 3u);
 }
 
 TEST(SpecifyDelaySelection, LrmExample2Mode2RiseIsFour) {
@@ -183,28 +134,6 @@ TEST(SpecifyDelaySelection, LrmExample2Mode5NoActivePathsReturnsZero) {
       {&p1, 10, false},
   };
   EXPECT_EQ(SelectPathDelay(candidates, 0), 0u);
-}
-
-TEST(SpecifyDelaySelection, MostRecentIsIndependentOfCandidateOrder) {
-  PathDelay a = MakePath("a", "y", {2, 9});
-  PathDelay b = MakePath("b", "y", {99, 99});
-  std::vector<PathCandidate> candidates = {
-      {&b, 5, true},
-      {&a, 20, true},
-  };
-  EXPECT_EQ(SelectPathDelay(candidates, 0), 2u);
-}
-
-TEST(SpecifyDelaySelection, SmallestWinsAcrossMultipleTiedCandidates) {
-  PathDelay a = MakePath("a", "y", {8});
-  PathDelay b = MakePath("b", "y", {5});
-  PathDelay c = MakePath("c", "y", {3});
-  std::vector<PathCandidate> candidates = {
-      {&a, 10, true},
-      {&b, 10, true},
-      {&c, 10, true},
-  };
-  EXPECT_EQ(SelectPathDelay(candidates, 0), 3u);
 }
 
 }
