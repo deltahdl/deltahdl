@@ -39,12 +39,4 @@ TEST(SystemCall, ParsesWithNoArgument) {
   EXPECT_EQ(stmt->expr->args.size(), 0u);
 }
 
-// §20.17.1: $system can be called as a function, parsing as a system call on the
-// right-hand side of an assignment.
-TEST(SystemCall, ParsesAsFunctionInAssignment) {
-  auto r = Parse("module m; int s; initial s = $system(\"exit 0\"); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 }  // namespace

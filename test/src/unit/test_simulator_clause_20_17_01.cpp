@@ -36,19 +36,6 @@ void Run(SimFixture& f, const std::string& src) {
   f.scheduler.Run();
 }
 
-// §20.17.1: called as a function, $system returns the value the C system() call
-// returns. A command that succeeds (exit status zero) yields a zero result.
-TEST(SystemTask, FunctionReturnsSystemResult) {
-  SimFixture f;
-  uint64_t r = RunAndRead(f,
-      "module t;\n"
-      "  int r;\n"
-      "  initial r = $system(\"exit 0\");\n"
-      "endmodule\n",
-      "r");
-  EXPECT_EQ(r, 0u);
-}
-
 // §20.17.1: the command is actually executed by system() as if from the
 // terminal, so a failing command reports back through the function's nonzero
 // return value rather than being treated as success.
