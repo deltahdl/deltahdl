@@ -35,24 +35,6 @@ TEST(IfnoneConditionParsing, ParallelPath) {
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
-TEST(IfnoneConditionParsing, FullPath) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    ifnone (a, b *> c) = 10;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  EXPECT_TRUE(si->path.is_ifnone);
-  EXPECT_EQ(si->path.condition, nullptr);
-  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
-  ASSERT_EQ(si->path.src_ports.size(), 2u);
-  ASSERT_EQ(si->path.dst_ports.size(), 1u);
-}
-
 TEST(IfnoneConditionParsing, ErrorMissingPath) {
   auto r = Parse(
       "module m;\n"
@@ -73,11 +55,15 @@ TEST(IfnoneConditionParsing, ErrorEdgeSensitiveParallel) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(IfnoneConditionParsing, ErrorEdgeSensitiveFull) {
+// The simple-only restriction also rejects a data-source path description,
+// which §30.4.3 permits without an edge identifier. This case carries no edge,
+// so it observes the data_source branch of the restriction independently of the
+// edge branch exercised by ErrorEdgeSensitiveParallel.
+TEST(IfnoneConditionParsing, ErrorDataSourcePath) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
-      "    ifnone (posedge clk *> (q : d)) = 5;\n"
+      "    ifnone (clk => (q : d)) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
