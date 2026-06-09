@@ -5,20 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(TimingCheckCommandParsing, SetupholdTwoLimits) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setuphold(posedge clk, data, 10, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetuphold);
-  ASSERT_GE(tc->limits.size(), 2u);
-}
-
 TEST(TimingCheckCommandParsing, SetupholdFullArgs) {
   auto r = Parse(
       "module m;\n"
@@ -104,6 +90,80 @@ TEST(TimingCheckCommandParsing, SetupholdConstantExpressionLimits) {
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   ASSERT_GE(tc->limits.size(), 2u);
+}
+
+// Syntax 31-5 productions timestamp_condition ::= mintypmax_expression and
+// timecheck_condition ::= mintypmax_expression: when present, each is parsed
+// into its own slot following the optional notifier.
+TEST(TimingCheckCommandParsing, SetupholdConditionsArePresent) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, data, 10, 5, ntfr, ts_c, tc_c);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->notifier, "ntfr");
+  EXPECT_NE(tc->timestamp_cond, nullptr);
+  EXPECT_NE(tc->timecheck_cond, nullptr);
+}
+
+// Syntax 31-5 productions delayed_reference and delayed_data each admit the
+// terminal_identifier [ constant_mintypmax_expression ] alternative; the bracket
+// select is captured alongside the terminal name.
+TEST(TimingCheckCommandParsing, SetupholdDelayedSignalsAcceptConstantSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK[3], dDATA[1]);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->delayed_ref, "dCLK");
+  EXPECT_EQ(tc->delayed_data, "dDATA");
+  EXPECT_NE(tc->delayed_ref_expr, nullptr);
+  EXPECT_NE(tc->delayed_data_expr, nullptr);
+}
+
+// The optional trailing arguments of Syntax 31-5 nest independently: a
+// timestamp_condition may be supplied while the following timecheck_condition is
+// omitted, so the argument list closes right after the timestamp slot.
+TEST(TimingCheckCommandParsing, SetupholdTimestampConditionWithoutTimecheckCondition) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, data, 10, 5, ntfr, ts_c);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_NE(tc->timestamp_cond, nullptr);
+  EXPECT_EQ(tc->timecheck_cond, nullptr);
+  EXPECT_TRUE(tc->delayed_ref.empty());
+  EXPECT_TRUE(tc->delayed_data.empty());
+}
+
+// Likewise the innermost nesting: a delayed_reference may appear without a
+// trailing delayed_data, with the argument list closing after the delayed
+// reference terminal.
+TEST(TimingCheckCommandParsing, SetupholdDelayedReferenceWithoutDelayedData) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->delayed_ref, "dCLK");
+  EXPECT_EQ(tc->delayed_ref_expr, nullptr);
+  EXPECT_TRUE(tc->delayed_data.empty());
 }
 
 }
