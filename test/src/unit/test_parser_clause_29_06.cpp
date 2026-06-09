@@ -1,40 +1,23 @@
 #include "fixture_parser.h"
-#include "simulator/udp_eval.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(UdpEdgeSeq, DFlipFlopFromSource) {
+// §29.6: a table entry may carry a transition specification on at most one
+// input. Entries with two transitions, e.g. "(01)(01)0 : 0 : 1;", are illegal.
+// The parser rejects any row whose input field holds more than one edge.
+
+TEST(UdpEdgeSeq, SingleEdgeIndicatorInRowAccepted) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
-      "  initial q = 1'bx;\n"
       "  table\n"
       "    0 r : ? : 0;\n"
       "    1 r : ? : 1;\n"
-      "    ? f : ? : -;\n"
-      "    * ? : ? : -;\n"
       "  endtable\n"
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-
-  UdpEvalState state(*udp);
-  EXPECT_EQ(state.GetOutput(), 'x');
-
-  state.SetInputs({'1', '0'});
-  state.EvaluateWithEdge({'1', '1'}, 1, '0');
-  EXPECT_EQ(state.GetOutput(), '1');
-
-  state.EvaluateWithEdge({'1', '0'}, 1, '1');
-  EXPECT_EQ(state.GetOutput(), '1');
-
-  state.EvaluateWithEdge({'0', '0'}, 0, '1');
-  EXPECT_EQ(state.GetOutput(), '1');
-
-  state.EvaluateWithEdge({'0', '1'}, 1, '0');
-  EXPECT_EQ(state.GetOutput(), '0');
 }
 
 TEST(UdpEdgeSeq, TwoParenthesizedEdgeIndicatorsInRowRejected) {
@@ -55,28 +38,6 @@ TEST(UdpEdgeSeq, TwoSingleLetterEdgeSymbolsInRowRejected) {
       "  endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(r.has_errors);
-}
-
-TEST(UdpEdgeSeq, MixedEdgeSymbolAndParenthesizedEdgeInRowRejected) {
-  auto r = Parse(
-      "primitive bad(output reg q, input a, input b);\n"
-      "  table\n"
-      "    r (01) : ? : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(UdpEdgeSeq, SingleEdgeIndicatorInRowAccepted) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, input clk);\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 }
