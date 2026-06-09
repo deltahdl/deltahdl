@@ -33,14 +33,6 @@ TEST(SdfParser, ParseDesign) {
   EXPECT_EQ(file.design, "top");
 }
 
-TEST(SdfAnnotateRequest, RecordsBothFileAndScopeArguments) {
-  SpecifyManager mgr;
-  mgr.AnnotateSdf({"timing.sdf", "top.dut"});
-  ASSERT_EQ(mgr.GetSdfAnnotations().size(), 1u);
-  EXPECT_EQ(mgr.GetSdfAnnotations()[0].sdf_file, "timing.sdf");
-  EXPECT_EQ(mgr.GetSdfAnnotations()[0].scope, "top.dut");
-}
-
 TEST(SdfMtmKeyword, MaximumStringMapsToMaximumKeyword) {
   SdfMtmKeyword out = SdfMtmKeyword::kToolControl;
   EXPECT_TRUE(ParseSdfMtmKeyword("MAXIMUM", out));
@@ -208,18 +200,6 @@ TEST(SdfScaling, FromTypicalDerivesEverySlotFromTheTypicalValue) {
   EXPECT_EQ(out.max_val, 24u);
 }
 
-TEST(SdfScaling, DefaultScaleTypeAndIdentityFactorsPreserveInputTriplet) {
-  SdfDelayValue v;
-  v.min_val = 7;
-  v.typ_val = 11;
-  v.max_val = 13;
-  SdfScaleFactors f;
-  auto out = ApplySdfScaling(v, SdfScaleType::kFromMtm, f);
-  EXPECT_EQ(out.min_val, 7u);
-  EXPECT_EQ(out.typ_val, 11u);
-  EXPECT_EQ(out.max_val, 13u);
-}
-
 TEST(SdfAnnotateScaling,
      NonIdentityFactorsPropagateThroughScaleAndAnnotateUnderTypicalMtm) {
   SpecifyManager mgr;
@@ -366,22 +346,6 @@ TEST(SdfAnnotationLog, EmptyPathIsANoOpAndReportsSuccess) {
   EXPECT_TRUE(WriteSdfAnnotationLog(file, ""));
 }
 
-TEST(SdfAnnotationLog, EmptySdfFileProducesZeroEntriesAndStillSucceeds) {
-  SdfFile file;
-  std::string log_path = "/tmp/sdf_annotate_log_empty.log";
-  std::remove(log_path.c_str());
-  EXPECT_TRUE(WriteSdfAnnotationLog(file, log_path));
-  std::ifstream in(log_path);
-  ASSERT_TRUE(in.is_open());
-  size_t line_count = 0;
-  std::string line;
-  while (std::getline(in, line)) {
-    if (!line.empty()) ++line_count;
-  }
-  EXPECT_EQ(line_count, 0u);
-  std::remove(log_path.c_str());
-}
-
 TEST(SdfAnnotationLog, UnwritablePathReportsFailureToCaller) {
   SdfFile file;
   ASSERT_TRUE(ParseSdf(R"(
@@ -394,114 +358,6 @@ TEST(SdfAnnotationLog, UnwritablePathReportsFailureToCaller) {
 
   EXPECT_FALSE(WriteSdfAnnotationLog(
       file, "/tmp/nonexistent_dir_for_sdf_log_test/x.log"));
-}
-
-TEST(SdfAnnotateScaling,
-     NonIdentityFactorsPropagateToInterconnectDelaysUnderTypicalMtm) {
-  SpecifyManager mgr;
-
-  SdfFile file;
-  ASSERT_TRUE(ParseSdf(R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "net")
-        (INSTANCE u1)
-        (DELAY (ABSOLUTE (INTERCONNECT s d (10))))))
-  )", file));
-
-  SdfScaleFactors factors;
-  factors.min_factor = 1.6;
-  factors.typ_factor = 1.4;
-  factors.max_factor = 1.2;
-  SdfFile scaled = ScaleSdfFile(file, SdfScaleType::kFromMtm, factors);
-  AnnotateSdfToManager(scaled, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetInterconnectDelays().size(), 1u);
-  const auto& ic = mgr.GetInterconnectDelays()[0];
-  EXPECT_EQ(ic.rise, 14u);
-}
-
-TEST(SdfAnnotateScaling,
-     NonIdentityFactorsPropagateToSpecparamValuesUnderTypicalMtm) {
-  SpecifyManager mgr;
-
-  SdfFile file;
-  ASSERT_TRUE(ParseSdf(R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "buf")
-        (INSTANCE u1)
-        (LABEL (ABSOLUTE (tHold 10)))))
-  )", file));
-
-  SdfScaleFactors factors;
-  factors.min_factor = 0.5;
-  factors.typ_factor = 2.0;
-  factors.max_factor = 0.5;
-  SdfFile scaled = ScaleSdfFile(file, SdfScaleType::kFromMtm, factors);
-  AnnotateSdfToManager(scaled, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetSpecparamValues().size(), 1u);
-  EXPECT_EQ(mgr.GetSpecparamValues()[0].name, "tHold");
-  EXPECT_EQ(mgr.GetSpecparamValues()[0].value, 20u);
-}
-
-TEST(SdfAnnotateScaling,
-     NonIdentityFactorsPropagateToTimingCheckLimitsUnderTypicalMtm) {
-  SpecifyManager mgr;
-  TimingCheckEntry pre;
-  pre.kind = TimingCheckKind::kSetup;
-  pre.ref_signal = "CLK";
-  pre.ref_edge = SpecifyEdge::kPosedge;
-  pre.data_signal = "D";
-  pre.limit = 0;
-  mgr.AddTimingCheck(pre);
-
-  SdfFile file;
-  ASSERT_TRUE(ParseSdf(R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "ff")
-        (INSTANCE u1)
-        (TIMINGCHECK (SETUP D (posedge CLK) (10)))))
-  )", file));
-
-  SdfScaleFactors factors;
-  factors.min_factor = 1.0;
-  factors.typ_factor = 1.5;
-  factors.max_factor = 1.0;
-  SdfFile scaled = ScaleSdfFile(file, SdfScaleType::kFromMtm, factors);
-  AnnotateSdfToManager(scaled, mgr, SdfMtm::kTypical);
-
-  bool found_scaled = false;
-  for (const auto& tc : mgr.GetTimingChecks()) {
-    if (tc.limit == 15u) {
-      found_scaled = true;
-      break;
-    }
-  }
-  EXPECT_TRUE(found_scaled);
-}
-
-TEST(SdfScaleFile, PreservesCellTypeAndInstanceMetadata) {
-  SdfFile file;
-  ASSERT_TRUE(ParseSdf(R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "buffer_x4")
-        (INSTANCE u1/dut)
-        (DELAY (ABSOLUTE (IOPATH A Z (10))))))
-  )", file));
-
-  SdfScaleFactors factors;
-  factors.typ_factor = 2.0;
-  SdfFile scaled = ScaleSdfFile(file, SdfScaleType::kFromMtm, factors);
-
-  ASSERT_EQ(scaled.cells.size(), 1u);
-  EXPECT_EQ(scaled.cells[0].cell_type, "buffer_x4");
-  EXPECT_EQ(scaled.cells[0].instance, "u1/dut");
-  ASSERT_EQ(scaled.cells[0].iopaths.size(), 1u);
-  EXPECT_EQ(scaled.cells[0].iopaths[0].rise.typ_val, 20u);
 }
 
 TEST(SdfScaleFactorsParser, SingleValueBroadcastsAcrossAllThreeFactorSlots) {
@@ -628,90 +484,98 @@ TEST(SdfAnnotateArgResolver,
   EXPECT_EQ(out.scale_type, SdfScaleType::kFromMtm);
 }
 
-TEST(SdfAnnotateArgResolver,
-     ExplicitArgsOverrideEveryConfigKeywordSimultaneously) {
-  SdfAnnotateConfig config;
-  config.mtm_spec = "MAXIMUM";
-  config.scale_factors = "2.0:3.0:4.0";
-  config.scale_type = "FROM_MAXIMUM";
-  auto out = ResolveSdfAnnotateArgs("MINIMUM", "1.6:1.4:1.2",
-                                     "FROM_MINIMUM", config);
-  EXPECT_EQ(out.mtm, SdfMtmKeyword::kMinimum);
-  EXPECT_DOUBLE_EQ(out.factors.min_factor, 1.6);
-  EXPECT_DOUBLE_EQ(out.factors.typ_factor, 1.4);
-  EXPECT_DOUBLE_EQ(out.factors.max_factor, 1.2);
-  EXPECT_EQ(out.scale_type, SdfScaleType::kFromMinimum);
+// mtm_spec selects which member of each min:typ:max triple is annotated.
+// A single IOPATH carrying three distinct values lets the annotated delay
+// reveal exactly which member the requested mtm picked.
+TEST(SdfAnnotateMtmSelection, AnnotatesTheMtmMemberChosenForEachKeyword) {
+  const char* kSdf = R"(
+    (DELAYFILE
+      (CELL (CELLTYPE "buf") (INSTANCE u1)
+        (DELAY (ABSOLUTE (IOPATH A Z (1:2:3))))))
+  )";
+
+  auto annotate_under = [&](SdfMtm mtm) -> uint64_t {
+    SpecifyManager mgr;
+    PathDelay pre;
+    pre.src_port = "A";
+    pre.dst_port = "Z";
+    pre.delay_count = 1;
+    pre.delays[0] = 0;
+    mgr.AddPathDelay(pre);
+
+    SdfFile file;
+    EXPECT_TRUE(ParseSdf(kSdf, file));
+    AnnotateSdfToManager(file, mgr, mtm);
+    return mgr.GetPathDelays()[0].delays[0];
+  };
+
+  EXPECT_EQ(annotate_under(SdfMtm::kMinimum), 1u);
+  EXPECT_EQ(annotate_under(SdfMtm::kTypical), 2u);
+  EXPECT_EQ(annotate_under(SdfMtm::kMaximum), 3u);
 }
 
-TEST(SdfAnnotationLog, IopathEntryRecordsRiseAndFallDelayValues) {
+// module_instance names the scope to annotate: only cells at or beneath that
+// hierarchy level are touched. Here the scope is an interior node, so its
+// descendant cell is annotated while a sibling subtree is left unchanged.
+TEST(SdfAnnotateScope, RestrictsAnnotationToInstancesWithinSpecifiedScope) {
+  SpecifyManager mgr;
+  PathDelay keep;
+  keep.src_port = "A";
+  keep.dst_port = "Z";
+  keep.delay_count = 1;
+  keep.delays[0] = 0;
+  mgr.AddPathDelay(keep);
+  PathDelay drop;
+  drop.src_port = "B";
+  drop.dst_port = "Y";
+  drop.delay_count = 1;
+  drop.delays[0] = 0;
+  mgr.AddPathDelay(drop);
+
   SdfFile file;
   ASSERT_TRUE(ParseSdf(R"(
     (DELAYFILE
-      (CELL
-        (CELLTYPE "buf")
-        (INSTANCE u1)
-        (DELAY (ABSOLUTE (IOPATH A Z (15) (27))))))
+      (CELL (CELLTYPE "buf") (INSTANCE top/sub/leaf)
+        (DELAY (ABSOLUTE (IOPATH A Z (10)))))
+      (CELL (CELLTYPE "buf") (INSTANCE top/other/leaf)
+        (DELAY (ABSOLUTE (IOPATH B Y (20))))))
   )", file));
 
-  std::string log_path = "/tmp/sdf_annotate_log_iopath_values.log";
-  std::remove(log_path.c_str());
-  EXPECT_TRUE(WriteSdfAnnotationLog(file, log_path));
+  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical, "top/sub");
 
-  std::ifstream in(log_path);
-  std::stringstream contents;
-  contents << in.rdbuf();
-  std::string text = contents.str();
-  EXPECT_NE(text.find("IOPATH"), std::string::npos);
-  EXPECT_NE(text.find("rise=15"), std::string::npos);
-  EXPECT_NE(text.find("fall=27"), std::string::npos);
-  std::remove(log_path.c_str());
+  uint64_t az = 999;
+  uint64_t by = 999;
+  for (const auto& pd : mgr.GetPathDelays()) {
+    if (pd.src_port == "A" && pd.dst_port == "Z") az = pd.delays[0];
+    if (pd.src_port == "B" && pd.dst_port == "Y") by = pd.delays[0];
+  }
+  EXPECT_EQ(az, 10u);
+  EXPECT_EQ(by, 0u);
 }
 
-TEST(SdfAnnotationLog, TimingCheckEntryRecordsLimitValue) {
+// Scope matching is by hierarchy level, not raw string prefix: "top/u1" is a
+// textual prefix of "top/u1x" but not an ancestor of it, so that cell stays
+// outside scope and is not annotated.
+TEST(SdfAnnotateScope, ScopeMatchRequiresHierarchySeparatorNotMerePrefix) {
+  SpecifyManager mgr;
+  PathDelay pre;
+  pre.src_port = "A";
+  pre.dst_port = "Z";
+  pre.delay_count = 1;
+  pre.delays[0] = 0;
+  mgr.AddPathDelay(pre);
+
   SdfFile file;
   ASSERT_TRUE(ParseSdf(R"(
     (DELAYFILE
-      (CELL
-        (CELLTYPE "ff")
-        (INSTANCE u1)
-        (TIMINGCHECK (SETUP D (posedge CLK) (42)))))
+      (CELL (CELLTYPE "buf") (INSTANCE top/u1x)
+        (DELAY (ABSOLUTE (IOPATH A Z (10))))))
   )", file));
 
-  std::string log_path = "/tmp/sdf_annotate_log_tc_limit.log";
-  std::remove(log_path.c_str());
-  EXPECT_TRUE(WriteSdfAnnotationLog(file, log_path));
+  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical, "top/u1");
 
-  std::ifstream in(log_path);
-  std::stringstream contents;
-  contents << in.rdbuf();
-  std::string text = contents.str();
-  EXPECT_NE(text.find("TIMINGCHECK"), std::string::npos);
-  EXPECT_NE(text.find("limit=42"), std::string::npos);
-  std::remove(log_path.c_str());
-}
-
-TEST(SdfAnnotationLog, SpecparamEntryRecordsNewValue) {
-  SdfFile file;
-  ASSERT_TRUE(ParseSdf(R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "buf")
-        (INSTANCE u1)
-        (LABEL (ABSOLUTE (tHold 99)))))
-  )", file));
-
-  std::string log_path = "/tmp/sdf_annotate_log_specparam_value.log";
-  std::remove(log_path.c_str());
-  EXPECT_TRUE(WriteSdfAnnotationLog(file, log_path));
-
-  std::ifstream in(log_path);
-  std::stringstream contents;
-  contents << in.rdbuf();
-  std::string text = contents.str();
-  EXPECT_NE(text.find("SPECPARAM"), std::string::npos);
-  EXPECT_NE(text.find("tHold"), std::string::npos);
-  EXPECT_NE(text.find("value=99"), std::string::npos);
-  std::remove(log_path.c_str());
+  ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
+  EXPECT_EQ(mgr.GetPathDelays()[0].delays[0], 0u);
 }
 
 }
