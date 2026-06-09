@@ -116,6 +116,34 @@ TEST(SdfInterconnectAnnotation, ParsedConstructsRouteToInterconnectDelays) {
   EXPECT_EQ(ics[2].dst_port, "d.d");
 }
 
+// On a multisource net, an INTERCONNECT construct can carry a unique delay for
+// each individual source/load pair. Two INTERCONNECT entries that share a load
+// but name different sources are retained as distinct annotated delays (the
+// per-(source,load) keying in AddInterconnectDelay).
+TEST(SdfInterconnectAnnotation, MultipleSourcesToSameLoadCoexistAsDistinctEntries) {
+  SdfFile file;
+  std::string sdf = R"(
+    (DELAYFILE
+      (CELL
+        (CELLTYPE "net")
+        (INSTANCE u1)
+        (DELAY (ABSOLUTE
+          (INTERCONNECT s1.q load.d (3) (3))
+          (INTERCONNECT s2.q load.d (7) (7))))))
+  )";
+  ASSERT_TRUE(ParseSdf(sdf, file));
+  SpecifyManager mgr;
+  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+  const auto& ics = mgr.GetInterconnectDelays();
+  ASSERT_EQ(ics.size(), 2u);
+  EXPECT_EQ(ics[0].src_port, "s1.q");
+  EXPECT_EQ(ics[0].dst_port, "load.d");
+  EXPECT_EQ(ics[0].delays[0], 3u);
+  EXPECT_EQ(ics[1].src_port, "s2.q");
+  EXPECT_EQ(ics[1].dst_port, "load.d");
+  EXPECT_EQ(ics[1].delays[0], 7u);
+}
+
 TEST(SdfInterconnectAnnotation, InterconnectDelayHas12TransitionSlots) {
   SdfFile file;
   SdfCell cell;
@@ -160,6 +188,32 @@ TEST(SdfInterconnectAnnotation, InterconnectPulseLimitsInitFromDelays) {
     EXPECT_EQ(got.reject_limit[i], got.delays[i]) << "slot " << i;
     EXPECT_EQ(got.error_limit[i], got.delays[i]) << "slot " << i;
   }
+}
+
+// A PORT construct carries no source, so its delay represents the delay from
+// all sources on the net to the load. Annotating it after source-specific
+// INTERCONNECT entries to the same load collapses them into the single
+// from-all-sources delay (the empty-source branch of AddInterconnectDelay).
+TEST(SdfInterconnectAnnotation, PortDelayRepresentsAllSourcesReplacingPerSource) {
+  SdfFile file;
+  std::string sdf = R"(
+    (DELAYFILE
+      (CELL
+        (CELLTYPE "net")
+        (INSTANCE u1)
+        (DELAY (ABSOLUTE
+          (INTERCONNECT s1.q load.d (3) (3))
+          (INTERCONNECT s2.q load.d (4) (4))
+          (PORT load.d (9) (9))))))
+  )";
+  ASSERT_TRUE(ParseSdf(sdf, file));
+  SpecifyManager mgr;
+  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+  const auto& ics = mgr.GetInterconnectDelays();
+  ASSERT_EQ(ics.size(), 1u);
+  EXPECT_TRUE(ics[0].src_port.empty());
+  EXPECT_EQ(ics[0].dst_port, "load.d");
+  EXPECT_EQ(ics[0].delays[0], 9u);
 }
 
 TEST(SdfInterconnectAnnotation, SingleValueDelayBroadcastsAcrossAllSlots) {
