@@ -1002,26 +1002,6 @@ enum class TimingCheckKind : uint8_t {
   kFullskew,
 };
 
-inline bool IsClockControlTimingCheck(TimingCheckKind kind) {
-  switch (kind) {
-    case TimingCheckKind::kSkew:
-    case TimingCheckKind::kTimeskew:
-    case TimingCheckKind::kFullskew:
-    case TimingCheckKind::kPeriod:
-    case TimingCheckKind::kWidth:
-    case TimingCheckKind::kNochange:
-      return true;
-    case TimingCheckKind::kSetup:
-    case TimingCheckKind::kHold:
-    case TimingCheckKind::kSetuphold:
-    case TimingCheckKind::kRecovery:
-    case TimingCheckKind::kRemoval:
-    case TimingCheckKind::kRecrem:
-      return false;
-  }
-  return false;
-}
-
 struct TimingCheckDecl {
   TimingCheckKind check_kind = TimingCheckKind::kSetup;
   SpecifyEdge ref_edge = SpecifyEdge::kNone;
