@@ -6,43 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SpecifyPathParsing, SpecifyParallelPath) {
-  auto r = Parse("module m; specify (a => b) = 5; endspecify endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecifyBlock);
-  ASSERT_GE(r.cu->modules[0]->items[0]->specify_items.size(), 1u);
-}
-
-TEST(SpecifyPathParsing, SpecifyBlockSingleItem) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 1u);
-}
-
-TEST(SpecifyPathParsing, SpecifyItemPathDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 1u);
-  EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
-}
-
 TEST(SpecifyPathParsing, PathDeclSimpleParallel) {
   auto r = Parse(
       "module m;\n"
@@ -96,19 +59,6 @@ TEST_F(SpecifyTest, ParallelPathDelay) {
   ASSERT_EQ(item->path.dst_ports.size(), 1u);
   EXPECT_EQ(item->path.dst_ports[0].name, "b");
   ASSERT_EQ(item->path.delays.size(), 1u);
-}
-
-TEST_F(SpecifyTest, FullPathDelay) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  (a *> b) = 10;\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 1u);
-  EXPECT_EQ(spec->specify_items[0]->path.path_kind, SpecifyPathKind::kFull);
 }
 
 TEST(SpecifyPathParsing, ParallelPathRejectsMultipleSources) {
@@ -267,6 +217,24 @@ TEST(SpecifyPathParsing, FullPathPolarityWithMultipleSources) {
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
   ASSERT_EQ(si->path.src_ports.size(), 2u);
+}
+
+// Syntax 30-3 declares polarity_operator ::= + | - . The positive alternative
+// is exercised above; this covers the negative alternative within the parallel
+// path description, where the '-' before '=>' yields a negative polarity.
+TEST(SpecifyPathParsing, ParallelPathNegativePolarity) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a - => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
+  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
 }
 
 }
