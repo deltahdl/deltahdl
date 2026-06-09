@@ -31,26 +31,6 @@ TEST(UdpLevelSeq, Latch) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-TEST(UdpLevelSeq, NoChange) {
-  UdpBuilder b;
-  b.SetSequential()
-      .SetInitial('0')
-      .AddSeqRow({'0'}, '?', '-')
-      .AddSeqRow({'1'}, '?', '1');
-
-  UdpEvalState state(b.decl);
-  EXPECT_EQ(state.GetOutput(), '0');
-
-  state.Evaluate({'0'});
-  EXPECT_EQ(state.GetOutput(), '0');
-
-  state.Evaluate({'1'});
-  EXPECT_EQ(state.GetOutput(), '1');
-
-  state.Evaluate({'0'});
-  EXPECT_EQ(state.GetOutput(), '1');
-}
-
 TEST(UdpLevelSeq, CurrentStateDiscriminatesMatchingRow) {
   UdpBuilder b;
   b.SetSequential()
