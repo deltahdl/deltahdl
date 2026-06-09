@@ -54,15 +54,16 @@ void Close(SysTaskFixture& f, uint64_t fd) {
   EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
 }
 
-// Registers an unpacked struct/union type `type` with the given fields and a
-// zero-initialized variable `var` of that type, so $fread can load into its
-// members. Field entries are {name, bit_offset, width}.
+// Registers a struct/union type `type` with the given fields and a
+// zero-initialized variable `var` of that type, so $fread can load into it.
+// Field entries are {name, bit_offset, width}. An unpacked type (the default) is
+// read member by member; a packed type is read as one whole value.
 void SetupStruct(SysTaskFixture& f, const char* type, const char* var,
                  uint32_t total_width, bool is_union,
-                 std::vector<StructFieldInfo> fields) {
+                 std::vector<StructFieldInfo> fields, bool is_packed = false) {
   StructTypeInfo info;
   info.type_name = type;
-  info.is_packed = false;  // unpacked: $fread is applied member by member
+  info.is_packed = is_packed;
   info.is_union = is_union;
   info.total_width = total_width;
   info.fields = std::move(fields);
@@ -269,6 +270,29 @@ TEST(FreadBinary, NineBitWordUsesTwoBytesBigEndian) {
   std::remove(path.c_str());
 }
 
+// §21.3.4.4: when a word width is not a whole number of bytes, the read still
+// consumes the rounded-up number of bytes, but the bits above the word width are
+// truncated -- so not all of the file data end up in memory. Here a 9-bit word
+// consumes two bytes (0x0300) yet only the low nine bits (0x100) are retained;
+// the tenth bit present in the file is dropped, while the byte count still
+// reports both bytes as read.
+TEST(FreadBinary, TruncatesBitsAboveWordWidth) {
+  SysTaskFixture f;
+  SetupMem(f, "mem", 0, 1, 9);
+  std::string path = WriteBytes("trunc", {0x03, 0x00});
+  uint64_t fd = OpenRead(f, path);
+  ASSERT_NE(fd, 0u);
+
+  auto result = EvalExpr(
+      MkSysCall(f.arena, "$fread", {MkId(f.arena, "mem"), MkInt(f.arena, fd)}),
+      f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 2u);
+  EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0x100u);
+
+  Close(f, fd);
+  std::remove(path.c_str());
+}
+
 // §21.3.4.4: the result code is the number of characters read; when nothing can
 // be read (the descriptor is already at end of file) the code is zero.
 TEST(FreadBinary, ReturnsZeroWhenNothingToRead) {
@@ -347,6 +371,28 @@ TEST(FreadBinary, UnpackedUnionReadsOnlyFirstMember) {
       f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("u")->value.ToUint64(), 0xABu);
+
+  Close(f, fd);
+  std::remove(path.c_str());
+}
+
+// §21.3.4.4: the integral-variable form is the one applied for all packed data,
+// so a packed struct is loaded as a single whole value, not member by member.
+// Two 4-bit members packed into one byte are read from a single file byte (the
+// unpacked counterpart consumes two), and that byte becomes the whole value.
+TEST(FreadBinary, PackedStructReadsAsWholeValue) {
+  SysTaskFixture f;
+  SetupStruct(f, "packed_t", "p", 8, /*is_union=*/false,
+              {{"a", 4, 4}, {"b", 0, 4}}, /*is_packed=*/true);
+  std::string path = WriteBytes("packed", {0x12, 0x34});
+  uint64_t fd = OpenRead(f, path);
+  ASSERT_NE(fd, 0u);
+
+  auto result = EvalExpr(
+      MkSysCall(f.arena, "$fread", {MkId(f.arena, "p"), MkInt(f.arena, fd)}),
+      f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("p")->value.ToUint64(), 0x12u);
 
   Close(f, fd);
   std::remove(path.c_str());
