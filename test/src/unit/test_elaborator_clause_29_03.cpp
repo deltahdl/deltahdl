@@ -5,21 +5,11 @@ using namespace delta;
 
 namespace {
 
-TEST(UdpForwardReferenceElaboration, UdpDefinedAfterInstantiationElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  wire y, a;\n"
-      "  my_udp u1(y, a);\n"
-      "endmodule\n"
-      "primitive my_udp(output out, input in);\n"
-      "  table 0 : 1; 1 : 0; endtable\n"
-      "endprimitive\n",
-      f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
+// §29.3: a UDP may be instantiated before or after its definition in the
+// source text. This single test covers both directions in one design --
+// before_def references the UDP defined later (forward reference) and
+// after_def references it from earlier in the file -- so a separate
+// forward-only case would re-exercise the same order-independent resolution.
 TEST(UdpForwardReferenceElaboration, UdpReferencedBeforeAndAfterDefinition) {
   ElabFixture f;
   auto* design = ElaborateSrc(

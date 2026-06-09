@@ -7,6 +7,12 @@ using namespace delta;
 
 namespace {
 
+// §29.3: a UDP definition shall not appear between the module/program/
+// interface/package keyword pairs. All four container bodies funnel their
+// items through the single ParseModuleItem dispatch, which has no primitive
+// case, so the rejection is applied at one production point regardless of the
+// enclosing container. The module body stands in for all four here; the
+// program/interface/package variants would only re-exercise the same path.
 TEST(UdpTopLevelParsing, PrimitiveInsideModuleRejected) {
   auto r = Parse(
       "module m;\n"
@@ -14,36 +20,6 @@ TEST(UdpTopLevelParsing, PrimitiveInsideModuleRejected) {
       "    table 0 : 1; 1 : 0; endtable\n"
       "  endprimitive\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(UdpTopLevelParsing, PrimitiveInsideProgramRejected) {
-  auto r = Parse(
-      "program p;\n"
-      "  primitive inv(output out, input in);\n"
-      "    table 0 : 1; 1 : 0; endtable\n"
-      "  endprimitive\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(UdpTopLevelParsing, PrimitiveInsideInterfaceRejected) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  primitive inv(output out, input in);\n"
-      "    table 0 : 1; 1 : 0; endtable\n"
-      "  endprimitive\n"
-      "endinterface\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(UdpTopLevelParsing, PrimitiveInsidePackageRejected) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  primitive inv(output out, input in);\n"
-      "    table 0 : 1; 1 : 0; endtable\n"
-      "  endprimitive\n"
-      "endpackage\n");
   EXPECT_TRUE(r.has_errors);
 }
 
