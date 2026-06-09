@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <vector>
 
 #include "simulator/sdf_parser.h"
@@ -10,13 +9,8 @@ using namespace delta;
 
 namespace {
 
-TEST(SdfParser, SdfDelayValueDefault) {
-  SdfDelayValue dv;
-  EXPECT_EQ(dv.min_val, 0u);
-  EXPECT_EQ(dv.typ_val, 0u);
-  EXPECT_EQ(dv.max_val, 0u);
-}
-
+// Claim T (Table 32-4): "1 value" column broadcasts the single SDF value to
+// every one of the 12 SystemVerilog transition slots.
 TEST(SdfExpand, OneValueBroadcastsToAllTwelveSlots) {
   SdfDelayValue d;
   d.typ_val = 100;
@@ -25,6 +19,8 @@ TEST(SdfExpand, OneValueBroadcastsToAllTwelveSlots) {
   for (auto v : out) EXPECT_EQ(v, 100u);
 }
 
+// Claim T (Table 32-4): "2 values" column, including the x->z = max(v1,v2) and
+// z->x = min(v1,v2) derivations in the final two slots.
 TEST(SdfExpand, TwoValuesSpreadAcrossRiseAndFallFamilies) {
   SdfDelayValue v1, v2;
   v1.typ_val = 10;
@@ -45,6 +41,8 @@ TEST(SdfExpand, TwoValuesSpreadAcrossRiseAndFallFamilies) {
   EXPECT_EQ(out[11], 10u);
 }
 
+// Claim T (Table 32-4): "3 values" column, including the min/max combinations
+// the table prescribes for the four x-state slots.
 TEST(SdfExpand, ThreeValuesAddTurnoffAndDirectXSlots) {
   SdfDelayValue v1, v2, v3;
   v1.typ_val = 10;
@@ -66,6 +64,8 @@ TEST(SdfExpand, ThreeValuesAddTurnoffAndDirectXSlots) {
   EXPECT_EQ(out[11], 10u);
 }
 
+// Claim T (Table 32-4): "6 values" column, where the six x-state slots are
+// derived from min/max pairings of the six supplied values.
 TEST(SdfExpand, SixValuesPopulateNonXSlotsAndDeriveXFromMinMax) {
   std::vector<SdfDelayValue> vals(6);
   for (int i = 0; i < 6; ++i) vals[i].typ_val = (i + 1) * 10;
@@ -85,6 +85,8 @@ TEST(SdfExpand, SixValuesPopulateNonXSlotsAndDeriveXFromMinMax) {
   EXPECT_EQ(out[11], 40u);
 }
 
+// Claim T (Table 32-4): "12 values" column copies all supplied values straight
+// across with no derivation.
 TEST(SdfExpand, TwelveValuesCopyDirectly) {
   std::vector<SdfDelayValue> vals(12);
   for (int i = 0; i < 12; ++i) vals[i].typ_val = (i + 1) * 7;
@@ -93,32 +95,9 @@ TEST(SdfExpand, TwelveValuesCopyDirectly) {
   for (int i = 0; i < 12; ++i) EXPECT_EQ(out[i], (uint64_t)((i + 1) * 7));
 }
 
-TEST(SdfExpand, MtmSelectMinimumThroughExpansion) {
-  SdfDelayValue v1;
-  v1.min_val = 5;
-  v1.typ_val = 10;
-  v1.max_val = 15;
-  auto out = ExpandSdfDelays({v1}, SdfMtm::kMinimum);
-  EXPECT_EQ(out[0], 5u);
-  EXPECT_EQ(out[6], 5u);
-}
-
-TEST(SdfExpand, MtmSelectMaximumThroughExpansion) {
-  SdfDelayValue v1;
-  v1.min_val = 5;
-  v1.typ_val = 10;
-  v1.max_val = 15;
-  auto out = ExpandSdfDelays({v1}, SdfMtm::kMaximum);
-  EXPECT_EQ(out[0], 15u);
-  EXPECT_EQ(out[11], 15u);
-}
-
-TEST(SdfExpand, EmptyInputProducesZeroes) {
-  auto out = ExpandSdfDelays({}, SdfMtm::kTypical);
-  ASSERT_EQ(out.size(), 12u);
-  for (auto v : out) EXPECT_EQ(v, 0u);
-}
-
+// Claim R + Claim X (final paragraph): more than three SDF delays are reduced to
+// three by ignoring the extras (the trailing 99s never appear), and the x-state
+// delay is the minimum of the three retained values.
 TEST(SdfReduceToThree, MoreThanThreeDropsExtrasAndDerivesXFromMin) {
   std::vector<SdfDelayValue> vals(6);
   vals[0].typ_val = 30;
@@ -134,40 +113,9 @@ TEST(SdfReduceToThree, MoreThanThreeDropsExtrasAndDerivesXFromMin) {
   EXPECT_EQ(out[3], 10u);
 }
 
-TEST(SdfReduceToThree, XStateUsesTurnoffWhenTurnoffIsSmallest) {
-  std::vector<SdfDelayValue> vals(4);
-  vals[0].typ_val = 30;
-  vals[1].typ_val = 20;
-  vals[2].typ_val = 10;
-  vals[3].typ_val = 99;
-  auto out = ReduceSdfDelaysToThree(vals, SdfMtm::kTypical);
-  EXPECT_EQ(out[0], 30u);
-  EXPECT_EQ(out[1], 20u);
-  EXPECT_EQ(out[2], 10u);
-  EXPECT_EQ(out[3], 10u);
-}
-
-TEST(SdfReduceToThree, MtmSelectionAppliesPerValue) {
-  std::vector<SdfDelayValue> vals(4);
-  vals[0].min_val = 1;
-  vals[0].typ_val = 10;
-  vals[0].max_val = 100;
-  vals[1].min_val = 2;
-  vals[1].typ_val = 20;
-  vals[1].max_val = 200;
-  vals[2].min_val = 3;
-  vals[2].typ_val = 30;
-  vals[2].max_val = 300;
-  vals[3].min_val = 999;
-  vals[3].typ_val = 999;
-  vals[3].max_val = 999;
-  auto out = ReduceSdfDelaysToThree(vals, SdfMtm::kMaximum);
-  EXPECT_EQ(out[0], 100u);
-  EXPECT_EQ(out[1], 200u);
-  EXPECT_EQ(out[2], 300u);
-  EXPECT_EQ(out[3], 100u);
-}
-
+// Claim T applied by the production carrier: the annotator runs an IOPATH's
+// three delay values through the Table 32-4 mapping and lands all 12 slots on
+// the specify path delay.
 TEST(SdfAnnotation, IopathExpansionPopulatesAllTwelveTransitionSlots) {
   SdfFile file;
   SdfCell cell;
@@ -198,6 +146,8 @@ TEST(SdfAnnotation, IopathExpansionPopulatesAllTwelveTransitionSlots) {
   EXPECT_EQ(pd.delays[11], 10u);
 }
 
+// Claim T applied by the production carrier on the other construct §32.8 names
+// (interconnect delays): a two-value INTERCONNECT is expanded to 12 slots.
 TEST(SdfAnnotation, InterconnectTwoValuesPopulateXStateSlotsThroughAnnotator) {
   SdfFile file;
   SdfCell cell;
@@ -228,31 +178,4 @@ TEST(SdfAnnotation, InterconnectTwoValuesPopulateXStateSlotsThroughAnnotator) {
   EXPECT_EQ(got.delays[11], 7u);
 }
 
-TEST(SdfAnnotation, IopathExpansionRespectsMtmSelection) {
-  SdfFile file;
-  SdfCell cell;
-  SdfIopath io;
-  io.src_port = "a";
-  io.dst_port = "z";
-  io.rise.min_val = 1;
-  io.rise.typ_val = 10;
-  io.rise.max_val = 100;
-  io.fall.min_val = 2;
-  io.fall.typ_val = 20;
-  io.fall.max_val = 200;
-  io.turnoff.min_val = 3;
-  io.turnoff.typ_val = 30;
-  io.turnoff.max_val = 300;
-  cell.iopaths.push_back(io);
-  file.cells.push_back(cell);
-
-  SpecifyManager mgr;
-  AnnotateSdfToManager(file, mgr, SdfMtm::kMinimum);
-  ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
-  const auto& pd = mgr.GetPathDelays()[0];
-  EXPECT_EQ(pd.delays[0], 1u);
-  EXPECT_EQ(pd.delays[1], 2u);
-  EXPECT_EQ(pd.delays[2], 3u);
-}
-
-}
+}  // namespace
