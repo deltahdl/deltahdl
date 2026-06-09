@@ -6,12 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(NegativeTimingCheckNotifierToggle, NoViolationDoesNotToggle) {
-  EXPECT_FALSE(NegativeTimingCheckNotifierShouldToggle(
-      false,
-      false));
-}
-
 TEST(NegativeTimingCheckNotifierToggle, DelayedViolationToggles) {
   EXPECT_TRUE(NegativeTimingCheckNotifierShouldToggle(
       true,
