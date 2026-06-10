@@ -49,4 +49,15 @@ TEST_F(ProtectEncryptAgentSyntaxTest,
   EXPECT_NE(result.find("endmodule"), std::string::npos);
 }
 
+// The `<string>` argument of the keyword expression is consumed in full
+// regardless of its contents: a quoted value with embedded spaces and
+// punctuation is still stripped along with the directive line.
+TEST_F(ProtectEncryptAgentSyntaxTest, EncryptAgentStringArgumentWithSpacesConsumed) {
+  auto result =
+      Preprocess("`pragma protect encrypt_agent = \"Acme Crypt v2.0\"\n");
+  EXPECT_FALSE(diag_.HasErrors());
+  EXPECT_EQ(result.find("pragma"), std::string::npos);
+  EXPECT_EQ(result.find("Acme Crypt"), std::string::npos);
+}
+
 }  // namespace
