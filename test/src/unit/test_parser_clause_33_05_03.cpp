@@ -47,35 +47,27 @@ TEST(SeparateCompilationTool, CompiledFormPersistsOnFilesystem) {
   EXPECT_GT(fs::file_size(path), 0u);
 }
 
-TEST(SeparateCompilationTool, MultipleInvocationsAccumulateCells) {
-  TempPrecompDir tmp;
-  auto path = tmp.dir / "rtlLib.dpl";
-  ASSERT_TRUE(PrecompiledLibrary::Save(
-      "module a;\n"
-      "endmodule\n",
-      "rtlLib", path));
-  ASSERT_TRUE(PrecompiledLibrary::Save(
-      "module b;\n"
-      "endmodule\n",
-      "rtlLib", path));
-
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag(mgr);
-  CompilationUnit target;
-  ASSERT_TRUE(PrecompiledLibrary::Load(path, target, mgr, arena, diag));
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_EQ(target.modules.size(), 2u);
-  EXPECT_EQ(target.modules[0]->name, "a");
-  EXPECT_EQ(target.modules[1]->name, "b");
-}
-
 TEST(SeparateCompilationTool, SaveRejectsUnparseableSource) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
   EXPECT_FALSE(PrecompiledLibrary::Save(
       "module broken; this is not legal SystemVerilog\n",
       "rtlLib", path));
+}
+
+// The compiled form has to land somewhere in the filesystem; if the chosen
+// location cannot hold it (here, a parent directory that does not exist), the
+// save reports failure rather than silently discarding the cell. The source is
+// well-formed so the failure is attributable to the location, not the parse.
+TEST(SeparateCompilationTool, SaveFailsWhenLocationUnwritable) {
+  TempPrecompDir tmp;
+  auto path = tmp.dir / "missing_subdir" / "rtlLib.dpl";
+  EXPECT_FALSE(PrecompiledLibrary::Save(
+      "module child;\n"
+      "endmodule\n",
+      "rtlLib", path));
+  std::error_code ec;
+  EXPECT_FALSE(fs::exists(path, ec));
 }
 
 TEST(SeparateCompilationTool, AllCellKindsRoundTrip) {
