@@ -547,6 +547,21 @@ std::string_view SimContext::FindInstanceType(std::string_view prefix) const {
                                        : std::string_view{};
 }
 
+void SimContext::RegisterInstanceBinding(std::string_view prefix,
+                                         std::string_view library,
+                                         std::string_view cell) {
+  // §33.7: store the binding already joined as "library.cell" so the display
+  // path can hand it straight back without re-formatting on every %l.
+  instance_bindings_[std::string(prefix)] =
+      std::string(library) + "." + std::string(cell);
+}
+
+std::string_view SimContext::FindInstanceBinding(std::string_view prefix) const {
+  auto it = instance_bindings_.find(std::string(prefix));
+  return (it != instance_bindings_.end()) ? std::string_view(it->second)
+                                          : std::string_view{};
+}
+
 void SimContext::RegisterVirtualInterfaceVar(const Variable* v) {
   if (v) vi_vars_.insert(v);
 }

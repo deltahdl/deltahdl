@@ -483,6 +483,15 @@ class SimContext {
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
 
+  // §33.7: record the resolved "library.cell" binding of a module instance,
+  // keyed by the same instance-path prefix used for instance types. The %l/%L
+  // display format specifier reports this for the instance that contains the
+  // running display task, mirroring how %m reports that instance's hierarchical
+  // path name. An unrecorded prefix has no binding and reads back empty.
+  void RegisterInstanceBinding(std::string_view prefix,
+                               std::string_view library, std::string_view cell);
+  std::string_view FindInstanceBinding(std::string_view prefix) const;
+
   // §25.9 virtual interface runtime. A virtual interface variable carries a
   // binding to the scope of the interface instance it currently refers to, or
   // is unbound (the null state, which is also the value before initialization).
@@ -747,6 +756,11 @@ class SimContext {
   std::unordered_map<std::string_view, uint32_t> type_widths_;
 
   std::unordered_map<std::string, std::string> instance_types_;
+
+  // §33.7: per-instance resolved "library.cell" binding strings, keyed like
+  // instance_types_ by instance-path prefix; read back by the %l/%L format
+  // specifier when it displays the binding of the containing module instance.
+  std::unordered_map<std::string, std::string> instance_bindings_;
 
   // §25.9: virtual interface variables and their current interface-instance
   // scope bindings (absence of a binding means null / uninitialized).

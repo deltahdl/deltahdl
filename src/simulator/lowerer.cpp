@@ -874,6 +874,10 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
     std::string key = inst_prefix_;
     if (!key.empty() && key.back() == '.') key.pop_back();
     ctx_.RegisterInstanceType(key, mod->name);
+    // §33.7: record this instance's resolved library.cell so the %l/%L display
+    // specifier can report its binding. The cell is the module's design-element
+    // name; the library is the one it was compiled into.
+    ctx_.RegisterInstanceBinding(key, mod->library, mod->name);
   }
   LowerParams(mod);
   for (const auto& net : mod->nets) {
@@ -1209,6 +1213,10 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
       std::string key = inst_prefix_;
       if (!key.empty() && key.back() == '.') key.pop_back();
       ctx_.RegisterInstanceType(key, child.resolved->name);
+      // §33.7: record the child instance's resolved library.cell binding for
+      // the %l/%L display specifier.
+      ctx_.RegisterInstanceBinding(key, child.resolved->library,
+                                   child.resolved->name);
     }
 
     for (const auto& var : child.resolved->variables) {

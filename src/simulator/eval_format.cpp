@@ -46,6 +46,27 @@ static std::string BuildScopeHierName(SimContext* ctx) {
   return name;
 }
 
+// §33.7: build the "library.cell" string that %l / %L expands to -- the actual
+// library and cell bound to the module instance that contains the running
+// display task. Like %m (which reports that instance's hierarchical name), the
+// instance is the one named by the running process's instance prefix; the
+// lowerer records each instance's resolved binding under that same prefix. When
+// there is no simulation context, or the containing instance has no recorded
+// binding, the specifier still substitutes a generic library.cell token so it
+// never expands to nothing (the no-argument substitution rule of §21.2.1).
+static std::string BuildInstanceBinding(SimContext* ctx) {
+  if (ctx != nullptr) {
+    std::string prefix;
+    if (Process* proc = ctx->CurrentProcess()) {
+      prefix = proc->inst_prefix;  // "u1.u2." form, empty at the top level
+      if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
+    }
+    std::string_view binding = ctx->FindInstanceBinding(prefix);
+    if (!binding.empty()) return std::string(binding);
+  }
+  return "<library.cell>";
+}
+
 std::string FormatValueAsString(const Logic4Vec& val) {
   std::string result;
   uint32_t nbytes = (val.width + 7) / 8;
@@ -416,8 +437,10 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
     return false;
   }
 
+  // §33.7: %l / %L expand to the library.cell binding of the module instance
+  // that contains the display task, consuming no argument the way %m does.
   if (spec == 'l') {
-    out += "<library.cell>";
+    out += BuildInstanceBinding(args.ctx);
     i = j;
     return false;
   }
