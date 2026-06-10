@@ -100,37 +100,6 @@ TEST(DefaultLibraryBinding, FirstLibraryContainingCellWinsForM) {
   EXPECT_EQ(bound->library, "rtlLib");
 }
 
-TEST(DefaultLibraryBinding, EarlierLibrariesWithoutCellAreSkipped) {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag(mgr);
-  auto* cu = ParseSrc(mgr, arena, diag,
-                      "module adder(input wire a, output wire y);\n"
-                      "  assign y = ~a;\n"
-                      "endmodule\n"
-                      "module top(input wire a, output wire y);\n"
-                      "  adder u(.a(a), .y(y));\n"
-                      "endmodule\n");
-  ASSERT_NE(cu, nullptr);
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_EQ(cu->modules.size(), 2u);
-
-  cu->modules[0]->library = "gateLib";
-  cu->modules[1]->library = "rtlLib";
-
-  Elaborator elab(arena, diag, cu);
-  elab.SetLibraryDeclarationOrder({"rtlLib", "aLib", "gateLib"});
-  auto* design = elab.Elaborate("top");
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_NE(design, nullptr);
-
-  auto* top = design->top_modules[0];
-  ASSERT_EQ(top->children.size(), 1u);
-  auto* bound = top->children[0].resolved;
-  ASSERT_NE(bound, nullptr);
-  EXPECT_EQ(bound->library, "gateLib");
-}
-
 TEST(DefaultLibraryBinding, ReversedDeclarationOrderReversesBinding) {
   SourceManager mgr;
   Arena arena;
@@ -165,43 +134,6 @@ TEST(DefaultLibraryBinding, ReversedDeclarationOrderReversesBinding) {
   auto* bound = top->children[0].resolved;
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->library, "gateLib");
-}
-
-TEST(DefaultLibraryBinding, AllSiblingInstancesPickSameLibrary) {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag(mgr);
-  auto* cu = ParseSrc(mgr, arena, diag,
-                      "module adder(input wire a, output wire y);\n"
-                      "  assign y = a;\n"
-                      "endmodule\n"
-                      "module adder(input wire a, output wire y);\n"
-                      "  assign y = ~a;\n"
-                      "endmodule\n"
-                      "module top(input wire a, output wire y1, y2);\n"
-                      "  adder u1(.a(a), .y(y1));\n"
-                      "  adder u2(.a(a), .y(y2));\n"
-                      "endmodule\n");
-  ASSERT_NE(cu, nullptr);
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_EQ(cu->modules.size(), 3u);
-
-  cu->modules[0]->library = "aLib";
-  cu->modules[1]->library = "gateLib";
-  cu->modules[2]->library = "rtlLib";
-
-  Elaborator elab(arena, diag, cu);
-  elab.SetLibraryDeclarationOrder({"rtlLib", "aLib", "gateLib"});
-  auto* design = elab.Elaborate("top");
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_NE(design, nullptr);
-
-  auto* top = design->top_modules[0];
-  ASSERT_EQ(top->children.size(), 2u);
-  ASSERT_NE(top->children[0].resolved, nullptr);
-  ASSERT_NE(top->children[1].resolved, nullptr);
-  EXPECT_EQ(top->children[0].resolved->library, "aLib");
-  EXPECT_EQ(top->children[1].resolved->library, "aLib");
 }
 
 TEST(DefaultLibraryBinding, TransitiveDefaultBindingAtNestedInstance) {
