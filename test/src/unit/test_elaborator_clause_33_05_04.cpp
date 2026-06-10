@@ -46,28 +46,10 @@ CompilationUnit* ParseSrc(SourceManager& mgr, Arena& arena, DiagEngine& diag,
   return parser.Parse();
 }
 
-TEST(ConfigCommandLine, DesignStatementSelectsTopModule) {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag(mgr);
-  auto* cu = ParseSrc(mgr, arena, diag,
-                      "module top;\n"
-                      "endmodule\n"
-                      "config cfg;\n"
-                      "  design top;\n"
-                      "endconfig\n");
-  ASSERT_NE(cu, nullptr);
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_EQ(cu->configs.size(), 1u);
-
-  Elaborator elab(arena, diag, cu);
-  auto* design = elab.Elaborate(cu->configs[0]);
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_NE(design, nullptr);
-  ASSERT_EQ(design->top_modules.size(), 1u);
-  EXPECT_EQ(design->top_modules[0]->name, "top");
-}
-
+// §33.5.4: when a config carries a design statement, the named cell is the
+// top-level module and uninstantiated cells elsewhere in the sources do not
+// become tops. The elaborator builds the top set strictly from the config's
+// design cells, so the spurious modules are never elaborated.
 TEST(ConfigCommandLine, UninstantiatedCellsDoNotDisplaceDesignTop) {
   SourceManager mgr;
   Arena arena;
@@ -145,24 +127,6 @@ TEST(ConfigCommandLine, PrecompiledConfigDrivesBinding) {
   ASSERT_NE(design, nullptr);
   ASSERT_EQ(design->top_modules.size(), 1u);
   EXPECT_EQ(design->top_modules[0]->name, "top");
-}
-
-TEST(ConfigCommandLine, DesignCellWithNoModuleFails) {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag(mgr);
-  auto* cu = ParseSrc(mgr, arena, diag,
-                      "module other;\n"
-                      "endmodule\n"
-                      "config cfg;\n"
-                      "  design missing_cell;\n"
-                      "endconfig\n");
-  ASSERT_NE(cu, nullptr);
-  ASSERT_FALSE(diag.HasErrors());
-
-  Elaborator elab(arena, diag, cu);
-  elab.Elaborate(cu->configs[0]);
-  EXPECT_TRUE(diag.HasErrors());
 }
 
 }

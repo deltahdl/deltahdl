@@ -33,32 +33,10 @@ struct TempPrecompDir {
   }
 };
 
-TEST(ConfigCommandLine, ConfigPersistsThroughPrecompiledLibrary) {
-  TempPrecompDir tmp;
-  auto path = tmp.dir / "lib.dpl";
-  ASSERT_TRUE(PrecompiledLibrary::Save(
-      "module top;\n"
-      "endmodule\n"
-      "config cfg;\n"
-      "  design top;\n"
-      "endconfig\n",
-      "rtlLib", path));
-
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag(mgr);
-  CompilationUnit target;
-  ASSERT_TRUE(PrecompiledLibrary::Load(path, target, mgr, arena, diag));
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_EQ(target.configs.size(), 1u);
-
-  const auto* cfg = target.configs[0];
-  EXPECT_EQ(cfg->name, "cfg");
-  EXPECT_EQ(cfg->library, "rtlLib");
-  ASSERT_EQ(cfg->design_cells.size(), 1u);
-  EXPECT_EQ(cfg->design_cells[0].second, "top");
-}
-
+// §33.5.4: in the separate-compilation strategy the config itself shall also be
+// precompiled. The precompiled library persists configs alongside cells, so a
+// saved config — its name, owning library, design cells, and binding rules —
+// survives the save/load round trip intact.
 TEST(ConfigCommandLine, ConfigDesignCellsAndRulesRoundTrip) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "lib.dpl";
@@ -83,6 +61,7 @@ TEST(ConfigCommandLine, ConfigDesignCellsAndRulesRoundTrip) {
   ASSERT_EQ(target.configs.size(), 1u);
 
   const auto* cfg = target.configs[0];
+  EXPECT_EQ(cfg->name, "cfg");
   EXPECT_EQ(cfg->library, "myLib");
   ASSERT_EQ(cfg->design_cells.size(), 2u);
   EXPECT_EQ(cfg->design_cells[0].second, "a");
