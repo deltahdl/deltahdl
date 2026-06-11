@@ -79,4 +79,17 @@ TEST_F(ProtectEncodingSyntaxTest, EncodingBytesWithoutLineLengthConsumed) {
   EXPECT_EQ(result.find("bytes"), std::string::npos);
 }
 
+// The mirror image of the previous case: with the optionals independent, a form
+// that supplies `line_length` but omits `bytes` is also a valid keyword
+// expression and is consumed in full. Together with the both/neither/bytes-only
+// forms this exhausts the four combinations of the two optional subkeywords.
+TEST_F(ProtectEncodingSyntaxTest, EncodingLineLengthWithoutBytesConsumed) {
+  auto result =
+      Preprocess("`pragma protect encoding = ( enctype = \"base64\" , "
+                 "line_length = 72 )\n");
+  EXPECT_FALSE(diag_.HasErrors());
+  EXPECT_EQ(result.find("pragma"), std::string::npos);
+  EXPECT_EQ(result.find("line_length"), std::string::npos);
+}
+
 }  // namespace
