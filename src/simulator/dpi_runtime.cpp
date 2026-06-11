@@ -1,6 +1,7 @@
 #include "simulator/dpi_runtime.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -92,6 +93,113 @@ SvChandle DpiArgValue::AsChandle() const { return data.chandle_val; }
 SvBit DpiArgValue::AsBit() const { return data.bit_val; }
 SvLogic DpiArgValue::AsLogic() const { return data.logic_val; }
 
+namespace {
+
+// Read any numeric DPI argument value as an integer. Real values round to the
+// nearest integer, matching the way SystemVerilog assignments convert a real
+// expression to an integral target — §35.6.1 requires the temporary/actual
+// assignments to follow general SystemVerilog assignment and coercion rules.
+int64_t NumericToInt(const DpiArgValue& v) {
+  switch (v.type) {
+    case DataTypeKind::kReal:
+    case DataTypeKind::kShortreal:
+    case DataTypeKind::kRealtime:
+      return static_cast<int64_t>(std::llround(v.AsReal()));
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kTime:
+      return v.AsLongint();
+    case DataTypeKind::kBit:
+      return v.AsBit();
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+      return v.AsLogic();
+    default:
+      return v.AsInt();
+  }
+}
+
+// Read any numeric DPI argument value as a real, used when coercing toward a
+// floating-point formal or actual.
+double NumericToReal(const DpiArgValue& v) {
+  switch (v.type) {
+    case DataTypeKind::kReal:
+    case DataTypeKind::kShortreal:
+    case DataTypeKind::kRealtime:
+      return v.AsReal();
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kTime:
+      return static_cast<double>(v.AsLongint());
+    case DataTypeKind::kBit:
+      return static_cast<double>(v.AsBit());
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+      return static_cast<double>(v.AsLogic());
+    default:
+      return static_cast<double>(v.AsInt());
+  }
+}
+
+// §35.6.1: when a coercion is needed, the value crosses the interface through a
+// temporary that is created with the appropriate coercion. This realizes that
+// temporary: it returns `v` converted to `target`, following SystemVerilog
+// assignment/coercion rules. When the value already has the target type no
+// conversion is needed and it is returned unchanged.
+DpiArgValue CoerceArgValue(const DpiArgValue& v, DataTypeKind target) {
+  if (v.type == target) return v;
+  switch (target) {
+    case DataTypeKind::kReal:
+    case DataTypeKind::kShortreal:
+    case DataTypeKind::kRealtime: {
+      DpiArgValue r = DpiArgValue::FromReal(NumericToReal(v));
+      r.type = target;
+      return r;
+    }
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kTime: {
+      DpiArgValue r = DpiArgValue::FromLongint(NumericToInt(v));
+      r.type = target;
+      return r;
+    }
+    case DataTypeKind::kBit:
+      return DpiArgValue::FromBit(static_cast<SvBit>(NumericToInt(v) & 1));
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg: {
+      DpiArgValue r =
+          DpiArgValue::FromLogic(static_cast<SvLogic>(NumericToInt(v) & 1));
+      r.type = target;
+      return r;
+    }
+    case DataTypeKind::kByte: {
+      DpiArgValue r =
+          DpiArgValue::FromInt(static_cast<int8_t>(NumericToInt(v)));
+      r.type = target;
+      return r;
+    }
+    case DataTypeKind::kShortint: {
+      DpiArgValue r =
+          DpiArgValue::FromInt(static_cast<int16_t>(NumericToInt(v)));
+      r.type = target;
+      return r;
+    }
+    case DataTypeKind::kString:
+      // No numeric/string coercion is defined across the interface here; a
+      // string actual is carried through unchanged toward a string formal and
+      // any other source yields the empty string.
+      return v.type == DataTypeKind::kString ? v : DpiArgValue::FromString("");
+    case DataTypeKind::kChandle:
+      return v.type == DataTypeKind::kChandle ? v
+                                              : DpiArgValue::FromChandle(nullptr);
+    default: {  // kInt, kInteger, and any other integral formal
+      DpiArgValue r =
+          DpiArgValue::FromInt(static_cast<int32_t>(NumericToInt(v)));
+      r.type = target;
+      return r;
+    }
+  }
+}
+
+}  // namespace
+
 void DpiRuntime::RegisterImport(DpiRtFunction func) {
   import_index_[func.sv_name] = imports_.size();
   imports_.push_back(std::move(func));
@@ -181,6 +289,12 @@ DpiArgValue DpiRuntime::CallImportWithArgs(
   for (size_t i = 0; i < func->args.size() && i < callee.size(); ++i) {
     if (func->args[i].direction == Direction::kOutput) {
       callee[i] = UndeterminedOutputValue(func->args[i].type);
+    } else {
+      // §35.6.1: input and inout formals are passed copy-in through a temporary
+      // initialized with the actual coerced to the formal's type. When the
+      // actual already matches the formal type CoerceArgValue is a no-op, so the
+      // §35.5.1.2 same-type behavior is preserved.
+      callee[i] = CoerceArgValue(callee[i], func->args[i].type);
     }
   }
 
@@ -208,7 +322,10 @@ DpiArgValue DpiRuntime::CallImportWithArgs(
   for (size_t i = 0; i < func->args.size() && i < actuals.size(); ++i) {
     Direction dir = func->args[i].direction;
     if (dir == Direction::kOutput || dir == Direction::kInout) {
-      actuals[i] = callee[i];
+      // §35.6.1: copy-out assigns the temporary's value back to the actual with
+      // the appropriate conversion — coerce the foreign-written value to the
+      // actual argument's own type. A matching type makes this a no-op.
+      actuals[i] = CoerceArgValue(callee[i], actuals[i].type);
     }
   }
   return result;
