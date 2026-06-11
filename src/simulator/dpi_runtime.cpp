@@ -11,6 +11,30 @@
 
 namespace delta {
 
+// §35.9 disable-protocol state for the current execution thread. A foreign
+// routine queries its disabled state with no handle, so the state is naturally
+// thread-local, mirroring how the C-ABI scope (g_current_scope) is held. The
+// acknowledgement flag records whether svAckDisabledState() was called during
+// the current disable episode; it is cleared whenever the disabled state is
+// left so each episode starts unacknowledged.
+namespace {
+thread_local bool g_disabled_state = false;
+thread_local bool g_disable_acked = false;
+}  // namespace
+
+bool DpiCurrentDisabledState() { return g_disabled_state; }
+
+void DpiSetCurrentDisabledState(bool disabled) {
+  g_disabled_state = disabled;
+  // The acknowledgement is per disable episode: leaving the disabled state ends
+  // the episode, so a subsequent one starts unacknowledged.
+  if (!disabled) g_disable_acked = false;
+}
+
+void DpiAckCurrentDisable() { g_disable_acked = true; }
+
+bool DpiCurrentDisableAcknowledged() { return g_disable_acked; }
+
 DpiArgValue DpiArgValue::FromInt(int32_t v) {
   DpiArgValue a;
   a.type = DataTypeKind::kInt;
@@ -167,6 +191,16 @@ DpiArgValue DpiRuntime::CallImportWithArgs(
     result = func->impl(callee);
   }
 
+  // §35.9: when a disable is in effect, the values of an imported subroutine's
+  // output and inout parameters are undefined, as is its return value. A
+  // SystemVerilog simulator is not obligated to propagate anything the foreign
+  // code wrote back to the calling SystemVerilog code. This implementation
+  // exercises that latitude: the actuals are left untouched and an undetermined
+  // result of the return type is yielded, so no disabled-call value leaks out.
+  if (DpiCurrentDisabledState()) {
+    return UndeterminedOutputValue(func->return_type);
+  }
+
   // Copy back only output and inout arguments: the value the foreign function
   // wrote to them is visible outside the call. Input arguments are passed by
   // value, so any modification the foreign function made to its copy is
@@ -247,6 +281,13 @@ DpiExportCallStatus DpiRuntime::CallExportFromImport(
     std::string_view sv_name, const std::vector<DpiArgValue>& args,
     DpiArgValue* out_result) {
   const auto* exp = FindExport(sv_name);
+  // §35.9 item d): once an imported subroutine has entered the disabled state,
+  // it is illegal for the current call to make any further calls to exported
+  // subroutines. This applies whatever the chain's context property or the kind
+  // of export, so it is checked ahead of the §35.8 and §35.5.3 rules.
+  if (DpiCurrentDisabledState()) {
+    return DpiExportCallStatus::kDisabledStateExportCall;
+  }
   // §35.8: it is never legal to call an exported task from within an imported
   // function — the DPI counterpart of the native rule that a function cannot
   // perform a task enable. When the innermost import in the chain is a function
@@ -288,6 +329,44 @@ bool DpiRuntime::IsImportCallOptimizationBarrier(
   const auto* func = FindImport(sv_name);
   if (func == nullptr) return false;
   return func->is_context;
+}
+
+int DpiRuntime::ReturnFromExportUnderDisable(DpiDisableTarget target) {
+  switch (target) {
+    case DpiDisableTarget::kAncestor:
+      // §35.9 item a): the exported task returns because a disable targets a
+      // parent. The disable is still propagating, so the calling import enters
+      // the disabled state and the task returns 1.
+      DpiSetCurrentDisabledState(true);
+      return 1;
+    case DpiDisableTarget::kExportItself:
+      // §35.9: when the exported task is itself the disable target, the disable
+      // stops there — its parent import is not considered disabled, the task
+      // returns 0, and svIsDisabledState() reports 0.
+      DpiSetCurrentDisabledState(false);
+      return 0;
+    case DpiDisableTarget::kNone:
+    default:
+      // §35.9 item a): a task that does not return due to a disable returns 0.
+      DpiSetCurrentDisabledState(false);
+      return 0;
+  }
+}
+
+bool DpiRuntime::IsDisabledState() const { return DpiCurrentDisabledState(); }
+
+bool DpiRuntime::CheckImportedSubroutineDisableReturn(
+    bool is_task, int task_return_value) const {
+  // §35.9: the verification only applies to a subroutine returning while a
+  // disable is in effect. With no disable there is nothing to check.
+  if (!DpiCurrentDisabledState()) return true;
+  if (is_task) {
+    // item b): an imported task returning due to a disable shall return 1.
+    return task_return_value == 1;
+  }
+  // item c): an imported function returning due to a disable shall have
+  // acknowledged it by calling svAckDisabledState() first.
+  return DpiCurrentDisableAcknowledged();
 }
 
 void AssertionApi::RegisterCallback(int reason, AssertionCbFunc cb,

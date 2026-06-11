@@ -2,6 +2,8 @@
 
 #include "simulator/svdpi.h"
 
+#include "simulator/dpi_runtime.h"
+
 static thread_local svScope g_current_scope = nullptr;
 
 // Per Annex H.10.1.3, the returned string names the canonical value
@@ -367,6 +369,13 @@ int svGetCallerInfo(const char** file_name, int* line_number) {
   return 0;
 }
 
-int svIsDisabledState(void) { return 0; }
+// §35.9: a subroutine determines whether it is in the disabled state by calling
+// this function. It reports the current thread's disabled state — set by the
+// runtime when a disable propagates through an exported subroutine into the
+// calling import.
+int svIsDisabledState(void) { return delta::DpiCurrentDisabledState() ? 1 : 0; }
 
-void svAckDisabledState(void) {}
+// §35.9 item c): an imported function shall call this to acknowledge it is
+// returning due to a disable. It records the acknowledgement for the current
+// disable episode so the simulator's protocol check can confirm it occurred.
+void svAckDisabledState(void) { delta::DpiAckCurrentDisable(); }

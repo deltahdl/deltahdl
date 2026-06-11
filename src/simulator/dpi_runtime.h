@@ -119,12 +119,42 @@ struct DpiRtExport {
 // scope without first calling svSetScope. kFunctionCallsTask reports the
 // §35.8 error of an imported function trying to invoke an exported task,
 // which is never legal regardless of the chain's context property.
+// kDisabledStateExportCall reports the §35.9 item d) error of an imported
+// subroutine that has entered the disabled state trying to make any further
+// call to an exported subroutine.
 enum class DpiExportCallStatus : uint8_t {
   kOk,
   kNoncontextChain,
   kScopeMismatch,
   kFunctionCallsTask,
+  kDisabledStateExportCall,
 };
+
+// §35.9: what a disable statement targets, relative to an exported subroutine
+// that is unwinding because of it. The target decides the int value the
+// exported task yields and whether the calling import enters the disabled
+// state.
+enum class DpiDisableTarget : uint8_t {
+  // The exported subroutine is returning normally; no disable is in effect.
+  kNone,
+  // The disable targets the exported subroutine itself. Per §35.9 the parent
+  // import is then not considered disabled and the task returns 0.
+  kExportItself,
+  // The disable targets a parent in the mixed-language call chain. The disable
+  // is still propagating, so the calling import enters the disabled state and
+  // the exported task returns 1.
+  kAncestor,
+};
+
+// §35.9 disable-protocol view of the current thread's state. The public svdpi
+// entry points svIsDisabledState() and svAckDisabledState() forward to these,
+// so the disabled state the standard describes is observable through the very
+// API functions it names. The state is per thread because a foreign routine
+// queries it for its own execution context with no explicit handle.
+bool DpiCurrentDisabledState();
+void DpiSetCurrentDisabledState(bool disabled);
+void DpiAckCurrentDisable();
+bool DpiCurrentDisableAcknowledged();
 
 class DpiRuntime {
  public:
@@ -197,6 +227,32 @@ class DpiRuntime {
   // import is declared context. Optimizers query this to decide whether the
   // call may be folded or eliminated.
   bool IsImportCallOptimizationBarrier(std::string_view sv_name) const;
+
+  // §35.9 item a) plus the §35.9 carve-out for a directly targeted export.
+  // Models an exported task returning while a disable is in effect and yields
+  // the int value the task returns — the value SystemVerilog guarantees, not
+  // one the DPI application has to ensure. When the disable targets a parent in
+  // the chain the task returns 1 and the calling import enters the disabled
+  // state; when the exported task is itself the disable target the disable
+  // stops there, so the task returns 0 and the parent is not disabled; with no
+  // disable the task returns 0. The current thread's disabled state is updated
+  // to match.
+  int ReturnFromExportUnderDisable(DpiDisableTarget target);
+
+  // §35.9: whether the current imported subroutine is in the disabled state —
+  // the same value svIsDisabledState() reports.
+  bool IsDisabledState() const;
+
+  // §35.9 items b) and c): the verification a simulator shall perform on
+  // imported subroutines that return while a disable is in effect. Returns true
+  // when the protocol was followed and false when it was violated; on a false
+  // result the caller issues the fatal simulation error §35.9 mandates. An
+  // imported task (item b) shall return 1 when it returns due to a disable; an
+  // imported function (item c) shall have called svAckDisabledState() before
+  // returning due to a disable. When no disable is in effect there is nothing
+  // to verify and the result is true.
+  bool CheckImportedSubroutineDisableReturn(bool is_task,
+                                            int task_return_value) const;
 
   static uint32_t SvLow(const SvOpenArrayHandle& h);
   static uint32_t SvHigh(const SvOpenArrayHandle& h);
