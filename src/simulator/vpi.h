@@ -653,6 +653,19 @@ struct VpiVlogInfo {
 constexpr int kVpiSysTask = 1;
 constexpr int kVpiSysFunc = 2;
 
+// §38.37.1: the value kinds a system function may declare through the
+// sysfunctype field. Only one of these may be named, and only when the system
+// task/function was registered as a vpiSysFunc.
+constexpr int kVpiIntFunc = 1;
+constexpr int kVpiRealFunc = 2;
+constexpr int kVpiTimeFunc = 3;
+constexpr int kVpiSizedFunc = 4;
+constexpr int kVpiSizedSignedFunc = 5;
+
+// §38.37.1: a sized system function (vpiSizedFunc/vpiSizedSignedFunc) whose
+// registration supplies no sizetf application returns a value 32 bits wide.
+constexpr int kVpiDefaultSizedFuncBits = 32;
+
 struct VpiSystfData {
   int type = 0;
   int sysfunctype = 0;
@@ -662,6 +675,46 @@ struct VpiSystfData {
   int (*sizetf)(const char*) = nullptr;
   void* user_data = nullptr;
 };
+
+// §38.37.1: the three points in the tool's lifetime that drive the callback
+// applications named in a s_vpi_systf_data record.
+enum class VpiSystfCallback { kCompiletf, kSizetf, kCalltf };
+
+// §38.37.1 (tfname rule): whether a candidate system task/function name is a
+// well-formed name as it would be written in SystemVerilog source - it begins
+// with a dollar sign and is followed by one or more characters that are legal in
+// a SystemVerilog simple identifier (A-Z, a-z, 0-9, underscore, dollar sign). A
+// bare "$", an empty string, or any other character makes the name ill-formed.
+bool VpiSystfNameIsValid(const char* tfname);
+
+// §38.37.1 (sysfunctype rule): the value kind a registration declares for a
+// system function. sysfunctype is meaningful only when the record was
+// registered as a vpiSysFunc; for a system task it does not apply, so this
+// reports 0 (no return-value kind) regardless of the stored field.
+int VpiSystfReturnType(const VpiSystfData& data);
+
+// §38.37.1: whether a given callback application fires while the simulation data
+// structure is being compiled or built (true for compiletf and sizetf) rather
+// than on every invocation during simulation execution (false for calltf).
+bool VpiSystfCallbackFiresAtBuild(VpiSystfCallback callback);
+
+// §38.37.1: invoke one of the systf callback applications. Every callback
+// receives exactly one argument - the registration's user_data field, passed as
+// a PLI_BYTE8 * - and a null function pointer (a field left unused) is simply
+// skipped, returning 0.
+int VpiSystfInvoke(int (*routine)(const char*), void* user_data);
+
+// §38.37.1 (sizetf rule): whether the sizetf application is to be called for a
+// registration. It is called only for a system function (vpiSysFunc) whose
+// sysfunctype is vpiSizedFunc or vpiSizedSignedFunc; for anything else sizetf is
+// never invoked.
+bool VpiSystfSizetfIsCalled(const VpiSystfData& data);
+
+// §38.37.1: the bit width a sized system function reports. When sizetf is to be
+// called and a sizetf application is present it supplies the width (receiving
+// user_data as its PLI_BYTE8 * argument); a sized function with no sizetf
+// defaults to 32 bits.
+int VpiSystfResultSizeBits(const VpiSystfData& data);
 
 class VpiContext {
  public:

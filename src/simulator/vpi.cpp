@@ -719,12 +719,16 @@ VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
   if (!data) return nullptr;
 
   // §36.9.1: a user-defined system task or system function name shall begin
-  // with a dollar sign. Refuse to register a name that omits the leading '$'.
-  if (data->tfname == nullptr || data->tfname[0] != '$') {
+  // with a dollar sign. §38.37.1 sharpens this: the dollar sign shall be
+  // followed by one or more characters that are legal in a SystemVerilog simple
+  // identifier. Refuse a name that fails either part of the rule (a missing or
+  // bare "$", or any illegal trailing character).
+  if (!VpiSystfNameIsValid(data->tfname)) {
     last_error_.state = kVpiError;
     last_error_.level = kVpiError;
     last_error_.message =
-        "system task or function name must begin with '$'";
+        "system task or function name must be '$' followed by one or more "
+        "identifier characters";
     return nullptr;
   }
 
@@ -1572,6 +1576,62 @@ void InvokeVlogStartupRoutines(VlogStartupRoutine* routines) {
   for (size_t i = 0; routines[i] != nullptr; ++i) {
     routines[i]();
   }
+}
+
+bool VpiSystfNameIsValid(const char* tfname) {
+  // §38.37.1: the name shall begin with a dollar sign and shall be followed by
+  // one or more characters legal in a SystemVerilog simple identifier. A null
+  // pointer, an empty string, or a bare "$" with nothing after it fails the
+  // "one or more" requirement.
+  if (tfname == nullptr || tfname[0] != '$' || tfname[1] == '\0') return false;
+  for (const char* p = tfname + 1; *p != '\0'; ++p) {
+    char c = *p;
+    bool legal = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                 (c >= '0' && c <= '9') || c == '_' || c == '$';
+    if (!legal) return false;
+  }
+  return true;
+}
+
+int VpiSystfReturnType(const VpiSystfData& data) {
+  // §38.37.1: sysfunctype shall only be used when type is set to vpiSysFunc, so
+  // it names a return-value kind only for a system function; a system task has
+  // no return-value kind.
+  if (data.type != kVpiSysFunc) return 0;
+  return data.sysfunctype;
+}
+
+bool VpiSystfCallbackFiresAtBuild(VpiSystfCallback callback) {
+  // §38.37.1: callbacks to compiletf and sizetf occur when the simulation data
+  // structure is compiled or built; callbacks to calltf occur each time the
+  // system task or function is invoked during simulation execution.
+  return callback == VpiSystfCallback::kCompiletf ||
+         callback == VpiSystfCallback::kSizetf;
+}
+
+int VpiSystfInvoke(int (*routine)(const char*), void* user_data) {
+  // §38.37.1: the only argument passed to a compiletf/sizetf/calltf routine is
+  // the user_data field, typed as PLI_BYTE8 * (char *). One or more of the
+  // routine fields may be null when not needed, so a null pointer is skipped.
+  if (routine == nullptr) return 0;
+  return routine(static_cast<const char*>(user_data));
+}
+
+bool VpiSystfSizetfIsCalled(const VpiSystfData& data) {
+  // §38.37.1: the sizetf application shall only be called if the type is
+  // vpiSysFunc and the sysfunctype is vpiSizedFunc or vpiSizedSignedFunc.
+  return data.type == kVpiSysFunc &&
+         (data.sysfunctype == kVpiSizedFunc ||
+          data.sysfunctype == kVpiSizedSignedFunc);
+}
+
+int VpiSystfResultSizeBits(const VpiSystfData& data) {
+  // §38.37.1: a sized system function takes its width from the sizetf
+  // application when one is provided; with no sizetf it returns 32 bits.
+  if (VpiSystfSizetfIsCalled(data) && data.sizetf != nullptr) {
+    return VpiSystfInvoke(data.sizetf, data.user_data);
+  }
+  return kVpiDefaultSizedFuncBits;
 }
 
 }
