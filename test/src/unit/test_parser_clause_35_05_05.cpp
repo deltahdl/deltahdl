@@ -134,6 +134,19 @@ TEST(FunctionDeclParsing, DpiImportFunctionPackedBitResultRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §35.5.5: only the *scalar* form of bit is permitted. A width-one packed
+// vector (bit [0:0]) carries a packed dimension and so is a one-bit vector, not
+// a scalar bit value -- this boundary case is rejected, just as a wider packed
+// vector is.
+TEST(FunctionDeclParsing, DpiImportFunctionWidthOnePackedBitResultRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function bit [0:0] read_single();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
 // §35.5.5: the allowed result list excludes the wide 4-state 'integer' type
 // (permitted only as a formal argument under §35.5.6), so an integer-returning
 // import is rejected.
@@ -144,6 +157,72 @@ TEST(FunctionDeclParsing, DpiImportFunctionIntegerResultRejected) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(r.has_errors);
+}
+
+// §35.5.5: 'byte' is one of the C-compatible integer types named in the
+// permitted small-value result list, so a byte-returning import parses cleanly.
+TEST(FunctionDeclParsing, DpiImportFunctionByteResultAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function byte read_octet();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->return_type.kind, DataTypeKind::kByte);
+}
+
+// §35.5.5: 'shortint' is in the permitted small-value result list, so a
+// shortint-returning import is accepted.
+TEST(FunctionDeclParsing, DpiImportFunctionShortintResultAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function shortint read_half();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->return_type.kind, DataTypeKind::kShortint);
+}
+
+// §35.5.5: 'int' -- the 32-bit C-compatible integer -- is in the permitted
+// small-value result list, so an int-returning import is accepted.
+TEST(FunctionDeclParsing, DpiImportFunctionIntResultAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int read_word();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
+}
+
+// §35.5.5: 'longint' is the 64-bit member of the permitted small-value integer
+// result types, so a longint-returning import is accepted.
+TEST(FunctionDeclParsing, DpiImportFunctionLongintResultAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function longint read_double();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->return_type.kind, DataTypeKind::kLongint);
+}
+
+// §35.5.5: 'shortreal' is the single-precision floating-point member of the
+// permitted small-value result list, distinct from 'real', so a
+// shortreal-returning import is accepted.
+TEST(FunctionDeclParsing, DpiImportFunctionShortrealResultAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function shortreal measure();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->return_type.kind, DataTypeKind::kShortreal);
 }
 
 }
