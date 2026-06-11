@@ -4,7 +4,11 @@
 
 static thread_local svScope g_current_scope = nullptr;
 
-const char* svDpiVersion(void) { return "IEEE 1800-2023"; }
+// Per Annex H.10.1.3, the returned string names the canonical value
+// representation in use rather than the language revision. This simulator uses
+// the VPI-based canonical value (s_vpi_vecval), so it reports "1800-2005". The
+// alternative "SV3.1a" is reserved for the legacy svLogicVec32 representation.
+const char* svDpiVersion(void) { return "1800-2005"; }
 
 svBit svGetBitselBit(const svBitVecVal* s, int i) {
   int word = i / 32;
