@@ -363,6 +363,16 @@ uint32_t DpiRuntime::SvHigh(const SvOpenArrayHandle& h) {
 
 uint32_t DpiRuntime::SvSize(const SvOpenArrayHandle& h) { return h.size; }
 
+SvOpenArrayHandle DpiRuntime::MakeOpenArrayFromActual(void* actual_data,
+                                                      uint32_t actual_size,
+                                                      uint32_t elem_width) {
+  // §35.6.1.1: the formal's unsized dimension takes the size of the
+  // corresponding actual argument dimension; the element width is the type
+  // information carried over from the import declaration. SvLow/SvHigh then
+  // report the normalized range for the solitary unsized dimension.
+  return SvOpenArrayHandle{actual_data, actual_size, elem_width};
+}
+
 void DpiRuntime::EnterContextImportCall(std::string_view sv_name,
                                         DpiScope decl_scope, bool is_task) {
   // §35.5.3: the chain's context is the import declaration's instantiated

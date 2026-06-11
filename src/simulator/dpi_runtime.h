@@ -258,6 +258,17 @@ class DpiRuntime {
   static uint32_t SvHigh(const SvOpenArrayHandle& h);
   static uint32_t SvSize(const SvOpenArrayHandle& h);
 
+  // §35.6.1.1: under the WYSIWYG principle the unsized ranges of an open-array
+  // formal (§35.5.6.1) are not fixed by the import declaration; they are
+  // determined at the call site from the corresponding actual argument. This
+  // builds the open-array handle a foreign function receives for such a formal,
+  // taking the unsized dimension's size from the actual passed at this call
+  // while the rest of the type information (the element width) stays as
+  // specified at the import declaration.
+  static SvOpenArrayHandle MakeOpenArrayFromActual(void* actual_data,
+                                                   uint32_t actual_size,
+                                                   uint32_t elem_width);
+
  private:
   struct ImportFrame {
     std::string_view sv_name;
