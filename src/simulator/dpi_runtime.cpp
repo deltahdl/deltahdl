@@ -198,6 +198,36 @@ DpiArgValue CoerceArgValue(const DpiArgValue& v, DataTypeKind target) {
   }
 }
 
+// §35.6.2: equality of two same-typed actual-argument values. After an
+// imported function returns, the copy-back leaves an output/inout actual with
+// its own declared type, so the value before the call and the value after it
+// share a type; this compares them so a value-change event is propagated only
+// when the call genuinely changed the actual, matching SystemVerilog
+// value-change semantics where an assignment of an unchanged value is inert.
+bool SameArgValue(const DpiArgValue& a, const DpiArgValue& b) {
+  if (a.type != b.type) return false;
+  switch (a.type) {
+    case DataTypeKind::kReal:
+    case DataTypeKind::kShortreal:
+    case DataTypeKind::kRealtime:
+      return a.AsReal() == b.AsReal();
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kTime:
+      return a.AsLongint() == b.AsLongint();
+    case DataTypeKind::kString:
+      return a.AsString() == b.AsString();
+    case DataTypeKind::kChandle:
+      return a.AsChandle() == b.AsChandle();
+    case DataTypeKind::kBit:
+      return a.AsBit() == b.AsBit();
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+      return a.AsLogic() == b.AsLogic();
+    default:
+      return a.AsInt() == b.AsInt();
+  }
+}
+
 }  // namespace
 
 void DpiRuntime::RegisterImport(DpiRtFunction func) {
@@ -327,6 +357,38 @@ DpiArgValue DpiRuntime::CallImportWithArgs(
       // actual argument's own type. A matching type makes this a no-op.
       actuals[i] = CoerceArgValue(callee[i], actuals[i].type);
     }
+  }
+  return result;
+}
+
+DpiArgValue DpiRuntime::CallImportDetectingChanges(
+    std::string_view sv_name, std::vector<DpiArgValue>& actuals,
+    std::vector<DpiArgValueChange>& changes) const {
+  const auto* func = FindImport(sv_name);
+  if (!func) return DpiArgValue::FromInt(0);
+
+  // §35.6.2: snapshot the actuals before the call so that, once control
+  // returns, the simulator can tell which output/inout actuals the call
+  // changed. Nothing is detected or propagated yet — that happens only after
+  // the imported function has returned.
+  std::vector<DpiArgValue> before = actuals;
+
+  // The copy-back of output/inout values into the actuals is the
+  // §35.5.1.2/§35.6.1 responsibility of CallImportWithArgs and finishes before
+  // any value-change event below is raised.
+  DpiArgValue result = CallImportWithArgs(sv_name, actuals);
+
+  // §35.6.2: now that control has returned, handle the value changes. Propagate
+  // each as if the actual were assigned the formal immediately after the
+  // return. Only output and inout actuals can change. Walk the arguments in
+  // declaration order so that, with more than one argument, the assignments and
+  // their value-change events follow the order general SystemVerilog rules
+  // impose. An actual whose value the call did not alter raises no event.
+  for (size_t i = 0; i < func->args.size() && i < actuals.size(); ++i) {
+    Direction dir = func->args[i].direction;
+    if (dir != Direction::kOutput && dir != Direction::kInout) continue;
+    if (SameArgValue(before[i], actuals[i])) continue;
+    changes.push_back(DpiArgValueChange{i, before[i], actuals[i]});
   }
   return result;
 }

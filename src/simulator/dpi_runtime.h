@@ -68,6 +68,17 @@ struct DpiArgValue {
   SvLogic AsLogic() const;
 };
 
+// §35.6.2: a value-change event the SystemVerilog simulator raises for an
+// output or inout actual after an imported function returns. `index` is the
+// argument's position in the call; `old_value` and `new_value` bracket the
+// change. The simulator is responsible for detecting and handling these
+// changes once control has returned from the import, never while it runs.
+struct DpiArgValueChange {
+  size_t index = 0;
+  DpiArgValue old_value;
+  DpiArgValue new_value;
+};
+
 using DpiRtCallback =
     std::function<DpiArgValue(const std::vector<DpiArgValue>&)>;
 
@@ -190,6 +201,22 @@ class DpiRuntime {
   // and the value written back is visible outside. Returns the function result.
   DpiArgValue CallImportWithArgs(std::string_view sv_name,
                                  std::vector<DpiArgValue>& actuals) const;
+
+  // §35.6.2: call an import and, once control has returned, detect the value
+  // changes on its output and inout actuals and report them as value-change
+  // events. The copy-back into the actuals is performed by CallImportWithArgs
+  // (§35.5.1.2/§35.6.1) and completes before any event is raised, so detection
+  // and handling happen strictly after the imported function returns and never
+  // during the call. A value-change event is appended only for an actual the
+  // call truly altered, modeling "the actual was assigned the formal
+  // immediately after control returns" — an unchanged actual raises none. When
+  // there is more than one argument the events are appended in declaration
+  // order, the order general SystemVerilog rules impose on the assignments and
+  // their value-change propagation. `changes` receives the ordered events; the
+  // function result is returned.
+  DpiArgValue CallImportDetectingChanges(
+      std::string_view sv_name, std::vector<DpiArgValue>& actuals,
+      std::vector<DpiArgValueChange>& changes) const;
 
   DpiArgValue CallExport(std::string_view sv_name,
                          const std::vector<DpiArgValue>& args) const;
