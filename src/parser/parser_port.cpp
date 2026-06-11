@@ -177,6 +177,12 @@ ModuleItem* Parser::ParseDpiImport() {
     Expect(TokenKind::kKwFunction);
   }
 
+  // §35.5.1.3: the pure property is reserved for imported functions; an
+  // imported task can never be declared pure.
+  if (item->dpi_is_task && item->dpi_is_pure) {
+    diag_.Error(item->loc, "an imported task cannot be declared pure");
+  }
+
   if (!item->dpi_is_task) {
     item->return_type = ParseDataType();
   }
