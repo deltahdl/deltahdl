@@ -172,6 +172,69 @@ TEST(DpiArgumentDirections, OutputUndeterminedSeedMatchesNonIntFormalType) {
   EXPECT_DOUBLE_EQ(actuals[0].AsReal(), 2.5);
 }
 
+// §35.5.1.2: the undetermined initial value supplied for an output argument is
+// type-correct for a string formal too. A string output is seeded with an
+// undetermined value (an empty string) rather than the caller's actual string,
+// and the string the foreign function writes is visible outside the call. This
+// exercises the string branch of the undetermined-seed selection, which stores
+// its value differently from the scalar branches.
+TEST(DpiArgumentDirections, OutputUndeterminedSeedForStringFormalIsNotActual) {
+  DpiRuntime rt;
+  DpiRtFunction func;
+  func.c_name = "c_sout";
+  func.sv_name = "sout";
+  func.return_type = DataTypeKind::kVoid;
+  func.args = {DpiArg{"s", DataTypeKind::kString, Direction::kOutput}};
+  std::string seen = "sentinel";
+  func.arg_impl = [&seen](std::vector<DpiArgValue>& a) {
+    seen = a[0].AsString();
+    a[0] = DpiArgValue::FromString("written");
+    return DpiArgValue::FromInt(0);
+  };
+  rt.RegisterImport(std::move(func));
+
+  std::vector<DpiArgValue> actuals = {DpiArgValue::FromString("caller")};
+  rt.CallImportWithArgs("sout", actuals);
+
+  // The string output formal does not receive the caller's actual string; it
+  // gets an undetermined (empty) string instead.
+  EXPECT_NE(seen, "caller");
+  EXPECT_EQ(seen, "");
+  // The written string is visible outside the call.
+  EXPECT_EQ(actuals[0].AsString(), "written");
+}
+
+// §35.5.1.2: the undetermined output seed is type-correct for a longint formal
+// as well — the callee sees a zeroed 64-bit value, not the caller's actual, and
+// the written longint is visible outside the call. This exercises the longint
+// branch of the undetermined-seed selection.
+TEST(DpiArgumentDirections, OutputUndeterminedSeedForLongintFormalIsNotActual) {
+  DpiRuntime rt;
+  DpiRtFunction func;
+  func.c_name = "c_lout";
+  func.sv_name = "lout";
+  func.return_type = DataTypeKind::kVoid;
+  func.args = {DpiArg{"l", DataTypeKind::kLongint, Direction::kOutput}};
+  int64_t seen = 0x7fffffffffffffffLL;
+  func.arg_impl = [&seen](std::vector<DpiArgValue>& a) {
+    seen = a[0].AsLongint();
+    a[0] = DpiArgValue::FromLongint(0x0123456789abcdefLL);
+    return DpiArgValue::FromInt(0);
+  };
+  rt.RegisterImport(std::move(func));
+
+  std::vector<DpiArgValue> actuals = {
+      DpiArgValue::FromLongint(0x1111222233334444LL)};
+  rt.CallImportWithArgs("lout", actuals);
+
+  // The longint output formal is seeded with an undetermined (zeroed) value
+  // rather than the caller's actual.
+  EXPECT_NE(seen, 0x1111222233334444LL);
+  EXPECT_EQ(seen, 0);
+  // The written 64-bit value is visible outside the call.
+  EXPECT_EQ(actuals[0].AsLongint(), 0x0123456789abcdefLL);
+}
+
 // §35.5.1.2: an import registered with the input-only callback (no direction-
 // aware implementation) is still callable through the direction-aware path.
 // Because that callback cannot write its arguments, an input actual is left
