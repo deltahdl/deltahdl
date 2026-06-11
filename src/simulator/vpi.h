@@ -130,10 +130,14 @@ constexpr int kVpi1 = 1;
 constexpr int kVpiX = 2;
 constexpr int kVpiZ = 3;
 
+// §38.2 Table 38-1: the vpi_chk_error() severity levels, ordered from lowest
+// (vpiNotice) to highest (vpiInternal). The values increase with severity, so
+// vpiSystem outranks vpiError and vpiInternal outranks them all.
 constexpr int kVpiNotice = 1;
 constexpr int kVpiWarning = 2;
 constexpr int kVpiError = 3;
-constexpr int kVpiInternal = 4;
+constexpr int kVpiSystem = 4;
+constexpr int kVpiInternal = 5;
 
 struct VpiObject {
   int type = 0;
@@ -906,6 +910,12 @@ class VpiContext {
 
   const VpiErrorInfo& LastError() const { return last_error_; }
 
+  // §38.2: the error status is reset by any VPI routine call except
+  // vpi_chk_error(). The C entry points clear the pending error here on entry
+  // before doing their work, so vpi_chk_error() reports only the outcome of the
+  // most recent routine; a failing routine then records a fresh error.
+  void ResetErrorStatus() { last_error_ = {}; }
+
  private:
   VpiHandle AllocObject();
 
@@ -1056,10 +1066,12 @@ using SVpiVlogInfo = delta::VpiVlogInfo;
 #define vpiX 2
 #define vpiZ 3
 
+// §38.2 Table 38-1: vpi_chk_error() severity levels, lowest to highest.
 #define vpiNotice 1
 #define vpiWarning 2
 #define vpiError 3
-#define vpiInternal 4
+#define vpiSystem 4
+#define vpiInternal 5
 
 #define vpiSysTask 1
 #define vpiSysFunc 2
@@ -1469,7 +1481,6 @@ using PLI_UBYTE8 = unsigned char;
 #define vpiCompile 1
 #define vpiPLI 2
 #define vpiRun 3
-#define vpiSystem 4
 #define cbForce 3
 #define cbRelease 4
 #define cbAssign 25

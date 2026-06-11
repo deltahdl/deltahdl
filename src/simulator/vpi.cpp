@@ -1694,68 +1694,84 @@ int VpiSystfResultSizeBits(const VpiSystfData& data) {
 }
 
 vpiHandle vpi_register_systf(s_vpi_systf_data* data) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().RegisterSystf(data);
 }
 
 void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   delta::GetGlobalVpiContext().GetSystfInfo(obj, systf_data_p);
 }
 
 void vpi_get_time(vpiHandle obj, s_vpi_time* time_p) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   delta::GetGlobalVpiContext().GetTime(obj, time_p);
 }
 
 vpiHandle VpiHandleC(int type, vpiHandle ref) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().Handle(type, ref);
 }
 
 vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().HandleByName(name, scope);
 }
 
 vpiHandle VpiHandleByIndexC(vpiHandle parent, int index) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().HandleByIndex(index, parent);
 }
 
 vpiHandle VpiHandleMultiC(int type, vpiHandle ref1, vpiHandle ref2) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().HandleMulti(type, ref1, ref2);
 }
 
 vpiHandle vpi_iterate(int type, vpiHandle ref) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().Iterate(type, ref);
 }
 
 vpiHandle vpi_scan(vpiHandle iterator) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().Scan(iterator);
 }
 
 void vpi_get_value(vpiHandle obj, s_vpi_value* value) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   delta::GetGlobalVpiContext().GetValue(obj, value);
 }
 
 vpiHandle vpi_put_value(vpiHandle obj, s_vpi_value* value, s_vpi_time* time,
                         int flags) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   delta::GetGlobalVpiContext().PutValue(obj, value, time, flags);
   return obj;
 }
 
 vpiHandle vpi_register_cb(s_cb_data* data) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().RegisterCb(data);
 }
 
 int VpiRemoveCbC(vpiHandle cb_handle) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().RemoveCb(cb_handle);
 }
 
 int vpi_get(int property, vpiHandle obj) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().Get(property, obj);
 }
 
 const char* vpi_get_str(int property, vpiHandle obj) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().GetStr(property, obj);
 }
 
 int vpi_free_object(vpiHandle obj) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().FreeObject(obj);
 }
 
@@ -1763,6 +1779,7 @@ int VpiControlC(int operation, ...) {
   // §38.4: vpi_control(operation, varargs) takes a variable number of
   // operation-specific arguments. Read exactly the arguments the operation
   // defines before forwarding the request to the simulator.
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   va_list args;
   va_start(args, operation);
   int result = 0;
@@ -1795,9 +1812,17 @@ int VpiControlC(int operation, ...) {
 }
 
 int VpiChkErrorC(SVpiErrorInfo* info) {
-  return delta::GetGlobalVpiContext().ChkError(info) ? 1 : 0;
+  // §38.2: vpi_chk_error() returns the severity level (a Table 38-1 constant) of
+  // the error left by the previous VPI routine call, or 0 (false) when that call
+  // did not result in an error. When info is non-null the error detail is copied
+  // out. Unlike every other VPI routine, vpi_chk_error() does not reset the error
+  // status, so the level it reports survives a repeated query.
+  auto& ctx = delta::GetGlobalVpiContext();
+  ctx.ChkError(info);
+  return ctx.LastError().level;
 }
 
 void vpi_get_vlog_info(SVpiVlogInfo* info) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   delta::GetGlobalVpiContext().GetVlogInfo(info);
 }
