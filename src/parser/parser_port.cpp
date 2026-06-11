@@ -294,6 +294,16 @@ ModuleItem* Parser::ParseDpiImport() {
                   std::format("type of formal argument '{}' is not permitted "
                               "for a DPI imported subroutine",
                               arg.name));
+    } else if (arg.data_type.kind == DataTypeKind::kUnion &&
+               !arg.data_type.is_packed) {
+      // §35.5.6: among the type-constructing forms in the permitted set, a
+      // union is allowed in its packed form only. An unpacked union is
+      // therefore not a permitted formal-argument type.
+      diag_.Error(item->loc,
+                  std::format("unpacked union formal argument '{}' is not "
+                              "permitted for a DPI imported subroutine; only "
+                              "the packed form of a union is allowed",
+                              arg.name));
     }
   }
   Expect(TokenKind::kSemicolon);

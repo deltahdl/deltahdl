@@ -120,4 +120,82 @@ TEST_F(DpiParseTest, DpiImportNonPermittedArgAmongPermittedRejected) {
   EXPECT_TRUE(diag_.HasErrors());
 }
 
+// §35.5.6: "Scalar values of type bit and logic" are listed among the permitted
+// formal-argument types in their own right -- not only in packed-vector form.
+// Single-bit bit and logic formals are therefore accepted.
+TEST_F(DpiParseTest, DpiImportScalarBitLogicArgsAccepted) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void f(input bit b, input logic l);\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  ASSERT_EQ(items[0]->func_args.size(), 2u);
+  EXPECT_EQ(items[0]->func_args[0].data_type.kind, DataTypeKind::kBit);
+  EXPECT_EQ(items[0]->func_args[0].data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(items[0]->func_args[1].data_type.kind, DataTypeKind::kLogic);
+  EXPECT_EQ(items[0]->func_args[1].data_type.packed_dim_left, nullptr);
+  EXPECT_FALSE(diag_.HasErrors());
+}
+
+// §35.5.6: packed structs composed of bit and logic members are a permitted
+// formal-argument type. An inline packed struct argument is accepted.
+TEST_F(DpiParseTest, DpiImportPackedStructArgAccepted) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void f(\n"
+      "    input struct packed { bit a; logic b; } s);\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  ASSERT_EQ(items[0]->func_args.size(), 1u);
+  EXPECT_EQ(items[0]->func_args[0].data_type.kind, DataTypeKind::kStruct);
+  EXPECT_FALSE(diag_.HasErrors());
+}
+
+// §35.5.6: packed unions composed of bit and logic members are likewise a
+// permitted formal-argument type. An inline packed union argument is accepted.
+TEST_F(DpiParseTest, DpiImportPackedUnionArgAccepted) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void f(\n"
+      "    input union packed { bit [7:0] a; logic [7:0] b; } u);\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  ASSERT_EQ(items[0]->func_args.size(), 1u);
+  EXPECT_EQ(items[0]->func_args[0].data_type.kind, DataTypeKind::kUnion);
+  EXPECT_FALSE(diag_.HasErrors());
+}
+
+// §35.5.6: a union is a permitted type-constructing form only in its packed
+// form. An unpacked union formal argument is therefore rejected, in contrast to
+// the accepted packed-union case above.
+TEST_F(DpiParseTest, DpiImportUnpackedUnionArgRejected) {
+  Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void f(\n"
+      "    input union { bit [7:0] a; logic [7:0] b; } u);\n"
+      "endmodule\n");
+  EXPECT_TRUE(diag_.HasErrors());
+}
+
+// §35.5.6: enumeration types are permitted as formal arguments (interpreted as
+// their associated base type). An inline enum argument is accepted.
+TEST_F(DpiParseTest, DpiImportEnumArgAccepted) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function void f(input enum { A, B } e);\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  ASSERT_EQ(items[0]->func_args.size(), 1u);
+  EXPECT_EQ(items[0]->func_args[0].data_type.kind, DataTypeKind::kEnum);
+  EXPECT_FALSE(diag_.HasErrors());
+}
+
 }

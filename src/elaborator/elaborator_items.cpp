@@ -303,6 +303,34 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
             }
           }
 
+          // §35.5.6: it is erroneous for an exported DPI subroutine to declare
+          // a formal argument of a dynamic array type. (Unsized "open" array
+          // formals are a relaxation reserved for imports under §35.5.6.1;
+          // exports get no such allowance.) A dynamic array shows up as an
+          // unpacked dimension with no bounds -- the empty-bracket "[]" form,
+          // recorded by the parser as a null dimension entry. Queues ("[$]"),
+          // associative arrays ("[*]" / "[type]") and fixed-size unpacked
+          // arrays all carry a non-null dimension marker, so they are not
+          // mistaken for dynamic arrays here.
+          for (const auto& arg : callable_it->second->func_args) {
+            bool has_dynamic_dim = false;
+            for (const Expr* dim : arg.unpacked_dims) {
+              if (dim == nullptr) {
+                has_dynamic_dim = true;
+                break;
+              }
+            }
+            if (has_dynamic_dim) {
+              diag_.Error(
+                  item->loc,
+                  std::format("SystemVerilog function '{}' has a dynamic array "
+                              "formal argument and therefore cannot be exported "
+                              "for DPI (§35.5.6)",
+                              item->name));
+              break;
+            }
+          }
+
           // §35.5.5: an exported function's result type is subject to the same
           // small-value restriction as an imported function's result. Tasks
           // carry no result, so the check applies only when the exported
