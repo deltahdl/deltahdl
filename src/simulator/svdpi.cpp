@@ -109,39 +109,54 @@ void svPutPartselLogic(svLogicVecVal* d, svLogicVecVal s, int i, int w) {
   d[word].bval |= (s.bval & wmask) << bit;
 }
 
+// The Annex H.12.2 array querying functions are modeled on the SystemVerilog
+// array querying functions (20.7) and share their semantics. Dimension 0 names
+// the packed part of the array (which is one-dimensional) and dimensions
+// greater than 0 name the unpacked part. Each function resolves the requested
+// dimension's declared bounds from the handle's descriptor and then derives the
+// queried quantity exactly as 20.7 prescribes.
+static const svOpenArrayDimRange* svResolveDim(svOpenArrayHandle h, int d) {
+  if (h == nullptr) return nullptr;
+  const svOpenArrayDesc* desc = static_cast<const svOpenArrayDesc*>(h);
+  if (desc->ranges == nullptr || d < 0 || d >= desc->n_dims) return nullptr;
+  return &desc->ranges[d];
+}
+
 int svLeft(svOpenArrayHandle h, int d) {
-  (void)h;
-  (void)d;
-  return 0;
+  const svOpenArrayDimRange* r = svResolveDim(h, d);
+  return r ? r->left : 0;
 }
 int svRight(svOpenArrayHandle h, int d) {
-  (void)h;
-  (void)d;
-  return 0;
+  const svOpenArrayDimRange* r = svResolveDim(h, d);
+  return r ? r->right : 0;
 }
 int svLow(svOpenArrayHandle h, int d) {
-  (void)h;
-  (void)d;
-  return 0;
+  const svOpenArrayDimRange* r = svResolveDim(h, d);
+  if (!r) return 0;
+  return r->left < r->right ? r->left : r->right;
 }
 int svHigh(svOpenArrayHandle h, int d) {
-  (void)h;
-  (void)d;
-  return 0;
+  const svOpenArrayDimRange* r = svResolveDim(h, d);
+  if (!r) return 0;
+  return r->left > r->right ? r->left : r->right;
 }
 int svIncrement(svOpenArrayHandle h, int d) {
-  (void)h;
-  (void)d;
-  return 1;
+  const svOpenArrayDimRange* r = svResolveDim(h, d);
+  if (!r) return 0;
+  // 20.7: $increment is 1 when the left bound is greater than or equal to the
+  // right bound, and -1 otherwise.
+  return r->left >= r->right ? 1 : -1;
 }
 int svSize(svOpenArrayHandle h, int d) {
-  (void)h;
-  (void)d;
-  return 0;
+  const svOpenArrayDimRange* r = svResolveDim(h, d);
+  if (!r) return 0;
+  int low = r->left < r->right ? r->left : r->right;
+  int high = r->left > r->right ? r->left : r->right;
+  return high - low + 1;
 }
 int svDimensions(svOpenArrayHandle h) {
-  (void)h;
-  return 0;
+  if (h == nullptr) return 0;
+  return static_cast<const svOpenArrayDesc*>(h)->n_dims;
 }
 void* svGetArrayPtr(svOpenArrayHandle h) {
   (void)h;

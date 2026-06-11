@@ -79,6 +79,24 @@ typedef s_vpi_time svTimeVal;
 typedef void* svScope;
 typedef void* svOpenArrayHandle;
 
+// Backing representation an svOpenArrayHandle points to. The array querying
+// functions of Annex H.12.2 are modeled on the SystemVerilog array querying
+// functions (20.7), so each dimension is described by its declared left and
+// right bounds; low/high/size/increment are then derived exactly as 20.7
+// defines them. The dimension at index 0 describes the single packed part of
+// the array and the dimensions at indices greater than 0 describe the unpacked
+// part, following H.12.2's dimension-numbering convention.
+typedef struct svOpenArrayDimRange {
+  int left;
+  int right;
+} svOpenArrayDimRange;
+
+typedef struct svOpenArrayDesc {
+  void* data;
+  int n_dims;
+  const svOpenArrayDimRange* ranges;
+} svOpenArrayDesc;
+
 XXTERN const char* svDpiVersion(void);
 
 XXTERN svBit svGetBitselBit(const svBitVecVal* s, int i);
