@@ -28,6 +28,44 @@ static std::string_view StripStringLiteralQuotes(std::string_view text) {
   return text.substr(1, text.size() - 2);
 }
 
+// §35.5.6: a rich but closed subset of SystemVerilog data types is permitted
+// for the formal arguments of DPI import/export subroutines. The clause states
+// these are the *only* permitted types: the C-compatible scalar types, the
+// scalar 2-/4-state bit types, packed arrays/structs/unions of bit and logic,
+// enumerations (interpreted as their base type), and user-defined types
+// (typedef/named) built from the above. Anything outside that set -- notably
+// event types, virtual interfaces, and net types -- is not a permitted formal
+// argument type. Named/typedef forms are accepted here because their underlying
+// type is only known after elaboration, and typedef is itself a permitted
+// construct per the clause.
+static bool IsPermittedDpiFormalType(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kImplicit:
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+    case DataTypeKind::kBit:
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kInteger:
+    case DataTypeKind::kReal:
+    case DataTypeKind::kShortreal:
+    case DataTypeKind::kRealtime:
+    case DataTypeKind::kTime:
+    case DataTypeKind::kString:
+    case DataTypeKind::kVoid:
+    case DataTypeKind::kChandle:
+    case DataTypeKind::kNamed:
+    case DataTypeKind::kEnum:
+    case DataTypeKind::kStruct:
+    case DataTypeKind::kUnion:
+      return true;
+    default:
+      return false;
+  }
+}
+
 static Direction TokenToDirection(TokenKind kind) {
   switch (kind) {
     case TokenKind::kKwInput:
@@ -197,6 +235,17 @@ ModuleItem* Parser::ParseDpiImport() {
       diag_.Error(item->loc,
                   "ref qualifier cannot be used in a DPI import declaration");
       break;
+    }
+  }
+  // §35.5.6: the listed types are the only permitted types for formal
+  // arguments of imported subroutines. Reject any formal argument whose type
+  // falls outside that closed set.
+  for (const auto& arg : item->func_args) {
+    if (!IsPermittedDpiFormalType(arg.data_type.kind)) {
+      diag_.Error(item->loc,
+                  std::format("type of formal argument '{}' is not permitted "
+                              "for a DPI imported subroutine",
+                              arg.name));
     }
   }
   Expect(TokenKind::kSemicolon);
