@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST_F(AnnexHParseTest, AnnexHDpiImportOutputArgs) {
+TEST_F(AnnexHParseTest, DpiImportRecordsInputOutputInoutDirections) {
   auto* unit = Parse(
       "module m;\n"
       "  import \"DPI-C\" function void get_data(\n"

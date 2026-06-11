@@ -71,12 +71,23 @@ struct DpiArgValue {
 using DpiRtCallback =
     std::function<DpiArgValue(const std::vector<DpiArgValue>&)>;
 
+// §35.5.1.2: an import implementation that participates in output and inout
+// argument passing. The argument vector is mutable so the foreign function can
+// deposit values into its output and inout formals; the return value is the
+// function result. Unlike DpiRtCallback (input-only), values written here to
+// output/inout positions become visible outside the call.
+using DpiRtArgCallback = std::function<DpiArgValue(std::vector<DpiArgValue>&)>;
+
 struct DpiRtFunction {
   std::string_view c_name;
   std::string_view sv_name;
   DataTypeKind return_type = DataTypeKind::kVoid;
   std::vector<DpiArg> args;
   DpiRtCallback impl;
+  // §35.5.1.2: optional direction-aware implementation. When set,
+  // CallImportWithArgs uses it so the foreign function can write its output
+  // and inout formals.
+  DpiRtArgCallback arg_impl;
   bool is_pure = false;
   bool is_context = false;
 };
@@ -122,6 +133,26 @@ class DpiRuntime {
 
   DpiArgValue CallImport(std::string_view sv_name,
                          const std::vector<DpiArgValue>& args) const;
+
+  // §35.5.1.2: the value a foreign function receives for an output formal.
+  // Because an imported function shall not assume anything about an output
+  // argument's initial value — it is undetermined and implementation
+  // dependent — the callee never sees the caller's actual on an output
+  // formal. This implementation deterministically chooses the formal type's
+  // zero as its undetermined seed.
+  static DpiArgValue UndeterminedOutputValue(DataTypeKind type);
+
+  // §35.5.1.2: call an import applying input/output/inout argument-passing
+  // semantics. `actuals` holds the caller's actual argument values and is
+  // updated in place. Input arguments are passed by value: the foreign
+  // function sees the actual but any modification it makes is discarded, so
+  // the actual is never changed and the change is not visible outside. Inout
+  // arguments are seeded with the actual's initial value (which the foreign
+  // function can read) and the value written back is visible outside. Output
+  // arguments are seeded with an undetermined value rather than the actual,
+  // and the value written back is visible outside. Returns the function result.
+  DpiArgValue CallImportWithArgs(std::string_view sv_name,
+                                 std::vector<DpiArgValue>& actuals) const;
 
   DpiArgValue CallExport(std::string_view sv_name,
                          const std::vector<DpiArgValue>& args) const;

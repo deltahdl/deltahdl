@@ -117,6 +117,69 @@ DpiArgValue DpiRuntime::CallImport(std::string_view sv_name,
   return func->impl(args);
 }
 
+DpiArgValue DpiRuntime::UndeterminedOutputValue(DataTypeKind type) {
+  // §35.5.1.2: the initial value of an output argument is undetermined and
+  // implementation dependent. We pick a deterministic per-type zero so the
+  // callee observes a value that is independent of the caller's actual.
+  switch (type) {
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kTime:
+      return DpiArgValue::FromLongint(0);
+    case DataTypeKind::kReal:
+    case DataTypeKind::kShortreal:
+    case DataTypeKind::kRealtime:
+      return DpiArgValue::FromReal(0.0);
+    case DataTypeKind::kString:
+      return DpiArgValue::FromString("");
+    case DataTypeKind::kChandle:
+      return DpiArgValue::FromChandle(nullptr);
+    case DataTypeKind::kBit:
+      return DpiArgValue::FromBit(0);
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+      return DpiArgValue::FromLogic(0);
+    default:
+      return DpiArgValue::FromInt(0);
+  }
+}
+
+DpiArgValue DpiRuntime::CallImportWithArgs(
+    std::string_view sv_name, std::vector<DpiArgValue>& actuals) const {
+  const auto* func = FindImport(sv_name);
+  if (!func) return DpiArgValue::FromInt(0);
+
+  // The vector the foreign function operates on. Input and inout arguments are
+  // seeded with the caller's actual value, so the foreign function can read an
+  // inout argument's initial value. An output argument is seeded with an
+  // undetermined value instead of the actual, because the foreign function
+  // shall not assume anything about an output argument's initial value.
+  std::vector<DpiArgValue> callee = actuals;
+  for (size_t i = 0; i < func->args.size() && i < callee.size(); ++i) {
+    if (func->args[i].direction == Direction::kOutput) {
+      callee[i] = UndeterminedOutputValue(func->args[i].type);
+    }
+  }
+
+  DpiArgValue result = DpiArgValue::FromInt(0);
+  if (func->arg_impl) {
+    result = func->arg_impl(callee);
+  } else if (func->impl) {
+    result = func->impl(callee);
+  }
+
+  // Copy back only output and inout arguments: the value the foreign function
+  // wrote to them is visible outside the call. Input arguments are passed by
+  // value, so any modification the foreign function made to its copy is
+  // discarded here and the caller's actual is left unchanged.
+  for (size_t i = 0; i < func->args.size() && i < actuals.size(); ++i) {
+    Direction dir = func->args[i].direction;
+    if (dir == Direction::kOutput || dir == Direction::kInout) {
+      actuals[i] = callee[i];
+    }
+  }
+  return result;
+}
+
 DpiArgValue DpiRuntime::CallExport(std::string_view sv_name,
                                    const std::vector<DpiArgValue>& args) const {
   const auto* exp = FindExport(sv_name);
