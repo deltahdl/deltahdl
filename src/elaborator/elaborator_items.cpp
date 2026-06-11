@@ -103,6 +103,38 @@ struct DpiExportSignature {
   bool operator==(const DpiExportSignature&) const = default;
 };
 
+// §35.5.5: "The same restrictions apply for the result types of exported
+// functions." An exported function's result is therefore limited to the same
+// small-value set imposed on imported function results: void, the C-compatible
+// scalar integer/real types, chandle, string, and scalar bit/logic. A native
+// function whose return type is omitted carries an implicit single-bit logic
+// result, which is itself a small value, so the implicit kind is permitted
+// here. Named/typedef results are deferred. Wide vector types (integer, time,
+// packed bit/logic) and aggregates are rejected.
+bool IsPermittedDpiResultType(const DataType& type) {
+  switch (type.kind) {
+    case DataTypeKind::kImplicit:
+    case DataTypeKind::kVoid:
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kReal:
+    case DataTypeKind::kShortreal:
+    case DataTypeKind::kRealtime:
+    case DataTypeKind::kChandle:
+    case DataTypeKind::kString:
+    case DataTypeKind::kNamed:
+      return true;
+    case DataTypeKind::kBit:
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+      return type.packed_dim_left == nullptr && type.extra_packed_dims.empty();
+    default:
+      return false;
+  }
+}
+
 DpiExportSignature BuildDpiExportSignature(const ModuleItem* callable) {
   DpiExportSignature key;
   key.return_type = callable->return_type.kind;
@@ -269,6 +301,20 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
                               item->name));
               break;
             }
+          }
+
+          // §35.5.5: an exported function's result type is subject to the same
+          // small-value restriction as an imported function's result. Tasks
+          // carry no result, so the check applies only when the exported
+          // routine is a function.
+          if (callable_it->second->kind == ModuleItemKind::kFunctionDecl &&
+              !IsPermittedDpiResultType(callable_it->second->return_type)) {
+            diag_.Error(
+                item->loc,
+                std::format("exported function '{}' has a result type that is "
+                            "not permitted for DPI; function results are "
+                            "restricted to small values (§35.5.5)",
+                            item->name));
           }
 
           auto sig = BuildDpiExportSignature(callable_it->second);
