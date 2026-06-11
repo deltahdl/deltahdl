@@ -16,6 +16,9 @@ struct DpiArg {
   std::string_view name;
   DataTypeKind type = DataTypeKind::kInt;
   Direction direction = Direction::kInput;
+  // Default value expression for the formal, if the import declared one. Used
+  // when the call site omits this argument (see §35.6).
+  const Expr* default_value = nullptr;
 };
 
 struct DpiFunction {

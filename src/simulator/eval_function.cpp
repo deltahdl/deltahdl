@@ -1966,10 +1966,42 @@ static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (!dpi || !dpi->HasImport(expr->callee)) {
     return MakeLogic4VecVal(arena, 1, 0);
   }
+  // §35.6: calling an imported function uses the same usage and syntax as a
+  // native function call. When the import's formals are known, resolve the
+  // call-site actuals against them so that named-argument binding and omitted
+  // arguments backed by defaults behave exactly as for native subroutine calls.
+  const DpiFunction* import = dpi->FindImport(expr->callee);
   std::vector<uint64_t> args;
-  args.reserve(expr->args.size());
-  for (auto* arg : expr->args) {
-    args.push_back(EvalExpr(arg, ctx, arena).ToUint64());
+  if (import && !import->args.empty()) {
+    size_t positional_count = expr->args.size() - expr->arg_names.size();
+    args.reserve(import->args.size());
+    for (size_t i = 0; i < import->args.size(); ++i) {
+      int ai = -1;
+      if (i < positional_count) {
+        ai = static_cast<int>(i);
+      } else {
+        for (size_t j = 0; j < expr->arg_names.size(); ++j) {
+          if (expr->arg_names[j] == import->args[i].name) {
+            ai = static_cast<int>(positional_count + j);
+            break;
+          }
+        }
+      }
+      if (ai >= 0 && expr->args[static_cast<size_t>(ai)] != nullptr) {
+        args.push_back(
+            EvalExpr(expr->args[static_cast<size_t>(ai)], ctx, arena).ToUint64());
+      } else if (import->args[i].default_value) {
+        args.push_back(
+            EvalExpr(import->args[i].default_value, ctx, arena).ToUint64());
+      } else {
+        args.push_back(0);
+      }
+    }
+  } else {
+    args.reserve(expr->args.size());
+    for (auto* arg : expr->args) {
+      args.push_back(EvalExpr(arg, ctx, arena).ToUint64());
+    }
   }
   uint64_t result = dpi->Call(expr->callee, args);
   return MakeLogic4VecVal(arena, 32, result);
