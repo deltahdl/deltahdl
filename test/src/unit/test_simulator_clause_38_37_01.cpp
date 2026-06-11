@@ -198,6 +198,17 @@ TEST(VpiSystfCallbacksSim, SizedFunctionWithoutSizetfDefaultsTo32) {
   EXPECT_EQ(VpiSystfResultSizeBits(sized), 32);
 }
 
+TEST(VpiSystfCallbacksSim, SignedSizedFunctionWithoutSizetfDefaultsTo32) {
+  // The default-width rule names both sized kinds, so a vpiSizedSignedFunc with
+  // no sizetf application reports 32 bits just as the unsigned sized kind does.
+  VpiSystfData sized_signed = {};
+  sized_signed.type = kVpiSysFunc;
+  sized_signed.sysfunctype = kVpiSizedSignedFunc;
+  sized_signed.sizetf = nullptr;
+
+  EXPECT_EQ(VpiSystfResultSizeBits(sized_signed), 32);
+}
+
 TEST(VpiSystfCallbacksSim, NonSizedFunctionDoesNotCallSizetf) {
   g_call_count = 0;
 
