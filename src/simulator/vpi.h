@@ -716,6 +716,45 @@ bool VpiSystfSizetfIsCalled(const VpiSystfData& data);
 // defaults to 32 bits.
 int VpiSystfResultSizeBits(const VpiSystfData& data);
 
+// §36.10.2: the tool-lifecycle phases that gate which VPI routines a PLI
+// application may call. kStartup is the window in which the
+// vlog_startup_routines[] array executes and very little functionality is
+// available; kSizetf is the phase immediately after, when the sizetf routines
+// run for user-defined system functions and no access beyond the startup phase
+// is permitted; kFull begins once the cbEndOfCompile callbacks are called, from
+// which point until the tool finishes all functionality is available.
+enum class VpiToolPhase { kStartup, kSizetf, kFull };
+
+// §36.10.2: whether a phase restricts VPI functionality. The startup phase and
+// the sizetf phase that follows it both restrict it (the sizetf phase permits no
+// access beyond the startup phase); only the full phase makes all functionality
+// available.
+bool VpiPhaseRestrictsFunctionality(VpiToolPhase phase);
+
+// §36.10.2: the VPI routines whose availability the startup-phase restriction
+// distinguishes. The two registration routines are the only ones callable while
+// the vlog_startup_routines[] array executes; the others stand in for the bulk
+// of the interface that is unavailable until the full phase.
+enum class VpiRoutine {
+  kRegisterSystf,
+  kRegisterCb,
+  kGetValue,
+  kPutValue,
+  kIterate,
+};
+
+// §36.10.2: whether a routine may be called during the startup phase. Only
+// vpi_register_systf() and vpi_register_cb() are available at that time; every
+// other VPI routine is not.
+bool VpiRoutineAvailableInStartup(VpiRoutine routine);
+
+// §36.10.2: whether vpi_register_cb() may be called for a given reason while
+// functionality is restricted. During the startup phase (and the sizetf phase,
+// which adds no access) the callback may be registered only for cbEndOfCompile,
+// cbStartOfSimulation, cbEndOfSimulation, cbUnresolvedSystf, cbError, or
+// cbPLIError.
+bool VpiStartupCallbackReasonAllowed(int reason);
+
 class VpiContext {
  public:
   VpiContext() = default;
@@ -837,6 +876,14 @@ class VpiContext {
   void MarkElaborationStarted() { elaboration_started_ = true; }
   bool ElaborationStarted() const { return elaboration_started_; }
 
+  // §36.10.2: the tool-lifecycle phase the VPI interface is currently in. It
+  // gates which routines and callback reasons a PLI application may use. The
+  // default is the full phase, so ordinary (post-compile) VPI use is
+  // unrestricted; InvokeVlogStartupRoutines narrows it to the startup phase
+  // while the vlog_startup_routines[] array executes.
+  void SetToolPhase(VpiToolPhase phase) { tool_phase_ = phase; }
+  VpiToolPhase ToolPhase() const { return tool_phase_; }
+
   bool StopRequested() const { return stop_requested_; }
   bool FinishRequested() const { return finish_requested_; }
 
@@ -873,6 +920,9 @@ class VpiContext {
   // a scaled-real result against.
   int sim_time_unit_ = 0;
   bool elaboration_started_ = false;
+  // §36.10.2: see SetToolPhase. Defaults to the full phase so VPI use outside
+  // the startup window is unrestricted.
+  VpiToolPhase tool_phase_ = VpiToolPhase::kFull;
   bool stop_requested_ = false;
   bool finish_requested_ = false;
   int stop_diag_level_ = 0;

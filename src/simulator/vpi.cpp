@@ -1207,6 +1207,21 @@ void VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* ,
 
 VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
   if (!data) return nullptr;
+
+  // §36.10.2: while VPI functionality is restricted - the startup phase, and
+  // the sizetf phase after it that permits no additional access - a callback
+  // may be registered only for the six early-phase reasons. Reject any other
+  // reason rather than register a callback the phase does not allow.
+  if (VpiPhaseRestrictsFunctionality(tool_phase_) &&
+      !VpiStartupCallbackReasonAllowed(data->reason)) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_register_cb() may register only an early-phase callback reason "
+        "while VPI functionality is restricted";
+    return nullptr;
+  }
+
   callbacks_.push_back(*data);
 
   auto* cb_obj = AllocObject();
@@ -1573,8 +1588,50 @@ void SetGlobalVpiContext(VpiContext* ctx) { g_vpi_context = ctx; }
 
 void InvokeVlogStartupRoutines(VlogStartupRoutine* routines) {
   if (!routines) return;
+  // §36.10.2: the routines in the vlog_startup_routines[] array execute in the
+  // startup phase, when very little VPI functionality is available. Establish
+  // that phase for the duration of the walk so the function-availability
+  // restriction is in force while the routines register their system
+  // tasks/functions and callbacks, then restore the prior phase afterwards. The
+  // array-walking itself is unchanged (that is §36.9.1's mechanism); this only
+  // narrows the available functionality for its duration.
+  VpiContext& ctx = GetGlobalVpiContext();
+  VpiToolPhase prior = ctx.ToolPhase();
+  ctx.SetToolPhase(VpiToolPhase::kStartup);
   for (size_t i = 0; routines[i] != nullptr; ++i) {
     routines[i]();
+  }
+  ctx.SetToolPhase(prior);
+}
+
+bool VpiPhaseRestrictsFunctionality(VpiToolPhase phase) {
+  // §36.10.2: only the full phase (cbEndOfCompile onward) makes all
+  // functionality available; the startup phase and the sizetf phase that
+  // follows it - which permits no access beyond the startup phase - both
+  // restrict it.
+  return phase != VpiToolPhase::kFull;
+}
+
+bool VpiRoutineAvailableInStartup(VpiRoutine routine) {
+  // §36.10.2: only the two registration routines may be called while the
+  // vlog_startup_routines[] array executes.
+  return routine == VpiRoutine::kRegisterSystf ||
+         routine == VpiRoutine::kRegisterCb;
+}
+
+bool VpiStartupCallbackReasonAllowed(int reason) {
+  // §36.10.2: the only reasons vpi_register_cb() may be registered for while
+  // VPI functionality is restricted.
+  switch (reason) {
+    case kCbEndOfCompile:
+    case kCbStartOfSimulation:
+    case kCbEndOfSimulation:
+    case kCbUnresolvedSystf:
+    case kCbError:
+    case kCbPLIError:
+      return true;
+    default:
+      return false;
   }
 }
 
