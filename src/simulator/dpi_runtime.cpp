@@ -213,15 +213,16 @@ uint32_t DpiRuntime::SvHigh(const SvOpenArrayHandle& h) {
 uint32_t DpiRuntime::SvSize(const SvOpenArrayHandle& h) { return h.size; }
 
 void DpiRuntime::EnterContextImportCall(std::string_view sv_name,
-                                        DpiScope decl_scope) {
+                                        DpiScope decl_scope, bool is_task) {
   // §35.5.3: the chain's context is the import declaration's instantiated
   // scope when SystemVerilog calls a context import.
   PushScope(std::move(decl_scope));
-  call_chain_.push_back({sv_name, true});
+  call_chain_.push_back({sv_name, true, is_task});
 }
 
-void DpiRuntime::EnterNoncontextImportCall(std::string_view sv_name) {
-  call_chain_.push_back({sv_name, false});
+void DpiRuntime::EnterNoncontextImportCall(std::string_view sv_name,
+                                           bool is_task) {
+  call_chain_.push_back({sv_name, false, is_task});
 }
 
 void DpiRuntime::LeaveImportCall() {
@@ -245,6 +246,16 @@ bool DpiRuntime::ChainRootIsContext() const {
 DpiExportCallStatus DpiRuntime::CallExportFromImport(
     std::string_view sv_name, const std::vector<DpiArgValue>& args,
     DpiArgValue* out_result) {
+  const auto* exp = FindExport(sv_name);
+  // §35.8: it is never legal to call an exported task from within an imported
+  // function — the DPI counterpart of the native rule that a function cannot
+  // perform a task enable. When the innermost import in the chain is a function
+  // and the export it is invoking names a task, reject the call outright,
+  // independent of the chain's context property.
+  if (!call_chain_.empty() && !call_chain_.back().is_task && exp != nullptr &&
+      exp->is_task) {
+    return DpiExportCallStatus::kFunctionCallsTask;
+  }
   // §35.5.3: a noncontext DPI subroutine cannot call a SystemVerilog export.
   // The check looks at the *current* (innermost) import call's context
   // property, not the chain root, because context is not transitively
@@ -257,7 +268,6 @@ DpiExportCallStatus DpiRuntime::CallExportFromImport(
   // requires the import to first set the chain scope via svSetScope.
   // When the export's scope_name is empty we treat the export as
   // scope-agnostic to keep callers that don't record scopes working.
-  const auto* exp = FindExport(sv_name);
   if (exp != nullptr && !exp->scope_name.empty() && current_scope_ != nullptr &&
       exp->scope_name != current_scope_->name) {
     return DpiExportCallStatus::kScopeMismatch;

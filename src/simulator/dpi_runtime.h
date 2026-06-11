@@ -105,6 +105,10 @@ struct DpiRtExport {
   // DpiRuntime::RegisterExport so callers that leave it unset still get the
   // spec-mandated behavior.
   bool is_context = true;
+  // §35.8: true when this export names a SystemVerilog task rather than a
+  // function. The runtime uses it to enforce that an imported function may
+  // never invoke an exported task; see CallExportFromImport.
+  bool is_task = false;
 };
 
 // §35.5.3: outcome of attempting to call a SystemVerilog export from inside
@@ -112,11 +116,14 @@ struct DpiRtExport {
 // reports the §35.5.3 error of a noncontext import trying to invoke an
 // export. kScopeMismatch reports the §35.5.3 error of a context import call
 // trying to invoke an export whose scope differs from the chain's current
-// scope without first calling svSetScope.
+// scope without first calling svSetScope. kFunctionCallsTask reports the
+// §35.8 error of an imported function trying to invoke an exported task,
+// which is never legal regardless of the chain's context property.
 enum class DpiExportCallStatus : uint8_t {
   kOk,
   kNoncontextChain,
   kScopeMismatch,
+  kFunctionCallsTask,
 };
 
 class DpiRuntime {
@@ -168,9 +175,12 @@ class DpiRuntime {
   // the import's declaration. EnterContextImportCall/EnterNoncontextImportCall
   // push one frame each; the chain's "is_context" is the property of the
   // root (the bottom-most frame), and per the LRM context is not transitively
-  // promoted to subsequent inner import calls.
-  void EnterContextImportCall(std::string_view sv_name, DpiScope decl_scope);
-  void EnterNoncontextImportCall(std::string_view sv_name);
+  // promoted to subsequent inner import calls. §35.8: is_task records whether
+  // the import opening the frame is itself a task (true) or a function (false);
+  // a function frame may never call an exported task.
+  void EnterContextImportCall(std::string_view sv_name, DpiScope decl_scope,
+                              bool is_task = false);
+  void EnterNoncontextImportCall(std::string_view sv_name, bool is_task = false);
   void LeaveImportCall();
   uint32_t ImportCallDepth() const;
   bool ChainRootIsContext() const;
@@ -196,6 +206,9 @@ class DpiRuntime {
   struct ImportFrame {
     std::string_view sv_name;
     bool is_context = false;
+    // §35.8: whether the import that opened this frame is a task. A function
+    // frame may not call an exported task.
+    bool is_task = false;
   };
 
   std::vector<DpiRtFunction> imports_;

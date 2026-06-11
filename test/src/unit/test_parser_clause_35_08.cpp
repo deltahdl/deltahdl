@@ -22,45 +22,23 @@ TEST(FunctionDeclParsing, DpiExportTask) {
   EXPECT_EQ(item->name, "sv_task");
 }
 
-TEST_F(DpiParseTest, ExportTask) {
-  auto* unit = Parse(R"(
-    module m;
-      export "DPI-C" task my_task;
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
-  EXPECT_EQ(items[0]->name, "my_task");
-  EXPECT_TRUE(items[0]->dpi_is_task);
-}
-
-TEST_F(AnnexHParseTest, AnnexHDpiExportTask) {
-  auto* unit = Parse(
+// §35.8: the optional c_identifier of an exported function (§35.7) applies to
+// exported tasks as well. A task export written with an explicit C linkage name
+// parses to a DPI export carrying both the task flag and the recorded
+// c_identifier, exactly as a function export would.
+TEST(FunctionDeclParsing, DpiExportTaskWithCIdentifier) {
+  auto r = Parse(
       "module m;\n"
-      "  export \"DPI-C\" task sv_task;\n"
+      "  task sv_task(); endtask\n"
+      "  export \"DPI-C\" c_task = task sv_task;\n"
       "endmodule\n");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
-  EXPECT_EQ(items[0]->name, "sv_task");
-  EXPECT_TRUE(items[0]->dpi_is_task);
-}
-
-TEST(DpiParsing, DpiExportTaskForSystf) {
-  auto r = Parse(R"(
-    module m;
-      export "DPI-C" task systf_handler;
-    endmodule
-  )");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
-  EXPECT_TRUE(items[0]->dpi_is_task);
+  auto* item = r.cu->modules[0]->items[1];
+  EXPECT_EQ(item->kind, ModuleItemKind::kDpiExport);
+  EXPECT_TRUE(item->dpi_is_task);
+  EXPECT_EQ(item->name, "sv_task");
+  EXPECT_EQ(item->dpi_c_name, "c_task");
 }
 
 }
