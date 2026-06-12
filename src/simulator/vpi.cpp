@@ -1222,6 +1222,21 @@ VpiHandle VpiDoWhileConditionExpr(VpiHandle do_while) {
   return nullptr;
 }
 
+VpiHandle VpiReturnConditionExpr(VpiHandle return_stmt) {
+  // §37.78: a return statement reaches the value it returns through the single
+  // edge the diagram draws, labeled vpiCondition. As with the looping and
+  // conditional statements (§37.66/§37.71/§37.74/§37.75), that value's own type
+  // is an expression kind (an operation, a reference, a constant, ...) rather
+  // than the vpiCondition relation tag, so it is found by scanning for the first
+  // expression child. A return from a void function or a task carries no value
+  // and so has no expression child; the scan then finds nothing and returns null.
+  if (!return_stmt) return nullptr;
+  for (auto* child : return_stmt->children) {
+    if (VpiIsExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
 VpiHandle VpiDelayControlStmt(VpiHandle delay_control) {
   // §37.68 detail 1: a delay control reaches the statement it guards through
   // vpiStmt. When the delay control is associated with an assignment - i.e. it
@@ -4001,6 +4016,18 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // special case here.
   if (type == vpiCondition && ref->type == vpiDoWhile) {
     return VpiDoWhileConditionExpr(ref);
+  }
+
+  // §37.78: vpiCondition of a return statement reaches the value it returns - the
+  // single edge the return statement diagram draws. As with the loop and
+  // conditional statements above, the value's own type is an expression kind
+  // rather than the vpiCondition relation tag, so the generic traversal below
+  // cannot find it. The relation is gated on the return statement kind so it does
+  // not also serve the vpiCondition edge other diagrams draw. A return that yields
+  // no value (a void function or task return) has no expression child and falls
+  // through to report null.
+  if (type == vpiCondition && ref->type == vpiReturnStmt) {
+    return VpiReturnConditionExpr(ref);
   }
 
   // §37.71: vpiElseStmt of an if-else statement reaches its else-branch body.
