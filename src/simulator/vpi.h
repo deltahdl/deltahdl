@@ -1353,6 +1353,26 @@ std::string VpiVariableDecompile(const VpiVariableNameParts& parts);
 std::string VpiVariableFullName(const VpiVariableNameParts& parts);
 
 // ===========================================================================
+// §37.18 Packed array variables. A vpiPackedArrayVar models a packed array of
+// packed struct var, union var, or enum var objects. The size/vector/struct-
+// union-member rules it cites are carried by the §37.17 variable helpers above;
+// the relations and property below are §37.18's own normative details. The
+// vpiElement and vpiIndex relations are recognized in VpiContext::Iterate
+// rather than through a standalone iterator helper.
+// ===========================================================================
+
+// §37.18 detail 3: the member kinds a packed array variable's vpiElement
+// transition reaches - a struct var, union var, enum var, or (for a
+// multidimensioned packed array) another packed array var. Used to collect a
+// packed array var's subelements one dimension level at a time.
+bool VpiIsPackedArrayVarElementType(int type);
+
+// §37.18 detail 4: vpiPackedArrayMember is TRUE for a struct var, union var,
+// enum var, or packed array var whose vpiParent prefix is a packed array var,
+// and FALSE for every other variable.
+bool VpiVariableIsPackedArrayMember(VpiHandle var);
+
+// ===========================================================================
 // §37.25 Typespec. The VPI object model for a type specification. Each helper
 // applies one of the clause's numbered "Details"; the figure's range relations
 // route through §37.22 and a member's expr role reuses §37.59's expr class. The

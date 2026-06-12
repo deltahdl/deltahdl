@@ -1274,6 +1274,34 @@ bool VpiVariableIsStructUnionMember(VpiHandle var) {
   return var->parent->type == vpiStructVar || var->parent->type == vpiUnionVar;
 }
 
+bool VpiIsPackedArrayVarElementType(int type) {
+  // §37.18 detail 3: a packed array variable's subelements are packed struct
+  // var, union var, or enum var objects; for a multidimensioned packed array a
+  // subelement is itself another packed array var (the leftmost packed range
+  // removed). vpiElement walks exactly these kinds.
+  switch (type) {
+    case vpiStructVar:
+    case vpiUnionVar:
+    case vpiEnumVar:
+    case vpiPackedArrayVar:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiVariableIsPackedArrayMember(VpiHandle var) {
+  // §37.18 detail 4: vpiPackedArrayMember is TRUE for a struct var, union var,
+  // enum var, or packed array var whose vpiParent prefix is a packed array var.
+  // The vpiParent prefix is resolved by §37.17 detail 26; here the property is
+  // simply that prefix being a packed array var with the element being one of
+  // those four kinds.
+  if (!var || !var->parent || var->parent->type != vpiPackedArrayVar) {
+    return false;
+  }
+  return VpiIsPackedArrayVarElementType(var->type);
+}
+
 VpiHandle VpiVariableInitExpr(VpiHandle var) {
   // §37.17 detail 8: when a variable has an initialization expression, it is
   // reached through vpiExpr - modeled as the variable's first child. A variable
@@ -3352,6 +3380,22 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   bool named_event_index_iteration =
       ref && ref->type == vpiNamedEvent && type == vpiIndex;
 
+  // §37.18 detail 3: vpiElement on a packed array variable reaches its
+  // subelements - struct var, union var, enum var, or (for a multidimensioned
+  // packed array) another packed array var - one dimension level at a time. The
+  // relation reaches those variable kinds, not children whose own type is
+  // literally vpiElement, so it is recognized specially below.
+  bool packed_array_var_element_iteration =
+      ref && ref->type == vpiPackedArrayVar && type == vpiElement;
+
+  // §37.18 detail 6: vpiIndex on a packed array variable reaches the index
+  // expressions that locate a subelement within its vpiParent, beginning with
+  // the subelement's own index and working outward (the right-to-left textual
+  // order). Like the named-event case it reaches exprs, not children whose own
+  // type is vpiIndex.
+  bool packed_array_var_index_iteration =
+      ref && ref->type == vpiPackedArrayVar && type == vpiIndex;
+
   // §38.23: unless otherwise specified, iterating the relationships of a
   // protected object is an error, so no iterator is produced. §37.42 detail 10
   // carves out one exception: a protected system task or function call shall
@@ -3380,8 +3424,9 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   // kind, so iterating it collects every object the class groups (the circle
   // relation, when ref is null) instead of matching one exact type.
   auto matches = [type, ref, tf_argument_iteration,
-                  named_event_waiting_iteration,
-                  named_event_index_iteration](int obj_type) {
+                  named_event_waiting_iteration, named_event_index_iteration,
+                  packed_array_var_element_iteration,
+                  packed_array_var_index_iteration](int obj_type) {
     if (type == vpiAssertion) return VpiIsAssertionType(obj_type);
     // §37.27 detail 1: a named event's vpiWaitingProcesses iteration collects the
     // thread objects of the waiting processes, not children typed
@@ -3390,6 +3435,15 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
     // §37.27 detail 2: a named event's vpiIndex iteration collects the index
     // expressions locating it within its array.
     if (named_event_index_iteration) return VpiIsExprType(obj_type);
+    // §37.18 detail 3: a packed array variable's vpiElement iteration collects
+    // its subelement variables (struct/union/enum/packed-array vars), not
+    // children whose own type is vpiElement.
+    if (packed_array_var_element_iteration) {
+      return VpiIsPackedArrayVarElementType(obj_type);
+    }
+    // §37.18 detail 6: a packed array variable's vpiIndex iteration collects the
+    // index expressions locating a subelement within its parent.
+    if (packed_array_var_index_iteration) return VpiIsExprType(obj_type);
     // §37.72 detail 1: a case item's match expressions are reached through the
     // vpiExpr edge, which spans both patterns and plain expressions, so the
     // iteration collects every condition the item groups - not only children
