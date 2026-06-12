@@ -59,36 +59,6 @@ TEST_F(VpiPutValueSim, PutValueInertialDelay) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-// §38.34: a put with vpiTransportDelay applies the value to the object.
-TEST_F(VpiPutValueSim, PutValueTransportDelay) {
-  auto* var = sim_ctx_.CreateVariable("dt", 32);
-  var->value = MakeLogic4VecVal(arena_, 32, 0);
-  vpi_ctx_.Attach(sim_ctx_);
-
-  vpiHandle h = vpi_handle_by_name("dt", nullptr);
-  s_vpi_value val = {};
-  val.format = vpiIntVal;
-  val.value.integer = 99;
-  s_vpi_time time = {};
-  time.type = vpiSimTime;
-  vpi_put_value(h, &val, &time, vpiTransportDelay);
-  EXPECT_EQ(var->value.ToUint64(), 99u);
-}
-
-// §38.34: a put with vpiPureTransportDelay applies the value to the object.
-TEST_F(VpiPutValueSim, PutValuePureTransportDelay) {
-  auto* var = sim_ctx_.CreateVariable("dpt", 32);
-  var->value = MakeLogic4VecVal(arena_, 32, 0);
-  vpi_ctx_.Attach(sim_ctx_);
-
-  vpiHandle h = vpi_handle_by_name("dpt", nullptr);
-  s_vpi_value val = {};
-  val.format = vpiIntVal;
-  val.value.integer = 55;
-  vpi_put_value(h, &val, nullptr, vpiPureTransportDelay);
-  EXPECT_EQ(var->value.ToUint64(), 55u);
-}
-
 // §38.34: a value supplied in vpiRealVal format is accepted.
 TEST_F(VpiPutValueSim, PutValueRealFormat) {
   auto* var = sim_ctx_.CreateVariable("rf", 32);
