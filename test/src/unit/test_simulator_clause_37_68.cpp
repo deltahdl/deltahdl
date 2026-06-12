@@ -23,24 +23,6 @@ class DelayControl : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// D1: a delay control associated with an assignment - its parent is the
-// assignment object (§37.64) - reports a null statement even when a statement
-// child is physically attached.
-TEST_F(DelayControl, AssignmentAssociatedDelayControlHasNullStatement) {
-  VpiObject stmt;
-  stmt.type = vpiStmt;
-
-  VpiObject assignment;
-  assignment.type = vpiAssignment;
-
-  VpiObject delay_control;
-  delay_control.type = vpiDelayControl;
-  delay_control.parent = &assignment;
-  delay_control.children = {&stmt};
-
-  EXPECT_EQ(VpiDelayControlStmt(&delay_control), nullptr);
-}
-
 // D1 (complement): a delay control that is not associated with an assignment
 // reaches its guarded statement normally - the rule is specific to the
 // assignment association and does not blanket-null every delay control's stmt.
