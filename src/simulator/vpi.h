@@ -529,6 +529,21 @@ struct VpiObject {
   // constraints, so an inline constraint is skipped; false by default.
   bool inline_constraint = false;
 
+  // §37.33 detail 1: a class object's identifier, reported through
+  // vpi_get(vpiObjId). It is a 64-bit value guaranteed unique among all live
+  // dynamic objects that carry this property for as long as the object lives;
+  // once the object is reclaimed its value may be reused. §37.33 detail 2: a
+  // class variable does not store its own identifier - it reports the identifier
+  // of the object it currently references (see referenced_object), or 0 when it
+  // references none. Zero by default.
+  int64_t obj_id = 0;
+
+  // §37.33 detail 2/5: the class object a class variable currently references.
+  // A class variable holding the value null references no object, in which case
+  // this is null: its vpiObjId is then 0 (detail 2) and the vpiClassObj relation
+  // applied to it reaches a null handle (detail 5). Null by default.
+  VpiObject* referenced_object = nullptr;
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 

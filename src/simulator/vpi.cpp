@@ -3307,7 +3307,16 @@ VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
       // the previously resolved scope for a deeper one - the search is confined
       // to that scope's immediate contents and nothing outside it.
       VpiHandle within = (current == nullptr) ? scope : current;
-      for (auto* child : within->children) {
+      // §37.33 detail 9: vpi_handle_by_name() accepts a full name down to a
+      // non-static data member even though such a member has no vpiFullName
+      // property. The member lives on the class object the class variable
+      // references, not on the variable itself, so descend into the referenced
+      // object's members when stepping through a class variable.
+      VpiHandle search = within;
+      if (within->type == vpiClassVar && within->referenced_object) {
+        search = within->referenced_object;
+      }
+      for (auto* child : search->children) {
         if (child->name == parts[i]) {
           next = child;
           break;
@@ -3492,6 +3501,15 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // null-port / no-connection rules.
   if (type == vpiHighConn) return VpiHighConn(ref);
   if (type == vpiLowConn) return VpiLowConn(ref);
+
+  // §37.33 detail 5: vpiClassObj of a class variable reaches the class object it
+  // currently references. The object is shared - several variables may reference
+  // it and one variable may reference different objects over its lifetime - so
+  // it is reached through a designated reference, not a child found by type. A
+  // class variable holding null references nothing, so the relation is NULL.
+  if (type == vpiClassObj && ref->type == vpiClassVar) {
+    return ref->referenced_object;
+  }
 
   // §37.15 detail 3: vpiActual reaches the actual instantiated object a ref obj
   // is bound to (NULL when unbound).
@@ -3874,12 +3892,27 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   // reached through its parent's internal scope, so it is excluded here.
   bool top_module_iteration = !ref && type == kVpiModule;
 
-  // §37.31 detail 1: vpiMethods on a class defn reaches the class's methods, which
-  // are task and function objects (the "task func" node) rather than children
-  // whose own type is literally vpiMethods, so this iteration is matched specially
-  // and filtered to drop implicit built-in methods below.
+  // §37.31 detail 1 and §37.33 detail 6: vpiMethods on a class defn or a class
+  // object reaches its methods, which are task and function objects (the "task
+  // func" node) rather than children whose own type is literally vpiMethods, so
+  // this iteration is matched specially and filtered to drop implicit built-in
+  // methods (those carrying no explicit declaration) below.
   bool class_methods_iteration =
-      ref && ref->type == vpiClassDefn && type == vpiMethods;
+      ref && (ref->type == vpiClassDefn || ref->type == vpiClassObj) &&
+      type == vpiMethods;
+
+  // §37.33 detail 3: vpiWaitingProcesses on a class object - a mailbox or a
+  // semaphore - reaches the threads of the processes waiting on it, like the
+  // named-event case (§37.27). The relation reaches thread objects, not children
+  // whose own type is literally vpiWaitingProcesses, so it is matched specially.
+  bool class_obj_waiting_iteration =
+      ref && ref->type == vpiClassObj && type == vpiWaitingProcesses;
+
+  // §37.33 detail 4: vpiMessages on a class object - a mailbox - reaches the
+  // messages it holds, which are expression objects rather than children whose
+  // own type is literally vpiMessages, so it too is matched specially.
+  bool class_obj_messages_iteration =
+      ref && ref->type == vpiClassObj && type == vpiMessages;
 
   // §37.31 detail 3: vpiConstraint on a class defn reaches the class's constraint
   // children directly (a generic type match), but the iteration must return only
@@ -3948,6 +3981,7 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
                   named_event_waiting_iteration, named_event_index_iteration,
                   packed_array_var_element_iteration,
                   packed_array_var_index_iteration, class_methods_iteration,
+                  class_obj_waiting_iteration, class_obj_messages_iteration,
                   class_derived_iteration, memory_word_iteration,
                   extends_argument_iteration, interconnect_array_element_iteration,
                   interconnect_net_element_iteration,
@@ -3957,9 +3991,10 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
     // words, rather than children whose own type is literally vpiMemoryWord.
     if (memory_word_iteration) return obj_type == kVpiReg;
     if (type == vpiAssertion) return VpiIsAssertionType(obj_type);
-    // §37.31 detail 1: a class defn's vpiMethods iteration collects its method
-    // objects - the tasks and functions declared as class items - rather than
-    // children whose own type is literally vpiMethods.
+    // §37.31 detail 1 / §37.33 detail 6: a class defn's or class object's
+    // vpiMethods iteration collects its method objects - the tasks and functions
+    // declared as class items - rather than children whose own type is literally
+    // vpiMethods.
     if (class_methods_iteration) return VpiIsClassMethodType(obj_type);
     // §37.31 detail 5: a class defn's vpiDerivedClasses iteration collects the
     // class defns derived from it.
@@ -3971,6 +4006,12 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
     // thread objects of the waiting processes, not children typed
     // vpiWaitingProcesses.
     if (named_event_waiting_iteration) return obj_type == vpiThread;
+    // §37.33 detail 3: a class object's vpiWaitingProcesses iteration likewise
+    // collects the thread objects of the processes waiting on it.
+    if (class_obj_waiting_iteration) return obj_type == vpiThread;
+    // §37.33 detail 4: a class object's vpiMessages iteration collects the
+    // message objects it holds - expressions - not children typed vpiMessages.
+    if (class_obj_messages_iteration) return VpiIsExprType(obj_type);
     // §37.27 detail 2: a named event's vpiIndex iteration collects the index
     // expressions locating it within its array.
     if (named_event_index_iteration) return VpiIsExprType(obj_type);
@@ -4967,6 +5008,17 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // code; TRUE when protected, FALSE otherwise.
     case vpiIsProtected:
       return obj->is_protected ? 1 : 0;
+    // §37.33 detail 1: a class object reports its own unique identifier. §37.33
+    // detail 2: a class variable reports the identifier of the object it
+    // currently references, or 0 when it references no object (it holds null).
+    // The identifier is a 64-bit value; tiny identifiers are returned as-is.
+    case vpiObjId:
+      if (obj->type == vpiClassVar) {
+        return obj->referenced_object
+                   ? static_cast<int>(obj->referenced_object->obj_id)
+                   : 0;
+      }
+      return static_cast<int>(obj->obj_id);
     case kVpiSize:
       // §37.47 detail 1: a cont assign bit models a single bit of a continuous
       // assignment, so its size is always scalar (one) regardless of any stored
