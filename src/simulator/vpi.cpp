@@ -1482,6 +1482,57 @@ VpiHandle VpiTypespecForTypeParameter(VpiHandle type_parameter,
 }
 
 // ===========================================================================
+// §37.29 Virtual interface.
+// ===========================================================================
+
+bool VpiIsInterfaceExprType(int type) {
+  // §37.29 (figure, "interface expr" group): the object kinds that may sit at
+  // the far end of a virtual interface var's vpiExpr - an interface, a modport,
+  // another virtual interface var, a ref obj, or a constant.
+  return type == vpiInterface || type == vpiModport ||
+         type == vpiVirtualInterfaceVar || type == vpiRefObj ||
+         type == vpiConstant;
+}
+
+bool VpiInterfaceExprIsValid(VpiHandle expr) {
+  // §37.29 detail 2: not every object of an interface-expr kind is a legal
+  // interface expr. A ref obj qualifies only when it is a local declaration of
+  // an interface or modport passed through a port - observable as its vpiActual
+  // being an interface or a modport. A constant qualifies only when its
+  // vpiConstType is vpiNullConst. An interface, a modport, or a virtual
+  // interface var always qualifies.
+  if (!expr) return false;
+  switch (expr->type) {
+    case vpiRefObj:
+      return expr->actual && (expr->actual->type == vpiInterface ||
+                              expr->actual->type == vpiModport);
+    case vpiConstant:
+      return expr->const_type == vpiNullConst;
+    case vpiInterface:
+    case vpiModport:
+    case vpiVirtualInterfaceVar:
+      return true;
+    default:
+      return false;
+  }
+}
+
+VpiHandle VpiVirtualInterfaceExpr(VpiHandle var) {
+  // §37.29 detail 1: vpiExpr of a virtual interface var reaches the interface
+  // instance assigned to it in its declaration, if any; otherwise NULL. The
+  // assignment is modeled as the first child that is a legal interface expr,
+  // so a child of an interface-expr kind that fails the detail-2 constraint is
+  // not an interface expr and is not handed back.
+  if (!var || var->type != vpiVirtualInterfaceVar) return nullptr;
+  for (auto* child : var->children) {
+    if (VpiIsInterfaceExprType(child->type) && VpiInterfaceExprIsValid(child)) {
+      return child;
+    }
+  }
+  return nullptr;
+}
+
+// ===========================================================================
 // §37.30 Interface typespec.
 // ===========================================================================
 
@@ -2590,6 +2641,14 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return VpiIoDeclExpr(ref);
   }
 
+  // §37.29 detail 1: vpiExpr of a virtual interface var reaches the interface
+  // instance assigned in its declaration (NULL when none was assigned). The
+  // target's own type is an interface-expr kind, not vpiExpr, so the shared
+  // traversal below cannot find it.
+  if (type == vpiExpr && ref->type == vpiVirtualInterfaceVar) {
+    return VpiVirtualInterfaceExpr(ref);
+  }
+
   // §37.14 details 3, 4, and 10 (shared with §37.15): the higher and lower port
   // connections - also a ref obj's highConn/lowConn. These reach a designated
   // connection pointer, not a child found by type, and the helpers apply the
@@ -2600,6 +2659,13 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // §37.15 detail 3: vpiActual reaches the actual instantiated object a ref obj
   // is bound to (NULL when unbound).
   if (type == vpiActual && ref->type == vpiRefObj) return ref->actual;
+
+  // §37.29 (Example 2): vpiActual of a virtual interface var reaches the
+  // interface instance it currently holds - the actual passed to the new call
+  // that bound it. It is NULL while the virtual interface is uninitialized.
+  if (type == vpiActual && ref->type == vpiVirtualInterfaceVar) {
+    return ref->actual;
+  }
 
   // §37.15 detail 7: a ref obj's vpiTypespec is gated on the kind of its actual.
   if (type == vpiTypespec && ref->type == vpiRefObj) {

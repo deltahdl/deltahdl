@@ -1196,6 +1196,36 @@ VpiHandle VpiTypespecForTypeParameter(VpiHandle type_parameter,
                                       VpiHandle resolved_typespec);
 
 // ===========================================================================
+// §37.29 Virtual interface. The VPI object model for a virtual interface var
+// (vpiVirtualInterfaceVar): a class/scope variable that holds an interface
+// instance. The figure's properties (vpiName/vpiFullName/vpiIsModPort) and its
+// vpiTypespec reach to an interface typespec (§37.30) are served by the generic
+// Get/GetStr/Handle machinery once the var's fields and children are populated.
+// The two relations the clause refines - vpiExpr (the declaration-time
+// assignment, detail 1) and vpiActual (the currently held instance, Example 2)
+// - are carried by the helpers below, which also drive the public vpi_handle
+// dispatch. Detail 2 constrains which objects may serve as a virtual interface
+// var's interface expr.
+// ===========================================================================
+
+// §37.29 (figure, "interface expr" group): the object kinds that may sit at the
+// far end of a virtual interface var's vpiExpr - an interface, a modport,
+// another virtual interface var, a ref obj, or a constant.
+bool VpiIsInterfaceExprType(int type);
+
+// §37.29 detail 2: whether an object of an interface-expr kind is a legal
+// interface expr. A ref obj qualifies only when its vpiActual is an interface or
+// a modport (a local declaration passed through a port); a constant only when
+// its vpiConstType is vpiNullConst; an interface, modport, or virtual interface
+// var always qualifies.
+bool VpiInterfaceExprIsValid(VpiHandle expr);
+
+// §37.29 detail 1: vpiExpr of a virtual interface var - the interface instance
+// assigned to it in its declaration, or NULL when none was assigned (and when
+// the only candidate fails the detail-2 constraint).
+VpiHandle VpiVirtualInterfaceExpr(VpiHandle var);
+
+// ===========================================================================
 // §37.30 Interface typespec. An interface typespec (vpiInterfaceTypespec) is a
 // typespec (§37.25) denoting a virtual interface or one of its modports. Its
 // vpiName (the typedef's name) and its vpiParamAssign relation are served by
