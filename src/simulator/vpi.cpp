@@ -2018,9 +2018,55 @@ int VpiContext::Get(int property, VpiHandle obj) {
   }
 }
 
+// §37.3.2: vpi_get_str(vpiType, ...) hands back the name of the type constant,
+// and that name is derived from the object's name in the data model diagram
+// (§37.3) - i.e. it is the very identifier of the type constant. This maps the
+// object-type codes the simulator models onto those spellings; an unmodelled
+// type yields no name (null), leaving room for other subclauses' types.
+static const char* VpiTypeConstantName(int type) {
+  switch (type) {
+    case vpiModule:
+      return "vpiModule";
+    case vpiNet:
+      return "vpiNet";
+    case vpiReg:
+      return "vpiReg";
+    case vpiPort:
+      return "vpiPort";
+    case vpiParameter:
+      return "vpiParameter";
+    case vpiConstant:
+      return "vpiConstant";
+    case vpiNamedEvent:
+      return "vpiNamedEvent";
+    case vpiOperation:
+      return "vpiOperation";
+    case vpiPrimitive:
+      return "vpiPrimitive";
+    case vpiIterator:
+      return "vpiIterator";
+    case vpiTypespec:
+      return "vpiTypespec";
+    case vpiFrame:
+      return "vpiFrame";
+    case vpiThread:
+      return "vpiThread";
+    case kVpiCallback:
+      return "vpiCallback";
+    case kVpiTimeQueue:
+      return "vpiTimeQueue";
+    default:
+      return nullptr;
+  }
+}
+
 const char* VpiContext::GetStr(int property, VpiHandle obj) {
   if (!obj) return nullptr;
   switch (property) {
+    // §37.3.2: every object carries a vpiType property; queried as a string it
+    // yields the name of that type constant (see 37.3 for how the names derive).
+    case kVpiType:
+      return VpiTypeConstantName(obj->type);
     case kVpiName:
       return obj->name.data();
     // §37.49: the file component of an assertion's source location. The general
