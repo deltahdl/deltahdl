@@ -1371,6 +1371,22 @@ VpiHandle VpiWaitConditionExpr(VpiHandle wait);
 // Backs the public vpi_handle(vpiExpr, repeat_control) dispatch.
 VpiHandle VpiRepeatControlExpr(VpiHandle repeat_control);
 
+// §37.77 Disables: whether an object kind is one of the named scopes a disable
+// statement may target - the four kinds the diagram groups at the far end of the
+// disable's vpiExpr edge: a task, a function, a named begin block, or a named
+// fork block.
+bool VpiIsDisableTargetType(int type);
+
+// §37.77 Disables: the named scope a disable statement reaches through vpiExpr -
+// the task, function, named begin, or named fork it disables. The scope's own
+// type is one of those kinds rather than the vpiExpr relation tag, so it is found
+// as the disable's first disable-target child; null when none is attached. A
+// disable fork (vpiDisableFork) draws no such edge - it disables the active
+// process's children with no named operand - so this relation is scoped to the
+// plain disable statement and a disable fork reports null. Backs the public
+// vpi_handle(vpiExpr, disable) dispatch.
+VpiHandle VpiDisableExpr(VpiHandle disable);
+
 // §37.71 If, if-else: whether an object kind is one of the two conditional
 // statements the if/if-else diagram groups - a plain if statement or an
 // if-else statement. Both reach a controlling condition (vpiCondition) and a

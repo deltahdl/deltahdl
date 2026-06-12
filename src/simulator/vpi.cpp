@@ -1119,6 +1119,36 @@ VpiHandle VpiRepeatControlExpr(VpiHandle repeat_control) {
   return nullptr;
 }
 
+bool VpiIsDisableTargetType(int type) {
+  // §37.77: the named scopes the disable diagram lists at the far end of the
+  // disable's vpiExpr edge - a task, a function, a named begin block, or a named
+  // fork block. A disable statement names exactly one of these to terminate.
+  switch (type) {
+    case vpiTask:
+    case vpiFunction:
+    case vpiNamedBegin:
+    case vpiNamedFork:
+      return true;
+    default:
+      return false;
+  }
+}
+
+VpiHandle VpiDisableExpr(VpiHandle disable) {
+  // §37.77: a disable statement reaches the named scope it disables through
+  // vpiExpr. Unlike most vpiExpr targets the scope is not an expression: its own
+  // type is a task, function, named begin, or named fork kind rather than the
+  // vpiExpr relation tag, so the generic child walk cannot find it. It is located
+  // as the disable's first disable-target child; null when none is attached. The
+  // companion disable fork form carries no named operand and so is handled by the
+  // caller scoping this relation to the plain disable statement.
+  if (!disable) return nullptr;
+  for (auto* child : disable->children) {
+    if (VpiIsDisableTargetType(child->type)) return child;
+  }
+  return nullptr;
+}
+
 bool VpiIsIfOrIfElseType(int type) {
   // §37.71: the two conditional statements the if/if-else diagram groups - a
   // plain if statement and an if-else statement. Both reach a controlling
@@ -3992,6 +4022,16 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // own type is vpiEventControl and so needs no special case here.
   if (type == vpiExpr && ref->type == vpiRepeatControl) {
     return VpiRepeatControlExpr(ref);
+  }
+
+  // §37.77: vpiExpr of a disable statement reaches the named scope it disables -
+  // a task, function, named begin, or named fork. That scope's own type is one of
+  // those scope kinds, not the vpiExpr relation tag, so the generic traversal
+  // below cannot find it. The relation is gated on the plain disable statement so
+  // a disable fork (vpiDisableFork), which disables the active process's children
+  // and names no scope, draws no such edge and falls through to report null.
+  if (type == vpiExpr && ref->type == vpiDisable) {
+    return VpiDisableExpr(ref);
   }
 
   // §37.12 detail 5: vpiStmt of a task or function reaches its body - null when
