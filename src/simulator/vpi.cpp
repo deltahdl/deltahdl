@@ -179,6 +179,31 @@ bool VpiIsConstraintItemType(int type) {
   }
 }
 
+bool VpiIsClassMethodType(int type) {
+  // §37.31 detail 1: the vpiMethods relation of a class defn reaches the class's
+  // methods, which the diagram draws as the "task func" node - a task or a
+  // function declared as a class item. No other object kind is a method.
+  switch (type) {
+    case vpiFunction:
+    case vpiTask:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiIsClassMemberValueType(int type) {
+  // §37.31 detail 2: the value-access restriction applies to the variable and
+  // event handles a class defn hands back - the variables node and the concrete
+  // variable kinds (§37.17), a class variable, and the named event / named event
+  // array. Anything else reached from a class defn is not value-bearing in this
+  // sense. This mirrors the variable/event grouping used for frame automatics
+  // (§37.43).
+  return type == vpiVariables || VpiIsLogicVarType(type) ||
+         VpiIsArrayVarType(type) || type == vpiClassVar ||
+         type == vpiNamedEvent || type == vpiNamedEventArray;
+}
+
 VpiHandle VpiAssertionClockingBlock(VpiHandle assertion) {
   // §37.49: a concurrent assertion traverses to its governing clocking block
   // through the untagged vpiClockingBlock relation. The association is modeled as
@@ -3505,6 +3530,32 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   // reached through its parent's internal scope, so it is excluded here.
   bool top_module_iteration = !ref && type == kVpiModule;
 
+  // §37.31 detail 1: vpiMethods on a class defn reaches the class's methods, which
+  // are task and function objects (the "task func" node) rather than children
+  // whose own type is literally vpiMethods, so this iteration is matched specially
+  // and filtered to drop implicit built-in methods below.
+  bool class_methods_iteration =
+      ref && ref->type == vpiClassDefn && type == vpiMethods;
+
+  // §37.31 detail 3: vpiConstraint on a class defn reaches the class's constraint
+  // children directly (a generic type match), but the iteration must return only
+  // normal constraints, so inline constraints are dropped below.
+  bool class_constraint_iteration =
+      ref && ref->type == vpiClassDefn && type == vpiConstraint;
+
+  // §37.31 detail 5: vpiDerivedClasses on a class defn reaches the class defns
+  // derived from it - again class-defn objects, not children whose own type is
+  // vpiDerivedClasses - so the relation is recognized specially.
+  bool class_derived_iteration =
+      ref && ref->type == vpiClassDefn && type == vpiDerivedClasses;
+
+  // §37.31 detail 6: the vpiArgument iteration from an extends object yields the
+  // expressions used for constructor chaining (8.17). The arguments are
+  // expression children, not children whose own type is vpiArgument, so this is
+  // matched specially like a tf call's argument iteration.
+  bool extends_argument_iteration =
+      ref && ref->type == vpiExtends && type == vpiArgument;
+
   // §38.23: unless otherwise specified, iterating the relationships of a
   // protected object is an error, so no iterator is produced. §37.42 detail 10
   // carves out one exception: a protected system task or function call shall
@@ -3535,8 +3586,20 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   auto matches = [type, ref, tf_argument_iteration,
                   named_event_waiting_iteration, named_event_index_iteration,
                   packed_array_var_element_iteration,
-                  packed_array_var_index_iteration](int obj_type) {
+                  packed_array_var_index_iteration, class_methods_iteration,
+                  class_derived_iteration,
+                  extends_argument_iteration](int obj_type) {
     if (type == vpiAssertion) return VpiIsAssertionType(obj_type);
+    // §37.31 detail 1: a class defn's vpiMethods iteration collects its method
+    // objects - the tasks and functions declared as class items - rather than
+    // children whose own type is literally vpiMethods.
+    if (class_methods_iteration) return VpiIsClassMethodType(obj_type);
+    // §37.31 detail 5: a class defn's vpiDerivedClasses iteration collects the
+    // class defns derived from it.
+    if (class_derived_iteration) return obj_type == vpiClassDefn;
+    // §37.31 detail 6: an extends object's vpiArgument iteration collects the
+    // expressions supplied for constructor chaining.
+    if (extends_argument_iteration) return VpiIsExprType(obj_type);
     // §37.27 detail 1: a named event's vpiWaitingProcesses iteration collects the
     // thread objects of the waiting processes, not children typed
     // vpiWaitingProcesses.
@@ -3582,7 +3645,15 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
     }
   } else if (ref) {
     for (auto* child : ref->children) {
-      if (matches(child->type)) iter->children.push_back(child);
+      if (!matches(child->type)) continue;
+      // §37.31 detail 1: the vpiMethods iteration omits implicit built-in methods
+      // (those SystemVerilog provides with no explicit declaration); an explicitly
+      // declared method, built-in or not, is still reported.
+      if (class_methods_iteration && child->implicit_builtin_method) continue;
+      // §37.31 detail 3: the vpiConstraint iteration returns only normal
+      // constraints, so an inline constraint is left out.
+      if (class_constraint_iteration && child->inline_constraint) continue;
+      iter->children.push_back(child);
     }
   } else {
     for (auto* obj : all_objects_) {
@@ -3762,6 +3833,19 @@ static void GetValueStringVal(VpiHandle obj, VpiValue* value,
 
 void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
   if (!obj || !value) return;
+  // §37.31 detail 2: vpi_get_value() is not allowed for variable and event
+  // handles obtained from a class defn handle. Such a handle denotes a class
+  // member rather than a free-standing object, so the read is refused, an error
+  // is recorded, and the caller's value buffer is left untouched.
+  if (obj->parent && obj->parent->type == vpiClassDefn &&
+      VpiIsClassMemberValueType(obj->type)) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_get_value(): a variable or event handle obtained from a class "
+        "definition handle has no accessible value";
+    return;
+  }
   // §37.26 detail 1: the value of an entire unpacked structure or unpacked
   // union is not accessible through vpi_get_value(). Such an aggregate holds no
   // single scalar or vector value to hand back, so the read is refused, an error
@@ -3839,6 +3923,20 @@ void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
 VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
                                int flags) {
   if (!obj) return nullptr;
+
+  // §37.31 detail 2: vpi_put_value() is not allowed for variable and event
+  // handles obtained from a class defn handle, the write side of the same
+  // restriction vpi_get_value() observes. The put is rejected, an error is
+  // recorded, and the member is left unchanged.
+  if (obj->parent && obj->parent->type == vpiClassDefn &&
+      VpiIsClassMemberValueType(obj->type)) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_put_value(): a variable or event handle obtained from a class "
+        "definition handle has no accessible value";
+    return nullptr;
+  }
 
   // §37.26 detail 1: an entire unpacked structure or union cannot be written
   // through vpi_put_value() any more than it can be read - it has no single

@@ -499,6 +499,19 @@ struct VpiObject {
   VpiObject* param_left_range = nullptr;
   VpiObject* param_right_range = nullptr;
 
+  // §37.31 detail 1: whether a class method is an implicit built-in method - one
+  // SystemVerilog provides for which the class carries no explicit declaration.
+  // The vpiMethods iteration of a class defn omits such methods (it returns only
+  // explicitly declared static and automatic methods); false by default, so an
+  // ordinary declared method is always reported.
+  bool implicit_builtin_method = false;
+
+  // §37.31 detail 3: whether a constraint is an inline constraint (one written at
+  // a randomize()-with call site, 18.7) rather than a normal constraint declared
+  // as a class item. A class defn's vpiConstraint iteration returns only normal
+  // constraints, so an inline constraint is skipped; false by default.
+  bool inline_constraint = false;
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 
@@ -614,6 +627,16 @@ bool VpiIsAssertionType(int type);
 // expression. An object qualifies as a constraint item exactly when its type is
 // one of these.
 bool VpiIsConstraintItemType(int type);
+
+// §37.31 detail 1: a class method is the kind of object the vpiMethods iteration
+// of a class defn reaches - a task or a function declared as a class item. An
+// object qualifies as a method exactly when its type is one of these.
+bool VpiIsClassMethodType(int type);
+
+// §37.31 detail 2: the variable/event grouping for which a value obtained from a
+// class defn handle is not accessible - the variables node, the concrete
+// variable kinds, a class variable, and the named event / named event array.
+bool VpiIsClassMemberValueType(int type);
 
 // §37.49: the clocking block governing a concurrent assertion, traversed with
 // vpi_handle(vpiClockingBlock, ...). Returns null when no clocking block is
