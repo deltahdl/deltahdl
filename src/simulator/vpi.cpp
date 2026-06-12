@@ -3773,6 +3773,70 @@ bool VpiIsVariableLoadType(int type) {
   }
 }
 
+// ===========================================================================
+// §37.46 Net drivers and loads.
+// ===========================================================================
+
+bool VpiIsNetDriverType(int type) {
+  // §37.46 (figure, net drivers): a port, a force, a delay terminal, a
+  // continuous assignment (whole or single bit), or a primitive terminal. Unlike
+  // a variable (§37.21) a net is not driven by a procedural assignment statement.
+  switch (type) {
+    case vpiPort:
+    case vpiForce:
+    case vpiDelayTerm:
+    case vpiContAssign:
+    case vpiContAssignBit:
+    case vpiPrimTerm:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiIsNetLoadType(int type) {
+  // §37.46 (figure, net loads): a delay terminal, an assignment statement, a
+  // force, a continuous assignment (whole or single bit), or a primitive
+  // terminal. A port is excluded here; detail 1 governs when a port is a load.
+  switch (type) {
+    case vpiDelayTerm:
+    case vpiAssignStmt:
+    case vpiForce:
+    case vpiContAssign:
+    case vpiContAssignBit:
+    case vpiPrimTerm:
+      return true;
+    default:
+      return false;
+  }
+}
+
+namespace {
+
+// §37.46 detail 1: a concatenation operation. The operand connections it groups
+// drive/load their nets individually, so a concatenation on a port does not make
+// the whole port a complex-expression load.
+bool VpiIsConcatenationExpression(VpiObject* expr) {
+  return expr->type == vpiOperation &&
+         (expr->op_type == vpiConcatOp || expr->op_type == vpiMultiConcatOp);
+}
+
+}  // namespace
+
+bool VpiPortIsComplexExpressionLoad(VpiHandle port) {
+  // §37.46 detail 1: a complex expression on an input port - an operation other
+  // than a concatenation - loads the nets it reads, and the port is then the load
+  // object reported when iterating the net's loads. A simple reference is a
+  // direct connection rather than a complex-expression load, a concatenation's
+  // operands connect their nets individually, and only an input port loads this
+  // way. The complex expression itself is reached through vpiHighConn (§37.14).
+  if (!port || port->type != vpiPort) return false;
+  if (port->direction != vpiInput) return false;
+  VpiObject* expr = port->high_conn;
+  if (!expr || expr->type != vpiOperation) return false;
+  return !VpiIsConcatenationExpression(expr);
+}
+
 namespace {
 
 // §37.21 detail 1: a structure, union, or class variable owns the additional
@@ -3823,6 +3887,24 @@ void CollectVariableDriversOrLoads(VpiObject* node, bool want_driver,
       iter->children.push_back(child);
     } else if (descend && VpiIsVariableSelectOrMemberType(child->type)) {
       CollectVariableDriversOrLoads(child, want_driver, descend, iter);
+    }
+  }
+}
+
+// §37.46 (figure) + detail 1: gather a net's drivers (want_driver) or loads into
+// the iterator. A driver/load is one of the object-kind children the figure
+// lists. On the driver side a port is always a driver; on the load side a port is
+// reported only when it carries a complex, non-concatenation expression on an
+// input (detail 1).
+void CollectNetDriversOrLoads(VpiObject* node, bool want_driver,
+                              VpiObject* iter) {
+  for (auto* child : node->children) {
+    if (want_driver) {
+      if (VpiIsNetDriverType(child->type)) iter->children.push_back(child);
+    } else if (child->type == vpiPort) {
+      if (VpiPortIsComplexExpressionLoad(child)) iter->children.push_back(child);
+    } else if (VpiIsNetLoadType(child->type)) {
+      iter->children.push_back(child);
     }
   }
 }
@@ -3899,12 +3981,29 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   bool memory_word_iteration =
       ref && VpiIsArrayVarType(ref->type) && type == vpiMemoryWord;
 
+  // §37.46 (figure): vpiDriver on a net reaches the net's driver objects - a
+  // port, a force, a delay terminal, a continuous assignment (whole or single
+  // bit), or a primitive terminal - and vpiLoad reaches its load objects. The
+  // net case differs from the variable case below: an assignment statement loads
+  // but does not drive a net, and a port loads a net only through the
+  // complex-expression rule (detail 1), so the net relations are collected by
+  // net-specific machinery rather than reused from §37.21.
+  bool net_driver_iteration =
+      ref && (ref->type == vpiNet || ref->type == vpiNetBit) &&
+      type == vpiDriver;
+  bool net_load_iteration =
+      ref && (ref->type == vpiNet || ref->type == vpiNetBit) &&
+      type == vpiLoad;
+
   // §37.21 (figure): vpiDriver on a variable reaches the variable's driver
   // objects - a port, a force, a continuous assignment (whole or single bit), or
   // a procedural assignment statement - rather than children whose own type is
-  // literally vpiDriver. Likewise vpiLoad reaches the variable's load objects.
-  bool variable_driver_iteration = ref && type == vpiDriver;
-  bool variable_load_iteration = ref && type == vpiLoad;
+  // literally vpiDriver. Likewise vpiLoad reaches the variable's load objects. A
+  // net reference is handled by §37.46 above, not here.
+  bool variable_driver_iteration =
+      ref && type == vpiDriver && !net_driver_iteration;
+  bool variable_load_iteration =
+      ref && type == vpiLoad && !net_load_iteration;
 
   // §37.5 detail 1: the top-level modules are accessed by iterating vpiModule
   // with a NULL reference object. Only top-level modules answer that iteration;
@@ -4129,6 +4228,12 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
     for (auto* obj : all_objects_) {
       if (obj->is_systf) iter->children.push_back(obj);
     }
+  } else if (net_driver_iteration || net_load_iteration) {
+    // §37.46 (figure) + detail 1: collect the net's driver objects (vpiDriver) or
+    // load objects (vpiLoad). On the load side a port is reported only when it
+    // carries a complex, non-concatenation expression on an input - detail 1's
+    // rule, applied inside the collector.
+    CollectNetDriversOrLoads(ref, net_driver_iteration, iter);
   } else if (variable_driver_iteration || variable_load_iteration) {
     // §37.21 (figure): collect the variable's driver objects (vpiDriver) or load
     // objects (vpiLoad). §37.21 detail 1: for a structure, union, or class
