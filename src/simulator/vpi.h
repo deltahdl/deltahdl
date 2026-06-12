@@ -445,6 +445,27 @@ struct VpiObject {
   bool tagged = false;
   bool soft = false;
 
+  // §37.28: the parameter / param assign figure properties and designated
+  // relation targets that the generic child-by-type walk cannot serve.
+  // `local_param` backs the parameter's vpiLocalParam Boolean (whether it is a
+  // localparam). `conn_by_name` backs a param assign's vpiConnByName Boolean
+  // (whether the override connects by name). `param_default` is the vpiExpr
+  // target - a value parameter's default value expression or a type parameter's
+  // default typespec (detail 3). `param_typespec` is a type parameter's vpiTypespec
+  // target - the typespec it resolved to at the end of elaboration, kept without
+  // typedef-alias resolution (detail 2). `explicit_param_range` records whether a
+  // value parameter was declared with an explicit range; when false, vpiLeftRange
+  // and vpiRightRange both report a null handle (detail 5). `param_left_range` and
+  // `param_right_range` hold the range-bound expressions for a parameter that does
+  // have an explicit range.
+  bool local_param = false;
+  bool conn_by_name = false;
+  VpiObject* param_default = nullptr;
+  VpiObject* param_typespec = nullptr;
+  bool explicit_param_range = false;
+  VpiObject* param_left_range = nullptr;
+  VpiObject* param_right_range = nullptr;
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 
@@ -1488,6 +1509,39 @@ bool VpiIsStructOrUnionType(int type);
 // accessible; only the unpacked aggregate is off-limits, so the rule is the
 // struct/union object kinds restricted to the unpacked case.
 bool VpiIsEntireUnpackedStructOrUnion(int type, bool packed);
+
+// ===========================================================================
+// §37.28 Parameter, spec param, def param, param assign. The VPI object model
+// for parameters (vpiParameter), type parameters (vpiTypeParameter), def params
+// (vpiDefParam), and param assigns (vpiParamAssign). Most of the figure - the
+// vpiName/vpiFullName/vpiSize/vpiConstType/vpiSigned properties, and the value
+// served by vpi_get_value() (detail 1, provided by §38.34) - is carried by the
+// generic machinery once the object's fields and children are populated. The
+// helpers below carry the four relation rules the clause refines (details 2-5)
+// and drive the public vpi_handle dispatch.
+// ===========================================================================
+
+// §37.28 detail 2: vpiTypespec of a type parameter - the typespec it resolved to
+// at the end of elaboration, handed back without following any typedef alias to
+// its underlying type (deliberately not applying §37.25/§37.30's alias
+// resolution). NULL when the type parameter carries no such typespec.
+VpiHandle VpiTypeParameterTypespec(VpiHandle type_parameter);
+
+// §37.28 detail 3: vpiExpr of a parameter - its default. For a value parameter
+// this is the default value expression; for a type parameter it is the default
+// typespec. NULL when no default is recorded.
+VpiHandle VpiParameterDefaultExpr(VpiHandle parameter);
+
+// §37.28 detail 4: vpiLhs of a param assign - the value or type parameter the
+// assignment overrides, i.e. the parameter-kind object among its children. NULL
+// when the param assign overrides nothing of that kind.
+VpiHandle VpiParamAssignLhs(VpiHandle param_assign);
+
+// §37.28 detail 5: vpiLeftRange / vpiRightRange of a value parameter. A
+// parameter declared without an explicit range reports a null handle for both;
+// otherwise each reaches the corresponding range-bound expression.
+VpiHandle VpiParameterLeftRange(VpiHandle parameter);
+VpiHandle VpiParameterRightRange(VpiHandle parameter);
 
 // ===========================================================================
 // §37.29 Virtual interface. The VPI object model for a virtual interface var

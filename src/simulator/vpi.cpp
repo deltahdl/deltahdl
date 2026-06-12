@@ -1754,6 +1754,69 @@ bool VpiIsEntireUnpackedStructOrUnion(int type, bool packed) {
 }
 
 // ===========================================================================
+// §37.28 Parameter, spec param, def param, param assign.
+// ===========================================================================
+
+VpiHandle VpiTypeParameterTypespec(VpiHandle type_parameter) {
+  // §37.28 detail 2: hand back the stored typespec verbatim. The detail asks for
+  // the typespec the type parameter has at the end of elaboration "without
+  // resolving typedef aliases", so we deliberately do not run §37.25/§37.30's
+  // alias resolution here - the recorded typespec is returned as-is, even when it
+  // is itself a typedef alias.
+  if (!type_parameter || type_parameter->type != vpiTypeParameter) {
+    return nullptr;
+  }
+  return type_parameter->param_typespec;
+}
+
+VpiHandle VpiParameterDefaultExpr(VpiHandle parameter) {
+  // §37.28 detail 3: vpiExpr reaches the parameter's default - a value
+  // parameter's default value expression, or a type parameter's default
+  // typespec. Both are kept in the same designated slot.
+  if (!parameter ||
+      (parameter->type != vpiParameter &&
+       parameter->type != vpiTypeParameter)) {
+    return nullptr;
+  }
+  return parameter->param_default;
+}
+
+VpiHandle VpiParamAssignLhs(VpiHandle param_assign) {
+  // §37.28 detail 4: vpiLhs reaches the overridden parameter - the value
+  // parameter (vpiParameter) or type parameter (vpiTypeParameter) among the
+  // param assign's children. The override target is a parameter-kind object, not
+  // a child whose own type is literally vpiLhs, so the generic walk cannot find
+  // it.
+  if (!param_assign || param_assign->type != vpiParamAssign) return nullptr;
+  for (auto* child : param_assign->children) {
+    if (child->type == vpiParameter || child->type == vpiTypeParameter) {
+      return child;
+    }
+  }
+  return nullptr;
+}
+
+VpiHandle VpiParameterLeftRange(VpiHandle parameter) {
+  // §37.28 detail 5: a value parameter declared without an explicit range
+  // reports a null handle for vpiLeftRange; only an explicitly ranged parameter
+  // reaches its left range-bound expression.
+  if (!parameter || parameter->type != vpiParameter ||
+      !parameter->explicit_param_range) {
+    return nullptr;
+  }
+  return parameter->param_left_range;
+}
+
+VpiHandle VpiParameterRightRange(VpiHandle parameter) {
+  // §37.28 detail 5: the mirror of VpiParameterLeftRange for vpiRightRange.
+  if (!parameter || parameter->type != vpiParameter ||
+      !parameter->explicit_param_range) {
+    return nullptr;
+  }
+  return parameter->param_right_range;
+}
+
+// ===========================================================================
 // §37.29 Virtual interface.
 // ===========================================================================
 
@@ -3263,6 +3326,37 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return VpiInterfaceTypespecParent(ref);
   }
 
+  // §37.28 detail 2: vpiTypespec of a type parameter reaches the typespec it has
+  // at the end of elaboration, returned without resolving typedef aliases. The
+  // target is held as a designated pointer, so the generic walk cannot serve it.
+  if (type == vpiTypespec && ref->type == vpiTypeParameter) {
+    return VpiTypeParameterTypespec(ref);
+  }
+
+  // §37.28 detail 3: vpiExpr of a value or type parameter reaches its default -
+  // the default value expression or default typespec - which is a designated
+  // target whose own type is not vpiExpr, so the generic walk would miss it.
+  if (type == vpiExpr &&
+      (ref->type == vpiParameter || ref->type == vpiTypeParameter)) {
+    return VpiParameterDefaultExpr(ref);
+  }
+
+  // §37.28 detail 4: vpiLhs of a param assign reaches the overridden value or
+  // type parameter, a parameter-kind child rather than one whose own type is
+  // vpiLhs.
+  if (type == vpiLhs && ref->type == vpiParamAssign) {
+    return VpiParamAssignLhs(ref);
+  }
+
+  // §37.28 detail 5: vpiLeftRange / vpiRightRange of a value parameter reach the
+  // bounds of its explicit range, or NULL when it was declared without one.
+  if (type == vpiLeftRange && ref->type == vpiParameter) {
+    return VpiParameterLeftRange(ref);
+  }
+  if (type == vpiRightRange && ref->type == vpiParameter) {
+    return VpiParameterRightRange(ref);
+  }
+
   // §37.65 detail 1: vpiStmt of an event control reaches the statement it guards,
   // except that an event control associated with an assignment always reports a
   // null statement rather than the first statement child the generic traversal
@@ -4159,6 +4253,14 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // the vpiDefDecayTime integer property.
     case vpiDefDecayTime:
       return obj->def_decay_time;
+    // §37.28: a parameter reports whether it is a localparam through the
+    // vpiLocalParam Boolean property.
+    case vpiLocalParam:
+      return obj->local_param ? 1 : 0;
+    // §37.28: a param assign reports whether the override connects by name (as
+    // opposed to by position) through the vpiConnByName Boolean property.
+    case vpiConnByName:
+      return obj->conn_by_name ? 1 : 0;
     // §37.3.7: declared lifetime as a Boolean (0 static, 1 non-static).
     case kVpiAutomatic:
       return obj->automatic ? 1 : 0;
