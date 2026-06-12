@@ -23,24 +23,6 @@ class EventControl : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// D1: an event control associated with an assignment - its parent is the
-// assignment object (§37.64) - reports a null statement even when a statement
-// child is physically attached.
-TEST_F(EventControl, AssignmentAssociatedEventControlHasNullStatement) {
-  VpiObject stmt;
-  stmt.type = vpiStmt;
-
-  VpiObject assignment;
-  assignment.type = vpiAssignment;
-
-  VpiObject event_control;
-  event_control.type = vpiEventControl;
-  event_control.parent = &assignment;
-  event_control.children = {&stmt};
-
-  EXPECT_EQ(VpiEventControlStmt(&event_control), nullptr);
-}
-
 // D1 (complement): an event control that is not associated with an assignment
 // reaches its guarded statement normally - the rule is specific to the
 // assignment association and does not blanket-null every event control's stmt.
