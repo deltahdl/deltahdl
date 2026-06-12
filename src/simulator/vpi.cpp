@@ -704,6 +704,348 @@ VpiHandle VpiSeqFormalInitExpr(VpiHandle formal) {
   return nullptr;
 }
 
+// ===========================================================================
+// §37.22 Object range (shared with §37.17's range relations).
+// ===========================================================================
+
+bool VpiDimensionRangeIsEmpty(VpiDimensionKind kind) {
+  // §37.22 detail 1: dynamic-array, queue, and associative dimensions have no
+  // fixed bounds and are represented by an empty range. Fixed packed and
+  // unpacked dimensions are not empty.
+  switch (kind) {
+    case VpiDimensionKind::kDynamic:
+    case VpiDimensionKind::kQueue:
+    case VpiDimensionKind::kAssoc:
+      return true;
+    case VpiDimensionKind::kPacked:
+    case VpiDimensionKind::kFixedUnpacked:
+      return false;
+  }
+  return false;
+}
+
+int VpiRangeSize(const VpiRangeDesc& range) {
+  // §37.22 detail 2: an empty range reports a size of 0.
+  return range.empty ? 0 : range.size;
+}
+
+VpiHandle VpiRangeLeftRange(const VpiRangeDesc& range) {
+  // §37.22 detail 2: an empty range returns NULL for vpiLeftRange.
+  return range.empty ? nullptr : range.left_expr;
+}
+
+VpiHandle VpiRangeRightRange(const VpiRangeDesc& range) {
+  // §37.22 detail 2: an empty range returns NULL for vpiRightRange.
+  return range.empty ? nullptr : range.right_expr;
+}
+
+// ===========================================================================
+// §37.17 Variables.
+// ===========================================================================
+
+bool VpiIsLogicVarType(int type) {
+  // §37.17 detail 19: a logic var and a reg are the same object kind.
+  return type == vpiLogicVar || type == kVpiReg;
+}
+
+bool VpiIsArrayVarType(int type) {
+  // §37.17 detail 19: an array var and a reg array are the same object kind.
+  return type == vpiArrayVar || type == vpiRegArray;
+}
+
+bool VpiIsArrayVar(int unpacked_range_count) {
+  // §37.17 detail 1: one or more unpacked ranges makes a variable an array var.
+  return unpacked_range_count >= 1;
+}
+
+bool VpiVariableIsArrayMember(VpiHandle var) {
+  // §37.17 detail 2: a variable is an array member when its vpiParent prefix is
+  // an array variable.
+  return var != nullptr && var->parent != nullptr &&
+         VpiIsArrayVarType(var->parent->type);
+}
+
+bool VpiVariableIsStructUnionMember(VpiHandle var) {
+  // §37.17 detail 17: a variable is a struct/union member when its vpiParent
+  // prefix is a struct or union variable.
+  if (!var || !var->parent) return false;
+  return var->parent->type == vpiStructVar || var->parent->type == vpiUnionVar;
+}
+
+VpiHandle VpiVariableInitExpr(VpiHandle var) {
+  // §37.17 detail 8: when a variable has an initialization expression, it is
+  // reached through vpiExpr - modeled as the variable's first child. A variable
+  // with no initialization expression has none.
+  if (!var || var->children.empty()) return nullptr;
+  return var->children.front();
+}
+
+bool VpiSizeChangeCallbackApplies(int array_type, bool is_string_var) {
+  // §37.17 detail 14: cbSizeChange applies only to dynamic arrays, associative
+  // arrays, queues, and string variables; not to fixed-size (static) arrays or
+  // any other variable.
+  if (is_string_var) return true;
+  return array_type == vpiDynamicArray || array_type == vpiAssocArray ||
+         array_type == vpiQueueArray;
+}
+
+std::vector<VpiRangeDesc> VpiArrayVarRanges(
+    const std::vector<VpiArrayDimension>& dims) {
+  // §37.17 detail 4: one range per dimension, leftmost to rightmost. Each
+  // dimension routes through §37.22: a dynamic/queue/associative dimension is an
+  // empty range, a fixed dimension keeps its bounds. The implicit range of a
+  // packed struct/union element or an enum var's base type is excluded.
+  std::vector<VpiRangeDesc> ranges;
+  for (const auto& dim : dims) {
+    if (dim.implicit_element_range) continue;
+    VpiRangeDesc range;
+    range.empty = VpiDimensionRangeIsEmpty(dim.kind);
+    range.left_expr = dim.left_expr;
+    range.right_expr = dim.right_expr;
+    range.size = dim.size;
+    ranges.push_back(range);
+  }
+  return ranges;
+}
+
+// §37.17 detail 6: build the §37.22 range for a variable's leftmost dimension,
+// the one vpiLeftRange/vpiRightRange report. Returns an empty range (so both
+// relations yield NULL) when the variable has no members or no dimensions.
+static VpiRangeDesc LeftmostVariableRange(
+    const std::vector<VpiArrayDimension>& dims, bool has_members) {
+  if (!has_members || dims.empty()) {
+    VpiRangeDesc empty;
+    empty.empty = true;
+    return empty;
+  }
+  const VpiArrayDimension& dim = dims.front();
+  VpiRangeDesc range;
+  range.empty = VpiDimensionRangeIsEmpty(dim.kind);
+  range.left_expr = dim.left_expr;
+  range.right_expr = dim.right_expr;
+  range.size = dim.size;
+  return range;
+}
+
+VpiHandle VpiVariableLeftRange(const std::vector<VpiArrayDimension>& dims,
+                               bool has_members) {
+  // §37.17 detail 6: defer to §37.22's vpiLeftRange, which returns NULL for an
+  // empty leftmost range.
+  return VpiRangeLeftRange(LeftmostVariableRange(dims, has_members));
+}
+
+VpiHandle VpiVariableRightRange(const std::vector<VpiArrayDimension>& dims,
+                                bool has_members) {
+  // §37.17 detail 6: the mirror of VpiVariableLeftRange.
+  return VpiRangeRightRange(LeftmostVariableRange(dims, has_members));
+}
+
+VpiHandle VpiSelectSingleIndex(
+    const std::vector<VpiHandle>& indices_inner_to_outer) {
+  // §37.17 detail 5: the index of a var select in a one-dimensional array is its
+  // single innermost index.
+  if (indices_inner_to_outer.empty()) return nullptr;
+  return indices_inner_to_outer.front();
+}
+
+std::vector<VpiHandle> VpiSelectIndicesOutward(
+    const std::vector<VpiHandle>& indices_inner_to_outer) {
+  // §37.17 details 5, 13, and 18: the iteration runs from the innermost index
+  // outward, which is the order the inputs are already in.
+  return indices_inner_to_outer;
+}
+
+int VpiVariableSize(const VpiVariableSizeQuery& query) {
+  // §37.17 details 9 and 10: vpiSize depends on the kind of variable.
+  if (VpiIsArrayVarType(query.var_type)) {
+    return query.array_element_count;  // variable array -> element count
+  }
+  if (VpiIsLogicVarType(query.var_type)) {
+    return query.bit_width;  // logic var (reg) -> size in bits
+  }
+  switch (query.var_type) {
+    case vpiByteVar:
+    case vpiShortIntVar:
+    case vpiIntVar:
+    case vpiLongIntVar:
+    case vpiIntegerVar:
+    case vpiTimeVar:
+    case vpiBitVar:
+    case vpiEnumVar:
+    case vpiPackedArrayVar:
+      return query.bit_width;  // integer-typed/packed/enum -> size in bits
+    case vpiStructVar:
+    case vpiUnionVar:
+      // packed -> size in bits; unpacked -> number of fields
+      return query.packed ? query.bit_width : query.field_count;
+    case vpiStringVar:
+      return query.string_length;  // current character count
+    case vpiVarBit:
+      return 1;  // a var bit is one bit
+    case vpiVarSelect:
+      return query.bit_width;  // bits in the (packed) var select
+    default:
+      return 0;  // behavior of vpiSize not defined for other variables
+  }
+}
+
+bool VpiVariableHasValueProperty(int var_type, bool vpi_vector) {
+  // §37.17 detail 11: array, class, and virtual-interface variables have no
+  // value property, and neither does an unpacked struct/union (vpiVector FALSE).
+  if (VpiIsArrayVarType(var_type) || var_type == vpiClassVar ||
+      var_type == vpiVirtualInterfaceVar) {
+    return false;
+  }
+  if ((var_type == vpiStructVar || var_type == vpiUnionVar) && !vpi_vector) {
+    return false;
+  }
+  return true;
+}
+
+bool VpiBitIteratorApplies(int var_type, bool packed) {
+  // §37.17 detail 12: vpiBit applies to logic, bit, packed struct, packed union,
+  // and packed array variables only.
+  if (VpiIsLogicVarType(var_type) || var_type == vpiBitVar ||
+      var_type == vpiPackedArrayVar) {
+    return true;
+  }
+  if (var_type == vpiStructVar || var_type == vpiUnionVar) {
+    return packed;
+  }
+  return false;
+}
+
+bool VpiIsRandTypeValue(int value) {
+  // §37.17 details 15 and 22: the three randomization types.
+  return value == vpiRand || value == vpiRandC || value == vpiNotRand;
+}
+
+bool VpiIsRandomized(bool active_for_randomization) {
+  // §37.17 detail 16: vpiIsRandomized is exactly that activeness.
+  return active_for_randomization;
+}
+
+bool VpiIsArrayTypeValue(int value) {
+  // §37.17 detail 21: the four array-type values.
+  return value == vpiStaticArray || value == vpiDynamicArray ||
+         value == vpiAssocArray || value == vpiQueueArray;
+}
+
+bool VpiVariableScalar(const VpiScalarVectorQuery& query) {
+  // §37.17 detail 20: a bit/logic var with no packed dimension and a var bit are
+  // scalars; an enum var defers to its base typespec; an array var defers to an
+  // element; every other variable kind is not a scalar.
+  if (VpiIsLogicVarType(query.var_type) || query.var_type == vpiBitVar) {
+    return !query.has_packed_dimension;
+  }
+  if (query.var_type == vpiVarBit) return true;
+  if (query.var_type == vpiEnumVar) return query.base_is_scalar;
+  if (VpiIsArrayVarType(query.var_type)) return query.element_is_scalar;
+  return false;
+}
+
+bool VpiVariableVector(const VpiScalarVectorQuery& query) {
+  // §37.17 detail 20: a packed bit/logic var, a packed struct/union/array var,
+  // and the integer-typed vars are vectors; an enum var defers to its base
+  // typespec; an array var defers to an element; everything else is not a vector.
+  if (VpiIsLogicVarType(query.var_type) || query.var_type == vpiBitVar) {
+    return query.has_packed_dimension;
+  }
+  if (query.var_type == vpiPackedArrayVar) return true;
+  if (query.var_type == vpiStructVar || query.var_type == vpiUnionVar) {
+    return query.packed;
+  }
+  if (query.var_type == vpiVarBit) return false;
+  if (query.var_type == vpiEnumVar) return query.base_is_vector;
+  switch (query.var_type) {
+    case vpiIntegerVar:
+    case vpiTimeVar:
+    case vpiShortIntVar:
+    case vpiIntVar:
+    case vpiLongIntVar:
+    case vpiByteVar:
+      return true;
+    default:
+      break;
+  }
+  if (VpiIsArrayVarType(query.var_type)) return query.element_is_vector;
+  return false;
+}
+
+int VpiVariableVisibility(bool is_class_member, int declared_visibility) {
+  // §37.17 detail 24: a non-class-member variable, and a class member that is
+  // neither local nor protected, reports vpiPublicVis.
+  if (!is_class_member) return vpiPublicVis;
+  if (declared_visibility == vpiLocalVis ||
+      declared_visibility == vpiProtectedVis) {
+    return declared_visibility;
+  }
+  return vpiPublicVis;
+}
+
+std::string VpiClassMemberFullName(bool is_static, std::string_view scope_path,
+                                   std::string_view class_defn,
+                                   std::string_view member) {
+  // §37.17 detail 25: a non-static class data member has no full name; a static
+  // member's full name routes through the "class defn" with "::", e.g.
+  // "top.Packet::Id".
+  if (!is_static) return std::string();
+  std::string result;
+  if (!scope_path.empty()) {
+    result += std::string(scope_path) + ".";
+  }
+  result += std::string(class_defn) + "::" + std::string(member);
+  return result;
+}
+
+VpiHandle VpiVariableParent(const std::vector<VpiParentPrefix>& prefixes) {
+  // §37.17 detail 26: scan the prefixes rightmost to leftmost and return the
+  // first one that qualifies; NULL when none does.
+  for (const auto& prefix : prefixes) {
+    if (prefix.qualifies) return prefix.handle;
+  }
+  return nullptr;
+}
+
+VpiHandle VpiLargestContainingArray(
+    const std::vector<VpiHandle>& nested_innermost_first) {
+  // §37.17 detail 26: the largest containing array is the outermost of the
+  // nested array prefixes (the last entry when given innermost first).
+  if (nested_innermost_first.empty()) return nullptr;
+  return nested_innermost_first.back();
+}
+
+bool VpiConstantSelect(const VpiConstantSelectQuery& query) {
+  // §37.17 detail 27: a static-lifetime variable with no parent is a constant
+  // select, as is a select whose indices are all elaboration-time constants and
+  // whose elements are all struct/union members or static-bound array elements.
+  if (query.has_static_lifetime && !query.has_parent) return true;
+  return query.all_indices_constant && query.all_elements_static_members;
+}
+
+std::string VpiVariableName(const VpiVariableNameParts& parts) {
+  // §37.17 detail 28: the leaf member and its own index/slice, no prefixes.
+  return parts.member + parts.index_suffix;
+}
+
+std::string VpiVariableDecompile(const VpiVariableNameParts& parts) {
+  // §37.17 detail 28: the struct/union/class-var prefixes joined to the member,
+  // without the top-level scope.
+  std::string result;
+  for (const auto& prefix : parts.member_prefixes) {
+    result += prefix + ".";
+  }
+  result += parts.member + parts.index_suffix;
+  return result;
+}
+
+std::string VpiVariableFullName(const VpiVariableNameParts& parts) {
+  // §37.17 detail 28: the top-level scope prefixed to the decompile form.
+  std::string decompile = VpiVariableDecompile(parts);
+  if (parts.top_scope.empty()) return decompile;
+  return parts.top_scope + "." + decompile;
+}
+
 void VpiContext::Attach(SimContext& sim_ctx) {
   for (auto& [name, var] : sim_ctx.GetVariables()) {
     auto* obj = AllocObject();

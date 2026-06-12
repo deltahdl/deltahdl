@@ -592,6 +592,264 @@ VpiHandle VpiSeqFormalTypespec(VpiHandle formal);
 // expression (§37.54); null when the formal has no initialization expression.
 VpiHandle VpiSeqFormalInitExpr(VpiHandle formal);
 
+// ===========================================================================
+// §37.22 Object range. A range object carries the bounds of one array
+// dimension. §37.17's range relations (details 4 and 6) are woven onto these
+// helpers, so a range that one subclause calls "empty" behaves identically in
+// the other.
+// ===========================================================================
+
+// §37.22 detail 1: a range object's contents. An empty range has no elements; it
+// stands in for an associative-array dimension, an empty dynamic array or queue,
+// and any range obtained from a typespec for a dynamic-array, queue, or
+// associative dimension. A non-empty range carries the bound expressions reached
+// through vpiLeftRange/vpiRightRange and an element count.
+struct VpiRangeDesc {
+  bool empty = false;
+  VpiHandle left_expr = nullptr;
+  VpiHandle right_expr = nullptr;
+  int size = 0;
+};
+
+// §37.22 detail 1 (and §37.17 detail 4): the array-dimension kinds a range can
+// describe, and which of them are represented by an empty range. Fixed packed
+// and unpacked dimensions have real bounds; dynamic-array, queue, and
+// associative dimensions are empty ranges.
+enum class VpiDimensionKind {
+  kPacked,
+  kFixedUnpacked,
+  kDynamic,
+  kQueue,
+  kAssoc,
+};
+
+// §37.22 detail 1: whether a dimension of the given kind is an empty range.
+bool VpiDimensionRangeIsEmpty(VpiDimensionKind kind);
+
+// §37.22 detail 2: vpiSize of a range - 0 for an empty range, otherwise the
+// range's element count.
+int VpiRangeSize(const VpiRangeDesc& range);
+
+// §37.22 detail 2: vpiLeftRange of a range - NULL for an empty range, otherwise
+// the left bound expression. §37.17 detail 6 reuses this for a variable's
+// leftmost dimension.
+VpiHandle VpiRangeLeftRange(const VpiRangeDesc& range);
+
+// §37.22 detail 2: vpiRightRange of a range, the mirror of VpiRangeLeftRange.
+VpiHandle VpiRangeRightRange(const VpiRangeDesc& range);
+
+// ===========================================================================
+// §37.17 Variables.
+// ===========================================================================
+
+// §37.17 detail 19: a logic var is the same object kind as a reg; treat either
+// as a logic variable so an existing reg-typed object is classified correctly.
+bool VpiIsLogicVarType(int type);
+
+// §37.17 detail 19: an array var is the same object kind as a reg array; accept
+// either kind wherever an array variable is meant.
+bool VpiIsArrayVarType(int type);
+
+// §37.17 detail 1: a variable declared as an array with one or more unpacked
+// ranges is an array var.
+bool VpiIsArrayVar(int unpacked_range_count);
+
+// §37.17 detail 2: vpiArrayMember is TRUE exactly when a variable is an element
+// of an array variable, read from the variable's vpiParent prefix.
+bool VpiVariableIsArrayMember(VpiHandle var);
+
+// §37.17 detail 17: vpiStructUnionMember is TRUE when a variable's vpiParent
+// prefix is a struct or union variable.
+bool VpiVariableIsStructUnionMember(VpiHandle var);
+
+// §37.17 detail 8: a variable's initialization expression, reached through
+// vpiExpr (modeled as the variable's first child). Null when the variable has no
+// initialization expression.
+VpiHandle VpiVariableInitExpr(VpiHandle var);
+
+// §37.17 detail 14: whether the cbSizeChange callback is applicable to a
+// variable. It applies only to dynamic arrays, associative arrays, queues, and
+// string variables; array_type is the variable's vpiArrayType (0 when not an
+// array). The detail's firing-order and new-size-value semantics need a
+// size-change callback engine the simulator does not have, so only applicability
+// is realized here.
+bool VpiSizeChangeCallbackApplies(int array_type, bool is_string_var);
+
+// §37.17 detail 4: one dimension of a variable as the vpiRange iteration sees
+// it. The kind decides whether the dimension yields an empty range (§37.22); a
+// fixed dimension also carries its bounds and size. An implicit element range
+// (the implicit range of packed struct/union elements, or an enum var's base
+// type) is excluded from a packed array's range iteration.
+struct VpiArrayDimension {
+  VpiDimensionKind kind = VpiDimensionKind::kFixedUnpacked;
+  VpiHandle left_expr = nullptr;
+  VpiHandle right_expr = nullptr;
+  int size = 0;
+  bool implicit_element_range = false;
+};
+
+// §37.17 detail 4: the ranges vpi_iterate(vpiRange, array_var) returns, one per
+// dimension from leftmost to rightmost. A dynamic-array, queue, or associative
+// dimension contributes an empty range (§37.22); a fixed dimension contributes
+// its bounds. Implicit element ranges are dropped.
+std::vector<VpiRangeDesc> VpiArrayVarRanges(
+    const std::vector<VpiArrayDimension>& dims);
+
+// §37.17 detail 6: vpiLeftRange of a variable - the left bound of its leftmost
+// dimension (leftmost packed dimension for a packed array, leftmost unpacked
+// dimension for an unpacked array). NULL when the variable has no members or
+// that leftmost range is empty (§37.22).
+VpiHandle VpiVariableLeftRange(const std::vector<VpiArrayDimension>& dims,
+                               bool has_members);
+
+// §37.17 detail 6: vpiRightRange of a variable, the mirror of VpiVariableLeftRange.
+VpiHandle VpiVariableRightRange(const std::vector<VpiArrayDimension>& dims,
+                                bool has_members);
+
+// §37.17 detail 5: vpi_handle(vpiIndex, var_select) returns the index of a var
+// select within a one-dimensional array - its single (innermost) index.
+VpiHandle VpiSelectSingleIndex(
+    const std::vector<VpiHandle>& indices_inner_to_outer);
+
+// §37.17 details 5, 13, and 18: vpi_iterate(vpiIndex, ...) over a var select, a
+// var bit, or an array-member variable returns the selecting index expressions
+// starting with the innermost index and working outward; the inputs are already
+// in that order.
+std::vector<VpiHandle> VpiSelectIndicesOutward(
+    const std::vector<VpiHandle>& indices_inner_to_outer);
+
+// §37.17 details 9 and 10: the inputs vpiSize reads for a variable or var select.
+struct VpiVariableSizeQuery {
+  int var_type = 0;
+  bool packed = false;          // struct/union var: packed vs unpacked
+  int bit_width = 0;            // integer-typed/packed/enum var, packed var select
+  int array_element_count = 0;  // variable array: number of element variables
+  int string_length = 0;        // string var: current character count
+  int field_count = 0;          // unpacked struct/union var: number of fields
+};
+
+// §37.17 details 9 and 10: vpiSize for a variable object. A variable array
+// reports its element count; an integer-typed, packed struct/union, packed
+// array, enum var, or packed var select reports its bit width; a string var
+// reports its current character count; an unpacked struct/union reports its
+// field count; a var bit reports 1. Every other variable's vpiSize is undefined
+// and reported as 0.
+int VpiVariableSize(const VpiVariableSizeQuery& query);
+
+// §37.17 detail 11: whether a variable kind has a value property. Array, class,
+// and virtual-interface variables do not; an unpacked struct or union variable
+// (vpiVector FALSE) does not; every other variable kind does.
+bool VpiVariableHasValueProperty(int var_type, bool vpi_vector);
+
+// §37.17 detail 12: the vpiBit iterator applies only to logic, bit, packed
+// struct, packed union, and packed array variables.
+bool VpiBitIteratorApplies(int var_type, bool packed);
+
+// §37.17 details 15 and 22: vpiRandType is one of vpiRand, vpiRandC, vpiNotRand.
+bool VpiIsRandTypeValue(int value);
+
+// §37.17 detail 16: vpiIsRandomized reports whether a random variable is
+// currently active for randomization.
+bool VpiIsRandomized(bool active_for_randomization);
+
+// §37.17 detail 21: vpiArrayType is one of vpiStaticArray, vpiDynamicArray,
+// vpiAssocArray, vpiQueueArray.
+bool VpiIsArrayTypeValue(int value);
+
+// §37.17 detail 20: the inputs the scalar/vector rules read for a variable.
+struct VpiScalarVectorQuery {
+  int var_type = 0;
+  bool has_packed_dimension = false;  // bit/logic var: any packed dimensions
+  bool packed = false;                // struct/union var: packed vs unpacked
+  bool base_is_scalar = false;        // enum var: base typespec's vpiScalar
+  bool base_is_vector = false;        // enum var: base typespec's vpiVector
+  bool element_is_scalar = false;     // array var: an element's vpiScalar
+  bool element_is_vector = false;     // array var: an element's vpiVector
+};
+
+// §37.17 detail 20: vpiScalar for a variable. A scalar bit/logic var (no packed
+// dimension) and a var bit are scalars; an enum var defers to its base typespec;
+// an array var defers to an element; every other variable is not a scalar.
+bool VpiVariableScalar(const VpiScalarVectorQuery& query);
+
+// §37.17 detail 20: vpiVector for a variable. A packed bit/logic var, a packed
+// struct/union/array var, and the integer-typed vars are vectors; an enum var
+// defers to its base typespec; an array var defers to an element; every other
+// variable is not a vector.
+bool VpiVariableVector(const VpiScalarVectorQuery& query);
+
+// §37.17 detail 24: vpiVisibility of a variable. A class member reports its
+// declared visibility (vpiLocalVis, vpiProtectedVis, or vpiPublicVis); a member
+// that is neither local nor protected - and any non-class-member variable -
+// reports vpiPublicVis.
+int VpiVariableVisibility(bool is_class_member, int declared_visibility);
+
+// §37.17 detail 25: vpiFullName for a class data member. A non-static member has
+// none (the empty string marks its absence); a static member's full name is the
+// hierarchical path written through its "class defn", e.g. "top.Packet::Id".
+std::string VpiClassMemberFullName(bool is_static, std::string_view scope_path,
+                                   std::string_view class_defn,
+                                   std::string_view member);
+
+// §37.17 detail 26: a candidate vpiParent prefix object, in prefix order
+// (rightmost/innermost first). A prefix qualifies when it is a struct/union/class
+// variable, a struct/union member or class data member, or the largest
+// containing packed or unpacked array object; otherwise its handle is null.
+struct VpiParentPrefix {
+  bool qualifies = false;
+  VpiHandle handle = nullptr;
+};
+
+// §37.17 detail 26: vpiParent of a variable. Scanning the prefixes rightmost to
+// leftmost, the first qualifying prefix is returned; NULL when none qualifies.
+VpiHandle VpiVariableParent(const std::vector<VpiParentPrefix>& prefixes);
+
+// §37.17 detail 26: among a run of nested array prefixes for one array object
+// (given innermost first), vpiParent reports the largest (outermost) containing
+// array - the last one - or null when there are none.
+VpiHandle VpiLargestContainingArray(
+    const std::vector<VpiHandle>& nested_innermost_first);
+
+// §37.17 detail 27: the inputs vpiConstantSelect reads for a var bit or other
+// variable.
+struct VpiConstantSelectQuery {
+  bool has_static_lifetime = false;
+  bool has_parent = false;                    // vpiParent != NULL
+  bool all_indices_constant = false;          // every index is elaboration-constant
+  bool all_elements_static_members = false;   // struct/union members or packed/
+                                              // unpacked array elements with
+                                              // static bounds
+};
+
+// §37.17 detail 27: vpiConstantSelect. TRUE when the variable has static lifetime
+// and no parent, or when every index expression is an elaboration-time constant
+// and every selected element is a struct/union member or a packed/unpacked array
+// element with static bounds; FALSE otherwise.
+bool VpiConstantSelect(const VpiConstantSelectQuery& query);
+
+// §37.17 detail 28: the components of a member variable's name. The struct/union/
+// class-var prefixes run outermost first; the object's own index/slice (if any)
+// is carried separately so it can be appended to all three name forms.
+struct VpiVariableNameParts {
+  std::string top_scope;
+  std::vector<std::string> member_prefixes;
+  std::string member;
+  std::string index_suffix;
+};
+
+// §37.17 detail 28: vpiName - the leaf member with its own index/slice but none
+// of its struct/union/class-var prefixes.
+std::string VpiVariableName(const VpiVariableNameParts& parts);
+
+// §37.17 detail 28: vpiDecompile - the prefixes joined to the member (and its
+// index/slice) without the top-level scope, so it resolves for any non-top-level
+// scope context.
+std::string VpiVariableDecompile(const VpiVariableNameParts& parts);
+
+// §37.17 detail 28: vpiFullName - the top-level scope prefixed to the decompile
+// form.
+std::string VpiVariableFullName(const VpiVariableNameParts& parts);
+
 struct VpiVectorVal {
   uint32_t aval;
   uint32_t bval;
@@ -1486,6 +1744,15 @@ using PLI_UBYTE8 = unsigned char;
 #define cbAssign 25
 #define cbDeassign 26
 #define cbDisable 27
+
+// §37.17 Variables / §37.22 Object range: the variable object kinds (vpiBitVar,
+// vpiStructVar, ...), the backward-compatibility aliases of detail 19 (vpiVarBit,
+// vpiLogicVar, vpiArrayVar), and the related properties (vpiArrayType,
+// vpiRandType, vpiVisibility, vpiArrayMember, vpiStructUnionMember, ...) are all
+// defined by the Annex M source listing in sv_vpi_user.h. The range relations
+// (vpiSize, vpiLeftRange, vpiRightRange, vpiRange, vpiBit, vpiIndex, vpiParent,
+// vpiScalar, vpiVector, vpiConstantSelect, vpiDecompile) are defined above. The
+// helpers declared below apply the clause rules on top of those constants.
 
 // §K.2: delay structure exchanged with the delay-processing routines. Zero
 // initialization leaves no delay array, zero delays and every flag cleared.
