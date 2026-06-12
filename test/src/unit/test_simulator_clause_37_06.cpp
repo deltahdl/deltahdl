@@ -62,5 +62,22 @@ TEST_F(Interface, IndexTransitionIsNullWhenNotAnArrayElement) {
   EXPECT_EQ(VpiHandleC(vpiIndex, &standalone), nullptr);
 }
 
+// D1 edge: an interface marked as an array element but carrying no recorded
+// index expression reports NULL directly. The array-member branch hands back
+// whatever index_expr holds - here, none - rather than diverting to the generic
+// child walk and surfacing some unrelated expr child.
+TEST_F(Interface, IndexTransitionIsNullForArrayElementWithoutIndexExpr) {
+  VpiObject child_expr;
+  child_expr.type = vpiConstant;
+
+  VpiObject member;
+  member.type = vpiInterface;
+  member.array_member = true;
+  member.index_expr = nullptr;          // array element, but no index recorded
+  member.children.push_back(&child_expr);  // must not be reported via vpiIndex
+
+  EXPECT_EQ(VpiHandleC(vpiIndex, &member), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
