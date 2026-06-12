@@ -110,5 +110,38 @@ TEST_F(VpiObjectProtection, GetStrOtherPropertyOnProtectedObjectIsAnError) {
   EXPECT_NE(info.level, 0);
 }
 
+// Claim (string form of the second permitted exception): vpiIsProtected is, like
+// vpiType, permitted on a protected object for all objects. Through vpi_get_str
+// it has no string representation (it is a Boolean), so the call hands back a
+// null pointer - but the protected-object guard must not have fired, so no error
+// is recorded. This distinguishes the permitted exception (silent null) from a
+// blocked property (null plus a recorded error).
+TEST_F(VpiObjectProtection, GetStrIsProtectedIsPermittedOnProtectedObject) {
+  VpiObject mod;
+  mod.type = vpiModule;
+  mod.is_protected = true;
+
+  EXPECT_EQ(vpi_get_str(vpiIsProtected, &mod), nullptr);
+
+  SVpiErrorInfo info = {};
+  EXPECT_EQ(VpiChkErrorC(&info), 0);
+}
+
+// Edge (boundary of the protected-object rule): the access error applies only to
+// protected objects. An ordinary object reports a non-exception property such as
+// vpiSize normally and records no error, confirming the guard keys off the
+// object's protection state rather than the property being requested.
+TEST_F(VpiObjectProtection, GetNonExceptionPropertyOnOrdinaryObjectSucceeds) {
+  VpiObject reg;
+  reg.type = vpiReg;
+  reg.size = 16;
+  // not protected
+
+  EXPECT_EQ(vpi_get(vpiSize, &reg), 16);
+
+  SVpiErrorInfo info = {};
+  EXPECT_EQ(VpiChkErrorC(&info), 0);
+}
+
 }  // namespace
 }  // namespace delta
