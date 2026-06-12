@@ -1370,6 +1370,29 @@ VpiHandle VpiWaitConditionExpr(VpiHandle wait);
 // Backs the public vpi_handle(vpiExpr, repeat_control) dispatch.
 VpiHandle VpiRepeatControlExpr(VpiHandle repeat_control);
 
+// §37.71 If, if-else: whether an object kind is one of the two conditional
+// statements the if/if-else diagram groups - a plain if statement or an
+// if-else statement. Both reach a controlling condition (vpiCondition) and a
+// then-branch body (the generic vpiStmt edge); the if-else additionally reaches
+// an else-branch body (vpiElseStmt).
+bool VpiIsIfOrIfElseType(int type);
+
+// §37.71 If, if-else: the controlling condition expression an if or if-else
+// statement reaches through vpiCondition. The condition's own type is an
+// expression kind rather than the vpiCondition relation tag, so it is found as
+// the statement's first expression child; null when none is attached. Backs the
+// public vpi_handle(vpiCondition, if/if-else) dispatch.
+VpiHandle VpiIfConditionExpr(VpiHandle if_stmt);
+
+// §37.71 If, if-else: the else-branch body an if-else statement reaches through
+// vpiElseStmt. The then-branch and the else-branch are both body statements; the
+// then-branch is served by the generic vpiStmt traversal (the first body child)
+// and the else-branch is the second body child, found here. Its own type is a
+// statement kind rather than the vpiElseStmt relation tag, so the generic walk
+// cannot serve it; null when the statement has no else branch. Backs the public
+// vpi_handle(vpiElseStmt, if-else) dispatch.
+VpiHandle VpiIfElseStmt(VpiHandle if_stmt);
+
 // §37.12 detail 1: whether an object kind is a block item declaration - a
 // variable declaration or a type declaration. These are the declarations whose
 // presence makes an unnamed begin or unnamed fork a scope.

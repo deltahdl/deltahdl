@@ -1119,6 +1119,48 @@ VpiHandle VpiRepeatControlExpr(VpiHandle repeat_control) {
   return nullptr;
 }
 
+bool VpiIsIfOrIfElseType(int type) {
+  // §37.71: the two conditional statements the if/if-else diagram groups - a
+  // plain if statement and an if-else statement. Both reach a controlling
+  // condition expression (vpiCondition) and a then-branch body (the generic
+  // vpiStmt edge); the if-else additionally draws an else-branch body
+  // (vpiElseStmt).
+  return type == vpiIf || type == vpiIfElse;
+}
+
+VpiHandle VpiIfConditionExpr(VpiHandle if_stmt) {
+  // §37.71: an if or if-else statement reaches its controlling condition through
+  // vpiCondition. The condition's own type is an expression kind (an operation,
+  // a reference, a constant, ...) rather than the vpiCondition relation tag, so
+  // it is found by scanning for the first expression child. The branch bodies
+  // are statement children and are skipped by this scan. Null when none is
+  // attached.
+  if (!if_stmt) return nullptr;
+  for (auto* child : if_stmt->children) {
+    if (VpiIsExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
+VpiHandle VpiIfElseStmt(VpiHandle if_stmt) {
+  // §37.71: an if-else statement reaches its else-branch body through
+  // vpiElseStmt. The then-branch and the else-branch are both body statements
+  // (modeled, like every other statement body in this data model, as a vpiStmt
+  // child); the generic traversal serves the then-branch as the first such
+  // child, so the else-branch is the second one. Its own type is a statement
+  // kind rather than the vpiElseStmt relation tag, so the generic walk cannot
+  // find it. Null when there is no second body statement (no else branch).
+  if (!if_stmt) return nullptr;
+  bool seen_then = false;
+  for (auto* child : if_stmt->children) {
+    if (child->type == vpiStmt) {
+      if (seen_then) return child;
+      seen_then = true;
+    }
+  }
+  return nullptr;
+}
+
 VpiHandle VpiDelayControlStmt(VpiHandle delay_control) {
   // §37.68 detail 1: a delay control reaches the statement it guards through
   // vpiStmt. When the delay control is associated with an assignment - i.e. it
@@ -3862,6 +3904,26 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // the generic vpiStmt traversal below and needs no special case here.
   if (type == vpiCondition && VpiIsWhileOrRepeatType(ref->type)) {
     return VpiLoopConditionExpr(ref);
+  }
+
+  // §37.71: vpiCondition of an if or if-else statement reaches its controlling
+  // condition expression. As with the loop statements above, the condition's own
+  // type is an expression kind rather than the vpiCondition relation tag, so the
+  // generic traversal below cannot find it. The relation is gated on the
+  // conditional statement kinds so it does not also serve the vpiCondition edge
+  // other diagrams draw. The then-branch body, drawn by the diagram's unlabeled
+  // edge to a statement, is reached by the generic vpiStmt traversal below.
+  if (type == vpiCondition && VpiIsIfOrIfElseType(ref->type)) {
+    return VpiIfConditionExpr(ref);
+  }
+
+  // §37.71: vpiElseStmt of an if-else statement reaches its else-branch body.
+  // The relation is drawn only from the if-else grouping, never from a plain if,
+  // so it is gated on the if-else kind. The else statement's own type is a
+  // statement kind rather than the vpiElseStmt relation tag, so the generic
+  // traversal below cannot find it.
+  if (type == vpiElseStmt && ref->type == vpiIfElse) {
+    return VpiIfElseStmt(ref);
   }
 
   // §37.69: vpiExpr of a repeat control reaches its count expression - the
