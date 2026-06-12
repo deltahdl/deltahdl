@@ -3083,6 +3083,14 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return ref->array_member ? ref->index_expr : nullptr;
   }
 
+  // §37.9 detail 1: vpiIndex from a program reaches the index expression that
+  // locates the program within its instance array. As with an array-member
+  // primitive, a program that is not an element of an instance array reports
+  // NULL here rather than letting the generic walk find some other expr child.
+  if (type == vpiIndex && ref->type == vpiProgram) {
+    return ref->array_member ? ref->index_expr : nullptr;
+  }
+
   if (ref->parent && ref->parent->type == type) return ref->parent;
 
   for (auto* child : ref->children) {
