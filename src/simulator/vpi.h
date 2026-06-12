@@ -1436,6 +1436,42 @@ const char* VpiInterfaceTypespecDefName(VpiHandle interface_typespec);
 VpiHandle VpiInterfaceTypespecParent(VpiHandle interface_typespec);
 
 // ===========================================================================
+// §37.48 Clocking block. The VPI object model for a clocking block
+// (vpiClockingBlock) and the clocking io decls (vpiClockingIODecl) it contains.
+// Most of the figure - the input/output skew delay controls, the clocking event,
+// the contained io/property/sequence decls, and the vpiName/vpiFullName and
+// vpiInputEdge/vpiOutputEdge properties - is served by the generic Get/GetStr/
+// Iterate/Handle machinery once the objects' fields and children are populated;
+// detail 1 only records that those skew/edge relations target the default
+// constructs on a clocking block and the io decl itself on an io decl. The three
+// numbered Details that refine traversal - vpiPrefix (detail 2), vpiActual
+// (detail 3), and vpiExpr of an io decl (detail 4) - are carried by the helpers
+// below, which also drive the public vpi_handle dispatch.
+// ===========================================================================
+
+// §37.48 detail 2: vpiPrefix of a clocking block - the virtual interface var the
+// clocking block expression is immediately prefixed by (e.g., "vif.cb"). It is
+// modeled as a virtual interface var child; a clocking block that is not so
+// prefixed has none and reports NULL.
+VpiHandle VpiClockingBlockPrefix(VpiHandle block);
+
+// §37.48 detail 3: vpiActual of a clocking block - the concrete clocking block
+// selected through its virtual interface prefix. When the prefix is a virtual
+// interface that holds no value at the current simulation time (its own vpiActual
+// is NULL), the clocking block's vpiActual is NULL as well.
+VpiHandle VpiClockingBlockActual(VpiHandle block);
+
+// §37.48 (figure, clocking io decl -> nets / variables / ref obj): the object
+// kinds a clocking io decl's vpiExpr relation may reach - the net, variable, or
+// ref obj the io decl names.
+bool VpiIsClockingIODeclExprType(int type);
+
+// §37.48 detail 4: vpiExpr of a clocking io decl - the expression or ref obj the
+// io decl names. For "enable = top.mem1.enable" the io decl "enable" reaches a
+// handle to the ref obj "top.mem1.enable"; NULL when the io decl names nothing.
+VpiHandle VpiClockingIODeclExpr(VpiHandle io_decl);
+
+// ===========================================================================
 // §37.13 IO declaration. The VPI object model for an io decl (vpiIODecl): a
 // module/UDP/task/function port or argument declaration. The diagram's
 // properties (vpiDirection/vpiName/vpiScalar/vpiSigned/vpiSize/vpiVector) and

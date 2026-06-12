@@ -1775,6 +1775,62 @@ VpiHandle VpiInterfaceTypespecParent(VpiHandle interface_typespec) {
 }
 
 // ===========================================================================
+// §37.48 Clocking block.
+// ===========================================================================
+
+VpiHandle VpiClockingBlockPrefix(VpiHandle block) {
+  // §37.48 detail 2: vpiPrefix of a clocking block is non-NULL exactly when the
+  // clocking block names an expression immediately prefixed by a virtual
+  // interface (for example "vif.cb"). That prefix - the virtual interface var -
+  // is modeled as a virtual interface var child. A clocking block that is not so
+  // prefixed has no such child, so the relation reports NULL. The generic walk
+  // cannot serve this transition: vpiPrefix and vpiVirtualInterfaceVar are
+  // different type tags, so the prefix child is only found here.
+  if (!block || block->type != vpiClockingBlock) return nullptr;
+  for (auto* child : block->children) {
+    if (child->type == vpiVirtualInterfaceVar) return child;
+  }
+  return nullptr;
+}
+
+VpiHandle VpiClockingBlockActual(VpiHandle block) {
+  // §37.48 detail 3: vpiActual of a clocking block reaches the concrete clocking
+  // block selected through its virtual interface prefix, held on the designated
+  // actual pointer. When the prefix is a virtual interface that has no value at
+  // the current simulation time - its own vpiActual being NULL, exactly as a
+  // virtual interface var is left uninitialized in §37.29 - the clocking block's
+  // vpiActual is NULL as well, regardless of any resolved actual.
+  if (!block || block->type != vpiClockingBlock) return nullptr;
+  VpiHandle prefix = VpiClockingBlockPrefix(block);
+  if (prefix && prefix->actual == nullptr) return nullptr;
+  return block->actual;
+}
+
+bool VpiIsClockingIODeclExprType(int type) {
+  // §37.48 (figure, clocking io decl -> nets / variables / ref obj): the object
+  // kinds a clocking io decl's vpiExpr relation may reach. As in §37.13's io
+  // decl, the named target is a net, a variable (a logic var shares vpiReg's
+  // code), or a ref obj.
+  return type == vpiRefObj || type == kVpiNet || type == kVpiReg ||
+         type == vpiVariables || VpiIsLogicVarType(type);
+}
+
+VpiHandle VpiClockingIODeclExpr(VpiHandle io_decl) {
+  // §37.48 detail 4: vpiExpr of a clocking io decl reaches the expression or ref
+  // obj the io decl names. For "enable = top.mem1.enable" the io decl "enable"
+  // reaches a handle to the ref obj "top.mem1.enable". The named object is
+  // modeled as the first child of a net / variable / ref obj kind; the io decl's
+  // other children (its input/output skews) are not the named expression. The
+  // generic walk cannot serve this transition because vpiExpr and the named
+  // object carry different type tags.
+  if (!io_decl || io_decl->type != vpiClockingIODecl) return nullptr;
+  for (auto* child : io_decl->children) {
+    if (VpiIsClockingIODeclExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
+// ===========================================================================
 // §37.13 IO declaration.
 // ===========================================================================
 
@@ -3107,6 +3163,26 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // that bound it. It is NULL while the virtual interface is uninitialized.
   if (type == vpiActual && ref->type == vpiVirtualInterfaceVar) {
     return ref->actual;
+  }
+
+  // §37.48 detail 3: vpiActual of a clocking block reaches the concrete clocking
+  // block selected through a virtual interface prefix, or NULL when that prefix
+  // holds no value at the current simulation time.
+  if (type == vpiActual && ref->type == vpiClockingBlock) {
+    return VpiClockingBlockActual(ref);
+  }
+
+  // §37.48 detail 2: vpiPrefix of a clocking block reaches the virtual interface
+  // var the clocking block expression is immediately prefixed by; NULL when the
+  // clocking block is not a virtual-interface-prefixed expression.
+  if (type == vpiPrefix && ref->type == vpiClockingBlock) {
+    return VpiClockingBlockPrefix(ref);
+  }
+
+  // §37.48 detail 4: vpiExpr of a clocking io decl reaches the expression or ref
+  // obj the io decl names.
+  if (type == vpiExpr && ref->type == vpiClockingIODecl) {
+    return VpiClockingIODeclExpr(ref);
   }
 
   // §37.15 detail 7: a ref obj's vpiTypespec is gated on the kind of its actual.
