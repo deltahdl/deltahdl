@@ -1152,6 +1152,61 @@ VpiHandle VpiTypespecForTypeParameter(VpiHandle type_parameter,
                                       VpiHandle resolved_typespec);
 
 // ===========================================================================
+// §37.13 IO declaration. The VPI object model for an io decl (vpiIODecl): a
+// module/UDP/task/function port or argument declaration. The diagram's
+// properties (vpiDirection/vpiName/vpiScalar/vpiSigned/vpiSize/vpiVector) and
+// the structural reach from instance/UDP/task-func/module are served by the
+// generic Get/Handle machinery; the four numbered details that refine the
+// model are carried by the helpers below. The range relations (detail 4) are
+// defined to equal the corresponding typespec's, so they rest on §37.25.
+// ===========================================================================
+
+// §37.13 (vpiExpr targets): the object kinds the single vpiExpr relation of an
+// io decl may draw to - a ref obj, an interface tf decl, a connected net or
+// variable, or (for a virtual interface) a virtual interface var.
+bool VpiIsIoDeclExprType(int type);
+
+// §37.13 detail 2: the kind of handle vpiExpr of an io decl yields. An io decl
+// passed by reference, or one that is itself an interface or a modport, hands
+// back a ref obj (vpiRefObj). A virtual-interface io decl hands back a virtual
+// interface var (vpiVirtualInterfaceVar). Any other io decl reaches its
+// connected expression - the net, variable, or interface tf decl supplied as
+// default_expr_type - directly.
+int VpiIoDeclExprType(bool passed_by_reference, bool is_interface_or_modport,
+                      bool is_virtual_interface, int default_expr_type);
+
+// §37.13 details 1 and 3: the vpiDirection an io decl reports. Detail 3 takes
+// precedence: an io decl whose vpiExpr is a ref obj whose vpiActual is an
+// interface or modport declaration, or whose vpiExpr is a virtual interface
+// var, has an undefined direction (reported as vpiNoDirection). Otherwise
+// detail 1 applies - a port or argument passed by reference reports vpiRef, and
+// every other passing mode keeps its declared direction.
+int VpiIoDeclDirection(int declared_direction, bool passed_by_reference,
+                       bool expr_is_ref_obj_to_interface_or_modport,
+                       bool expr_is_virtual_interface_var);
+
+// §37.13 detail 2: the io decl's vpiExpr target - the designated connection
+// child reached through the single vpiExpr relation. That child's own type is
+// one of the expr-target kinds (not vpiExpr), so the shared traversal cannot
+// find it by type; this returns the first such child. Null when the handle is
+// null, is not an io decl, or carries no expr-target child.
+VpiHandle VpiIoDeclExpr(VpiHandle io_decl);
+
+// §37.13 detail 4 (woven with §37.25): the ranges vpi_iterate(vpiRange, io_decl)
+// returns are the same as for the io decl's corresponding typespec, so this
+// defers to §37.25's typespec range helper.
+std::vector<VpiRangeDesc> VpiIoDeclRanges(
+    const std::vector<VpiArrayDimension>& dims);
+
+// §37.13 detail 4 (woven with §37.25): vpiLeftRange of an io decl, identical to
+// the corresponding typespec's vpiLeftRange.
+VpiHandle VpiIoDeclLeftRange(const std::vector<VpiArrayDimension>& dims);
+
+// §37.13 detail 4 (woven with §37.25): vpiRightRange of an io decl, the mirror
+// of VpiIoDeclLeftRange.
+VpiHandle VpiIoDeclRightRange(const std::vector<VpiArrayDimension>& dims);
+
+// ===========================================================================
 // §37.16 Nets. The VPI net object model, the net counterpart of §37.17's
 // variable model. Each helper applies one of the clause's numbered "Details" so
 // the rule can be observed independently of the surrounding elaboration and

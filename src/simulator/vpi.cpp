@@ -1482,6 +1482,71 @@ VpiHandle VpiTypespecForTypeParameter(VpiHandle type_parameter,
 }
 
 // ===========================================================================
+// §37.13 IO declaration.
+// ===========================================================================
+
+bool VpiIsIoDeclExprType(int type) {
+  // §37.13: the object kinds the io decl's vpiExpr relation draws to - the named
+  // ref obj / interface tf decl / virtual interface var target boxes plus the
+  // nets and variables groupings (a logic var shares vpiReg's code).
+  return type == vpiRefObj || type == vpiInterfaceTfDecl ||
+         type == vpiVirtualInterfaceVar || type == kVpiNet || type == kVpiReg;
+}
+
+int VpiIoDeclExprType(bool passed_by_reference, bool is_interface_or_modport,
+                      bool is_virtual_interface, int default_expr_type) {
+  // §37.13 detail 2: a virtual-interface io decl resolves to its virtual
+  // interface var; an io decl passed by reference, or one that is an interface
+  // or a modport, resolves to a ref obj. Anything else keeps the directly
+  // connected expression kind the caller already knows.
+  if (is_virtual_interface) return vpiVirtualInterfaceVar;
+  if (passed_by_reference || is_interface_or_modport) return vpiRefObj;
+  return default_expr_type;
+}
+
+int VpiIoDeclDirection(int declared_direction, bool passed_by_reference,
+                       bool expr_is_ref_obj_to_interface_or_modport,
+                       bool expr_is_virtual_interface_var) {
+  // §37.13 detail 3 first: an io decl whose vpiExpr denotes an interface/modport
+  // (through a ref obj) or a virtual interface var has no defined direction.
+  if (expr_is_ref_obj_to_interface_or_modport ||
+      expr_is_virtual_interface_var) {
+    return vpiNoDirection;
+  }
+  // §37.13 detail 1: a port or argument passed by reference reports vpiRef.
+  if (passed_by_reference) return vpiRef;
+  return declared_direction;
+}
+
+VpiHandle VpiIoDeclExpr(VpiHandle io_decl) {
+  // §37.13 detail 2: vpiExpr of an io decl reaches a single designated
+  // connection whose own type is an expr-target kind rather than vpiExpr, so the
+  // first such child is the relation's target.
+  if (!io_decl || io_decl->type != vpiIODecl) return nullptr;
+  for (auto* child : io_decl->children) {
+    if (VpiIsIoDeclExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
+std::vector<VpiRangeDesc> VpiIoDeclRanges(
+    const std::vector<VpiArrayDimension>& dims) {
+  // §37.13 detail 4: the io decl's vpiRange iteration is the same as for its
+  // corresponding typespec (§37.25).
+  return VpiTypespecRanges(dims);
+}
+
+VpiHandle VpiIoDeclLeftRange(const std::vector<VpiArrayDimension>& dims) {
+  // §37.13 detail 4: vpiLeftRange is the corresponding typespec's vpiLeftRange.
+  return VpiTypespecLeftRange(dims);
+}
+
+VpiHandle VpiIoDeclRightRange(const std::vector<VpiArrayDimension>& dims) {
+  // §37.13 detail 4: vpiRightRange is the corresponding typespec's vpiRightRange.
+  return VpiTypespecRightRange(dims);
+}
+
+// ===========================================================================
 // §37.16 Nets.
 // ===========================================================================
 
@@ -2335,6 +2400,13 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // whose own type happens to be vpiExpr.
   if (type == vpiExpr && VpiIsInstanceArrayType(ref->type)) {
     return VpiInstanceArrayConnections(ref);
+  }
+
+  // §37.13 detail 2: vpiExpr of an io decl reaches its designated connection -
+  // a ref obj, virtual interface var, net, variable, or interface tf decl -
+  // whose own type is not vpiExpr, so the shared traversal below cannot find it.
+  if (type == vpiExpr && ref->type == vpiIODecl) {
+    return VpiIoDeclExpr(ref);
   }
 
   if (ref->parent && ref->parent->type == type) return ref->parent;
