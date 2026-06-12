@@ -4551,6 +4551,26 @@ int VpiContext::CompareObjects(VpiHandle obj1, VpiHandle obj2) {
   return a == b ? 1 : 0;
 }
 
+VpiHandle VpiContext::CreateHandleFor(VpiHandle object) {
+  // §37.2.1: a null object denotes nothing, so there is no handle to create.
+  if (object == nullptr) return nullptr;
+
+  // Resolve through any existing alias chain to the representative of the
+  // underlying object so the new handle points straight at it. The fresh handle
+  // is a distinct object (a different pointer than the one passed in), which is
+  // the "may create two distinct handles" latitude the standard grants.
+  VpiObject* rep = ResolveSameObject(object);
+  auto* handle = AllocObject();
+  handle->type = rep->type;
+
+  // §37.2.1: the new handle and the original both refer to the same object, so
+  // they are equivalent. Recording that this handle denotes `rep` lets
+  // vpi_compare_objects() resolve the two to a common representative and report
+  // them equal despite their pointers differing.
+  handle->same_object_as = rep;
+  return handle;
+}
+
 VpiHandle VpiContext::CreateModule(std::string_view name,
                                    std::string full_name) {
   auto* obj = AllocObject();

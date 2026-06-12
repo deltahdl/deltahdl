@@ -2332,6 +2332,16 @@ class VpiContext {
   // object equivalence cannot be settled with a C "==" comparison.
   int CompareObjects(VpiHandle obj1, VpiHandle obj2);
 
+  // §37.2.1: hand back a handle that refers to an existing object. The standard
+  // lets a tool answer a request for a handle to an object it can already name
+  // either with the same handle or with a fresh, distinct one; this routine
+  // takes the latter option, allocating a new handle (a different pointer) that
+  // nonetheless denotes the same underlying object. Because the two handles
+  // refer to one object they are equivalent: vpi_compare_objects() reports them
+  // equal even though a C "==" of the handle pointers would not. A null object
+  // names nothing, so the result is null.
+  VpiHandle CreateHandleFor(VpiHandle object);
+
   VpiHandle CreateModule(std::string_view name, std::string full_name);
 
   VpiHandle CreatePort(std::string_view name, int direction, VpiHandle parent);
