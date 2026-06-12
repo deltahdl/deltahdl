@@ -731,6 +731,47 @@ bool VpiIsExprType(int type) {
   }
 }
 
+bool VpiIsAtomicStmtType(int type) {
+  // §37.60: the members drawn inside the atomic stmt class. The waits, disables,
+  // and tf call entries are themselves groupings; their concrete kinds (the wait,
+  // the disable, and the task/system-task calls) stand in for them here.
+  switch (type) {
+    case vpiIf:
+    case vpiIfElse:
+    case vpiWhile:
+    case vpiRepeat:
+    case vpiWait:           // the "waits" grouping
+    case vpiCase:
+    case vpiFor:
+    case vpiDelayControl:
+    case vpiEventControl:
+    case vpiEventStmt:
+    case vpiAssignment:
+    case vpiAssignStmt:
+    case vpiDeassign:
+    case vpiDisable:        // the "disables" grouping
+    case vpiTaskCall:       // the "tf call" grouping: a task call ...
+    case vpiSysTaskCall:    // ... or a system-task call
+    case vpiForever:
+    case vpiForce:
+    case vpiRelease:
+    case vpiDoWhile:
+    case vpiExpectStmt:
+    case vpiForeachStmt:
+    case vpiImmediateAssert:
+    // vpiReturn shares this constant value with vpiImmediateAssume in this header
+    // set, so the return statement is classified through the same case.
+    case vpiImmediateAssume:
+    case vpiImmediateCover:
+    case vpiBreak:
+    case vpiContinue:
+    case vpiNullStmt:
+      return true;
+    default:
+      return false;
+  }
+}
+
 std::vector<VpiHandle> VpiMultiConcatOperands(
     VpiHandle multiplier, const std::vector<VpiHandle>& concat_exprs) {
   // §37.59 detail 1: the multiplier first, then the concatenation's expressions
@@ -3473,6 +3514,12 @@ const char* VpiContext::GetStr(int property, VpiHandle obj) {
       if (obj->type == vpiPort) {
         return VpiPortName(obj->explicit_name, obj->name.data(),
                            obj->name.data());
+      }
+      // §37.60 detail 1: an atomic statement's vpiName is its label when one was
+      // written, and NULL otherwise - never an empty string for an unlabeled
+      // statement.
+      if (VpiIsAtomicStmtType(obj->type)) {
+        return obj->name.empty() ? nullptr : obj->name.data();
       }
       return obj->name.data();
     // §37.49: the file component of an assertion's source location. The general

@@ -705,6 +705,15 @@ VpiHandle VpiSeqFormalInitExpr(VpiHandle formal);
 // accessible on a protected expression) and to classify diagram members.
 bool VpiIsExprType(int type);
 
+// §37.60: the statement kinds the atomic stmt class groups in the object model
+// diagram - the procedural control statements (if, if-else, while, repeat, the
+// waits, case, for, the timing controls, the event statement, the assignments,
+// deassign, the disables, the tf calls, forever, force, release, do-while, the
+// expect/foreach/return statements, break, continue, the immediate assertions,
+// and the null statement). Used to scope detail 1, which gives an atomic
+// statement a single label edge: vpiName reports its label, or NULL when none.
+bool VpiIsAtomicStmtType(int type);
+
 // §37.59 detail 1: the operand order of a vpiMultiConcatOp operation. The first
 // operand is the multiplier expression; the remaining operands are the
 // expressions within the concatenation, in source order.
