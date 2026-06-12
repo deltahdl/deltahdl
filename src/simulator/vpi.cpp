@@ -3558,6 +3558,22 @@ static const char* VpiTypeConstantName(int type) {
 }
 
 const char* VpiContext::GetStr(int property, VpiHandle obj) {
+  // §38.11: vpi_get_str() returns string property values. The value is placed in
+  // a single temporary buffer reused by every call - so a pointer from an
+  // earlier call is overwritten by the next - and that buffer is distinct from
+  // str_pool_, the storage for s_vpi_value strings. A null raw result (null or
+  // protected object, or a property with no string) yields null, not "".
+  const char* raw = GetStrRaw(property, obj);
+  if (!raw) return nullptr;
+  // Reserve once so repeated assigns of typical-length strings keep writing into
+  // the same allocation, leaving an earlier returned pointer valid until the
+  // next call overwrites its contents.
+  if (get_str_buffer_.capacity() < 256) get_str_buffer_.reserve(256);
+  get_str_buffer_.assign(raw);
+  return get_str_buffer_.c_str();
+}
+
+const char* VpiContext::GetStrRaw(int property, VpiHandle obj) {
   if (!obj) return nullptr;
   // §37.3.6: a protected object's properties are inaccessible unless otherwise
   // specified, so a string query for one is an error. The vpiType and

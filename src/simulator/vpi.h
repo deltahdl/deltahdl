@@ -1969,6 +1969,10 @@ class VpiContext {
   int SmallestModuleTimePrecision() const;
 
   const char* GetStr(int property, VpiHandle obj);
+  // §38.11: computes the raw string value for a property, pointing into the
+  // object's own storage (or null). GetStr() copies the result into the shared
+  // temporary buffer the clause mandates; this helper does not.
+  const char* GetStrRaw(int property, VpiHandle obj);
   int FreeObject(VpiHandle obj);
   // §38.4: vpi_control() passes an operation-specific request from the PLI
   // application to the simulator. arg0..arg2 carry the operation's additional
@@ -2082,6 +2086,12 @@ class VpiContext {
   std::string version_ = "0.1.0";
 
   std::vector<std::string> str_pool_;
+
+  // §38.11: vpi_get_str() places its result in one temporary buffer that every
+  // call reuses, so an earlier returned pointer is clobbered by a later call.
+  // It is deliberately separate storage from str_pool_ (the buffer that backs
+  // s_vpi_value strings), which the clause requires to be a different buffer.
+  std::string get_str_buffer_;
 
   // §38.15: vpi_get_value() owns the memory for the vector arm of the value
   // union; each retrieval keeps its s_vpi_vecval array alive here until the
