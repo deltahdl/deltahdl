@@ -808,6 +808,23 @@ VpiHandle VpiEventControlStmt(VpiHandle event_control) {
   return nullptr;
 }
 
+VpiHandle VpiDelayControlStmt(VpiHandle delay_control) {
+  // §37.68 detail 1: a delay control reaches the statement it guards through
+  // vpiStmt. When the delay control is associated with an assignment - i.e. it
+  // is the delay control drawn on an assignment object (§37.64) - that statement
+  // is always null, since the assignment itself is the action and there is no
+  // separate guarded statement. For any other delay control the first statement
+  // child is returned, or null when none is attached.
+  if (!delay_control) return nullptr;
+  if (delay_control->parent && delay_control->parent->type == vpiAssignment) {
+    return nullptr;
+  }
+  for (auto* child : delay_control->children) {
+    if (child->type == vpiStmt) return child;
+  }
+  return nullptr;
+}
+
 std::vector<VpiHandle> VpiMultiConcatOperands(
     VpiHandle multiplier, const std::vector<VpiHandle>& concat_exprs) {
   // §37.59 detail 1: the multiplier first, then the concatenation's expressions
@@ -2768,6 +2785,14 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // below would otherwise find.
   if (type == vpiStmt && ref->type == vpiEventControl) {
     return VpiEventControlStmt(ref);
+  }
+
+  // §37.68 detail 1: vpiStmt of a delay control reaches the statement it guards,
+  // except that a delay control associated with an assignment always reports a
+  // null statement rather than the first statement child the generic traversal
+  // below would otherwise find.
+  if (type == vpiStmt && ref->type == vpiDelayControl) {
+    return VpiDelayControlStmt(ref);
   }
 
   if (ref->parent && ref->parent->type == type) return ref->parent;
