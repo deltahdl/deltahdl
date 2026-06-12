@@ -2679,6 +2679,50 @@ std::string VpiNetFullName(const VpiVariableNameParts& parts) {
 }
 
 // ===========================================================================
+// §37.24 Generic interconnect.
+//
+// The generic-interconnect data model draws an interconnect array and the
+// interconnect nets it ultimately resolves to. The relations that step into an
+// interconnect's subobjects - vpiElement (an array element or a net's array
+// element) and vpiMember (a net's struct member) - are named for the relation,
+// not for the kind of object reached, so the Iterate dispatcher recognizes them
+// specially below.
+// ===========================================================================
+
+bool VpiIsInterconnectSubelementType(int type) {
+  // §37.24 details 1 and 2: stepping into an interconnect reaches another
+  // interconnect object - a nested interconnect array (a further dimension
+  // level) or a leaf interconnect net.
+  return type == vpiInterconnectArray || type == vpiInterconnectNet;
+}
+
+bool VpiIsInterconnectArrayDataTypespec(int typespec_type) {
+  // §37.24 detail 1: vpiElement reaches an interconnect net's elements only when
+  // the data type of the typespec it connects to is a packed or unpacked array.
+  return typespec_type == vpiArrayTypespec ||
+         typespec_type == vpiPackedArrayTypespec;
+}
+
+bool VpiIsInterconnectStructDataTypespec(int typespec_type) {
+  // §37.24 detail 1: vpiMember reaches an interconnect net's members only when
+  // the data type of the typespec it connects to is a packed or unpacked struct;
+  // a union is likewise member-bearing and reached the same way.
+  return typespec_type == vpiStructTypespec || typespec_type == vpiUnionTypespec;
+}
+
+int VpiInterconnectNetTypespecType(VpiHandle interconnect_net) {
+  // §37.24 detail 1: an interconnect net's typespec is the typespec of the net
+  // or nets it connects to (§37.16 detail 13 hands it back). Its data-type kind
+  // selects whether vpiElement or vpiMember reaches the net's subobjects, so
+  // report the kind of the net's typespec child; zero when it has none.
+  if (!interconnect_net) return 0;
+  for (auto* child : interconnect_net->children) {
+    if (VpiIsTypespecType(child->type)) return child->type;
+  }
+  return 0;
+}
+
+// ===========================================================================
 // §37.11 Instance arrays.
 // ===========================================================================
 
@@ -3786,6 +3830,27 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   bool packed_array_var_index_iteration =
       ref && ref->type == vpiPackedArrayVar && type == vpiIndex;
 
+  // §37.24 detail 2: vpiElement on an interconnect array reaches its subelements
+  // one dimension level at a time - each is itself an interconnect array (a
+  // further dimension) or a leaf interconnect net - rather than children whose
+  // own type is literally vpiElement.
+  bool interconnect_array_element_iteration =
+      ref && ref->type == vpiInterconnectArray && type == vpiElement;
+
+  // §37.24 detail 1: vpiElement on an interconnect net reaches the net's array
+  // elements, but only when the typespec it connects to has a packed or unpacked
+  // array data type; a net connected to a non-array type has no such elements.
+  bool interconnect_net_element_iteration =
+      ref && ref->type == vpiInterconnectNet && type == vpiElement &&
+      VpiIsInterconnectArrayDataTypespec(VpiInterconnectNetTypespecType(ref));
+
+  // §37.24 detail 1: vpiMember on an interconnect net reaches the net's struct
+  // members, but only when the typespec it connects to has a packed or unpacked
+  // struct (or union) data type.
+  bool interconnect_net_member_iteration =
+      ref && ref->type == vpiInterconnectNet && type == vpiMember &&
+      VpiIsInterconnectStructDataTypespec(VpiInterconnectNetTypespecType(ref));
+
   // §37.20 detail 1: vpiMemoryWord is a backwards-compatibility relation. A
   // memory has been generalized to a reg array (vpiRegArray) and its words to
   // reg objects (vpiReg). Iterating vpiMemoryWord over a reg array therefore
@@ -3884,7 +3949,9 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
                   packed_array_var_element_iteration,
                   packed_array_var_index_iteration, class_methods_iteration,
                   class_derived_iteration, memory_word_iteration,
-                  extends_argument_iteration](int obj_type) {
+                  extends_argument_iteration, interconnect_array_element_iteration,
+                  interconnect_net_element_iteration,
+                  interconnect_net_member_iteration](int obj_type) {
     // §37.20 detail 1: a reg array's vpiMemoryWord iteration collects its reg
     // word objects (vpiReg), the backwards-compatible form of the legacy memory
     // words, rather than children whose own type is literally vpiMemoryWord.
@@ -3916,6 +3983,16 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
     // §37.18 detail 6: a packed array variable's vpiIndex iteration collects the
     // index expressions locating a subelement within its parent.
     if (packed_array_var_index_iteration) return VpiIsExprType(obj_type);
+    // §37.24 details 1 and 2: an interconnect array's vpiElement, an
+    // interconnect net's vpiElement, and an interconnect net's vpiMember each
+    // collect the interconnect subobjects they reach - a nested interconnect
+    // array or a leaf interconnect net - not children whose own type is
+    // literally vpiElement or vpiMember.
+    if (interconnect_array_element_iteration ||
+        interconnect_net_element_iteration ||
+        interconnect_net_member_iteration) {
+      return VpiIsInterconnectSubelementType(obj_type);
+    }
     // §37.72 detail 1: a case item's match expressions are reached through the
     // vpiExpr edge, which spans both patterns and plain expressions, so the
     // iteration collects every condition the item groups - not only children

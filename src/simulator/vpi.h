@@ -2191,6 +2191,30 @@ std::string VpiNetDecompile(const VpiVariableNameParts& parts);
 std::string VpiNetFullName(const VpiVariableNameParts& parts);
 
 // ===========================================================================
+// §37.24 Generic interconnect.
+// ===========================================================================
+
+// §37.24 details 1 and 2: the subobjects reached when stepping into an
+// interconnect (an array's elements, a net's array elements, or a net's struct
+// members) are themselves interconnect objects - a nested interconnect array or
+// a leaf interconnect net.
+bool VpiIsInterconnectSubelementType(int type);
+
+// §37.24 detail 1: an interconnect net supports vpiElement only when the data
+// type of the typespec it connects to is a packed or unpacked array.
+bool VpiIsInterconnectArrayDataTypespec(int typespec_type);
+
+// §37.24 detail 1: an interconnect net supports vpiMember only when the data
+// type of the typespec it connects to is a packed or unpacked struct (a union
+// is reached the same way).
+bool VpiIsInterconnectStructDataTypespec(int typespec_type);
+
+// §37.24 detail 1: the data-type kind of the typespec an interconnect net
+// connects to, used to decide whether vpiElement or vpiMember reaches the net's
+// subobjects. Zero when the net carries no typespec.
+int VpiInterconnectNetTypespecType(VpiHandle interconnect_net);
+
+// ===========================================================================
 // §37.11 Instance arrays.
 // ===========================================================================
 
