@@ -1071,6 +1071,87 @@ std::string VpiVariableDecompile(const VpiVariableNameParts& parts);
 std::string VpiVariableFullName(const VpiVariableNameParts& parts);
 
 // ===========================================================================
+// §37.25 Typespec. The VPI object model for a type specification. Each helper
+// applies one of the clause's numbered "Details"; the figure's range relations
+// route through §37.22 and a member's expr role reuses §37.59's expr class. The
+// figure attributes that carry no numbered Detail (vpiTagged/vpiSoft/vpiPacked/
+// vpiVector/vpiArrayType/vpiRandType) are defined by §37.26 and §37.17, not here.
+// ===========================================================================
+
+// §37.25: the object-type codes the data model groups under the typespec class -
+// every "... typespec" node of Figure 37.25, plus an unresolved type parameter,
+// which acts as a typespec (detail 11). Used to tell a member's typespec child
+// from its default-value expr child.
+bool VpiIsTypespecType(int type);
+
+// §37.25 detail 1: vpiName of a typespec. A typespec that denotes a user-defined
+// typedef reports that typedef's name (which may be the empty string for a field
+// defined inline, detail 5); a class typespec always reports the class name;
+// every SystemVerilog built-in type reports NULL.
+const char* VpiTypespecName(int ts_type, bool denotes_user_typedef,
+                            const char* typedef_name, const char* class_name);
+
+// §37.25 detail 1: vpiTypedefAlias of a typespec. A typespec whose typedef
+// creates an alias of another typedef hands back a handle to the aliased typedef;
+// a typespec that is not such an alias reports NULL.
+VpiHandle VpiTypespecTypedefAlias(bool is_alias, VpiHandle aliased_typedef);
+
+// §37.25 detail 2: vpiIndexTypespec of a typespec. The relation exists only on an
+// associative-array typespec, where it yields the type used as the array key; a
+// wildcard index type (see 7.8.1) yields NULL, and so does any typespec that is
+// not an associative array.
+VpiHandle VpiTypespecIndexTypespec(bool is_assoc_array_typespec,
+                                   bool wildcard_index, VpiHandle key_typespec);
+
+// §37.25 detail 3: the members vpi_iterate(vpiTypespecMember, typespec) walks.
+// Only a struct or union typespec has members; every other typespec kind yields
+// none.
+std::vector<VpiHandle> VpiTypespecMembers(
+    int ts_type, const std::vector<VpiHandle>& members);
+
+// §37.25 detail 3: the typespec relation of a struct/union member indicates the
+// member's type - the member's typespec child.
+VpiHandle VpiTypespecMemberTypespec(VpiHandle member);
+
+// §37.25 detail 4: vpiName of a typespec member is the member's own name, not the
+// name of the member's typespec.
+const char* VpiTypespecMemberName(VpiHandle member);
+
+// §37.25 detail 7: the expr of a typespec member is the explicit default value of
+// the corresponding member of an unpacked structure (see 7.2), reached as the
+// member's expr child; a member with no default reports NULL.
+VpiHandle VpiTypespecMemberDefaultExpr(VpiHandle member);
+
+// §37.25 detail 8: vpi_handle(vpiElemTypespec, typespec) unwinds one array
+// dimension at a time. A typespec that still has at least one range hands back
+// the element typespec with its leftmost range removed; a typespec with no ranges
+// present yields NULL.
+VpiHandle VpiTypespecElemTypespec(bool has_ranges, VpiHandle element_typespec);
+
+// §37.25 detail 10 (woven with §37.22): the ranges vpi_iterate(vpiRange,
+// typespec) returns, one per dimension from leftmost to rightmost. For an array
+// typespec these are the unpacked ranges; for a bit or logic typespec they are
+// the packed ranges. A dynamic-array, queue, or associative dimension contributes
+// an empty range.
+std::vector<VpiRangeDesc> VpiTypespecRanges(
+    const std::vector<VpiArrayDimension>& dims);
+
+// §37.25 detail 9: vpiLeftRange of a typespec - the left bound of its leftmost
+// dimension (the leftmost packed dimension of a logic/bit/packed-array typespec,
+// the leftmost unpacked dimension of an array typespec). NULL when there is no
+// dimension or that leftmost range is empty (§37.22).
+VpiHandle VpiTypespecLeftRange(const std::vector<VpiArrayDimension>& dims);
+
+// §37.25 detail 9: vpiRightRange of a typespec, the mirror of VpiTypespecLeftRange.
+VpiHandle VpiTypespecRightRange(const std::vector<VpiArrayDimension>& dims);
+
+// §37.25 detail 11: in a context where a type parameter has not been resolved,
+// the type parameter itself acts as the typespec. Returns the resolved typespec
+// when one exists, otherwise the type parameter handle itself.
+VpiHandle VpiTypespecForTypeParameter(VpiHandle type_parameter,
+                                      VpiHandle resolved_typespec);
+
+// ===========================================================================
 // §37.16 Nets. The VPI net object model, the net counterpart of §37.17's
 // variable model. Each helper applies one of the clause's numbered "Details" so
 // the rule can be observed independently of the surrounding elaboration and
