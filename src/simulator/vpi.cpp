@@ -3938,6 +3938,10 @@ int VpiContext::Get(int property, VpiHandle obj) {
     case vpiIsProtected:
       return obj->is_protected ? 1 : 0;
     case kVpiSize:
+      // §37.47 detail 1: a cont assign bit models a single bit of a continuous
+      // assignment, so its size is always scalar (one) regardless of any stored
+      // width.
+      if (obj->type == vpiContAssignBit) return 1;
       // §37.14 detail 11: a null port reports size 0; any other port reports its
       // bit width. Every other object reports its own stored size. §37.35 detail
       // 1: for a primitive that stored size is its number of inputs, so vpiSize
@@ -4073,6 +4077,21 @@ int VpiContext::Get(int property, VpiHandle obj) {
     case vpiLineNo:
       if (!VpiHasLocationProperties(obj->type)) return vpiUndefined;
       return obj->line_no;
+    // §37.47 detail 3: a cont assign bit reports its bit offset from the least
+    // significant bit through vpiOffset. The offset is measured from the LSB, so
+    // the LSB shall report zero - exactly the default this field holds.
+    case vpiOffset:
+      return obj->offset;
+    // §37.47: a continuous assignment reports whether it is a net declaration
+    // assignment through the vpiNetDeclAssign Boolean property.
+    case vpiNetDeclAssign:
+      return obj->net_decl_assign ? 1 : 0;
+    // §37.47: a continuous assignment reports the drive strengths on its 0 and 1
+    // values through vpiStrength0 and vpiStrength1.
+    case vpiStrength0:
+      return obj->strength0;
+    case vpiStrength1:
+      return obj->strength1;
     default:
       return 0;
   }

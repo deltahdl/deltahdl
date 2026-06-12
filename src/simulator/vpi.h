@@ -387,6 +387,24 @@ struct VpiObject {
   // likewise a built-in method task call reports NULL for vpiTask.
   bool builtin_method = false;
 
+  // §37.47 detail 3: the bit offset a cont assign bit reports through
+  // vpi_get(vpiOffset). The offset is measured from the least significant bit,
+  // so the LSB carries offset zero and the bit n positions above it carries
+  // offset n. Zero by default, which is the value the LSB must report.
+  int offset = 0;
+
+  // §37.47: whether a continuous assignment is a net declaration assignment (the
+  // assignment written as part of a net declaration, as in "wire w = a & b;")
+  // rather than a standalone assign statement. Reported through the
+  // vpiNetDeclAssign Boolean property; false by default.
+  bool net_decl_assign = false;
+
+  // §37.47: the drive strengths a continuous assignment carries on its 0 and 1
+  // values, reported through vpi_get(vpiStrength0) and vpi_get(vpiStrength1).
+  // Zero when unset.
+  int strength0 = 0;
+  int strength1 = 0;
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 
