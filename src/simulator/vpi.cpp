@@ -772,6 +772,25 @@ bool VpiIsAtomicStmtType(int type) {
   }
 }
 
+int VpiAssignmentOpType(std::string_view assign_operator) {
+  // §37.64 detail 1: an assignment operator reports the operator combined with the
+  // assignment, per 11.4.1. The plain "=" and "<=" forms are normal assignments and
+  // report vpiAssignmentOp, as does any spelling that is not an assignment operator.
+  if (assign_operator == "+=") return vpiAddOp;
+  if (assign_operator == "-=") return vpiSubOp;
+  if (assign_operator == "*=") return vpiMultOp;
+  if (assign_operator == "/=") return vpiDivOp;
+  if (assign_operator == "%=") return vpiModOp;
+  if (assign_operator == "&=") return vpiBitAndOp;
+  if (assign_operator == "|=") return vpiBitOrOp;
+  if (assign_operator == "^=") return vpiBitXorOp;
+  if (assign_operator == "<<=") return vpiLShiftOp;
+  if (assign_operator == ">>=") return vpiRShiftOp;
+  if (assign_operator == "<<<=") return vpiArithLShiftOp;
+  if (assign_operator == ">>>=") return vpiArithRShiftOp;
+  return vpiAssignmentOp;
+}
+
 std::vector<VpiHandle> VpiMultiConcatOperands(
     VpiHandle multiplier, const std::vector<VpiHandle>& concat_exprs) {
   // §37.59 detail 1: the multiplier first, then the concatenation's expressions

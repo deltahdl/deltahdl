@@ -714,6 +714,15 @@ bool VpiIsExprType(int type);
 // statement a single label edge: vpiName reports its label, or NULL when none.
 bool VpiIsAtomicStmtType(int type);
 
+// §37.64 Assignment detail 1: the vpiOpType an assignment object reports. A normal
+// assignment - blocking "=" or nonblocking "<=" - reports vpiAssignmentOp. An
+// assignment written with an assignment operator instead reports the operator
+// combined with the assignment, following 11.4.1: "+=" reports vpiAddOp, "-="
+// vpiSubOp, "<<<=" vpiArithLShiftOp, and so on. `assign_operator` is the source
+// spelling of the operator ("=", "<=", "+=", ...). Any spelling that is not one of
+// the assignment operators is treated as a normal assignment (vpiAssignmentOp).
+int VpiAssignmentOpType(std::string_view assign_operator);
+
 // §37.59 detail 1: the operand order of a vpiMultiConcatOp operation. The first
 // operand is the multiplier expression; the remaining operands are the
 // expressions within the concatenation, in source order.
