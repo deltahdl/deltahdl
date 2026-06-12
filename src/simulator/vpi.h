@@ -366,6 +366,27 @@ struct VpiObject {
   // held as a designated pointer rather than found by the generic child walk.
   VpiObject* index_expr = nullptr;
 
+  // §37.42 detail 2: for a method func/task call, the object the method is
+  // applied to, reached through vpiPrefix. For the call "packet.send()" this is
+  // the class variable "packet". Null for a tf call that is not a method call,
+  // where the vpiPrefix relation does not apply.
+  VpiObject* tf_prefix = nullptr;
+
+  // §37.42 detail 1: the with-clause a method call carries (an expression, or a
+  // constraint for randomize), reached through vpiWith. The relation is available
+  // only for the methods that accept a with clause - the randomize methods (18.7)
+  // and the array locator methods (7.12.1); `tf_with_method` records whether this
+  // call is one of those. vpiWith reports `tf_with` only when it is, NULL
+  // otherwise.
+  VpiObject* tf_with = nullptr;
+  bool tf_with_method = false;
+
+  // §37.42 detail 11: whether a method call invokes a built-in method (one
+  // SystemVerilog provides) rather than a user-written class method. A built-in
+  // method func call has no user function object, so vpiFunction reports NULL;
+  // likewise a built-in method task call reports NULL for vpiTask.
+  bool builtin_method = false;
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 
@@ -773,6 +794,41 @@ struct VpiLetFormal {
 std::vector<VpiHandle> VpiLetExprArguments(
     const std::vector<VpiLetFormal>& formals,
     const std::vector<VpiHandle>& provided);
+
+// ===========================================================================
+// §37.42 Task and function call. The VPI object model for a tf call - the task
+// call, function call, method task/func call, and system task/func call the
+// diagram groups under "tf call". A call iterates its arguments (vpiArgument); a
+// method call additionally reaches the object it is applied to (vpiPrefix) and,
+// for the methods that take one, a with clause (vpiWith). The helpers and the
+// dispatch wiring below carry the subclause's numbered Details.
+// ===========================================================================
+
+// §37.42: the call kinds the tf call class groups - a task call, a function
+// call, a method task/func call, and a system task/func call.
+bool VpiIsTfCallType(int type);
+
+// §37.42 details 1, 2, 11: the method-call kinds (method func call, method task
+// call). The vpiPrefix and vpiWith relations apply only to these, as does the
+// built-in-method NULL rule for vpiFunction/vpiTask.
+bool VpiIsMethodCallType(int type);
+
+// §37.42: the object kinds the vpiArgument relation reaches from a tf call - an
+// expression, an interface expression, a scope, a primitive, a named event, or a
+// named event array. Used to collect a call's arguments when iterating
+// vpiArgument: an argument is found by being one of these kinds, not by being a
+// child whose own type happens to be vpiArgument.
+bool VpiIsTfCallArgumentType(int type);
+
+// §37.42 detail 8: how an omitted (empty) call argument is represented - as an
+// expression object of type vpiOperation whose vpiOpType is vpiNullOp. Sets those
+// two fields on `arg` so vpi_get reports them.
+void VpiMakeEmptyArgument(VpiHandle arg);
+
+// §37.42 detail 8: how a call argument written as the special value `null` is
+// represented - as an expression object of type vpiConstant whose vpiConstType is
+// vpiNullConst. Sets those two fields on `arg` so vpi_get reports them.
+void VpiMakeNullArgument(VpiHandle arg);
 
 // ===========================================================================
 // §37.59 Expressions. The VPI object model for an expression. The expr class
@@ -2205,6 +2261,13 @@ class VpiContext {
   void SetActiveFrame(VpiHandle frame) { active_frame_ = frame; }
   VpiHandle ActiveFrame() const { return active_frame_; }
 
+  // §37.42 detail 3: record which system task or function call is currently
+  // invoking a PLI application. An application reaches it through
+  // vpi_handle(vpiSysTfCall, NULL) (see Handle); null when no system tf call is
+  // active.
+  void SetCurrentSystfCall(VpiHandle call) { current_systf_call_ = call; }
+  VpiHandle CurrentSystfCall() const { return current_systf_call_; }
+
   const VpiErrorInfo& LastError() const { return last_error_; }
 
   // §38.2: the error status is reset by any VPI routine call except
@@ -2242,6 +2305,9 @@ class VpiContext {
   // §37.43 detail 4: the frame currently active, returned by
   // vpi_handle(vpiFrame, NULL).
   VpiHandle active_frame_ = nullptr;
+  // §37.42 detail 3: the system task or function call currently invoking a PLI
+  // application, returned by vpi_handle(vpiSysTfCall, NULL).
+  VpiHandle current_systf_call_ = nullptr;
   VpiErrorInfo last_error_ = {};
 
   // §38.9: the reason of the callback whose application routine is currently

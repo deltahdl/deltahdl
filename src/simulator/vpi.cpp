@@ -1006,6 +1006,62 @@ std::string VpiDecompileParenthesize(std::string_view inner) {
 }
 
 // ===========================================================================
+// §37.42 Task and function call.
+// ===========================================================================
+
+bool VpiIsTfCallType(int type) {
+  // §37.42: the concrete call kinds the "tf call" class groups.
+  switch (type) {
+    case vpiFuncCall:
+    case vpiTaskCall:
+    case vpiMethodFuncCall:
+    case vpiMethodTaskCall:
+    case vpiSysFuncCall:
+    case vpiSysTaskCall:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiIsMethodCallType(int type) {
+  // §37.42: the method-call kinds (method func call and method task call).
+  return type == vpiMethodFuncCall || type == vpiMethodTaskCall;
+}
+
+bool VpiIsTfCallArgumentType(int type) {
+  // §37.42: the vpiArgument relation of a tf call reaches an expr, an interface
+  // expr, a scope, a primitive, a named event, or a named event array. An expr
+  // and an interface expr are themselves groupings, so defer to their
+  // classifiers; the rest are concrete kinds.
+  if (VpiIsExprType(type) || VpiIsInterfaceExprType(type)) return true;
+  switch (type) {
+    case vpiScope:
+    case vpiNamedEvent:
+    case vpiNamedEventArray:
+      return true;
+    default:
+      return VpiObjectIsPrimitive(type);
+  }
+}
+
+void VpiMakeEmptyArgument(VpiHandle arg) {
+  // §37.42 detail 8: an omitted argument is represented as an expression of type
+  // vpiOperation whose operator is the null operation.
+  if (!arg) return;
+  arg->type = vpiOperation;
+  arg->op_type = vpiNullOp;
+}
+
+void VpiMakeNullArgument(VpiHandle arg) {
+  // §37.42 detail 8: an argument that is the special value null is represented as
+  // a constant expression whose constant type is the null constant.
+  if (!arg) return;
+  arg->type = vpiConstant;
+  arg->const_type = vpiNullConst;
+}
+
+// ===========================================================================
 // §37.43 Frames (shared with §37.44's frame--thread edge and vpiActive).
 // ===========================================================================
 
@@ -2993,6 +3049,10 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // thread, and an application reaches it with vpi_handle(vpiFrame, NULL).
   if (!ref && type == vpiFrame) return active_frame_;
 
+  // §37.42 detail 3: the system task or function that invoked the application is
+  // reached with vpi_handle(vpiSysTfCall, NULL).
+  if (!ref && type == vpiSysTfCall) return current_systf_call_;
+
   if (!ref) return nullptr;
 
   // §38.18: unless otherwise specified, asking vpi_handle() for an object
@@ -3100,6 +3160,35 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return ref->array_member ? ref->index_expr : nullptr;
   }
 
+  // §37.42 detail 2: vpiPrefix of a method call reaches the object the method is
+  // applied to (the class var "packet" in "packet.send()"). The prefix is held as
+  // a designated pointer (it is an expr, not a vpiPrefix-typed child); a tf call
+  // that is not a method call carries no prefix.
+  if (type == vpiPrefix && VpiIsMethodCallType(ref->type)) {
+    return ref->tf_prefix;
+  }
+
+  // §37.42 detail 1: vpiWith of a method call reaches its with-clause (an
+  // expression, or a constraint), but the relation is available only for the
+  // methods that take a with clause - randomize and array-locator methods. For
+  // any other method call it reports NULL even when a with object is attached.
+  if (type == vpiWith && VpiIsMethodCallType(ref->type)) {
+    return ref->tf_with_method ? ref->tf_with : nullptr;
+  }
+
+  // §37.42 detail 11: a built-in method func call has no user function object, so
+  // vpiFunction reports NULL; a built-in method task call likewise reports NULL
+  // for vpiTask. A user-defined (non-built-in) method call falls through to the
+  // generic traversal below, which finds its function/task child.
+  if (type == vpiFunction && ref->type == vpiMethodFuncCall &&
+      ref->builtin_method) {
+    return nullptr;
+  }
+  if (type == vpiTask && ref->type == vpiMethodTaskCall &&
+      ref->builtin_method) {
+    return nullptr;
+  }
+
   if (ref->parent && ref->parent->type == type) return ref->parent;
 
   for (auto* child : ref->children) {
@@ -3109,9 +3198,19 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
 }
 
 VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
+  // §37.42: a tf call's arguments are reached through vpiArgument. The arguments
+  // are the call's argument-kind children (an expr, interface expr, scope,
+  // primitive, or named event(-array)), not children whose own type is
+  // vpiArgument, so this iteration is recognized specially below.
+  bool tf_argument_iteration =
+      ref && VpiIsTfCallType(ref->type) && type == vpiArgument;
+
   // §38.23: unless otherwise specified, iterating the relationships of a
-  // protected object is an error, so no iterator is produced.
-  if (ref && ref->is_protected) return nullptr;
+  // protected object is an error, so no iterator is produced. §37.42 detail 10
+  // carves out one exception: a protected system task or function call shall
+  // still allow iteration over its vpiArgument relation. Every other protected
+  // iteration is still refused.
+  if (ref && ref->is_protected && !tf_argument_iteration) return nullptr;
 
   // §37.72 detail 2: a default case item has no condition expression, so
   // iterating its match expressions (vpi_iterate(vpiExpr, item)) returns NULL.
@@ -3133,7 +3232,7 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   // §37.49: vpiAssertion names the assertion class rather than a single object
   // kind, so iterating it collects every object the class groups (the circle
   // relation, when ref is null) instead of matching one exact type.
-  auto matches = [type, ref](int obj_type) {
+  auto matches = [type, ref, tf_argument_iteration](int obj_type) {
     if (type == vpiAssertion) return VpiIsAssertionType(obj_type);
     // §37.72 detail 1: a case item's match expressions are reached through the
     // vpiExpr edge, which spans both patterns and plain expressions, so the
@@ -3142,10 +3241,22 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
     if (ref && ref->type == vpiCaseItem && type == vpiExpr) {
       return VpiIsCaseItemConditionType(obj_type);
     }
+    // §37.42: a tf call's vpiArgument iteration collects its argument objects -
+    // the exprs, interface exprs, scope, primitive, and named-event(-array) the
+    // relation reaches - rather than children whose own type is vpiArgument.
+    if (tf_argument_iteration) return VpiIsTfCallArgumentType(obj_type);
     return obj_type == type;
   };
 
-  if (ref) {
+  // §37.42 detail 6: every user-defined system task or function is retrieved with
+  // vpi_iterate(vpiUserSystf, NULL). These are the registered systf objects
+  // (callbacks marked as a system tf), found by that mark rather than by a plain
+  // type match.
+  if (!ref && type == vpiUserSystf) {
+    for (auto* obj : all_objects_) {
+      if (obj->is_systf) iter->children.push_back(obj);
+    }
+  } else if (ref) {
     for (auto* child : ref->children) {
       if (matches(child->type)) iter->children.push_back(child);
     }
