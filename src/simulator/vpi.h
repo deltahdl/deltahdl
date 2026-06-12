@@ -599,6 +599,34 @@ struct VpiObject {
   // source order. Empty for an object that holds no such body.
   std::vector<VpiObject*> constraint_exprs;
 
+  // §37.41 details 1-3: the variable that captures a function's return value,
+  // reached through the vpiReturn relation. Detail 1 makes a function contain a
+  // return-capture object sharing the function's name, size, and type; detail 2
+  // makes vpi_handle(vpiReturn, function) hand back that variable so a caller can
+  // inspect a user-defined return type through it; detail 3 makes the relation
+  // always reach a var object, even for a simple scalar return. Its own type is a
+  // variable kind, not the relation enum, so it is held as a designated pointer
+  // rather than found by the generic child walk. Null for a task (which returns
+  // nothing) and for any object that is not a function.
+  VpiObject* return_var = nullptr;
+
+  // §37.41 details 6-10: the DPI properties a DPI import/export task or function
+  // reports. `is_dpi` marks the tf as a DPI import or export, and `dpi_export`
+  // distinguishes an export (true) from an import (false); vpiAccessType reports
+  // vpiDPIExportAcc or vpiDPIImportAcc from the pair (detail 6). `dpi_pure` backs
+  // vpiDPIPure - true only for a pure DPI import function (detail 7). `dpi_context`
+  // backs vpiDPIContext - true for a context import (detail 8). `is_dpi_c` selects
+  // the flavor vpiDPICStr reports: vpiDPIC for a "DPI-C" tf, vpiDPI for a "DPI" tf
+  // (detail 9). `dpi_c_identifier` is the C linkage name vpiDPICIdentifier reports
+  // (detail 10). All default to the not-a-DPI-tf values, so a plain task or
+  // function reports none of them.
+  bool is_dpi = false;
+  bool dpi_export = false;
+  bool dpi_pure = false;
+  bool dpi_context = false;
+  bool is_dpi_c = false;
+  std::string dpi_c_identifier;
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 
@@ -1563,6 +1591,14 @@ struct VpiVariableSizeQuery {
 // and reported as 0.
 int VpiVariableSize(const VpiVariableSizeQuery& query);
 
+// §37.41 detail 12: vpiSize of a function. When the function's vpiReturn variable
+// has a defined size that can be determined without evaluating the function,
+// vpiSize for the function is the same as vpiSize for that variable. A void
+// function reports 0. For every other case the behavior is undefined; this helper
+// reports 0 there, the same not-defined sentinel VpiVariableSize uses.
+int VpiFunctionSize(bool is_void_function, bool return_size_defined,
+                    int return_var_size);
+
 // §37.17 detail 11: whether a variable kind has a value property. Array, class,
 // and virtual-interface variables do not; an unpacked struct or union variable
 // (vpiVector FALSE) does not; every other variable kind does.
@@ -1610,6 +1646,12 @@ bool VpiVariableVector(const VpiScalarVectorQuery& query);
 // that is neither local nor protected - and any non-class-member variable -
 // reports vpiPublicVis.
 int VpiVariableVisibility(bool is_class_member, int declared_visibility);
+
+// §37.41 detail 4: vpiVisibility of a task or function. A class member (a method)
+// reports its declared visibility (vpiLocalVis, vpiProtectedVis, or vpiPublicVis);
+// a member that is neither local nor protected - and any task or function that is
+// not a class member - reports vpiPublicVis.
+int VpiTaskFuncVisibility(bool is_class_member, int declared_visibility);
 
 // §37.17 detail 25: vpiFullName for a class data member. A non-static member has
 // none (the empty string marks its absence); a static member's full name is the

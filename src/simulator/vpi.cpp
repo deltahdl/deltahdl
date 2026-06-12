@@ -1682,6 +1682,18 @@ int VpiVariableSize(const VpiVariableSizeQuery& query) {
   }
 }
 
+int VpiFunctionSize(bool is_void_function, bool return_size_defined,
+                    int return_var_size) {
+  // §37.41 detail 12: a void function has no return value, so its size is 0.
+  // Otherwise, when the vpiReturn variable's size is defined and determinable
+  // without evaluating the function, the function's size is that variable's size
+  // (§37.17 detail 9 is what defines the variable's size). Every remaining case is
+  // undefined; report 0, the same not-defined value VpiVariableSize uses.
+  if (is_void_function) return 0;
+  if (return_size_defined) return return_var_size;
+  return 0;
+}
+
 bool VpiVariableHasValueProperty(int var_type, bool vpi_vector) {
   // §37.17 detail 11: array, class, and virtual-interface variables have no
   // value property, and neither does an unpacked struct/union (vpiVector FALSE).
@@ -1768,6 +1780,18 @@ bool VpiVariableVector(const VpiScalarVectorQuery& query) {
 int VpiVariableVisibility(bool is_class_member, int declared_visibility) {
   // §37.17 detail 24: a non-class-member variable, and a class member that is
   // neither local nor protected, reports vpiPublicVis.
+  if (!is_class_member) return vpiPublicVis;
+  if (declared_visibility == vpiLocalVis ||
+      declared_visibility == vpiProtectedVis) {
+    return declared_visibility;
+  }
+  return vpiPublicVis;
+}
+
+int VpiTaskFuncVisibility(bool is_class_member, int declared_visibility) {
+  // §37.41 detail 4: a task or function that is not a class member, and a class
+  // member (method) that is neither local nor protected, reports vpiPublicVis;
+  // a local or protected method reports its declared visibility.
   if (!is_class_member) return vpiPublicVis;
   if (declared_visibility == vpiLocalVis ||
       declared_visibility == vpiProtectedVis) {
@@ -3614,6 +3638,17 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   if (type == vpiClassObj && ref->type == vpiClassVar) {
     return ref->referenced_object;
   }
+
+  // §37.41 details 1-3: vpiReturn of a function reaches the variable that
+  // captures its return value. Detail 1 makes a function contain that
+  // return-capture object; detail 3 makes the relation always reach a var object,
+  // even for a simple return; detail 2 makes it the implicit variable a caller
+  // inspects to learn a user-defined return type. The target's own type is a
+  // variable kind, not vpiReturn, so it is held as a designated pointer. Gated on
+  // a function reference so the constant's other meanings (it shares a value with
+  // vpiImmediateAssume) cannot reach this path. A task returns nothing, so it has
+  // no return variable.
+  if (type == vpiReturn && ref->type == vpiFunction) return ref->return_var;
 
   // §37.15 detail 3: vpiActual reaches the actual instantiated object a ref obj
   // is bound to (NULL when unbound).
@@ -5510,7 +5545,28 @@ int VpiContext::Get(int property, VpiHandle obj) {
                 obj->access_type == vpiExternAcc)
                    ? obj->access_type
                    : vpiUndefined;
+      // §37.41 detail 6: a DPI ("DPI" or "DPI-C") task or function reports
+      // vpiDPIExportAcc when it is an export and vpiDPIImportAcc when it is an
+      // import. A non-DPI task or function falls through to its stored access type.
+      if ((obj->type == vpiFunction || obj->type == vpiTask) && obj->is_dpi)
+        return obj->dpi_export ? vpiDPIExportAcc : vpiDPIImportAcc;
       return obj->access_type;
+    // §37.41 detail 7: vpiDPIPure reports TRUE for a pure DPI import function and
+    // FALSE otherwise - the value of the stored flag, which is set only for such a
+    // function.
+    case vpiDPIPure:
+      return obj->dpi_pure ? 1 : 0;
+    // §37.41 detail 8: vpiDPIContext reports TRUE for a context import DPI task or
+    // function and FALSE otherwise.
+    case vpiDPIContext:
+      return obj->dpi_context ? 1 : 0;
+    // §37.41 detail 9: vpiDPICStr reports vpiDPIC for a "DPI-C" task or function
+    // and vpiDPI for a "DPI" task or function. A task or function that is not a DPI
+    // tf carries no such flavor, so the property is meaningful only when is_dpi is
+    // set; report zero (none) otherwise.
+    case vpiDPICStr:
+      if (!obj->is_dpi) return 0;
+      return obj->is_dpi_c ? vpiDPIC : vpiDPI;
     // §37.34: whether a constraint is virtual, as a Boolean property.
     case vpiVirtual:
       return obj->is_virtual ? 1 : 0;
@@ -5685,6 +5741,12 @@ const char* VpiContext::GetStrRaw(int property, VpiHandle obj) {
       return obj->file.empty() ? nullptr : obj->file.c_str();
     case kVpiFullName:
       return obj->full_name.empty() ? obj->name.data() : obj->full_name.c_str();
+    // §37.41 detail 10: vpiDPICIdentifier reports the C linkage name of a "DPI" or
+    // "DPI-C" task or function. An object that carries no such name yields null
+    // rather than an empty string.
+    case vpiDPICIdentifier:
+      return obj->dpi_c_identifier.empty() ? nullptr
+                                           : obj->dpi_c_identifier.c_str();
     case kVpiDefName:
       if (obj->type == kVpiModule) return obj->name.data();
       // §37.15 detail 6: a ref obj whose actual is an interface or modport
