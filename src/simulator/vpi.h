@@ -1913,6 +1913,18 @@ class VpiContext {
   // illegal no_of_delays records an error and writes nothing.
   void GetDelays(VpiHandle obj, VpiDelay* delay_p);
 
+  // §38.32: set the delays or timing limits of `obj` from the
+  // application-allocated `delay_p`, the write counterpart of GetDelays().
+  // delay_p->no_of_delays selects how many delays to set and must be legal for
+  // the object's category; delay_p->time_type gives the form of every source
+  // value (the type field of each da entry is ignored); delay_p->mtm_flag and
+  // delay_p->pulsere_flag select the per-delay layout (Table 38-4), with the
+  // delays taken in source order. Only the fields the flags select are written,
+  // so when pulsere_flag is clear the pulse limits keep their prior values. A
+  // null delay_p, a null obj, or a null da changes nothing; an illegal
+  // no_of_delays records an error (§38.2) and changes nothing.
+  void PutDelays(VpiHandle obj, VpiDelay* delay_p);
+
   // §38.9: retrieve up to `num_of_bytes` of data saved under the save/restart
   // `id` into the caller-allocated buffer `data_loc`, returning the number of
   // bytes actually retrieved. The first call for an id reads from the start of
@@ -2720,6 +2732,7 @@ void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p);
 void vpi_get_cb_info(vpiHandle obj, s_cb_data* cb_data_p);
 void vpi_get_time(vpiHandle obj, s_vpi_time* time_p);
 void vpi_get_delays(vpiHandle obj, p_vpi_delay delay_p);
+void vpi_put_delays(vpiHandle obj, p_vpi_delay delay_p);
 PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes);
 vpiHandle VpiHandleC(int type, vpiHandle ref);
 vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope);

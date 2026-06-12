@@ -2473,6 +2473,20 @@ void VpiWriteDelayValue(VpiTime* slot, int time_type, double value) {
   }
 }
 
+// §38.32: read one delay value out of a caller-supplied time entry, the inverse
+// of VpiWriteDelayValue. The form is dictated by the delay structure's
+// time_type: vpiScaledRealTime carries the value in the real field; vpiSimTime
+// carries it as a 64-bit count split across high/low; vpiSuppressTime carries
+// no time, so the value is zero.
+double VpiReadDelayValue(const VpiTime& slot, int time_type) {
+  if (time_type == vpiScaledRealTime) return slot.real;
+  if (time_type == vpiSimTime) {
+    uint64_t ticks = (static_cast<uint64_t>(slot.high) << 32) | slot.low;
+    return static_cast<double>(ticks);
+  }
+  return 0.0;
+}
+
 }  // namespace
 
 void VpiContext::GetDelays(VpiHandle obj, VpiDelay* delay_p) {
@@ -2543,6 +2557,85 @@ void VpiContext::GetDelays(VpiHandle obj, VpiDelay* delay_p) {
       VpiWriteDelayValue(&delay_p->da[k++], tt, d.min_error);
       VpiWriteDelayValue(&delay_p->da[k++], tt, d.typ_error);
       VpiWriteDelayValue(&delay_p->da[k++], tt, d.max_error);
+    }
+  }
+}
+
+void VpiContext::PutDelays(VpiHandle obj, VpiDelay* delay_p) {
+  // §38.32 / §38.1: the structure and its da array are application-allocated.
+  // With no source values or no target object there is nothing to set; the
+  // routine never allocates the caller's memory itself.
+  if (delay_p == nullptr || obj == nullptr) return;
+
+  // §37.14 detail 2: the delay routines do not apply to an interface port.
+  // Treat such a request as an error (§38.2) and change nothing.
+  if (obj->type == vpiPort && !VpiPortDelaysApplicable(obj->port_type)) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_put_delays(): delays are not applicable to an interface port";
+    return;
+  }
+
+  // §38.32: the legal number of delays is fixed by the object's category, the
+  // same classification vpi_get_delays() uses. A request that is not legal for
+  // this object is an error; record it (§38.2) and set nothing.
+  if (!VpiNoOfDelaysLegal(obj->type, delay_p->no_of_delays,
+                          obj->delays.size())) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_put_delays(): the requested number of delays is not legal for "
+        "this object";
+    return;
+  }
+
+  if (delay_p->da == nullptr) return;
+
+  const bool mtm = delay_p->mtm_flag != 0;
+  const bool pulsere = delay_p->pulsere_flag != 0;
+  const int tt = delay_p->time_type;
+
+  // Ensure there is a stored slot for every delay being set, preserving any
+  // values already present so the pulse limits survive a delay-only write
+  // (§38.32: pulse limits retain their prior values when only the delay is
+  // altered).
+  if (obj->delays.size() < static_cast<size_t>(delay_p->no_of_delays))
+    obj->delays.resize(delay_p->no_of_delays);
+
+  // §38.32 (Table 38-4, == the vpi_get_delays() Table 38-2 layout): each delay
+  // occupies a run of da entries selected by mtm_flag and pulsere_flag, and the
+  // delays are taken in source order. Only the fields the flags select are
+  // written; every other field of the stored delay is left untouched, so when
+  // pulsere_flag is clear the reject/error limits keep the values they had.
+  int k = 0;
+  for (int i = 0; i < delay_p->no_of_delays; ++i) {
+    VpiDelayInfo& d = obj->delays[i];
+    if (!mtm && !pulsere) {
+      // Neither flag set: one entry, the plain delay.
+      d.delay = VpiReadDelayValue(delay_p->da[k++], tt);
+    } else if (mtm && !pulsere) {
+      // min:typ:max only: three entries, min then typ then max delay.
+      d.min_delay = VpiReadDelayValue(delay_p->da[k++], tt);
+      d.typ_delay = VpiReadDelayValue(delay_p->da[k++], tt);
+      d.max_delay = VpiReadDelayValue(delay_p->da[k++], tt);
+    } else if (!mtm && pulsere) {
+      // Pulse limits only: delay, reject limit, error limit.
+      d.delay = VpiReadDelayValue(delay_p->da[k++], tt);
+      d.reject = VpiReadDelayValue(delay_p->da[k++], tt);
+      d.error = VpiReadDelayValue(delay_p->da[k++], tt);
+    } else {
+      // Both flags: nine entries - min:typ:max of delay, then reject, then
+      // error.
+      d.min_delay = VpiReadDelayValue(delay_p->da[k++], tt);
+      d.typ_delay = VpiReadDelayValue(delay_p->da[k++], tt);
+      d.max_delay = VpiReadDelayValue(delay_p->da[k++], tt);
+      d.min_reject = VpiReadDelayValue(delay_p->da[k++], tt);
+      d.typ_reject = VpiReadDelayValue(delay_p->da[k++], tt);
+      d.max_reject = VpiReadDelayValue(delay_p->da[k++], tt);
+      d.min_error = VpiReadDelayValue(delay_p->da[k++], tt);
+      d.typ_error = VpiReadDelayValue(delay_p->da[k++], tt);
+      d.max_error = VpiReadDelayValue(delay_p->da[k++], tt);
     }
   }
 }
@@ -4017,6 +4110,11 @@ void vpi_get_time(vpiHandle obj, s_vpi_time* time_p) {
 void vpi_get_delays(vpiHandle obj, p_vpi_delay delay_p) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   delta::GetGlobalVpiContext().GetDelays(obj, delay_p);
+}
+
+void vpi_put_delays(vpiHandle obj, p_vpi_delay delay_p) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  delta::GetGlobalVpiContext().PutDelays(obj, delay_p);
 }
 
 PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes) {
