@@ -1359,6 +1359,17 @@ bool VpiIsWaitType(int type);
 // wait's condition to this helper.
 VpiHandle VpiWaitConditionExpr(VpiHandle wait);
 
+// §37.69 Repeat control: the count expression a repeat control reaches through
+// its unlabeled edge to an expr (the vpiExpr relation) - the number of triggers
+// of the intra-assignment repeat event control "repeat (n) @(event)". The count's
+// own type is an expression kind (an operation, a constant, a reference, ...)
+// rather than the vpiExpr relation tag, so it is found as the repeat control's
+// first expression child; null when none is attached. The diagram's other
+// unlabeled edge, to the event control, reaches an object whose own type is
+// vpiEventControl and so is served by the generic traversal, needing no helper.
+// Backs the public vpi_handle(vpiExpr, repeat_control) dispatch.
+VpiHandle VpiRepeatControlExpr(VpiHandle repeat_control);
+
 // §37.12 detail 1: whether an object kind is a block item declaration - a
 // variable declaration or a type declaration. These are the declarations whose
 // presence makes an unnamed begin or unnamed fork a scope.

@@ -1103,6 +1103,22 @@ VpiHandle VpiWaitConditionExpr(VpiHandle wait) {
   return nullptr;
 }
 
+VpiHandle VpiRepeatControlExpr(VpiHandle repeat_control) {
+  // §37.69: a repeat control reaches its count expression through the diagram's
+  // unlabeled edge to an expr - the vpiExpr relation. The count is the repetition
+  // number of an intra-assignment repeat event control ("repeat (n) @(event)").
+  // Its own type is an expression kind (an operation, a constant, a reference,
+  // ...) rather than the vpiExpr relation tag, so it is found by scanning for the
+  // first expression child; null when none is attached. The repeat control's
+  // other unlabeled edge, to the event control, reaches a child whose own type is
+  // vpiEventControl and is left to the generic traversal.
+  if (!repeat_control) return nullptr;
+  for (auto* child : repeat_control->children) {
+    if (VpiIsExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
 VpiHandle VpiDelayControlStmt(VpiHandle delay_control) {
   // §37.68 detail 1: a delay control reaches the statement it guards through
   // vpiStmt. When the delay control is associated with an assignment - i.e. it
@@ -3846,6 +3862,18 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // the generic vpiStmt traversal below and needs no special case here.
   if (type == vpiCondition && VpiIsWhileOrRepeatType(ref->type)) {
     return VpiLoopConditionExpr(ref);
+  }
+
+  // §37.69: vpiExpr of a repeat control reaches its count expression - the
+  // repetition number of an intra-assignment repeat event control. The count's
+  // own type is an expression kind, not the vpiExpr relation tag, so the generic
+  // traversal below cannot find it. The relation is gated on the repeat control
+  // kind so it does not disturb the vpiExpr edges other diagrams draw (for
+  // instance a parameter's default, §37.28). The diagram's other edge, to the
+  // event control, is reached by the generic traversal below because that child's
+  // own type is vpiEventControl and so needs no special case here.
+  if (type == vpiExpr && ref->type == vpiRepeatControl) {
+    return VpiRepeatControlExpr(ref);
   }
 
   // §37.12 detail 5: vpiStmt of a task or function reaches its body - null when
