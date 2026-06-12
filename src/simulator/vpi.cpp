@@ -1967,6 +1967,25 @@ int VpiNetLineNo(bool implicit, int declared_line) {
   return implicit ? 0 : declared_line;
 }
 
+bool VpiHasLocationProperties(int type) {
+  // §37.3.3: vpiLineNo and vpiFile apply to every object that maps to source
+  // text. The exceptions are object kinds that have no single source line or
+  // file; for those the location properties are not valid queries.
+  switch (type) {
+    case vpiCallback:
+    case vpiDelayTerm:
+    case vpiDelayDevice:
+    case vpiInterModPath:
+    case vpiIterator:
+    case vpiTimeQueue:
+    case vpiGenScopeArray:
+    case vpiGenScope:
+      return false;
+    default:
+      return true;
+  }
+}
+
 VpiHandle VpiNetBitIndex(const std::vector<VpiHandle>& indices_inner_to_outer) {
   // §37.16 detail 10: the bit index of a net bit is its single innermost index.
   if (indices_inner_to_outer.empty()) return nullptr;
@@ -3705,6 +3724,13 @@ int VpiContext::Get(int property, VpiHandle obj) {
       return obj->end_line;
     case vpiEndColumn:
       return obj->end_column;
+    // §37.3.3: vpiLineNo reports the source line an object occupies. It applies
+    // to every object that corresponds to source text; for the object kinds
+    // §37.3.3 excepts (which have no single source line) it is not a valid query
+    // and yields vpiUndefined.
+    case vpiLineNo:
+      if (!VpiHasLocationProperties(obj->type)) return vpiUndefined;
+      return obj->line_no;
     default:
       return 0;
   }
@@ -3828,10 +3854,14 @@ const char* VpiContext::GetStrRaw(int property, VpiHandle obj) {
         return obj->name.empty() ? nullptr : obj->name.data();
       }
       return obj->name.data();
-    // §37.49: the file component of an assertion's source location. The general
-    // vpiFile semantics (and the `line directive's effect) are §37.3.3/§22.12's;
-    // here the stored file string is handed back, or null when unset.
+    // §37.3.3: vpiFile names the source file an object came from - one of the two
+    // location properties, alongside vpiLineNo. It applies to every object that
+    // corresponds to source text; the object kinds §37.3.3 excepts have no source
+    // file and yield null regardless of any stored string. The `line directive
+    // (§22.12) may shift the reported file. §37.49 stores an assertion's file in
+    // the same field, and it is handed back here.
     case vpiFile:
+      if (!VpiHasLocationProperties(obj->type)) return nullptr;
       return obj->file.empty() ? nullptr : obj->file.c_str();
     case kVpiFullName:
       return obj->full_name.empty() ? obj->name.data() : obj->full_name.c_str();

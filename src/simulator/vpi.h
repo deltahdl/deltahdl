@@ -282,6 +282,13 @@ struct VpiObject {
   int end_line = 0;
   int end_column = 0;
 
+  // §37.3.3: the source line this object occupies, reported through
+  // vpi_get(vpiLineNo). One of the two location properties (with vpiFile, held
+  // in `file`) that every object mapping to source text carries; both are
+  // omitted for the object kinds §37.3.3 lists as exceptions. May be shifted by
+  // the `line directive (§22.12).
+  int line_no = 0;
+
   // §38.10: the delays this object carries, in the order they occur in the
   // SystemVerilog description. vpi_get_delays() reports them in this order, so
   // da[0] is the first source delay, da[1] the second, and so on. Empty for an
@@ -1483,6 +1490,14 @@ bool VpiPortInstReferenceQualifies(bool connected_to_any_port_bit);
 // §37.16 detail 9: vpiLineNo of a net. An implicit net reports 0; an explicitly
 // declared net reports the line it was declared on.
 int VpiNetLineNo(bool implicit, int declared_line);
+
+// §37.3.3: whether an object kind carries the source-location properties
+// vpiLineNo and vpiFile. True for every object that corresponds to something in
+// the source text; false for the kinds §37.3.3 names as exceptions - those that
+// have no single source line or file (callbacks, delay terms and devices,
+// intermodule paths, iterators, the time queue, and generate-scope arrays and
+// scopes).
+bool VpiHasLocationProperties(int type);
 
 // §37.16 detail 10: vpi_handle(vpiIndex, net_bit) returns the bit index of a net
 // bit - its single innermost index.
