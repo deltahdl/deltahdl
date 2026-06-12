@@ -281,6 +281,37 @@ struct VpiObject {
   // object that bears no delays.
   std::vector<VpiDelayInfo> delays;
 
+  // §37.14 / §37.15: a port (or a ref obj) carries two designated connections.
+  // vpiHighConn reaches the hierarchically higher connection (closer to the top
+  // module); vpiLowConn reaches the lower one. A null pointer is the natural
+  // encoding of "no such connection", which §37.14 detail 10 mandates as NULL
+  // for a null port (lowConn) or an unconnected instance (highConn).
+  VpiObject* high_conn = nullptr;
+  VpiObject* low_conn = nullptr;
+
+  // §37.15 detail 3: the actual instantiated object a ref obj is bound to,
+  // reported through the vpiActual relation. NULL when the ref obj is not bound
+  // to an actual at the time of the query.
+  VpiObject* actual = nullptr;
+
+  // §37.14 detail 1: a port's type, one of vpiPort, vpiInterfacePort, or
+  // vpiModportPort, reported through vpi_get(vpiPortType). It is derived from the
+  // formal, not the actual. Zero when unset.
+  int port_type = 0;
+
+  // §37.14 detail 8: whether a port was given an explicit name in the port list,
+  // reported through vpi_get(vpiExplicitName).
+  bool explicit_name = false;
+
+  // §37.14 detail 10/11: whether a port is a null port (e.g. "module M();").
+  // Its vpiLowConn is NULL and its vpiSize is 0.
+  bool null_port = false;
+
+  // §37.15 detail 5: whether a ref obj refers to a generic interface. Only
+  // meaningful when the ref obj refers to an interface; reported through
+  // vpi_get(vpiGeneric).
+  bool generic_interface = false;
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 
@@ -1205,6 +1236,81 @@ VpiHandle VpiIoDeclLeftRange(const std::vector<VpiArrayDimension>& dims);
 // §37.13 detail 4 (woven with §37.25): vpiRightRange of an io decl, the mirror
 // of VpiIoDeclLeftRange.
 VpiHandle VpiIoDeclRightRange(const std::vector<VpiArrayDimension>& dims);
+
+// ===========================================================================
+// §37.14 Ports and §37.15 Reference objects. The two clauses share a model: a
+// port's vpiHighConn/vpiLowConn connections are reached the same way a ref obj's
+// are, and the lowConn of an interface port is itself a ref obj (§37.14 detail
+// 5), so the connection helpers below serve both. The numbered "Details" that
+// carry decision rules are realized as helpers; the diagram's structural
+// relations are served by the generic Handle/Get machinery once the designated
+// connection pointers are populated.
+// ===========================================================================
+
+// §37.14 detail 1: the three port types a port may report through
+// vpi_get(vpiPortType). The value is determined by the formal, never the actual.
+bool VpiIsValidPortType(int port_type);
+
+// §37.14 detail 1: the port type derived from what the formal denotes - an
+// interface formal yields vpiInterfacePort, a modport formal vpiModportPort, and
+// any ordinary formal vpiPort. The actual a port connects to never changes this.
+int VpiPortTypeFromFormal(bool formal_is_interface, bool formal_is_modport);
+
+// §37.14 detail 2: vpi_get_delays() and vpi_put_delays() are not applicable to
+// an interface port. FALSE for an interface port; TRUE for any other port type.
+bool VpiPortDelaysApplicable(int port_type);
+
+// §37.14 details 3, 4, and 10 (shared with §37.15): the hierarchically higher
+// (closer to the top module) port connection. NULL when the instance has no
+// connection to the port. Also serves a ref obj's vpiHighConn.
+VpiHandle VpiHighConn(VpiHandle obj);
+
+// §37.14 details 3, 4, and 10 (shared with §37.15): the lower (further from the
+// top module) port connection. NULL for a null port. Also serves a ref obj's
+// vpiLowConn.
+VpiHandle VpiLowConn(VpiHandle obj);
+
+// §37.14 detail 5: the lowConn of a vpiInterfacePort shall always be a ref obj.
+// TRUE when the port is not an interface port, or it is and its lowConn is a ref
+// obj; FALSE when an interface port's lowConn is missing or some other kind.
+bool VpiPortLowConnSatisfiesInterfaceRule(VpiHandle port);
+
+// §37.14 detail 6: vpiScalar is TRUE when the port is exactly one bit wide. The
+// width is the port's own, never anything about what is connected to it.
+bool VpiPortScalar(int port_width);
+
+// §37.14 detail 6: vpiVector is TRUE when the port is more than one bit wide.
+bool VpiPortVector(int port_width);
+
+// §37.14 detail 7: vpiPortIndex and vpiName do not apply to a port bit (only to
+// a whole port). TRUE for a port, FALSE for a port bit.
+bool VpiPortIndexAndNameApply(int type);
+
+// §37.14 detail 8: the name vpi_get_str(vpiName) returns for a port. An
+// explicitly named port returns its explicit name; otherwise, if an inferred
+// name exists, that name is returned; otherwise NULL. An empty C string counts
+// as "no name".
+const char* VpiPortName(bool explicitly_named, const char* explicit_name,
+                        const char* inferred_name);
+
+// §37.14 detail 11: vpiSize for a port. A null port reports 0; any other port
+// reports its bit width.
+int VpiPortSize(bool is_null_port, int port_width);
+
+// §37.15 detail 5: vpiGeneric for a ref obj. TRUE when the ref obj refers to a
+// generic interface, FALSE when it refers to a non-generic interface, and
+// vpiUndefined for every other kind of ref obj.
+int VpiRefObjGeneric(bool refers_to_interface, bool is_generic_interface);
+
+// §37.15 detail 6: vpiDefName for a ref obj whose vpiActual is an interface or a
+// modport returns that interface's definition name or the modport name. NULL for
+// a ref obj whose actual is neither (or which is unbound).
+const char* VpiRefObjDefName(VpiHandle ref_obj);
+
+// §37.15 detail 7: the vpiTypespec relation returns NULL for a ref obj whose
+// vpiActual is not a net, variable, or part select; otherwise it returns the ref
+// obj's typespec child.
+VpiHandle VpiRefObjTypespec(VpiHandle ref_obj);
 
 // ===========================================================================
 // §37.16 Nets. The VPI net object model, the net counterpart of §37.17's

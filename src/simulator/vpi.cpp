@@ -1547,6 +1547,147 @@ VpiHandle VpiIoDeclRightRange(const std::vector<VpiArrayDimension>& dims) {
 }
 
 // ===========================================================================
+// §37.14 Ports and §37.15 Reference objects.
+// ===========================================================================
+
+bool VpiIsValidPortType(int port_type) {
+  // §37.14 detail 1: a port's vpiPortType is one of exactly these three values.
+  return port_type == vpiPort || port_type == vpiInterfacePort ||
+         port_type == vpiModportPort;
+}
+
+int VpiPortTypeFromFormal(bool formal_is_interface, bool formal_is_modport) {
+  // §37.14 detail 1: the port type follows the formal. A modport formal makes a
+  // modport port, an interface formal an interface port, and anything else an
+  // ordinary port. The actual the port connects to is never consulted.
+  if (formal_is_modport) return vpiModportPort;
+  if (formal_is_interface) return vpiInterfacePort;
+  return vpiPort;
+}
+
+bool VpiPortDelaysApplicable(int port_type) {
+  // §37.14 detail 2: the delay routines do not apply to an interface port.
+  return port_type != vpiInterfacePort;
+}
+
+VpiHandle VpiHighConn(VpiHandle obj) {
+  // §37.14 details 3 and 10 (shared with §37.15): the higher connection, or NULL
+  // when the instance has no connection to the port. A null pointer already
+  // encodes "no connection", so it is handed straight back.
+  if (!obj) return nullptr;
+  return obj->high_conn;
+}
+
+VpiHandle VpiLowConn(VpiHandle obj) {
+  // §37.14 details 4 and 10 (shared with §37.15): the lower connection. A null
+  // port carries no low connection, so its stored pointer is NULL.
+  if (!obj) return nullptr;
+  if (obj->null_port) return nullptr;
+  return obj->low_conn;
+}
+
+bool VpiPortLowConnSatisfiesInterfaceRule(VpiHandle port) {
+  // §37.14 detail 5: an interface port's lowConn must always be a ref obj
+  // (§37.15). For any other port type the rule does not constrain the lowConn.
+  if (!port || port->port_type != vpiInterfacePort) return true;
+  return port->low_conn != nullptr && port->low_conn->type == vpiRefObj;
+}
+
+bool VpiPortScalar(int port_width) {
+  // §37.14 detail 6: a port is scalar when it is exactly one bit wide. This
+  // reflects the port itself, not whatever is connected to it.
+  return port_width == 1;
+}
+
+bool VpiPortVector(int port_width) {
+  // §37.14 detail 6: a port is a vector when it is more than one bit wide.
+  return port_width > 1;
+}
+
+bool VpiPortIndexAndNameApply(int type) {
+  // §37.14 detail 7: vpiPortIndex and vpiName apply to a whole port but not to a
+  // port bit.
+  return type != vpiPortBit;
+}
+
+const char* VpiPortName(bool explicitly_named, const char* explicit_name,
+                        const char* inferred_name) {
+  // §37.14 detail 8: an explicitly named port returns its explicit name; failing
+  // that, an inferred name is returned if one exists; otherwise NULL.
+  if (explicitly_named && explicit_name && explicit_name[0] != '\0') {
+    return explicit_name;
+  }
+  if (inferred_name && inferred_name[0] != '\0') return inferred_name;
+  return nullptr;
+}
+
+int VpiPortSize(bool is_null_port, int port_width) {
+  // §37.14 detail 11: a null port has size 0; otherwise the size is the port's
+  // bit width.
+  return is_null_port ? 0 : port_width;
+}
+
+int VpiRefObjGeneric(bool refers_to_interface, bool is_generic_interface) {
+  // §37.15 detail 5: a ref obj that refers to an interface reports whether that
+  // interface is generic; any other ref obj reports vpiUndefined.
+  if (!refers_to_interface) return vpiUndefined;
+  return is_generic_interface ? 1 : 0;
+}
+
+// §37.15 detail 6: the actual kinds whose definition/modport name a ref obj's
+// vpiDefName reports - an interface, an interface array, or a modport.
+static bool VpiRefObjActualIsInterfaceOrModport(int actual_type) {
+  return actual_type == vpiInterface || actual_type == vpiInterfaceArray ||
+         actual_type == vpiModport;
+}
+
+const char* VpiRefObjDefName(VpiHandle ref_obj) {
+  // §37.15 detail 6: when the ref obj's actual is an interface or modport, its
+  // definition name (or the modport name) is reported; otherwise there is none.
+  if (!ref_obj || !ref_obj->actual) return nullptr;
+  if (!VpiRefObjActualIsInterfaceOrModport(ref_obj->actual->type)) {
+    return nullptr;
+  }
+  return ref_obj->actual->name.data();
+}
+
+// §37.15 detail 7: the actual kinds that carry a typespec - a net, a variable,
+// or a part select. A ref obj bound to any of these exposes vpiTypespec; bound
+// to anything else (an interface, modport, named event, ...) it does not.
+static bool VpiRefObjActualHasTypespec(int actual_type) {
+  switch (actual_type) {
+    case vpiNet:        // == kVpiNet, the net family head
+    case vpiStructNet:
+    case vpiUnionNet:
+    case vpiEnumNet:
+    case vpiIntegerNet:
+    case vpiTimeNet:
+    case vpiBitNet:
+    case vpiPackedArrayNet:
+    case vpiReg:        // == vpiLogicVar, the variable family head
+    case vpiIntegerVar:
+    case vpiRealVar:
+    case vpiIntVar:
+    case vpiBitVar:
+    case vpiPartSelect:
+      return true;
+    default:
+      return false;
+  }
+}
+
+VpiHandle VpiRefObjTypespec(VpiHandle ref_obj) {
+  // §37.15 detail 7: NULL unless the ref obj's actual is a net, variable, or part
+  // select; in that case the ref obj's own typespec child is returned.
+  if (!ref_obj || !ref_obj->actual) return nullptr;
+  if (!VpiRefObjActualHasTypespec(ref_obj->actual->type)) return nullptr;
+  for (auto* child : ref_obj->children) {
+    if (child->type == vpiTypespec) return child;
+  }
+  return nullptr;
+}
+
+// ===========================================================================
 // §37.16 Nets.
 // ===========================================================================
 
@@ -2147,6 +2288,16 @@ void VpiContext::GetDelays(VpiHandle obj, VpiDelay* delay_p) {
   // to do; the routine never allocates anything itself.
   if (delay_p == nullptr || obj == nullptr) return;
 
+  // §37.14 detail 2: the delay routines are not applicable to an interface port.
+  // Treat such a request as an error (§38.2) and leave the caller's array alone.
+  if (obj->type == vpiPort && !VpiPortDelaysApplicable(obj->port_type)) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_get_delays(): delays are not applicable to an interface port";
+    return;
+  }
+
   // §38.10: the legal values for the number of delays are fixed by the object's
   // category. A request that is not legal for this object is an error; record
   // it (§38.2) and leave the caller's array untouched.
@@ -2407,6 +2558,29 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // whose own type is not vpiExpr, so the shared traversal below cannot find it.
   if (type == vpiExpr && ref->type == vpiIODecl) {
     return VpiIoDeclExpr(ref);
+  }
+
+  // §37.14 details 3, 4, and 10 (shared with §37.15): the higher and lower port
+  // connections - also a ref obj's highConn/lowConn. These reach a designated
+  // connection pointer, not a child found by type, and the helpers apply the
+  // null-port / no-connection rules.
+  if (type == vpiHighConn) return VpiHighConn(ref);
+  if (type == vpiLowConn) return VpiLowConn(ref);
+
+  // §37.15 detail 3: vpiActual reaches the actual instantiated object a ref obj
+  // is bound to (NULL when unbound).
+  if (type == vpiActual && ref->type == vpiRefObj) return ref->actual;
+
+  // §37.15 detail 7: a ref obj's vpiTypespec is gated on the kind of its actual.
+  if (type == vpiTypespec && ref->type == vpiRefObj) {
+    return VpiRefObjTypespec(ref);
+  }
+
+  // §37.14 / §37.15 detail 4: vpiParent of a port bit reaches its port, and of a
+  // ref obj reaches the ref obj it is a subelement of.
+  if (type == vpiParent &&
+      (ref->type == vpiRefObj || ref->type == vpiPortBit)) {
+    return ref->parent;
   }
 
   if (ref->parent && ref->parent->type == type) return ref->parent;
@@ -2993,9 +3167,41 @@ int VpiContext::Get(int property, VpiHandle obj) {
     case vpiIsProtected:
       return obj->is_protected ? 1 : 0;
     case kVpiSize:
+      // §37.14 detail 11: a null port reports size 0; any other port reports its
+      // bit width. Every other object reports its own stored size.
+      if (obj->type == vpiPort) return VpiPortSize(obj->null_port, obj->size);
       return obj->size;
     case kVpiDirection:
       return obj->direction;
+    // §37.14 detail 1: a port reports its port type (vpiPort/vpiInterfacePort/
+    // vpiModportPort), fixed by the formal.
+    case vpiPortType:
+      return obj->port_type;
+    // §37.14 detail 6: a port reports whether it is scalar (exactly one bit) or a
+    // vector (more than one bit), based on its own width.
+    case vpiScalar:
+      if (obj->type == vpiPort) return VpiPortScalar(obj->size) ? 1 : 0;
+      return 0;
+    case vpiVector:
+      if (obj->type == vpiPort) return VpiPortVector(obj->size) ? 1 : 0;
+      return 0;
+    // §37.14 detail 8: whether a port carries an explicit name.
+    case vpiExplicitName:
+      return obj->explicit_name ? 1 : 0;
+    // §37.14 details 7 and 9: the port index gives port order (the first port is
+    // 0); it does not apply to a port bit, which reports vpiUndefined.
+    case vpiPortIndex:
+      if (obj->type == vpiPortBit) return vpiUndefined;
+      return obj->index;
+    // §37.15 detail 5: a ref obj reports whether it refers to a generic interface
+    // (TRUE/FALSE for an interface reference, vpiUndefined for any other ref obj).
+    case vpiGeneric: {
+      if (obj->type != vpiRefObj) return vpiUndefined;
+      bool refers_to_interface =
+          obj->actual && (obj->actual->type == vpiInterface ||
+                          obj->actual->type == vpiInterfaceArray);
+      return VpiRefObjGeneric(refers_to_interface, obj->generic_interface);
+    }
     // §37.3.7: declared lifetime as a Boolean (0 static, 1 non-static).
     case kVpiAutomatic:
       return obj->automatic ? 1 : 0;
@@ -3153,6 +3359,15 @@ const char* VpiContext::GetStr(int property, VpiHandle obj) {
     case kVpiType:
       return VpiTypeConstantName(obj->type);
     case kVpiName:
+      // §37.14 detail 7: vpiName does not apply to a port bit.
+      if (obj->type == vpiPortBit) return nullptr;
+      // §37.14 detail 8: a port returns its name - explicit name preferred, then
+      // any inferred name, else NULL. The model stores one name, so an unnamed
+      // (null) port yields NULL while a named port yields its name.
+      if (obj->type == vpiPort) {
+        return VpiPortName(obj->explicit_name, obj->name.data(),
+                           obj->name.data());
+      }
       return obj->name.data();
     // §37.49: the file component of an assertion's source location. The general
     // vpiFile semantics (and the `line directive's effect) are §37.3.3/§22.12's;
@@ -3163,6 +3378,9 @@ const char* VpiContext::GetStr(int property, VpiHandle obj) {
       return obj->full_name.empty() ? obj->name.data() : obj->full_name.c_str();
     case kVpiDefName:
       if (obj->type == kVpiModule) return obj->name.data();
+      // §37.15 detail 6: a ref obj whose actual is an interface or modport
+      // reports that interface's definition name or the modport name.
+      if (obj->type == vpiRefObj) return VpiRefObjDefName(obj);
       return nullptr;
 
     case kVpiLibrary:
