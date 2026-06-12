@@ -1943,6 +1943,17 @@ class VpiContext {
   // it so the data vpi_get_data() reads back can be established.
   void SeedSaveData(int id, const char* data, int len);
 
+  // §38.31: append `num_of_bytes` bytes from `data_loc` to the save/restart
+  // store for `id`, returning the number of bytes written. The byte count must
+  // be greater than zero and the source pointer must be supplied by the
+  // application. The routine is only legal from an application routine running
+  // for reason cbStartOfSave or cbEndOfSave; any failure (wrong reason, a
+  // non-positive count, or a null source) detects an error and returns zero.
+  // There is no limit on how many times an id may be written, and ids may be
+  // written in any order; bytes for one id accumulate contiguously so that
+  // vpi_get_data() (§38.9) can later read them back in chunks of any size.
+  int PutData(int id, const char* data_loc, int num_of_bytes);
+
   // §38.13: set the simulation time unit, as a base-ten exponent of one second
   // (the unit the scheduler counts ticks in). vpi_get_time() uses it both as the
   // scaling reference for a scaled-real result and as the unit reported for a
@@ -2734,6 +2745,7 @@ void vpi_get_time(vpiHandle obj, s_vpi_time* time_p);
 void vpi_get_delays(vpiHandle obj, p_vpi_delay delay_p);
 void vpi_put_delays(vpiHandle obj, p_vpi_delay delay_p);
 PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes);
+PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes);
 vpiHandle VpiHandleC(int type, vpiHandle ref);
 vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope);
 vpiHandle VpiHandleByIndexC(vpiHandle parent, int index);

@@ -2701,6 +2701,41 @@ int VpiContext::GetData(int id, char* data_loc, int num_of_bytes) {
   return num_of_bytes;
 }
 
+int VpiContext::PutData(int id, const char* data_loc, int num_of_bytes) {
+  // §38.31: legal only from an application routine running for reason
+  // cbStartOfSave or cbEndOfSave. Any other context is an error, which the
+  // routine reports by returning zero bytes written.
+  if (current_callback_reason_ != kCbStartOfSave &&
+      current_callback_reason_ != kCbEndOfSave) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_put_data() may only be called from a cbStartOfSave or "
+        "cbEndOfSave application routine";
+    return 0;
+  }
+
+  // §38.31: numOfBytes shall be greater than zero, and the source storage must
+  // be supplied by the application. Either condition is a detected error, which
+  // returns zero bytes written.
+  if (data_loc == nullptr || num_of_bytes <= 0) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_put_data() requires a non-null source and a positive byte count";
+    return 0;
+  }
+
+  // §38.31: append the bytes to the save/restart store for this id. There is no
+  // limit on how many times an id is written and no ordering constraint across
+  // ids; storing the bytes contiguously lets vpi_get_data() (§38.9) read them
+  // back later in chunks of any size. The return value is the number of bytes
+  // written.
+  std::vector<char>& bytes = save_data_[id];
+  bytes.insert(bytes.end(), data_loc, data_loc + num_of_bytes);
+  return num_of_bytes;
+}
+
 namespace {
 
 // §38.21: split a possibly hierarchical name into its dot-separated path
@@ -4120,6 +4155,11 @@ void vpi_put_delays(vpiHandle obj, p_vpi_delay delay_p) {
 PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().GetData(id, dataLoc, numOfBytes);
+}
+
+PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  return delta::GetGlobalVpiContext().PutData(id, dataLoc, numOfBytes);
 }
 
 vpiHandle VpiHandleC(int type, vpiHandle ref) {
