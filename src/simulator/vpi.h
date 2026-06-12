@@ -544,6 +544,16 @@ struct VpiObject {
   // applied to it reaches a null handle (detail 5). Null by default.
   VpiObject* referenced_object = nullptr;
 
+  // §37.40 detail 1: the event terms a timing check reaches through its
+  // vpiTchkRefTerm and vpiTchkDataTerm relations. The reference term is the
+  // check's reference event or controlled reference event; the data term is its
+  // data event, present only when the check has one (otherwise null). Both are
+  // tchk term objects, whose own type (vpiTchkTerm) differs from the relation
+  // enum, so they are held as designated pointers rather than found by a type
+  // match. Null by default.
+  VpiObject* tchk_ref_term = nullptr;
+  VpiObject* tchk_data_term = nullptr;
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 

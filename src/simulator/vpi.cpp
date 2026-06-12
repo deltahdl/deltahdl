@@ -3694,6 +3694,17 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return nullptr;
   }
 
+  // §37.40 detail 1: a timing check's vpiTchkRefTerm relation denotes its
+  // reference event (or controlled reference event), and vpiTchkDataTerm denotes
+  // its data event when the check has one. Both reach tchk term objects, whose
+  // own type (vpiTchkTerm) differs from the relation enum, so the generic walk
+  // below cannot find them; they are held as designated pointers. A check with
+  // no data event reports NULL for vpiTchkDataTerm ("if any").
+  if (type == vpiTchkRefTerm && ref->type == vpiTchk) return ref->tchk_ref_term;
+  if (type == vpiTchkDataTerm && ref->type == vpiTchk) {
+    return ref->tchk_data_term;
+  }
+
   // §37.39 detail 1: vpiModule from a specify-block path (mod path) is kept for
   // backward compatibility, but it shall report NULL when that specify block
   // lives in an interface rather than a module. Walk outward to the innermost
@@ -3950,6 +3961,13 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   // literally vpiImport or items merely made visible by the import.
   bool import_iteration = ref && type == vpiImport;
 
+  // §37.40 detail 2: a timing check's vpiExpr iteration reaches its arguments.
+  // The reference, controlled-reference, and data events are returned as tchk
+  // term objects (vpiTchkTerm); every other argument keeps the type of its
+  // expression. The relation therefore reaches those terms and expressions, not
+  // children whose own type is literally vpiExpr, so it is matched specially.
+  bool tchk_expr_iteration = ref && ref->type == vpiTchk && type == vpiExpr;
+
   // §38.23: unless otherwise specified, iterating the relationships of a
   // protected object is an error, so no iterator is produced. §37.42 detail 10
   // carves out one exception: a protected system task or function call shall
@@ -3985,7 +4003,8 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
                   class_derived_iteration, memory_word_iteration,
                   extends_argument_iteration, interconnect_array_element_iteration,
                   interconnect_net_element_iteration,
-                  interconnect_net_member_iteration](int obj_type) {
+                  interconnect_net_member_iteration,
+                  tchk_expr_iteration](int obj_type) {
     // §37.20 detail 1: a reg array's vpiMemoryWord iteration collects its reg
     // word objects (vpiReg), the backwards-compatible form of the legacy memory
     // words, rather than children whose own type is literally vpiMemoryWord.
@@ -4033,6 +4052,13 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
         interconnect_net_element_iteration ||
         interconnect_net_member_iteration) {
       return VpiIsInterconnectSubelementType(obj_type);
+    }
+    // §37.40 detail 2: a timing check's vpiExpr iteration collects its argument
+    // objects - the reference/controlled-reference and data event terms (each a
+    // vpiTchkTerm) together with the check's other argument expressions - rather
+    // than children whose own type is literally vpiExpr.
+    if (tchk_expr_iteration) {
+      return obj_type == vpiTchkTerm || VpiIsExprType(obj_type);
     }
     // §37.72 detail 1: a case item's match expressions are reached through the
     // vpiExpr edge, which spans both patterns and plain expressions, so the
