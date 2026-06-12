@@ -3265,6 +3265,21 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return nullptr;
   }
 
+  // §37.39 detail 1: vpiModule from a specify-block path (mod path) is kept for
+  // backward compatibility, but it shall report NULL when that specify block
+  // lives in an interface rather than a module. Walk outward to the innermost
+  // enclosing instance: reaching an interface first means there is no owning
+  // module to return, even when the interface is itself instantiated inside a
+  // module; reaching a module first reports that module. New code is meant to
+  // use the vpiInstance relation, which reaches either container.
+  if (type == kVpiModule && ref->type == vpiModPath) {
+    for (VpiObject* scope = ref->parent; scope; scope = scope->parent) {
+      if (scope->type == vpiInterface) return nullptr;
+      if (scope->type == kVpiModule) return scope;
+    }
+    return nullptr;
+  }
+
   if (ref->parent && ref->parent->type == type) return ref->parent;
 
   for (auto* child : ref->children) {
