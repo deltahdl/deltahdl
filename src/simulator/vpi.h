@@ -2541,6 +2541,36 @@ class VpiContext {
   // names nothing, so the result is null.
   VpiHandle CreateHandleFor(VpiHandle object);
 
+  // §36.12.2.2: Mechanism 2 - selection of the default VPI compatibility mode
+  // run by the host simulator. This is the means the simulation provider makes
+  // available to set, for an entire simulation run, the compatibility mode that
+  // governs every VPI application not bound to a mode through the compile-based
+  // scheme of Mechanism 1 (§36.12.2.1). Only one default mode is selectable for
+  // a given run: the first selection fixes it and a later request for a
+  // different mode is refused (returns false) so the run keeps one consistent
+  // default; re-selecting the mode already in force is accepted. `mode` is a
+  // vpiCompatibilityMode value, with 0 meaning no compatibility mode (the
+  // native, current-standard data model). Returns true when the requested mode
+  // is the one in force after the call.
+  bool SetDefaultCompatibilityMode(int mode);
+
+  // §36.12.2.2: the default VPI compatibility mode currently in force for the
+  // simulation run, as established by SetDefaultCompatibilityMode. Zero when no
+  // mode has been selected, in which case applications observe the native
+  // current-standard behavior.
+  int DefaultCompatibilityMode() const { return default_compat_mode_; }
+
+  // §36.12.2.2: the compatibility mode that actually governs a particular VPI
+  // application. An application bound to a mode through Mechanism 1 carries that
+  // mode in its recompiled entry points, so the run-wide default does not apply
+  // to it - when `uses_mechanism1` is true the application's own
+  // `mechanism1_mode` governs. Every application not using the compile-based
+  // scheme is governed by the run-wide default instead. This is how an
+  // application needing a mode different from the default obtains one: by using
+  // the compile-based mechanism.
+  int EffectiveCompatibilityMode(bool uses_mechanism1,
+                                 int mechanism1_mode) const;
+
   VpiHandle CreateModule(std::string_view name, std::string full_name);
 
   VpiHandle CreatePort(std::string_view name, int direction, VpiHandle parent);
@@ -2664,6 +2694,14 @@ class VpiContext {
   // §37.42 detail 3: the system task or function call currently invoking a PLI
   // application, returned by vpi_handle(vpiSysTfCall, NULL).
   VpiHandle current_systf_call_ = nullptr;
+
+  // §36.12.2.2: the run-wide default VPI compatibility mode selected through
+  // Mechanism 2 (a vpiCompatibilityMode value; 0 = native current standard),
+  // and whether one has been selected yet. The selection is fixed for the
+  // simulation run once made, so only one default mode is selectable per run.
+  int default_compat_mode_ = 0;
+  bool default_compat_mode_selected_ = false;
+
   VpiErrorInfo last_error_ = {};
 
   // §38.9: the reason of the callback whose application routine is currently

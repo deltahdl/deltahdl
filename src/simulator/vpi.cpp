@@ -5229,6 +5229,31 @@ VpiHandle VpiContext::CreateHandleFor(VpiHandle object) {
   return handle;
 }
 
+bool VpiContext::SetDefaultCompatibilityMode(int mode) {
+  // §36.12.2.2: only one default mode is selectable for a given simulation run.
+  // Once a mode has been selected, refuse any request that would change it so
+  // the run keeps a single, consistent default; a request for the mode already
+  // in force is consistent and is accepted.
+  if (default_compat_mode_selected_ && mode != default_compat_mode_) {
+    return false;
+  }
+  default_compat_mode_ = mode;
+  default_compat_mode_selected_ = true;
+  return true;
+}
+
+int VpiContext::EffectiveCompatibilityMode(bool uses_mechanism1,
+                                           int mechanism1_mode) const {
+  // §36.12.2.2: the run-wide default determines the compatibility-mode VPI
+  // behavior for every application not using the compile-based scheme. An
+  // application that does use Mechanism 1 is governed by the mode compiled into
+  // it, so the default does not apply to it.
+  if (uses_mechanism1) {
+    return mechanism1_mode;
+  }
+  return default_compat_mode_;
+}
+
 VpiHandle VpiContext::CreateModule(std::string_view name,
                                    std::string full_name) {
   auto* obj = AllocObject();
