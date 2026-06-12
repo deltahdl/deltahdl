@@ -68,5 +68,19 @@ TEST_F(AtomicStatement, EmptyLabelIsTreatedAsNoLabel) {
   EXPECT_EQ(vpi_get_str(vpiName, &stmt), nullptr);
 }
 
+// D1 scope guard: the empty-label-becomes-NULL conversion is specific to atomic
+// statements. An object outside the grouping keeps the generic name behavior, so
+// an empty name comes back as the empty string rather than NULL. This pins the
+// production guard (VpiIsAtomicStmtType) to the atomic statement case - without
+// it, the rule would wrongly nullify empty names for every object kind.
+TEST_F(AtomicStatement, EmptyNameNullingDoesNotApplyToNonAtomicObjects) {
+  VpiObject non_stmt;
+  non_stmt.type = vpiModule;  // not an atomic statement
+  non_stmt.name = "";         // empty, same as the unlabeled case above
+  const char* result = vpi_get_str(vpiName, &non_stmt);
+  ASSERT_NE(result, nullptr);
+  EXPECT_STREQ(result, "");
+}
+
 }  // namespace
 }  // namespace delta
