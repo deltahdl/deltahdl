@@ -1178,6 +1178,347 @@ std::string VpiVariableFullName(const VpiVariableNameParts& parts) {
   return parts.top_scope + "." + decompile;
 }
 
+// ===========================================================================
+// §37.16 Nets.
+// ===========================================================================
+
+// §37.16: the net object kinds the simulator's data type can hold. An
+// integral-typed net is one whose value is a packed vector of bits (see 6.11.1);
+// enum, logic, and bit nets are handled separately by the scalar/vector rules.
+static bool VpiIsIntegralTypedNet(int net_type) {
+  switch (net_type) {
+    case vpiIntegerNet:
+    case vpiTimeNet:
+    case vpiByteNet:
+    case vpiShortIntNet:
+    case vpiIntNet:
+    case vpiLongIntNet:
+    case vpiPackedArrayNet:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiIsArrayNet(int unpacked_range_count) {
+  // §37.16 detail 1: one or more unpacked ranges makes a net an array net.
+  return unpacked_range_count >= 1;
+}
+
+bool VpiIsPackedArrayNet(int net_type, int explicit_packed_range_count) {
+  // §37.16 detail 1: a packed struct/union net or an enum net becomes a packed
+  // array net when it carries at least one explicit packed range.
+  if (explicit_packed_range_count < 1) return false;
+  return net_type == vpiStructNet || net_type == vpiUnionNet ||
+         net_type == vpiEnumNet;
+}
+
+bool VpiNetIsArrayMember(VpiHandle net) {
+  // §37.16 detail 2: a net is an array member when its vpiParent prefix is an
+  // array net.
+  return net != nullptr && net->parent != nullptr &&
+         net->parent->type == vpiNetArray;
+}
+
+bool VpiNetIsPackedArrayMember(VpiHandle net) {
+  // §37.16 detail 2: vpiPackedArrayMember is TRUE for a packed struct/union net,
+  // an enum net, or a packed array net whose vpiParent prefix is a packed array
+  // net.
+  if (!net || !net->parent || net->parent->type != vpiPackedArrayNet) {
+    return false;
+  }
+  switch (net->type) {
+    case vpiStructNet:
+    case vpiUnionNet:
+    case vpiEnumNet:
+    case vpiPackedArrayNet:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiNetBitIteratorApplies(int net_type) {
+  // §37.16 detail 3: a logic net or bit net always exposes its net bits, whether
+  // or not the vector was expanded.
+  return net_type == vpiNet || net_type == vpiBitNet;
+}
+
+bool VpiNetTerminalAccessAllowed(bool is_scalar_net_or_bit_select) {
+  // §37.16 detail 5: continuous assignments and primitive terminals are reachable
+  // only from a scalar net or a bit-select.
+  return is_scalar_net_or_bit_select;
+}
+
+VpiPortGranularity VpiPortsReferenceGranularity(int ref_type) {
+  // §37.16 detail 6: a net bit reference selects the matching port bits; an
+  // entire net or array net reference selects a handle to the whole port.
+  if (ref_type == vpiNetBit) return VpiPortGranularity::kPortBits;
+  return VpiPortGranularity::kEntirePort;
+}
+
+VpiPortGranularity VpiPortInstReferenceGranularity(
+    bool ref_is_bit_or_scalar, bool ref_is_entire_net_or_array,
+    bool highconn_bit_index_undeterminable) {
+  // §37.16 detail 7: an entire net or array net reference always selects the
+  // whole port. A bit or scalar reference selects the matching port bits or
+  // scalar ports, except when the highconn is a complex expression whose bit
+  // index cannot be determined - then the whole port is selected instead.
+  if (ref_is_entire_net_or_array) return VpiPortGranularity::kEntirePort;
+  if (ref_is_bit_or_scalar) {
+    return highconn_bit_index_undeterminable ? VpiPortGranularity::kEntirePort
+                                             : VpiPortGranularity::kPortBits;
+  }
+  return VpiPortGranularity::kEntirePort;
+}
+
+bool VpiPortInstReferenceQualifies(bool connected_to_any_port_bit) {
+  // §37.16 detail 8: a reference inside the highconn that is connected to none of
+  // the port's bits does not qualify as a member of the iteration.
+  return connected_to_any_port_bit;
+}
+
+int VpiNetLineNo(bool implicit, int declared_line) {
+  // §37.16 detail 9: an implicit net has no declaration line, so vpiLineNo is 0.
+  return implicit ? 0 : declared_line;
+}
+
+VpiHandle VpiNetBitIndex(const std::vector<VpiHandle>& indices_inner_to_outer) {
+  // §37.16 detail 10: the bit index of a net bit is its single innermost index.
+  if (indices_inner_to_outer.empty()) return nullptr;
+  return indices_inner_to_outer.front();
+}
+
+std::vector<VpiHandle> VpiNetBitIndicesOutward(
+    const std::vector<VpiHandle>& indices_inner_to_outer) {
+  // §37.16 detail 10: a multidimensional net array bit-select iterates from the
+  // net bit's index outward, the order the inputs already carry.
+  return indices_inner_to_outer;
+}
+
+int VpiNetNettypeValue(bool is_part_of_nettype_net) {
+  // §37.16 detail 11: a select of a nettype net reports vpiNettypeNetSelect; a
+  // net not declared with a nettype reports vpiNettypeNet.
+  return is_part_of_nettype_net ? vpiNettypeNetSelect : vpiNettypeNet;
+}
+
+bool VpiNetDriverIterationSupported(int nettype_value) {
+  // §37.16 detail 11: driver iteration is unsupported on a vpiNettypeNetSelect.
+  return nettype_value != vpiNettypeNetSelect;
+}
+
+int VpiInterconnectNetType() {
+  // §37.16 detail 12: an interconnect net or interconnect net select reports
+  // vpiInterconnect.
+  return vpiInterconnect;
+}
+
+int VpiInterconnectResolvedNetType(int simulated_resolved_type) {
+  // §37.16 detail 12: a simulated interconnect net resolves to the type of the
+  // simulated net (see 23.3.3.7).
+  return simulated_resolved_type;
+}
+
+VpiHandle VpiNetTypespec(VpiHandle net) {
+  // §37.16 detail 13: an interconnect array has no typespec; any other net hands
+  // back its first typespec child.
+  if (!net || net->type == vpiInterconnectArray) return nullptr;
+  for (auto* child : net->children) {
+    if (child->type == vpiTypespec) return child;
+  }
+  return nullptr;
+}
+
+bool VpiNetBitExpanded(VpiHandle net_bit) {
+  // §37.16 detail 21: vpiExpanded on a net bit reports the parent net's value. A
+  // scalared net (and the default) is expanded; a vectored net is not.
+  if (!net_bit || !net_bit->parent) return true;
+  return !net_bit->parent->is_vectored;
+}
+
+bool VpiNetConstantSelect(bool has_parent, bool all_indices_constant,
+                          bool all_elements_static_members) {
+  // §37.16 detail 23: a net or net bit with no parent is a constant select, as is
+  // a select whose indices are all elaboration-time constants and whose elements
+  // are all struct/union net members or static-bound array elements.
+  if (!has_parent) return true;
+  return all_indices_constant && all_elements_static_members;
+}
+
+int VpiNetSize(const VpiNetSizeQuery& query) {
+  // §37.16 detail 24: vpiSize depends on the kind of net.
+  switch (query.net_type) {
+    case vpiInterconnectArray:
+      return query.interconnect_array_count;
+    case vpiInterconnectNet:
+      return query.connected_net_size;  // the connected net's size
+    case vpiNetArray:
+      return query.array_element_count;  // number of nets in the array
+    case vpiNetBit:
+      return 1;
+    case vpiStructNet:
+    case vpiUnionNet:
+      // packed -> integral, size in bits; unpacked -> number of members
+      return query.packed ? query.bit_width : query.member_count;
+    default:
+      break;
+  }
+  if (VpiIsIntegralTypedNet(query.net_type) || query.net_type == vpiNet ||
+      query.net_type == vpiBitNet || query.net_type == vpiEnumNet) {
+    return query.bit_width;  // net of an integral data type -> size in bits
+  }
+  return 0;  // vpiSize not defined for any other net
+}
+
+std::vector<VpiHandle> VpiNetIndicesOutward(
+    bool is_array_member, const std::vector<VpiHandle>& indices_inner_to_outer) {
+  // §37.16 detail 25: only an element of an array net has an index iteration; it
+  // runs from the net's own index outward. A net that is not an array element
+  // yields no indices.
+  if (!is_array_member) return {};
+  return indices_inner_to_outer;
+}
+
+std::vector<VpiRangeDesc> VpiNetRanges(
+    const std::vector<VpiArrayDimension>& dims) {
+  // §37.16 detail 26 (woven with §37.22): one range per declared dimension, in
+  // declaration order. Each dimension routes through §37.22's empty-range rule;
+  // the implicit element ranges of a packed struct/union element are dropped
+  // (detail 1).
+  std::vector<VpiRangeDesc> ranges;
+  for (const auto& dim : dims) {
+    if (dim.implicit_element_range) continue;
+    VpiRangeDesc range;
+    range.empty = VpiDimensionRangeIsEmpty(dim.kind);
+    range.left_expr = dim.left_expr;
+    range.right_expr = dim.right_expr;
+    range.size = dim.size;
+    ranges.push_back(range);
+  }
+  return ranges;
+}
+
+// §37.16 detail 26: the §37.22 range for a net's leftmost packed dimension, the
+// one vpiLeftRange/vpiRightRange report. Returns an empty range (so both
+// relations yield NULL) when the net has no dimensions.
+static VpiRangeDesc LeftmostNetRange(
+    const std::vector<VpiArrayDimension>& dims) {
+  std::vector<VpiRangeDesc> ranges = VpiNetRanges(dims);
+  if (ranges.empty()) {
+    VpiRangeDesc empty;
+    empty.empty = true;
+    return empty;
+  }
+  return ranges.front();
+}
+
+VpiHandle VpiNetLeftRange(const std::vector<VpiArrayDimension>& dims) {
+  // §37.16 detail 26: defer to §37.22's vpiLeftRange.
+  return VpiRangeLeftRange(LeftmostNetRange(dims));
+}
+
+VpiHandle VpiNetRightRange(const std::vector<VpiArrayDimension>& dims) {
+  // §37.16 detail 26: the mirror of VpiNetLeftRange.
+  return VpiRangeRightRange(LeftmostNetRange(dims));
+}
+
+bool VpiNetScalar(const VpiNetScalarVectorQuery& query) {
+  // §37.16 detail 28: a bit/logic net with no packed dimension and a net bit are
+  // scalars; an enum net defers to its base typespec; an array net defers to an
+  // element; every other net is not a scalar.
+  if (query.net_type == vpiNet || query.net_type == vpiBitNet) {
+    return !query.has_packed_dimension;
+  }
+  if (query.net_type == vpiNetBit) return true;
+  if (query.net_type == vpiEnumNet) return query.base_is_scalar;
+  if (query.net_type == vpiNetArray) return query.element_is_scalar;
+  return false;
+}
+
+bool VpiNetVector(const VpiNetScalarVectorQuery& query) {
+  // §37.16 detail 28: a bit/logic net with a packed dimension, the integral-typed
+  // nets, and a packed struct/union net are vectors; an enum net defers to its
+  // base typespec; an array net defers to an element; every other net is not a
+  // vector.
+  if (query.net_type == vpiNet || query.net_type == vpiBitNet) {
+    return query.has_packed_dimension;
+  }
+  if (query.net_type == vpiNetBit) return false;
+  if (query.net_type == vpiEnumNet) return query.base_is_vector;
+  if (query.net_type == vpiStructNet || query.net_type == vpiUnionNet) {
+    return query.packed;
+  }
+  if (query.net_type == vpiNetArray) return query.element_is_vector;
+  return VpiIsIntegralTypedNet(query.net_type);
+}
+
+bool VpiNetHasValueProperty(int net_type, bool packed_struct_union) {
+  // §37.16 detail 30: array nets, unpacked struct/union nets, and interconnect
+  // arrays have no value property; every other net does.
+  if (net_type == vpiNetArray || net_type == vpiInterconnectArray) return false;
+  if ((net_type == vpiStructNet || net_type == vpiUnionNet) &&
+      !packed_struct_union) {
+    return false;
+  }
+  return true;
+}
+
+VpiHandle VpiNetParent(const std::vector<VpiParentPrefix>& prefixes) {
+  // §37.16 detail 31: scan the prefixes rightmost to leftmost and return the
+  // first one that qualifies; NULL when none does.
+  for (const auto& prefix : prefixes) {
+    if (prefix.qualifies) return prefix.handle;
+  }
+  return nullptr;
+}
+
+bool VpiNetElementIteratorApplies(int net_type) {
+  // §37.16 detail 32: vpiElement iterates only over a packed array net.
+  return net_type == vpiPackedArrayNet;
+}
+
+std::vector<VpiHandle> VpiPackedArrayNetElements(VpiHandle packed_array_net) {
+  // §37.16 detail 32: the subelements of a packed array net are its element
+  // children, returned in declaration order. A net that is not a packed array
+  // net has none.
+  if (!packed_array_net ||
+      !VpiNetElementIteratorApplies(packed_array_net->type)) {
+    return {};
+  }
+  return packed_array_net->children;
+}
+
+bool VpiNetStructUnionMember(VpiHandle net) {
+  // §37.16 detail 33: TRUE for a net or array net whose vpiParent is a struct or
+  // union net; not defined for a net bit (whose vpiParent is a net), reported
+  // FALSE.
+  if (!net || net->type == vpiNetBit || !net->parent) return false;
+  return net->parent->type == vpiStructNet || net->parent->type == vpiUnionNet;
+}
+
+std::string VpiNetName(const VpiVariableNameParts& parts) {
+  // §37.16 detail 34: the leaf member with its own index/slice, no prefixes.
+  return parts.member + parts.index_suffix;
+}
+
+std::string VpiNetDecompile(const VpiVariableNameParts& parts) {
+  // §37.16 detail 34: the struct/union-net prefixes joined to the member (with
+  // its index/slice), without the top-level scope.
+  std::string result;
+  for (const auto& prefix : parts.member_prefixes) {
+    result += prefix + ".";
+  }
+  result += parts.member + parts.index_suffix;
+  return result;
+}
+
+std::string VpiNetFullName(const VpiVariableNameParts& parts) {
+  // §37.16 detail 34: the top-level scope prefixed to the decompile form.
+  std::string decompile = VpiNetDecompile(parts);
+  if (parts.top_scope.empty()) return decompile;
+  return parts.top_scope + "." + decompile;
+}
+
 void VpiContext::Attach(SimContext& sim_ctx) {
   for (auto& [name, var] : sim_ctx.GetVariables()) {
     auto* obj = AllocObject();
@@ -2010,8 +2351,15 @@ int VpiContext::Get(int property, VpiHandle obj) {
       return obj->is_scalared ? 1 : 0;
     case vpiExplicitVectored:
       return obj->is_vectored ? 1 : 0;
+    // §37.16 detail 21: vpiExpanded on a net bit reports the parent net's value;
+    // otherwise it reports the object's own expansion (a scalared net, and the
+    // default, is expanded; a vectored net is not).
     case vpiExpanded:
+      if (obj->type == vpiNetBit) return VpiNetBitExpanded(obj) ? 1 : 0;
       return obj->is_vectored ? 0 : 1;
+    // §37.16 detail 9: whether a net was created by implicit declaration.
+    case vpiImplicitDecl:
+      return obj->implicit_decl ? 1 : 0;
     // §37.49: the integer components of an assertion's source span.
     case vpiStartLine:
       return obj->start_line;
@@ -2035,8 +2383,34 @@ static const char* VpiTypeConstantName(int type) {
   switch (type) {
     case vpiModule:
       return "vpiModule";
-    case vpiNet:
+    // §37.16 details 27 and 29: vpiLogicNet is #defined the same as vpiNet and
+    // vpiArrayNet the same as vpiNetArray, so vpi_get_str(vpiType) may report
+    // either spelling for those kinds. The simulator returns the IEEE 1364 net
+    // spellings, which are among the permitted names.
+    case vpiNet:  // == vpiLogicNet
       return "vpiNet";
+    case vpiNetArray:  // == vpiArrayNet
+      return "vpiNetArray";
+    case vpiNetBit:
+      return "vpiNetBit";
+    case vpiStructNet:
+      return "vpiStructNet";
+    case vpiUnionNet:
+      return "vpiUnionNet";
+    case vpiEnumNet:
+      return "vpiEnumNet";
+    case vpiIntegerNet:
+      return "vpiIntegerNet";
+    case vpiTimeNet:
+      return "vpiTimeNet";
+    case vpiBitNet:
+      return "vpiBitNet";
+    case vpiPackedArrayNet:
+      return "vpiPackedArrayNet";
+    case vpiInterconnectNet:
+      return "vpiInterconnectNet";
+    case vpiInterconnectArray:
+      return "vpiInterconnectArray";
     case vpiReg:
       return "vpiReg";
     case vpiPort:

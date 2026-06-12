@@ -192,6 +192,12 @@ struct VpiObject {
   bool imported = false;
   bool in_compilation_unit = false;
 
+  // §37.16 detail 9: whether a net was created by implicit declaration (a net
+  // referenced without an explicit declaration). Reported by vpiImplicitDecl;
+  // an implicit net's vpiLineNo is 0 and its vpiFile names where the net was
+  // first referenced (carried in `file`).
+  bool implicit_decl = false;
+
   // §37.10 detail 7: the time precision an instance was elaborated with. Only
   // meaningful on module objects; the design-wide query reads it across every
   // module to find the smallest precision.
@@ -943,6 +949,224 @@ std::string VpiVariableDecompile(const VpiVariableNameParts& parts);
 // §37.17 detail 28: vpiFullName - the top-level scope prefixed to the decompile
 // form.
 std::string VpiVariableFullName(const VpiVariableNameParts& parts);
+
+// ===========================================================================
+// §37.16 Nets. The VPI net object model, the net counterpart of §37.17's
+// variable model. Each helper applies one of the clause's numbered "Details" so
+// the rule can be observed independently of the surrounding elaboration and
+// driver-update machinery. Range relations (details 1 and 26) are woven onto
+// §37.22's range helpers, and the prefix and member-name rules (details 31 and
+// 34) reuse §37.17's prefix/name structures, since a net prefix and a variable
+// prefix carry the same shape.
+// ===========================================================================
+
+// §37.16 detail 1: a net declared as an array with one or more unpacked ranges
+// is an array net.
+bool VpiIsArrayNet(int unpacked_range_count);
+
+// §37.16 detail 1: a packed struct net, packed union net, or enum net declared
+// with one or more explicit packed ranges is a packed array net. The net_type
+// is the declared net object kind; explicit_packed_range_count counts only the
+// ranges written on the declaration, never the implicit element ranges.
+bool VpiIsPackedArrayNet(int net_type, int explicit_packed_range_count);
+
+// §37.16 detail 2: vpiArrayMember is TRUE exactly when a net is an element of an
+// array net, read from the net's vpiParent prefix. (The older vpiArray property
+// is deprecated for the same role.)
+bool VpiNetIsArrayMember(VpiHandle net);
+
+// §37.16 detail 2: vpiPackedArrayMember is TRUE for a packed struct net, packed
+// union net, enum net, or packed array net that is an element of a packed array
+// net (its vpiParent prefix is a packed array net).
+bool VpiNetIsPackedArrayMember(VpiHandle net);
+
+// §37.16 detail 3: a net bit of a logic net or bit net is always reachable
+// through vpiBit, regardless of whether the vector was expanded. True for a
+// logic net or a bit net.
+bool VpiNetBitIteratorApplies(int net_type);
+
+// §37.16 detail 5: continuous assignments and primitive terminals (vpiContAssign
+// and vpiPrimTerm) shall only be accessed from a scalar net or a bit-select.
+bool VpiNetTerminalAccessAllowed(bool is_scalar_net_or_bit_select);
+
+// §37.16 details 6 and 7: the granularity a vpiPorts or vpiPortInst iteration
+// hands back for a given reference handle - either the individual port bits (or
+// scalar ports) matching the reference, or a handle to the entire port.
+enum class VpiPortGranularity {
+  kPortBits,    // the port bits / scalar ports the reference selects
+  kEntirePort,  // a handle to the whole port
+};
+
+// §37.16 detail 6: the granularity vpiPorts returns. A net bit reference yields
+// the matching port bits; an entire net or array net reference yields a handle
+// to the entire port.
+VpiPortGranularity VpiPortsReferenceGranularity(int ref_type);
+
+// §37.16 detail 7: the granularity vpiPortInst returns. A bit or scalar
+// reference yields port bits or scalar ports, unless the port's highconn is a
+// complex expression whose bit index cannot be determined, in which case the
+// entire port is returned. An entire net or array net reference always yields
+// the entire port.
+VpiPortGranularity VpiPortInstReferenceGranularity(
+    bool ref_is_bit_or_scalar, bool ref_is_entire_net_or_array,
+    bool highconn_bit_index_undeterminable);
+
+// §37.16 detail 8: a vpiPortInst reference that lies within the highconn
+// expression but is connected to none of the port's bits (which can happen on a
+// size mismatch) does not qualify as a member of that iteration.
+bool VpiPortInstReferenceQualifies(bool connected_to_any_port_bit);
+
+// §37.16 detail 9: vpiLineNo of a net. An implicit net reports 0; an explicitly
+// declared net reports the line it was declared on.
+int VpiNetLineNo(bool implicit, int declared_line);
+
+// §37.16 detail 10: vpi_handle(vpiIndex, net_bit) returns the bit index of a net
+// bit - its single innermost index.
+VpiHandle VpiNetBitIndex(const std::vector<VpiHandle>& indices_inner_to_outer);
+
+// §37.16 detail 10: vpi_iterate(vpiIndex, net_bit) over a multidimensional net
+// array bit-select returns the indices starting with the net bit's index and
+// working outward; the inputs are already in that order.
+std::vector<VpiHandle> VpiNetBitIndicesOutward(
+    const std::vector<VpiHandle>& indices_inner_to_outer);
+
+// §37.16 detail 11: vpiNetType for a user-defined nettype. A net not declared
+// with a nettype reports vpiNettypeNet; any part (a select) of a net declared
+// with a nettype reports vpiNettypeNetSelect.
+int VpiNetNettypeValue(bool is_part_of_nettype_net);
+
+// §37.16 detail 11: vpiDriver and vpiLocalDriver iterations are not supported for
+// a net whose vpiNetType is vpiNettypeNetSelect.
+bool VpiNetDriverIterationSupported(int nettype_value);
+
+// §37.16 detail 12: vpiNetType for an interconnect net or interconnect net
+// select is vpiInterconnect.
+int VpiInterconnectNetType();
+
+// §37.16 detail 12: vpiResolvedNetType for an interconnect net that is a
+// simulated net (see 23.3.3.7) is the resolved type of that simulated net.
+int VpiInterconnectResolvedNetType(int simulated_resolved_type);
+
+// §37.16 detail 13: vpiTypespec returns NULL for an interconnect array; for any
+// other net it is the net's typespec child.
+VpiHandle VpiNetTypespec(VpiHandle net);
+
+// §37.16 detail 21: vpiExpanded queried on a net bit reports the value of the
+// property for the bit's parent net.
+bool VpiNetBitExpanded(VpiHandle net_bit);
+
+// §37.16 detail 23: vpiConstantSelect for a net or net bit. TRUE when the object
+// has no parent (vpiParent returns NULL), or when every index expression in the
+// select is an elaboration-time constant and every selected element denotes a
+// struct/union net member or a packed/unpacked array element with static bounds
+// (see A.8.4); FALSE otherwise.
+bool VpiNetConstantSelect(bool has_parent, bool all_indices_constant,
+                          bool all_elements_static_members);
+
+// §37.16 detail 24: the inputs vpiSize reads for a net object.
+struct VpiNetSizeQuery {
+  int net_type = 0;
+  bool packed = false;               // struct/union net: packed vs unpacked
+  int bit_width = 0;                 // integral-typed net: size in bits
+  int array_element_count = 0;       // array net: number of nets in the array
+  int interconnect_array_count = 0;  // interconnect array: number of elements
+  int connected_net_size = 0;        // interconnect net (not array): connected
+                                     // net's vpiSize
+  int member_count = 0;              // unpacked struct/union net: member count
+};
+
+// §37.16 detail 24: vpiSize for a net object. An interconnect array reports its
+// element count; an interconnect net that is not an array reports the size of
+// the net it connects to; an array net reports the number of nets in the array;
+// a net of integral data type (see 6.11.1) reports its size in bits; a net bit
+// reports 1; an unpacked struct or union net reports its member count. Every
+// other net's vpiSize is undefined and reported as 0.
+int VpiNetSize(const VpiNetSizeQuery& query);
+
+// §37.16 detail 25: vpi_iterate(vpiIndex, net) over a net within an array net
+// returns the selecting indices starting with the net's index and working
+// outward. A net that is not an element of an array net (vpiArrayMember FALSE)
+// has no index iteration, signalled by an empty result.
+std::vector<VpiHandle> VpiNetIndicesOutward(
+    bool is_array_member, const std::vector<VpiHandle>& indices_inner_to_outer);
+
+// §37.16 detail 26 (woven with §37.22): the ranges vpi_iterate(vpiRange, net)
+// returns, one per dimension. For an array net the iteration runs from the
+// leftmost unpacked range to the rightmost; for a packed array, logic, or bit
+// net it runs from the leftmost packed range to the rightmost. Implicit element
+// ranges are dropped (detail 1).
+std::vector<VpiRangeDesc> VpiNetRanges(
+    const std::vector<VpiArrayDimension>& dims);
+
+// §37.16 detail 26: vpiLeftRange of a bit, logic, or packed array net - the
+// bound of the leftmost packed dimension. NULL when the net has no dimensions or
+// that leftmost range is empty.
+VpiHandle VpiNetLeftRange(const std::vector<VpiArrayDimension>& dims);
+
+// §37.16 detail 26: vpiRightRange of a net, the mirror of VpiNetLeftRange.
+VpiHandle VpiNetRightRange(const std::vector<VpiArrayDimension>& dims);
+
+// §37.16 detail 28: the inputs the scalar/vector rules read for a net.
+struct VpiNetScalarVectorQuery {
+  int net_type = 0;
+  bool has_packed_dimension = false;  // bit/logic net: any packed dimensions
+  bool packed = false;                // struct/union net: packed vs unpacked
+  bool base_is_scalar = false;        // enum net: base typespec's vpiScalar
+  bool base_is_vector = false;        // enum net: base typespec's vpiVector
+  bool element_is_scalar = false;     // array net: an element's vpiScalar
+  bool element_is_vector = false;     // array net: an element's vpiVector
+};
+
+// §37.16 detail 28: vpiScalar for a net. A bit or logic net with no packed
+// dimension and a net bit are scalars; an enum net defers to its base typespec;
+// an array net defers to an element; every other net object is not a scalar.
+bool VpiNetScalar(const VpiNetScalarVectorQuery& query);
+
+// §37.16 detail 28: vpiVector for a net. A bit or logic net with a packed
+// dimension and the other integral-typed nets (integer, time, byte, shortint,
+// int, longint, packed struct/union, packed array net) are vectors; an enum net
+// defers to its base typespec; an array net defers to an element; every other
+// net object is not a vector.
+bool VpiNetVector(const VpiNetScalarVectorQuery& query);
+
+// §37.16 detail 30: whether a net kind has a value property. Array nets, unpacked
+// struct nets, unpacked union nets, and interconnect arrays do not; every other
+// net does.
+bool VpiNetHasValueProperty(int net_type, bool packed_struct_union);
+
+// §37.16 detail 31: vpiParent of a net. Scanning the prefix objects rightmost to
+// leftmost (the order given), the first qualifying prefix is returned - a
+// struct/union net, a struct/union member net, or the largest containing packed
+// or unpacked array net; NULL when none qualifies. Reuses §37.17's prefix
+// descriptor, whose shape is shared between the two object models.
+VpiHandle VpiNetParent(const std::vector<VpiParentPrefix>& prefixes);
+
+// §37.16 detail 32: vpiElement iterates the subelements of a packed array net,
+// one dimension at a time. True for a packed array net, false for any other net.
+bool VpiNetElementIteratorApplies(int net_type);
+
+// §37.16 detail 32: the subelements a vpiElement iteration over a packed array
+// net returns - its element children, in declaration order.
+std::vector<VpiHandle> VpiPackedArrayNetElements(VpiHandle packed_array_net);
+
+// §37.16 detail 33: vpiStructUnionMember is TRUE for a net or array net that is a
+// direct member of a struct net or union net (its vpiParent is a struct/union
+// net), FALSE for any other net, and is not defined for a net bit (reported
+// FALSE).
+bool VpiNetStructUnionMember(VpiHandle net);
+
+// §37.16 detail 34: vpiName of a net - the leaf member with its own index/slice
+// but none of its struct/union-net prefixes. Reuses §37.17's name-parts shape.
+std::string VpiNetName(const VpiVariableNameParts& parts);
+
+// §37.16 detail 34: vpiDecompile of a net - the struct/union-net prefixes joined
+// to the member (and its index/slice) without the top-level scope, so it
+// resolves for any non-top-level scope context.
+std::string VpiNetDecompile(const VpiVariableNameParts& parts);
+
+// §37.16 detail 34: vpiFullName of a net - the top-level scope prefixed to the
+// decompile form.
+std::string VpiNetFullName(const VpiVariableNameParts& parts);
 
 struct VpiVectorVal {
   uint32_t aval;
