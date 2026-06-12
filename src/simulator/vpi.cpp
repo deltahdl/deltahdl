@@ -3305,6 +3305,15 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return ref->array_member ? ref->index_expr : nullptr;
   }
 
+  // §37.5 detail 2: vpiIndex from a module reaches the index expression that
+  // locates the module within its module array. As with an array-member
+  // program, primitive, or interface, a module that is not an element of a
+  // module array reports NULL here rather than letting the generic walk find
+  // some other expr child.
+  if (type == vpiIndex && ref->type == kVpiModule) {
+    return ref->array_member ? ref->index_expr : nullptr;
+  }
+
   // §37.42 detail 2: vpiPrefix of a method call reaches the object the method is
   // applied to (the class var "packet" in "packet.send()"). The prefix is held as
   // a designated pointer (it is an expr, not a vpiPrefix-typed child); a tf call
@@ -3396,6 +3405,12 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   bool packed_array_var_index_iteration =
       ref && ref->type == vpiPackedArrayVar && type == vpiIndex;
 
+  // §37.5 detail 1: the top-level modules are accessed by iterating vpiModule
+  // with a NULL reference object. Only top-level modules answer that iteration;
+  // a module nested inside another scope is also a vpiModule object but is
+  // reached through its parent's internal scope, so it is excluded here.
+  bool top_module_iteration = !ref && type == kVpiModule;
+
   // §38.23: unless otherwise specified, iterating the relationships of a
   // protected object is an error, so no iterator is produced. §37.42 detail 10
   // carves out one exception: a protected system task or function call shall
@@ -3477,7 +3492,11 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
     }
   } else {
     for (auto* obj : all_objects_) {
-      if (matches(obj->type)) iter->children.push_back(obj);
+      if (!matches(obj->type)) continue;
+      // §37.5 detail 1: a NULL-reference vpiModule iteration reaches only the
+      // top-level modules, never a module nested within another scope.
+      if (top_module_iteration && !obj->top_module) continue;
+      iter->children.push_back(obj);
     }
   }
 
@@ -4131,6 +4150,15 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // (rather than the interface itself) as the vpiIsModPort Boolean property.
     case vpiIsModPort:
       return obj->is_modport ? 1 : 0;
+    // §37.5: a module reports whether it is a top-level module - one reached by
+    // iterating vpiModule with a NULL reference - through the vpiTopModule
+    // Boolean property.
+    case vpiTopModule:
+      return obj->top_module ? 1 : 0;
+    // §37.5: a module reports its default net decay time (in time units) through
+    // the vpiDefDecayTime integer property.
+    case vpiDefDecayTime:
+      return obj->def_decay_time;
     // §37.3.7: declared lifetime as a Boolean (0 static, 1 non-static).
     case kVpiAutomatic:
       return obj->automatic ? 1 : 0;

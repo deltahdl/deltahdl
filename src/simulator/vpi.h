@@ -366,6 +366,19 @@ struct VpiObject {
   // held as a designated pointer rather than found by the generic child walk.
   VpiObject* index_expr = nullptr;
 
+  // §37.5 detail 1: whether a module is a top-level module - one with no
+  // instantiating parent. The top-level modules are exactly the ones reached by
+  // iterating vpiModule with a NULL reference object; a module nested inside
+  // another scope is reached through its parent instead and so is excluded from
+  // that iteration. Also reported directly through vpi_get(vpiTopModule). False
+  // by default.
+  bool top_module = false;
+
+  // §37.5: the default net decay time a module reports through
+  // vpi_get(vpiDefDecayTime) - the number of time units a tri-state net holds
+  // its last driven value before decaying to x. Zero when unset.
+  int def_decay_time = 0;
+
   // §37.42 detail 2: for a method func/task call, the object the method is
   // applied to, reached through vpiPrefix. For the call "packet.send()" this is
   // the class variable "packet". Null for a tf call that is not a method call,
