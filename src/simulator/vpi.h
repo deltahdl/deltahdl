@@ -2561,6 +2561,16 @@ class VpiContext {
   // handle (there is nothing to have released).
   bool HandleReleased(VpiHandle handle) const;
 
+  // §37.2.4: whether a handle is valid. A handle is valid from the time of its
+  // creation until it is released (§37.2.2), until the object it refers to
+  // ceases to exist (§38.3 object existence), or until the tool terminates; at
+  // any other time it is invalid. Termination tears down the context itself, so
+  // the live cases this predicate distinguishes are release and the object
+  // ceasing to exist. A null handle refers to nothing and is never valid. A VPI
+  // program is required not to use an invalid handle to refer to an object, nor
+  // to release one; this predicate reports the validity those rules turn on.
+  bool HandleValid(VpiHandle handle) const;
+
   // §37.2.2 (restart): whether a handle survives a simulation restart. Only the
   // handles to cbStartOfRestart and cbEndOfRestart callbacks survive; every
   // other handle is released by the restart so those two callbacks can run.

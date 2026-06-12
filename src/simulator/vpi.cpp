@@ -5249,6 +5249,21 @@ bool VpiContext::HandleReleased(VpiHandle handle) const {
   return handle != nullptr && handle->released;
 }
 
+bool VpiContext::HandleValid(VpiHandle handle) const {
+  // §37.2.4: validity runs from a handle's creation until one of the events
+  // that ends it. A null handle names no object and so is never valid. A
+  // released handle (§37.2.2) is no longer a live handle to its object, and a
+  // handle whose object has ceased to exist (§38.3) no longer refers to a live
+  // object; both are invalid. Tool termination, the remaining terminating
+  // event, disposes of the context and every handle with it, so a handle that
+  // is still queryable here has not hit that case. What is left is a valid
+  // handle: non-null, unreleased, and naming an object that still exists.
+  if (!handle) return false;
+  if (handle->released) return false;
+  if (!handle->object_exists) return false;
+  return true;
+}
+
 bool VpiContext::HandleSurvivesRestart(VpiHandle handle) const {
   // §37.2.2 (restart): a restart releases every handle except those naming a
   // cbStartOfRestart or cbEndOfRestart callback. A surviving handle is therefore
