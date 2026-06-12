@@ -2284,6 +2284,22 @@ VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
     return nullptr;
   }
 
+  // §38.36.1: it is illegal to place a cbForce, cbRelease, or cbDisable
+  // simulation-event callback on a variable bit-select. A single addressed bit
+  // of a variable is not a legal target for a force/release/disable callback, so
+  // reject the registration instead of handing back a callback that could never
+  // fire correctly.
+  if ((data->reason == cbForce || data->reason == cbRelease ||
+       data->reason == cbDisable) &&
+      data->obj && data->obj->type == vpiBitSelect) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_register_cb(): a cbForce, cbRelease, or cbDisable callback may not "
+        "be placed on a variable bit-select";
+    return nullptr;
+  }
+
   callbacks_.push_back(*data);
 
   auto* cb_obj = AllocObject();
