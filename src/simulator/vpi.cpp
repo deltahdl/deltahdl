@@ -2366,6 +2366,24 @@ void VpiContext::GetSystfInfo(VpiHandle obj, VpiSystfData* systf_data_p) {
   *systf_data_p = systfs_[idx];
 }
 
+void VpiContext::GetCbInfo(VpiHandle obj, VpiCbData* cb_data_p) {
+  // §38.8: the destination structure is allocated by the application. With no
+  // structure to fill, or no callback to read, there is nothing to report; the
+  // routine never allocates that memory itself.
+  if (obj == nullptr || cb_data_p == nullptr) return;
+
+  // §38.8: obj must name a simulation-related callback. A system task/function
+  // callback carries an s_vpi_systf_data record instead (read it through
+  // vpi_get_systf_info), so it is not a valid argument here.
+  if (obj->type != kVpiCallback || obj->is_systf) return;
+  int idx = obj->index;
+  if (idx < 0 || idx >= static_cast<int>(callbacks_.size())) return;
+
+  // §38.8: report the callback's information by writing the stored s_cb_data
+  // fields into the caller's structure.
+  *cb_data_p = callbacks_[idx];
+}
+
 VpiHandle VpiContext::CreateTimeQueue() {
   // §38.13: a time queue object carries no further state of its own; its kind is
   // enough for GetTime() to know to report the next future event time.
@@ -3916,6 +3934,11 @@ vpiHandle vpi_register_systf(s_vpi_systf_data* data) {
 void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   delta::GetGlobalVpiContext().GetSystfInfo(obj, systf_data_p);
+}
+
+void vpi_get_cb_info(vpiHandle obj, s_cb_data* cb_data_p) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  delta::GetGlobalVpiContext().GetCbInfo(obj, cb_data_p);
 }
 
 void vpi_get_time(vpiHandle obj, s_vpi_time* time_p) {

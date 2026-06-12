@@ -1883,6 +1883,15 @@ class VpiContext {
   // task/function callback leaves the destination untouched.
   void GetSystfInfo(VpiHandle obj, VpiSystfData* systf_data_p);
 
+  // §38.8: report the registration of the simulation-related callback denoted by
+  // `obj` into the application-allocated structure `cb_data_p`. The structure's
+  // memory belongs to the caller; this routine only writes the stored s_cb_data
+  // fields into it - it never allocates that storage. A null destination, a null
+  // handle, or a handle that does not name a registered simulation callback
+  // leaves the destination untouched. (Use GetSystfInfo for a system
+  // task/function callback instead.)
+  void GetCbInfo(VpiHandle obj, VpiCbData* cb_data_p);
+
   // §38.13: write the relevant simulation time into the application-allocated
   // structure `time_p`. The caller selects the form through `time_p->type`:
   // vpiSimTime delivers the raw 64-bit count in high/low; vpiScaledRealTime
@@ -2676,6 +2685,7 @@ typedef struct t_vpi_arrayvalue {
 
 vpiHandle vpi_register_systf(s_vpi_systf_data* data);
 void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p);
+void vpi_get_cb_info(vpiHandle obj, s_cb_data* cb_data_p);
 void vpi_get_time(vpiHandle obj, s_vpi_time* time_p);
 void vpi_get_delays(vpiHandle obj, p_vpi_delay delay_p);
 vpiHandle VpiHandleC(int type, vpiHandle ref);
