@@ -1330,6 +1330,19 @@ VpiHandle VpiEventControlStmt(VpiHandle event_control);
 // Backs the public vpi_handle(vpiStmt, delay_control) dispatch.
 VpiHandle VpiDelayControlStmt(VpiHandle delay_control);
 
+// §37.66 While, repeat: whether an object kind is one of the two looping
+// statements the while/repeat diagram groups - a while statement or a repeat
+// statement. Both reach a condition expression and a body statement through the
+// same relations.
+bool VpiIsWhileOrRepeatType(int type);
+
+// §37.66 While, repeat: the controlling condition expression a while or repeat
+// statement reaches through vpiCondition. The condition's own type is an
+// expression kind rather than the vpiCondition relation tag, so it is found as
+// the loop's first expression child; null when none is attached. Backs the
+// public vpi_handle(vpiCondition, while/repeat) dispatch.
+VpiHandle VpiLoopConditionExpr(VpiHandle loop);
+
 // §37.12 detail 1: whether an object kind is a block item declaration - a
 // variable declaration or a type declaration. These are the declarations whose
 // presence makes an unnamed begin or unnamed fork a scope.

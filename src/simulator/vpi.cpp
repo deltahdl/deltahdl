@@ -1058,6 +1058,27 @@ VpiHandle VpiEventControlStmt(VpiHandle event_control) {
   return nullptr;
 }
 
+bool VpiIsWhileOrRepeatType(int type) {
+  // §37.66: the two looping statements the while/repeat diagram groups together -
+  // a while statement and a repeat statement. Both reach a controlling condition
+  // expression (vpiCondition) and a body statement (vpiStmt) through the same
+  // relations.
+  return type == vpiWhile || type == vpiRepeat;
+}
+
+VpiHandle VpiLoopConditionExpr(VpiHandle loop) {
+  // §37.66: a while or repeat statement reaches its controlling condition through
+  // vpiCondition. The condition is an expression child whose own type is an
+  // expression kind (an operation, a reference, a constant, ...) rather than the
+  // vpiCondition relation tag, so it is found by scanning for the first expression
+  // child. Null when none is attached.
+  if (!loop) return nullptr;
+  for (auto* child : loop->children) {
+    if (VpiIsExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
 VpiHandle VpiDelayControlStmt(VpiHandle delay_control) {
   // §37.68 detail 1: a delay control reaches the statement it guards through
   // vpiStmt. When the delay control is associated with an assignment - i.e. it
@@ -3790,6 +3811,17 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // below would otherwise find.
   if (type == vpiStmt && ref->type == vpiDelayControl) {
     return VpiDelayControlStmt(ref);
+  }
+
+  // §37.66: vpiCondition of a while or repeat statement reaches its controlling
+  // condition expression. The condition's own type is an expression kind, not the
+  // vpiCondition relation tag, so the generic traversal below cannot find it. The
+  // relation is gated on the loop statement kinds so it does not also serve the
+  // vpiCondition edge other diagrams draw (for instance the waits of §37.67). The
+  // loop body, drawn by the diagram's unlabeled edge to a statement, is reached by
+  // the generic vpiStmt traversal below and needs no special case here.
+  if (type == vpiCondition && VpiIsWhileOrRepeatType(ref->type)) {
+    return VpiLoopConditionExpr(ref);
   }
 
   // §37.12 detail 5: vpiStmt of a task or function reaches its body - null when
