@@ -346,6 +346,13 @@ struct VpiObject {
   // (vpi_iterate(vpiExpr, item)) returns NULL and it groups no conditions.
   bool default_case_item = false;
 
+  // §37.63 detail 1: the always kind a process reports through
+  // vpi_get(vpiAlwaysType) - one of vpiAlways, vpiAlwaysComb, vpiAlwaysFF, or
+  // vpiAlwaysLatch. A process that is not an always procedure (an initial or
+  // final process), or an always_type left unset, carries none of those and so
+  // has no always type to report. Zero (no always type) by default.
+  int always_type = 0;
+
   // §37.35 detail 4 / §37.9 detail 1: whether an object is an element within an
   // array. It gates the vpiIndex transition for both an array-member primitive
   // and a program that is an element of an instance array: such an object
@@ -801,6 +808,15 @@ bool VpiIsAtomicStmtType(int type);
 // spelling of the operator ("=", "<=", "+=", ...). Any spelling that is not one of
 // the assignment operators is treated as a normal assignment (vpiAssignmentOp).
 int VpiAssignmentOpType(std::string_view assign_operator);
+
+// §37.63 Process detail 1: whether `always_type` is a legal value of the
+// vpiAlwaysType property. The property distinguishes the flavors of always
+// procedure and is restricted to exactly four constants - vpiAlways,
+// vpiAlwaysComb, vpiAlwaysFF, and vpiAlwaysLatch. Any other value (including the
+// unset default carried by an initial or final process) is not an always type.
+// Scopes vpi_get(vpiAlwaysType), which reports the value only when it is one of
+// the four and vpiUndefined otherwise.
+bool VpiIsAlwaysType(int always_type);
 
 // §37.65 Event control detail 1: the statement an event control "@" reaches
 // through vpiStmt. An event control associated with an assignment - the event

@@ -844,6 +844,15 @@ int VpiAssignmentOpType(std::string_view assign_operator) {
   return vpiAssignmentOp;
 }
 
+bool VpiIsAlwaysType(int always_type) {
+  // §37.63 detail 1: vpiAlwaysType can be exactly one of these four constants.
+  // vpiAlways names a general always procedure; vpiAlwaysComb, vpiAlwaysFF, and
+  // vpiAlwaysLatch name the three specialized always_comb/always_ff/always_latch
+  // forms. Nothing else is an always type.
+  return always_type == vpiAlways || always_type == vpiAlwaysComb ||
+         always_type == vpiAlwaysFF || always_type == vpiAlwaysLatch;
+}
+
 VpiHandle VpiEventControlStmt(VpiHandle event_control) {
   // §37.65 detail 1: an event control reaches the statement it guards through
   // vpiStmt. When the event control is associated with an assignment - i.e. it is
@@ -3773,6 +3782,13 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // §37.54 (D2): an operation reports its operation type as an int property.
     case vpiOpType:
       return obj->op_type;
+    // §37.63 detail 1: a process reports which kind of always procedure it is
+    // through vpiAlwaysType, restricted to vpiAlways/vpiAlwaysComb/vpiAlwaysFF/
+    // vpiAlwaysLatch. A process carrying none of those - an initial or final
+    // process, or an unset always_type - has no always type, so the property
+    // reports vpiUndefined rather than handing back a value outside the four.
+    case vpiAlwaysType:
+      return VpiIsAlwaysType(obj->always_type) ? obj->always_type : vpiUndefined;
     // §37.72: a case statement reports its case kind (vpiCaseExact/vpiCaseX/
     // vpiCaseZ) as an int property.
     case vpiCaseType:
