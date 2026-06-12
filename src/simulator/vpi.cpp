@@ -4141,6 +4141,15 @@ int VpiContext::Get(int property, VpiHandle obj) {
     case vpiAccessType:
       if (obj->type == vpiConstraint)
         return obj->access_type == vpiExternAcc ? vpiExternAcc : 0;
+      // §37.8 detail 2: an interface task or function declaration reports an
+      // access type that is only ever vpiForkJoinAcc or vpiExternAcc. Any other
+      // stored value is not a legal access type here, so it collapses to
+      // vpiUndefined rather than letting a third value escape the property.
+      if (obj->type == vpiInterfaceTfDecl)
+        return (obj->access_type == vpiForkJoinAcc ||
+                obj->access_type == vpiExternAcc)
+                   ? obj->access_type
+                   : vpiUndefined;
       return obj->access_type;
     // §37.34: whether a constraint is virtual, as a Boolean property.
     case vpiVirtual:
