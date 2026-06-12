@@ -3705,6 +3705,15 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return ref->tchk_data_term;
   }
 
+  // §37.45: a delay device reaches its input delay term through vpiInTerm and its
+  // output delay term through vpiOutTerm. Both terms are delay term objects whose
+  // own type (vpiDelayTerm) differs from the relation enum, so the generic walk
+  // below cannot find them; they are held as designated pointers. The relations
+  // are specific to a delay device, so they do not reach a stray delay term on
+  // any other object.
+  if (type == vpiInTerm && ref->type == vpiDelayDevice) return ref->in_term;
+  if (type == vpiOutTerm && ref->type == vpiDelayDevice) return ref->out_term;
+
   // §37.39 detail 1: vpiModule from a specify-block path (mod path) is kept for
   // backward compatibility, but it shall report NULL when that specify block
   // lives in an interface rather than a module. Walk outward to the innermost
@@ -5269,6 +5278,11 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // scope.
     case vpiLocalVarDecls:
       return obj->local_var_decls ? 1 : 0;
+    // §37.45: a delay device and a delay term both report the kind of delay they
+    // model through the vpiDelayType integer property. The value is the stored
+    // delay-type code; objects that are neither carry zero and so report zero.
+    case vpiDelayType:
+      return obj->delay_type;
     default:
       return 0;
   }

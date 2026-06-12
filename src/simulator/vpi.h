@@ -554,6 +554,21 @@ struct VpiObject {
   VpiObject* tchk_ref_term = nullptr;
   VpiObject* tchk_data_term = nullptr;
 
+  // §37.45: the two delay terminals a delay device reaches. vpiInTerm denotes the
+  // input delay term and vpiOutTerm the output delay term. Each is a delay term
+  // object, whose own type (vpiDelayTerm) differs from the relation enum
+  // (vpiInTerm / vpiOutTerm), so - as with the timing-check terms above - they
+  // are held as designated pointers rather than found by a type match. Null by
+  // default.
+  VpiObject* in_term = nullptr;
+  VpiObject* out_term = nullptr;
+
+  // §37.45: the vpiDelayType integer property carried by a delay device and by a
+  // delay term. It names the kind of delay (for example a module-path or timing
+  // delay). Zero by default, which is what every object that is not a delay
+  // device or delay term reports.
+  int delay_type = 0;
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 
