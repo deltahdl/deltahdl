@@ -560,6 +560,39 @@ struct VpiObject {
   // handle to the same object untouched. False until vpi_release_handle() (or a
   // simulation event that frees the handle's object) releases it.
   bool released = false;
+
+  // §37.3.5: whether this expression has side effects when it is evaluated. The
+  // subclause classifies such expressions as ones built from assignment
+  // operators, increment or decrement operators, function or system-function
+  // calls (including built-in methods) that change simulation state by some
+  // means other than their return value, or any expression that contains such an
+  // expression as an operand, argument, or index. This flag marks an
+  // already-classified expression; the VPI value, property, and relation
+  // routines consult it. False by default.
+  bool has_side_effects = false;
+
+  // §37.3.5: a running count of how many times this expression has been
+  // evaluated through VPI. Applying vpi_get_value() to an expression with side
+  // effects shall fully evaluate it together with its side effects, so that read
+  // bumps this counter - the observable stand-in for the state change the
+  // evaluation performs (for instance an embedded i++). Zero until the first
+  // such evaluation.
+  int side_effect_count = 0;
+
+  // §37.3.5: whether a VPI query for a property or relation of this expression
+  // cannot be answered without also evaluating an expression that has side
+  // effects. When set, vpi_get() and vpi_handle() refuse the query and record an
+  // error rather than silently triggering the side effect - for example asking
+  // the vpiSize of a function call whose size cannot be known without calling
+  // it. False by default; most queries are answerable structurally.
+  bool property_needs_side_effect_eval = false;
+
+  // §37.3.5: the index expressions that select into this object, in order. It is
+  // an error to apply vpi_put_value() to an object when any of these index
+  // expressions has side effects (for instance my_array[i++]); vpi_put_value()
+  // consults this list and refuses the write in that case. Empty for an object
+  // that is not an indexed select.
+  std::vector<VpiObject*> index_expressions;
 };
 
 using VpiHandle = VpiObject*;
@@ -1012,6 +1045,13 @@ void VpiMakeNullArgument(VpiHandle arg);
 // expression). Used to scope detail 8's protected-object carve-out (vpiSize stays
 // accessible on a protected expression) and to classify diagram members.
 bool VpiIsExprType(int type);
+
+// §37.3.5: whether an expression has side effects when evaluated - true exactly
+// when the object is non-null and carries the has_side_effects mark. The
+// put_value index-expression check and any application that needs to ask the
+// question share this single predicate, so the notion of "expression with side
+// effects" is decided in one place.
+bool VpiExpressionHasSideEffects(const VpiObject* obj);
 
 // §37.60: the statement kinds the atomic stmt class groups in the object model
 // diagram - the procedural control statements (if, if-else, while, repeat, the

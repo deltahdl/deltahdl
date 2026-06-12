@@ -3394,6 +3394,19 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return nullptr;
   }
 
+  // §37.3.5: it is an error to ask for a relation of an expression when the
+  // implementation cannot reach the related handle without also evaluating an
+  // expression that has side effects. The traversal is refused with an error and
+  // a null handle rather than triggering the side effect.
+  if (ref->property_needs_side_effect_eval) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_handle(): this relation cannot be determined without evaluating "
+        "an expression with side effects";
+    return nullptr;
+  }
+
   // §38.23: vpi_handle(vpiUse, iterator) recovers the reference object the
   // iterator was created to walk.
   if (type == vpiUse && ref->type == vpiIterator) return ref->iter_ref;
@@ -4043,8 +4056,22 @@ static void GetValueStringVal(VpiHandle obj, VpiValue* value,
   value->value.str = pool.back().c_str();
 }
 
+bool VpiExpressionHasSideEffects(const VpiObject* obj) {
+  // §37.3.5: the mark records the classification described in the subclause; an
+  // absent object cannot have side effects.
+  return obj && obj->has_side_effects;
+}
+
 void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
   if (!obj || !value) return;
+  // §37.3.5: applying vpi_get_value() to an expression with side effects shall
+  // fully evaluate the expression together with its side effects. Reading the
+  // value performs that evaluation, so record that the side effect occurred
+  // before the value is handed back below - the count is the observable evidence
+  // that evaluation, and thus the embedded state change, took place.
+  if (VpiExpressionHasSideEffects(obj)) {
+    ++obj->side_effect_count;
+  }
   // §37.31 detail 2: vpi_get_value() is not allowed for variable and event
   // handles obtained from a class defn handle. Such a handle denotes a class
   // member rather than a free-standing object, so the read is refused, an error
@@ -4175,6 +4202,22 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
     last_error_.message =
         "vpi_put_value(): only a sequential UDP primitive may be written";
     return nullptr;
+  }
+
+  // §37.3.5: it is an error to apply vpi_put_value() to an object when any of
+  // its index expressions has side effects (for instance my_array[i++] or
+  // my_array[--i]). The write is rejected before any value is stored - an error
+  // is recorded, the target is left unchanged, and the side-effecting index is
+  // not evaluated.
+  for (const VpiObject* index : obj->index_expressions) {
+    if (VpiExpressionHasSideEffects(index)) {
+      last_error_.state = kVpiError;
+      last_error_.level = kVpiError;
+      last_error_.message =
+          "vpi_put_value(): an index expression with side effects is not "
+          "allowed";
+      return nullptr;
+    }
   }
 
   // §38.34: vpiReturnEvent is an independent bit mask layered on top of the
@@ -4704,6 +4747,22 @@ int VpiContext::Get(int property, VpiHandle obj) {
     last_error_.state = kVpiError;
     last_error_.level = kVpiError;
     last_error_.message = "vpi_get() on a protected object is an error";
+    return vpiUndefined;
+  }
+  // §37.3.5: it is an error to ask for a property of an expression when the
+  // implementation cannot determine that property without also evaluating an
+  // expression that has side effects (for instance the vpiSize of a function
+  // call that cannot be sized without calling it). The query is refused rather
+  // than silently triggering the side effect. The object's kind is always
+  // available structurally, so vpiType is let through; every other property
+  // records the error and returns vpiUndefined, the value vpi_get() yields on
+  // error.
+  if (obj->property_needs_side_effect_eval && property != kVpiType) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_get(): this property cannot be determined without evaluating an "
+        "expression with side effects";
     return vpiUndefined;
   }
   switch (property) {
