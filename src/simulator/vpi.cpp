@@ -5490,6 +5490,14 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // §37.54 (D2): an operation reports its operation type as an int property.
     case vpiOpType:
       return obj->op_type;
+    // §37.62: an event statement reports through vpiBlocking whether it is a
+    // blocking event trigger (->) as opposed to a nonblocking one (->>). The
+    // property is drawn only on the event statement object, so asking any other
+    // object kind is not a valid query and yields vpiUndefined; for an event
+    // statement the answer is the stored Boolean, reported as 1 or 0.
+    case vpiBlocking:
+      if (obj->type != vpiEventStmt) return vpiUndefined;
+      return obj->blocking ? 1 : 0;
     // §37.63 detail 1: a process reports which kind of always procedure it is
     // through vpiAlwaysType, restricted to vpiAlways/vpiAlwaysComb/vpiAlwaysFF/
     // vpiAlwaysLatch. A process carrying none of those - an initial or final
