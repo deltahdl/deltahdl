@@ -552,6 +552,14 @@ struct VpiObject {
   // absent (for instance a class handle that is still null) never compares
   // equal. True by default - most objects exist for the whole simulation.
   bool object_exists = true;
+
+  // §37.2.2: whether this particular handle has been released. A released
+  // handle is no longer a live handle to its object, but the underlying object
+  // is unaffected - a distinct, unreleased handle to the same object keeps
+  // working. The flag is per-handle, so releasing one handle leaves any other
+  // handle to the same object untouched. False until vpi_release_handle() (or a
+  // simulation event that frees the handle's object) releases it.
+  bool released = false;
 };
 
 using VpiHandle = VpiObject*;
@@ -2541,6 +2549,43 @@ class VpiContext {
   // names nothing, so the result is null.
   VpiHandle CreateHandleFor(VpiHandle object);
 
+  // §37.2.2: release a handle, the operation vpi_release_handle() performs. The
+  // handle is marked released so it is no longer a live handle to its object;
+  // the object itself is left in place. Because the flag is per-handle, a
+  // distinct handle to the same object - one another VPI program may still hold
+  // - is unaffected and continues to refer to that object. A null handle names
+  // nothing to release. Idempotent.
+  void ReleaseHandle(VpiHandle handle);
+
+  // §37.2.2: observe whether a handle has been released. False for a null
+  // handle (there is nothing to have released).
+  bool HandleReleased(VpiHandle handle) const;
+
+  // §37.2.2 (restart): whether a handle survives a simulation restart. Only the
+  // handles to cbStartOfRestart and cbEndOfRestart callbacks survive; every
+  // other handle is released by the restart so those two callbacks can run.
+  bool HandleSurvivesRestart(VpiHandle handle) const;
+
+  // §37.2.2 (restart): release every handle a simulation restart releases - all
+  // of them except the two restart-callback handles (see HandleSurvivesRestart).
+  // DispatchRestart() invokes this so a restart applies the rule.
+  void ReleaseHandlesForRestart();
+
+  // §37.2.2 (frame/thread free): when the simulator frees objects belonging to a
+  // frame or thread, it releases all handles to those objects and to any
+  // subelement of them; handles to callbacks placed on any of these objects are
+  // released as well. `root` is the freed object; its subelements are its
+  // children, walked recursively.
+  void ReleaseFrameOrThreadObject(VpiHandle root);
+
+  // §37.2.2 (class reclaim): when the simulator reclaims the memory of a class
+  // object, it releases the handle to the class object, to any of its automatic
+  // data members, and to any subelement of those automatic data members;
+  // handles to callbacks placed on any of these are released too. Static data
+  // members persist and are not released (NOTE 3 of §37.2.2 - a static local in
+  // a task/function does not belong to a frame or thread either).
+  void ReleaseClassObject(VpiHandle class_object);
+
   // §36.12.2.2: Mechanism 2 - selection of the default VPI compatibility mode
   // run by the host simulator. This is the means the simulation provider makes
   // available to set, for an entire simulation run, the compatibility mode that
@@ -2664,6 +2709,15 @@ class VpiContext {
 
  private:
   VpiHandle AllocObject();
+
+  // §37.2.2: release one handle plus the handles to every callback placed on the
+  // object it names. Building block for the simulation-event release rules.
+  void ReleaseHandleWithCallbacks(VpiObject* object);
+
+  // §37.2.2: release a handle, all subelement handles reachable through its
+  // children, and the callbacks on any of them. Used by the frame/thread-free
+  // and class-reclaim release rules.
+  void ReleaseHandleSubtree(VpiObject* root);
 
   std::vector<VpiSystfData> systfs_;
   std::vector<VpiCbData> callbacks_;

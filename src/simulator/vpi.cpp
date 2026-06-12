@@ -4649,6 +4649,12 @@ int VpiContext::DispatchReset() {
 }
 
 int VpiContext::DispatchRestart() {
+  // §37.2.2 (restart): a simulation restart releases all handles except the
+  // handles to the cbStartOfRestart and cbEndOfRestart callbacks. Apply this
+  // before the callback reasons are cleared below, so the surviving restart
+  // callbacks are still identifiable by their reason.
+  ReleaseHandlesForRestart();
+
   // §38.36.3: with the exception of the restart callbacks, every registered
   // callback is removed when a restart occurs. Clearing the reason marks a slot
   // removed, matching RemoveCb.
@@ -5227,6 +5233,82 @@ VpiHandle VpiContext::CreateHandleFor(VpiHandle object) {
   // them equal despite their pointers differing.
   handle->same_object_as = rep;
   return handle;
+}
+
+void VpiContext::ReleaseHandle(VpiHandle handle) {
+  // §37.2.2: vpi_release_handle() causes the tool to release a handle. Marking
+  // the handle released is all that is needed: the underlying object is not
+  // touched, so a distinct handle to the same object - held perhaps by another
+  // VPI program - is unaffected and can still refer to that object. A null
+  // handle names nothing.
+  if (!handle) return;
+  handle->released = true;
+}
+
+bool VpiContext::HandleReleased(VpiHandle handle) const {
+  return handle != nullptr && handle->released;
+}
+
+bool VpiContext::HandleSurvivesRestart(VpiHandle handle) const {
+  // §37.2.2 (restart): a restart releases every handle except those naming a
+  // cbStartOfRestart or cbEndOfRestart callback. A surviving handle is therefore
+  // a callback handle whose registered reason is one of the two restart reasons.
+  if (!handle || handle->type != kVpiCallback) return false;
+  if (handle->index < 0 ||
+      handle->index >= static_cast<int>(callbacks_.size())) {
+    return false;
+  }
+  int reason = callbacks_[handle->index].reason;
+  return reason == kCbStartOfRestart || reason == kCbEndOfRestart;
+}
+
+void VpiContext::ReleaseHandlesForRestart() {
+  // §37.2.2 (restart): release all handles except the restart-callback handles.
+  // Every allocated handle is visited; the two surviving kinds are left live.
+  for (VpiObject* handle : all_objects_) {
+    if (!HandleSurvivesRestart(handle)) handle->released = true;
+  }
+}
+
+// §37.2.2: release a handle along with the handles to every callback placed on
+// the object it names. A callback handle records, in `index`, the slot of the
+// callback whose `obj` is the watched object; any such handle is released too.
+void VpiContext::ReleaseHandleWithCallbacks(VpiObject* object) {
+  if (!object) return;
+  object->released = true;
+  for (VpiObject* cb : cb_handles_) {
+    if (cb->index >= 0 && cb->index < static_cast<int>(callbacks_.size()) &&
+        callbacks_[cb->index].obj == object) {
+      cb->released = true;
+    }
+  }
+}
+
+// §37.2.2: release a handle, every subelement reachable through its children,
+// and the callbacks placed on any of them. Shared by the frame/thread-free and
+// class-reclaim rules; the two differ only in which children they descend into.
+void VpiContext::ReleaseHandleSubtree(VpiObject* root) {
+  if (!root) return;
+  ReleaseHandleWithCallbacks(root);
+  for (VpiObject* child : root->children) ReleaseHandleSubtree(child);
+}
+
+void VpiContext::ReleaseFrameOrThreadObject(VpiHandle root) {
+  // §37.2.2 (frame/thread free): release the freed object, all of its
+  // subelements, and the callbacks placed on any of them.
+  ReleaseHandleSubtree(root);
+}
+
+void VpiContext::ReleaseClassObject(VpiHandle class_object) {
+  // §37.2.2 (class reclaim): release the class object and the callbacks on it,
+  // then release each automatic data member together with all of its
+  // subelements. Non-automatic (static) data members are left live - they are
+  // not reclaimed with the class object.
+  if (!class_object) return;
+  ReleaseHandleWithCallbacks(class_object);
+  for (VpiObject* member : class_object->children) {
+    if (member->automatic) ReleaseHandleSubtree(member);
+  }
 }
 
 bool VpiContext::SetDefaultCompatibilityMode(int mode) {
