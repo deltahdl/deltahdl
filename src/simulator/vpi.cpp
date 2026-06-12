@@ -304,6 +304,58 @@ bool VpiConcurrentAssertionIsSimulated(int type) {
   return VpiIsConcurrentAssertionType(type) && type != vpiRestrict;
 }
 
+bool VpiIsImmediateAssertionType(int type) {
+  // §37.55: the three immediate-assertion kinds the diagram draws - immediate
+  // assert, immediate assume, and immediate cover. No other object kind is an
+  // immediate assertion.
+  switch (type) {
+    case vpiImmediateAssert:
+    case vpiImmediateAssume:
+    case vpiImmediateCover:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiImmediateAssertionHasElseStmt(int type) {
+  // §37.55 (vpiElseStmt): the diagram routes a vpiElseStmt edge from the
+  // immediate assert and immediate assume boxes but not from immediate cover, so
+  // only an assert or an assume carries an else (fail) action statement.
+  return type == vpiImmediateAssert || type == vpiImmediateAssume;
+}
+
+VpiHandle VpiImmediateAssertionExpr(VpiHandle assertion) {
+  // §37.55: the asserted expression, reached through vpiExpr and modeled as the
+  // assertion's first expression child. Null when none is attached.
+  if (!assertion) return nullptr;
+  for (auto* child : assertion->children) {
+    if (VpiIsExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
+VpiHandle VpiImmediateAssertionStmt(VpiHandle assertion) {
+  // §37.55: the pass action statement, modeled as the assertion's first
+  // statement child reached through vpiStmt. Null when none is attached.
+  if (!assertion) return nullptr;
+  for (auto* child : assertion->children) {
+    if (child->type == vpiStmt) return child;
+  }
+  return nullptr;
+}
+
+VpiHandle VpiImmediateAssertionElseStmt(VpiHandle assertion) {
+  // §37.55: the else (fail) action statement, modeled as the assertion's first
+  // else-statement child reached through vpiElseStmt. Null when none is attached
+  // (always the case for an immediate cover).
+  if (!assertion) return nullptr;
+  for (auto* child : assertion->children) {
+    if (child->type == vpiElseStmt) return child;
+  }
+  return nullptr;
+}
+
 bool VpiIsSequenceExprType(int type) {
   // §37.54 (D1): the kinds the sequence-expr class groups - an operation, a
   // sequence instance, a distribution, and a bare boolean expression. The bare
@@ -5281,6 +5333,17 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // event was inferred (rather than explicit) as a Boolean property.
     case vpiIsClockInferred:
       return obj->clock_inferred ? 1 : 0;
+    // §37.55: an immediate assertion (immediate assert/assume/cover) reports
+    // whether it is a deferred assertion and whether it is a final assertion as
+    // Boolean properties. Both are drawn only on the immediate-assertion kinds,
+    // so asking any other object kind is not a valid query and yields
+    // vpiUndefined.
+    case vpiIsDeferred:
+      if (!VpiIsImmediateAssertionType(obj->type)) return vpiUndefined;
+      return obj->is_deferred ? 1 : 0;
+    case vpiIsFinal:
+      if (!VpiIsImmediateAssertionType(obj->type)) return vpiUndefined;
+      return obj->is_final ? 1 : 0;
     // §6.9.2: the advisory vector-net accessibility keywords, reported as
     // Boolean properties. vpiExplicitScalared/vpiExplicitVectored each report
     // whether that keyword was written on the declaration. vpiExpanded reports

@@ -283,6 +283,13 @@ struct VpiObject {
   // the actual event either way; this flag only records which form produced it.
   bool clock_inferred = false;
 
+  // §37.55: whether an immediate assertion (immediate assert/assume/cover) is a
+  // deferred assertion and whether it is a final assertion, reported through
+  // vpi_get(vpiIsDeferred) and vpi_get(vpiIsFinal). Both are Boolean properties
+  // drawn only on the immediate-assertion kinds; false by default.
+  bool is_deferred = false;
+  bool is_final = false;
+
   // §37.43/§37.44: whether a frame or a thread is the active one, reported
   // through vpi_get(vpiActive). The object that currently holds execution is
   // active; an inactive one is suspended or otherwise not running. There is at
@@ -789,6 +796,33 @@ VpiHandle VpiConcurrentAssertionElseStmt(VpiHandle assertion);
 // generates run-time information. Every kind is, except restrict, which is not
 // simulated and hence generates no run-time information.
 bool VpiConcurrentAssertionIsSimulated(int type);
+
+// §37.55: the immediate-assertion class groups the three immediate directive
+// kinds the diagram draws - immediate assert, immediate assume, and immediate
+// cover. An object is an immediate assertion exactly when its type is one of
+// these. (This is the immediate counterpart of §37.50's concurrent assertions;
+// both are part of §37.49's broader assertion class.)
+bool VpiIsImmediateAssertionType(int type);
+
+// §37.55 (vpiElseStmt): whether an immediate-assertion kind carries an else
+// (fail) action statement. An immediate assert and an immediate assume do; an
+// immediate cover has no else statement (the diagram draws it with a single,
+// unconditional action block).
+bool VpiImmediateAssertionHasElseStmt(int type);
+
+// §37.55: the asserted expression an immediate assertion traverses to through
+// vpiExpr - its first expression child; null for a null handle or an assertion
+// with no expression attached.
+VpiHandle VpiImmediateAssertionExpr(VpiHandle assertion);
+
+// §37.55: the pass action statement an immediate assertion traverses to through
+// vpiStmt - its first statement child; null when none is attached.
+VpiHandle VpiImmediateAssertionStmt(VpiHandle assertion);
+
+// §37.55 (vpiElseStmt): the else (fail) action statement an immediate assert or
+// assume traverses to through vpiElseStmt - its first else-statement child; null
+// when none is attached (an immediate cover never has one).
+VpiHandle VpiImmediateAssertionElseStmt(VpiHandle assertion);
 
 // §37.54 (D1): the sequence-expr class groups the kinds the diagram draws under
 // it - an operation, a sequence instance, a distribution, and a bare boolean
