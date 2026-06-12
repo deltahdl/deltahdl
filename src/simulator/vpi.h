@@ -370,6 +370,23 @@ struct VpiObject {
   // has no always type to report. Zero (no always type) by default.
   int always_type = 0;
 
+  // §37.12 detail 6: the join kind that terminates a fork-join block, reported
+  // through vpi_get(vpiJoinType) - one of vpiJoin, vpiJoinNone, or vpiJoinAny.
+  // vpiJoin (zero) by default.
+  int join_type = 0;
+
+  // §37.12 detail 2: whether a for statement declares its loop control
+  // variables local to the loop, reported through vpi_get(vpiLocalVarDecls). A
+  // for statement is a scope if and only if this is true. False by default.
+  bool local_var_decls = false;
+
+  // §37.12 detail 4: whether an object was imported into its enclosing scope
+  // through an import declaration and is actually referenced there. A scope's
+  // vpiImport iteration returns exactly the children carrying this mark, so an
+  // item merely made visible by an import (but not referenced) is not flagged.
+  // False by default.
+  bool imported = false;
+
   // §37.35 detail 4 / §37.9 detail 1: whether an object is an element within an
   // array. It gates the vpiIndex transition for both an array-member primitive
   // and a program that is an element of an instance array: such an object
@@ -1032,6 +1049,43 @@ VpiHandle VpiEventControlStmt(VpiHandle event_control);
 // delay control reports its first statement child, or null when none is attached.
 // Backs the public vpi_handle(vpiStmt, delay_control) dispatch.
 VpiHandle VpiDelayControlStmt(VpiHandle delay_control);
+
+// §37.12 detail 1: whether an object kind is a block item declaration - a
+// variable declaration or a type declaration. These are the declarations whose
+// presence makes an unnamed begin or unnamed fork a scope.
+bool VpiIsBlockItemDeclType(int type);
+
+// §37.12 details 1 and 2: whether a begin/fork/for block object is a scope. A
+// named begin or named fork is always a scope. An unnamed begin or unnamed fork
+// is a scope if and only if it directly contains a block item declaration
+// (VpiIsBlockItemDeclType). A for statement is a scope if and only if its
+// vpiLocalVarDecls property is true. Any other object is not classified here.
+bool VpiBlockScopeIsScope(VpiHandle block);
+
+// §37.12 details 2 and 3: whether an object kind is a loop control variable -
+// the variable a for or foreach statement declares as its index. The variable
+// kinds qualify; a type or parameter declaration does not. Used to route a loop
+// control variable's vpiScope to its enclosing loop statement.
+bool VpiIsLoopControlVarType(int type);
+
+// §37.12 detail 6: whether `join_type` is a legal value of the vpiJoinType
+// property - one of vpiJoin, vpiJoinNone, or vpiJoinAny. Scopes
+// vpi_get(vpiJoinType), which reports the stored value only when it is one of
+// the three.
+bool VpiIsJoinType(int join_type);
+
+// §37.12 detail 5: whether an object kind is a task or a function - the "task
+// func" node of the scope diagram whose body is reached through vpiStmt.
+bool VpiIsTaskFuncType(int type);
+
+// §37.12 detail 5: the body statement of a task or function, reached through
+// vpiStmt. A task or function with no statements reports null; with exactly one
+// statement it reports that statement; with more than one the statements are
+// grouped under an unnamed begin and that begin is reported. In every nonzero
+// case the body is the task/func's single statement child, so this returns the
+// first statement child, or null when the body is empty. Backs the public
+// vpi_handle(vpiStmt, task_func) dispatch.
+VpiHandle VpiTaskFuncStmt(VpiHandle task_func);
 
 // §37.59 detail 1: the operand order of a vpiMultiConcatOp operation. The first
 // operand is the multiplier expression; the remaining operands are the

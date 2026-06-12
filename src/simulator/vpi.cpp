@@ -925,6 +925,131 @@ VpiHandle VpiDelayControlStmt(VpiHandle delay_control) {
   return nullptr;
 }
 
+// ===========================================================================
+// §37.12 Scope.
+// ===========================================================================
+
+bool VpiIsBlockItemDeclType(int type) {
+  // §37.12 detail 1: a block item declaration is a variable declaration or a
+  // type declaration. The variable kinds are the concrete var objects (§37.17);
+  // a type declaration is a typedef. A localparam declared in a block is a
+  // parameter, which the diagram draws among a scope's members, so it counts as
+  // a block item declaration too.
+  switch (type) {
+    case vpiLogicVar:  // == vpiReg
+    case vpiIntegerVar:
+    case vpiRealVar:
+    case vpiShortRealVar:
+    case vpiTimeVar:
+    case vpiByteVar:
+    case vpiShortIntVar:
+    case vpiIntVar:
+    case vpiLongIntVar:
+    case vpiBitVar:
+    case vpiEnumVar:
+    case vpiStructVar:
+    case vpiUnionVar:
+    case vpiStringVar:
+    case vpiClassVar:
+    case vpiChandleVar:
+    case vpiPackedArrayVar:
+    case vpiArrayVar:  // == vpiRegArray
+    case vpiTypedef:
+    case vpiParameter:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiBlockScopeIsScope(VpiHandle block) {
+  // §37.12 detail 1: a named begin or named fork is always a scope. An unnamed
+  // begin or unnamed fork is a scope only if it directly contains a block item
+  // declaration - a directly-nested declaration, not one buried in a deeper
+  // named block. §37.12 detail 2: a for statement is a scope exactly when it
+  // declares its loop control variables local to the loop (vpiLocalVarDecls).
+  if (!block) return false;
+  switch (block->type) {
+    case vpiNamedBegin:
+    case vpiNamedFork:
+      return true;
+    case vpiBegin:
+    case vpiFork:
+      for (auto* child : block->children) {
+        if (VpiIsBlockItemDeclType(child->type)) return true;
+      }
+      return false;
+    case vpiFor:
+      return block->local_var_decls;
+    default:
+      return false;
+  }
+}
+
+bool VpiIsLoopControlVarType(int type) {
+  // §37.12 details 2 and 3: a loop control variable is a variable - the var kinds
+  // a for or foreach statement declares as its index. A type declaration or a
+  // parameter, though both block item declarations, is not a loop variable.
+  return VpiIsBlockItemDeclType(type) && type != vpiTypedef &&
+         type != vpiParameter;
+}
+
+// §37.12 detail 7: an array of virtual interfaces is an array variable whose
+// elements are virtual interface vars (§37.29). Used to expand the array under
+// a scope's vpiVirtualInterfaceVar iteration and to report it as the single
+// array var under the scope's vpiVariables iteration.
+static bool VpiIsVirtualInterfaceArray(VpiHandle obj) {
+  if (!obj || !VpiIsArrayVarType(obj->type)) return false;
+  for (auto* elem : obj->children) {
+    if (elem->type == vpiVirtualInterfaceVar) return true;
+  }
+  return false;
+}
+
+bool VpiIsJoinType(int join_type) {
+  // §37.12 detail 6: vpiJoinType is exactly one of these three constants -
+  // vpiJoin for a plain join, vpiJoinNone for join_none, vpiJoinAny for
+  // join_any. Nothing else is a join type.
+  return join_type == vpiJoin || join_type == vpiJoinNone ||
+         join_type == vpiJoinAny;
+}
+
+bool VpiIsTaskFuncType(int type) {
+  // §37.12: the "task func" node groups tasks and functions; the combined
+  // vpiTaskFunc kind also denotes one.
+  return type == vpiTask || type == vpiFunction || type == vpiTaskFunc;
+}
+
+// §37.12 detail 5: a statement child of a task or function body - the kinds a
+// task/func groups as its statements. The atomic statements (§37.60) plus the
+// block kinds (a begin/fork, named or not) that group several statements.
+static bool VpiIsScopeBodyStmtType(int type) {
+  if (VpiIsAtomicStmtType(type)) return true;
+  switch (type) {
+    case vpiBegin:
+    case vpiNamedBegin:
+    case vpiFork:
+    case vpiNamedFork:
+      return true;
+    default:
+      return false;
+  }
+}
+
+VpiHandle VpiTaskFuncStmt(VpiHandle task_func) {
+  // §37.12 detail 5: a task or function can have zero or more statements. With
+  // none, vpiStmt is null. With more than one, the statements are grouped under
+  // an unnamed begin and that begin is the body; with exactly one, that
+  // statement is the body. In every nonzero case the body is the task/func's
+  // single statement child, so return the first statement child, or null when
+  // the body holds no statement.
+  if (!task_func) return nullptr;
+  for (auto* child : task_func->children) {
+    if (VpiIsScopeBodyStmtType(child->type)) return child;
+  }
+  return nullptr;
+}
+
 std::vector<VpiHandle> VpiMultiConcatOperands(
     VpiHandle multiplier, const std::vector<VpiHandle>& concat_exprs) {
   // §37.59 detail 1: the multiplier first, then the concatenation's expressions
@@ -3398,6 +3523,29 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return VpiDelayControlStmt(ref);
   }
 
+  // §37.12 detail 5: vpiStmt of a task or function reaches its body - null when
+  // the task/func has no statements, the lone statement when it has one, and the
+  // unnamed begin grouping them when it has more than one. The body's own type
+  // is a statement kind (a begin or an atomic statement), not vpiStmt, so the
+  // generic traversal below cannot find it.
+  if (type == vpiStmt && VpiIsTaskFuncType(ref->type)) {
+    return VpiTaskFuncStmt(ref);
+  }
+
+  // §37.12 details 2 and 3: the scope of a loop control variable is the loop
+  // statement that declares it - a foreach statement always (detail 3), or a for
+  // statement when that for statement is itself a scope, i.e. it declares its
+  // loop variables locally (detail 2, vpiLocalVarDecls). The variable is a child
+  // of the loop, so its enclosing scope is the loop object rather than something
+  // the generic walk below would find. A for statement that is not a scope leaves
+  // the query to the generic handling.
+  if (type == vpiScope && ref->parent && VpiIsLoopControlVarType(ref->type)) {
+    if (ref->parent->type == vpiForeachStmt) return ref->parent;
+    if (ref->parent->type == vpiFor && ref->parent->local_var_decls) {
+      return ref->parent;
+    }
+  }
+
   // §37.35 detail 4: vpiIndex from a primitive reaches the index expression that
   // locates the primitive within its primitive array. The transition is only
   // meaningful for an array-member primitive; a primitive that is not part of a
@@ -3556,6 +3704,23 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   bool extends_argument_iteration =
       ref && ref->type == vpiExtends && type == vpiArgument;
 
+  // §37.12 detail 7: a scope's vpiVirtualInterfaceVar iteration reaches the
+  // virtual interface vars it declares (§37.29). When the scope declares an array
+  // of virtual interfaces, the iteration yields each element of the array
+  // separately, so the array var child is expanded rather than returned whole.
+  bool vif_iteration = ref && type == vpiVirtualInterfaceVar;
+
+  // §37.12 detail 7: a scope's vpiVariables iteration reports an array of virtual
+  // interfaces as the single array var that declares it (not its elements),
+  // alongside the scope's ordinary variables.
+  bool variables_iteration = ref && type == vpiVariables;
+
+  // §37.12 detail 4: a scope's vpiImport iteration reaches the objects actually
+  // imported into it through import declarations - the items genuinely referenced
+  // across the import (marked imported), rather than children whose own type is
+  // literally vpiImport or items merely made visible by the import.
+  bool import_iteration = ref && type == vpiImport;
+
   // §38.23: unless otherwise specified, iterating the relationships of a
   // protected object is an error, so no iterator is produced. §37.42 detail 10
   // carves out one exception: a protected system task or function call shall
@@ -3635,11 +3800,44 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
     return obj_type == type;
   };
 
-  // §37.42 detail 6: every user-defined system task or function is retrieved with
-  // vpi_iterate(vpiUserSystf, NULL). These are the registered systf objects
-  // (callbacks marked as a system tf), found by that mark rather than by a plain
-  // type match.
-  if (!ref && type == vpiUserSystf) {
+  if (vif_iteration) {
+    // §37.12 detail 7: the vpiVirtualInterfaceVar iteration is supported only in
+    // an elaborated context; within a lexical context such as a class defn
+    // (§37.31) it is not supported and yields nothing. Otherwise collect the
+    // scope's virtual interface vars, expanding a declared array of virtual
+    // interfaces into its individual elements.
+    if (ref->type != vpiClassDefn) {
+      for (auto* child : ref->children) {
+        if (child->type == vpiVirtualInterfaceVar) {
+          iter->children.push_back(child);
+        } else if (VpiIsVirtualInterfaceArray(child)) {
+          for (auto* elem : child->children) {
+            if (elem->type == vpiVirtualInterfaceVar) {
+              iter->children.push_back(elem);
+            }
+          }
+        }
+      }
+    }
+  } else if (variables_iteration) {
+    // §37.12 detail 7: the scope's variables, with an array of virtual interfaces
+    // reported as the single array var that declares it rather than expanded.
+    for (auto* child : ref->children) {
+      if (child->type == vpiVariables || VpiIsVirtualInterfaceArray(child)) {
+        iter->children.push_back(child);
+      }
+    }
+  } else if (import_iteration) {
+    // §37.12 detail 4: the objects actually imported into the scope - those
+    // referenced across an import declaration, marked imported.
+    for (auto* child : ref->children) {
+      if (child->imported) iter->children.push_back(child);
+    }
+  } else if (!ref && type == vpiUserSystf) {
+    // §37.42 detail 6: every user-defined system task or function is retrieved
+    // with vpi_iterate(vpiUserSystf, NULL). These are the registered systf
+    // objects (callbacks marked as a system tf), found by that mark rather than
+    // by a plain type match.
     for (auto* obj : all_objects_) {
       if (obj->is_systf) iter->children.push_back(obj);
     }
@@ -4707,6 +4905,19 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // as the vpiSoft Boolean property.
     case vpiSoft:
       return obj->soft ? 1 : 0;
+    // §37.12 detail 6: a fork-join scope reports the kind of join that
+    // terminates it through vpiJoinType, restricted to vpiJoin/vpiJoinNone/
+    // vpiJoinAny. A stored value outside those three is not a join type, so the
+    // property collapses to vpiJoin (the plain join) rather than escaping a
+    // fourth value.
+    case vpiJoinType:
+      return VpiIsJoinType(obj->join_type) ? obj->join_type : vpiJoin;
+    // §37.12 detail 2: a for statement reports whether it declares its loop
+    // control variables local to the loop through the vpiLocalVarDecls Boolean
+    // property; this is exactly the condition under which the for statement is a
+    // scope.
+    case vpiLocalVarDecls:
+      return obj->local_var_decls ? 1 : 0;
     default:
       return 0;
   }
