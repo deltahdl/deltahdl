@@ -1537,6 +1537,16 @@ class VpiContext {
   // that passes through a protected scope, makes the call an error (no handle).
   VpiHandle HandleByName(const char* name, VpiHandle scope);
   VpiHandle HandleByIndex(int index, VpiHandle parent);
+
+  // §38.20: return a handle to the index-selected subobject of `parent` named
+  // by the `num_index` indices in `index_array`. Like vpi_handle_by_index(),
+  // the reference object must carry the access-by-index property and must not be
+  // protected, or the call is an error. The indices are applied leftmost first,
+  // following the array dimension declaration from the leftmost to the rightmost
+  // range, optionally ending in a bit-select index. When the indices do not form
+  // a legal SystemVerilog index select expression the result is a null handle.
+  VpiHandle HandleByMultiIndex(int num_index, const int* index_array,
+                               VpiHandle parent);
   VpiHandle Handle(int type, VpiHandle ref);
   VpiHandle Iterate(int type, VpiHandle ref);
   VpiHandle Scan(VpiHandle iterator);
@@ -2277,6 +2287,8 @@ void vpi_get_delays(vpiHandle obj, p_vpi_delay delay_p);
 vpiHandle VpiHandleC(int type, vpiHandle ref);
 vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope);
 vpiHandle VpiHandleByIndexC(vpiHandle parent, int index);
+vpiHandle VpiHandleByMultiIndexC(vpiHandle parent, int num_index,
+                                 int* index_array);
 vpiHandle VpiHandleMultiC(int type, vpiHandle ref1, vpiHandle ref2);
 vpiHandle vpi_iterate(int type, vpiHandle ref);
 vpiHandle vpi_scan(vpiHandle iterator);

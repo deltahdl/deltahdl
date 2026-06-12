@@ -2011,6 +2011,51 @@ VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
   return nullptr;
 }
 
+VpiHandle VpiContext::HandleByMultiIndex(int num_index, const int* index_array,
+                                         VpiHandle parent) {
+  if (!parent) return nullptr;
+
+  // §38.20: as with vpi_handle_by_index(), calling vpi_handle_by_multi_index()
+  // for a protected reference object is an error unless otherwise specified.
+  // Record it (§38.2) and hand back a null handle.
+  if (parent->is_protected) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_handle_by_multi_index() on a protected object is an error";
+    return nullptr;
+  }
+
+  // §38.20: the reference object must carry the access-by-index property - the
+  // same property vpi_handle_by_index() requires of its reference object.
+  if (!VpiHasAccessByIndex(parent->type)) return nullptr;
+
+  // §38.20: num_index gives how many indices index_array carries. With no
+  // indices there is no index select expression to construct, so no subobject
+  // is named.
+  if (num_index <= 0 || index_array == nullptr) return nullptr;
+
+  // §38.20: apply the indices in the order provided - leftmost first - following
+  // the array dimension declaration from the leftmost to the rightmost range of
+  // the reference handle, with an optional trailing bit-select index. Each step
+  // descends to the subobject carrying that index. If any index names no
+  // subobject the chain is not a legal SystemVerilog index select expression, so
+  // the result is a null handle.
+  VpiHandle current = parent;
+  for (int i = 0; i < num_index; ++i) {
+    VpiHandle next = nullptr;
+    for (auto* child : current->children) {
+      if (child->index == index_array[i]) {
+        next = child;
+        break;
+      }
+    }
+    if (!next) return nullptr;
+    current = next;
+  }
+  return current;
+}
+
 VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // §37.43 detail 4: there is at most one active frame at a time in a given
   // thread, and an application reaches it with vpi_handle(vpiFrame, NULL).
@@ -3103,6 +3148,13 @@ vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope) {
 vpiHandle VpiHandleByIndexC(vpiHandle parent, int index) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().HandleByIndex(index, parent);
+}
+
+vpiHandle VpiHandleByMultiIndexC(vpiHandle parent, int num_index,
+                                 int* index_array) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  return delta::GetGlobalVpiContext().HandleByMultiIndex(num_index, index_array,
+                                                         parent);
 }
 
 vpiHandle VpiHandleMultiC(int type, vpiHandle ref1, vpiHandle ref2) {
