@@ -1682,6 +1682,24 @@ VpiHandle VpiTypespecForTypeParameter(VpiHandle type_parameter,
 // helpers below recognise.
 // ===========================================================================
 
+// ===========================================================================
+// §37.21 Variable drivers and loads. The vpiDriver and vpiLoad edges relate a
+// variable to the objects that drive it and the objects that read it. A driver
+// or load is not a child whose own type is literally vpiDriver/vpiLoad; it is
+// one of the driving/reading object kinds the figure lists, so the iteration is
+// recognised through these classifiers.
+// ===========================================================================
+
+// §37.21 (figure, variable drivers): the object kinds that drive a variable - a
+// port, a force, a continuous assignment (a whole continuous assignment or a
+// single bit of one), or a procedural assignment statement.
+bool VpiIsVariableDriverType(int type);
+
+// §37.21 (figure, variable loads): the object kinds that read a variable. They
+// are the driver kinds without a port: an assignment statement, a force, and a
+// continuous assignment (whole or single bit). A port appears only as a driver.
+bool VpiIsVariableLoadType(int type);
+
 // §37.26 (figure): the four object kinds the Structures-and-unions figure
 // models - a structure or union declared as a variable, and a structure or
 // union declared as a net. Used to recognise an entire structure/union object.

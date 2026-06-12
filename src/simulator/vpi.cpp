@@ -3655,6 +3655,98 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   return nullptr;
 }
 
+// ===========================================================================
+// §37.21 Variable drivers and loads.
+// ===========================================================================
+
+bool VpiIsVariableDriverType(int type) {
+  // §37.21 (figure, variable drivers): the kinds that drive a variable - a port,
+  // a force, a continuous assignment, a single bit of a continuous assignment, or
+  // a procedural assignment statement.
+  switch (type) {
+    case vpiPort:
+    case vpiForce:
+    case vpiContAssign:
+    case vpiContAssignBit:
+    case vpiAssignStmt:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiIsVariableLoadType(int type) {
+  // §37.21 (figure, variable loads): the kinds that read a variable. The figure
+  // lists the driver kinds without a port - an assignment statement, a force, and
+  // a continuous assignment or single bit of one - because a port only ever
+  // drives a variable, it never loads it.
+  switch (type) {
+    case vpiForce:
+    case vpiContAssign:
+    case vpiContAssignBit:
+    case vpiAssignStmt:
+      return true;
+    default:
+      return false;
+  }
+}
+
+namespace {
+
+// §37.21 detail 1: a structure, union, or class variable owns the additional
+// driver/load collection behaviour - the relation must also reach drivers/loads
+// of bit/part-selects and nested members of the variable.
+bool VpiIsStructUnionOrClassVar(int type) {
+  return type == vpiStructVar || type == vpiUnionVar || type == vpiClassVar;
+}
+
+// §37.21 detail 1: the select kinds whose drivers/loads count toward an
+// aggregate variable - a bit-select or either form of part-select.
+bool VpiIsVariableSelectType(int type) {
+  return type == vpiBitSelect || type == vpiPartSelect ||
+         type == vpiIndexedPartSelect;
+}
+
+// §37.21 detail 1: the children worth descending into when gathering the drivers
+// or loads of an aggregate variable - a bit-select or part-select of the
+// variable, or a member nested inside it (itself any variable kind, including a
+// further aggregate that is walked recursively).
+bool VpiIsVariableSelectOrMemberType(int type) {
+  if (VpiIsVariableSelectType(type)) return true;
+  if (VpiIsLogicVarType(type) || VpiIsArrayVarType(type)) return true;
+  switch (type) {
+    case vpiStructVar:
+    case vpiUnionVar:
+    case vpiClassVar:
+    case vpiEnumVar:
+    case vpiPackedArrayVar:
+    case vpiVariables:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §37.21 (figure) + detail 1: gather a variable's drivers (want_driver) or loads
+// into the iterator. The variable's own driver/load children are always
+// collected. When descend is set - the variable is a structure, union, or class
+// variable - the walk also recurses through the variable's bit/part-selects and
+// nested members so their drivers/loads are included as well.
+void CollectVariableDriversOrLoads(VpiObject* node, bool want_driver,
+                                   bool descend, VpiObject* iter) {
+  for (auto* child : node->children) {
+    bool is_target = want_driver ? VpiIsVariableDriverType(child->type)
+                                 : VpiIsVariableLoadType(child->type);
+    if (is_target) {
+      iter->children.push_back(child);
+    } else if (descend && VpiIsVariableSelectOrMemberType(child->type)) {
+      CollectVariableDriversOrLoads(child, want_driver, descend, iter);
+    }
+  }
+}
+
+}  // namespace
+
 VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   // §37.42: a tf call's arguments are reached through vpiArgument. The arguments
   // are the call's argument-kind children (an expr, interface expr, scope,
@@ -3703,6 +3795,13 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   // belong to §37.17.
   bool memory_word_iteration =
       ref && VpiIsArrayVarType(ref->type) && type == vpiMemoryWord;
+
+  // §37.21 (figure): vpiDriver on a variable reaches the variable's driver
+  // objects - a port, a force, a continuous assignment (whole or single bit), or
+  // a procedural assignment statement - rather than children whose own type is
+  // literally vpiDriver. Likewise vpiLoad reaches the variable's load objects.
+  bool variable_driver_iteration = ref && type == vpiDriver;
+  bool variable_load_iteration = ref && type == vpiLoad;
 
   // §37.5 detail 1: the top-level modules are accessed by iterating vpiModule
   // with a NULL reference object. Only top-level modules answer that iteration;
@@ -3877,6 +3976,15 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
     for (auto* obj : all_objects_) {
       if (obj->is_systf) iter->children.push_back(obj);
     }
+  } else if (variable_driver_iteration || variable_load_iteration) {
+    // §37.21 (figure): collect the variable's driver objects (vpiDriver) or load
+    // objects (vpiLoad). §37.21 detail 1: for a structure, union, or class
+    // variable the relation shall also include the drivers/loads of any
+    // bit-select or part-select of the variable and of any member nested inside
+    // it, so the walk descends through the variable's selects and members in that
+    // case. Any other variable contributes only its own direct drivers/loads.
+    CollectVariableDriversOrLoads(ref, variable_driver_iteration,
+                                  VpiIsStructUnionOrClassVar(ref->type), iter);
   } else if (ref) {
     for (auto* child : ref->children) {
       if (!matches(child->type)) continue;
