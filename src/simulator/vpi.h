@@ -617,20 +617,21 @@ struct VpiObject {
   // device or delay term reports.
   int delay_type = 0;
 
-  // §37.38 detail 1: the variable a foreach constraint indexes. A foreach
-  // constraint reaches it through the vpiVariables relation, where it represents
-  // the array being iterated over. Its own type is a variable kind (an array
-  // variable), not the relation enum, so it is held as a designated pointer
-  // rather than found by a type match. Null by default - only a foreach
-  // constraint carries one.
+  // §37.38 detail 1 / §37.75 detail 1: the variable a foreach constraint or
+  // foreach statement indexes. The foreach reaches it through the vpiVariables
+  // relation, where it represents the array (or string) being iterated over. Its
+  // own type is a variable kind, not the relation enum, so it is held as a
+  // designated pointer rather than found by a type match. Null by default - only
+  // a foreach constraint or foreach statement carries one.
   VpiObject* foreach_array = nullptr;
 
-  // §37.38 detail 2: the index variables of a foreach constraint, in left-to-
-  // right declaration order, as walked by the vpiLoopVars iteration. A null
-  // entry marks an index position that was skipped in the foreach header; the
-  // iteration represents such a position with a freshly built vpiOperation whose
-  // operator is the null operation, so callers see a placeholder in that slot.
-  // Empty for any object that is not a foreach constraint.
+  // §37.38 detail 2 / §37.75 detail 2: the index variables of a foreach
+  // constraint or foreach statement, in left-to-right declaration order, as
+  // walked by the vpiLoopVars iteration. A null entry marks an index position
+  // that was skipped in the foreach header; the iteration represents such a
+  // position with a freshly built vpiOperation whose operator is the null
+  // operation, so callers see a placeholder in that slot. Empty for any object
+  // that is neither a foreach constraint nor a foreach statement.
   std::vector<VpiObject*> loop_vars;
 
   // §37.38 detail 3: the constraint expressions held in the body of a

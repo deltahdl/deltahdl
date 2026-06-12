@@ -1177,6 +1177,21 @@ VpiHandle VpiForConditionExpr(VpiHandle for_stmt) {
   return nullptr;
 }
 
+VpiHandle VpiDoWhileConditionExpr(VpiHandle do_while) {
+  // §37.75: a do-while statement reaches its controlling condition through
+  // vpiCondition. As with the other looping and conditional statements
+  // (§37.66/§37.71/§37.74), the condition's own type is an expression kind (an
+  // operation, a reference, a constant, ...) rather than the vpiCondition
+  // relation tag, so it is found by scanning for the first expression child. The
+  // do-while's body, drawn by the diagram's unlabeled edge to a statement, is a
+  // statement-edge child that this scan skips. Null when no condition is attached.
+  if (!do_while) return nullptr;
+  for (auto* child : do_while->children) {
+    if (VpiIsExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
 VpiHandle VpiDelayControlStmt(VpiHandle delay_control) {
   // §37.68 detail 1: a delay control reaches the statement it guards through
   // vpiStmt. When the delay control is associated with an assignment - i.e. it
@@ -3946,6 +3961,18 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return VpiForConditionExpr(ref);
   }
 
+  // §37.75: vpiCondition of a do-while statement reaches its controlling
+  // condition expression. As with the loop and conditional statements above, the
+  // condition's own type is an expression kind rather than the vpiCondition
+  // relation tag, so the generic traversal below cannot find it. The relation is
+  // gated on the do-while kind so it does not also serve the vpiCondition edge
+  // other diagrams draw. The do-while's body (the diagram's unlabeled edge to a
+  // statement) is reached by the generic vpiStmt traversal below and needs no
+  // special case here.
+  if (type == vpiCondition && ref->type == vpiDoWhile) {
+    return VpiDoWhileConditionExpr(ref);
+  }
+
   // §37.71: vpiElseStmt of an if-else statement reaches its else-branch body.
   // The relation is drawn only from the if-else grouping, never from a plain if,
   // so it is gated on the if-else kind. The else statement's own type is a
@@ -4094,6 +4121,17 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // to a foreach constraint, so it does not pick up a stray variable on any other
   // object.
   if (type == vpiVariables && ref->type == vpiConstrForEach) {
+    return ref->foreach_array;
+  }
+
+  // §37.75 detail 1: a foreach statement's vpiVariables relation reaches the
+  // variable being indexed - the packed array, unpacked array, or string var the
+  // loop iterates over. As with the foreach constraint above, that variable's own
+  // type is a variable kind rather than the relation enum, so it is held as a
+  // designated pointer rather than found by the generic walk. The relation is
+  // specific to a foreach statement, so it does not pick up a stray variable on
+  // any other object.
+  if (type == vpiVariables && ref->type == vpiForeachStmt) {
     return ref->foreach_array;
   }
 
@@ -4467,6 +4505,15 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   bool constr_foreach_loopvars_iteration =
       ref && ref->type == vpiConstrForEach && type == vpiLoopVars;
 
+  // §37.75 detail 2: vpiLoopVars on a foreach statement walks the loop's index
+  // variables in left-to-right order. As with the foreach constraint above, the
+  // objects reached are the index variables (and null-op placeholders for skipped
+  // positions), not children whose own type is literally vpiLoopVars, so the
+  // iteration is built from the statement's dedicated loop-var list rather than
+  // matched by type.
+  bool foreach_stmt_loopvars_iteration =
+      ref && ref->type == vpiForeachStmt && type == vpiLoopVars;
+
   // §37.38 detail 3: vpiConstraintExpr on a constraint-expression container - an
   // implication, constraint if, constraint if-else, or foreach constraint -
   // walks the body expressions it holds in source order. They are reached from a
@@ -4643,12 +4690,14 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
     // case. Any other variable contributes only its own direct drivers/loads.
     CollectVariableDriversOrLoads(ref, variable_driver_iteration,
                                   VpiIsStructUnionOrClassVar(ref->type), iter);
-  } else if (constr_foreach_loopvars_iteration) {
-    // §37.38 detail 2: hand back the foreach constraint's index variables in
-    // left-to-right order. A skipped index position - stored as a null slot in
-    // the list - is reported as a freshly built vpiOperation whose operator is
-    // the null operation, so the caller still sees a placeholder occupying that
-    // slot (the same null-op convention §37.42 uses for an omitted argument).
+  } else if (constr_foreach_loopvars_iteration ||
+             foreach_stmt_loopvars_iteration) {
+    // §37.38 detail 2 / §37.75 detail 2: hand back the foreach constraint's or
+    // foreach statement's index variables in left-to-right order. A skipped index
+    // position - stored as a null slot in the list - is reported as a freshly
+    // built vpiOperation whose operator is the null operation, so the caller still
+    // sees a placeholder occupying that slot (the same null-op convention §37.42
+    // uses for an omitted argument).
     for (auto* loop_var : ref->loop_vars) {
       if (loop_var) {
         iter->children.push_back(loop_var);
