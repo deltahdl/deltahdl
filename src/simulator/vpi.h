@@ -39,6 +39,23 @@ constexpr int kVpiVectorVal = 9;
 constexpr int kVpiStrengthVal = 10;
 constexpr int kVpiObjTypeVal = 12;
 
+// §38.35: the additional value formats vpi_put_value_array() accepts on top of
+// the vpi_get_value() formats of §38.15 (Table 38-3). The raw forms carry an
+// element's aval/bval bytes directly; the int/long/real forms carry one C
+// scalar per element.
+constexpr int kVpiShortIntVal = 14;
+constexpr int kVpiLongIntVal = 15;
+constexpr int kVpiShortRealVal = 16;
+constexpr int kVpiRawTwoStateVal = 17;
+constexpr int kVpiRawFourStateVal = 18;
+
+// §38.35: the only flags vpi_put_value_array() permits. vpiOneValue applies a
+// single supplied element value to the whole selected section; vpiPropagateOff
+// suppresses fanout notification; vpiNoDelay (the default, value 0 in the flags
+// word) is the only scheduling mode the routine allows.
+constexpr int kVpiOneValue = 0x4000;
+constexpr int kVpiPropagateOff = 0x8000;
+
 constexpr int kVpiSimTime = 1;
 constexpr int kVpiScaledRealTime = 2;
 
@@ -365,6 +382,22 @@ struct VpiObject {
   // its array. The target's own type is an expr kind (not vpiIndex), so it is
   // held as a designated pointer rather than found by the generic child walk.
   VpiObject* index_expr = nullptr;
+
+  // §37.17 detail 21 / §38.35: the array kind this object reports through
+  // vpi_get(vpiArrayType) - vpiStaticArray, vpiDynamicArray, vpiAssocArray, or
+  // vpiQueueArray. vpi_put_value_array() writes only into a static unpacked
+  // array, so it reads this to confirm the target is a vpiStaticArray before
+  // touching any element. Zero when the object is not an array.
+  int array_type = 0;
+
+  // §38.35: for a static unpacked array, the declared index values of each
+  // unpacked dimension in left-to-right (declaration) order - so a[2:0][3:5]
+  // holds {{2,1,0},{3,4,5}}. The size of this list is the number of unpacked
+  // dimensions, which the index_p argument must match; the lists map an index
+  // coordinate to the element's flat ordinal (rightmost dimension varying
+  // fastest), which is the order vpi_put_value_array() fills elements in. The
+  // element children carry that flat ordinal in their `index` field.
+  std::vector<std::vector<int>> array_dim_indices;
 
   // §37.5 detail 1: whether a module is a top-level module - one with no
   // instantiating parent. The top-level modules are exactly the ones reached by
@@ -2061,6 +2094,28 @@ struct VpiTime {
   double real = 0.0;
 };
 
+// §38.35 (s_vpi_arrayvalue): the aggregate that carries the values
+// vpi_put_value_array() writes into a static unpacked array. format selects
+// which arm of the union is live and how each element is encoded; flags carries
+// vpiOneValue/vpiPropagateOff. Every arm is a pointer to caller-allocated
+// storage holding one entry per element (the raw arms hold packed aval/bval
+// bytes instead). The public spellings s_vpi_arrayvalue/p_vpi_arrayvalue alias
+// this type below.
+struct VpiArrayValue {
+  uint32_t format = 0;
+  uint32_t flags = 0;
+  union {
+    int32_t* integers;
+    int16_t* shortints;
+    int64_t* longints;
+    char* rawvals;
+    VpiVectorVal* vectors;
+    VpiTime* times;
+    double* reals;
+    float* shortreals;
+  } value = {};
+};
+
 // §38.10 (Figure 38-3): the delay structure exchanged with vpi_get_delays()
 // (and vpi_put_delays()). `da` is an application-allocated array of VpiTime
 // entries the routine fills with delay values; no_of_delays selects how many
@@ -2421,6 +2476,23 @@ class VpiContext {
   VpiHandle CreateAssertion(std::string_view name, int type);
 
   VpiHandle CreateNetObj(std::string_view name, Net* net_ptr, int width);
+
+  // §38.35: build a static unpacked array object with one element child per
+  // supplied variable. `array_type` is the vpiArrayType the array reports;
+  // `dim_indices` gives the declared index values of each unpacked dimension in
+  // left-to-right order. Each element child is created as a vpiReg over the
+  // matching variable, keyed by its flat ordinal (rightmost dimension varying
+  // fastest), so vpi_put_value_array() can locate and fill elements.
+  VpiHandle CreateRegArray(std::string_view name, int array_type,
+                           const std::vector<std::vector<int>>& dim_indices,
+                           const std::vector<Variable*>& elements);
+
+  // §38.35: write values into contiguous elements of a static unpacked array.
+  // arrayvalue_p selects the element encoding and flags; index_p gives the
+  // starting element's coordinate (one entry per unpacked dimension); num is how
+  // many consecutive elements to set. Applies vpiNoDelay semantics only.
+  void PutValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p, int* index_p,
+                     unsigned int num);
 
   const std::vector<VpiSystfData>& RegisteredSystfs() const { return systfs_; }
 
@@ -3106,20 +3178,11 @@ typedef struct t_vpi_strengthval {
 
 // §K.2: aggregate value used by the array value routines. The format selects
 // which arm of the union is live; flags carries vpiUserAllocFlag and friends.
-typedef struct t_vpi_arrayvalue {
-  PLI_UINT32 format = 0;
-  PLI_UINT32 flags = 0;
-  union {
-    PLI_INT32* integers;
-    PLI_INT16* shortints;
-    PLI_INT64* longints;
-    PLI_BYTE8* rawvals;
-    s_vpi_vecval* vectors;
-    s_vpi_time* times;
-    double* reals;
-    float* shortreals;
-  } value = {};
-} s_vpi_arrayvalue, *p_vpi_arrayvalue;
+// The definition lives inside the delta namespace (VpiArrayValue) so the
+// simulator can name it directly; these aliases expose it under the standard
+// PLI spellings.
+using s_vpi_arrayvalue = delta::VpiArrayValue;
+using p_vpi_arrayvalue = delta::VpiArrayValue*;
 
 
 vpiHandle vpi_register_systf(s_vpi_systf_data* data);
@@ -3142,6 +3205,8 @@ vpiHandle vpi_scan(vpiHandle iterator);
 void vpi_get_value(vpiHandle obj, s_vpi_value* value);
 vpiHandle vpi_put_value(vpiHandle obj, s_vpi_value* value, s_vpi_time* time,
                         int flags);
+void vpi_put_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
+                         PLI_INT32* index_p, PLI_UINT32 num);
 vpiHandle vpi_register_cb(s_cb_data* data);
 int VpiRemoveCbC(vpiHandle cb_handle);
 int vpi_get(int property, vpiHandle obj);
