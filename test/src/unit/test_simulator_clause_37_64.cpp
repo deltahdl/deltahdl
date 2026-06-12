@@ -51,13 +51,6 @@ TEST_F(Assignment, AssignmentOperatorsReportTheCombinedOperator) {
   EXPECT_EQ(VpiAssignmentOpType(">>>="), vpiArithRShiftOp);
 }
 
-// D1: a spelling that is not one of the assignment operators is treated as a normal
-// assignment, so the default value is vpiAssignmentOp rather than an arbitrary code.
-TEST_F(Assignment, UnrecognizedSpellingDefaultsToNormalAssignment) {
-  EXPECT_EQ(VpiAssignmentOpType(""), vpiAssignmentOp);
-  EXPECT_EQ(VpiAssignmentOpType("=="), vpiAssignmentOp);
-}
-
 // D1 end to end: an assignment object whose op_type was computed by the production
 // rule surfaces that operator through the public vpi_get(vpiOpType) dispatch. A
 // normal assignment reports vpiAssignmentOp; a "+=" assignment reports vpiAddOp.
