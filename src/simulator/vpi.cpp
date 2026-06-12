@@ -869,6 +869,52 @@ bool VpiSimpleExprBitSelectConstantSelect(bool all_indices_constant,
 }
 
 // ===========================================================================
+// §37.61 Dynamic prefixing.
+// ===========================================================================
+
+bool VpiIsDynamicPrefixSourceType(int type) {
+  // §37.61 detail 1: the object kinds whose vpiPrefix relation this subclause
+  // serves - a simple expression (its concrete reference and bit-select kinds),
+  // a part-select, an indexed part-select, a named event, and a named event
+  // array. A tf call is in the diagram too, but a method call's prefix is owned
+  // by §37.42, so tf-call kinds are deliberately left out here.
+  switch (type) {
+    case vpiRefObj:            // the concrete simple expression
+    case vpiBitSelect:         // a bit-select is also a simple expression
+    case vpiPartSelect:
+    case vpiIndexedPartSelect:
+    case vpiNamedEvent:
+    case vpiNamedEventArray:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiObjectHasActual(int actual_origin, bool has_current_actual) {
+  // §37.61 detail 3: vpiHasActual is TRUE for an object that is all or part of a
+  // statically declared object in an elaborated context, or an automatic
+  // variable obtained from a frame (§37.43); it is FALSE for an object obtained
+  // from a lexical context such as a class defn (§37.31), one referenced
+  // relative to its class typespec (§37.32), or an automatic variable obtained
+  // from a task or function declaration (§37.41). When the provenance does not
+  // pin the answer, it tracks whether the object has a corresponding actual at
+  // the current simulation time.
+  switch (actual_origin) {
+    case kVpiActualStaticElab:
+    case kVpiActualFrameVar:
+      return true;
+    case kVpiActualLexicalDefn:
+    case kVpiActualClassTypespec:
+    case kVpiActualTaskFuncVar:
+      return false;
+    case kVpiActualBySimTime:
+    default:
+      return has_current_actual;
+  }
+}
+
+// ===========================================================================
 // §37.59 Expressions.
 // ===========================================================================
 
@@ -3812,6 +3858,19 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return ref->tf_prefix;
   }
 
+  // §37.61 detail 1: vpiPrefix of a dynamically prefixed object - a simple
+  // expression, part-select, indexed part-select, named event, or named event
+  // array - reaches the class var, virtual interface var, or clocking block that
+  // prefixes it in the source. The prefix is held as a designated pointer (its
+  // own type is none of these relation tags), so the generic walk below cannot
+  // serve it; an object that is not prefixed reports NULL. The relation is non-
+  // NULL exactly when the object represents an expression prefixed by a virtual
+  // interface or clocking block, or is all or part of a non-static class
+  // property prefixed by a class var.
+  if (type == vpiPrefix && VpiIsDynamicPrefixSourceType(ref->type)) {
+    return ref->prefix;
+  }
+
   // §37.42 detail 1: vpiWith of a method call reaches its with-clause (an
   // expression, or a constraint), but the relation is available only for the
   // methods that take a with clause - randomize and array-locator methods. For
@@ -5419,6 +5478,14 @@ int VpiContext::Get(int property, VpiHandle obj) {
       return obj->automatic ? 1 : 0;
     // §37.3.7: the object's allocation scheme; defaults to kVpiOtherScheme.
     case kVpiAllocScheme:
+      // §37.61 detail 2: an object reached through a class var or virtual
+      // interface var prefix shares that prefix's memory allocation scheme, so
+      // report the prefix's scheme rather than the object's own. A clocking-
+      // block prefix is not subject to this rule, nor is an unprefixed object.
+      if (obj->prefix && (obj->prefix->type == vpiClassVar ||
+                          obj->prefix->type == vpiVirtualInterfaceVar)) {
+        return obj->prefix->alloc_scheme;
+      }
       return obj->alloc_scheme;
     // §37.54 (D2): an operation reports its operation type as an int property.
     case vpiOpType:
@@ -5430,6 +5497,16 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // reports vpiUndefined rather than handing back a value outside the four.
     case vpiAlwaysType:
       return VpiIsAlwaysType(obj->always_type) ? obj->always_type : vpiUndefined;
+    // §37.61 detail 3: a dynamically prefixed object reports through vpiHasActual
+    // whether it has a corresponding actual. The property is drawn only on the
+    // dynamic-prefix source kinds, so asking any other object kind is not a valid
+    // query and yields vpiUndefined; for a source kind the answer follows the
+    // object's provenance (and, when that leaves it open, whether an actual is
+    // bound at the current simulation time).
+    case vpiHasActual:
+      if (!VpiIsDynamicPrefixSourceType(obj->type)) return vpiUndefined;
+      return VpiObjectHasActual(obj->actual_origin, obj->actual != nullptr) ? 1
+                                                                            : 0;
     // §37.72: a case statement reports its case kind (vpiCaseExact/vpiCaseX/
     // vpiCaseZ) as an int property.
     case vpiCaseType:

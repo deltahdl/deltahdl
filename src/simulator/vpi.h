@@ -121,6 +121,29 @@ constexpr int kVpiAutomaticScheme = 1;
 constexpr int kVpiDynamicScheme = 2;
 constexpr int kVpiOtherScheme = 3;
 
+// §37.61 detail 3: how a dynamically prefixed object's correspondence to an
+// actual is established, which fixes what vpiHasActual reports. These live in a
+// private namespace (not VPI selector values) describing the provenance the
+// clause enumerates, not anything queried directly.
+//   kVpiActualBySimTime    -> depends on whether a corresponding actual exists
+//                             at the current simulation time (the default case)
+//   kVpiActualStaticElab   -> all or part of a statically declared object in an
+//                             elaborated context (always has an actual)
+//   kVpiActualFrameVar     -> automatically allocated variable from a frame,
+//                             see §37.43 (always has an actual)
+//   kVpiActualLexicalDefn  -> obtained from a lexical context such as a class
+//                             defn, see §37.31 (never has an actual)
+//   kVpiActualClassTypespec-> part of a non-static class property referenced
+//                             relative to its class typespec, see §37.32 (none)
+//   kVpiActualTaskFuncVar  -> automatically allocated variable from a task or
+//                             function declaration, see §37.41 (none)
+constexpr int kVpiActualBySimTime = 0;
+constexpr int kVpiActualStaticElab = 1;
+constexpr int kVpiActualFrameVar = 2;
+constexpr int kVpiActualLexicalDefn = 3;
+constexpr int kVpiActualClassTypespec = 4;
+constexpr int kVpiActualTaskFuncVar = 5;
+
 constexpr int kVpiLibrary = 67;
 constexpr int kVpiConfig = 70;
 constexpr int kVpiCell = 71;
@@ -331,6 +354,19 @@ struct VpiObject {
   // reported through the vpiActual relation. NULL when the ref obj is not bound
   // to an actual at the time of the query.
   VpiObject* actual = nullptr;
+
+  // §37.61 detail 1: the dynamic prefix this object is reached through - the
+  // class var, virtual interface var, or clocking block that prefixes the
+  // expression, named event, or named event array in the source. Reported
+  // through the vpiPrefix relation; NULL when the object is not so prefixed. A
+  // tf call's prefix is modeled separately by §37.42.
+  VpiObject* prefix = nullptr;
+
+  // §37.61 detail 3: how this object's correspondence to an actual is fixed (one
+  // of the kVpiActual* provenances). The default, kVpiActualBySimTime, leaves
+  // vpiHasActual driven by whether `actual` is bound at the current simulation
+  // time; the other values pin the answer per the object's provenance.
+  int actual_origin = kVpiActualBySimTime;
 
   // §37.14 detail 1: a port's type, one of vpiPort, vpiInterfacePort, or
   // vpiModportPort, reported through vpi_get(vpiPortType). It is derived from the
@@ -1189,6 +1225,36 @@ bool VpiSimpleExprBitSelectUseAccessesUse(
 // vpiConstantSelect is itself TRUE for the bit-select's parent; otherwise FALSE.
 bool VpiSimpleExprBitSelectConstantSelect(bool all_indices_constant,
                                           bool parent_constant_select);
+
+// ===========================================================================
+// §37.61 Dynamic prefixing. The object model diagram draws a vpiPrefix relation
+// from a dynamically prefixed object - a simple expression (a reference, a bit-
+// select, a part-select, or an indexed part-select), a named event, a named
+// event array, or a tf call - to the class var, virtual interface var, or
+// clocking block that prefixes it; and gives those source objects one property
+// edge, "-> has actual" (bool: vpiHasActual). The tf call's prefix is owned by
+// §37.42; the helpers below carry §37.61's own normative details.
+// ===========================================================================
+
+// §37.61 detail 1: the object kinds that can carry a dynamic prefix and report
+// it through vpiPrefix - the concrete simple-expression kinds (a reference and a
+// bit-select), a part-select and an indexed part-select, a named event, and a
+// named event array. A tf call is excluded: a method call's prefix is supplied
+// by §37.42, so a tf call is not classified here. Scopes the vpiPrefix
+// traversal so the relation is served only for the source kinds the diagram
+// draws it from.
+bool VpiIsDynamicPrefixSourceType(int type);
+
+// §37.61 detail 3: whether a dynamically prefixed object has a corresponding
+// actual, the value reported through vpiHasActual. `actual_origin` selects how
+// the answer is fixed (a kVpiActual* provenance); `has_current_actual` is
+// whether the object is bound to an actual at the current simulation time, used
+// only when the provenance leaves the question to simulation time. A statically
+// declared object in an elaborated context and an automatic variable obtained
+// from a frame have an actual; an object obtained from a class defn, referenced
+// relative to a class typespec, or automatically allocated from a task/function
+// declaration does not.
+bool VpiObjectHasActual(int actual_origin, bool has_current_actual);
 
 // ===========================================================================
 // §37.59 Expressions. The VPI object model for an expression. The expr class
