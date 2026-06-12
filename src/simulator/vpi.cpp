@@ -3909,6 +3909,21 @@ void VpiContext::GetVlogInfo(VpiVlogInfo* info) {
 VpiHandle VpiContext::HandleMulti(int type, VpiHandle ref1, VpiHandle ref2) {
   if (!ref1 && !ref2) return nullptr;
 
+  // §38.22: a request for an intermodule path names the output-port and
+  // input-port reference objects the path runs between. Those two ports shall
+  // be of the same size; they may, however, sit at different levels of the
+  // hierarchy, which is deliberately left unconstrained. A size mismatch cannot
+  // describe a valid intermodule path, so report it (§38.2) and return no
+  // handle.
+  if (type == vpiInterModPath && ref1 && ref2 && ref1->size != ref2->size) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_handle_multi(): the two ports of an intermodule path must be of "
+        "the same size";
+    return nullptr;
+  }
+
   auto* result = AllocObject();
   result->type = type;
   if (ref1) {
