@@ -1390,6 +1390,16 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
 
   if (!ref) return nullptr;
 
+  // §38.18: unless otherwise specified, asking vpi_handle() for an object
+  // related to a protected reference object is an error. Record it and hand
+  // back a null handle.
+  if (ref->is_protected) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message = "vpi_handle() on a protected object is an error";
+    return nullptr;
+  }
+
   // §38.23: vpi_handle(vpiUse, iterator) recovers the reference object the
   // iterator was created to walk.
   if (type == vpiUse && ref->type == vpiIterator) return ref->iter_ref;
