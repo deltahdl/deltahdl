@@ -332,6 +332,20 @@ struct VpiObject {
   // interface, not a modport) by default.
   bool is_modport = false;
 
+  // §37.72: the case kind a case statement reports through vpi_get(vpiCaseType)
+  // - one of vpiCaseExact, vpiCaseX, or vpiCaseZ. Zero when unset.
+  int case_type = 0;
+
+  // §37.72: the qualifier flags a case statement reports through
+  // vpi_get(vpiQualifier) - a bitwise OR of the unique/priority/etc. qualifier
+  // bits (vpiNoQualifier when the statement carries no qualifier).
+  int qualifier = 0;
+
+  // §37.72 detail 2: whether a case item is the default item. The default case
+  // item carries no condition expression, so iterating its match expressions
+  // (vpi_iterate(vpiExpr, item)) returns NULL and it groups no conditions.
+  bool default_case_item = false;
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 
@@ -609,6 +623,19 @@ bool VpiIsPropertyVariableValueAccessible();
 // item -> property expr edge) is excluded. The default case item has no
 // condition expression, so it groups none (detail 5).
 std::vector<VpiHandle> VpiCaseItemConditions(VpiHandle case_item);
+
+// §37.72: the object kinds a case item's match expressions may reach. The
+// diagram draws the case item's vpiExpr edge to both the pattern grouping and a
+// plain expr, so a condition is one of the pattern kinds (any/tagged/struct
+// pattern, or a bare pattern) or an ordinary expression.
+bool VpiIsCaseItemConditionType(int type);
+
+// §37.72 detail 1: the case conditions a (statement) case item groups - its
+// match-expression members, each of which branches to the item's statement, in
+// declaration order. The statement reached through the item's -> stmt edge is
+// not a condition. The default case item has no condition expression, so it
+// groups none (detail 2).
+std::vector<VpiHandle> VpiCaseItemMatchExprs(VpiHandle case_item);
 
 // §37.52: the kinds the property-spec/property-expr disable-condition relation
 // may reach - a bare expression or a distribution. (A property instance's

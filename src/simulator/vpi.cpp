@@ -772,6 +772,38 @@ bool VpiIsAtomicStmtType(int type) {
   }
 }
 
+bool VpiIsCaseItemConditionType(int type) {
+  // §37.72: a case item reaches its match expressions through the vpiExpr edge,
+  // which the diagram draws to both the pattern grouping and a plain expr. A
+  // condition is therefore one of the pattern kinds (any/tagged/struct pattern,
+  // or a bare pattern) or an expression.
+  switch (type) {
+    case vpiAnyPattern:
+    case vpiTaggedPattern:
+    case vpiStructPattern:
+    case vpiPattern:
+    case vpiExpr:
+      return true;
+    default:
+      return VpiIsExprType(type);
+  }
+}
+
+std::vector<VpiHandle> VpiCaseItemMatchExprs(VpiHandle case_item) {
+  // §37.72 detail 1: a case item groups every case condition that branches to
+  // the same statement; those conditions are its match-expression members. The
+  // statement reached through the item's -> stmt edge is not one of them, so
+  // only the pattern/expr children are collected, in declaration order. The
+  // default case item has no condition expression (detail 2), so it groups none
+  // - enforced here even if the object carries stray children.
+  std::vector<VpiHandle> conditions;
+  if (!case_item || case_item->default_case_item) return conditions;
+  for (auto* child : case_item->children) {
+    if (VpiIsCaseItemConditionType(child->type)) conditions.push_back(child);
+  }
+  return conditions;
+}
+
 int VpiAssignmentOpType(std::string_view assign_operator) {
   // §37.64 detail 1: an assignment operator reports the operator combined with the
   // assignment, per 11.4.1. The plain "=" and "<=" forms are normal assignments and
@@ -3034,6 +3066,15 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   // protected object is an error, so no iterator is produced.
   if (ref && ref->is_protected) return nullptr;
 
+  // §37.72 detail 2: a default case item has no condition expression, so
+  // iterating its match expressions (vpi_iterate(vpiExpr, item)) returns NULL.
+  // This holds even when the object carries other children, distinguishing the
+  // default item from a non-default item that simply has no conditions yet.
+  if (ref && ref->type == vpiCaseItem && type == vpiExpr &&
+      ref->default_case_item) {
+    return nullptr;
+  }
+
   // §38.23: the handle returned is an iterator whose own type is vpiIterator;
   // the requested object type only selects which related objects it walks. The
   // reference object is remembered so it can be recovered through vpiUse.
@@ -3045,8 +3086,15 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   // §37.49: vpiAssertion names the assertion class rather than a single object
   // kind, so iterating it collects every object the class groups (the circle
   // relation, when ref is null) instead of matching one exact type.
-  auto matches = [type](int obj_type) {
+  auto matches = [type, ref](int obj_type) {
     if (type == vpiAssertion) return VpiIsAssertionType(obj_type);
+    // §37.72 detail 1: a case item's match expressions are reached through the
+    // vpiExpr edge, which spans both patterns and plain expressions, so the
+    // iteration collects every condition the item groups - not only children
+    // whose own type happens to be vpiExpr.
+    if (ref && ref->type == vpiCaseItem && type == vpiExpr) {
+      return VpiIsCaseItemConditionType(obj_type);
+    }
     return obj_type == type;
   };
 
@@ -3667,6 +3715,15 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // §37.54 (D2): an operation reports its operation type as an int property.
     case vpiOpType:
       return obj->op_type;
+    // §37.72: a case statement reports its case kind (vpiCaseExact/vpiCaseX/
+    // vpiCaseZ) as an int property.
+    case vpiCaseType:
+      return obj->case_type;
+    // §37.72: a case statement reports its qualifier flags (a bitwise OR of the
+    // unique/priority/etc. qualifiers, vpiNoQualifier when none) as an int
+    // property.
+    case vpiQualifier:
+      return obj->qualifier;
     // §37.59: a constant reports its constant type as an int property
     // (vpiUnboundedConst for the $ used in assertion ranges, detail 4); an unset
     // constant reports zero.
