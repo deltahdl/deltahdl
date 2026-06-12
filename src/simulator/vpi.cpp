@@ -166,6 +166,19 @@ bool VpiIsAssertionType(int type) {
   }
 }
 
+bool VpiIsConstraintItemType(int type) {
+  // §37.34 detail 5: the constraint-item grouping spans the constraint orderings
+  // (the solve-before/solve-after relations) and the constraint expressions that
+  // make up a constraint. Any other object kind is not a constraint item.
+  switch (type) {
+    case vpiConstraintOrdering:
+    case vpiConstraintExpr:
+      return true;
+    default:
+      return false;
+  }
+}
+
 VpiHandle VpiAssertionClockingBlock(VpiHandle assertion) {
   // §37.49: a concurrent assertion traverses to its governing clocking block
   // through the untagged vpiClockingBlock relation. The association is modeled as
@@ -3360,6 +3373,11 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
     // the exprs, interface exprs, scope, primitive, and named-event(-array) the
     // relation reaches - rather than children whose own type is vpiArgument.
     if (tf_argument_iteration) return VpiIsTfCallArgumentType(obj_type);
+    // §37.34 detail 5: a constraint's vpiConstraintItem iteration collects every
+    // constraint item it groups - the constraint orderings and constraint
+    // expressions - in the order they occur, rather than children whose own type
+    // is literally vpiConstraintItem.
+    if (type == vpiConstraintItem) return VpiIsConstraintItemType(obj_type);
     return obj_type == type;
   };
 
@@ -4107,6 +4125,23 @@ int VpiContext::Get(int property, VpiHandle obj) {
       return obj->strength0;
     case vpiStrength1:
       return obj->strength1;
+    // §37.34 detail 3: a constraint's access type is vpiExternAcc when it is
+    // declared outside its enclosing class declaration, and zero otherwise -
+    // the only two values the property takes for a constraint. Any other stored
+    // value collapses to zero so the constraint never reports a third value.
+    case vpiAccessType:
+      if (obj->type == vpiConstraint)
+        return obj->access_type == vpiExternAcc ? vpiExternAcc : 0;
+      return obj->access_type;
+    // §37.34: whether a constraint is virtual, as a Boolean property.
+    case vpiVirtual:
+      return obj->is_virtual ? 1 : 0;
+    // §37.34: whether a constraint is currently enabled, as a Boolean property.
+    case vpiIsConstraintEnabled:
+      return obj->constraint_enabled ? 1 : 0;
+    // §37.34: the distribution kind a dist item carries, as an int property.
+    case vpiDistType:
+      return obj->dist_type;
     default:
       return 0;
   }

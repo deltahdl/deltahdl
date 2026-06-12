@@ -405,6 +405,23 @@ struct VpiObject {
   int strength0 = 0;
   int strength1 = 0;
 
+  // §37.34: a constraint's access type, reported through vpi_get(vpiAccessType).
+  // For a constraint the only values are vpiExternAcc - when the constraint is
+  // declared outside its enclosing class declaration (detail 3) - and zero.
+  int access_type = 0;
+
+  // §37.34: whether a constraint is virtual, reported through the vpiVirtual
+  // Boolean property; false by default.
+  bool is_virtual = false;
+
+  // §37.34: whether a constraint is currently enabled (constraint_mode), reported
+  // through the vpiIsConstraintEnabled Boolean property.
+  bool constraint_enabled = false;
+
+  // §37.34: the distribution kind a dist item carries (e.g. vpiEqualDist or
+  // vpiDivDist), reported through vpi_get(vpiDistType) as an int property.
+  int dist_type = 0;
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 
@@ -514,6 +531,12 @@ int VpiSmallestTimePrecision(const std::vector<int>& precisions);
 // kinds, the immediate assert/assume/cover kinds, and sequence and property
 // instances. An object is an assertion exactly when its type is one of these.
 bool VpiIsAssertionType(int type);
+
+// §37.34 detail 5: a constraint item is the abstract grouping of the kinds the
+// vpiConstraintItem iteration reaches - a constraint ordering or a constraint
+// expression. An object qualifies as a constraint item exactly when its type is
+// one of these.
+bool VpiIsConstraintItemType(int type);
 
 // §37.49: the clocking block governing a concurrent assertion, traversed with
 // vpi_handle(vpiClockingBlock, ...). Returns null when no clocking block is
