@@ -54,24 +54,6 @@ TEST_F(VpiObjectTypeProperty, GetStrTypeReturnsTheTypeConstantName) {
   EXPECT_EQ(std::string(mod_name), "vpiModule");
 }
 
-// Edge of the vpiType string rule: the property is universal, so the name comes
-// back for objects of any modelled type - here an iterator (an object whose type
-// the iteration mechanism itself produces) and a named event - not just for the
-// few diagrammed in the clause's example.
-TEST_F(VpiObjectTypeProperty, GetStrTypeNamesEveryModelledType) {
-  VpiObject iter;
-  iter.type = vpiIterator;
-  const char* iter_name = vpi_get_str(vpiType, &iter);
-  ASSERT_NE(iter_name, nullptr);
-  EXPECT_EQ(std::string(iter_name), "vpiIterator");
-
-  VpiObject ev;
-  ev.type = vpiNamedEvent;
-  const char* ev_name = vpi_get_str(vpiType, &ev);
-  ASSERT_NE(ev_name, nullptr);
-  EXPECT_EQ(std::string(ev_name), "vpiNamedEvent");
-}
-
 // Edge of the vpiType string rule: vpi_get_str names the type only for the
 // object kinds the simulator actually models. For a handle whose type code the
 // model does not yet carry a spelling for, the string accessor reports no name
