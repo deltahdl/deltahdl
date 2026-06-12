@@ -3205,6 +3205,21 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   bool tf_argument_iteration =
       ref && VpiIsTfCallType(ref->type) && type == vpiArgument;
 
+  // §37.27 detail 1: vpiWaitingProcesses on a named event reaches the threads of
+  // every process - static or dynamic - currently waiting on that event. The
+  // relation is named for the processes but the objects it reaches are threads,
+  // so it is recognized specially rather than matched against the relation name.
+  bool named_event_waiting_iteration =
+      ref && ref->type == vpiNamedEvent && type == vpiWaitingProcesses;
+
+  // §37.27 detail 2: vpiIndex on a named event reaches the index expressions that
+  // locate it within an array, starting with the index for the named event and
+  // working outward. A named event that is not an array element has no such
+  // indices, so the iteration finds none and reports NULL. The relation reaches
+  // exprs, not children whose own type is vpiIndex, so it too is special.
+  bool named_event_index_iteration =
+      ref && ref->type == vpiNamedEvent && type == vpiIndex;
+
   // §38.23: unless otherwise specified, iterating the relationships of a
   // protected object is an error, so no iterator is produced. §37.42 detail 10
   // carves out one exception: a protected system task or function call shall
@@ -3232,8 +3247,17 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   // §37.49: vpiAssertion names the assertion class rather than a single object
   // kind, so iterating it collects every object the class groups (the circle
   // relation, when ref is null) instead of matching one exact type.
-  auto matches = [type, ref, tf_argument_iteration](int obj_type) {
+  auto matches = [type, ref, tf_argument_iteration,
+                  named_event_waiting_iteration,
+                  named_event_index_iteration](int obj_type) {
     if (type == vpiAssertion) return VpiIsAssertionType(obj_type);
+    // §37.27 detail 1: a named event's vpiWaitingProcesses iteration collects the
+    // thread objects of the waiting processes, not children typed
+    // vpiWaitingProcesses.
+    if (named_event_waiting_iteration) return obj_type == vpiThread;
+    // §37.27 detail 2: a named event's vpiIndex iteration collects the index
+    // expressions locating it within its array.
+    if (named_event_index_iteration) return VpiIsExprType(obj_type);
     // §37.72 detail 1: a case item's match expressions are reached through the
     // vpiExpr edge, which spans both patterns and plain expressions, so the
     // iteration collects every condition the item groups - not only children
