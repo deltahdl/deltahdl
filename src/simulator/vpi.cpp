@@ -1636,6 +1636,112 @@ void VpiContext::GetTime(VpiHandle obj, VpiTime* time_p) {
 
 namespace {
 
+// §38.10: the four object categories that carry delays. Their legal
+// no_of_delays values differ, so vpi_get_delays() classifies the object first.
+bool VpiObjectIsPrimitive(int type) {
+  return type == vpiGate || type == vpiSwitch || type == vpiUdp ||
+         type == vpiPrimitive || type == vpiSeqPrim || type == vpiCombPrim;
+}
+
+// §38.10: whether `n` is a legal number of delays to request for an object of
+// `type` that carries `available` stored delays. For a primitive the count is
+// 2 or 3; for a module (path-delay) object 1, 2, 3, 6, or 12; for an
+// intermodule path 2 or 3; for a timing check it must match the number of
+// limits the check actually has. Any other object bears no delays.
+bool VpiNoOfDelaysLegal(int type, int n, size_t available) {
+  if (VpiObjectIsPrimitive(type)) return n == 2 || n == 3;
+  if (type == vpiModPath)
+    return n == 1 || n == 2 || n == 3 || n == 6 || n == 12;
+  if (type == vpiInterModPath) return n == 2 || n == 3;
+  if (type == vpiTchk) return n == static_cast<int>(available);
+  return false;
+}
+
+// §38.10: write one delay value into a caller-supplied time entry. The form is
+// dictated solely by the delay structure's time_type - the entry's own type
+// field is ignored on input and overwritten with time_type. vpiScaledRealTime
+// delivers a real; vpiSimTime delivers the value as a 64-bit count split across
+// high/low; vpiSuppressTime asks for no time and leaves the value cleared.
+void VpiWriteDelayValue(VpiTime* slot, int time_type, double value) {
+  slot->type = time_type;
+  slot->high = 0;
+  slot->low = 0;
+  slot->real = 0.0;
+  if (time_type == vpiScaledRealTime) {
+    slot->real = value;
+  } else if (time_type == vpiSimTime) {
+    auto ticks = static_cast<uint64_t>(value);
+    slot->high = static_cast<uint32_t>(ticks >> 32);
+    slot->low = static_cast<uint32_t>(ticks & 0xFFFFFFFFu);
+  }
+}
+
+}  // namespace
+
+void VpiContext::GetDelays(VpiHandle obj, VpiDelay* delay_p) {
+  // §38.10 / §38.1: the structure and its da array are application-allocated.
+  // With nothing to fill, or no object to read delays from, there is nothing
+  // to do; the routine never allocates anything itself.
+  if (delay_p == nullptr || obj == nullptr) return;
+
+  // §38.10: the legal values for the number of delays are fixed by the object's
+  // category. A request that is not legal for this object is an error; record
+  // it (§38.2) and leave the caller's array untouched.
+  if (!VpiNoOfDelaysLegal(obj->type, delay_p->no_of_delays,
+                          obj->delays.size())) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_get_delays(): the requested number of delays is not legal for "
+        "this object";
+    return;
+  }
+
+  if (delay_p->da == nullptr) return;
+
+  const bool mtm = delay_p->mtm_flag != 0;
+  const bool pulsere = delay_p->pulsere_flag != 0;
+  const int tt = delay_p->time_type;
+
+  // §38.10 (Table 38-2): each delay occupies a run of da entries selected by
+  // mtm_flag and pulsere_flag, and the delays appear in source order. Walk the
+  // delays in order, emitting each delay's run before moving to the next.
+  int k = 0;
+  for (int i = 0; i < delay_p->no_of_delays; ++i) {
+    const VpiDelayInfo d = (static_cast<size_t>(i) < obj->delays.size())
+                               ? obj->delays[i]
+                               : VpiDelayInfo{};
+    if (!mtm && !pulsere) {
+      // Neither flag set: one entry, the plain delay.
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.delay);
+    } else if (mtm && !pulsere) {
+      // min:typ:max only: three entries, min then typ then max delay.
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.min_delay);
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.typ_delay);
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.max_delay);
+    } else if (!mtm && pulsere) {
+      // Pulse limits only: delay, reject limit, error limit.
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.delay);
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.reject);
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.error);
+    } else {
+      // Both flags: nine entries - min:typ:max of delay, then reject, then
+      // error.
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.min_delay);
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.typ_delay);
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.max_delay);
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.min_reject);
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.typ_reject);
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.max_reject);
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.min_error);
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.typ_error);
+      VpiWriteDelayValue(&delay_p->da[k++], tt, d.max_error);
+    }
+  }
+}
+
+namespace {
+
 // §38.21: split a possibly hierarchical name into its dot-separated path
 // components, outermost scope first. A simple name yields a single component.
 std::vector<std::string_view> VpiNamePathComponents(std::string_view name) {
@@ -2767,6 +2873,11 @@ void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p) {
 void vpi_get_time(vpiHandle obj, s_vpi_time* time_p) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   delta::GetGlobalVpiContext().GetTime(obj, time_p);
+}
+
+void vpi_get_delays(vpiHandle obj, p_vpi_delay delay_p) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  delta::GetGlobalVpiContext().GetDelays(obj, delay_p);
 }
 
 vpiHandle VpiHandleC(int type, vpiHandle ref) {

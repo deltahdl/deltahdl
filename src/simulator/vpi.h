@@ -139,6 +139,21 @@ constexpr int kVpiError = 3;
 constexpr int kVpiSystem = 4;
 constexpr int kVpiInternal = 5;
 
+// §38.10: one delay element carried by a delay-bearing object (a primitive, a
+// module path, a timing check, or an intermodule path). `delay` is the plain
+// value reported when min:typ:max is not requested; the min/typ/max triples
+// give the spread that mtm_flag asks for; reject/error (and their triples)
+// carry the pulse-control limits that pulsere_flag asks for. vpi_get_delays()
+// reads these and lays them out into the caller's array per Table 38-2.
+struct VpiDelayInfo {
+  double delay = 0.0;
+  double min_delay = 0.0, typ_delay = 0.0, max_delay = 0.0;
+  double reject = 0.0;
+  double min_reject = 0.0, typ_reject = 0.0, max_reject = 0.0;
+  double error = 0.0;
+  double min_error = 0.0, typ_error = 0.0, max_error = 0.0;
+};
+
 struct VpiObject {
   int type = 0;
   std::string_view name;
@@ -249,6 +264,12 @@ struct VpiObject {
   int column = 0;
   int end_line = 0;
   int end_column = 0;
+
+  // §38.10: the delays this object carries, in the order they occur in the
+  // SystemVerilog description. vpi_get_delays() reports them in this order, so
+  // da[0] is the first source delay, da[1] the second, and so on. Empty for an
+  // object that bears no delays.
+  std::vector<VpiDelayInfo> delays;
 
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
@@ -1201,6 +1222,22 @@ struct VpiTime {
   double real = 0.0;
 };
 
+// §38.10 (Figure 38-3): the delay structure exchanged with vpi_get_delays()
+// (and vpi_put_delays()). `da` is an application-allocated array of VpiTime
+// entries the routine fills with delay values; no_of_delays selects how many
+// of the object's delays to retrieve; time_type selects the form of each value
+// written into da; mtm_flag and pulsere_flag together select how many entries
+// each delay occupies and what they hold (see Table 38-2). append_flag is only
+// meaningful when putting delays.
+struct VpiDelay {
+  VpiTime* da = nullptr;
+  int no_of_delays = 0;
+  int time_type = 0;
+  int mtm_flag = 0;
+  int append_flag = 0;
+  int pulsere_flag = 0;
+};
+
 struct VpiCbData {
   int reason = 0;
   // §38.36 (Figure 38-17): the application routine the simulator invokes when it
@@ -1363,6 +1400,17 @@ class VpiContext {
   // belongs to the caller, so the routine only fills it and never allocates. A
   // null `time_p` leaves nothing to do.
   void GetTime(VpiHandle obj, VpiTime* time_p);
+
+  // §38.10: retrieve the delays or pulse limits of `obj` into the
+  // application-allocated structure `delay_p`. delay_p->no_of_delays selects
+  // how many of the object's delays to retrieve and must be legal for the
+  // object's category; delay_p->time_type controls the form of every value
+  // written, and the type field of each da entry is ignored; delay_p->mtm_flag
+  // and delay_p->pulsere_flag select the per-delay layout (Table 38-2). The
+  // structure and its da array belong to the caller, so the routine only fills
+  // them. A null delay_p, a null obj, or a null da leaves nothing to do; an
+  // illegal no_of_delays records an error and writes nothing.
+  void GetDelays(VpiHandle obj, VpiDelay* delay_p);
 
   // §38.13: set the simulation time unit, as a base-ten exponent of one second
   // (the unit the scheduler counts ticks in). vpi_get_time() uses it both as the
@@ -2081,16 +2129,12 @@ using PLI_UBYTE8 = unsigned char;
 // vpiScalar, vpiVector, vpiConstantSelect, vpiDecompile) are defined above. The
 // helpers declared below apply the clause rules on top of those constants.
 
-// §K.2: delay structure exchanged with the delay-processing routines. Zero
-// initialization leaves no delay array, zero delays and every flag cleared.
-typedef struct t_vpi_delay {
-  s_vpi_time* da = nullptr;     // application-allocated array of delay values
-  PLI_INT32 no_of_delays = 0;   // number of delays
-  PLI_INT32 time_type = 0;      // vpiScaledRealTime/vpiSimTime/vpiSuppressTime
-  PLI_INT32 mtm_flag = 0;       // true for min:typ:max values
-  PLI_INT32 append_flag = 0;    // true to append rather than replace
-  PLI_INT32 pulsere_flag = 0;   // true for pulse-reject values
-} s_vpi_delay, *p_vpi_delay;
+// §K.2: delay structure exchanged with the delay-processing routines. The
+// definition lives inside the delta namespace (VpiDelay) so the simulator's
+// implementation can name it directly; these aliases expose it under the
+// standard PLI spellings.
+using s_vpi_delay = delta::VpiDelay;
+using p_vpi_delay = delta::VpiDelay*;
 
 // §K.2: scalar strength value. logic holds a vpi0/vpi1/vpiX/vpiZ code and the
 // s0/s1 fields carry the drive/charge strength components.
@@ -2121,6 +2165,7 @@ typedef struct t_vpi_arrayvalue {
 vpiHandle vpi_register_systf(s_vpi_systf_data* data);
 void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p);
 void vpi_get_time(vpiHandle obj, s_vpi_time* time_p);
+void vpi_get_delays(vpiHandle obj, p_vpi_delay delay_p);
 vpiHandle VpiHandleC(int type, vpiHandle ref);
 vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope);
 vpiHandle VpiHandleByIndexC(vpiHandle parent, int index);
