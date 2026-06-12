@@ -1393,6 +1393,14 @@ VpiHandle VpiIfConditionExpr(VpiHandle if_stmt);
 // vpi_handle(vpiElseStmt, if-else) dispatch.
 VpiHandle VpiIfElseStmt(VpiHandle if_stmt);
 
+// §37.74 For: the controlling condition expression a for statement reaches
+// through vpiCondition. The condition's own type is an expression kind rather
+// than the vpiCondition relation tag, so it is found as the for statement's
+// first expression child; the initialization, increment, and body statements are
+// statement-edge children and are skipped. Null when none is attached. Backs the
+// public vpi_handle(vpiCondition, for) dispatch.
+VpiHandle VpiForConditionExpr(VpiHandle for_stmt);
+
 // §37.12 detail 1: whether an object kind is a block item declaration - a
 // variable declaration or a type declaration. These are the declarations whose
 // presence makes an unnamed begin or unnamed fork a scope.

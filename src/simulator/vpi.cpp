@@ -1161,6 +1161,22 @@ VpiHandle VpiIfElseStmt(VpiHandle if_stmt) {
   return nullptr;
 }
 
+VpiHandle VpiForConditionExpr(VpiHandle for_stmt) {
+  // §37.74: a for statement reaches its controlling condition through
+  // vpiCondition. As with the other looping and conditional statements, the
+  // condition's own type is an expression kind (an operation, a reference, a
+  // constant, ...) rather than the vpiCondition relation tag, so it is found by
+  // scanning for the first expression child. The for statement's other children -
+  // its initialization statements (vpiForInitStmt), increment statements
+  // (vpiForIncStmt), and body (vpiStmt) - are statement-edge children that this
+  // scan skips. Null when no condition is attached.
+  if (!for_stmt) return nullptr;
+  for (auto* child : for_stmt->children) {
+    if (VpiIsExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
 VpiHandle VpiDelayControlStmt(VpiHandle delay_control) {
   // §37.68 detail 1: a delay control reaches the statement it guards through
   // vpiStmt. When the delay control is associated with an assignment - i.e. it
@@ -3915,6 +3931,19 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // edge to a statement, is reached by the generic vpiStmt traversal below.
   if (type == vpiCondition && VpiIsIfOrIfElseType(ref->type)) {
     return VpiIfConditionExpr(ref);
+  }
+
+  // §37.74: vpiCondition of a for statement reaches its controlling condition
+  // expression. As with the loop and conditional statements above, the
+  // condition's own type is an expression kind rather than the vpiCondition
+  // relation tag, so the generic traversal below cannot find it. The relation is
+  // gated on the for statement kind so it does not also serve the vpiCondition
+  // edge other diagrams draw. The for statement's initialization and increment
+  // statements (vpiForInitStmt/vpiForIncStmt) and its body (the diagram's
+  // unlabeled edge to a statement) are reached by the generic traversal and
+  // iteration and need no special case here.
+  if (type == vpiCondition && ref->type == vpiFor) {
+    return VpiForConditionExpr(ref);
   }
 
   // §37.71: vpiElseStmt of an if-else statement reaches its else-branch body.
