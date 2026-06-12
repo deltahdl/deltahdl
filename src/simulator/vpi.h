@@ -168,8 +168,10 @@ struct VpiObject {
   // with a frame/thread or in dynamic memory reports vpiOtherScheme.
   int alloc_scheme = kVpiOtherScheme;
 
-  // §38.6: whether this object is protected. Unless otherwise specified,
-  // querying a protected object's property with vpi_get() is an error.
+  // §37.3.6: whether this object represents protected code (sealed in a
+  // decryption envelope). Reported by the vpiIsProtected property. Unless
+  // otherwise specified, accessing a protected object's properties is an error;
+  // vpiType and vpiIsProtected are the permitted exceptions.
   bool is_protected = false;
 
   // §38.12: whether this callback object stands in for a user-defined system

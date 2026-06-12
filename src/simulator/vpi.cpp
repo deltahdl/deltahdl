@@ -1947,10 +1947,13 @@ int VpiContext::Get(int property, VpiHandle obj) {
     }
     return 0;
   }
-  // §38.6: unless otherwise specified, asking vpi_get() for any property of a
-  // protected object is an error. Record the error and return vpiUndefined,
-  // the value vpi_get() yields whenever an error occurs.
-  if (obj->is_protected) {
+  // §37.3.6: unless otherwise specified, asking vpi_get() for a property of a
+  // protected object is an error - it represents code sealed in a decryption
+  // envelope. Access to the vpiType and vpiIsProtected properties is the stated
+  // exception: it shall be permitted for all objects, so those two are let
+  // through to the switch below while every other property records the error and
+  // returns vpiUndefined, the value vpi_get() yields whenever an error occurs.
+  if (obj->is_protected && property != kVpiType && property != vpiIsProtected) {
     last_error_.state = kVpiError;
     last_error_.level = kVpiError;
     last_error_.message = "vpi_get() on a protected object is an error";
@@ -1959,6 +1962,11 @@ int VpiContext::Get(int property, VpiHandle obj) {
   switch (property) {
     case kVpiType:
       return obj->type;
+    // §37.3.6: every object carries a vpiIsProtected Boolean property (not drawn
+    // in the data model diagrams) reporting whether the handle denotes protected
+    // code; TRUE when protected, FALSE otherwise.
+    case vpiIsProtected:
+      return obj->is_protected ? 1 : 0;
     case kVpiSize:
       return obj->size;
     case kVpiDirection:
@@ -2062,6 +2070,16 @@ static const char* VpiTypeConstantName(int type) {
 
 const char* VpiContext::GetStr(int property, VpiHandle obj) {
   if (!obj) return nullptr;
+  // §37.3.6: a protected object's properties are inaccessible unless otherwise
+  // specified, so a string query for one is an error. The vpiType and
+  // vpiIsProtected properties are the exception - permitted for all objects - so
+  // they fall through; any other property records the error and yields no string.
+  if (obj->is_protected && property != kVpiType && property != vpiIsProtected) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message = "vpi_get_str() on a protected object is an error";
+    return nullptr;
+  }
   switch (property) {
     // §37.3.2: every object carries a vpiType property; queried as a string it
     // yields the name of that type constant (see 37.3 for how the names derive).
