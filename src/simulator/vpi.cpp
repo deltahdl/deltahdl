@@ -2547,6 +2547,67 @@ void VpiContext::GetDelays(VpiHandle obj, VpiDelay* delay_p) {
   }
 }
 
+void VpiContext::SeedSaveData(int id, const char* data, int len) {
+  // §38.9 / §38.32: append bytes to the save/restart store for `id`. This
+  // stands in for the production writer vpi_put_data(); it does not touch the
+  // read cursor, so a subsequent first vpi_get_data() reads from offset zero.
+  if (data == nullptr || len <= 0) return;
+  std::vector<char>& bytes = save_data_[id];
+  bytes.insert(bytes.end(), data, data + len);
+}
+
+int VpiContext::GetData(int id, char* data_loc, int num_of_bytes) {
+  // §38.9: legal only from an application routine running for reason
+  // cbStartOfRestart or cbEndOfRestart. Any other context is a failure, which
+  // the routine reports by returning 0.
+  if (current_callback_reason_ != kCbStartOfRestart &&
+      current_callback_reason_ != kCbEndOfRestart) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_get_data() may only be called from a cbStartOfRestart or "
+        "cbEndOfRestart application routine";
+    return 0;
+  }
+
+  // §38.9: a null buffer, a non-positive request, or an id that was never saved
+  // is a failure - return 0.
+  auto it = save_data_.find(id);
+  if (data_loc == nullptr || num_of_bytes <= 0 || it == save_data_.end()) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message = "vpi_get_data() could not retrieve saved data";
+    return 0;
+  }
+
+  const std::vector<char>& bytes = it->second;
+  std::size_t& cursor = save_data_cursor_[id];
+  const std::size_t available =
+      (cursor < bytes.size()) ? bytes.size() - cursor : 0;
+
+  if (static_cast<std::size_t>(num_of_bytes) > available) {
+    // §38.9: asking for more than remains is a warning. Hand back the bytes
+    // that are left, zero-fill the rest of the buffer, advance the cursor past
+    // what was delivered, and return the count actually retrieved.
+    const int retrieved = static_cast<int>(available);
+    for (int i = 0; i < retrieved; ++i) data_loc[i] = bytes[cursor + i];
+    for (int i = retrieved; i < num_of_bytes; ++i) data_loc[i] = '\0';
+    cursor += available;
+    last_error_.state = kVpiWarning;
+    last_error_.level = kVpiWarning;
+    last_error_.message =
+        "vpi_get_data() requested more data than were saved for this id";
+    return retrieved;
+  }
+
+  // §38.9: the normal case (and the explicitly-acceptable case of asking for
+  // fewer bytes than were saved). Copy the request and advance the cursor so a
+  // later call resumes where this one stopped.
+  for (int i = 0; i < num_of_bytes; ++i) data_loc[i] = bytes[cursor + i];
+  cursor += static_cast<std::size_t>(num_of_bytes);
+  return num_of_bytes;
+}
+
 namespace {
 
 // §38.21: split a possibly hierarchical name into its dot-separated path
@@ -3324,7 +3385,14 @@ int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
     if (user_data != nullptr) {
       data.user_data = user_data;
     }
+    // §38.9: record the reason of the routine about to run so that a routine
+    // gated on its callback reason (e.g. vpi_get_data, legal only under
+    // cbStartOfRestart/cbEndOfRestart) can observe it. Restore the prior value
+    // afterward to keep nested dispatches honest.
+    int saved_reason = current_callback_reason_;
+    current_callback_reason_ = data.reason;
     data.cb_rtn(&data);
+    current_callback_reason_ = saved_reason;
     ++fired;
   }
   return fired;
@@ -3949,6 +4017,11 @@ void vpi_get_time(vpiHandle obj, s_vpi_time* time_p) {
 void vpi_get_delays(vpiHandle obj, p_vpi_delay delay_p) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   delta::GetGlobalVpiContext().GetDelays(obj, delay_p);
+}
+
+PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  return delta::GetGlobalVpiContext().GetData(id, dataLoc, numOfBytes);
 }
 
 vpiHandle VpiHandleC(int type, vpiHandle ref) {

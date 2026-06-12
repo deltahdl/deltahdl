@@ -1913,6 +1913,24 @@ class VpiContext {
   // illegal no_of_delays records an error and writes nothing.
   void GetDelays(VpiHandle obj, VpiDelay* delay_p);
 
+  // §38.9: retrieve up to `num_of_bytes` of data saved under the save/restart
+  // `id` into the caller-allocated buffer `data_loc`, returning the number of
+  // bytes actually retrieved. The first call for an id reads from the start of
+  // what was saved; each later call resumes where the previous one stopped. It
+  // is acceptable to ask for fewer bytes than were saved. Asking for more than
+  // remain is a warning: the bytes that are left are delivered, the rest of the
+  // buffer is zero-filled, and the return value is the number actually read.
+  // The routine is only legal from an application routine running for reason
+  // cbStartOfRestart or cbEndOfRestart; any other failure (wrong reason, an
+  // unknown id, or a null buffer) records an error and returns 0.
+  int GetData(int id, char* data_loc, int num_of_bytes);
+
+  // §38.9 / §38.32: populate the save/restart store for `id` with `len` bytes
+  // from `data`, appending to whatever is already stored for that id. The
+  // production writer is vpi_put_data() (§38.32); this entry point stands in for
+  // it so the data vpi_get_data() reads back can be established.
+  void SeedSaveData(int id, const char* data, int len);
+
   // §38.13: set the simulation time unit, as a base-ten exponent of one second
   // (the unit the scheduler counts ticks in). vpi_get_time() uses it both as the
   // scaling reference for a scaled-real result and as the unit reported for a
@@ -2091,6 +2109,20 @@ class VpiContext {
   // vpi_handle(vpiFrame, NULL).
   VpiHandle active_frame_ = nullptr;
   VpiErrorInfo last_error_ = {};
+
+  // §38.9: the reason of the callback whose application routine is currently
+  // executing, or -1 when no callback is running. vpi_get_data() consults this
+  // to enforce that it is only called from a cbStartOfRestart/cbEndOfRestart
+  // routine; DispatchCallbacks sets and restores it around each cb_rtn call.
+  int current_callback_reason_ = -1;
+
+  // §38.9 / §38.32: the save/restart byte store keyed by save/restart id, plus
+  // a per-id read cursor so successive vpi_get_data() calls resume where the
+  // previous one stopped. SeedSaveData appends bytes (standing in for
+  // vpi_put_data, §38.32); GetData reads and advances the cursor.
+  std::unordered_map<int, std::vector<char>> save_data_;
+  std::unordered_map<int, std::size_t> save_data_cursor_;
+
   std::string product_ = "DeltaHDL";
   std::string version_ = "0.1.0";
 
@@ -2688,6 +2720,7 @@ void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p);
 void vpi_get_cb_info(vpiHandle obj, s_cb_data* cb_data_p);
 void vpi_get_time(vpiHandle obj, s_vpi_time* time_p);
 void vpi_get_delays(vpiHandle obj, p_vpi_delay delay_p);
+PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes);
 vpiHandle VpiHandleC(int type, vpiHandle ref);
 vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope);
 vpiHandle VpiHandleByIndexC(vpiHandle parent, int index);
