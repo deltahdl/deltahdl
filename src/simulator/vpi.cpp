@@ -1,5 +1,6 @@
 #include "simulator/vpi.h"
 
+#include <cctype>
 #include <cmath>
 #include <cstdarg>
 #include <cstddef>
@@ -702,6 +703,150 @@ VpiHandle VpiSeqFormalInitExpr(VpiHandle formal) {
     }
   }
   return nullptr;
+}
+
+// ===========================================================================
+// §37.59 Expressions.
+// ===========================================================================
+
+bool VpiIsExprType(int type) {
+  // §37.59: the member kinds the expr class draws - an operation, a constant, a
+  // part-select or indexed part-select, the func/method-func/sys-func calls, a
+  // let expression, and a reference (the concrete simple expression). Variables
+  // and nets are not expressions, so a protected variable still has its
+  // properties guarded (detail 8 carves out only protected expressions).
+  switch (type) {
+    case vpiOperation:
+    case vpiConstant:
+    case vpiPartSelect:
+    case vpiIndexedPartSelect:
+    case vpiFuncCall:
+    case vpiMethodFuncCall:
+    case vpiSysFuncCall:
+    case vpiLetExpr:
+    case vpiRefObj:
+      return true;
+    default:
+      return false;
+  }
+}
+
+std::vector<VpiHandle> VpiMultiConcatOperands(
+    VpiHandle multiplier, const std::vector<VpiHandle>& concat_exprs) {
+  // §37.59 detail 1: the multiplier first, then the concatenation's expressions
+  // in order.
+  std::vector<VpiHandle> operands;
+  operands.reserve(concat_exprs.size() + 1);
+  operands.push_back(multiplier);
+  operands.insert(operands.end(), concat_exprs.begin(), concat_exprs.end());
+  return operands;
+}
+
+std::vector<VpiHandle> VpiMultiAssignmentPatternOperands(
+    VpiHandle multiplier, const std::vector<VpiHandle>& pattern_exprs) {
+  // §37.59 detail 7: the multiplier first, then the assignment pattern's
+  // expressions in order - the same shape as a multiconcat (detail 1) but over a
+  // distinct operator.
+  std::vector<VpiHandle> operands;
+  operands.reserve(pattern_exprs.size() + 1);
+  operands.push_back(multiplier);
+  operands.insert(operands.end(), pattern_exprs.begin(), pattern_exprs.end());
+  return operands;
+}
+
+std::vector<VpiHandle> VpiCastOpOperands(VpiHandle cast_expr) {
+  // §37.59 detail 3: a cast is a unary operation; its only operand is the
+  // expression being cast (the target type is the typespec, not an operand).
+  return {cast_expr};
+}
+
+std::vector<VpiHandle> VpiAssignmentPatternPositionalOperands(
+    int slots, const std::vector<VpiAssignmentPatternEntry>& positioned,
+    VpiHandle default_value) {
+  // §37.59 detail 6: seed every position with the default value, then place each
+  // explicitly positioned entry. Iterating the result reproduces the pattern in
+  // positional notation; nested patterns stay whole because each value is an
+  // opaque handle.
+  size_t count = slots > 0 ? static_cast<size_t>(slots) : 0;
+  std::vector<VpiHandle> operands(count, default_value);
+  for (const auto& entry : positioned) {
+    if (entry.position >= 0 && entry.position < slots) {
+      operands[static_cast<size_t>(entry.position)] = entry.value;
+    }
+  }
+  return operands;
+}
+
+bool VpiTypespecAlwaysAvailable(int op_type, bool is_simple_expr,
+                                bool assignment_pattern_has_type_prefix) {
+  // §37.59 detail 5: guaranteed for a simple expression and a cast operation;
+  // guaranteed for an assignment-pattern operation only when its braces are
+  // prefixed by a data type name. Any other expression is implementation
+  // dependent, so the guarantee does not hold.
+  if (is_simple_expr) return true;
+  if (op_type == vpiCastOp) return true;
+  if (op_type == vpiAssignmentPatternOp ||
+      op_type == vpiMultiAssignmentPatternOp) {
+    return assignment_pattern_has_type_prefix;
+  }
+  return false;
+}
+
+bool VpiPartSelectConstantSelect(
+    const VpiPartSelectConstantSelectQuery& query) {
+  // §37.59 detail 9: all three conditions must hold; otherwise FALSE.
+  return query.parent_constant_select && query.parent_array_has_static_bounds &&
+         query.all_range_exprs_constant;
+}
+
+std::string VpiPartSelectParentExpr(std::string_view select_expr) {
+  // §37.59 detail 10: remove the trailing bracketed selection. After trimming
+  // trailing white space, if the expression ends with ']' the matching '[' is
+  // located (honoring nested brackets) and everything from it onward is dropped,
+  // yielding the parent expression of Table 37-1.
+  size_t end = select_expr.size();
+  while (end > 0 &&
+         std::isspace(static_cast<unsigned char>(select_expr[end - 1]))) {
+    --end;
+  }
+  if (end == 0 || select_expr[end - 1] != ']') {
+    return std::string(select_expr.substr(0, end));
+  }
+  int depth = 0;
+  size_t i = end;
+  while (i > 0) {
+    --i;
+    char c = select_expr[i];
+    if (c == ']') {
+      ++depth;
+    } else if (c == '[') {
+      --depth;
+      if (depth == 0) break;
+    }
+  }
+  return std::string(select_expr.substr(0, i));
+}
+
+std::string VpiDecompileJoin(const std::vector<std::string>& pieces) {
+  // §37.59 detail 2: exactly one space between adjacent operands and operators.
+  // Empty pieces are skipped so the single-space rule never produces a double
+  // space or a leading/trailing space.
+  std::string out;
+  for (const auto& piece : pieces) {
+    if (piece.empty()) continue;
+    if (!out.empty()) out.push_back(' ');
+    out += piece;
+  }
+  return out;
+}
+
+std::string VpiDecompileParenthesize(std::string_view inner) {
+  // §37.59 detail 2: parentheses add no white space - none inside and none
+  // around them.
+  std::string out = "(";
+  out += inner;
+  out.push_back(')');
+  return out;
 }
 
 // ===========================================================================
@@ -2416,7 +2561,11 @@ int VpiContext::Get(int property, VpiHandle obj) {
   // exception: it shall be permitted for all objects, so those two are let
   // through to the switch below while every other property records the error and
   // returns vpiUndefined, the value vpi_get() yields whenever an error occurs.
-  if (obj->is_protected && property != kVpiType && property != vpiIsProtected) {
+  // §37.59 detail 8 carves out one more case: a protected *expression* shall
+  // still permit access to vpiSize, so that property passes through too when the
+  // object is one of the expr-class kinds.
+  if (obj->is_protected && property != kVpiType && property != vpiIsProtected &&
+      !(property == kVpiSize && VpiIsExprType(obj->type))) {
     last_error_.state = kVpiError;
     last_error_.level = kVpiError;
     last_error_.message = "vpi_get() on a protected object is an error";
@@ -2443,6 +2592,15 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // §37.54 (D2): an operation reports its operation type as an int property.
     case vpiOpType:
       return obj->op_type;
+    // §37.59: a constant reports its constant type as an int property
+    // (vpiUnboundedConst for the $ used in assertion ranges, detail 4); an unset
+    // constant reports zero.
+    case vpiConstType:
+      return obj->const_type;
+    // §37.59: an indexed part-select reports its index-part-select type (the
+    // direction of the +:/-: selection) as an int property; zero when unset.
+    case vpiIndexedPartSelectType:
+      return obj->indexed_part_select_type;
     // §37.52 detail 3: an operation reports whether it is the strong version of
     // its operator as a Boolean property (TRUE for the strong form).
     case vpiOpStrong:

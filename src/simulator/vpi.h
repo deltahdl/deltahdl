@@ -233,6 +233,16 @@ struct VpiObject {
   // sequence operators (see VpiIsSequenceExprOpType); zero when unset.
   int op_type = 0;
 
+  // §37.59: the constant type a constant object reports through
+  // vpi_get(vpiConstType). vpiUnboundedConst names the $ value used in assertion
+  // ranges (detail 4). Zero when unset.
+  int const_type = 0;
+
+  // §37.59: the index-part-select type an indexed part-select reports through
+  // vpi_get(vpiIndexedPartSelectType) - whether the selection ascends (+:) or
+  // descends (-:). Zero when unset.
+  int indexed_part_select_type = 0;
+
   // §37.52 detail 3: whether an operation reports the strong version of its
   // operator through vpi_get(vpiOpStrong). Meaningful only for the operators
   // VpiIsOpStrongValidOp accepts (and for sequence expressions); false otherwise.
@@ -633,6 +643,95 @@ VpiHandle VpiSeqFormalTypespec(VpiHandle formal);
 // through vpiExpr. The diagram draws its target as a named event or a sequence
 // expression (§37.54); null when the formal has no initialization expression.
 VpiHandle VpiSeqFormalInitExpr(VpiHandle formal);
+
+// ===========================================================================
+// §37.59 Expressions. The VPI object model for an expression. The expr class
+// groups operations, constants, part-selects and indexed part-selects, the
+// function/method-function/system-function calls and let expressions, and a
+// simple expression (a reference). Every expression carries the vpiDecompile,
+// vpiSize and value properties; an operation carries vpiOpType, a constant
+// vpiConstType, and an indexed part-select vpiIndexedPartSelectType (all applied
+// by VpiContext::Get). The helpers below carry the subclause's normative details.
+// ===========================================================================
+
+// §37.59: the kinds the expr class groups in the data model diagram - an
+// operation, a constant, a part-select or indexed part-select, a func/method-func/
+// sys-func call, a let expression, and a reference (the concrete simple
+// expression). Used to scope detail 8's protected-object carve-out (vpiSize stays
+// accessible on a protected expression) and to classify diagram members.
+bool VpiIsExprType(int type);
+
+// §37.59 detail 1: the operand order of a vpiMultiConcatOp operation. The first
+// operand is the multiplier expression; the remaining operands are the
+// expressions within the concatenation, in source order.
+std::vector<VpiHandle> VpiMultiConcatOperands(
+    VpiHandle multiplier, const std::vector<VpiHandle>& concat_exprs);
+
+// §37.59 detail 7: the operand order of a vpiMultiAssignmentPatternOp operation.
+// As with multiconcat, the first operand is the multiplier expression and the
+// remaining operands are the expressions within the assignment pattern.
+std::vector<VpiHandle> VpiMultiAssignmentPatternOperands(
+    VpiHandle multiplier, const std::vector<VpiHandle>& pattern_exprs);
+
+// §37.59 detail 3: a cast operation (vpiOpType == vpiCastOp) is modeled as a
+// unary operation whose sole operand is the expression being cast; the type cast
+// to is reached through the one-to-one typespec relation (detail 5). The operand
+// list is therefore exactly that single argument.
+std::vector<VpiHandle> VpiCastOpOperands(VpiHandle cast_expr);
+
+// §37.59 detail 6: an assignment pattern (vpiAssignmentPatternOp) resolves its
+// keyed entries (member, type, index, or default keys) to positional notation
+// before vpiOperand iterates it. One entry assigns a value to a target position.
+struct VpiAssignmentPatternEntry {
+  int position = 0;          // 0-based target position this entry fills
+  VpiHandle value = nullptr;
+};
+
+// §37.59 detail 6: build the positional operand list of an assignment pattern.
+// `slots` is the number of target positions (struct members or array elements);
+// each positioned entry fills its position, and any position left unassigned takes
+// `default_value`. The result is the value of position 0..slots-1 in order. Values
+// stay opaque handles, so a nested assignment-pattern operand is preserved as a
+// single handle - nesting is not flattened.
+std::vector<VpiHandle> VpiAssignmentPatternPositionalOperands(
+    int slots, const std::vector<VpiAssignmentPatternEntry>& positioned,
+    VpiHandle default_value);
+
+// §37.59 detail 5: the one-to-one typespec relation of an expression is always
+// available for a cast operation, for a simple expression, and for an assignment-
+// pattern operation (vpiAssignmentPatternOp/vpiMultiAssignmentPatternOp) whose
+// curly braces are prefixed by a data type name. For every other expression it is
+// implementation dependent, so the guarantee does not hold. Returns whether a
+// typespec is guaranteed to be available.
+bool VpiTypespecAlwaysAvailable(int op_type, bool is_simple_expr,
+                                bool assignment_pattern_has_type_prefix);
+
+// §37.59 detail 9: vpiConstantSelect of a part-select or indexed part-select. It
+// is TRUE only when vpiConstantSelect is TRUE for the parent, the parent is a
+// packed or unpacked array with static bounds, and every range expression of the
+// (indexed) part-select is an elaboration-time constant; otherwise FALSE.
+struct VpiPartSelectConstantSelectQuery {
+  bool parent_constant_select = false;
+  bool parent_array_has_static_bounds = false;
+  bool all_range_exprs_constant = false;
+};
+bool VpiPartSelectConstantSelect(const VpiPartSelectConstantSelectQuery& query);
+
+// §37.59 detail 10: the vpiParent of a part-select or indexed part-select is the
+// expression formed by removing the part-select range - the expression with its
+// trailing bracketed selection dropped (Table 37-1). Given the decompiled select
+// expression, returns the parent's decompiled form.
+std::string VpiPartSelectParentExpr(std::string_view select_expr);
+
+// §37.59 detail 2: vpiDecompile renders an expression as a functionally equivalent
+// string with each operand and operator separated by a single space. Joins the
+// pieces with exactly one space, skipping empty pieces so no double space appears.
+std::string VpiDecompileJoin(const std::vector<std::string>& pieces);
+
+// §37.59 detail 2: parentheses are added to a decompiled subexpression only to
+// preserve precedence and introduce no white space - none inside the parentheses
+// and none around them. Wraps `inner` accordingly.
+std::string VpiDecompileParenthesize(std::string_view inner);
 
 // ===========================================================================
 // §37.43 Frames. The VPI object model for a frame - a dynamically activated
