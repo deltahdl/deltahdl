@@ -1079,6 +1079,30 @@ VpiHandle VpiLoopConditionExpr(VpiHandle loop) {
   return nullptr;
 }
 
+bool VpiIsWaitType(int type) {
+  // §37.67: the wait statements the diagram groups under the abstract "waits"
+  // label - a wait, an ordered wait, and a wait fork. All three reach a body
+  // statement through the generic vpiStmt edge; the wait and ordered wait
+  // additionally reach a controlling condition through vpiCondition.
+  return type == vpiWait || type == vpiOrderedWait || type == vpiWaitFork;
+}
+
+VpiHandle VpiWaitConditionExpr(VpiHandle wait) {
+  // §37.67: a wait or ordered wait statement reaches its controlling condition
+  // through vpiCondition. The diagram routes that edge to either an expression or
+  // a sequence instance, so the condition is the first child whose own type is an
+  // expression kind or a sequence instance - never the vpiCondition relation tag
+  // itself, which is why the generic child walk cannot serve it. Null when none is
+  // attached, as for a wait fork, which draws no condition edge.
+  if (!wait) return nullptr;
+  for (auto* child : wait->children) {
+    if (VpiIsExprType(child->type) || child->type == vpiSequenceInst) {
+      return child;
+    }
+  }
+  return nullptr;
+}
+
 VpiHandle VpiDelayControlStmt(VpiHandle delay_control) {
   // §37.68 detail 1: a delay control reaches the statement it guards through
   // vpiStmt. When the delay control is associated with an assignment - i.e. it

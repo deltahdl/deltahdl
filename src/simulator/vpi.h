@@ -1343,6 +1343,22 @@ bool VpiIsWhileOrRepeatType(int type);
 // public vpi_handle(vpiCondition, while/repeat) dispatch.
 VpiHandle VpiLoopConditionExpr(VpiHandle loop);
 
+// §37.67 Waits: whether an object kind is one of the wait statements the diagram
+// groups under "waits" - a wait, an ordered wait, or a wait fork. The grouping
+// shares a body statement (vpiStmt) and, for the wait and ordered wait, a
+// controlling condition (vpiCondition).
+bool VpiIsWaitType(int type);
+
+// §37.67 Waits: the controlling condition a wait or ordered wait statement reaches
+// through vpiCondition. The condition may be either an expression or a sequence
+// instance; either way its own type is an expression/sequence kind rather than the
+// vpiCondition relation tag, so it is found as the wait's first such child. Null
+// when none is attached (as for a wait fork, which draws no condition edge). This
+// is a dedicated helper rather than a vpi_handle dispatch case: the public
+// vpiCondition dispatch is scoped to the loop statements of §37.66, which leaves a
+// wait's condition to this helper.
+VpiHandle VpiWaitConditionExpr(VpiHandle wait);
+
 // §37.12 detail 1: whether an object kind is a block item declaration - a
 // variable declaration or a type declaration. These are the declarations whose
 // presence makes an unnamed begin or unnamed fork a scope.
