@@ -1565,6 +1565,32 @@ bool VpiIsPackedArrayVarElementType(int type);
 bool VpiVariableIsPackedArrayMember(VpiHandle var);
 
 // ===========================================================================
+// §37.19 Variable select. A var select is a variable reference qualified by one
+// or more index expressions (vpiIndex) that reach into an unpacked array var
+// (its vpiParent). Its name/full name (§37.17 detail 28), size (§37.17 detail
+// 10), value (§38.34) and typespec relations are the generic variable
+// machinery; the one normative detail owned here is when the var select's
+// vpiConstantSelect property is TRUE.
+// ===========================================================================
+
+// §37.19 detail 1: the inputs vpiConstantSelect reads for a var select.
+struct VpiVarSelectConstantSelectQuery {
+  bool all_indices_constant = false;          // every index expression of the
+                                              // select is an elaboration-time
+                                              // constant expression
+  bool parent_is_unpacked_static_array =      // the select's parent is an
+      false;                                  // unpacked array with static bounds
+  bool parent_constant_select = false;        // vpiConstantSelect is TRUE for
+                                              // the select's parent
+};
+
+// §37.19 detail 1: vpiConstantSelect of a var select. TRUE only when every index
+// expression of the select is an elaboration-time constant, the parent is an
+// unpacked array with static bounds, and vpiConstantSelect is itself TRUE for
+// that parent; otherwise FALSE.
+bool VpiVarSelectConstantSelect(const VpiVarSelectConstantSelectQuery& query);
+
+// ===========================================================================
 // §37.25 Typespec. The VPI object model for a type specification. Each helper
 // applies one of the clause's numbered "Details"; the figure's range relations
 // route through §37.22 and a member's expr role reuses §37.59's expr class. The

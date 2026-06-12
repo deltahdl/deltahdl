@@ -1452,6 +1452,15 @@ bool VpiVariableIsPackedArrayMember(VpiHandle var) {
   return VpiIsPackedArrayVarElementType(var->type);
 }
 
+bool VpiVarSelectConstantSelect(const VpiVarSelectConstantSelectQuery& query) {
+  // §37.19 detail 1: a var select is a constant select only when all three
+  // conditions hold together - every index is an elaboration-time constant, the
+  // parent is an unpacked array with static bounds, and the parent is itself a
+  // constant select. If any condition fails the property is FALSE.
+  return query.all_indices_constant && query.parent_is_unpacked_static_array &&
+         query.parent_constant_select;
+}
+
 VpiHandle VpiVariableInitExpr(VpiHandle var) {
   // §37.17 detail 8: when a variable has an initialization expression, it is
   // reached through vpiExpr - modeled as the variable's first child. A variable
