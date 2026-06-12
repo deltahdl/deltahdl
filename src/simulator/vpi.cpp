@@ -1661,29 +1661,110 @@ void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
   }
 }
 
-void VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
-                          int ) {
-  if (!obj || !value) return;
+VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
+                               int flags) {
+  if (!obj) return nullptr;
+
+  // §38.34: vpiReturnEvent is an independent bit mask layered on top of the
+  // delay-mode selector that lives in the low bits of the flags word.
+  bool return_event = (flags & vpiReturnEvent) != 0;
+  int mode = flags & ~vpiReturnEvent;
+
+  // §38.34: vpiCancelEvent removes a previously scheduled event. The object
+  // must be a vpiSchedEvent handle, and value_p and time_p are not needed. It
+  // is not an error to cancel an event that has already occurred, so a handle
+  // that is no longer scheduled is simply left alone. Cancelling removes the
+  // event from the queue; the handle itself remains for the caller to free.
+  if (mode == vpiCancelEvent) {
+    if (obj->type == vpiSchedEvent) obj->scheduled = false;
+    return nullptr;
+  }
+
+  // §38.34: vpiNoDelay, vpiForceFlag, and vpiReleaseFlag all act immediately and
+  // ignore time_p; every other mode takes its delay from time_p, where a delay
+  // is present when a nonzero time is supplied.
+  bool immediate = (mode == vpiNoDelay || mode == vpiForceFlag ||
+                    mode == vpiReleaseFlag);
+  bool has_delay = !immediate && time &&
+                   (time->low != 0 || time->high != 0 || time->real != 0.0);
+
+  // §38.34: a sequential UDP is always set with no delay, no matter what delay
+  // the primitive instance carries, so a value may be put to it only with the
+  // vpiNoDelay flag. Supplying one of the scheduled delay modes instead is an
+  // error, and the put is rejected.
+  if (obj->type == vpiSeqPrim &&
+      (mode == vpiInertialDelay || mode == vpiTransportDelay ||
+       mode == vpiPureTransportDelay)) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_put_value(): a sequential UDP must be written with the vpiNoDelay "
+        "flag";
+    return nullptr;
+  }
 
   // §37.43 detail 3: it is illegal to put a value with a delay on an automatic
   // variable. A delay would schedule the update for a future time, but the
-  // automatic object's storage may no longer exist by then. A delay is present
-  // when a nonzero time is supplied; reject the put rather than applying it.
-  bool has_delay =
-      time && (time->low != 0 || time->high != 0 || time->real != 0.0);
+  // automatic object's storage may no longer exist by then. Reject the put
+  // rather than applying it.
   if (obj->automatic && has_delay) {
     last_error_.state = kVpiError;
     last_error_.level = kVpiError;
     last_error_.message =
         "vpi_put_value(): a value with a delay may not be put on an automatic "
         "variable";
-    return;
+    return nullptr;
   }
 
-  if (!obj->var && !obj->net) return;
+  if (!obj->var && !obj->net) return nullptr;
+
+  if (!obj->var) {
+    if (scheduler_) scheduler_->NoteWriteAttempt();
+    return nullptr;
+  }
+
+  // §38.34: putting to a vpiNamedEvent toggles (triggers) the named event. Such
+  // an object needs no value, so value_p may be NULL and is not consulted.
+  if (obj->var->is_event) {
+    if (scheduler_)
+      obj->var->triggered_ticks = scheduler_->CurrentTime().ticks;
+    return nullptr;
+  }
+
+  if (!value) return nullptr;
+
+  // §38.34: it is illegal to give the value the vpiStringVal format when the
+  // target is a real object. Record the error and leave the object unchanged.
+  if (value->format == kVpiStringVal && obj->var->value.is_real) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_put_value(): vpiStringVal is not a legal format for a real object";
+    return nullptr;
+  }
+
+  // §38.34: it is illegal to give the value the vpiStrengthVal format when the
+  // target is a vector object (more than one bit wide).
+  if (value->format == kVpiStrengthVal && obj->var->value.width > 1) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_put_value(): vpiStrengthVal is not a legal format for a vector "
+        "object";
+    return nullptr;
+  }
+
+  // §38.34: vpiReleaseFlag releases a forced value, the same operation as the
+  // procedural release of §10.6.2, and writes the object's post-release value
+  // back through value_p so the caller can observe what the object settled to.
+  if (mode == vpiReleaseFlag) {
+    obj->var->is_forced = false;
+    GetValue(obj, value);
+    return nullptr;
+  }
 
   if (scheduler_) scheduler_->NoteWriteAttempt();
-  if (!obj->var) return;
+
   if (value->format == kVpiIntVal) {
     auto new_val = static_cast<uint64_t>(value->value.integer);
     obj->var->value.words[0].aval = new_val;
@@ -1697,6 +1778,24 @@ void VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
     obj->var->value.words[0].aval = (s == kVpi1 || s == kVpiZ) ? 1 : 0;
     obj->var->value.words[0].bval = (s == kVpiX || s == kVpiZ) ? 1 : 0;
   }
+
+  // §38.34: vpiForceFlag performs a procedural force (§10.6.2): the supplied
+  // value takes effect now and is held as the forced value.
+  if (mode == vpiForceFlag) {
+    obj->var->is_forced = true;
+    obj->var->forced_value = obj->var->value;
+  }
+
+  // §38.34: a handle to the scheduled event is returned only when vpiReturnEvent
+  // was requested and a delay actually scheduled an event; in every other case
+  // (no bit mask, no delay, or nothing scheduled) the return value is NULL.
+  if (return_event && has_delay) {
+    auto* ev = AllocObject();
+    ev->type = vpiSchedEvent;
+    ev->scheduled = true;
+    return ev;
+  }
+  return nullptr;
 }
 
 VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
@@ -1871,6 +1970,10 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // a Boolean property (the same vpiActive property, shared by both models).
     case vpiActive:
       return obj->active ? 1 : 0;
+    // §38.34: a scheduled-event handle reports whether its event is still in the
+    // event queue as a Boolean property; cancelling the event clears it.
+    case vpiScheduled:
+      return obj->scheduled ? 1 : 0;
     // §37.50: a cover reports whether it covers a sequence (rather than a
     // property) as a Boolean property.
     case vpiIsCoverSequence:
@@ -2256,8 +2359,7 @@ void vpi_get_value(vpiHandle obj, s_vpi_value* value) {
 vpiHandle vpi_put_value(vpiHandle obj, s_vpi_value* value, s_vpi_time* time,
                         int flags) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
-  delta::GetGlobalVpiContext().PutValue(obj, value, time, flags);
-  return obj;
+  return delta::GetGlobalVpiContext().PutValue(obj, value, time, flags);
 }
 
 vpiHandle vpi_register_cb(s_cb_data* data) {

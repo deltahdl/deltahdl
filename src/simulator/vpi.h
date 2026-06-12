@@ -178,6 +178,12 @@ struct VpiObject {
   // callback from a simulation callback, which is also a vpiCallback object.
   bool is_systf = false;
 
+  // §38.34: whether a vpiSchedEvent handle still names an event sitting in the
+  // event queue. vpi_put_value() with vpiReturnEvent hands back such a handle
+  // marked scheduled; vpi_get(vpiScheduled) reports this flag, and
+  // vpi_put_value() with vpiCancelEvent clears it when the event is removed.
+  bool scheduled = false;
+
   // §37.10 detail 6: items that vpi_handle_by_name() must not be able to reach.
   // An imported item is brought into scope by an import declaration; a
   // compilation-unit object lives directly in the $unit compilation-unit scope.
@@ -1153,7 +1159,7 @@ class VpiContext {
   VpiHandle Iterate(int type, VpiHandle ref);
   VpiHandle Scan(VpiHandle iterator);
   void GetValue(VpiHandle obj, VpiValue* value);
-  void PutValue(VpiHandle obj, VpiValue* value, VpiTime* time, int flags);
+  VpiHandle PutValue(VpiHandle obj, VpiValue* value, VpiTime* time, int flags);
   VpiHandle RegisterCb(VpiCbData* data);
   int RemoveCb(VpiHandle cb_handle);
   int ExecuteCallback(VpiHandle cb_handle);
