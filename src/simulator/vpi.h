@@ -346,6 +346,18 @@ struct VpiObject {
   // (vpi_iterate(vpiExpr, item)) returns NULL and it groups no conditions.
   bool default_case_item = false;
 
+  // §37.35 detail 4: whether a primitive is an element within a primitive array.
+  // It gates the vpiIndex transition: an array-member primitive reaches the
+  // index expression that selects it within the array through that transition,
+  // while a primitive that is not part of an array returns NULL there.
+  bool array_member = false;
+
+  // §37.35 detail 4: for an array-member primitive, the index expression the
+  // vpiIndex transition reaches - the expr that locates the primitive within its
+  // primitive array. The target's own type is an expr kind (not vpiIndex), so it
+  // is held as a designated pointer rather than found by the generic child walk.
+  VpiObject* index_expr = nullptr;
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 

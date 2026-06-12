@@ -3074,6 +3074,15 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return VpiDelayControlStmt(ref);
   }
 
+  // §37.35 detail 4: vpiIndex from a primitive reaches the index expression that
+  // locates the primitive within its primitive array. The transition is only
+  // meaningful for an array-member primitive; a primitive that is not part of a
+  // primitive array reports NULL here rather than letting the generic walk find
+  // some other expr child.
+  if (type == vpiIndex && VpiObjectIsPrimitive(ref->type)) {
+    return ref->array_member ? ref->index_expr : nullptr;
+  }
+
   if (ref->parent && ref->parent->type == type) return ref->parent;
 
   for (auto* child : ref->children) {
@@ -3360,6 +3369,19 @@ void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
 VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
                                int flags) {
   if (!obj) return nullptr;
+
+  // §37.35 detail 2: among primitives, vpi_put_value() may be applied only to a
+  // sequential UDP. Putting a value to any other primitive kind - a gate,
+  // switch, combinational UDP, or a generic primitive - is not allowed, so the
+  // put is rejected before any value is written. (The complementary delay-mode
+  // restriction on a sequential UDP itself is checked further below.)
+  if (VpiObjectIsPrimitive(obj->type) && obj->type != vpiSeqPrim) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_put_value(): only a sequential UDP primitive may be written";
+    return nullptr;
+  }
 
   // §38.34: vpiReturnEvent is an independent bit mask layered on top of the
   // delay-mode selector that lives in the low bits of the flags word.
@@ -3689,9 +3711,16 @@ int VpiContext::Get(int property, VpiHandle obj) {
       return obj->is_protected ? 1 : 0;
     case kVpiSize:
       // §37.14 detail 11: a null port reports size 0; any other port reports its
-      // bit width. Every other object reports its own stored size.
+      // bit width. Every other object reports its own stored size. §37.35 detail
+      // 1: for a primitive that stored size is its number of inputs, so vpiSize
+      // returns the input count through this same path.
       if (obj->type == vpiPort) return VpiPortSize(obj->null_port, obj->size);
       return obj->size;
+    // §37.35 detail 3: a prim term reports its terminal index through
+    // vpiTermIndex, which fixes the terminal order; the first terminal carries
+    // index zero.
+    case vpiTermIndex:
+      return obj->index;
     case kVpiDirection:
       return obj->direction;
     // §37.14 detail 1: a port reports its port type (vpiPort/vpiInterfacePort/
