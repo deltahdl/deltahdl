@@ -705,6 +705,52 @@ VpiHandle VpiSeqFormalInitExpr(VpiHandle formal) {
 }
 
 // ===========================================================================
+// §37.44 Threads.
+// ===========================================================================
+
+VpiHandle VpiThreadParent(VpiHandle thread) {
+  // §37.44 (vpiParent -> thread): a thread reaches the thread that spawned it
+  // through its parent link, provided that parent is itself a thread. A root
+  // thread (no parent) and a null handle report none.
+  if (!thread || !thread->parent) return nullptr;
+  return thread->parent->type == vpiThread ? thread->parent : nullptr;
+}
+
+VpiHandle VpiThreadOrigin(VpiHandle thread) {
+  // §37.44 (vpiOrigin -> stmt): the originating statement of a thread, modeled
+  // as its first statement child. Null when the handle is null or no origin
+  // statement is attached.
+  if (!thread) return nullptr;
+  for (auto* child : thread->children) {
+    if (child->type == vpiStmt) return child;
+  }
+  return nullptr;
+}
+
+VpiHandle VpiThreadFrame(VpiHandle thread) {
+  // §37.44 (frame -- thread / detail 1): the frame currently active in the
+  // thread, modeled as its first frame child. As tasks and functions are
+  // entered new frames are activated, but at most one is active at a time, so a
+  // single frame is reported. Null for a null handle or a thread with no frame.
+  if (!thread) return nullptr;
+  for (auto* child : thread->children) {
+    if (child->type == vpiFrame) return child;
+  }
+  return nullptr;
+}
+
+std::vector<VpiHandle> VpiThreadThreads(VpiHandle thread) {
+  // §37.44 (thread one-to-many thread): the child threads this thread spawned,
+  // as the thread iteration yields them - its thread children, in order.
+  std::vector<VpiHandle> threads;
+  if (!thread) return threads;
+  for (auto* child : thread->children) {
+    if (child->type == vpiThread) threads.push_back(child);
+  }
+  return threads;
+}
+
+// ===========================================================================
 // §37.22 Object range (shared with §37.17's range relations).
 // ===========================================================================
 
@@ -1703,6 +1749,10 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // its operator as a Boolean property (TRUE for the strong form).
     case vpiOpStrong:
       return obj->op_strong ? 1 : 0;
+    // §37.44: a thread (or frame) reports whether it is the active one as a
+    // Boolean property.
+    case vpiActive:
+      return obj->active ? 1 : 0;
     // §37.50: a cover reports whether it covers a sequence (rather than a
     // property) as a Boolean property.
     case vpiIsCoverSequence:

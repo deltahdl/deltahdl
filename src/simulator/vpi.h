@@ -220,6 +220,12 @@ struct VpiObject {
   // the actual event either way; this flag only records which form produced it.
   bool clock_inferred = false;
 
+  // §37.44: whether a thread (or frame) is the active one, reported through
+  // vpi_get(vpiActive). A thread that currently holds execution is active; an
+  // inactive thread is one that is suspended or otherwise not running. False by
+  // default.
+  bool active = false;
+
   // §37.49: the source span an assertion object occupies. start/column/end are
   // reported through vpi_get(vpiStartLine/vpiColumn/vpiEndLine/vpiEndColumn) and
   // the file through vpi_get_str(vpiFile); the assertion name reuses `name`.
@@ -591,6 +597,37 @@ VpiHandle VpiSeqFormalTypespec(VpiHandle formal);
 // through vpiExpr. The diagram draws its target as a named event or a sequence
 // expression (§37.54); null when the formal has no initialization expression.
 VpiHandle VpiSeqFormalInitExpr(VpiHandle formal);
+
+// ===========================================================================
+// §37.44 Threads. The VPI object model for a thread - a SystemVerilog process
+// such as an always procedure or a branch of a fork construct (detail 1). The
+// diagram gives a thread one Boolean property (vpiActive, applied by
+// VpiContext::Get) and four relations modeled by the helpers below. Thread
+// specific callbacks are §38.36.1's (detail 2).
+// ===========================================================================
+
+// §37.44 (vpiParent -> thread): the thread that spawned this one, reached up the
+// parent chain. Returns the thread's parent when that parent is itself a thread;
+// null for a null handle, a root thread with no parent, or a parent that is not
+// a thread.
+VpiHandle VpiThreadParent(VpiHandle thread);
+
+// §37.44 (vpiOrigin -> stmt): the statement a thread originated from, modeled as
+// the thread's first statement child. Null for a null handle or a thread with no
+// origin statement attached.
+VpiHandle VpiThreadOrigin(VpiHandle thread);
+
+// §37.44 (frame -- thread / detail 1): the active frame of a thread. As a thread
+// descends a call chain of tasks and functions a new frame is activated for each
+// one entered, and at most one is active at a time (§37.43); this returns that
+// frame, modeled as the thread's first frame child. Null for a null handle or a
+// thread with no frame attached.
+VpiHandle VpiThreadFrame(VpiHandle thread);
+
+// §37.44 (thread one-to-many thread): the threads spawned by this thread, as the
+// iteration over its thread children yields them, in order. A null handle yields
+// none.
+std::vector<VpiHandle> VpiThreadThreads(VpiHandle thread);
 
 // ===========================================================================
 // §37.22 Object range. A range object carries the bounds of one array
