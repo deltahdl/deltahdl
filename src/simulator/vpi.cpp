@@ -1967,8 +1967,44 @@ VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
   return current;
 }
 
+bool VpiHasAccessByIndex(int type) {
+  switch (type) {
+    case kVpiModule:         // §38.19: module indexes its ports
+    case kVpiPort:           // a port indexes its bits
+    case kVpiNet:            // a net indexes its bits
+    case kVpiReg:            // a reg indexes its bits
+    case vpiMemory:          // a memory indexes its words
+    case vpiNetArray:        // an array net indexes its elements
+    case vpiRegArray:        // a reg array indexes its elements
+    case vpiPackedArrayVar:  // a packed array indexes its elements
+      return true;
+    default:
+      return false;
+  }
+}
+
 VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
   if (!parent) return nullptr;
+
+  // §38.19: unless otherwise specified, calling vpi_handle_by_index() for a
+  // protected reference object is an error. Record it (§38.2) and hand back a
+  // null handle.
+  if (parent->is_protected) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_handle_by_index() on a protected object is an error";
+    return nullptr;
+  }
+
+  // §38.19: the reference object must have the access-by-index property. An
+  // object whose type offers no index-selected relationship cannot anchor an
+  // index select, so there is no handle to return.
+  if (!VpiHasAccessByIndex(parent->type)) return nullptr;
+
+  // §38.19: return the sub-object selected by the index number. When no
+  // sub-object carries the index, the selection is not a legal SystemVerilog
+  // index select expression, so the result is a null handle.
   for (auto* child : parent->children) {
     if (child->index == index) return child;
   }
