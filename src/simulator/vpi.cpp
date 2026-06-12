@@ -179,6 +179,23 @@ bool VpiIsConstraintItemType(int type) {
   }
 }
 
+bool VpiIsConstraintExprContainerType(int type) {
+  // §37.38 detail 3: the constraint-expression kinds that hold a body of further
+  // constraint expressions reachable through the vpiConstraintExpr iteration - an
+  // implication, a constraint if, a constraint if-else, or a foreach constraint.
+  // Any other constraint expression (a distribution, a soft disable, a bare
+  // expression) holds no such body.
+  switch (type) {
+    case vpiImplication:
+    case vpiConstrIf:
+    case vpiConstrIfElse:
+    case vpiConstrForEach:
+      return true;
+    default:
+      return false;
+  }
+}
+
 bool VpiIsClassMethodType(int type) {
   // §37.31 detail 1: the vpiMethods relation of a class defn reaches the class's
   // methods, which the diagram draws as the "task func" node - a task or a
@@ -3766,6 +3783,16 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   if (type == vpiInTerm && ref->type == vpiDelayDevice) return ref->in_term;
   if (type == vpiOutTerm && ref->type == vpiDelayDevice) return ref->out_term;
 
+  // §37.38 detail 1: a foreach constraint's vpiVariables relation reaches the
+  // variable that represents the array being indexed. The array variable's own
+  // type is a variable kind, not the relation enum, so the generic walk below
+  // cannot find it; it is held as a designated pointer. The relation is specific
+  // to a foreach constraint, so it does not pick up a stray variable on any other
+  // object.
+  if (type == vpiVariables && ref->type == vpiConstrForEach) {
+    return ref->foreach_array;
+  }
+
   // §37.39 detail 1: vpiModule from a specify-block path (mod path) is kept for
   // backward compatibility, but it shall report NULL when that specify block
   // lives in an interface rather than a module. Walk outward to the innermost
@@ -4128,6 +4155,23 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   // children whose own type is literally vpiExpr, so it is matched specially.
   bool tchk_expr_iteration = ref && ref->type == vpiTchk && type == vpiExpr;
 
+  // §37.38 detail 2: vpiLoopVars on a foreach constraint walks the constraint's
+  // index variables in left-to-right order. The objects reached are the index
+  // variables (and null-op placeholders for skipped positions), not children
+  // whose own type is literally vpiLoopVars, so the iteration is built from the
+  // constraint's dedicated loop-var list rather than matched by type.
+  bool constr_foreach_loopvars_iteration =
+      ref && ref->type == vpiConstrForEach && type == vpiLoopVars;
+
+  // §37.38 detail 3: vpiConstraintExpr on a constraint-expression container - an
+  // implication, constraint if, constraint if-else, or foreach constraint -
+  // walks the body expressions it holds in source order. They are reached from a
+  // dedicated body list, not matched as children whose own type is
+  // vpiConstraintExpr, so this iteration is recognized specially.
+  bool constraint_expr_iteration =
+      ref && type == vpiConstraintExpr &&
+      VpiIsConstraintExprContainerType(ref->type);
+
   // §38.23: unless otherwise specified, iterating the relationships of a
   // protected object is an error, so no iterator is produced. §37.42 detail 10
   // carves out one exception: a protected system task or function call shall
@@ -4295,6 +4339,27 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
     // case. Any other variable contributes only its own direct drivers/loads.
     CollectVariableDriversOrLoads(ref, variable_driver_iteration,
                                   VpiIsStructUnionOrClassVar(ref->type), iter);
+  } else if (constr_foreach_loopvars_iteration) {
+    // §37.38 detail 2: hand back the foreach constraint's index variables in
+    // left-to-right order. A skipped index position - stored as a null slot in
+    // the list - is reported as a freshly built vpiOperation whose operator is
+    // the null operation, so the caller still sees a placeholder occupying that
+    // slot (the same null-op convention §37.42 uses for an omitted argument).
+    for (auto* loop_var : ref->loop_vars) {
+      if (loop_var) {
+        iter->children.push_back(loop_var);
+      } else {
+        VpiHandle placeholder = AllocObject();
+        VpiMakeEmptyArgument(placeholder);
+        iter->children.push_back(placeholder);
+      }
+    }
+  } else if (constraint_expr_iteration) {
+    // §37.38 detail 3: hand back the container's body constraint expressions in
+    // the order they occur in the implication, if, if-else, or foreach.
+    for (auto* expr : ref->constraint_exprs) {
+      iter->children.push_back(expr);
+    }
   } else if (ref) {
     for (auto* child : ref->children) {
       if (!matches(child->type)) continue;

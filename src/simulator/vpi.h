@@ -576,6 +576,29 @@ struct VpiObject {
   // device or delay term reports.
   int delay_type = 0;
 
+  // §37.38 detail 1: the variable a foreach constraint indexes. A foreach
+  // constraint reaches it through the vpiVariables relation, where it represents
+  // the array being iterated over. Its own type is a variable kind (an array
+  // variable), not the relation enum, so it is held as a designated pointer
+  // rather than found by a type match. Null by default - only a foreach
+  // constraint carries one.
+  VpiObject* foreach_array = nullptr;
+
+  // §37.38 detail 2: the index variables of a foreach constraint, in left-to-
+  // right declaration order, as walked by the vpiLoopVars iteration. A null
+  // entry marks an index position that was skipped in the foreach header; the
+  // iteration represents such a position with a freshly built vpiOperation whose
+  // operator is the null operation, so callers see a placeholder in that slot.
+  // Empty for any object that is not a foreach constraint.
+  std::vector<VpiObject*> loop_vars;
+
+  // §37.38 detail 3: the constraint expressions held in the body of a
+  // constraint-expression container - an implication, a constraint if, a
+  // constraint if-else, or a foreach constraint - in the order they occur. The
+  // vpiConstraintExpr iteration walks this list so the expressions come back in
+  // source order. Empty for an object that holds no such body.
+  std::vector<VpiObject*> constraint_exprs;
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 
@@ -732,6 +755,12 @@ bool VpiIsAssertionType(int type);
 // expression. An object qualifies as a constraint item exactly when its type is
 // one of these.
 bool VpiIsConstraintItemType(int type);
+
+// §37.38 detail 3: a constraint-expression container is the kind of constraint
+// expression whose vpiConstraintExpr iteration reaches the nested expressions it
+// holds - an implication, a constraint if, a constraint if-else, or a foreach
+// constraint. An object qualifies exactly when its type is one of these.
+bool VpiIsConstraintExprContainerType(int type);
 
 // §37.31 detail 1: a class method is the kind of object the vpiMethods iteration
 // of a class defn reaches - a task or a function declared as a class item. An
