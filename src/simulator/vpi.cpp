@@ -3977,6 +3977,37 @@ VpiHandle VpiContext::HandleMulti(int type, VpiHandle ref1, VpiHandle ref2) {
   return result;
 }
 
+// §38.3: resolve a handle to the representative of the underlying simulation
+// object it denotes by following the same_object_as chain. A bounded walk
+// guards against an accidental cycle; the chains the simulator builds are short
+// (a handle aliases at most one representative).
+static VpiObject* ResolveSameObject(VpiObject* obj) {
+  for (int steps = 0; obj && obj->same_object_as && steps < 1000; ++steps) {
+    obj = obj->same_object_as;
+  }
+  return obj;
+}
+
+int VpiContext::CompareObjects(VpiHandle obj1, VpiHandle obj2) {
+  // §38.3: a null handle names no object, so it can never refer to the same
+  // object as anything.
+  if (obj1 == nullptr || obj2 == nullptr) return 0;
+
+  VpiObject* a = ResolveSameObject(obj1);
+  VpiObject* b = ResolveSameObject(obj2);
+
+  // §38.3: the comparison holds only "provided that the simulation object
+  // exists". A handle whose underlying object is absent (e.g. a class handle
+  // that is still null) is never equal to anything, even to itself.
+  if (!a->object_exists || !b->object_exists) return 0;
+
+  // §38.3: TRUE when both handles resolve to the same underlying object. The
+  // representatives are compared, not the original handle pointers, so two
+  // distinct handles that alias one object still compare equal - object
+  // equivalence cannot be settled by a C "==" of the handles.
+  return a == b ? 1 : 0;
+}
+
 VpiHandle VpiContext::CreateModule(std::string_view name,
                                    std::string full_name) {
   auto* obj = AllocObject();
@@ -4239,6 +4270,11 @@ vpiHandle VpiHandleByMultiIndexC(vpiHandle parent, int num_index,
 vpiHandle VpiHandleMultiC(int type, vpiHandle ref1, vpiHandle ref2) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().HandleMulti(type, ref1, ref2);
+}
+
+int VpiCompareObjectsC(vpiHandle obj1, vpiHandle obj2) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  return delta::GetGlobalVpiContext().CompareObjects(obj1, obj2);
 }
 
 vpiHandle vpi_iterate(int type, vpiHandle ref) {

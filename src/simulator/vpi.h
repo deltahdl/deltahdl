@@ -339,6 +339,22 @@ struct VpiObject {
   // iteration was created over. It is reported back through the vpiUse relation,
   // so vpi_handle(vpiUse, iterator) recovers the object the iterator walks.
   VpiObject* iter_ref = nullptr;
+
+  // §38.3: the underlying simulation object this handle denotes, when that is
+  // not the handle object itself. Two distinct handles can name one and the
+  // same object - e.g. a packed-struct bit reachable both as ps[0] and as
+  // ps.b[7], or an expression i[j] that resolves to the array element i[0].
+  // vpi_compare_objects() follows this link to a common representative, so it
+  // reports such handles equal even though a C "==" of the handle pointers
+  // would not. Null means the handle is its own representative.
+  VpiObject* same_object_as = nullptr;
+
+  // §38.3: whether the underlying simulation object this handle denotes exists
+  // at the time it is queried. vpi_compare_objects() compares objects only
+  // "provided that the simulation object exists", so a handle whose object is
+  // absent (for instance a class handle that is still null) never compares
+  // equal. True by default - most objects exist for the whole simulation.
+  bool object_exists = true;
 };
 
 using VpiHandle = VpiObject*;
@@ -2050,6 +2066,14 @@ class VpiContext {
   void GetVlogInfo(VpiVlogInfo* info);
   VpiHandle HandleMulti(int type, VpiHandle ref1, VpiHandle ref2);
 
+  // §38.3: report whether two handles reference the same underlying simulation
+  // object at the moment of the call. Returns 1 (TRUE) when they do and that
+  // object exists, 0 (FALSE) otherwise. The comparison resolves each handle to
+  // the representative of the object it denotes, so handles that alias the same
+  // object compare equal even though their handle pointers differ; this is why
+  // object equivalence cannot be settled with a C "==" comparison.
+  int CompareObjects(VpiHandle obj1, VpiHandle obj2);
+
   VpiHandle CreateModule(std::string_view name, std::string full_name);
 
   VpiHandle CreatePort(std::string_view name, int direction, VpiHandle parent);
@@ -2767,6 +2791,7 @@ vpiHandle VpiHandleByIndexC(vpiHandle parent, int index);
 vpiHandle VpiHandleByMultiIndexC(vpiHandle parent, int num_index,
                                  int* index_array);
 vpiHandle VpiHandleMultiC(int type, vpiHandle ref1, vpiHandle ref2);
+int VpiCompareObjectsC(vpiHandle obj1, vpiHandle obj2);
 vpiHandle vpi_iterate(int type, vpiHandle ref);
 vpiHandle vpi_scan(vpiHandle iterator);
 void vpi_get_value(vpiHandle obj, s_vpi_value* value);
