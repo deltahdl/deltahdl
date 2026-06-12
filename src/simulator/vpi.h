@@ -220,10 +220,11 @@ struct VpiObject {
   // the actual event either way; this flag only records which form produced it.
   bool clock_inferred = false;
 
-  // §37.44: whether a thread (or frame) is the active one, reported through
-  // vpi_get(vpiActive). A thread that currently holds execution is active; an
-  // inactive thread is one that is suspended or otherwise not running. False by
-  // default.
+  // §37.43/§37.44: whether a frame or a thread is the active one, reported
+  // through vpi_get(vpiActive). The object that currently holds execution is
+  // active; an inactive one is suspended or otherwise not running. There is at
+  // most one active frame at a time in a given thread (§37.43 detail 4). False
+  // by default.
   bool active = false;
 
   // §37.49: the source span an assertion object occupies. start/column/end are
@@ -597,6 +598,54 @@ VpiHandle VpiSeqFormalTypespec(VpiHandle formal);
 // through vpiExpr. The diagram draws its target as a named event or a sequence
 // expression (§37.54); null when the formal has no initialization expression.
 VpiHandle VpiSeqFormalInitExpr(VpiHandle formal);
+
+// ===========================================================================
+// §37.43 Frames. The VPI object model for a frame - a dynamically activated
+// procedural scope together with its locally declared automatic variables,
+// events, and event arrays, if any (detail 1). A frame carries one Boolean
+// property (vpiActive, applied by VpiContext::Get - the same property a thread
+// reports, §37.44) and the relations modeled by the helpers below. A frame is
+// woven to its thread by the frame--thread edge shared with §37.44: §37.44's
+// VpiThreadFrame walks that edge from the thread to its active frame, and
+// VpiFrameThread (below) walks it back. Frame specific callbacks are §38.36.1's
+// (detail 8). The frame object model is not backwards compatible with
+// IEEE Std 1800-2017 or earlier (detail 7).
+// ===========================================================================
+
+// §37.43 (vpiOrigin targets / detail 6): the object kinds a frame's vpiOrigin
+// can reach - the point in the elaboration hierarchy from which the frame was
+// activated. The diagram draws these as a scope, a (system/method) task or
+// function call, or a net or net array. The net and net-array cases cover a
+// frame activated for a nettype's user-defined resolution function.
+bool VpiIsFrameOriginType(int type);
+
+// §37.43 (vpiParent -> frame / detail 5): the frame from which this child frame
+// was activated, reached up the parent chain when that parent is itself a frame.
+// Null for a null handle, a root frame with no parent, or a non-frame parent.
+VpiHandle VpiFrameParent(VpiHandle frame);
+
+// §37.43 (vpiOrigin / detail 6): the elaboration-hierarchy point a frame was
+// activated from, modeled as the frame's first origin-kind child (see
+// VpiIsFrameOriginType). Null for a null handle or a frame with no origin.
+VpiHandle VpiFrameOrigin(VpiHandle frame);
+
+// §37.43 (frame to stmt transition / details 4 and 5): the statement reached
+// from a frame. For the active frame this is the currently active statement
+// within it; for a parent frame it is the atomic statement or scope whose
+// execution activated the child frame. Modeled as the frame's first statement
+// child. Null for a null handle or a frame with no statement attached.
+VpiHandle VpiFrameStmt(VpiHandle frame);
+
+// §37.43 (frame--thread edge): the thread a frame belongs to. This is the
+// reverse of §37.44's VpiThreadFrame, which reaches the active frame from the
+// thread; here the frame reaches its thread, modeled as its first thread child.
+// Null for a null handle or a frame with no thread attached.
+VpiHandle VpiFrameThread(VpiHandle frame);
+
+// §37.43 (vpiAutomatics / detail 1): the automatic objects a frame locally
+// declares - its automatic variables, named events, and named event arrays, in
+// order. A null handle yields none.
+std::vector<VpiHandle> VpiFrameAutomatics(VpiHandle frame);
 
 // ===========================================================================
 // §37.44 Threads. The VPI object model for a thread - a SystemVerilog process
@@ -1203,6 +1252,12 @@ class VpiContext {
   // the tool's interactive scope.
   VpiHandle InteractiveScope() const { return interactive_scope_; }
 
+  // §37.43 detail 4: record which frame is the one currently active. There is at
+  // most one active frame at a time in a given thread, and an application reaches
+  // it through vpi_handle(vpiFrame, NULL) (see Handle).
+  void SetActiveFrame(VpiHandle frame) { active_frame_ = frame; }
+  VpiHandle ActiveFrame() const { return active_frame_; }
+
   const VpiErrorInfo& LastError() const { return last_error_; }
 
   // §38.2: the error status is reset by any VPI routine call except
@@ -1237,6 +1292,9 @@ class VpiContext {
   int reset_reset_value_ = 0;
   int reset_diag_value_ = 0;
   VpiHandle interactive_scope_ = nullptr;
+  // §37.43 detail 4: the frame currently active, returned by
+  // vpi_handle(vpiFrame, NULL).
+  VpiHandle active_frame_ = nullptr;
   VpiErrorInfo last_error_ = {};
   std::string product_ = "DeltaHDL";
   std::string version_ = "0.1.0";

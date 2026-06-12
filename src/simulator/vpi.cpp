@@ -705,6 +705,92 @@ VpiHandle VpiSeqFormalInitExpr(VpiHandle formal) {
 }
 
 // ===========================================================================
+// §37.43 Frames (shared with §37.44's frame--thread edge and vpiActive).
+// ===========================================================================
+
+bool VpiIsFrameOriginType(int type) {
+  // §37.43 detail 6: the vpiOrigin of a frame is the elaboration-hierarchy point
+  // it was activated from. The diagram draws that as a scope, a task or function
+  // call (including the system and method forms), or a net or net array - the
+  // last covering a frame activated for a nettype's user-defined resolution
+  // function.
+  switch (type) {
+    case vpiScope:
+    case vpiTaskCall:
+    case vpiFuncCall:
+    case vpiSysTaskCall:
+    case vpiSysFuncCall:
+    case vpiMethodTaskCall:
+    case vpiMethodFuncCall:
+    case vpiNet:
+    case vpiNetArray:
+      return true;
+    default:
+      return false;
+  }
+}
+
+VpiHandle VpiFrameParent(VpiHandle frame) {
+  // §37.43 detail 5: vpiParent reaches the frame from which this child frame was
+  // activated, through the parent link when that parent is itself a frame. A
+  // root frame (no parent) and a null handle report none. This mirrors §37.44's
+  // VpiThreadParent, the same parent-chain relation one level up.
+  if (!frame || !frame->parent) return nullptr;
+  return frame->parent->type == vpiFrame ? frame->parent : nullptr;
+}
+
+VpiHandle VpiFrameOrigin(VpiHandle frame) {
+  // §37.43 detail 6: the elaboration-hierarchy point a frame was activated from,
+  // modeled as its first origin-kind child.
+  if (!frame) return nullptr;
+  for (auto* child : frame->children) {
+    if (VpiIsFrameOriginType(child->type)) return child;
+  }
+  return nullptr;
+}
+
+VpiHandle VpiFrameStmt(VpiHandle frame) {
+  // §37.43 details 4 and 5: the frame-to-stmt transition. For the active frame
+  // this is the currently active statement within it; for a parent frame it is
+  // the atomic statement or scope whose execution activated the child frame.
+  // Either way it is modeled as the frame's first statement child.
+  if (!frame) return nullptr;
+  for (auto* child : frame->children) {
+    if (child->type == vpiStmt) return child;
+  }
+  return nullptr;
+}
+
+VpiHandle VpiFrameThread(VpiHandle frame) {
+  // §37.43 (frame--thread edge): the thread a frame belongs to, the reverse of
+  // §37.44's VpiThreadFrame. Modeled as the frame's first thread child.
+  if (!frame) return nullptr;
+  for (auto* child : frame->children) {
+    if (child->type == vpiThread) return child;
+  }
+  return nullptr;
+}
+
+std::vector<VpiHandle> VpiFrameAutomatics(VpiHandle frame) {
+  // §37.43 detail 1: the vpiAutomatics relation yields a frame's locally
+  // declared automatic objects - its variables, named events, and named event
+  // arrays - in order. A null handle yields none.
+  std::vector<VpiHandle> automatics;
+  if (!frame) return automatics;
+  for (auto* child : frame->children) {
+    // The diagram draws the variables node as the variables class, so accept the
+    // class node itself as well as the concrete logic/array variable kinds
+    // (§37.17), alongside named events and named event arrays.
+    if (child->type == vpiVariables || VpiIsLogicVarType(child->type) ||
+        VpiIsArrayVarType(child->type) || child->type == vpiNamedEvent ||
+        child->type == vpiNamedEventArray) {
+      automatics.push_back(child);
+    }
+  }
+  return automatics;
+}
+
+// ===========================================================================
 // §37.44 Threads.
 // ===========================================================================
 
@@ -1298,6 +1384,10 @@ VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
 }
 
 VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
+  // §37.43 detail 4: there is at most one active frame at a time in a given
+  // thread, and an application reaches it with vpi_handle(vpiFrame, NULL).
+  if (!ref && type == vpiFrame) return active_frame_;
+
   if (!ref) return nullptr;
 
   // §38.23: vpi_handle(vpiUse, iterator) recovers the reference object the
@@ -1571,9 +1661,25 @@ void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
   }
 }
 
-void VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* ,
+void VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
                           int ) {
   if (!obj || !value) return;
+
+  // §37.43 detail 3: it is illegal to put a value with a delay on an automatic
+  // variable. A delay would schedule the update for a future time, but the
+  // automatic object's storage may no longer exist by then. A delay is present
+  // when a nonzero time is supplied; reject the put rather than applying it.
+  bool has_delay =
+      time && (time->low != 0 || time->high != 0 || time->real != 0.0);
+  if (obj->automatic && has_delay) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_put_value(): a value with a delay may not be put on an automatic "
+        "variable";
+    return;
+  }
+
   if (!obj->var && !obj->net) return;
 
   if (scheduler_) scheduler_->NoteWriteAttempt();
@@ -1607,6 +1713,18 @@ VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
     last_error_.message =
         "vpi_register_cb() may register only an early-phase callback reason "
         "while VPI functionality is restricted";
+    return nullptr;
+  }
+
+  // §37.43 detail 2: it is illegal to place a value change callback on an
+  // automatic variable - automatic storage exists only while its frame is
+  // active, so there is no persistent object to watch. Reject the registration.
+  if (data->reason == cbValueChange && data->obj && data->obj->automatic) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_register_cb(): a value change callback may not be placed on an "
+        "automatic variable";
     return nullptr;
   }
 
@@ -1749,8 +1867,8 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // its operator as a Boolean property (TRUE for the strong form).
     case vpiOpStrong:
       return obj->op_strong ? 1 : 0;
-    // §37.44: a thread (or frame) reports whether it is the active one as a
-    // Boolean property.
+    // §37.43/§37.44: a frame or a thread reports whether it is the active one as
+    // a Boolean property (the same vpiActive property, shared by both models).
     case vpiActive:
       return obj->active ? 1 : 0;
     // §37.50: a cover reports whether it covers a sequence (rather than a
