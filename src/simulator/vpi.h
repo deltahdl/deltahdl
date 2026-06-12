@@ -228,6 +228,13 @@ struct VpiObject {
   std::string cell_name;
   std::string config_name;
 
+  // §37.30 detail 1: the definition name an interface typespec reports through
+  // vpi_get_str(vpiDefName) - the modport identifier when the typespec
+  // represents a modport, the interface declaration's identifier when it
+  // represents an interface. Distinct from `name`, which carries the typespec's
+  // vpiName (the typedef name); empty when unset.
+  std::string def_name;
+
   // §37.54 (D2): the operation type an operation object reports through
   // vpi_get(vpiOpType). For a sequence expression's operation this is one of the
   // sequence operators (see VpiIsSequenceExprOpType); zero when unset.
@@ -311,6 +318,12 @@ struct VpiObject {
   // meaningful when the ref obj refers to an interface; reported through
   // vpi_get(vpiGeneric).
   bool generic_interface = false;
+
+  // §37.30: whether an interface typespec represents a modport rather than an
+  // interface, reported through vpi_get(vpiIsModPort). It also selects how
+  // vpiDefName and vpiParent are interpreted (details 1 and 2). False (an
+  // interface, not a modport) by default.
+  bool is_modport = false;
 
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
@@ -1181,6 +1194,29 @@ VpiHandle VpiTypespecRightRange(const std::vector<VpiArrayDimension>& dims);
 // when one exists, otherwise the type parameter handle itself.
 VpiHandle VpiTypespecForTypeParameter(VpiHandle type_parameter,
                                       VpiHandle resolved_typespec);
+
+// ===========================================================================
+// §37.30 Interface typespec. An interface typespec (vpiInterfaceTypespec) is a
+// typespec (§37.25) denoting a virtual interface or one of its modports. Its
+// vpiName (the typedef's name) and its vpiParamAssign relation are served by
+// the generic GetStr/Iterate machinery once the name and param-assign children
+// are populated; the two numbered "Details" that refine the model - vpiDefName
+// (detail 1) and vpiParent (detail 2) - are carried by the helpers below, which
+// also drive the public vpi_get_str/vpi_handle dispatch.
+// ===========================================================================
+
+// §37.30 detail 1: vpiDefName of an interface typespec. When the typespec
+// represents a modport the definition name is the modport identifier; when it
+// represents an interface it is the interface declaration's identifier. Either
+// definition name is stored on the typespec, so it is reported directly. NULL
+// for a handle that is not an interface typespec or that carries no definition
+// name.
+const char* VpiInterfaceTypespecDefName(VpiHandle interface_typespec);
+
+// §37.30 detail 2: vpiParent of an interface typespec. A typespec that
+// represents a modport reaches the interface typespec of the interface it
+// belongs to; a typespec that represents an interface has no parent (NULL).
+VpiHandle VpiInterfaceTypespecParent(VpiHandle interface_typespec);
 
 // ===========================================================================
 // §37.13 IO declaration. The VPI object model for an io decl (vpiIODecl): a

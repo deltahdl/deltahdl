@@ -1482,6 +1482,36 @@ VpiHandle VpiTypespecForTypeParameter(VpiHandle type_parameter,
 }
 
 // ===========================================================================
+// §37.30 Interface typespec.
+// ===========================================================================
+
+const char* VpiInterfaceTypespecDefName(VpiHandle interface_typespec) {
+  // §37.30 detail 1: a modport interface typespec reports the modport
+  // identifier as its vpiDefName, and an interface interface typespec reports
+  // the interface declaration's identifier. Either definition name is held on
+  // the typespec, so it is handed back directly; a typespec with no recorded
+  // definition name, or a handle of any other kind, yields NULL.
+  if (!interface_typespec ||
+      interface_typespec->type != vpiInterfaceTypespec) {
+    return nullptr;
+  }
+  return interface_typespec->def_name.empty()
+             ? nullptr
+             : interface_typespec->def_name.c_str();
+}
+
+VpiHandle VpiInterfaceTypespecParent(VpiHandle interface_typespec) {
+  // §37.30 detail 2: a modport interface typespec's vpiParent is the interface
+  // typespec of the interface it belongs to; an interface interface typespec
+  // has no parent, so it reports NULL even when some enclosing object exists.
+  if (!interface_typespec ||
+      interface_typespec->type != vpiInterfaceTypespec) {
+    return nullptr;
+  }
+  return interface_typespec->is_modport ? interface_typespec->parent : nullptr;
+}
+
+// ===========================================================================
 // §37.13 IO declaration.
 // ===========================================================================
 
@@ -2583,6 +2613,12 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return ref->parent;
   }
 
+  // §37.30 detail 2: vpiParent of a modport interface typespec reaches the
+  // interface typespec it belongs to; an interface interface typespec has none.
+  if (type == vpiParent && ref->type == vpiInterfaceTypespec) {
+    return VpiInterfaceTypespecParent(ref);
+  }
+
   if (ref->parent && ref->parent->type == type) return ref->parent;
 
   for (auto* child : ref->children) {
@@ -3202,6 +3238,10 @@ int VpiContext::Get(int property, VpiHandle obj) {
                           obj->actual->type == vpiInterfaceArray);
       return VpiRefObjGeneric(refers_to_interface, obj->generic_interface);
     }
+    // §37.30: an interface typespec reports whether it represents a modport
+    // (rather than the interface itself) as the vpiIsModPort Boolean property.
+    case vpiIsModPort:
+      return obj->is_modport ? 1 : 0;
     // §37.3.7: declared lifetime as a Boolean (0 static, 1 non-static).
     case kVpiAutomatic:
       return obj->automatic ? 1 : 0;
@@ -3381,6 +3421,11 @@ const char* VpiContext::GetStr(int property, VpiHandle obj) {
       // §37.15 detail 6: a ref obj whose actual is an interface or modport
       // reports that interface's definition name or the modport name.
       if (obj->type == vpiRefObj) return VpiRefObjDefName(obj);
+      // §37.30 detail 1: an interface typespec reports the modport identifier or
+      // the interface declaration's identifier as its definition name.
+      if (obj->type == vpiInterfaceTypespec) {
+        return VpiInterfaceTypespecDefName(obj);
+      }
       return nullptr;
 
     case kVpiLibrary:
