@@ -1664,6 +1664,101 @@ std::string VpiNetFullName(const VpiVariableNameParts& parts) {
   return parts.top_scope + "." + decompile;
 }
 
+// ===========================================================================
+// §37.11 Instance arrays.
+// ===========================================================================
+
+bool VpiIsPrimitiveArrayType(int type) {
+  // §37.11 (primitive-array diagram): a primitive array and the three concrete
+  // forms drawn beneath it - gate, switch, and udp arrays.
+  switch (type) {
+    case vpiPrimitiveArray:
+    case vpiGateArray:
+    case vpiSwitchArray:
+    case vpiUdpArray:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiIsInstanceArrayType(int type) {
+  // §37.11 (instance-array diagram): the module, interface, and program arrays
+  // drawn beneath instance array, plus every primitive array (a primitive array
+  // is itself a kind of instance array) and the instance-array supertype.
+  switch (type) {
+    case vpiInstanceArray:
+    case vpiModuleArray:
+    case vpiInterfaceArray:
+    case vpiProgramArray:
+      return true;
+    default:
+      return VpiIsPrimitiveArrayType(type);
+  }
+}
+
+VpiHandle VpiInstanceArrayConnections(VpiHandle instance_array) {
+  // §37.11 detail 1: the expr reached from an instance array is the operation
+  // object listing the array's actual connections, modeled as the array's first
+  // operation child. A null, non-instance-array, or childless handle has none.
+  if (!instance_array) return nullptr;
+  if (!VpiIsInstanceArrayType(instance_array->type)) return nullptr;
+  for (auto* child : instance_array->children) {
+    if (child->type == vpiOperation) return child;
+  }
+  return nullptr;
+}
+
+bool VpiInstanceArrayConnectionsIsListOp(VpiHandle expr) {
+  // §37.11 detail 1: that expr shall be a vpiOperation whose vpiOpType is
+  // vpiListOp.
+  return expr && expr->type == vpiOperation && expr->op_type == vpiListOp;
+}
+
+std::vector<VpiRangeDesc> VpiInstanceArrayRanges(
+    const std::vector<VpiArrayDimension>& dims) {
+  // §37.11 detail 2: one range per declared dimension, beginning with the
+  // leftmost range of the array declaration and iterating through the rightmost.
+  // Each dimension routes through §37.22's empty-range rule.
+  std::vector<VpiRangeDesc> ranges;
+  for (const auto& dim : dims) {
+    VpiRangeDesc range;
+    range.empty = VpiDimensionRangeIsEmpty(dim.kind);
+    range.left_expr = dim.left_expr;
+    range.right_expr = dim.right_expr;
+    range.size = dim.size;
+    ranges.push_back(range);
+  }
+  return ranges;
+}
+
+// §37.11 detail 2: the §37.22 range for an instance array's leftmost dimension,
+// the one vpiLeftRange/vpiRightRange report. An array with no dimensions yields
+// an empty range, so both relations report NULL.
+static VpiRangeDesc LeftmostInstanceArrayRange(
+    const std::vector<VpiArrayDimension>& dims) {
+  std::vector<VpiRangeDesc> ranges = VpiInstanceArrayRanges(dims);
+  if (ranges.empty()) {
+    VpiRangeDesc empty;
+    empty.empty = true;
+    return empty;
+  }
+  return ranges.front();
+}
+
+VpiHandle VpiInstanceArrayLeftRange(
+    const std::vector<VpiArrayDimension>& dims) {
+  // §37.11 detail 2: vpiLeftRange returns the bound of the leftmost dimension;
+  // defer to §37.22's vpiLeftRange.
+  return VpiRangeLeftRange(LeftmostInstanceArrayRange(dims));
+}
+
+VpiHandle VpiInstanceArrayRightRange(
+    const std::vector<VpiArrayDimension>& dims) {
+  // §37.11 detail 2: the mirror of VpiInstanceArrayLeftRange.
+  return VpiRangeRightRange(LeftmostInstanceArrayRange(dims));
+}
+
 void VpiContext::Attach(SimContext& sim_ctx) {
   for (auto& [name, var] : sim_ctx.GetVariables()) {
     auto* obj = AllocObject();
@@ -2076,6 +2171,13 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // §38.23: vpi_handle(vpiUse, iterator) recovers the reference object the
   // iterator was created to walk.
   if (type == vpiUse && ref->type == vpiIterator) return ref->iter_ref;
+
+  // §37.11 detail 1: traversing vpiExpr from an instance array reaches the
+  // operation object that lists the array's actual connections, not a child
+  // whose own type happens to be vpiExpr.
+  if (type == vpiExpr && VpiIsInstanceArrayType(ref->type)) {
+    return VpiInstanceArrayConnections(ref);
+  }
 
   if (ref->parent && ref->parent->type == type) return ref->parent;
 

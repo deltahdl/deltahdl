@@ -1288,6 +1288,46 @@ std::string VpiNetDecompile(const VpiVariableNameParts& parts);
 // decompile form.
 std::string VpiNetFullName(const VpiVariableNameParts& parts);
 
+// ===========================================================================
+// §37.11 Instance arrays.
+// ===========================================================================
+
+// §37.11 (primitive-array diagram): the primitive-array group - a primitive
+// array and the concrete gate, switch, and udp array forms drawn beneath it.
+bool VpiIsPrimitiveArrayType(int type);
+
+// §37.11 (instance-array diagram): the instance-array group - the module,
+// interface, and program arrays drawn beneath instance array, plus every
+// primitive array (a primitive array is itself a kind of instance array) and
+// the instance-array supertype. The details below apply to this whole group.
+bool VpiIsInstanceArrayType(int type);
+
+// §37.11 detail 1: traversing from an instance array to its expr returns the
+// operation object that gives access to the actual list of connections to the
+// array. Modeled as the array's first operation child; null when the handle is
+// null, is not an instance array, or carries no such child.
+VpiHandle VpiInstanceArrayConnections(VpiHandle instance_array);
+
+// §37.11 detail 1: the expr an instance array traverses to shall be a simple
+// expression object of type vpiOperation whose vpiOpType is vpiListOp.
+bool VpiInstanceArrayConnectionsIsListOp(VpiHandle expr);
+
+// §37.11 detail 2: the ranges vpi_iterate(vpiRange, instance_array) returns, one
+// per declared dimension, beginning with the leftmost range of the declaration
+// and running through the rightmost. Each dimension routes through §37.22's
+// empty-range rule.
+std::vector<VpiRangeDesc> VpiInstanceArrayRanges(
+    const std::vector<VpiArrayDimension>& dims);
+
+// §37.11 detail 2: vpiLeftRange of an instance array - the left bound of the
+// leftmost dimension of a (possibly multidimensional) array. NULL when the array
+// has no dimensions or that leftmost range is empty (§37.22).
+VpiHandle VpiInstanceArrayLeftRange(const std::vector<VpiArrayDimension>& dims);
+
+// §37.11 detail 2: vpiRightRange of an instance array, the mirror of
+// VpiInstanceArrayLeftRange.
+VpiHandle VpiInstanceArrayRightRange(const std::vector<VpiArrayDimension>& dims);
+
 struct VpiVectorVal {
   uint32_t aval;
   uint32_t bval;
