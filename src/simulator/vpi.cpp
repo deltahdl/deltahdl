@@ -1707,6 +1707,25 @@ VpiHandle VpiTypespecForTypeParameter(VpiHandle type_parameter,
 }
 
 // ===========================================================================
+// §37.26 Structures and unions.
+// ===========================================================================
+
+bool VpiIsStructOrUnionType(int type) {
+  // §37.26 (figure): the structure/union object kinds - a struct or union
+  // declared as a variable, and a struct or union declared as a net.
+  return type == vpiStructVar || type == vpiUnionVar ||
+         type == vpiStructNet || type == vpiUnionNet;
+}
+
+bool VpiIsEntireUnpackedStructOrUnion(int type, bool packed) {
+  // §37.26 detail 1: the value-access restriction applies to an entire unpacked
+  // structure or union. A packed aggregate has a single vector value and is
+  // accessible, so the restriction is the struct/union kinds with vpiPacked
+  // false.
+  return VpiIsStructOrUnionType(type) && !packed;
+}
+
+// ===========================================================================
 // §37.29 Virtual interface.
 // ===========================================================================
 
@@ -3575,7 +3594,21 @@ static void GetValueStringVal(VpiHandle obj, VpiValue* value,
 }
 
 void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
-  if (!obj || !value || !obj->var) return;
+  if (!obj || !value) return;
+  // §37.26 detail 1: the value of an entire unpacked structure or unpacked
+  // union is not accessible through vpi_get_value(). Such an aggregate holds no
+  // single scalar or vector value to hand back, so the read is refused, an error
+  // is recorded, and the caller's value buffer is left untouched. A packed
+  // struct/union is excluded by the helper and reads normally.
+  if (VpiIsEntireUnpackedStructOrUnion(obj->type, obj->packed)) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_get_value(): the value of an entire unpacked structure or union "
+        "cannot be accessed";
+    return;
+  }
+  if (!obj->var) return;
   switch (value->format) {
     case kVpiIntVal: {
       // §38.15, Table 38-3: any x or z bit of the object maps to a 0 in the
@@ -3639,6 +3672,20 @@ void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
 VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
                                int flags) {
   if (!obj) return nullptr;
+
+  // §37.26 detail 1: an entire unpacked structure or union cannot be written
+  // through vpi_put_value() any more than it can be read - it has no single
+  // value to take the write. The put is rejected, an error is recorded, and the
+  // aggregate is left unchanged. A packed struct/union is excluded by the helper
+  // and is written through the normal path below.
+  if (VpiIsEntireUnpackedStructOrUnion(obj->type, obj->packed)) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_put_value(): the value of an entire unpacked structure or union "
+        "cannot be accessed";
+    return nullptr;
+  }
 
   // §37.35 detail 2: among primitives, vpi_put_value() may be applied only to a
   // sequential UDP. Putting a value to any other primitive kind - a gate,
@@ -4160,6 +4207,19 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // §37.34: the distribution kind a dist item carries, as an int property.
     case vpiDistType:
       return obj->dist_type;
+    // §37.26 (figure): a structure or union object reports whether it is packed
+    // as the vpiPacked Boolean property (TRUE for a packed aggregate). Any
+    // object not declared packed reports FALSE.
+    case vpiPacked:
+      return obj->packed ? 1 : 0;
+    // §37.26 (figure): a union object reports whether it is a tagged union as
+    // the vpiTagged Boolean property.
+    case vpiTagged:
+      return obj->tagged ? 1 : 0;
+    // §37.26 (figure): a packed union reports whether it is a soft-packed union
+    // as the vpiSoft Boolean property.
+    case vpiSoft:
+      return obj->soft ? 1 : 0;
     default:
       return 0;
   }

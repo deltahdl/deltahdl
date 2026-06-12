@@ -422,6 +422,16 @@ struct VpiObject {
   // vpiDivDist), reported through vpi_get(vpiDistType) as an int property.
   int dist_type = 0;
 
+  // §37.26: the Boolean figure properties a struct/union object carries.
+  // `packed` backs vpiPacked - whether the structure or union is packed; a
+  // packed aggregate has a single vector value while an unpacked one does not.
+  // `tagged` backs vpiTagged - whether the union is a tagged union. `soft`
+  // backs vpiSoft - whether the (packed) union is a soft-packed union. All
+  // three default false, so any object that is not so declared reports FALSE.
+  bool packed = false;
+  bool tagged = false;
+  bool soft = false;
+
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
 
@@ -1422,6 +1432,29 @@ VpiHandle VpiTypespecRightRange(const std::vector<VpiArrayDimension>& dims);
 // when one exists, otherwise the type parameter handle itself.
 VpiHandle VpiTypespecForTypeParameter(VpiHandle type_parameter,
                                       VpiHandle resolved_typespec);
+
+// ===========================================================================
+// §37.26 Structures and unions. The VPI object model for a structure or union
+// declared as a variable (struct/union var) or as a net (struct/union net).
+// Each is reached from its parent and iterates to its member variables or nets
+// (vpiParent/vpiMember), and carries the Boolean figure properties vpiPacked,
+// vpiTagged, and vpiSoft. Those relations and properties are served by the
+// generic object-model machinery once an object's fields and children are set;
+// the clause's one numbered rule (detail 1) is the value-access restriction the
+// helpers below recognise.
+// ===========================================================================
+
+// §37.26 (figure): the four object kinds the Structures-and-unions figure
+// models - a structure or union declared as a variable, and a structure or
+// union declared as a net. Used to recognise an entire structure/union object.
+bool VpiIsStructOrUnionType(int type);
+
+// §37.26 detail 1: whether an object is an entire unpacked structure or unpacked
+// union - one whose value vpi_get_value()/vpi_put_value() cannot access. A
+// packed struct/union (vpiPacked true) has a single vector value and stays
+// accessible; only the unpacked aggregate is off-limits, so the rule is the
+// struct/union object kinds restricted to the unpacked case.
+bool VpiIsEntireUnpackedStructOrUnion(int type, bool packed);
 
 // ===========================================================================
 // §37.29 Virtual interface. The VPI object model for a virtual interface var
