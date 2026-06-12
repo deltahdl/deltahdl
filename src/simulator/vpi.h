@@ -738,6 +738,22 @@ VpiHandle VpiSeqFormalTypespec(VpiHandle formal);
 // expression (§37.54); null when the formal has no initialization expression.
 VpiHandle VpiSeqFormalInitExpr(VpiHandle formal);
 
+// §37.57 detail 1: a let formal as seen by the let expression's argument
+// iteration. A formal may carry a default value (null when it has none) that
+// stands in as the argument when an instantiation does not supply one.
+struct VpiLetFormal {
+  VpiHandle default_value = nullptr;
+};
+
+// §37.57 detail 1: the arguments the vpiArgument iteration returns for a let
+// expression, in the order the let's formals are declared so each argument can
+// be matched to its formal. `provided` is parallel to `formals`; a null entry
+// means the instantiation omitted that argument, so the formal's default value
+// is substituted in its place, keeping the declaration order intact.
+std::vector<VpiHandle> VpiLetExprArguments(
+    const std::vector<VpiLetFormal>& formals,
+    const std::vector<VpiHandle>& provided);
+
 // ===========================================================================
 // §37.59 Expressions. The VPI object model for an expression. The expr class
 // groups operations, constants, part-selects and indexed part-selects, the

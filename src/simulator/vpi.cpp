@@ -706,6 +706,27 @@ VpiHandle VpiSeqFormalInitExpr(VpiHandle formal) {
 }
 
 // ===========================================================================
+// §37.57 Let.
+// ===========================================================================
+
+std::vector<VpiHandle> VpiLetExprArguments(
+    const std::vector<VpiLetFormal>& formals,
+    const std::vector<VpiHandle>& provided) {
+  // §37.57 detail 1: the vpiArgument iteration returns a let expression's
+  // arguments in the order the let's formals are declared, so each argument
+  // corresponds to its formal. Walk the formals in that order, taking the actual
+  // the instantiation supplied; when it omits one, fall back to that formal's
+  // default value so the result still lines up one-to-one with the formals.
+  std::vector<VpiHandle> arguments;
+  arguments.reserve(formals.size());
+  for (size_t i = 0; i < formals.size(); ++i) {
+    VpiHandle actual = i < provided.size() ? provided[i] : nullptr;
+    arguments.push_back(actual != nullptr ? actual : formals[i].default_value);
+  }
+  return arguments;
+}
+
+// ===========================================================================
 // §37.59 Expressions.
 // ===========================================================================
 
