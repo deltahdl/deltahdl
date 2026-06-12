@@ -3249,6 +3249,15 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return ref->array_member ? ref->index_expr : nullptr;
   }
 
+  // §37.6 detail 1: vpiIndex from an interface reaches the index expression that
+  // locates the interface within its instance array. As with an array-member
+  // program or primitive, an interface that is not an element of an instance
+  // array reports NULL here rather than letting the generic walk find some other
+  // expr child.
+  if (type == vpiIndex && ref->type == vpiInterface) {
+    return ref->array_member ? ref->index_expr : nullptr;
+  }
+
   // §37.42 detail 2: vpiPrefix of a method call reaches the object the method is
   // applied to (the class var "packet" in "packet.send()"). The prefix is held as
   // a designated pointer (it is an expr, not a vpiPrefix-typed child); a tf call
