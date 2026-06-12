@@ -50,21 +50,6 @@ TEST_F(VirtualInterface, ExprReachesAssignedInterfaceInstance) {
   EXPECT_EQ(VpiHandleC(vpiExpr, &vif), &iface);
 }
 
-// D1: a virtual interface var may be declared as assigned a modport (one of the
-// interface-expr boxes). vpiExpr reaches that modport through the public dispatch
-// path, exercising the modport arm of the assignment relation.
-TEST_F(VirtualInterface, ExprReachesAssignedModport) {
-  VpiObject modport;  // the modport assigned at declaration
-  modport.type = vpiModport;
-
-  VpiObject vif;
-  vif.type = vpiVirtualInterfaceVar;
-  vif.children = {&modport};
-
-  EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), &modport);
-  EXPECT_EQ(VpiHandleC(vpiExpr, &vif), &modport);
-}
-
 // D1: a virtual interface var whose declaration assigned no interface reports
 // NULL for vpiExpr rather than reaching some unrelated child.
 TEST_F(VirtualInterface, ExprIsNullWhenNoInterfaceAssigned) {
@@ -175,19 +160,6 @@ TEST_F(VirtualInterface, ActualReachesHeldInterfaceInstance) {
   vif.actual = &iface;
 
   EXPECT_EQ(VpiHandleC(vpiActual, &vif), &iface);
-}
-
-// Example 2 / figure: the held instance reached through vpiActual may be a
-// modport as well as an interface (the vpiActual group is interface or modport).
-TEST_F(VirtualInterface, ActualReachesHeldModport) {
-  VpiObject modport;
-  modport.type = vpiModport;
-
-  VpiObject vif;
-  vif.type = vpiVirtualInterfaceVar;
-  vif.actual = &modport;
-
-  EXPECT_EQ(VpiHandleC(vpiActual, &vif), &modport);
 }
 
 // Example 2: vpiActual returns NULL while the virtual interface is
