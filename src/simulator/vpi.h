@@ -1133,6 +1133,36 @@ void VpiMakeEmptyArgument(VpiHandle arg);
 void VpiMakeNullArgument(VpiHandle arg);
 
 // ===========================================================================
+// §37.58 Simple expressions. The VPI object model for a simple expression - a
+// reference (net, variable, ref obj, parameter, spec param) or a select of one
+// (var select, bit select). Its vpiUse relation reaches the terminals,
+// statements, and continuous assignments that reference it; a bit-select also
+// carries the vpiParent/vpiIndex relations, a name, and the vpiConstantSelect
+// property. The generic naming and traversal machinery is supplied by §38.11
+// and §38.18; the helpers below carry the subclause's three numbered Details.
+// ===========================================================================
+
+// §37.58 detail 1: whether a candidate use is reached by the vpiUse relation of
+// a vector simple expression. It is, when the use references the vector itself
+// or any of the vector's part-selects or bit-selects.
+bool VpiSimpleExprVectorUseAccessesUse(bool references_vector,
+                                       bool references_part_select_of_vector,
+                                       bool references_bit_select_of_vector);
+
+// §37.58 detail 2: whether a candidate use is reached by the vpiUse relation of
+// a bit-select. It is, when the use references that specific bit, the parent
+// vector, or a part-select of the parent that contains the bit.
+bool VpiSimpleExprBitSelectUseAccessesUse(
+    bool references_this_bit, bool references_parent_vector,
+    bool references_part_select_containing_bit);
+
+// §37.58 detail 3: vpiConstantSelect of a bit-select. TRUE only when every
+// associated index expression is an elaboration-time constant and
+// vpiConstantSelect is itself TRUE for the bit-select's parent; otherwise FALSE.
+bool VpiSimpleExprBitSelectConstantSelect(bool all_indices_constant,
+                                          bool parent_constant_select);
+
+// ===========================================================================
 // §37.59 Expressions. The VPI object model for an expression. The expr class
 // groups operations, constants, part-selects and indexed part-selects, the
 // function/method-function/system-function calls and let expressions, and a

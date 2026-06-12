@@ -834,6 +834,41 @@ std::vector<VpiHandle> VpiLetExprArguments(
 }
 
 // ===========================================================================
+// §37.58 Simple expressions.
+// ===========================================================================
+
+bool VpiSimpleExprVectorUseAccessesUse(bool references_vector,
+                                       bool references_part_select_of_vector,
+                                       bool references_bit_select_of_vector) {
+  // §37.58 detail 1: for a vector simple expression, the vpiUse relation
+  // reaches every use of the vector itself as well as every use of any of its
+  // part-selects or bit-selects. A candidate use therefore counts whenever it
+  // references the vector or one of those derived selects.
+  return references_vector || references_part_select_of_vector ||
+         references_bit_select_of_vector;
+}
+
+bool VpiSimpleExprBitSelectUseAccessesUse(
+    bool references_this_bit, bool references_parent_vector,
+    bool references_part_select_containing_bit) {
+  // §37.58 detail 2: for a bit-select, the vpiUse relation reaches every use of
+  // that specific bit, every use of the parent vector, and every part-select of
+  // the parent that contains the bit. A candidate use counts when it references
+  // any of those three.
+  return references_this_bit || references_parent_vector ||
+         references_part_select_containing_bit;
+}
+
+bool VpiSimpleExprBitSelectConstantSelect(bool all_indices_constant,
+                                          bool parent_constant_select) {
+  // §37.58 detail 3: vpiConstantSelect of a bit-select is TRUE only when every
+  // associated index expression is an elaboration-time constant and
+  // vpiConstantSelect is itself TRUE for the bit-select's parent; otherwise it
+  // is FALSE.
+  return all_indices_constant && parent_constant_select;
+}
+
+// ===========================================================================
 // §37.59 Expressions.
 // ===========================================================================
 
