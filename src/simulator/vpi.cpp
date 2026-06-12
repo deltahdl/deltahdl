@@ -3461,10 +3461,17 @@ VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
 }
 
 int VpiContext::RemoveCb(VpiHandle cb_handle) {
+  // §38.39: the argument shall be a handle to the callback object. A null or
+  // wrong-typed handle is not a callback object, so removal fails.
   if (!cb_handle) return 0;
   if (cb_handle->type != kVpiCallback) return 0;
   int idx = cb_handle->index;
   if (idx >= 0 && idx < static_cast<int>(callbacks_.size())) {
+    // §38.39: once vpi_remove_cb() has been called with a handle to the
+    // callback, that handle is no longer valid. A cleared reason marks an
+    // already-removed slot, so a repeat removal on the stale handle fails
+    // rather than reporting success a second time.
+    if (callbacks_[idx].reason < 0) return 0;
     callbacks_[idx].reason = -1;
     return 1;
   }
