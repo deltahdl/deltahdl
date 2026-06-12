@@ -723,6 +723,15 @@ bool VpiIsAtomicStmtType(int type);
 // the assignment operators is treated as a normal assignment (vpiAssignmentOp).
 int VpiAssignmentOpType(std::string_view assign_operator);
 
+// §37.65 Event control detail 1: the statement an event control "@" reaches
+// through vpiStmt. An event control associated with an assignment - the event
+// control drawn on an assignment object (§37.64), recognized here by its parent
+// being a vpiAssignment - always reports a null statement, because the
+// assignment itself is the action and guards no separate statement. Any other
+// event control reports its first statement child, or null when none is attached.
+// Backs the public vpi_handle(vpiStmt, event_control) dispatch.
+VpiHandle VpiEventControlStmt(VpiHandle event_control);
+
 // §37.59 detail 1: the operand order of a vpiMultiConcatOp operation. The first
 // operand is the multiplier expression; the remaining operands are the
 // expressions within the concatenation, in source order.

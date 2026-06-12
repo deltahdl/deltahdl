@@ -791,6 +791,23 @@ int VpiAssignmentOpType(std::string_view assign_operator) {
   return vpiAssignmentOp;
 }
 
+VpiHandle VpiEventControlStmt(VpiHandle event_control) {
+  // §37.65 detail 1: an event control reaches the statement it guards through
+  // vpiStmt. When the event control is associated with an assignment - i.e. it is
+  // the event control drawn on an assignment object (§37.64) - that statement is
+  // always null, since the assignment itself is the action and there is no
+  // separate guarded statement. For any other event control the first statement
+  // child is returned, or null when none is attached.
+  if (!event_control) return nullptr;
+  if (event_control->parent && event_control->parent->type == vpiAssignment) {
+    return nullptr;
+  }
+  for (auto* child : event_control->children) {
+    if (child->type == vpiStmt) return child;
+  }
+  return nullptr;
+}
+
 std::vector<VpiHandle> VpiMultiConcatOperands(
     VpiHandle multiplier, const std::vector<VpiHandle>& concat_exprs) {
   // §37.59 detail 1: the multiplier first, then the concatenation's expressions
@@ -2743,6 +2760,14 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // interface typespec it belongs to; an interface interface typespec has none.
   if (type == vpiParent && ref->type == vpiInterfaceTypespec) {
     return VpiInterfaceTypespecParent(ref);
+  }
+
+  // §37.65 detail 1: vpiStmt of an event control reaches the statement it guards,
+  // except that an event control associated with an assignment always reports a
+  // null statement rather than the first statement child the generic traversal
+  // below would otherwise find.
+  if (type == vpiStmt && ref->type == vpiEventControl) {
+    return VpiEventControlStmt(ref);
   }
 
   if (ref->parent && ref->parent->type == type) return ref->parent;
