@@ -7485,6 +7485,30 @@ PLI_INT32 VpiContext::McdFlush(PLI_UINT32 mcd) {
   return 0;
 }
 
+PLI_BYTE8* VpiContext::McdName(PLI_UINT32 cd) {
+  // §38.26: a descriptor of 0 names no file, so it takes the error return.
+  if (cd == 0) return nullptr;
+
+  // §38.26: cd is a single-channel descriptor - one mcd channel, or an fd from
+  // $fopen with its MSB set. The file it names is the entry recorded under
+  // exactly that descriptor in the shared mcd/fd namespace, the same one
+  // vpi_mcd_open() and $fopen populate (§38.27, §21.3.1).
+  for (const auto& [name, descriptor] : mcd_open_files_) {
+    if (descriptor != cd) continue;
+    // §38.26: the name is returned through a buffer reused on every call, so a
+    // pointer handed back earlier is overwritten here; a caller that needs to
+    // keep the string must copy it. Reserve once so repeated assigns of typical
+    // names keep writing into the same allocation, leaving an earlier pointer
+    // valid until the next call overwrites its contents.
+    if (mcd_name_buffer_.capacity() < 256) mcd_name_buffer_.reserve(256);
+    mcd_name_buffer_.assign(name);
+    return mcd_name_buffer_.data();
+  }
+
+  // §38.26: no open file is named by this descriptor, so report the error.
+  return nullptr;
+}
+
 }  // namespace delta
 
 PLI_INT32 vpi_flush() {
@@ -7520,4 +7544,12 @@ PLI_INT32 vpi_mcd_flush(PLI_UINT32 mcd) {
   // points. Returns 0 when the named buffers were flushed, nonzero on failure.
   delta::GetGlobalVpiContext().ResetErrorStatus();
   return delta::GetGlobalVpiContext().McdFlush(mcd);
+}
+
+PLI_BYTE8* vpi_mcd_name(PLI_UINT32 cd) {
+  // §38.26: return the name of the file represented by a single-channel
+  // descriptor. Clears the pending error status (§38.2) like the other entry
+  // points. Returns NULL on error, including a descriptor naming no open file.
+  delta::GetGlobalVpiContext().ResetErrorStatus();
+  return delta::GetGlobalVpiContext().McdName(cd);
 }

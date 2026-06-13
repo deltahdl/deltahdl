@@ -3204,6 +3204,15 @@ class VpiContext {
   // so nothing pending is lost.
   PLI_INT32 McdFlush(PLI_UINT32 mcd);
 
+  // §38.26: return the name of the file a single-channel descriptor names. The
+  // descriptor is looked up in the shared mcd/fd namespace - the one
+  // vpi_mcd_open() and $fopen populate (§38.27, §21.3.1) - so cd may be an mcd
+  // channel or an fd from $fopen with its MSB set. The name is handed back
+  // through a buffer reused on every call, so a pointer from an earlier call is
+  // overwritten here; a caller that needs to keep the string must copy it.
+  // Returns NULL on error, including a descriptor that names no open file.
+  PLI_BYTE8* McdName(PLI_UINT32 cd);
+
   // Support hooks for the mcd-flush model. The writer feeds buffered text onto a
   // single channel (the one set bit naming the file); the accessors report what
   // is still pending on a channel and what a flush has committed; the failure
@@ -3534,6 +3543,10 @@ class VpiContext {
   // Returned by the channel accessors when a channel has no buffered or flushed
   // text, so they can hand back a reference without inserting an entry.
   const std::string empty_mcd_buffer_;
+
+  // §38.26: the single buffer vpi_mcd_name() reuses for its result, so each call
+  // overwrites the previous returned value. Separate from get_str_buffer_.
+  std::string mcd_name_buffer_;
 
   VpiErrorInfo last_error_ = {};
 
@@ -4193,3 +4206,4 @@ PLI_INT32 vpi_flush();
 PLI_UINT32 vpi_mcd_open(PLI_BYTE8* file);
 PLI_UINT32 vpi_mcd_close(PLI_UINT32 mcd);
 PLI_INT32 vpi_mcd_flush(PLI_UINT32 mcd);
+PLI_BYTE8* vpi_mcd_name(PLI_UINT32 cd);
