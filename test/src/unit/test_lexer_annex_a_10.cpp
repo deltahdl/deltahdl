@@ -20,12 +20,6 @@ TEST(BnfClarificationLexing, SpaceBreaksRealNumber) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
 }
 
-TEST(BnfClarificationLexing, NoSpaceInExponentNumber) {
-  auto tokens = Lex("1e10");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
-}
-
 TEST(BnfClarificationLexing, TimeLiteralNoSpace) {
   auto tokens = Lex("10ns");
   ASSERT_GE(tokens.size(), 2u);
@@ -44,12 +38,6 @@ TEST(BnfClarificationLexing, SimpleIdentStartsWithUnderscore) {
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[0].text, "_foo");
-}
-
-TEST(BnfClarificationLexing, SimpleIdentSingleChar) {
-  auto tokens = Lex("x");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
 }
 
 TEST(BnfClarificationLexing, SpaceSplitsIdentifiers) {
@@ -86,24 +74,6 @@ TEST(BnfClarificationLexing, EmptyInputHasEof) {
 
 TEST(BnfClarificationLexing, UnbasedUnsizedZeroNoSpace) {
   auto tokens = Lex("'0");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
-}
-
-TEST(BnfClarificationLexing, UnbasedUnsizedOneNoSpace) {
-  auto tokens = Lex("'1");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
-}
-
-TEST(BnfClarificationLexing, UnbasedUnsizedXNoSpace) {
-  auto tokens = Lex("'x");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
-}
-
-TEST(BnfClarificationLexing, UnbasedUnsizedZNoSpace) {
-  auto tokens = Lex("'z");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
 }

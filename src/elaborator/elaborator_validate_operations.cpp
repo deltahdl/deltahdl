@@ -108,10 +108,22 @@ void Elaborator::CheckTypeRefCompareOp(const Expr* expr) {
 
 void Elaborator::WalkExprForTypeRefCompare(const Expr* expr) {
   if (!expr) return;
-  if (expr->kind == ExprKind::kBinary &&
-      (expr->op == TokenKind::kEqEq || expr->op == TokenKind::kBangEq ||
-       expr->op == TokenKind::kEqEqEq || expr->op == TokenKind::kBangEqEq)) {
-    CheckTypeRefCompareOp(expr);
+  if (expr->kind == ExprKind::kBinary) {
+    bool is_equality =
+        expr->op == TokenKind::kEqEq || expr->op == TokenKind::kBangEq ||
+        expr->op == TokenKind::kEqEqEq || expr->op == TokenKind::kBangEqEq;
+    if (is_equality) {
+      CheckTypeRefCompareOp(expr);
+    } else if ((expr->lhs && expr->lhs->kind == ExprKind::kTypeRef) ||
+               (expr->rhs && expr->rhs->kind == ExprKind::kTypeRef)) {
+      // §A.10: a type_reference primary is restricted to the equality,
+      // inequality, case-equality, and case-inequality operators (and to use
+      // as the casting type of a static cast, which is not a binary operator).
+      // Any other operator applied to a type_reference is illegal.
+      diag_.Error(expr->range.start,
+                  "a type reference may only be used with the equality, "
+                  "inequality, and case equality/inequality operators");
+    }
   }
   WalkExprForTypeRefCompare(expr->lhs);
   WalkExprForTypeRefCompare(expr->rhs);
