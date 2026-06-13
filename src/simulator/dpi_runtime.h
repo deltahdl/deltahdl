@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/types.h"
@@ -454,6 +455,49 @@ class AssertionApi {
                                  uint64_t cb_time,
                                  const AssertionAttemptInfo& info);
 
+  // §39.4.2.1: callbacks placed on an assertion that refers to a global clocking
+  // future sampled value function (see §16.9.4) are delivered with two
+  // peculiarities. The callback is not executed when its event occurs; delivery
+  // is deferred to the nearest tick of the global clock strictly following the
+  // event. The cb_time reported to the callback is, however, the time of the
+  // event itself — not the later tick at which the callback executes.
+
+  // The schedule of global clock ticks against which deferred deliveries mature.
+  void SetGlobalClockTicks(std::vector<uint64_t> ticks);
+
+  // Records that the named assertion refers to a global clocking future sampled
+  // value function, so its callbacks are delivered with the deferral above.
+  void MarkAssertionUsesGlobalClockingFuture(std::string_view assertion);
+  bool AssertionUsesGlobalClockingFuture(std::string_view assertion) const;
+
+  // Sentinel returned when the tick schedule holds no tick after the event.
+  static constexpr uint64_t kNoGlobalClockTick = UINT64_MAX;
+
+  // The nearest global clock tick strictly following `event_time`: the smallest
+  // tick greater than it. A tick that coincides with the event does not qualify.
+  // Returns kNoGlobalClockTick when no later tick exists in the schedule.
+  static uint64_t NearestGlobalClockTickAfter(
+      const std::vector<uint64_t>& ticks, uint64_t event_time);
+
+  // Deliver, or for a global-clocking-future assertion schedule, an event for
+  // `reason` occurring on `assertion` at `event_time`. When the assertion refers
+  // to a global clocking future sampled value function the callback is not fired
+  // now: it is queued for the nearest global clock tick strictly following the
+  // event, so this call invokes nothing and returns 0. For any other assertion
+  // delivery is immediate, exactly as DeliverAssertionEvent at the event time.
+  uint32_t DeliverAssertionEventAtGlobalClock(std::string_view assertion,
+                                              int reason, uint64_t event_time,
+                                              const AssertionAttemptInfo& info);
+
+  // Advances the global clock to `tick_time`, firing every queued global-
+  // clocking-future callback whose deferred delivery tick has been reached. Each
+  // is invoked with cb_time equal to the time of its original event — not this
+  // delivery tick. Returns the number of callbacks invoked.
+  uint32_t AdvanceGlobalClockTick(uint64_t tick_time);
+
+  // The number of global-clocking-future callbacks still awaiting their tick.
+  uint32_t PendingGlobalClockingCallbackCount() const;
+
   void SetSeverity(std::string_view name, AssertionSeverity sev);
   AssertionSeverity GetSeverity(std::string_view name) const;
 
@@ -545,6 +589,21 @@ class AssertionApi {
   };
   std::vector<PlacedCb> placed_callbacks_;
   AssertionCallbackHandle next_callback_handle_ = 1;
+
+  // §39.4.2.1 deferred delivery for assertions referring to global clocking
+  // future sampled value functions. Such an assertion's callbacks fire at the
+  // nearest global clock tick strictly following the event; until that tick they
+  // wait here, each remembering the event time that becomes its cb_time.
+  struct PendingGlobalClockingCb {
+    std::string assertion;
+    int reason = 0;
+    uint64_t event_time = 0;     // becomes cb_time at delivery
+    uint64_t delivery_time = 0;  // nearest tick strictly following the event
+    AssertionAttemptInfo info;
+  };
+  std::vector<PendingGlobalClockingCb> pending_global_clocking_cbs_;
+  std::vector<uint64_t> global_clock_ticks_;
+  std::unordered_set<std::string> global_clocking_future_assertions_;
 
   std::unordered_map<std::string, AssertionSeverity> severity_map_;
   std::unordered_map<std::string, AssertionAction> action_map_;

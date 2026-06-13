@@ -736,6 +736,71 @@ uint32_t AssertionApi::DeliverAssertionEvent(std::string_view assertion,
   return fired;
 }
 
+void AssertionApi::SetGlobalClockTicks(std::vector<uint64_t> ticks) {
+  global_clock_ticks_ = std::move(ticks);
+}
+
+void AssertionApi::MarkAssertionUsesGlobalClockingFuture(
+    std::string_view assertion) {
+  global_clocking_future_assertions_.emplace(assertion);
+}
+
+bool AssertionApi::AssertionUsesGlobalClockingFuture(
+    std::string_view assertion) const {
+  return global_clocking_future_assertions_.count(std::string(assertion)) != 0;
+}
+
+uint64_t AssertionApi::NearestGlobalClockTickAfter(
+    const std::vector<uint64_t>& ticks, uint64_t event_time) {
+  // The nearest tick strictly following the event is the smallest tick greater
+  // than it; a tick coinciding with the event does not qualify. The schedule
+  // need not be sorted, so scan for the minimum qualifying tick.
+  uint64_t nearest = kNoGlobalClockTick;
+  for (uint64_t tick : ticks) {
+    if (tick > event_time && tick < nearest) nearest = tick;
+  }
+  return nearest;
+}
+
+uint32_t AssertionApi::DeliverAssertionEventAtGlobalClock(
+    std::string_view assertion, int reason, uint64_t event_time,
+    const AssertionAttemptInfo& info) {
+  // An assertion that does not refer to a global clocking future sampled value
+  // function has no deferral: deliver at the event time as usual.
+  if (!AssertionUsesGlobalClockingFuture(assertion)) {
+    return DeliverAssertionEvent(assertion, reason, event_time, info);
+  }
+  // §39.4.2.1: defer delivery to the nearest global clock tick strictly
+  // following the event. Nothing fires at the event time; the event time is
+  // remembered so it can be reported as cb_time when the callback executes.
+  uint64_t delivery_time =
+      NearestGlobalClockTickAfter(global_clock_ticks_, event_time);
+  pending_global_clocking_cbs_.push_back(
+      {std::string(assertion), reason, event_time, delivery_time, info});
+  return 0;
+}
+
+uint32_t AssertionApi::AdvanceGlobalClockTick(uint64_t tick_time) {
+  uint32_t fired = 0;
+  std::vector<PendingGlobalClockingCb> still_waiting;
+  for (auto& pending : pending_global_clocking_cbs_) {
+    if (pending.delivery_time <= tick_time) {
+      // The deferred tick has been reached. Delivery reports the event time as
+      // cb_time, not this later tick, and reuses the §39.4.2 delivery path.
+      fired += DeliverAssertionEvent(pending.assertion, pending.reason,
+                                     pending.event_time, pending.info);
+    } else {
+      still_waiting.push_back(std::move(pending));
+    }
+  }
+  pending_global_clocking_cbs_ = std::move(still_waiting);
+  return fired;
+}
+
+uint32_t AssertionApi::PendingGlobalClockingCallbackCount() const {
+  return static_cast<uint32_t>(pending_global_clocking_cbs_.size());
+}
+
 void AssertionApi::SetSeverity(std::string_view name, AssertionSeverity sev) {
   severity_map_[std::string(name)] = sev;
 }
