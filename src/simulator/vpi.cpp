@@ -4065,6 +4065,23 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return ref->rhs;
   }
 
+  // §37.76: an alias statement reaches the two sides of the alias it establishes -
+  // its left-hand side expression through vpiLhs and its right-hand side
+  // expression through vpiRhs. As with the procedural continuous assignment family
+  // of §37.79 above, each side is an expression whose own type is an expression
+  // kind rather than the vpiLhs / vpiRhs relation tag, so the generic walk below
+  // cannot find it; both are held as the designated lhs / rhs pointers. The
+  // relations are gated on the alias statement kind so they do not disturb the
+  // vpiLhs / vpiRhs edges other diagrams draw. The diagram's remaining edge, the
+  // bidirectional structural link between the alias statement and the enclosing
+  // instance, is reached by the generic traversal and needs no special case here.
+  if (type == vpiLhs && ref->type == vpiAliasStmt) {
+    return ref->lhs;
+  }
+  if (type == vpiRhs && ref->type == vpiAliasStmt) {
+    return ref->rhs;
+  }
+
   // §37.71: vpiElseStmt of an if-else statement reaches its else-branch body.
   // The relation is drawn only from the if-else grouping, never from a plain if,
   // so it is gated on the if-else kind. The else statement's own type is a
