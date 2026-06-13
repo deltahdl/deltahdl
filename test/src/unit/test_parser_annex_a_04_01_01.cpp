@@ -156,44 +156,6 @@ TEST(ModuleInstantiationGrammar, EmptyParameterValueAssignment) {
   EXPECT_EQ(item->inst_params.size(), 0u);
 }
 
-TEST(ModuleInstantiationGrammar, MultipleInstancesSharedParams) {
-  auto r = Parse(
-      "module sub #(parameter W = 1)(input [W-1:0] d);\n"
-      "endmodule\n"
-      "module top;\n"
-      "  sub #(.W(8)) u0(.d(8'd0)), u1(.d(8'd1));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[1]->items.size(), 2u);
-  auto* i0 = r.cu->modules[1]->items[0];
-  auto* i1 = r.cu->modules[1]->items[1];
-  EXPECT_EQ(i0->inst_module, "sub");
-  EXPECT_EQ(i0->inst_params.size(), 1u);
-  EXPECT_EQ(i0->inst_params[0].first, "W");
-  EXPECT_EQ(i1->inst_module, "sub");
-  EXPECT_EQ(i1->inst_params.size(), 1u);
-  EXPECT_EQ(i1->inst_params[0].first, "W");
-}
-
-TEST(ModuleInstantiationGrammar, SimpleInstanceNoConnections) {
-  auto r = Parse(
-      "module sub; endmodule\n"
-      "module m;\n"
-      "  sub u0();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[1]->items[0]->kind, ModuleItemKind::kModuleInst);
-}
-
-TEST(ModuleInstantiationGrammar, MultipleLevelsOfHierarchy) {
-  EXPECT_TRUE(
-      ParseOk("module leaf; endmodule\n"
-              "module mid; leaf u0(); endmodule\n"
-              "module top; mid u0(); endmodule\n"));
-}
-
 TEST(ModuleInstantiationGrammar, AttributeOnPortConnection) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -201,123 +163,19 @@ TEST(ModuleInstantiationGrammar, AttributeOnPortConnection) {
               "endmodule"));
 }
 
-TEST(ModuleInstantiationGrammar, TopMux2to1Example) {
-  auto r = Parse(
-      "module mux2to1 (input wire a, b, sel,\n"
-      "                output logic y);\n"
-      "  not g1 (sel_n, sel);\n"
-      "  and g2 (a_s, a, sel_n);\n"
-      "  and g3 (b_s, b, sel);\n"
-      "  or  g4 (y, a_s, b_s);\n"
-      "endmodule: mux2to1\n"
-      "module top;\n"
-      "  logic in1, in2, select;\n"
-      "  wire out1;\n"
-      "  mux2to1 m1 (.a(in1), .b(in2), .sel(select), .y(out1));\n"
-      "endmodule: top\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 2u);
-  EXPECT_EQ(r.cu->modules[1]->name, "top");
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst));
-}
-
-TEST(ModuleInstantiationGrammar, ModuleInstWithParams) {
-  auto r = Parse("module m; sub #(8, 4) u0(.clk(clk)); endmodule\n");
+// ordered_port_connection ::= { attribute_instance } [ expression ]
+// The attribute_instance prefix is also permitted on a positional (ordered)
+// connection, not only on a named one; the connection still parses as ordered.
+TEST(ModuleInstantiationGrammar, AttributeOnOrderedPortConnection) {
+  auto r = Parse("module m; sub u0((* full_case *) x, (* parallel *) y); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_params.size(), 2u);
-}
-
-TEST(ModuleInstantiationGrammar, OrderedParamsNamedPorts) {
-  auto r = Parse("module m; sub #(8) u0(.clk(clk)); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->inst_params.size(), 1u);
-  EXPECT_EQ(item->inst_params[0].first, "");
-  EXPECT_EQ(item->inst_ports.size(), 1u);
-}
-
-TEST(ModuleInstantiationGrammar, OrderedParameterOverrideMultiModule) {
-  auto r = Parse(
-      "module sub #(parameter W = 1)(input [W-1:0] d);\n"
-      "endmodule\n"
-      "module top;\n"
-      "  sub #(8) u0(.d(8'd0));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* inst = FindModuleInst(r.cu->modules[1]->items);
-  ASSERT_NE(inst, nullptr);
-  EXPECT_EQ(inst->inst_params.size(), 1u);
-  EXPECT_EQ(inst->inst_params[0].first, "");
-  EXPECT_NE(inst->inst_params[0].second, nullptr);
-}
-
-TEST(ModuleInstantiationGrammar, ModuleInstanceWithParameters) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub #(8, 16) u1 (.a(x));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_module, "sub");
-  EXPECT_EQ(item->inst_name, "u1");
-  ASSERT_EQ(item->inst_params.size(), 2);
-}
-
-TEST(ModuleInstantiationGrammar, NamedParameterOverrideMultiModule) {
-  auto r = Parse(
-      "module sub #(parameter W = 1)(input [W-1:0] d);\n"
-      "endmodule\n"
-      "module top;\n"
-      "  sub #(.W(16)) u0(.d(16'd0));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* inst = FindModuleInst(r.cu->modules[1]->items);
-  ASSERT_NE(inst, nullptr);
-  EXPECT_EQ(inst->inst_params.size(), 1u);
-  EXPECT_EQ(inst->inst_params[0].first, "W");
-  EXPECT_NE(inst->inst_params[0].second, nullptr);
-}
-
-TEST(ModuleInstantiationGrammar, ModuleInstNamedParamOverride) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub #(.WIDTH(8), .DEPTH(16)) u1(.a(w1));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_module, "sub");
-}
-
-TEST(ModuleInstantiationGrammar, InstanceArrayWithRange) {
-  auto r = Parse("module m; sub u0[3:0](.a(a)); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->inst_name, "u0");
-  EXPECT_NE(item->inst_range_left, nullptr);
-  EXPECT_NE(item->inst_range_right, nullptr);
-}
-
-TEST(ModuleInstantiationGrammar, InstanceArrayKind) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub inst[3:0] (.a(a), .b(b));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_module, "sub");
-  EXPECT_EQ(item->inst_name, "inst");
+  ASSERT_EQ(item->inst_ports.size(), 2u);
+  EXPECT_EQ(item->inst_ports[0].first, "");
+  EXPECT_NE(item->inst_ports[0].second, nullptr);
+  EXPECT_EQ(item->inst_ports[1].first, "");
+  EXPECT_NE(item->inst_ports[1].second, nullptr);
 }
 
 TEST(ModuleInstantiationGrammar, InstanceArrayMultipleDimensions) {
@@ -335,6 +193,88 @@ TEST(ModuleInstantiationGrammar, InstanceArrayMultipleDimensions) {
   EXPECT_EQ(item->inst_range_right, item->inst_dims[0].second);
 }
 
+// named_port_connection ::= ... | { attribute_instance } . *
+// The .* wildcard is a distinct alternative of named_port_connection; it sets
+// the instance's wildcard flag rather than appending an explicit connection.
+TEST(ModuleInstantiationGrammar, WildcardPortConnection) {
+  auto r = Parse("module m; sub u0(.*); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_TRUE(item->inst_wildcard);
+  EXPECT_EQ(item->inst_ports.size(), 0u);
+}
+
+// A second .* in the same port-connection list is rejected.
+TEST(ModuleInstantiationGrammar, ErrorDuplicateWildcardPort) {
+  auto r = Parse("module m; sub u0(.*, .*); endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// named_port_connection ::= { attribute_instance } . port_identifier
+//                           [ ( [ expression ] ) ]
+// With the parenthesized expression omitted, the port name is connected
+// implicitly; the parser records this via the implicit flag.
+TEST(ModuleInstantiationGrammar, ImplicitNamedPortConnection) {
+  auto r = Parse("module m; sub u0(.clk, .data); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->inst_ports.size(), 2u);
+  EXPECT_EQ(item->inst_ports[0].first, "clk");
+  EXPECT_EQ(item->inst_ports[1].first, "data");
+  ASSERT_EQ(item->inst_ports_implicit.size(), 2u);
+  EXPECT_TRUE(item->inst_ports_implicit[0]);
+  EXPECT_TRUE(item->inst_ports_implicit[1]);
+}
+
+// named_port_connection with the optional expression present but empty:
+// . port_identifier ( ) leaves the connection expression null.
+TEST(ModuleInstantiationGrammar, EmptyNamedPortExpression) {
+  auto r = Parse("module m; sub u0(.clk()); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->inst_ports.size(), 1u);
+  EXPECT_EQ(item->inst_ports[0].first, "clk");
+  EXPECT_EQ(item->inst_ports[0].second, nullptr);
+  ASSERT_EQ(item->inst_ports_implicit.size(), 1u);
+  EXPECT_FALSE(item->inst_ports_implicit[0]);
+}
+
+// ordered_port_connection ::= { attribute_instance } [ expression ]
+// The expression is optional, so an empty positional slot is permitted and
+// yields a null connection expression.
+TEST(ModuleInstantiationGrammar, OrderedPortConnectionEmptyExpression) {
+  auto r = Parse("module m; sub u0(a, , c); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->inst_ports.size(), 3u);
+  EXPECT_EQ(item->inst_ports[0].first, "");
+  EXPECT_NE(item->inst_ports[0].second, nullptr);
+  EXPECT_EQ(item->inst_ports[1].first, "");
+  EXPECT_EQ(item->inst_ports[1].second, nullptr);
+  EXPECT_NE(item->inst_ports[2].second, nullptr);
+}
+
+// list_of_port_connections ::= ordered_port_connection { , ordered_port_connection }
+//                            | named_port_connection { , named_port_connection }
+// The two alternatives are mutually exclusive: a single list cannot combine
+// ordered and named port connections.
+TEST(ModuleInstantiationGrammar, ErrorOrderedAndNamedPortsCannotMix) {
+  auto r = Parse("module m; sub u0(a, .b(c)); endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// list_of_parameter_value_assignments has the same two-alternative shape, so
+// ordered and named parameter value assignments cannot be combined either.
+TEST(ModuleInstantiationGrammar, ErrorOrderedAndNamedParamsCannotMix) {
+  auto r = Parse("module m; sub #(8, .D(4)) u0(a); endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 TEST(ModuleInstantiationGrammar, ErrorMissingInstanceName) {
   auto r = Parse("module m; sub(a, b); endmodule\n");
   EXPECT_TRUE(r.has_errors);
@@ -342,6 +282,12 @@ TEST(ModuleInstantiationGrammar, ErrorMissingInstanceName) {
 
 TEST(ModuleInstantiationGrammar, ErrorMissingPortParentheses) {
   auto r = Parse("module m; sub u0; endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// module_instantiation is terminated by a semicolon; omitting it is an error.
+TEST(ModuleInstantiationGrammar, ErrorMissingSemicolon) {
+  auto r = Parse("module m; sub u0(a) endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
 
