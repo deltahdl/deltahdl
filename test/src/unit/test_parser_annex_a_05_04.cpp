@@ -267,25 +267,6 @@ TEST(UdpInstantiationParsing, UdpInst_Unnamed) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 3u);
 }
 
-TEST(UdpInstantiationParsing, UdpInst_DriveStrength) {
-  auto r = Parse(
-      "primitive my_udp(output y, input a, input b);\n"
-      "  table\n"
-      "    0 0 : 0 ;\n"
-      "    1 1 : 1 ;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "module m;\n"
-      "  my_udp (strong0, pull1) u1(out, in1, in2);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto insts = FindUdpInsts(r.cu->modules[0]->items);
-  ASSERT_EQ(insts.size(), 1u);
-  EXPECT_NE(insts[0]->drive_strength0, 0);
-  EXPECT_NE(insts[0]->drive_strength1, 0);
-}
-
 TEST(UdpInstantiationParsing, UdpInst_DriveStrengthReversed) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
@@ -345,45 +326,6 @@ TEST(UdpInstantiationParsing, UdpInst_DelayRiseFall) {
   EXPECT_EQ(insts[0]->gate_delay_decay, nullptr);
 }
 
-TEST(UdpInstantiationParsing, UdpInst_StrengthAndDelay) {
-  auto r = Parse(
-      "primitive my_udp(output y, input a, input b);\n"
-      "  table\n"
-      "    0 0 : 0 ;\n"
-      "    1 1 : 1 ;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "module m;\n"
-      "  my_udp (weak0, weak1) #7 u1(out, in1, in2);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto insts = FindUdpInsts(r.cu->modules[0]->items);
-  ASSERT_EQ(insts.size(), 1u);
-  EXPECT_NE(insts[0]->drive_strength0, 0);
-  EXPECT_NE(insts[0]->drive_strength1, 0);
-  EXPECT_NE(insts[0]->gate_delay, nullptr);
-}
-
-TEST(UdpInstantiationParsing, UdpInst_MultipleInstances) {
-  auto r = Parse(
-      "primitive my_udp(output y, input a, input b);\n"
-      "  table\n"
-      "    0 0 : 0 ;\n"
-      "    1 1 : 1 ;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "module m;\n"
-      "  my_udp u1(o1, i1, i2), u2(o2, i3, i4);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto insts = FindUdpInsts(r.cu->modules[0]->items);
-  ASSERT_EQ(insts.size(), 2u);
-  EXPECT_EQ(insts[0]->gate_inst_name, "u1");
-  EXPECT_EQ(insts[1]->gate_inst_name, "u2");
-}
-
 TEST(UdpInstantiationParsing, UdpInst_MultipleWithStrengthDelay) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
@@ -426,24 +368,6 @@ TEST(UdpInstantiationParsing, UdpInst_InstanceArray) {
   EXPECT_NE(insts[0]->inst_range_right, nullptr);
 }
 
-TEST(UdpInstantiationParsing, UdpInst_SingleInput) {
-  auto r = Parse(
-      "primitive my_buf(output y, input a);\n"
-      "  table\n"
-      "    0 : 0 ;\n"
-      "    1 : 1 ;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "module m;\n"
-      "  my_buf u1(out, in1);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto insts = FindUdpInsts(r.cu->modules[0]->items);
-  ASSERT_EQ(insts.size(), 1u);
-  EXPECT_EQ(insts[0]->gate_terminals.size(), 2u);
-}
-
 TEST(UdpInstantiationParsing, UdpInst_ManyInputs) {
   auto r = Parse(
       "primitive my_gate(output y, input a, input b, input c, input d);\n"
@@ -478,41 +402,6 @@ TEST(UdpInstantiationParsing, UdpInst_WithAttributes) {
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
   ASSERT_EQ(insts.size(), 1u);
   EXPECT_FALSE(insts[0]->attrs.empty());
-}
-
-TEST(UdpInstantiationParsing, UdpInstance) {
-  auto r = Parse(
-      "primitive inv(output out, input in);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "module top;\n"
-      "  wire a, b;\n"
-      "  inv u1(a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->udps.size(), 1);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-  auto insts = FindUdpInsts(r.cu->modules[0]->items);
-  ASSERT_EQ(insts.size(), 1u);
-  EXPECT_EQ(insts[0]->inst_module, "inv");
-  EXPECT_EQ(insts[0]->gate_inst_name, "u1");
-}
-
-TEST(UdpInstantiationParsing, UdpInstanceInModule) {
-  auto r = Parse(
-      "primitive udp_and (output out, input a, b);\n"
-      "  table 0 0 : 0; 0 1 : 0; 1 0 : 0; 1 1 : 1; endtable\n"
-      "endprimitive\n"
-      "module m;\n"
-      "  wire a, b, y;\n"
-      "  udp_and u1(y, a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst));
 }
 
 TEST(UdpInstantiationParsing, BuiltInAndUdpCoexist) {
@@ -626,6 +515,52 @@ TEST(UdpInstantiationParsing, ThreeInstances) {
   EXPECT_EQ(insts[0]->gate_inst_name, "u1");
   EXPECT_EQ(insts[1]->gate_inst_name, "u2");
   EXPECT_EQ(insts[2]->gate_inst_name, "u3");
+}
+
+// The udp_instantiation production permits only delay2 (at most two delay
+// values), unlike continuous_assign which uses delay3. A third delay value
+// must therefore be rejected.
+TEST(UdpInstantiationParsing, UdpInstThreeDelaysRejected) {
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  wire y, a;\n"
+      "  inv #(1, 2, 3) u1(y, a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
+// The udp_instantiation production terminates with a mandatory semicolon;
+// omitting it after the instance list must be flagged as an error.
+TEST(UdpInstantiationParsing, UdpInstMissingSemicolonRejected) {
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  wire y, a;\n"
+      "  inv u1(y, a)\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
+// The udp_instance production wraps its terminals in parentheses; a terminal
+// list left unclosed must be flagged as an error.
+TEST(UdpInstantiationParsing, UdpInstMissingCloseParenRejected) {
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  wire y, a;\n"
+      "  inv u1(y, a ;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
 }
 
 TEST(UdpInstantiationParsing, AllStrengthKeywords) {
