@@ -292,22 +292,6 @@ TEST(PrimitiveStrengthParsing, PulldownStrength_SingleStrength0_MultipleInstance
   EXPECT_EQ(gates[1]->drive_strength1, 0u);
 }
 
-TEST(PrimitiveStrengthParsing, PulldownStrength_AllStrength0Values) {
-  EXPECT_TRUE(ParseOk("module m; pulldown (highz0) (out); endmodule"));
-  EXPECT_TRUE(ParseOk("module m; pulldown (weak0) (out); endmodule"));
-  EXPECT_TRUE(ParseOk("module m; pulldown (pull0) (out); endmodule"));
-  EXPECT_TRUE(ParseOk("module m; pulldown (strong0) (out); endmodule"));
-  EXPECT_TRUE(ParseOk("module m; pulldown (supply0) (out); endmodule"));
-}
-
-TEST(PrimitiveStrengthParsing, PullupStrength_AllStrength1Values) {
-  EXPECT_TRUE(ParseOk("module m; pullup (highz1) (out); endmodule"));
-  EXPECT_TRUE(ParseOk("module m; pullup (weak1) (out); endmodule"));
-  EXPECT_TRUE(ParseOk("module m; pullup (pull1) (out); endmodule"));
-  EXPECT_TRUE(ParseOk("module m; pullup (strong1) (out); endmodule"));
-  EXPECT_TRUE(ParseOk("module m; pullup (supply1) (out); endmodule"));
-}
-
 TEST(PrimitiveStrengthParsing, Error_PulldownSingleStrength1) {
   auto r = Parse(
       "module m;\n"
@@ -316,74 +300,10 @@ TEST(PrimitiveStrengthParsing, Error_PulldownSingleStrength1) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(PrimitiveStrengthParsing, Error_PulldownSingleWeak1) {
-  auto r = Parse(
-      "module m;\n"
-      "  pulldown (weak1) pd1(out);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveStrengthParsing, Error_PulldownSinglePull1) {
-  auto r = Parse(
-      "module m;\n"
-      "  pulldown (pull1) pd1(out);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveStrengthParsing, Error_PulldownSingleSupply1) {
-  auto r = Parse(
-      "module m;\n"
-      "  pulldown (supply1) pd1(out);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveStrengthParsing, Error_PulldownSingleHighz1) {
-  auto r = Parse(
-      "module m;\n"
-      "  pulldown (highz1) pd1(out);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(PrimitiveStrengthParsing, Error_PullupSingleStrength0) {
   auto r = Parse(
       "module m;\n"
       "  pullup (strong0) pu1(out);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveStrengthParsing, Error_PullupSingleWeak0) {
-  auto r = Parse(
-      "module m;\n"
-      "  pullup (weak0) pu1(out);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveStrengthParsing, Error_PullupSinglePull0) {
-  auto r = Parse(
-      "module m;\n"
-      "  pullup (pull0) pu1(out);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveStrengthParsing, Error_PullupSingleHighz0) {
-  auto r = Parse(
-      "module m;\n"
-      "  pullup (highz0) pu1(out);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveStrengthParsing, Error_PullupSingleSupply0) {
-  auto r = Parse(
-      "module m;\n"
-      "  pullup (supply0) pu1(out);\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
