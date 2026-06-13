@@ -342,6 +342,20 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
     return MakeLogic4VecVal(arena, 1,
                             ctx.IsEventTriggered(ep_name) ? 1u : 0u);
   }
+
+  if (!base_var && field_name == "ended" && ctx.FindSequenceDecl(base_name)) {
+    // Annex C.2.3: IEEE 1800-2005 supplied the ended sequence method to detect
+    // a sequence end point inside a sequence expression, while triggered served
+    // the same role in other contexts. The two had identical meaning but
+    // mutually exclusive uses, so this version retires ended and lets triggered
+    // cover both. A reference to ended on a named sequence therefore names a
+    // removed method and is reported rather than silently evaluated.
+    ctx.GetDiag().Error(
+        {}, "the ended sequence method has been removed; use the triggered "
+            "method to detect the end point of sequence '" +
+                std::string(base_name) + "'");
+    return MakeLogic4Vec(arena, 1);
+  }
   if (TryClassPropertyAccess(base_var, field_name, base_name, ctx, arena, out))
     return out;
   if (TryClassEnumAccess(base_var, field_name, ctx, arena, out)) return out;
