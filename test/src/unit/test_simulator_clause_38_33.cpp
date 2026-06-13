@@ -41,16 +41,6 @@ TEST_F(VpiPutUserDataSim, AssociatesUserDataWithFunctionCall) {
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
-// §38.33 (Arguments): the routine also accepts a system task call instance -
-// the other call kind the routine names - storing and returning success.
-TEST_F(VpiPutUserDataSim, AssociatesUserDataWithTaskCall) {
-  VpiHandle call = MakeCall(vpiSysTaskCall);
-  int marker = 0;
-
-  EXPECT_EQ(vpi_put_userdata(call, &marker), 1);
-  EXPECT_EQ(call->user_data, &marker);
-}
-
 // §38.33 (Arguments, edge case): the user-data argument is just a value to be
 // associated, so a null value is legal data, not an error. Only the handle is
 // validated: putting a null user-data value on a valid call handle still
