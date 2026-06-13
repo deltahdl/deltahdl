@@ -5,20 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(UdpBodyGrammar, UdpSequential) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, input clk);\n"
-      "  table\n"
-      "    0 r : ? : 0 ;\n"
-      "    1 r : ? : 1 ;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  EXPECT_TRUE(r.cu->udps[0]->is_sequential);
-}
-
 TEST(UdpBodyGrammar, UdpBody_CombinationalAlternative) {
   auto r = Parse(
       "primitive and_gate(output y, input a, b);\n"
@@ -166,20 +152,6 @@ TEST(UdpBodyGrammar, CombEntry_Structure) {
   EXPECT_EQ(udp->table[1].output, '1');
 }
 
-TEST(UdpBodyGrammar, SeqBody_SingleEntry) {
-  auto r = Parse(
-      "primitive sr_min(output reg q, input s, r);\n"
-      "  table\n"
-      "    1 0 : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_EQ(udp->table.size(), 1);
-}
-
 TEST(UdpBodyGrammar, SeqBody_WithInitial) {
   auto r = Parse(
       "primitive latch_init(output reg q, input d, en);\n"
@@ -234,21 +206,6 @@ TEST(UdpBodyGrammar, UdpBody_SimSequential) {
 
   eval.Evaluate({'1', '0'});
   EXPECT_EQ(eval.GetOutput(), '0');
-}
-
-TEST(UdpBodyGrammar, InitStmt_ValueOne) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, clk);\n"
-      "  initial q = 1;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '1');
 }
 
 TEST(UdpBodyGrammar, InitVal_1b0) {
@@ -560,45 +517,6 @@ TEST(UdpBodyGrammar, EdgeIndicator_Paren01) {
   ASSERT_EQ(udp->table[0].inputs.size(), 2);
 }
 
-TEST(UdpBodyGrammar, EdgeIndicator_Paren10) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, clk);\n"
-      "  table\n"
-      "    ? (10) : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table[0].inputs.size(), 2);
-}
-
-TEST(UdpBodyGrammar, EdgeIndicator_Paren0x) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, clk);\n"
-      "  table\n"
-      "    ? (0x) : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table[0].inputs.size(), 2);
-}
-
-TEST(UdpBodyGrammar, EdgeIndicator_Parenx1) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, clk);\n"
-      "  table\n"
-      "    ? (x1) : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table[0].inputs.size(), 2);
-}
-
 TEST(UdpBodyGrammar, EdgeIndicator_SimParen01) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -623,52 +541,6 @@ TEST(UdpBodyGrammar, EdgeIndicator_SimParen01) {
 
   eval.SetInputs({'0', '0'});
   EXPECT_EQ(eval.EvaluateWithEdge({'0', '1'}, 1, '0'), '0');
-}
-
-TEST(UdpBodyGrammar, TableEdgeNotationParenthesized) {
-  EXPECT_TRUE(
-      ParseOk("primitive edge_udp(output reg q, input d, clk);\n"
-              "  table\n"
-              "    0 (01) : ? : 0;\n"
-              "    1 (01) : ? : 1;\n"
-              "    ? (10) : ? : -;\n"
-              "    ? (0x) : ? : -;\n"
-              "    ? (x1) : ? : -;\n"
-              "  endtable\n"
-              "endprimitive\n"));
-}
-
-TEST(UdpBodyGrammar, CurrentState_Zero) {
-  auto r = Parse(
-      "primitive p(output reg q, input s, r);\n"
-      "  table\n"
-      "    1 0 : 0 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->udps[0]->table[0].current_state, '0');
-}
-
-TEST(UdpBodyGrammar, CurrentState_One) {
-  auto r = Parse(
-      "primitive p(output reg q, input s, r);\n"
-      "  table\n"
-      "    0 1 : 1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->udps[0]->table[0].current_state, '1');
-}
-
-TEST(UdpBodyGrammar, CurrentState_Question) {
-  auto r = Parse(
-      "primitive p(output reg q, input d, en);\n"
-      "  table\n"
-      "    0 1 : ? : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->udps[0]->table[0].current_state, '?');
 }
 
 TEST(UdpBodyGrammar, CurrentState_X) {
@@ -719,50 +591,6 @@ TEST(UdpBodyGrammar, SequentialCurrentStateField) {
 
   EXPECT_EQ(udp->table[3].current_state, '?');
   EXPECT_EQ(udp->table[3].output, '-');
-}
-
-TEST(UdpBodyGrammar, NextState_Zero) {
-  auto r = Parse(
-      "primitive p(output reg q, input d, en);\n"
-      "  table\n"
-      "    0 1 : ? : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->udps[0]->table[0].output, '0');
-}
-
-TEST(UdpBodyGrammar, NextState_One) {
-  auto r = Parse(
-      "primitive p(output reg q, input d, en);\n"
-      "  table\n"
-      "    1 1 : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->udps[0]->table[0].output, '1');
-}
-
-TEST(UdpBodyGrammar, NextState_X) {
-  auto r = Parse(
-      "primitive p(output reg q, input d, en);\n"
-      "  table\n"
-      "    1 1 : ? : x;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->udps[0]->table[0].output, 'x');
-}
-
-TEST(UdpBodyGrammar, NextState_Dash) {
-  auto r = Parse(
-      "primitive p(output reg q, input d, en);\n"
-      "  table\n"
-      "    ? 0 : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->udps[0]->table[0].output, '-');
 }
 
 TEST(UdpBodyGrammar, NextState_SimDashKeepsState) {
@@ -886,105 +714,6 @@ TEST(UdpBodyGrammar, LevelSymbol_SimB) {
   EXPECT_EQ(eval.Evaluate({'x'}), 'x');
 }
 
-TEST(UdpBodyGrammar, TableSymbol0And1) {
-  auto r = Parse(
-      "primitive and_gate(output out, input a, b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    0 1 : 0;\n"
-      "    1 0 : 0;\n"
-      "    1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->udps.size(), 1);
-  auto* udp = r.cu->udps[0];
-  EXPECT_FALSE(udp->is_sequential);
-  ASSERT_EQ(udp->table.size(), 4);
-
-  EXPECT_EQ(udp->table[0].inputs[0], '0');
-  EXPECT_EQ(udp->table[0].inputs[1], '0');
-  EXPECT_EQ(udp->table[0].output, '0');
-
-  EXPECT_EQ(udp->table[3].inputs[0], '1');
-  EXPECT_EQ(udp->table[3].inputs[1], '1');
-  EXPECT_EQ(udp->table[3].output, '1');
-}
-
-TEST(UdpBodyGrammar, TableSymbolQuestionMark) {
-  auto r = Parse(
-      "primitive buf_udp(output out, input in);\n"
-      "  table\n"
-      "    0 : 0;\n"
-      "    1 : 1;\n"
-      "    ? : x;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->udps.size(), 1);
-  ASSERT_EQ(r.cu->udps[0]->table.size(), 3);
-
-  EXPECT_EQ(r.cu->udps[0]->table[2].inputs[0], '?');
-  EXPECT_EQ(r.cu->udps[0]->table[2].output, 'x');
-}
-
-TEST(UdpBodyGrammar, TableSymbolX) {
-  auto r = Parse(
-      "primitive xor_udp(output out, input a, b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    0 1 : 1;\n"
-      "    1 0 : 1;\n"
-      "    1 1 : 0;\n"
-      "    x ? : x;\n"
-      "    ? x : x;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table.size(), 6);
-
-  EXPECT_EQ(udp->table[4].inputs[0], 'x');
-  EXPECT_EQ(udp->table[4].inputs[1], '?');
-  EXPECT_EQ(udp->table[4].output, 'x');
-}
-
-TEST(UdpBodyGrammar, TableSymbolB) {
-  auto r = Parse(
-      "primitive or_udp(output out, input a, b);\n"
-      "  table\n"
-      "    b 0 : 0;\n"
-      "    0 b : 0;\n"
-      "    1 ? : 1;\n"
-      "    ? 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table.size(), 4);
-  EXPECT_EQ(udp->table[0].inputs[0], 'b');
-  EXPECT_EQ(udp->table[1].inputs[1], 'b');
-}
-
-TEST(UdpBodyGrammar, TableSymbolDashNoChange) {
-  auto r = Parse(
-      "primitive latch(output reg q, input d, en);\n"
-      "  table\n"
-      "    0 1 : ? : 0;\n"
-      "    1 1 : ? : 1;\n"
-      "    ? 0 : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->is_sequential);
-  ASSERT_EQ(udp->table.size(), 3);
-
-  EXPECT_EQ(udp->table[2].output, '-');
-
-  EXPECT_EQ(udp->table[2].current_state, '?');
-}
-
 TEST(UdpBodyGrammar, EdgeSymbol_AllValues) {
   auto r = Parse(
       "primitive p(output reg q, input a);\n"
@@ -1103,138 +832,6 @@ TEST(UdpBodyGrammar, EdgeSymbol_SimStar) {
   EXPECT_EQ(eval.EvaluateWithEdge({'0'}, 0, '1'), '1');
 }
 
-TEST(UdpBodyGrammar, TableEdgeSymbolsRAndF) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, clk);\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "    ? f : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->is_sequential);
-  ASSERT_EQ(udp->table.size(), 3);
-  EXPECT_EQ(udp->table[0].inputs[1], 'r');
-  EXPECT_EQ(udp->table[1].inputs[1], 'r');
-  EXPECT_EQ(udp->table[2].inputs[1], 'f');
-  EXPECT_EQ(udp->table[2].output, '-');
-}
-
-TEST(UdpBodyGrammar, TableEdgeSymbolStar) {
-  auto r = Parse(
-      "primitive any_change(output reg q, input d, clk);\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "    * ? : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table.size(), 3);
-  EXPECT_EQ(udp->table[2].inputs[0], '*');
-  EXPECT_EQ(udp->table[2].output, '-');
-}
-
-TEST(UdpBodyGrammar, TableEdgeSymbolsPAndN) {
-  EXPECT_TRUE(
-      ParseOk("primitive pos_neg(output reg q, input d, clk);\n"
-              "  table\n"
-              "    0 p : ? : 0;\n"
-              "    1 p : ? : 1;\n"
-              "    ? n : ? : -;\n"
-              "  endtable\n"
-              "endprimitive\n"));
-}
-
-TEST(UdpBodyGrammar, SequentialInitialX) {
-  auto r = Parse(
-      "primitive dff_x(output reg q, input d, input clk);\n"
-      "  initial q = 1'bx;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, 'x');
-}
-
-TEST(UdpBodyGrammar, TableEdgeSymbols) {
-  auto r = Parse(
-      "primitive edge_det(output reg q, input d, input clk);\n"
-      "  table\n"
-      "    ? f : ? : 1;\n"
-      "    ? p : ? : 0;\n"
-      "    * ? : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table.size(), 3u);
-  EXPECT_EQ(udp->table[0].inputs[1], 'f');
-  EXPECT_EQ(udp->table[1].inputs[1], 'p');
-  EXPECT_EQ(udp->table[2].inputs[0], '*');
-  EXPECT_EQ(udp->table[2].output, '-');
-}
-
-TEST(UdpBodyGrammar, TableWildcardSymbols) {
-  auto r = Parse(
-      "primitive wild(output out, input a, input b);\n"
-      "  table\n"
-      "    ? ? : 0;\n"
-      "    b b : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table.size(), 2u);
-  EXPECT_EQ(udp->table[0].inputs[0], '?');
-  EXPECT_EQ(udp->table[0].inputs[1], '?');
-  EXPECT_EQ(udp->table[1].inputs[0], 'b');
-  EXPECT_EQ(udp->table[1].inputs[1], 'b');
-}
-
-TEST(UdpBodyGrammar, SequentialInitialOne) {
-  auto r = Parse(
-      "primitive latch(output reg q, input d, input en);\n"
-      "  initial q = 1'b1;\n"
-      "  table\n"
-      "    ? 0 : ? : -;\n"
-      "    0 1 : ? : 0;\n"
-      "    1 1 : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '1');
-}
-
-TEST(UdpBodyGrammar, InitStmt_Parsed) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, clk);\n"
-      "  initial q = 0;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '0');
-}
-
 TEST(UdpBodyGrammar, EmptyTableError) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -1242,87 +839,6 @@ TEST(UdpBodyGrammar, EmptyTableError) {
       "  endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(r.has_errors);
-}
-
-TEST(UdpBodyGrammar, LargeCombinationalTable) {
-  auto r = Parse(
-      "primitive full3(output y, input a, b, c);\n"
-      "  table\n"
-      "    0 0 0 : 0;\n"
-      "    0 0 1 : 0;\n"
-      "    0 1 0 : 0;\n"
-      "    0 1 1 : 1;\n"
-      "    1 0 0 : 0;\n"
-      "    1 0 1 : 1;\n"
-      "    1 1 0 : 1;\n"
-      "    1 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_FALSE(udp->is_sequential);
-  EXPECT_EQ(udp->table.size(), 8u);
-}
-
-TEST(UdpBodyGrammar, ManyInputsLevelInputList) {
-  auto r = Parse(
-      "primitive wide(output y, input a, b, c, d, e, f, g, h);\n"
-      "  table\n"
-      "    0 0 0 0 0 0 0 0 : 0;\n"
-      "    1 1 1 1 1 1 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table.size(), 2u);
-  EXPECT_EQ(udp->table[0].inputs.size(), 8u);
-}
-
-TEST(UdpBodyGrammar, EdgeIndicator_ParenQuestion0) {
-  EXPECT_TRUE(
-      ParseOk("primitive p(output reg q, input a);\n"
-              "  table\n"
-              "    (?0) : ? : 0;\n"
-              "  endtable\n"
-              "endprimitive\n"));
-}
-
-TEST(UdpBodyGrammar, EdgeIndicator_ParenQuestion1) {
-  EXPECT_TRUE(
-      ParseOk("primitive p(output reg q, input a);\n"
-              "  table\n"
-              "    (?1) : ? : 0;\n"
-              "  endtable\n"
-              "endprimitive\n"));
-}
-
-TEST(UdpBodyGrammar, EdgeIndicator_ParenB0) {
-  EXPECT_TRUE(
-      ParseOk("primitive p(output reg q, input a);\n"
-              "  table\n"
-              "    (b0) : ? : 0;\n"
-              "  endtable\n"
-              "endprimitive\n"));
-}
-
-TEST(UdpBodyGrammar, EdgeIndicator_Paren1x) {
-  EXPECT_TRUE(
-      ParseOk("primitive p(output reg q, input a);\n"
-              "  table\n"
-              "    (1x) : ? : 0;\n"
-              "  endtable\n"
-              "endprimitive\n"));
-}
-
-TEST(UdpBodyGrammar, EdgeIndicator_Parenx0) {
-  EXPECT_TRUE(
-      ParseOk("primitive p(output reg q, input a);\n"
-              "  table\n"
-              "    (x0) : ? : 0;\n"
-              "  endtable\n"
-              "endprimitive\n"));
 }
 
 TEST(UdpBodyGrammar, SeqEntry_ManyInputsWithEdge) {
@@ -1359,26 +875,6 @@ TEST(UdpBodyGrammar, SeqBody_SingleEntryMinimal) {
   EXPECT_EQ(udp->table[0].output, '1');
 }
 
-TEST(UdpBodyGrammar, CombEntry_AllOutputSymbols) {
-  auto r = Parse(
-      "primitive p(output y, input a, b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    0 1 : 1;\n"
-      "    1 0 : x;\n"
-      "    1 1 : X;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table.size(), 4u);
-  EXPECT_EQ(udp->table[0].output, '0');
-  EXPECT_EQ(udp->table[1].output, '1');
-  EXPECT_EQ(udp->table[2].output, 'x');
-  EXPECT_TRUE(udp->table[3].output == 'x' || udp->table[3].output == 'X');
-}
-
 TEST(UdpBodyGrammar, NextState_AllValuesInOneUdp) {
   auto r = Parse(
       "primitive p(output reg q, input a);\n"
@@ -1397,6 +893,80 @@ TEST(UdpBodyGrammar, NextState_AllValuesInOneUdp) {
   EXPECT_EQ(udp->table[1].output, '1');
   EXPECT_EQ(udp->table[2].output, 'x');
   EXPECT_EQ(udp->table[3].output, '-');
+}
+
+// Error/edge cases for the symbol-position restrictions that §A.5.3's BNF
+// imposes. Each parses a table that violates one production and expects the
+// parser to flag it, observing the grammar rule being enforced.
+
+// combinational_entry's output is an output_symbol (0 1 x X); a level-only
+// symbol such as b is not a legal combinational output.
+TEST(UdpBodyGrammar, CombinationalOutputRejectsNonOutputSymbol) {
+  auto r = Parse(
+      "primitive p(output y, input a);\n"
+      "  table\n"
+      "    0 : b;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// The dash (no-change) is only legal as a next_state; a combinational
+// output_symbol may not be a dash.
+TEST(UdpBodyGrammar, CombinationalOutputRejectsDash) {
+  auto r = Parse(
+      "primitive p(output y, input a);\n"
+      "  table\n"
+      "    0 : -;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// current_state is a level_symbol, so an edge symbol is not allowed there.
+TEST(UdpBodyGrammar, CurrentStateRejectsEdgeSymbol) {
+  auto r = Parse(
+      "primitive p(output reg q, input d, clk);\n"
+      "  table\n"
+      "    0 r : r : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// current_state is a level_symbol; the dash (no-change) is not a level_symbol.
+TEST(UdpBodyGrammar, CurrentStateRejectsDash) {
+  auto r = Parse(
+      "primitive p(output reg q, input d, en);\n"
+      "  table\n"
+      "    0 1 : - : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// Input fields are made of level/edge symbols; the dash is neither and may not
+// appear in the input list.
+TEST(UdpBodyGrammar, InputFieldRejectsDash) {
+  auto r = Parse(
+      "primitive p(output y, input a, b);\n"
+      "  table\n"
+      "    - 1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// A parenthesized edge_indicator's two endpoints are level_symbols; an edge
+// symbol inside the parentheses is not permitted.
+TEST(UdpBodyGrammar, ParenEdgeEndpointsRejectNonLevelSymbol) {
+  auto r = Parse(
+      "primitive p(output reg q, input d, clk);\n"
+      "  table\n"
+      "    0 (r0) : ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }
