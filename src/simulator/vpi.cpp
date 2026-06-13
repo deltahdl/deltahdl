@@ -6180,6 +6180,44 @@ int VpiContext::Get(int property, VpiHandle obj) {
   }
 }
 
+// §38.7: vpi_get64() returns the value of a 64-bit integer object property - one
+// whose type is PLI_INT64. The value any given property carries (and, for those
+// with a defined value, the value reported) is fixed by the subclause that
+// introduces the property and by Annex K and Annex M; this routine provides the
+// shared full-width access path and the error behaviour those properties rely
+// on.
+PLI_INT64 VpiContext::Get64(int property, VpiHandle obj) {
+  if (!obj) return 0;
+  // §38.7: as with vpi_get(), unless otherwise specified querying a property of
+  // a protected object is an error, and on any error vpi_get64() returns
+  // vpiUndefined. The vpiType and vpiIsProtected properties stay accessible for
+  // every object, and a protected expression still permits vpiSize, mirroring
+  // the carve-outs vpi_get() applies (§37.3.6, §37.59).
+  if (obj->is_protected && property != kVpiType && property != vpiIsProtected &&
+      !(property == kVpiSize && VpiIsExprType(obj->type))) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message = "vpi_get64() on a protected object is an error";
+    return vpiUndefined;
+  }
+  switch (property) {
+    // §37.33: a class object's unique identifier is a genuinely 64-bit value,
+    // and a class variable reports the identifier of the object it references (0
+    // when it references none). vpi_get64() hands back the full width, where
+    // vpi_get() must narrow the same value to PLI_INT32.
+    case vpiObjId:
+      if (obj->type == vpiClassVar) {
+        return obj->referenced_object ? obj->referenced_object->obj_id : 0;
+      }
+      return obj->obj_id;
+    // Every other property is a 32-bit integer or Boolean property; widen the
+    // value vpi_get() computes to the 64-bit return type so vpi_get64() can read
+    // it too.
+    default:
+      return Get(property, obj);
+  }
+}
+
 // §37.3.2: vpi_get_str(vpiType, ...) hands back the name of the type constant,
 // and that name is derived from the object's name in the data model diagram
 // (§37.3) - i.e. it is the very identifier of the type constant. This maps the
@@ -6952,6 +6990,11 @@ int VpiRemoveCbC(vpiHandle cb_handle) {
 int vpi_get(int property, vpiHandle obj) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().Get(property, obj);
+}
+
+PLI_INT64 vpi_get64(int property, vpiHandle obj) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  return delta::GetGlobalVpiContext().Get64(property, obj);
 }
 
 const char* vpi_get_str(int property, vpiHandle obj) {

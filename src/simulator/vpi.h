@@ -3060,6 +3060,12 @@ class VpiContext {
 
   int Get(int property, VpiHandle obj);
 
+  // §38.7: read a 64-bit integer object property (one whose type is PLI_INT64),
+  // returning the value at full width instead of the PLI_INT32 vpi_get() yields.
+  // Querying a protected object is an error, and on any error the value returned
+  // is vpiUndefined.
+  PLI_INT64 Get64(int property, VpiHandle obj);
+
   // §37.10 detail 7: the smallest time precision over every module object the
   // context knows about, used to answer vpi_get(vpiTimePrecision/vpiTimeUnit)
   // for a null handle.
@@ -4019,6 +4025,7 @@ void vpi_put_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
 vpiHandle vpi_register_cb(s_cb_data* data);
 int VpiRemoveCbC(vpiHandle cb_handle);
 int vpi_get(int property, vpiHandle obj);
+PLI_INT64 vpi_get64(int property, vpiHandle obj);
 const char* vpi_get_str(int property, vpiHandle obj);
 int vpi_free_object(vpiHandle obj);
 int VpiControlC(int operation, ...);
