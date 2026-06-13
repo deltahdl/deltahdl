@@ -21,6 +21,23 @@ class Lexer {
 
   std::vector<Token> LexAll();
 
+  // §40.4.1 — an FSM recognition "tool" pragma carried inside a block comment.
+  // The current-state form names the vector signal that holds the FSM state and
+  // may bind an enumeration name in the same comment; the enum-only form is the
+  // separate pragma written immediately after the signal's bit range.
+  struct FsmStatePragma {
+    enum class Form { kStateVector, kEnumOnly };
+    Form form = Form::kStateVector;
+    std::string_view signal_name;  // populated for kStateVector
+    std::string_view enum_name;    // populated when has_enum is true
+    bool has_enum = false;
+    SourceLoc loc;
+  };
+
+  const std::vector<FsmStatePragma>& FsmStatePragmas() const {
+    return fsm_state_pragmas_;
+  }
+
   struct SavedPos {
     uint32_t pos;
     uint32_t line;
@@ -43,7 +60,9 @@ class Lexer {
   void SkipWhitespaceAndComments();
   void ConsumeKeywordMarker();
   void SkipLineComment();
-  void SkipBlockComment(SourceLoc start_loc);
+  uint32_t SkipBlockComment(SourceLoc start_loc);
+  void TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc);
+  static bool IsSimplePragmaIdentifier(std::string_view word);
 
   Token MakeToken(TokenKind kind, SourceLoc loc) const;
   Token MakeOp(TokenKind kind, SourceLoc loc, uint32_t start);
@@ -96,6 +115,7 @@ class Lexer {
   bool in_attribute_ = false;
   Token peeked_;
   KeywordVersion keyword_version_ = KeywordVersion::kVer18002023;
+  std::vector<FsmStatePragma> fsm_state_pragmas_;
 };
 
 }

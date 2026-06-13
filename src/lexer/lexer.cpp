@@ -47,17 +47,103 @@ void Lexer::SkipLineComment() {
   }
 }
 
-void Lexer::SkipBlockComment(SourceLoc start_loc) {
+uint32_t Lexer::SkipBlockComment(SourceLoc start_loc) {
 
   while (!AtEnd()) {
     if (Current() == '*' && PeekChar() == '/') {
+      uint32_t body_end = pos_;
       Advance();
       Advance();
-      return;
+      return body_end;
     }
     Advance();
   }
   diag_.Error(start_loc, "unterminated block comment");
+  return pos_;
+}
+
+bool Lexer::IsSimplePragmaIdentifier(std::string_view word) {
+  if (word.empty()) {
+    return false;
+  }
+  char first = word.front();
+  if (!(std::isalpha(static_cast<unsigned char>(first)) || first == '_')) {
+    return false;
+  }
+  for (char c : word) {
+    if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '_')) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void Lexer::TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc) {
+  // Split the comment body into whitespace-delimited words.
+  std::vector<std::string_view> words;
+  size_t i = 0;
+  while (i < body.size()) {
+    while (i < body.size() &&
+           std::isspace(static_cast<unsigned char>(body[i]))) {
+      ++i;
+    }
+    size_t start = i;
+    while (i < body.size() &&
+           !std::isspace(static_cast<unsigned char>(body[i]))) {
+      ++i;
+    }
+    if (i > start) {
+      words.push_back(body.substr(start, i - start));
+    }
+  }
+
+  // Every §40.4.1 FSM pragma opens with the required `tool` keyword.
+  if (words.empty() || words[0] != "tool") {
+    return;
+  }
+
+  FsmStatePragma pragma;
+  pragma.loc = loc;
+
+  if (words.size() >= 3 && words[1] == "state_vector") {
+    // Current-state form: `tool state_vector signal_name`, optionally with a
+    // trailing `enum enumeration_name` binding the signal to the FSM.
+    if (!IsSimplePragmaIdentifier(words[2])) {
+      // A bracketed part-select or braced concatenation is a descendant form
+      // (§40.4.2 / §40.4.3), not the simple signal named here.
+      return;
+    }
+    pragma.form = FsmStatePragma::Form::kStateVector;
+    pragma.signal_name = words[2];
+    if (words.size() == 3) {
+      // Bare current-state pragma; the enum name is supplied separately.
+    } else if (words.size() == 5 && words[3] == "enum" &&
+               IsSimplePragmaIdentifier(words[4])) {
+      pragma.has_enum = true;
+      pragma.enum_name = words[4];
+    } else {
+      // An interposed FSM name or other trailing tokens belong to the
+      // descendant pragma forms, not the simple §40.4.1 signal pragma.
+      return;
+    }
+  } else if (words.size() == 3 && words[1] == "enum" &&
+             IsSimplePragmaIdentifier(words[2])) {
+    // Separate `tool enum enumeration_name` pragma placed after the bit range.
+    pragma.form = FsmStatePragma::Form::kEnumOnly;
+    pragma.has_enum = true;
+    pragma.enum_name = words[2];
+  } else {
+    return;
+  }
+
+  // Avoid re-recording the same comment if the lexer backtracks over it.
+  for (const auto& existing : fsm_state_pragmas_) {
+    if (existing.loc.file_id == loc.file_id && existing.loc.line == loc.line &&
+        existing.loc.column == loc.column) {
+      return;
+    }
+  }
+  fsm_state_pragmas_.push_back(pragma);
 }
 
 void Lexer::SkipWhitespaceAndComments() {
@@ -80,7 +166,10 @@ void Lexer::SkipWhitespaceAndComments() {
       auto comment_loc = MakeLoc();
       Advance();
       Advance();
-      SkipBlockComment(comment_loc);
+      uint32_t body_start = pos_;
+      uint32_t body_end = SkipBlockComment(comment_loc);
+      TryRecognizeFsmStatePragma(
+          source_.substr(body_start, body_end - body_start), comment_loc);
       continue;
     }
     break;
