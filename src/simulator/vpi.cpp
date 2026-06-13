@@ -5534,6 +5534,58 @@ VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
     return nullptr;
   }
 
+  // §38.36.2: a simulation-time callback carries its timing in the s_cb_data
+  // time structure, and the standard constrains how that structure - and a
+  // delay of zero - may be used. These checks apply only to the time-related
+  // reasons; every other reason ignores the time field.
+  if (VpiIsSimulationTimeCallbackReason(data->reason)) {
+    // §38.36.2: the time->type field shall be vpiSimTime or vpiScaledRealTime.
+    // A vpiSuppressTime type, or a null time pointer, leaves no time for the
+    // callback to fire at, so registration is an error and no callback is made.
+    if (data->time == nullptr || data->time->type == vpiSuppressTime) {
+      last_error_.state = kVpiError;
+      last_error_.level = kVpiError;
+      last_error_.message =
+          "vpi_register_cb(): a simulation-time callback requires a time "
+          "structure with type vpiSimTime or vpiScaledRealTime";
+      return nullptr;
+    }
+
+    // §38.36.2: the requested time, or the delay before the callback, lives in
+    // time->{low,high,real}; a delay of zero is all three being zero.
+    bool delay_is_zero = data->time->low == 0 && data->time->high == 0 &&
+                         data->time->real == 0.0;
+
+    // §38.36.2: a zero-delay cbAtStartOfSimTime callback may not be placed once
+    // simulation has progressed into a time slice - unless the application is
+    // itself running inside a cbAtStartOfSimTime callback, where it is allowed
+    // and produces another cbAtStartOfSimTime callback in the same time slice.
+    if (data->reason == cbAtStartOfSimTime && delay_is_zero &&
+        sim_progressed_into_time_slice_ &&
+        current_callback_reason_ != cbAtStartOfSimTime) {
+      last_error_.state = kVpiError;
+      last_error_.level = kVpiError;
+      last_error_.message =
+          "vpi_register_cb(): a zero-delay cbAtStartOfSimTime callback may not "
+          "be placed after simulation has entered a time slice, except from "
+          "within a cbAtStartOfSimTime callback";
+      return nullptr;
+    }
+
+    // §38.36.2: a zero-delay cbReadWriteSynch callback may not be placed at
+    // read-only synch time, where scheduling an event for the current time is
+    // not permitted.
+    if (data->reason == cbReadWriteSynch && delay_is_zero &&
+        at_read_only_synch_time_) {
+      last_error_.state = kVpiError;
+      last_error_.level = kVpiError;
+      last_error_.message =
+          "vpi_register_cb(): a zero-delay cbReadWriteSynch callback may not be "
+          "placed at read-only synch time";
+      return nullptr;
+    }
+  }
+
   callbacks_.push_back(*data);
 
   auto* cb_obj = AllocObject();
@@ -6579,6 +6631,23 @@ bool VpiStartupCallbackReasonAllowed(int reason) {
     case kCbUnresolvedSystf:
     case kCbError:
     case kCbPLIError:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiIsSimulationTimeCallbackReason(int reason) {
+  // §38.36.2: the seven time-related callback reasons. Their placement is
+  // constrained through the s_cb_data time structure (see RegisterCb).
+  switch (reason) {
+    case kCbAtStartOfSimTime:
+    case kCbNBASynch:
+    case kCbReadWriteSynch:
+    case kCbAtEndOfSimTime:
+    case kCbReadOnlySynch:
+    case kCbNextSimTime:
+    case kCbAfterDelay:
       return true;
     default:
       return false;

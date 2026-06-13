@@ -2833,6 +2833,12 @@ bool VpiRoutineAvailableInStartup(VpiRoutine routine);
 // cbPLIError.
 bool VpiStartupCallbackReasonAllowed(int reason);
 
+// §38.36.2: whether a callback reason is one of the simulation-time reasons -
+// cbAtStartOfSimTime, cbNBASynch, cbReadWriteSynch, cbAtEndOfSimTime,
+// cbReadOnlySynch, cbNextSimTime, or cbAfterDelay. These are the reasons whose
+// placement vpi_register_cb() constrains through the s_cb_data time structure.
+bool VpiIsSimulationTimeCallbackReason(int reason);
+
 // §38.19: whether an object type carries the "access by index" property - the
 // property the reference object of vpi_handle_by_index() must have. An object
 // has it when one of its relationships selects a sub-object by an index number:
@@ -3158,6 +3164,21 @@ class VpiContext {
   void SetToolPhase(VpiToolPhase phase) { tool_phase_ = phase; }
   VpiToolPhase ToolPhase() const { return tool_phase_; }
 
+  // §38.36.2: the scheduler records when simulation has advanced past time zero
+  // into a time slice, and when it has reached the read-only synch region of a
+  // time slice. vpi_register_cb() consults these to reject the zero-delay
+  // simulation-time callbacks the standard forbids in those situations.
+  void SetSimulationProgressedIntoTimeSlice(bool progressed) {
+    sim_progressed_into_time_slice_ = progressed;
+  }
+  bool SimulationProgressedIntoTimeSlice() const {
+    return sim_progressed_into_time_slice_;
+  }
+  void SetAtReadOnlySynchTime(bool at_read_only) {
+    at_read_only_synch_time_ = at_read_only;
+  }
+  bool AtReadOnlySynchTime() const { return at_read_only_synch_time_; }
+
   bool StopRequested() const { return stop_requested_; }
   bool FinishRequested() const { return finish_requested_; }
 
@@ -3255,6 +3276,14 @@ class VpiContext {
   // to enforce that it is only called from a cbStartOfRestart/cbEndOfRestart
   // routine; DispatchCallbacks sets and restores it around each cb_rtn call.
   int current_callback_reason_ = -1;
+
+  // §38.36.2: simulation-time-callback placement state, driven by the scheduler
+  // as simulation advances. The first is set once execution has progressed into
+  // a time slice (past time zero); the second while the time slice is in its
+  // read-only synch region. Both gate the zero-delay placement errors in
+  // RegisterCb. Default: simulation has not yet entered any time slice.
+  bool sim_progressed_into_time_slice_ = false;
+  bool at_read_only_synch_time_ = false;
 
   // §38.9 / §38.32: the save/restart byte store keyed by save/restart id, plus
   // a per-id read cursor so successive vpi_get_data() calls resume where the
