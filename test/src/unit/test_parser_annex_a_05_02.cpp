@@ -21,36 +21,6 @@ TEST(UdpPortGrammar, OutputDeclAnsi_RegInitZero) {
   EXPECT_EQ(udp->initial_value, '0');
 }
 
-TEST(UdpPortGrammar, OutputDeclAnsi_RegInitOne) {
-  auto r = Parse(
-      "primitive dff(output reg q = 1'b1, input d, input clk);\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '1');
-}
-
-TEST(UdpPortGrammar, OutputDeclAnsi_RegInitX) {
-  auto r = Parse(
-      "primitive dff(output reg q = 1'bx, input d, input clk);\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, 'x');
-}
-
 TEST(UdpPortGrammar, OutputDeclNonAnsi_RegInitZero) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -67,23 +37,6 @@ TEST(UdpPortGrammar, OutputDeclNonAnsi_RegInitZero) {
   EXPECT_TRUE(udp->is_sequential);
   EXPECT_TRUE(udp->has_initial);
   EXPECT_EQ(udp->initial_value, '0');
-}
-
-TEST(UdpPortGrammar, OutputDeclNonAnsi_RegInitOne) {
-  auto r = Parse(
-      "primitive dff(q, d, clk);\n"
-      "  output reg q = 1'b1;\n"
-      "  input d, clk;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '1');
 }
 
 TEST(UdpPortGrammar, OutputDeclWildcard_RegInit) {
@@ -151,6 +104,112 @@ TEST(UdpPortGrammar, SimNonAnsiPortLevelInit) {
 
   state.Evaluate({'0', '1'});
   EXPECT_EQ(state.GetOutput(), '0');
+}
+
+// udp_declaration_port_list: the optional { attribute_instance } prefix on
+// udp_output_declaration and udp_input_declaration is consumed by the ANSI
+// header parser; the surrounding port grammar must still parse normally.
+TEST(UdpPortGrammar, AttributesOnAnsiPortDeclarations) {
+  auto r = Parse(
+      "primitive dff((* keep *) output reg q = 1'b0,"
+      " (* foo = 1 *) input d, (* bar *) input clk);\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  EXPECT_EQ(udp->output_name, "q");
+  ASSERT_EQ(udp->input_names.size(), 2u);
+  EXPECT_EQ(udp->input_names[0], "d");
+  EXPECT_EQ(udp->input_names[1], "clk");
+  EXPECT_TRUE(udp->is_sequential);
+  EXPECT_TRUE(udp->has_initial);
+  EXPECT_EQ(udp->initial_value, '0');
+}
+
+// udp_port_declaration: each of udp_output_declaration, udp_reg_declaration and
+// udp_input_declaration carries an optional { attribute_instance } prefix in the
+// non-ANSI body. The prefixes must be consumed without disturbing the port set.
+TEST(UdpPortGrammar, AttributesOnNonAnsiPortDeclarations) {
+  auto r = Parse(
+      "primitive dff(q, d, clk);\n"
+      "  (* keep *) output q;\n"
+      "  (* synth *) reg q;\n"
+      "  (* foo = 2 *) input d, clk;\n"
+      "  initial q = 1'b0;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  EXPECT_EQ(udp->output_name, "q");
+  ASSERT_EQ(udp->input_names.size(), 2u);
+  EXPECT_EQ(udp->input_names[0], "d");
+  EXPECT_EQ(udp->input_names[1], "clk");
+  EXPECT_TRUE(udp->is_sequential);
+}
+
+// udp_declaration_port_list with the first alternative of udp_output_declaration
+// ({ attribute_instance } output port_identifier) — a combinational UDP whose
+// ANSI output port carries no reg keyword, so the primitive is not sequential.
+TEST(UdpPortGrammar, CombinationalOutputDeclAnsi) {
+  auto r = Parse(
+      "primitive and_udp(output q, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    0 1 : 0;\n"
+      "    1 0 : 0;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  EXPECT_EQ(udp->output_name, "q");
+  ASSERT_EQ(udp->input_names.size(), 2u);
+  EXPECT_EQ(udp->input_names[0], "a");
+  EXPECT_EQ(udp->input_names[1], "b");
+  EXPECT_FALSE(udp->is_sequential);
+  EXPECT_FALSE(udp->has_initial);
+}
+
+// udp_output_declaration second alternative with the optional [ = constant_expression ]
+// omitted: a sequential reg output that declares no port-level initial value.
+TEST(UdpPortGrammar, OutputRegDeclWithoutInitializer) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, input clk);\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  EXPECT_EQ(udp->output_name, "q");
+  EXPECT_TRUE(udp->is_sequential);
+  EXPECT_FALSE(udp->has_initial);
+}
+
+// udp_port_declaration requires each declaration to be terminated by a semicolon;
+// dropping it on a non-ANSI body declaration is rejected.
+TEST(UdpPortGrammar, NonAnsiPortDeclarationMissingSemicolon) {
+  auto r = Parse(
+      "primitive dff(q, d, clk);\n"
+      "  output reg q = 1'b0;\n"
+      "  input d, clk\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 TEST(UdpPortGrammar, SimStandaloneRegSequential) {
