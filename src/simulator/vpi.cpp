@@ -7417,6 +7417,51 @@ PLI_UINT32 VpiContext::McdOpen(const std::string& filename) {
   return 0;
 }
 
+PLI_UINT32 VpiContext::McdClose(PLI_UINT32 mcd) {
+  // §38.24: walk the descriptor bit by bit. Each channel is a discrete bit, so a
+  // single call closes several channels at once. A bit that cannot be closed is
+  // gathered into the error result and reported back to the caller.
+  PLI_UINT32 unclosed = 0;
+  for (int bit = 0; bit < 32; ++bit) {
+    PLI_UINT32 channel = PLI_UINT32{1} << bit;
+    if ((mcd & channel) == 0) continue;
+
+    // §38.24: descriptor 1 (the LSB) is predefined for the tool's output channel
+    // and current log file; it shall not be closed and so is reported as still
+    // open.
+    if (bit == 0) {
+      unclosed |= channel;
+      continue;
+    }
+
+    // §38.24: a bit naming no open channel has nothing to close, so it too is
+    // reported back rather than silently succeeding.
+    if ((mcd_allocated_channels_ & channel) == 0) {
+      unclosed |= channel;
+      continue;
+    }
+
+    // §38.24: close the channel - free it in the shared namespace and drop any
+    // file that named it. The namespace is shared with $fopen (§21.3.1), so an fd
+    // opened there is closed here the same way.
+    mcd_allocated_channels_ &= ~channel;
+    for (auto it = mcd_open_files_.begin(); it != mcd_open_files_.end();) {
+      if ((it->second & channel) != 0) {
+        it->second &= ~channel;
+        if (it->second == 0) {
+          it = mcd_open_files_.erase(it);
+          continue;
+        }
+      }
+      ++it;
+    }
+  }
+
+  // §38.24: 0 when every requested channel closed, otherwise the mcd of the
+  // channels left open.
+  return unclosed;
+}
+
 }  // namespace delta
 
 PLI_INT32 vpi_flush() {
@@ -7435,4 +7480,13 @@ PLI_UINT32 vpi_mcd_open(PLI_BYTE8* file) {
   delta::GetGlobalVpiContext().ResetErrorStatus();
   if (file == nullptr) return 0;
   return delta::GetGlobalVpiContext().McdOpen(file);
+}
+
+PLI_UINT32 vpi_mcd_close(PLI_UINT32 mcd) {
+  // §38.24: close the file(s) named by a multichannel descriptor. Clears the
+  // pending error status (§38.2) like the other entry points. Returns 0 when
+  // every requested channel was closed, otherwise the mcd of the unclosed
+  // channels.
+  delta::GetGlobalVpiContext().ResetErrorStatus();
+  return delta::GetGlobalVpiContext().McdClose(mcd);
 }

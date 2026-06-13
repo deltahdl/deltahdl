@@ -3169,6 +3169,16 @@ class VpiContext {
   // including when no channel is free.
   PLI_UINT32 McdOpen(const std::string& filename);
 
+  // §38.24: close the file(s) named by a multichannel descriptor. Because the
+  // channels are discrete bits of the integer mcd, several are closed at once -
+  // every set bit that names an open channel is freed and the file it named is
+  // dropped from the shared namespace (the same namespace $fopen uses, so an fd
+  // opened there can be closed here too). Descriptor 1 (the LSB) is predefined
+  // for the tool's own output channel and log file and cannot be closed; any bit
+  // that names no closeable channel is left untouched. Returns 0 when every
+  // requested channel was closed, otherwise the mcd of the channels left open.
+  PLI_UINT32 McdClose(PLI_UINT32 mcd);
+
   // Support hooks for the mcd-open model. The fopen registrar records that a
   // file is already open on a given descriptor in the shared namespace; the
   // accessors let a test observe which descriptor names a file; the failure
@@ -4144,3 +4154,4 @@ int VpiChkErrorC(SVpiErrorInfo* info);
 PLI_INT32 vpi_get_vlog_info(SVpiVlogInfo* info);
 PLI_INT32 vpi_flush();
 PLI_UINT32 vpi_mcd_open(PLI_BYTE8* file);
+PLI_UINT32 vpi_mcd_close(PLI_UINT32 mcd);
