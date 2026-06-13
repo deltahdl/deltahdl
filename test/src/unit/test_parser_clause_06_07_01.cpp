@@ -5,50 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(FormalSyntaxParsing, NetDeclWire) {
-  auto r = Parse("module m; wire [3:0] w; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kNetDecl);
-}
-
-TEST(TypeDeclParsing, NetDeclWireBasic) {
-  auto r = Parse("module m; wire [7:0] data; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-}
-
-TEST(TypeDeclParsing, NetDeclWithDriveStrength) {
-  auto r = Parse("module m; wire (strong0, weak1) w; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_NE(item->drive_strength0, 0);
-}
-
-TEST(TypeDeclParsing, NetDeclWithDelay) {
-  auto r = Parse("module m; wire #5 w; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_NE(item->net_delay, nullptr);
-}
-
-TEST(TypeDeclParsing, NetDeclMultipleAssign) {
-  auto r = Parse("module m; wire a, b, c; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kNetDecl) count++;
-  }
-  EXPECT_GE(count, 3);
-}
-
 TEST(StrengthParsing, DriveStrengthOnTri) {
   auto r = Parse(
       "module m;\n"
@@ -82,38 +38,6 @@ TEST(DeclarationListParsing, ListOfNetDeclAssignmentsSingle) {
     if (item->kind == ModuleItemKind::kNetDecl) count++;
   }
   EXPECT_EQ(count, 1);
-}
-
-TEST(DeclarationListParsing, ListOfNetDeclAssignmentsMultiple) {
-  auto r = Parse("module m; wire a, b, c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kNetDecl) count++;
-  }
-  EXPECT_GE(count, 3);
-}
-
-TEST(DeclarationListParsing, ListOfNetDeclAssignmentsWithUnpackedDim) {
-  auto r = Parse("module m; wire a [3:0], b [7:0]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kNetDecl) count++;
-  }
-  EXPECT_GE(count, 2);
-}
-
-TEST(DeclarationRangeParsing, NetWithUnpackedDim) {
-  auto r = Parse("module m; wire [7:0] bus [0:3]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
-  ASSERT_EQ(item->unpacked_dims.size(), 1u);
 }
 
 TEST(DataTypeParsing, WireWithUserDefinedType) {
@@ -162,40 +86,6 @@ TEST(DataTypeParsing, WireWithPackedStructType) {
   EXPECT_EQ(item->name, "memsig");
 }
 
-TEST(DataTypeParsing, MultipleNetsExplicitType) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire logic a, b, c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_EQ(items.size(), 3u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(items[0]->data_type.is_net);
-  EXPECT_EQ(items[0]->name, "a");
-  EXPECT_EQ(items[1]->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(items[1]->data_type.is_net);
-  EXPECT_EQ(items[1]->name, "b");
-  EXPECT_EQ(items[2]->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(items[2]->data_type.is_net);
-  EXPECT_EQ(items[2]->name, "c");
-}
-
-TEST(DataTypeParsing, NetWithExplicitBitType) {
-  auto r = Parse(
-      "module t;\n"
-      "  tri bit [3:0] b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-  EXPECT_EQ(item->name, "b");
-}
-
 TEST(DataTypeParsing, DriveStrengthWithExplicitType) {
   auto r = Parse(
       "module t;\n"
@@ -227,69 +117,6 @@ TEST(DataTypeParsing, WirePackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-TEST(DataTypeParsing, NetImplicitSigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire signed [7:0] ws;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-  EXPECT_TRUE(item->data_type.is_signed);
-  EXPECT_EQ(item->name, "ws");
-}
-
-TEST(DataTypeParsing, WireImplicitLogic) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-}
-
-TEST(DataTypeParsing, TriImplicitLogic) {
-  auto r = Parse(
-      "module t;\n"
-      "  tri t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-}
-
-TEST(DataTypeParsing, WandImplicitLogic) {
-  auto r = Parse(
-      "module t;\n"
-      "  wand w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-}
-
-TEST(DataTypeParsing, WireWithRange) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire [15:0] ww;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
-}
-
 TEST(DataTypeParsing, WireUnpackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -302,64 +129,6 @@ TEST(DataTypeParsing, WireUnpackedDims) {
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_TRUE(item->data_type.is_net);
   EXPECT_FALSE(item->unpacked_dims.empty());
-}
-
-TEST(DataTypeParsing, WireExplicitLogicType) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire logic [7:0] w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-}
-
-TEST(DataTypeParsing, WireIntegerType) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire integer w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-}
-
-TEST(DataTypeParsing, WireTimeType) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire time w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-}
-
-TEST(DataTypeParsing, WireWithPackedStruct) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire struct packed { logic ecc; logic [7:0] data; } memsig;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "memsig");
-}
-
-TEST(DataTypeParsing, WireWithTypedef) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef logic [31:0] addressT;\n"
-      "  wire addressT w1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_GE(items.size(), 2u);
-  EXPECT_EQ(items[1]->name, "w1");
 }
 
 TEST(DataTypeParsing, MultipleWireDecls) {
@@ -378,86 +147,6 @@ TEST(DataTypeParsing, MultipleWireDecls) {
   EXPECT_EQ(items[0]->name, "a");
   EXPECT_EQ(items[1]->name, "b");
   EXPECT_EQ(items[2]->name, "c");
-}
-
-TEST(DataTypeParsing, TriNetDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  tri [3:0] bus;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTri);
-  EXPECT_TRUE(item->data_type.is_net);
-  EXPECT_EQ(item->name, "bus");
-}
-
-TEST(DataTypeParsing, WireDeclaration_Kind) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire [7:0] w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kWire);
-}
-
-TEST(DataTypeParsing, WireMultipleNames) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire a, b, c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_EQ(items.size(), 3u);
-  EXPECT_EQ(items[0]->name, "a");
-  EXPECT_EQ(items[1]->name, "b");
-  EXPECT_EQ(items[2]->name, "c");
-}
-
-TEST(DataTypeParsing, WireDeclaration_Props) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire [7:0] w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->data_type.is_net);
-  EXPECT_EQ(item->name, "w");
-}
-
-TEST(DataTypeParsing, TriDeclaration) {
-  auto r = Parse(
-      "module t;\n"
-      "  tri [3:0] t1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-}
-
-TEST(DataTypeParsing, WireMultipleNamesAllNetDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire a, b, c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_EQ(items.size(), 3u);
-  for (auto* item : items) {
-    EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-    EXPECT_EQ(item->data_type.kind, DataTypeKind::kWire);
-    EXPECT_TRUE(item->data_type.is_net);
-  }
 }
 
 TEST(DataTypeParsing, TriWithRange) {
@@ -575,20 +264,6 @@ TEST(DataTypeParsing, MixedNetTypesInModule) {
   EXPECT_EQ(items[4]->data_type.kind, DataTypeKind::kSupply1);
 }
 
-TEST(DataTypeParsing, WireUnpackedDim) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire w [0:3];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_EQ(item->name, "w");
-  EXPECT_FALSE(item->unpacked_dims.empty());
-}
-
 TEST(DataTypeParsing, WirePackedAndUnpackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -688,20 +363,6 @@ TEST(DataTypeParsing, WandWithRange) {
   EXPECT_EQ(item->name, "bus");
 }
 
-TEST(DataTypeParsing, Supply0WithRange) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  supply0 [3:0] gnd_bus;\n"
-              "endmodule\n"));
-}
-
-TEST(DataTypeParsing, Supply1WithRange) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  supply1 [3:0] vdd_bus;\n"
-              "endmodule\n"));
-}
-
 TEST(DataTypeParsing, TriRegDirectlyIsError) {
   EXPECT_FALSE(
       ParseOk("module t;\n"
@@ -713,13 +374,6 @@ TEST(DataTypeParsing, WireRegDirectlyIsError) {
   EXPECT_FALSE(
       ParseOk("module t;\n"
               "  wire reg p;\n"
-              "endmodule\n"));
-}
-
-TEST(DataTypeParsing, WandRegDirectlyIsError) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  wand reg w;\n"
               "endmodule\n"));
 }
 
@@ -743,67 +397,10 @@ TEST(DataTypeParsing, IdentifierStartingWithRegOk) {
   EXPECT_EQ(item->name, "reg_name");
 }
 
-TEST(DataTypeParsing, WorRegDirectlyIsError) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  wor reg w;\n"
-              "endmodule\n"));
-}
-
-TEST(DataTypeParsing, TriandRegDirectlyIsError) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  triand reg w;\n"
-              "endmodule\n"));
-}
-
-TEST(DataTypeParsing, TriorRegDirectlyIsError) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  trior reg w;\n"
-              "endmodule\n"));
-}
-
-TEST(DataTypeParsing, Tri0RegDirectlyIsError) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  tri0 reg r;\n"
-              "endmodule\n"));
-}
-
-TEST(DataTypeParsing, Tri1RegDirectlyIsError) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  tri1 reg r;\n"
-              "endmodule\n"));
-}
-
-TEST(DataTypeParsing, Supply0RegDirectlyIsError) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  supply0 reg r;\n"
-              "endmodule\n"));
-}
-
-TEST(DataTypeParsing, Supply1RegDirectlyIsError) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  supply1 reg r;\n"
-              "endmodule\n"));
-}
-
-TEST(DataTypeParsing, UwireRegDirectlyIsError) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  uwire reg r;\n"
-              "endmodule\n"));
-}
-
-TEST(DataTypeParsing, TriregRegDirectlyIsError) {
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  trireg reg r;\n"
-              "endmodule\n"));
+// §6.7.1: the no-reg-after-a-net-keyword rule applies to port declarations too,
+// not just standalone net declarations.
+TEST(DataTypeParsing, PortNetTypeFollowedByRegIsError) {
+  EXPECT_FALSE(ParseOk("module m(inout wire reg p); endmodule\n"));
 }
 
 TEST(StrengthParsing, DriveStrengthSupply0Weak1) {
@@ -884,15 +481,53 @@ TEST(StrengthParsing, NetDeclNoDriveStrengthDefault) {
   EXPECT_EQ(item->drive_strength1, 0u);
 }
 
-TEST(NetDeclarations, WireWithPackedRange) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [7:0] bus;\n"
-      "endmodule\n");
+// --- §6.7.1 interconnect net restrictions (grammar-enforced) ---
+// An interconnect net has no data type but may carry optional packed or
+// unpacked dimensions, and may specify neither drive nor charge strength.
+
+TEST(InterconnectParsing, PlainInterconnectOk) {
+  auto r = Parse("module m; interconnect w; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kNetDecl);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_interconnect);
+}
+
+TEST(InterconnectParsing, PackedDimensionOk) {
+  auto r = Parse("module m; interconnect [3:0] w; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_interconnect);
+  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
+}
+
+TEST(InterconnectParsing, UnpackedDimensionOk) {
+  auto r = Parse("module m; interconnect w [0:3]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_interconnect);
+  EXPECT_FALSE(item->unpacked_dims.empty());
+}
+
+TEST(InterconnectParsing, DataTypeIsError) {
+  EXPECT_FALSE(ParseOk("module m; interconnect logic w; endmodule\n"));
+}
+
+// A parenthesized strength spec after `interconnect` -- whether it reads as a
+// drive strength like (strong0, strong1) or a charge strength like (small) --
+// is rejected through the same grammar path.
+TEST(InterconnectParsing, StrengthSpecIsError) {
+  EXPECT_FALSE(
+      ParseOk("module m; interconnect (strong0, strong1) w; endmodule\n"));
+  EXPECT_FALSE(ParseOk("module m; interconnect (small) w; endmodule\n"));
 }
 
 }

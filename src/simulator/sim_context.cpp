@@ -94,8 +94,16 @@ Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
   if (is_signed) var->is_signed = true;
   if (is_user_nettype) {
 
+  } else if (type == NetType::kTrireg) {
+    // §6.7.1: a trireg net is the exception to the default-z rule -- it holds
+    // charge and defaults to x (the retained value is unknown until something
+    // drives it). Encode x as aval=0, bval=1 per bit.
+    for (uint32_t i = 0; i < var->value.nwords; ++i) {
+      var->value.words[i].aval = uint64_t{0};
+      var->value.words[i].bval = ~uint64_t{0};
+    }
   } else {
-
+    // §6.7.1: every other net defaults to z (high impedance) until driven.
     for (uint32_t i = 0; i < var->value.nwords; ++i) {
       var->value.words[i].aval = ~uint64_t{0};
       var->value.words[i].bval = ~uint64_t{0};
