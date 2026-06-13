@@ -264,6 +264,12 @@ struct VpiObject {
   // expressed in the simulation time unit (no scaling).
   int time_unit = 0;
 
+  // §37.81: for a time queue object produced by the vpi_iterate(vpiTimeQueue,
+  // NULL) walk, the simulation time (in ticks of the simulation time unit) of
+  // the time slot it represents. The iteration hands the objects back in
+  // increasing order of this value (detail 1). Zero for any other object.
+  uint64_t time_queue_time = 0;
+
   std::string library_name;
   std::string cell_name;
   std::string config_name;
@@ -2848,6 +2854,19 @@ bool VpiIsSimulationTimeCallbackReason(int reason);
 // reference object.
 bool VpiHasAccessByIndex(int type);
 
+// §37.81: one entry of the simulation time queue - a simulation time, expressed
+// in ticks of the simulation time unit, at which events are still scheduled.
+// `is_current` marks the entry at the current simulation time; detail 3 admits
+// that entry to the vpi_iterate(vpiTimeQueue, NULL) walk only when events remain
+// scheduled before its read-only synch region, recorded by
+// `has_events_before_read_only_synch`. A future entry (is_current false) always
+// takes part in the iteration.
+struct VpiTimeQueueSlot {
+  uint64_t time = 0;
+  bool is_current = false;
+  bool has_events_before_read_only_synch = false;
+};
+
 class VpiContext {
  public:
   VpiContext() = default;
@@ -2947,6 +2966,16 @@ class VpiContext {
   // §38.13: create a time queue object so vpi_get_time() can report the
   // scheduled time of the next future event.
   VpiHandle CreateTimeQueue();
+
+  // §37.81: record the simulation time queue the vpi_iterate(vpiTimeQueue, NULL)
+  // walk reports. The scheduler keeps this in step with the pending-event
+  // calendar; each slot names a simulation time that still holds events. The
+  // iteration sorts them into increasing time order, drops the current-time slot
+  // unless events remain before its read-only synch region, and yields a time
+  // queue object for each surviving slot (an empty result returns NULL).
+  void SetTimeQueueSlots(std::vector<VpiTimeQueueSlot> slots) {
+    time_queue_slots_ = std::move(slots);
+  }
 
   // §38.21: return a handle to the object named `name`, which may be a simple
   // or a hierarchical name. With a null scope the name is searched for from the
@@ -3242,6 +3271,11 @@ class VpiContext {
   // scheduler's tick count is expressed in; the reference vpi_get_time() scales
   // a scaled-real result against.
   int sim_time_unit_ = 0;
+  // §37.81: the pending entries of the simulation time queue, the source the
+  // vpi_iterate(vpiTimeQueue, NULL) walk filters and sorts. Empty until the
+  // scheduler records pending events, which is why an idle queue iterates to
+  // NULL.
+  std::vector<VpiTimeQueueSlot> time_queue_slots_;
   bool elaboration_started_ = false;
   // §36.10.2: see SetToolPhase. Defaults to the full phase so VPI use outside
   // the startup window is unrestricted.

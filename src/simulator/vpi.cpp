@@ -1,5 +1,6 @@
 #include "simulator/vpi.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdarg>
@@ -4760,6 +4761,30 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
     // by a plain type match.
     for (auto* obj : all_objects_) {
       if (obj->is_systf) iter->children.push_back(obj);
+    }
+  } else if (!ref && type == vpiTimeQueue) {
+    // §37.81: vpi_iterate(vpiTimeQueue, NULL) walks the simulation time queue.
+    // Detail 3: the slot at the current simulation time takes part only when
+    // events remain scheduled before its read-only synch region; a future slot
+    // always contributes. Detail 1: the surviving slots are handed back in
+    // increasing order of simulation time, so they are sorted by time here and
+    // a time queue object carrying that time is produced for each. Detail 2 - an
+    // empty queue yields NULL rather than an empty iterator - is left to the
+    // shared empty-children check at the tail of this routine.
+    std::vector<VpiTimeQueueSlot> slots;
+    for (const auto& slot : time_queue_slots_) {
+      if (slot.is_current && !slot.has_events_before_read_only_synch) continue;
+      slots.push_back(slot);
+    }
+    std::sort(slots.begin(), slots.end(),
+              [](const VpiTimeQueueSlot& a, const VpiTimeQueueSlot& b) {
+                return a.time < b.time;
+              });
+    for (const auto& slot : slots) {
+      auto* tq = AllocObject();
+      tq->type = kVpiTimeQueue;
+      tq->time_queue_time = slot.time;
+      iter->children.push_back(tq);
     }
   } else if (net_driver_iteration || net_load_iteration) {
     // §37.46 (figure) + detail 1: collect the net's driver objects (vpiDriver) or
