@@ -6727,7 +6727,20 @@ const char* VpiContext::GetStrRaw(int property, VpiHandle obj) {
   }
 }
 
-int VpiContext::FreeObject(VpiHandle ) { return 0; }
+int VpiContext::FreeObject(VpiHandle obj) {
+  // Annex C.2.4: vpi_free_object() has been deprecated. Once its behavior was
+  // settled against handle validity and the dynamic data of the SystemVerilog
+  // object model, the routine was renamed vpi_release_handle(), so the old name
+  // no longer denotes a supported operation. A surviving call to it is flagged
+  // as deprecated - pointing the program at the replacement - and performs no
+  // release, reporting failure.
+  (void)obj;
+  last_error_.state = kVpiWarning;
+  last_error_.level = kVpiWarning;
+  last_error_.message =
+      "vpi_free_object() is deprecated; use vpi_release_handle() instead";
+  return 0;
+}
 
 int VpiContext::Control(int operation, int arg0, int arg1, int arg2,
                         VpiHandle scope) {

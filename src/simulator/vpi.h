@@ -3111,6 +3111,10 @@ class VpiContext {
   // object's own storage (or null). GetStr() copies the result into the shared
   // temporary buffer the clause mandates; this helper does not.
   const char* GetStrRaw(int property, VpiHandle obj);
+  // Annex C.2.4: the deprecated vpi_free_object() routine. It was renamed
+  // vpi_release_handle(), so this name no longer performs a release: a call is
+  // flagged as deprecated and reports failure. Use ReleaseHandleStatus() (the
+  // vpi_release_handle() backend) for the live operation.
   int FreeObject(VpiHandle obj);
   // §38.4: vpi_control() passes an operation-specific request from the PLI
   // application to the simulator. arg0..arg2 carry the operation's additional
