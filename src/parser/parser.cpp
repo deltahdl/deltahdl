@@ -5,6 +5,21 @@
 
 namespace delta {
 
+namespace {
+// §A.1.11: anonymous_program_item is a closed set (task, function, class,
+// interface-class, covergroup, and class-constructor declarations, plus the
+// null item). Unlike a named program, an anonymous program may not contain net
+// or variable declarations, so reject any that appear directly in its body.
+void CheckAnonymousProgramItem(DiagEngine& diag, ModuleItem* item) {
+  if (item->kind == ModuleItemKind::kNetDecl ||
+      item->kind == ModuleItemKind::kVarDecl) {
+    diag.Error(item->loc,
+               "a net or variable declaration is not allowed in an anonymous "
+               "program");
+  }
+}
+}  // namespace
+
 Parser::Parser(Lexer& lexer, Arena& arena, DiagEngine& diag)
     : lexer_(lexer), arena_(arena), diag_(diag) {
 
@@ -343,6 +358,7 @@ bool Parser::TryParseAnonymousProgram(CompilationUnit* unit) {
     ParseModuleItem(unit->cu_items);
     for (size_t i = before; i < unit->cu_items.size(); ++i) {
       unit->cu_items[i]->from_anonymous_program = true;
+      CheckAnonymousProgramItem(diag_, unit->cu_items[i]);
     }
   }
   in_anonymous_program_ = prev_anon;
@@ -599,6 +615,7 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
       ParseModuleItem(items);
       for (size_t i = before; i < items.size(); ++i) {
         items[i]->from_anonymous_program = true;
+        CheckAnonymousProgramItem(diag_, items[i]);
       }
     }
     in_anonymous_program_ = prev_anon;
