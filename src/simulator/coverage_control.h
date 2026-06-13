@@ -94,6 +94,16 @@ class CoverageControlState {
     scopes_[scope].coverable_items[coverage_type] = count;
   }
 
+  // Registers the number of coverable items of `coverage_type` a scope has
+  // actually covered so far, mirroring what a real coverage engine accumulates
+  // as collection proceeds. §40.3.2.3 reports this count, summed over the
+  // hierarchy, as the current coverage level. Unlike the coverable-item count,
+  // this varies with the collection state over the simulation.
+  void SetCoveredItems(const std::string &scope, int coverage_type,
+                       std::int64_t count) {
+    scopes_[scope].covered_items[coverage_type] = count;
+  }
+
   // §40.3.2.2 ($coverage_get_max): returns the value representing 100% coverage
   // for `coverage_type` over `scope` — the sum of all coverable items of that
   // type in the hierarchy. That sum is a property of the design structure, not
@@ -112,6 +122,34 @@ class CoverageControlState {
     }
     auto type_it = it->second.coverable_items.find(coverage_type);
     if (type_it == it->second.coverable_items.end() || type_it->second <= 0) {
+      return static_cast<int>(CoverageStatus::NoCoverage);
+    }
+    if (type_it->second >
+        static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())) {
+      return static_cast<int>(CoverageStatus::Overflow);
+    }
+    return static_cast<int>(type_it->second);
+  }
+
+  // §40.3.2.3 ($coverage_get): returns the current coverage value for
+  // `coverage_type` over `scope` — the sum of the coverable items of that type
+  // that have been covered so far in the hierarchy. The return follows the same
+  // pattern as §40.3.2.2, but the positive value is the current coverage level
+  // rather than the maximum, so it can grow as collection proceeds.
+  //
+  // The integer result follows §40.3.2.3: a scope the design does not contain is
+  // a bad argument (`SV_COV_ERROR); a count too large to represent as an integer
+  // overflows (`SV_COV_OVERFLOW); a coverage type with nothing covered (no
+  // entry, or none of its items covered yet) reports no coverage (`SV_COV_NOCOV,
+  // 0, since a positive value is strictly greater than zero); otherwise the
+  // positive count is the current coverage number.
+  int CoverageGet(const std::string &scope, int coverage_type) const {
+    auto it = scopes_.find(scope);
+    if (it == scopes_.end()) {
+      return static_cast<int>(CoverageStatus::Error);
+    }
+    auto type_it = it->second.covered_items.find(coverage_type);
+    if (type_it == it->second.covered_items.end() || type_it->second <= 0) {
       return static_cast<int>(CoverageStatus::NoCoverage);
     }
     if (type_it->second >
@@ -209,6 +247,9 @@ class CoverageControlState {
     // 100% (maximum) coverage value. Keyed by the §40.3.1 coverage-type
     // constant (`SV_COV_ASSERTION, `SV_COV_FSM_STATE, ...).
     std::unordered_map<int, std::int64_t> coverable_items;
+    // §40.3.2.3: covered-item counts per coverage type, used to report the
+    // current coverage level. Keyed by the §40.3.1 coverage-type constant.
+    std::unordered_map<int, std::int64_t> covered_items;
   };
 
   // Begins collection on a scope that is not already collecting. A scope already
