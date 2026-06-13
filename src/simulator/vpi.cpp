@@ -3931,6 +3931,13 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return VpiInterfaceTypespecParent(ref);
   }
 
+  // §37.83: vpiParent of an attribute reaches the object the attribute is attached
+  // to - the instance, net, statement, or other design object that owns it. That
+  // owning object is held as the attribute's parent pointer.
+  if (type == vpiParent && ref->type == vpiAttribute) {
+    return ref->parent;
+  }
+
   // §37.28 detail 2: vpiTypespec of a type parameter reaches the typespec it has
   // at the end of elaboration, returned without resolving typedef aliases. The
   // target is held as a designated pointer, so the generic walk cannot serve it.
@@ -5891,6 +5898,18 @@ int VpiContext::Get(int property, VpiHandle obj) {
     case vpiBlocking:
       if (obj->type != vpiEventStmt) return vpiUndefined;
       return obj->blocking ? 1 : 0;
+    // §37.83: an attribute reports through vpiDefAttribute whether it was specified
+    // on a definition rather than on an instance. The property is drawn only on the
+    // attribute object, so asking any other object kind is not a valid query and
+    // yields vpiUndefined; for an attribute the answer is the stored Boolean.
+    case vpiDefAttribute:
+      if (obj->type != vpiAttribute) return vpiUndefined;
+      return obj->def_attribute ? 1 : 0;
+    // §37.83: an attribute reports the source line of its definition through the
+    // vpiDefLineNo integer property, again drawn only on the attribute object.
+    case vpiDefLineNo:
+      if (obj->type != vpiAttribute) return vpiUndefined;
+      return obj->def_line_no;
     // §37.63 detail 1: a process reports which kind of always procedure it is
     // through vpiAlwaysType, restricted to vpiAlways/vpiAlwaysComb/vpiAlwaysFF/
     // vpiAlwaysLatch. A process carrying none of those - an initial or final
@@ -6217,6 +6236,13 @@ const char* VpiContext::GetStrRaw(int property, VpiHandle obj) {
     case vpiFile:
       if (!VpiHasLocationProperties(obj->type)) return nullptr;
       return obj->file.empty() ? nullptr : obj->file.c_str();
+    // §37.83: an attribute reports the source file of its definition through the
+    // vpiDefFile string property. It is drawn only on the attribute object; an
+    // attribute with no recorded definition file - and any other object kind -
+    // yields null rather than an empty string.
+    case vpiDefFile:
+      if (obj->type != vpiAttribute) return nullptr;
+      return obj->def_file.empty() ? nullptr : obj->def_file.c_str();
     case kVpiFullName:
       return obj->full_name.empty() ? obj->name.data() : obj->full_name.c_str();
     // §37.41 detail 10: vpiDPICIdentifier reports the C linkage name of a "DPI" or

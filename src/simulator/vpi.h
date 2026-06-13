@@ -342,6 +342,17 @@ struct VpiObject {
   // the `line directive (§22.12).
   int line_no = 0;
 
+  // §37.83: the scalar properties the Attribute data model diagram draws on an
+  // attribute object (vpiAttribute). vpiDefAttribute reports whether the attribute
+  // was specified on a definition (such as a UDP or module definition) rather than
+  // on an instance; vpiDefFile and vpiDefLineNo give the source file and line of
+  // that definition. The attribute's vpiName reuses `name`, its value is reached
+  // through vpi_get_value() (§38.34), and its owning object is reached through
+  // vpiParent (reusing `parent`). All default to the "unset" state.
+  bool def_attribute = false;
+  std::string def_file;
+  int def_line_no = 0;
+
   // §38.10: the delays this object carries, in the order they occur in the
   // SystemVerilog description. vpi_get_delays() reports them in this order, so
   // da[0] is the first source delay, da[1] the second, and so on. Empty for an
