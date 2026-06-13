@@ -199,5 +199,39 @@ TEST_F(VpiSimTimeCallbacks, NonZeroDelayReadWriteSynchAllowedAtReadOnlySynch) {
   EXPECT_NE(vpi_register_cb(&cb), nullptr);
 }
 
+// §38.36.2: the requested delay is carried across the whole time value, not the
+// low word alone. A delay set only in the high word is still non-zero, so the
+// zero-delay cbAtStartOfSimTime restriction does not apply and registration
+// succeeds even after simulation has entered a time slice.
+TEST_F(VpiSimTimeCallbacks, HighWordDelayCountsAsNonZeroForAtStartOfSimTime) {
+  vpi_ctx_.SetSimulationProgressedIntoTimeSlice(true);
+
+  VpiTime t = {};
+  t.type = vpiSimTime;
+  t.low = 0;
+  t.high = 1;  // non-zero delay carried entirely in the high word
+  s_cb_data cb = {};
+  cb.reason = cbAtStartOfSimTime;
+  cb.time = &t;
+  EXPECT_NE(vpi_register_cb(&cb), nullptr);
+}
+
+// §38.36.2: for vpiScaledRealTime the delay lives in the real field. A non-zero
+// real delay is likewise non-zero, lifting the zero-delay cbAtStartOfSimTime
+// restriction even after the simulation has entered a time slice.
+TEST_F(VpiSimTimeCallbacks, RealDelayCountsAsNonZeroForAtStartOfSimTime) {
+  vpi_ctx_.SetSimulationProgressedIntoTimeSlice(true);
+
+  VpiTime t = {};
+  t.type = vpiScaledRealTime;
+  t.low = 0;
+  t.high = 0;
+  t.real = 1.0;  // non-zero delay carried in the real field
+  s_cb_data cb = {};
+  cb.reason = cbAtStartOfSimTime;
+  cb.time = &t;
+  EXPECT_NE(vpi_register_cb(&cb), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
