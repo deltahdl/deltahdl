@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "common/types.h"
+#include "simulator/coverage_control.h"
 
 namespace delta {
 
@@ -3118,6 +3119,29 @@ class VpiContext {
   // argument of vpiSetInteractiveScope. Returns 1 on success, 0 on failure.
   int Control(int operation, int arg0 = 0, int arg1 = 0, int arg2 = 0,
               VpiHandle scope = nullptr);
+
+  // §40.5.3: control of coverage collection is requested through vpi_control()
+  // using the coverage control constants of §40.5.1. `operation` selects the
+  // action: vpiCoverageStart/Stop/Reset/Check apply the §40.3.2.1 control rules
+  // to the scope named by `scope_handle` (an instance or assertion handle);
+  // vpiCoverageSave applies the §40.3.2.5 rules and vpiCoverageMerge the
+  // §40.3.2.4 rules to the coverage database located by `name`. `coverage_type`
+  // is one of the §40.5.1 coverage type properties.
+  //
+  // Statement, toggle, and FSM coverage are not individually controllable, so
+  // the Start/Stop/Reset/Check actions act on the scope the handle names as a
+  // whole rather than on any per-statement, per-signal, or per-FSM object. The
+  // return is the §40.3.1 status value the equivalent system function produces,
+  // so the detailed outcome - and the collection-state change it reflects - is
+  // observable to the caller.
+  int ControlCoverage(int operation, int coverage_type, VpiHandle scope_handle,
+                      const std::string& name);
+
+  // §40.5.3: the coverage-control state vpi_control() drives. It applies the
+  // same §40.3.2.1/.4/.5 rules the $coverage_* system functions use, so tests
+  // can register scopes and databases and observe the rules being applied.
+  CoverageControlState& GetCoverageControlState() { return coverage_control_; }
+
   bool ChkError(VpiErrorInfo* info);
 
   // §38.17: capture the simulator's invocation command line. Following the
@@ -3597,6 +3621,11 @@ class VpiContext {
   // vpi_put_data, §38.32); GetData reads and advances the cursor.
   std::unordered_map<int, std::vector<char>> save_data_;
   std::unordered_map<int, std::size_t> save_data_cursor_;
+
+  // §40.5.3: the coverage-collection state driven by vpi_control(). It carries
+  // the §40.3.2.1/.4/.5 control rules so a coverage control request applies the
+  // same semantics as the equivalent $coverage_* system function.
+  CoverageControlState coverage_control_;
 
   std::string product_ = "DeltaHDL";
   std::string version_ = "0.1.0";

@@ -6765,6 +6765,64 @@ int VpiContext::Control(int operation, int arg0, int arg1, int arg2,
   return 0;
 }
 
+int VpiContext::ControlCoverage(int operation, int coverage_type,
+                                VpiHandle scope_handle,
+                                const std::string& name) {
+  switch (operation) {
+    case vpiCoverageStart:
+    case vpiCoverageStop:
+    case vpiCoverageReset:
+    case vpiCoverageCheck: {
+      // §40.5.3: Start/Stop/Reset/Check control the collection of coverage over
+      // a scope, with the semantics of $coverage_control() (§40.3.2.1). The
+      // coverage type selects the kind of coverage being controlled but, since
+      // statement, toggle, and FSM coverage are not individually controllable,
+      // the control acts on the instance (or assertion) the handle names as a
+      // whole rather than on any sub-object of it.
+      CoverageControl control = CoverageControl::Start;
+      switch (operation) {
+        case vpiCoverageStart:
+          control = CoverageControl::Start;
+          break;
+        case vpiCoverageStop:
+          control = CoverageControl::Stop;
+          break;
+        case vpiCoverageReset:
+          control = CoverageControl::Reset;
+          break;
+        case vpiCoverageCheck:
+          control = CoverageControl::Check;
+          break;
+      }
+      // The handle names the controlled scope. A handle's hierarchical name
+      // identifies the instance; a handle with no full name falls back to its
+      // simple name. A null handle names no scope, which the control rules treat
+      // as a nonexisting scope (a bad argument).
+      std::string scope;
+      if (scope_handle != nullptr) {
+        if (!scope_handle->full_name.empty()) {
+          scope = scope_handle->full_name;
+        } else {
+          scope = std::string(scope_handle->name);
+        }
+      }
+      return static_cast<int>(coverage_control_.Control(control, scope));
+    }
+    case vpiCoverageSave:
+      // §40.5.3: save the current coverage of the requested type to the named
+      // coverage database, per $coverage_save() (§40.3.2.5).
+      return static_cast<int>(coverage_control_.CoverageSave(coverage_type, name));
+    case vpiCoverageMerge:
+      // §40.5.3: merge coverage of the requested type from the named coverage
+      // database into the simulation, per $coverage_merge() (§40.3.2.4).
+      return static_cast<int>(
+          coverage_control_.CoverageMerge(coverage_type, name));
+    default:
+      // Not a coverage control operation: nothing to apply.
+      return 0;
+  }
+}
+
 bool VpiContext::ChkError(VpiErrorInfo* info) {
   if (!info) return last_error_.level != 0;
   *info = last_error_;
@@ -7444,6 +7502,32 @@ int VpiControlC(int operation, ...) {
     case delta::kVpiSetInteractiveScope: {
       vpiHandle scope = va_arg(args, vpiHandle);
       result = delta::GetGlobalVpiContext().Control(operation, 0, 0, 0, scope);
+      break;
+    }
+    case vpiCoverageStart:
+    case vpiCoverageStop:
+    case vpiCoverageReset:
+    case vpiCoverageCheck: {
+      // §40.5.3: vpi_control(<coverageControl>, <coverageType>, handle) controls
+      // the collection of coverage over the instance or assertion the handle
+      // names. The coverage type is the second argument and the controlled scope
+      // is the third.
+      int coverage_type = va_arg(args, int);
+      vpiHandle handle = va_arg(args, vpiHandle);
+      result = delta::GetGlobalVpiContext().ControlCoverage(
+          operation, coverage_type, handle, std::string());
+      break;
+    }
+    case vpiCoverageSave:
+    case vpiCoverageMerge: {
+      // §40.5.3: vpi_control(<coverageControl>, <coverageType>, name) saves or
+      // merges coverage of the requested type against the coverage database
+      // located by the name string given as the third argument.
+      int coverage_type = va_arg(args, int);
+      const char* name = va_arg(args, const char*);
+      result = delta::GetGlobalVpiContext().ControlCoverage(
+          operation, coverage_type, nullptr, name ? std::string(name)
+                                                   : std::string());
       break;
     }
     default:
