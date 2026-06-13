@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdarg>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -4216,3 +4217,4 @@ PLI_UINT32 vpi_mcd_close(PLI_UINT32 mcd);
 PLI_INT32 vpi_mcd_flush(PLI_UINT32 mcd);
 PLI_BYTE8* vpi_mcd_name(PLI_UINT32 cd);
 PLI_INT32 vpi_mcd_printf(PLI_UINT32 mcd, PLI_BYTE8* format, ...);
+PLI_INT32 vpi_mcd_vprintf(PLI_UINT32 mcd, PLI_BYTE8* format, va_list ap);
