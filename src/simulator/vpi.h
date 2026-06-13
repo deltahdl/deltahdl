@@ -3241,6 +3241,16 @@ class VpiContext {
   void SetCurrentSystfCall(VpiHandle call) { current_systf_call_ = call; }
   VpiHandle CurrentSystfCall() const { return current_systf_call_; }
 
+  // §37.82: record the system task call that established the active time format,
+  // i.e. the $timeformat() call. An application reaches it through
+  // vpi_handle(vpiActiveTimeFormat, NULL) (see Handle). It stays null until
+  // $timeformat() runs, which is what makes that traversal return NULL when no
+  // time format has been set (detail 1).
+  void SetActiveTimeFormatCall(VpiHandle call) {
+    active_time_format_call_ = call;
+  }
+  VpiHandle ActiveTimeFormatCall() const { return active_time_format_call_; }
+
   const VpiErrorInfo& LastError() const { return last_error_; }
 
   // §38.2: the error status is reset by any VPI routine call except
@@ -3295,6 +3305,10 @@ class VpiContext {
   // §37.42 detail 3: the system task or function call currently invoking a PLI
   // application, returned by vpi_handle(vpiSysTfCall, NULL).
   VpiHandle current_systf_call_ = nullptr;
+
+  // §37.82: the $timeformat() call that set the active time format, returned by
+  // vpi_handle(vpiActiveTimeFormat, NULL). Null until $timeformat() is called.
+  VpiHandle active_time_format_call_ = nullptr;
 
   // §36.12.2.2: the run-wide default VPI compatibility mode selected through
   // Mechanism 2 (a vpiCompatibilityMode value; 0 = native current standard),

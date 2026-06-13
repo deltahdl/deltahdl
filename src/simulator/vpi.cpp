@@ -3798,6 +3798,12 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // reached with vpi_handle(vpiSysTfCall, NULL).
   if (!ref && type == vpiSysTfCall) return current_systf_call_;
 
+  // §37.82: vpi_handle(vpiActiveTimeFormat, NULL) reaches the system task call
+  // that established the active time format - the $timeformat() call. Detail 1
+  // requires NULL when $timeformat() has not been called; the recorded call is
+  // null until then, so this branch returns NULL in that case.
+  if (!ref && type == vpiActiveTimeFormat) return active_time_format_call_;
+
   if (!ref) return nullptr;
 
   // §38.18: unless otherwise specified, asking vpi_handle() for an object
