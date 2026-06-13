@@ -4252,6 +4252,25 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return nullptr;
   }
 
+  // §37.23 detail 2: a nettype declaration that is an alias of another nettype
+  // declaration reaches the aliased nettype through vpiNetTypedefAlias, which
+  // reports a non-null handle to that nettype. The aliased nettype's own type is
+  // vpiNetTypedef, not the relation tag, so it is kept as a designated pointer
+  // rather than found by the generic walk. A nettype that is not an alias has no
+  // such target and reports NULL.
+  if (type == vpiNetTypedefAlias && ref->type == vpiNetTypedef) {
+    return ref->nettype_alias;
+  }
+
+  // §37.23 detail 1: a nettype declaration reaches its associated resolution
+  // function through vpiWith. A nettype declared without a resolution function
+  // reports NULL. (vpiWith on a method call is served by the §37.42 branch
+  // above; here the relation originates from a nettype declaration, a distinct
+  // object kind, so the two never collide.)
+  if (type == vpiWith && ref->type == vpiNetTypedef) {
+    return ref->nettype_with;
+  }
+
   if (ref->parent && ref->parent->type == type) return ref->parent;
 
   for (auto* child : ref->children) {
