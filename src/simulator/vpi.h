@@ -705,6 +705,12 @@ struct VpiObject {
   // so vpi_handle(vpiUse, iterator) recovers the object the iterator walks.
   VpiObject* iter_ref = nullptr;
 
+  // §37.84: for an iterator object (type vpiIterator), the kind of object the
+  // iteration walks - the type code handed to vpi_iterate when the iterator was
+  // created. It is reported back through the iterator's vpiIteratorType property,
+  // so vpi_get(vpiIteratorType, iterator) recovers what the iterator traverses.
+  int iter_type = 0;
+
   // §38.3: the underlying simulation object this handle denotes, when that is
   // not the handle object itself. Two distinct handles can name one and the
   // same object - e.g. a packed-struct bit reachable both as ps[0] and as

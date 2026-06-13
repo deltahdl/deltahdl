@@ -3829,8 +3829,10 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return nullptr;
   }
 
-  // §38.23: vpi_handle(vpiUse, iterator) recovers the reference object the
-  // iterator was created to walk.
+  // §37.84 details 1 and 2: vpi_handle(vpiUse, iterator) recovers the reference
+  // handle the iterator was created over (detail 1). When that reference was null
+  // - an iterator built over a null handle - the stored reference is null, so the
+  // traversal hands back null in turn (detail 2). See also §38.23.
   if (type == vpiUse && ref->type == vpiIterator) return ref->iter_ref;
 
   // §37.11 detail 1: traversing vpiExpr from an instance array reaches the
@@ -4645,6 +4647,9 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   auto* iter = new VpiObject();
   iter->type = vpiIterator;
   iter->iter_ref = ref;
+  // §37.84: remember the object kind being walked so the iterator can report it
+  // through vpi_get(vpiIteratorType, iterator).
+  iter->iter_type = type;
   iter->scan_index = 0;
 
   // §37.49: vpiAssertion names the assertion class rather than a single object
@@ -5861,6 +5866,11 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // Boolean property.
     case vpiTopModule:
       return obj->top_module ? 1 : 0;
+    // §37.84: an iterator reports the kind of object its iteration walks - the
+    // type code it was created to traverse - through the integer vpiIteratorType
+    // property. A non-iterator object has no walked kind, so it reports 0.
+    case vpiIteratorType:
+      return obj->iter_type;
     // §37.5: a module reports its default net decay time (in time units) through
     // the vpiDefDecayTime integer property.
     case vpiDefDecayTime:
