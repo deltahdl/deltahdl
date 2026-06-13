@@ -3274,6 +3274,17 @@ class VpiContext {
   // nothing to release. Idempotent.
   void ReleaseHandle(VpiHandle handle);
 
+  // §38.38: the public vpi_release_handle() routine. It frees the memory a VPI
+  // routine allocated for a handle and reports whether it did so - 1 on success
+  // and 0 on failure. The routine shall not be called on an invalid handle, so a
+  // null, already-released, or otherwise invalid handle has no live memory to
+  // free and the call fails with 0. An iterator object (from vpi_iterate(),
+  // §38.21) owns storage that vpi_scan() reclaims only once a traversal runs to
+  // its end; releasing one before then frees that storage directly, which is how
+  // a program that breaks out of an iteration loop early reclaims it. For any
+  // other handle, freeing it is the §37.2.2 release operation above.
+  PLI_INT32 ReleaseHandleStatus(VpiHandle handle);
+
   // §37.2.2: observe whether a handle has been released. False for a null
   // handle (there is nothing to have released).
   bool HandleReleased(VpiHandle handle) const;
@@ -4215,6 +4226,7 @@ int vpi_get(int property, vpiHandle obj);
 PLI_INT64 vpi_get64(int property, vpiHandle obj);
 const char* vpi_get_str(int property, vpiHandle obj);
 int vpi_free_object(vpiHandle obj);
+PLI_INT32 vpi_release_handle(vpiHandle obj);
 int VpiControlC(int operation, ...);
 int VpiChkErrorC(SVpiErrorInfo* info);
 PLI_INT32 vpi_get_vlog_info(SVpiVlogInfo* info);

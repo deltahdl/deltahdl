@@ -6898,6 +6898,31 @@ void VpiContext::ReleaseHandle(VpiHandle handle) {
   handle->released = true;
 }
 
+PLI_INT32 VpiContext::ReleaseHandleStatus(VpiHandle handle) {
+  // §38.38: vpi_release_handle() shall free the memory a VPI routine allocated
+  // for a handle. It shall not be called on an invalid handle: a null,
+  // already-released, or no-longer-existing handle names no live memory to free,
+  // so the call fails and returns 0.
+  if (!HandleValid(handle)) return 0;
+
+  // §38.38: an iterator object (from vpi_iterate(), §38.21) carries storage that
+  // vpi_scan() reclaims only once a traversal reaches its end. When a program
+  // breaks out of an iteration loop before that, vpi_release_handle() frees the
+  // iterator's memory. An iterator is allocated standalone - it is not one of the
+  // tracked objects - so its storage is returned here directly, the same way
+  // vpi_scan() disposes of an exhausted one.
+  if (handle->type == vpiIterator) {
+    delete handle;
+    return 1;
+  }
+
+  // §38.38: for any other handle, freeing it is the §37.2.2 release operation -
+  // the handle stops being a live handle to its object while the object itself
+  // is left in place. The routine succeeds, returning 1.
+  ReleaseHandle(handle);
+  return 1;
+}
+
 bool VpiContext::HandleReleased(VpiHandle handle) const {
   return handle != nullptr && handle->released;
 }
@@ -7386,6 +7411,11 @@ const char* vpi_get_str(int property, vpiHandle obj) {
 int vpi_free_object(vpiHandle obj) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().FreeObject(obj);
+}
+
+PLI_INT32 vpi_release_handle(vpiHandle obj) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  return delta::GetGlobalVpiContext().ReleaseHandleStatus(obj);
 }
 
 int VpiControlC(int operation, ...) {
