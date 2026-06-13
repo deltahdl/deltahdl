@@ -5,27 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SystemTimingCheckParsing, MultipleTimingChecks) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data, posedge clk, 10);\n"
-      "  $hold(posedge clk, data, 5);\n"
-      "  $period(posedge clk, 50);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 3u);
-  EXPECT_EQ(spec->specify_items[0]->timing_check.check_kind,
-            TimingCheckKind::kSetup);
-  EXPECT_EQ(spec->specify_items[1]->timing_check.check_kind,
-            TimingCheckKind::kHold);
-  EXPECT_EQ(spec->specify_items[2]->timing_check.check_kind,
-            TimingCheckKind::kPeriod);
-}
-
 TEST(SystemTimingCheckParsing, AllTwelveTimingCheckKinds) {
   auto r = Parse(
       "module m;\n"
@@ -75,23 +54,6 @@ TEST(SystemTimingCheckParsing, AllTwelveTimingCheckKinds) {
             TimingCheckKind::kNochange);
 }
 
-TEST(TimingCheckCommandParsing, SetupKindAndTerminals) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data, posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetup);
-  EXPECT_EQ(tc->ref_terminal.name, "data");
-  EXPECT_EQ(tc->data_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc->data_terminal.name, "clk");
-  ASSERT_EQ(tc->limits.size(), 1u);
-}
-
 TEST(TimingCheckCommandParsing, SetupWithNotifier) {
   auto r = Parse(
       "module m;\n"
@@ -103,6 +65,24 @@ TEST(TimingCheckCommandParsing, SetupWithNotifier) {
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->notifier, "ntfr");
+}
+
+// The notifier in the optional [ , [ notifier ] ] tail may itself be omitted
+// while the separating comma is present; the trailing comma parses cleanly and
+// leaves the notifier empty.
+TEST(TimingCheckCommandParsing, SetupEmptyNotifierSlot) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, posedge clk, 10, );\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetup);
+  EXPECT_TRUE(tc->notifier.empty());
+  ASSERT_EQ(tc->limits.size(), 1u);
 }
 
 TEST(TimingCheckCommandParsing, SetupAsSpecifyItem) {
@@ -142,6 +122,127 @@ TEST(TimingCheckCommandParsing, NochangeAsSpecifyItem) {
   EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
   EXPECT_EQ(si->timing_check.data_terminal.name, "data");
   ASSERT_GE(si->timing_check.limits.size(), 2u);
+}
+
+// $setuphold_timing_check carries two timing_check_limit arguments; the parser
+// records both in the limits list.
+TEST(TimingCheckCommandParsing, SetupholdTwoLimits) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, data, 10, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetuphold);
+  EXPECT_EQ(tc->data_terminal.name, "data");
+  ASSERT_EQ(tc->limits.size(), 2u);
+}
+
+// A $setuphold with only one timing_check_limit violates the production's
+// two-limit form and is rejected.
+TEST(TimingCheckCommandParsing, SetupholdSingleLimitRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, data, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// $recrem_timing_check likewise takes two timing_check_limit arguments.
+TEST(TimingCheckCommandParsing, RecremTwoLimits) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $recrem(posedge rst, posedge clk, 10, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kRecrem);
+  ASSERT_EQ(tc->limits.size(), 2u);
+}
+
+// A $recrem with a single timing_check_limit violates its two-limit form.
+TEST(TimingCheckCommandParsing, RecremSingleLimitRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $recrem(posedge rst, posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// $fullskew_timing_check is the two-limit member of the skew family.
+TEST(TimingCheckCommandParsing, FullskewTwoLimits) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $fullskew(posedge clk1, posedge clk2, 50, 50);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kFullskew);
+  ASSERT_EQ(tc->limits.size(), 2u);
+}
+
+// A $fullskew with a single timing_check_limit violates its two-limit form.
+TEST(TimingCheckCommandParsing, FullskewSingleLimitRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $fullskew(posedge clk1, posedge clk2, 50);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// $period_timing_check opens with a controlled_reference_event and has no
+// data_event; only the reference terminal is populated.
+TEST(TimingCheckCommandParsing, PeriodControlledReferenceNoDataEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $period(posedge clk, 50);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kPeriod);
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc->ref_terminal.name, "clk");
+  EXPECT_EQ(tc->data_edge, SpecifyEdge::kNone);
+  EXPECT_TRUE(tc->data_terminal.name.empty());
+  ASSERT_EQ(tc->limits.size(), 1u);
+}
+
+// $width_timing_check has no data_event and carries a threshold after the
+// timing_check_limit, recorded as the second limits entry.
+TEST(TimingCheckCommandParsing, WidthThresholdNoDataEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $width(posedge clk, 20, 1);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kWidth);
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc->ref_terminal.name, "clk");
+  EXPECT_EQ(tc->data_edge, SpecifyEdge::kNone);
+  EXPECT_TRUE(tc->data_terminal.name.empty());
+  ASSERT_EQ(tc->limits.size(), 2u);
 }
 
 TEST(TimingCheckCommandParsing, ErrorMissingCloseParen) {
