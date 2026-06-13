@@ -15,6 +15,7 @@
 #include "common/diagnostic.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
+#include "simulator/coverage_control.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
@@ -895,6 +896,35 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 32, 0);
 }
 
+// §40.3.2.1: $coverage_control(control_constant, coverage_type, scope_def,
+// modules_or_instance) performs the control action named by its first argument
+// over the scope named by its fourth and returns one of the §40.3.1 status
+// values. The action is applied to the simulation's coverage-control state.
+static Logic4Vec EvalCoverageControl(const Expr* expr, SimContext& ctx,
+                                     Arena& arena) {
+  auto status_vec = [&](CoverageStatus status) {
+    return MakeLogic4VecVal(arena, 32,
+                            static_cast<uint32_t>(static_cast<int>(status)));
+  };
+  // A control constant outside the §40.3.1 set (or a missing one) is a bad
+  // argument, reported as `SV_COV_ERROR.
+  if (expr->args.empty()) return status_vec(CoverageStatus::Error);
+  int control_value =
+      static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+  CoverageControl control;
+  if (!CoverageControlFromInt(control_value, &control)) {
+    return status_vec(CoverageStatus::Error);
+  }
+  // The fourth argument names the module definition or instance. When given as a
+  // string literal it is used directly; otherwise the scope is left empty.
+  std::string scope;
+  if (expr->args.size() > 3 &&
+      expr->args[3]->kind == ExprKind::kStringLiteral) {
+    scope = ExtractStrArg(expr->args[3]);
+  }
+  return status_vec(ctx.GetCoverageControlState().Control(control, scope));
+}
+
 Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            std::string_view name) {
 
@@ -927,6 +957,8 @@ Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   }
 
   if (name.starts_with("$assert")) return MakeLogic4VecVal(arena, 1, 0);
+
+  if (name == "$coverage_control") return EvalCoverageControl(expr, ctx, arena);
 
   if (name.starts_with("$coverage")) return MakeLogic4VecVal(arena, 32, 0);
 

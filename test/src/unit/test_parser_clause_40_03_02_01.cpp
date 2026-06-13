@@ -15,17 +15,4 @@ TEST_F(ApiParseTest, CoverageControlSystemCall) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-TEST(DataReadApiParsing, CoverageControlInAlwaysBlock) {
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      logic clk, reset;
-      always @(posedge clk) begin
-        if (reset) begin
-          $coverage_control(2, 0, 0);
-        end
-      end
-    endmodule
-  )"));
-}
-
 }

@@ -16,6 +16,7 @@
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
+#include "simulator/coverage_control.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sync_objects.h"
@@ -210,6 +211,9 @@ class SimContext {
   }
   uint32_t ResetCount() const { return reset_count_; }
   int64_t ResetValue() const { return reset_value_; }
+
+  // §40.3.2.1 coverage-collection state driven by $coverage_control.
+  CoverageControlState& GetCoverageControlState() { return coverage_control_; }
 
   void RegisterProgramInitial(uint32_t program_block_id, Process* proc);
   void OnProgramInitialComplete(Process* proc);
@@ -675,6 +679,7 @@ class SimContext {
   bool stop_requested_ = false;
   uint32_t reset_count_ = 0;
   int64_t reset_value_ = 0;
+  CoverageControlState coverage_control_;
 
   std::unordered_map<const Expr*, Logic4Vec> deferred_arg_snapshots_;
 
