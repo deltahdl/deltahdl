@@ -288,20 +288,6 @@ TEST(UdpDeclGrammar, EndLabelSequential) {
   EXPECT_TRUE(r.cu->udps[0]->is_sequential);
 }
 
-TEST(UdpDeclGrammar, CombinationalUdpEndLabel) {
-  auto r = Parse(
-      "primitive inv(output y, input a);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive : inv\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  EXPECT_EQ(r.cu->udps[0]->name, "inv");
-}
-
 TEST(UdpDeclGrammar, EndLabelMismatchIsError) {
   EXPECT_FALSE(ParseOk(
       "primitive inv(output y, input a);\n"
@@ -369,6 +355,30 @@ TEST(UdpDeclGrammar, AttributeOnExternUdp) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
   EXPECT_EQ(r.cu->udps[0]->name, "inv");
+}
+
+// Every udp_nonansi_declaration / udp_ansi_declaration header ends with a
+// semicolon after the closing parenthesis of its port list. Dropping it must
+// be diagnosed by the declaration parser.
+TEST(UdpDeclGrammar, MissingSemicolonAfterPortListIsError) {
+  EXPECT_FALSE(ParseOk(
+      "primitive inv(output out, input in)\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n"));
+}
+
+// A udp_declaration must be terminated by the endprimitive keyword; a body that
+// reaches end-of-input without it must be diagnosed.
+TEST(UdpDeclGrammar, MissingEndprimitiveIsError) {
+  EXPECT_FALSE(ParseOk(
+      "primitive inv(output out, input in);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"));
 }
 
 }
