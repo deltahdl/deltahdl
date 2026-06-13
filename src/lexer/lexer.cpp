@@ -78,6 +78,46 @@ bool Lexer::IsSimplePragmaIdentifier(std::string_view word) {
   return true;
 }
 
+bool Lexer::ParsePartSelect(std::string_view word, std::string_view& base,
+                            int& msb, int& lsb) {
+  // A §40.4.2 part-select word has the shape `signal_name[msb:lsb]`: a simple
+  // base identifier followed by a bracketed two-bound range.
+  size_t open = word.find('[');
+  if (open == std::string_view::npos || open == 0 || word.back() != ']') {
+    return false;
+  }
+  std::string_view candidate_base = word.substr(0, open);
+  if (!IsSimplePragmaIdentifier(candidate_base)) {
+    return false;
+  }
+  std::string_view inside = word.substr(open + 1, word.size() - open - 2);
+  size_t colon = inside.find(':');
+  if (colon == std::string_view::npos) {
+    return false;
+  }
+  std::string_view hi = inside.substr(0, colon);
+  std::string_view lo = inside.substr(colon + 1);
+  if (hi.empty() || lo.empty()) {
+    return false;
+  }
+  auto parse_index = [](std::string_view text, int& out) -> bool {
+    int value = 0;
+    for (char c : text) {
+      if (!std::isdigit(static_cast<unsigned char>(c))) {
+        return false;
+      }
+      value = value * 10 + (c - '0');
+    }
+    out = value;
+    return true;
+  };
+  if (!parse_index(hi, msb) || !parse_index(lo, lsb)) {
+    return false;
+  }
+  base = candidate_base;
+  return true;
+}
+
 void Lexer::TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc) {
   // Split the comment body into whitespace-delimited words.
   std::vector<std::string_view> words;
@@ -109,8 +149,13 @@ void Lexer::TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc) {
     // Current-state form: `tool state_vector signal_name`, optionally with a
     // trailing `enum enumeration_name` binding the signal to the FSM.
     if (!IsSimplePragmaIdentifier(words[2])) {
-      // A bracketed part-select or braced concatenation is a descendant form
-      // (§40.4.2 / §40.4.3), not the simple signal named here.
+      // §40.4.2: a part-select of a vector signal can hold the current state.
+      // Such a pragma must also supply an FSM name for the coverage tool to
+      // report under, distinct from the enumeration name:
+      //   `tool state_vector signal_name[msb:lsb] FSM_name enum enum_name`.
+      TryRecognizeFsmPartSelectPragma(words, loc);
+      // A bracketed part-select or braced concatenation is otherwise a
+      // descendant form (§40.4.2 / §40.4.3), not the simple signal named here.
       return;
     }
     pragma.form = FsmStatePragma::Form::kStateVector;
@@ -144,6 +189,39 @@ void Lexer::TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc) {
     }
   }
   fsm_state_pragmas_.push_back(pragma);
+}
+
+void Lexer::TryRecognizeFsmPartSelectPragma(
+    const std::vector<std::string_view>& words, SourceLoc loc) {
+  // The caller has already matched the leading `tool state_vector`. §40.4.2's
+  // form names a part-select, an FSM name, and an enumeration name:
+  //   tool state_vector signal_name[msb:lsb] FSM_name enum enum_name
+  if (words.size() != 6 || words[4] != "enum") {
+    return;
+  }
+
+  FsmPartSelectPragma pragma;
+  if (!ParsePartSelect(words[2], pragma.signal_name, pragma.msb, pragma.lsb)) {
+    return;
+  }
+  // The FSM name is required so the coverage tool has a name to report the FSM
+  // under, and it is distinct from the enumeration name.
+  if (!IsSimplePragmaIdentifier(words[3]) ||
+      !IsSimplePragmaIdentifier(words[5])) {
+    return;
+  }
+  pragma.fsm_name = words[3];
+  pragma.enum_name = words[5];
+  pragma.loc = loc;
+
+  // Avoid re-recording the same comment if the lexer backtracks over it.
+  for (const auto& existing : fsm_part_select_pragmas_) {
+    if (existing.loc.file_id == loc.file_id && existing.loc.line == loc.line &&
+        existing.loc.column == loc.column) {
+      return;
+    }
+  }
+  fsm_part_select_pragmas_.push_back(pragma);
 }
 
 void Lexer::SkipWhitespaceAndComments() {

@@ -38,6 +38,23 @@ class Lexer {
     return fsm_state_pragmas_;
   }
 
+  // §40.4.2 — an FSM "tool" pragma whose current state is held by a part-select
+  // of a vector signal. Because the state lives in a part-select rather than a
+  // whole signal, the pragma carries an explicit FSM name (which is distinct
+  // from the enumeration name) for the coverage tool to report the FSM under.
+  struct FsmPartSelectPragma {
+    std::string_view signal_name;  // base vector signal of the part-select
+    int msb = 0;                   // part-select range [msb:lsb]
+    int lsb = 0;
+    std::string_view fsm_name;   // required name the FSM is reported under
+    std::string_view enum_name;  // enumeration name bound by the `enum` keyword
+    SourceLoc loc;
+  };
+
+  const std::vector<FsmPartSelectPragma>& FsmPartSelectPragmas() const {
+    return fsm_part_select_pragmas_;
+  }
+
   struct SavedPos {
     uint32_t pos;
     uint32_t line;
@@ -62,7 +79,11 @@ class Lexer {
   void SkipLineComment();
   uint32_t SkipBlockComment(SourceLoc start_loc);
   void TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc);
+  void TryRecognizeFsmPartSelectPragma(
+      const std::vector<std::string_view>& words, SourceLoc loc);
   static bool IsSimplePragmaIdentifier(std::string_view word);
+  static bool ParsePartSelect(std::string_view word, std::string_view& base,
+                              int& msb, int& lsb);
 
   Token MakeToken(TokenKind kind, SourceLoc loc) const;
   Token MakeOp(TokenKind kind, SourceLoc loc, uint32_t start);
@@ -116,6 +137,7 @@ class Lexer {
   Token peeked_;
   KeywordVersion keyword_version_ = KeywordVersion::kVer18002023;
   std::vector<FsmStatePragma> fsm_state_pragmas_;
+  std::vector<FsmPartSelectPragma> fsm_part_select_pragmas_;
 };
 
 }
