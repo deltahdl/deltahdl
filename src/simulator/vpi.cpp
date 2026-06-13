@@ -4030,6 +4030,25 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return VpiReturnConditionExpr(ref);
   }
 
+  // §37.79: the procedural continuous assignment family - an assign statement, a
+  // force, a deassign, and a release - reaches its target through vpiLhs, and the
+  // two that supply a value (the assign statement and the force) reach that value
+  // through vpiRhs. Each side is an expression whose own type is an expression
+  // kind, not the vpiLhs / vpiRhs relation tag, so the generic walk below cannot
+  // find it; both are held as designated pointers. The vpiLhs relation is scoped
+  // to these four kinds so it does not disturb the vpiLhs edge other diagrams draw
+  // (for instance the parameter assignment of §37.28, handled above). A deassign
+  // or release draws no vpiRhs edge: it falls through the rhs gate below and the
+  // generic walk reports null, since it names a target but supplies no value.
+  if (type == vpiLhs &&
+      (ref->type == vpiAssignStmt || ref->type == vpiForce ||
+       ref->type == vpiDeassign || ref->type == vpiRelease)) {
+    return ref->lhs;
+  }
+  if (type == vpiRhs && (ref->type == vpiAssignStmt || ref->type == vpiForce)) {
+    return ref->rhs;
+  }
+
   // §37.71: vpiElseStmt of an if-else statement reaches its else-branch body.
   // The relation is drawn only from the if-else grouping, never from a plain if,
   // so it is gated on the if-else kind. The else statement's own type is a

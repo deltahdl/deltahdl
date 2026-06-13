@@ -611,6 +611,17 @@ struct VpiObject {
   VpiObject* in_term = nullptr;
   VpiObject* out_term = nullptr;
 
+  // §37.79: the left- and right-hand side expressions of a procedural
+  // continuous assignment family object - an assign statement, a force, a
+  // deassign, or a release. The diagram draws vpiLhs from all four and vpiRhs
+  // only from the assign statement and force (deassign and release name a target
+  // but supply no value). Each side is an expression, whose own type is an
+  // expression kind rather than the vpiLhs / vpiRhs relation enum, so - as with
+  // the other designated targets above - they are held as designated pointers
+  // rather than found by a type match. Null by default.
+  VpiObject* lhs = nullptr;
+  VpiObject* rhs = nullptr;
+
   // §37.45: the vpiDelayType integer property carried by a delay device and by a
   // delay term. It names the kind of delay (for example a module-path or timing
   // delay). Zero by default, which is what every object that is not a delay
