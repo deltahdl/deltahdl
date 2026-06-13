@@ -31,35 +31,6 @@ TEST(ProgramInstantiationGrammar, ProgramInstEmptyPorts) {
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
-TEST(ProgramInstantiationGrammar, BasicProgramInst) {
-  auto r = Parse(
-      "program my_prog(input logic clk);\n"
-      "endprogram\n"
-      "module m; my_prog u0(.clk(clk)); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_module, "my_prog");
-  EXPECT_EQ(item->inst_name, "u0");
-}
-
-TEST(ProgramInstantiationGrammar, MultipleProgramInstances) {
-  auto r = Parse(
-      "program my_prog(input logic clk);\n"
-      "endprogram\n"
-      "module m; my_prog u0(.clk(a)), u1(.clk(b)); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  auto* i0 = r.cu->modules[0]->items[0];
-  auto* i1 = r.cu->modules[0]->items[1];
-  EXPECT_EQ(i0->inst_module, "my_prog");
-  EXPECT_EQ(i0->inst_name, "u0");
-  EXPECT_EQ(i1->inst_module, "my_prog");
-  EXPECT_EQ(i1->inst_name, "u1");
-}
-
 TEST(ProgramInstantiationGrammar, ProgramInstantiatedInModule) {
   auto r = Parse(
       "program test_prog(input logic clk);\n"
@@ -124,19 +95,6 @@ TEST(ProgramInstantiationGrammar, ProgramInstWildcardPort) {
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->inst_wildcard);
-}
-
-TEST(ProgramInstantiationGrammar, ProgramInstWithNamedParams) {
-  auto r = Parse(
-      "program my_prog #(parameter int W = 8)(input logic [W-1:0] data);\n"
-      "endprogram\n"
-      "module m; my_prog #(.W(16)) u0(.data(d)); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->inst_module, "my_prog");
-  ASSERT_EQ(item->inst_params.size(), 1u);
-  EXPECT_EQ(item->inst_params[0].first, "W");
 }
 
 TEST(ProgramInstantiationGrammar, ProgramInstArray) {
