@@ -19,6 +19,7 @@
 #include <limits>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace delta {
 
@@ -159,6 +160,61 @@ class CoverageControlState {
     return static_cast<int>(type_it->second);
   }
 
+  // Registers a named coverage database the tool could load, mirroring what a
+  // real coverage engine would find when asked to merge by name. §40.3.2.4 keys
+  // the database by an arbitrary, implementation-specific `name`; this model
+  // stores it by that string. `from_this_design` records whether the database
+  // corresponds to the design being simulated, and `coverage_types` lists the
+  // §40.3.1 coverage-type constants the database holds — the two properties
+  // §40.3.2.4 inspects to decide the outcome of a merge.
+  void RegisterCoverageDatabase(const std::string &name, bool from_this_design,
+                                std::unordered_set<int> coverage_types) {
+    CoverageDatabase &db = databases_[name];
+    db.from_this_design = from_this_design;
+    db.coverage_types = std::move(coverage_types);
+  }
+
+  // §40.3.2.4 ($coverage_merge): loads and merges coverage data of
+  // `coverage_type` from the database located by `name` into the simulation, and
+  // returns the resulting §40.3.1 status.
+  //
+  //   `SV_COV_OK    — the database was found, belongs to this design, and holds
+  //                   the requested coverage type, so its data are merged.
+  //   `SV_COV_NOCOV — the database was found but does not contain the requested
+  //                   coverage type, so there is nothing of that type to merge.
+  //   `SV_COV_ERROR — the database was not found, or does not correspond to this
+  //                   design, or another error occurred. §40.3.2.4 requires an
+  //                   error when `name` does not exist or is from a different
+  //                   design.
+  CoverageStatus CoverageMerge(int coverage_type, const std::string &name) {
+    auto it = databases_.find(name);
+    // The name does not exist: no database to load. §40.3.2.4 requires an error.
+    if (it == databases_.end()) {
+      return CoverageStatus::Error;
+    }
+    CoverageDatabase &db = it->second;
+    // The database is from a different design: §40.3.2.4 requires an error.
+    if (!db.from_this_design) {
+      return CoverageStatus::Error;
+    }
+    // The database exists for this design but does not hold the requested type:
+    // the data were found but did not contain the coverage type requested.
+    if (db.coverage_types.find(coverage_type) == db.coverage_types.end()) {
+      return CoverageStatus::NoCoverage;
+    }
+    // The data are found and merged.
+    ++db.merges;
+    return CoverageStatus::Ok;
+  }
+
+  // Number of successful merges performed against a named database. A merge only
+  // happens on the `SV_COV_OK path, so this makes the "merged" effect of
+  // $coverage_merge observable rather than just the returned status.
+  std::uint64_t MergeCount(const std::string &name) const {
+    auto it = databases_.find(name);
+    return it == databases_.end() ? 0 : it->second.merges;
+  }
+
   bool IsCollecting(const std::string &scope) const {
     auto it = scopes_.find(scope);
     return it != scopes_.end() && it->second.collecting;
@@ -252,6 +308,16 @@ class CoverageControlState {
     std::unordered_map<int, std::int64_t> covered_items;
   };
 
+  // §40.3.2.4: a named coverage database that $coverage_merge can load.
+  struct CoverageDatabase {
+    // Whether the saved database corresponds to the design being simulated.
+    bool from_this_design = false;
+    // The §40.3.1 coverage-type constants the database holds.
+    std::unordered_set<int> coverage_types;
+    // Successful merges performed against this database.
+    std::uint64_t merges = 0;
+  };
+
   // Begins collection on a scope that is not already collecting. A scope already
   // collecting is left untouched so that a repeated start has no effect.
   static void StartCollecting(ScopeState &s) {
@@ -269,6 +335,8 @@ class CoverageControlState {
   }
 
   std::unordered_map<std::string, ScopeState> scopes_;
+  // §40.3.2.4: named coverage databases available to $coverage_merge.
+  std::unordered_map<std::string, CoverageDatabase> databases_;
 };
 
 }  // namespace delta

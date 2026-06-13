@@ -987,6 +987,37 @@ static Logic4Vec EvalCoverageGet(const Expr* expr, SimContext& ctx,
   return int_vec(ctx.GetCoverageControlState().CoverageGet(scope, coverage_type));
 }
 
+// §40.3.2.4: $coverage_merge(coverage_type, "name") loads and merges coverage
+// data of the given coverage type from the named coverage database into the
+// simulation. `name` is an arbitrary, implementation-specific locator for the
+// database. The integer result is one of the §40.3.1 status values:
+// `SV_COV_OK when the data are found (for this design) and merged, `SV_COV_NOCOV
+// when the data are found but do not contain the requested coverage type, and
+// `SV_COV_ERROR when the name does not exist, the data are from a different
+// design, or another error occurs.
+static Logic4Vec EvalCoverageMerge(const Expr* expr, SimContext& ctx,
+                                   Arena& arena) {
+  auto int_vec = [&](int value) {
+    return MakeLogic4VecVal(arena, 32, static_cast<uint32_t>(value));
+  };
+  // The first argument selects the coverage type; without it the arguments are
+  // incorrect, reported as `SV_COV_ERROR.
+  if (expr->args.empty()) {
+    return int_vec(static_cast<int>(CoverageStatus::Error));
+  }
+  int coverage_type =
+      static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+  // The second argument names the coverage database to load. A missing or
+  // non-literal name locates no database, which is the error case.
+  std::string name;
+  if (expr->args.size() > 1 &&
+      expr->args[1]->kind == ExprKind::kStringLiteral) {
+    name = ExtractStrArg(expr->args[1]);
+  }
+  return int_vec(static_cast<int>(
+      ctx.GetCoverageControlState().CoverageMerge(coverage_type, name)));
+}
+
 Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            std::string_view name) {
 
@@ -1025,6 +1056,8 @@ Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$coverage_get_max") return EvalCoverageGetMax(expr, ctx, arena);
 
   if (name == "$coverage_get") return EvalCoverageGet(expr, ctx, arena);
+
+  if (name == "$coverage_merge") return EvalCoverageMerge(expr, ctx, arena);
 
   if (name.starts_with("$coverage")) return MakeLogic4VecVal(arena, 32, 0);
 
