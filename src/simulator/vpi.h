@@ -56,6 +56,11 @@ constexpr int kVpiRawFourStateVal = 18;
 constexpr int kVpiOneValue = 0x4000;
 constexpr int kVpiPropagateOff = 0x8000;
 
+// §38.16: with vpiUserAllocFlag set in arrayvalue.flags, vpi_get_value_array()
+// writes the retrieved values into a buffer the application has already pointed
+// the value arm at, instead of allocating VPI-owned storage for them.
+constexpr int kVpiUserAllocFlag = 0x2000;
+
 constexpr int kVpiSimTime = 1;
 constexpr int kVpiScaledRealTime = 2;
 
@@ -3268,6 +3273,16 @@ class VpiContext {
   void PutValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p, int* index_p,
                      unsigned int num);
 
+  // §38.16: read values from contiguous elements of a static unpacked array.
+  // arrayvalue_p->format selects the element encoding written back; index_p
+  // gives the starting element's coordinate (one entry per unpacked dimension);
+  // num is how many consecutive elements to retrieve, taken with the rightmost
+  // dimension varying fastest. By default the values land in VPI-owned storage
+  // pointed to by the value arm; with vpiUserAllocFlag the caller's own buffer
+  // is filled instead. On any error the value arm is set to NULL.
+  void GetValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p, int* index_p,
+                     unsigned int num);
+
   const std::vector<VpiSystfData>& RegisteredSystfs() const { return systfs_; }
 
   const std::vector<VpiCbData>& RegisteredCallbacks() const {
@@ -3465,6 +3480,12 @@ class VpiContext {
   // §38.15: likewise the routine owns the s_vpi_strengthval array handed back
   // for the strength arm of the value union.
   std::vector<std::vector<VpiStrengthVal>> strength_pool_;
+
+  // §38.16: by default vpi_get_value_array() returns the retrieved section in
+  // VPI-allocated, read-only storage. One reusable buffer backs the value arm;
+  // a subsequent call overwrites it, so the caller must copy out anything it
+  // needs to keep.
+  std::vector<unsigned char> value_array_storage_;
 };
 
 Region RegionForPliCallback(int reason);
@@ -4051,6 +4072,8 @@ void vpi_get_value(vpiHandle obj, s_vpi_value* value);
 vpiHandle vpi_put_value(vpiHandle obj, s_vpi_value* value, s_vpi_time* time,
                         int flags);
 void vpi_put_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
+                         PLI_INT32* index_p, PLI_UINT32 num);
+void vpi_get_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
                          PLI_INT32* index_p, PLI_UINT32 num);
 vpiHandle vpi_register_cb(s_cb_data* data);
 int VpiRemoveCbC(vpiHandle cb_handle);
