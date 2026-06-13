@@ -7793,3 +7793,36 @@ PLI_INT32 vpi_printf(PLI_BYTE8* format, ...) {
   // and return the number of characters printed.
   return delta::GetGlobalVpiContext().Printf(text);
 }
+
+PLI_INT32 vpi_vprintf(PLI_BYTE8* format, va_list ap) {
+  // §38.41: this routine performs the same function as vpi_printf(), except that
+  // the variable-argument list has already been started by the caller. It
+  // therefore receives an already-started va_list instead of starting its own.
+  // Like the other entry points it clears the pending error status (§38.2).
+  delta::GetGlobalVpiContext().ResetErrorStatus();
+
+  // §38.41: the text is controlled by a C printf()-style format string; with no
+  // format string there is nothing to print, so report the error by returning
+  // EOF (matching vpi_printf()).
+  if (format == nullptr) return EOF;
+
+  // §38.41: expand the format with the caller's already-started arguments. Use a
+  // copy to measure the length, leaving the caller-owned list for the format
+  // pass; ownership of ap stays with the caller, so it is not ended here.
+  va_list measure;
+  va_copy(measure, ap);
+  int needed = std::vsnprintf(nullptr, 0, format, measure);
+  va_end(measure);
+  if (needed < 0) {
+    // §38.41: the format expansion failed, so report the error with EOF.
+    return EOF;
+  }
+  std::string text(static_cast<std::size_t>(needed), '\0');
+  if (needed > 0) {
+    std::vsnprintf(text.data(), static_cast<std::size_t>(needed) + 1, format, ap);
+  }
+
+  // §38.41: write the expanded text to the tool's output channel and log file
+  // (reusing the §38.30 writer) and return the number of characters written.
+  return delta::GetGlobalVpiContext().Printf(text);
+}
