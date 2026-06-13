@@ -7509,6 +7509,26 @@ PLI_BYTE8* VpiContext::McdName(PLI_UINT32 cd) {
   return nullptr;
 }
 
+PLI_INT32 VpiContext::McdPrintf(PLI_UINT32 mcd, std::string_view text) {
+  // §38.28: write the formatted text to one or more channels (up to 31)
+  // determined by the descriptor. Each channel is a discrete bit of the integer
+  // mcd, so several channels can be written simultaneously in a single call:
+  // bit 0 names channel 1 - the tool's output channel and current log file -
+  // bit 1 names channel 2, and so on, while the MSB names a file opened as an fd
+  // by $fopen (§21.3.1). Every named channel receives the same text, appended to
+  // its output buffer (the buffer §38.25 later flushes to the file).
+  for (int bit = 0; bit < 32; ++bit) {
+    PLI_UINT32 channel = PLI_UINT32{1} << bit;
+    if ((mcd & channel) == 0) continue;
+    WriteMcdChannel(channel, text);
+  }
+
+  // §38.28: the routine returns the number of characters printed. The count is
+  // the length of the formatted text, independent of how many channels received
+  // it, mirroring C fprintf().
+  return static_cast<PLI_INT32>(text.size());
+}
+
 }  // namespace delta
 
 PLI_INT32 vpi_flush() {
@@ -7552,4 +7572,40 @@ PLI_BYTE8* vpi_mcd_name(PLI_UINT32 cd) {
   // points. Returns NULL on error, including a descriptor naming no open file.
   delta::GetGlobalVpiContext().ResetErrorStatus();
   return delta::GetGlobalVpiContext().McdName(cd);
+}
+
+PLI_INT32 vpi_mcd_printf(PLI_UINT32 mcd, PLI_BYTE8* format, ...) {
+  // §38.28: write to the file(s) named by a multichannel descriptor. Clears the
+  // pending error status (§38.2) like the other entry points.
+  delta::GetGlobalVpiContext().ResetErrorStatus();
+
+  // §38.28: the text is controlled by a format string using the same format as
+  // the C fprintf() routine; a missing format string names nothing to print, so
+  // the routine reports the error by returning EOF.
+  if (format == nullptr) return EOF;
+
+  // §38.28: expand the format string with its variable arguments exactly as
+  // C fprintf() would. Measure the result first, then format it into a buffer of
+  // the right size.
+  va_list args;
+  va_start(args, format);
+  va_list measure;
+  va_copy(measure, args);
+  int needed = std::vsnprintf(nullptr, 0, format, measure);
+  va_end(measure);
+  if (needed < 0) {
+    // §38.28: the format expansion failed, so report the error with EOF.
+    va_end(args);
+    return EOF;
+  }
+  std::string text(static_cast<std::size_t>(needed), '\0');
+  if (needed > 0) {
+    std::vsnprintf(text.data(), static_cast<std::size_t>(needed) + 1, format,
+                   args);
+  }
+  va_end(args);
+
+  // §38.28: write the expanded text to every named channel and return the number
+  // of characters printed.
+  return delta::GetGlobalVpiContext().McdPrintf(mcd, text);
 }

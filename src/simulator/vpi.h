@@ -3213,6 +3213,14 @@ class VpiContext {
   // Returns NULL on error, including a descriptor that names no open file.
   PLI_BYTE8* McdName(PLI_UINT32 cd);
 
+  // §38.28: write already-formatted text to every file the descriptor names.
+  // Each channel is a discrete bit of the integer mcd, so one call writes to
+  // several files at once; bit 0 names channel 1 (the tool's output channel and
+  // log file), and the MSB names a file opened as an fd by $fopen. The text is
+  // appended to each named channel's output buffer (the same buffer §38.25
+  // flushes). Returns the number of characters written.
+  PLI_INT32 McdPrintf(PLI_UINT32 mcd, std::string_view text);
+
   // Support hooks for the mcd-flush model. The writer feeds buffered text onto a
   // single channel (the one set bit naming the file); the accessors report what
   // is still pending on a channel and what a flush has committed; the failure
@@ -4207,3 +4215,4 @@ PLI_UINT32 vpi_mcd_open(PLI_BYTE8* file);
 PLI_UINT32 vpi_mcd_close(PLI_UINT32 mcd);
 PLI_INT32 vpi_mcd_flush(PLI_UINT32 mcd);
 PLI_BYTE8* vpi_mcd_name(PLI_UINT32 cd);
+PLI_INT32 vpi_mcd_printf(PLI_UINT32 mcd, PLI_BYTE8* format, ...);
