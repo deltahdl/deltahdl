@@ -6010,6 +6010,26 @@ void VpiContext::RegisterCbValueChange(const VpiCbData& data) {
   });
 }
 
+// §38.36.1.3: collect every statement within a module instance that can have a
+// cbStmt callback placed on it. The statement-class objects reached through the
+// module's children qualify - the same kinds a scope body groups (§37.12) - and
+// the recursion descends through them so a statement nested inside a block is
+// found as well. Two kinds of child are left out. A nested module instance owns
+// its own statements, so the walk does not cross into one. And a statement that
+// resides in a protected portion of the code shall not have a callback placed on
+// it, so a protected child - which seals everything it contains - is skipped in
+// whole.
+static void VpiCollectModuleWideStmtTargets(VpiObject* scope,
+                                            std::vector<VpiObject*>& out) {
+  for (VpiObject* child : scope->children) {
+    if (child == nullptr) continue;
+    if (child->is_protected) continue;
+    if (child->type == kVpiModule) continue;
+    if (VpiIsScopeBodyStmtType(child->type)) out.push_back(child);
+    VpiCollectModuleWideStmtTargets(child, out);
+  }
+}
+
 int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
   int fired = 0;
   // §38.36.3: only callbacks still registered for this reason are delivered.
@@ -6017,20 +6037,11 @@ int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
   // never matches a real reason here. Snapshot the count so callbacks registered
   // from within a routine are not delivered during this same pass.
   size_t count = callbacks_.size();
-  for (size_t i = 0; i < count; ++i) {
-    if (callbacks_[i].reason != reason || callbacks_[i].cb_rtn == nullptr) {
-      continue;
-    }
-    // §38.36.3: the routine is passed a pointer to an s_cb_data structure that
-    // is not the one supplied at registration. Work from a copy and let the
-    // simulator fill obj/user_data when it has them for this reason.
-    VpiCbData data = callbacks_[i];
-    if (obj != nullptr) {
-      data.obj = obj;
-    }
-    if (user_data != nullptr) {
-      data.user_data = user_data;
-    }
+
+  // Deliver one invocation of a callback routine. `data` already carries the obj
+  // the routine should see. This applies the cbStmt field guarantees (§38.36.1.1)
+  // and the current-reason bookkeeping (§38.9), then counts the firing.
+  auto deliver = [&](VpiCbData data) {
     // §38.36.1.1: the s_cb_data delivered for a cbStmt callback has fixed
     // contents regardless of what was supplied at registration - the value
     // field is always NULL and the index field is always 0. In addition, when
@@ -6052,6 +6063,40 @@ int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
     data.cb_rtn(&data);
     current_callback_reason_ = saved_reason;
     ++fired;
+  };
+
+  for (size_t i = 0; i < count; ++i) {
+    if (callbacks_[i].reason != reason || callbacks_[i].cb_rtn == nullptr) {
+      continue;
+    }
+    // §38.36.3: the routine is passed a pointer to an s_cb_data structure that
+    // is not the one supplied at registration. Work from a copy and let the
+    // simulator fill obj/user_data when it has them for this reason.
+    VpiCbData data = callbacks_[i];
+    if (obj != nullptr) {
+      data.obj = obj;
+    }
+    if (user_data != nullptr) {
+      data.user_data = user_data;
+    }
+    // §38.36.1.3: a handle to a module instance in the obj field places a cbStmt
+    // callback on every statement in the module that can have one. The single
+    // registration stands in for all of them, so deliver the routine once per
+    // such statement - each with obj set to that statement - rather than once for
+    // the module as a whole. Statements in protected portions are skipped by the
+    // collector and never receive a callback.
+    if (data.reason == cbStmt && data.obj != nullptr &&
+        data.obj->type == kVpiModule) {
+      std::vector<VpiObject*> stmts;
+      VpiCollectModuleWideStmtTargets(data.obj, stmts);
+      for (VpiObject* stmt : stmts) {
+        VpiCbData per = data;
+        per.obj = stmt;
+        deliver(per);
+      }
+      continue;
+    }
+    deliver(data);
   }
   return fired;
 }
