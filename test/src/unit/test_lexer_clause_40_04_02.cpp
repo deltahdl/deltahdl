@@ -76,16 +76,15 @@ TEST(FsmPartSelectPragmaLexing, FsmNameIsRequired) {
           .empty());
 }
 
-// §40.4.2's pragma binds the enumeration with the required `enum` keyword. A
-// part-select pragma that names the FSM but omits the `enum enumeration_name`
-// binding is not recognized.
-TEST(FsmPartSelectPragmaLexing, EnumBindingIsRequired) {
-  EXPECT_TRUE(
-      CollectPartSelectPragmas("/* tool state_vector cur_state[3:0] my_fsm */")
-          .empty());
+// §40.4.2's pragma binds the enumeration with the literal `enum` keyword
+// (`... FSM_name enum enumeration_name`). A pragma with the full five trailing
+// words but some other token in the binding position — rather than too few
+// words — is not recognized: the keyword itself is required, not merely a word
+// in that slot.
+TEST(FsmPartSelectPragmaLexing, RequiresLiteralEnumKeywordInBinding) {
   EXPECT_TRUE(
       CollectPartSelectPragmas("/* tool state_vector cur_state[3:0] my_fsm "
-                               "state_e */")
+                               "uses state_e */")
           .empty());
 }
 
