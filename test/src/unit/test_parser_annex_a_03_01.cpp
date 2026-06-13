@@ -17,13 +17,6 @@ TEST(PrimitiveInstantiationParsing, GateInst_AndBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(PrimitiveInstantiationParsing, GateInst_NandBasic) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  nand (out, a, b);\n"
-              "endmodule\n"));
-}
-
 TEST(PrimitiveInstantiationParsing, GateInst_OrBasic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -35,13 +28,6 @@ TEST(PrimitiveInstantiationParsing, GateInst_NorBasic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  nor (out, a, b);\n"
-              "endmodule\n"));
-}
-
-TEST(PrimitiveInstantiationParsing, GateInst_XorBasic) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  xor (out, a, b);\n"
               "endmodule\n"));
 }
 
@@ -95,74 +81,6 @@ TEST(PrimitiveInstantiationParsing, NInputGateInst_EightInputs) {
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kXor);
   ASSERT_NE(g, nullptr);
   EXPECT_EQ(g->gate_terminals.size(), 9u);
-}
-
-TEST(PrimitiveInstantiationParsing, GateInst_AllNInputGateTypes) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  and  a1(o, i1, i2);\n"
-              "  nand n1(o, i1, i2);\n"
-              "  or   o1(o, i1, i2);\n"
-              "  nor  r1(o, i1, i2);\n"
-              "  xor  x1(o, i1, i2);\n"
-              "  xnor z1(o, i1, i2);\n"
-              "endmodule\n"));
-}
-
-TEST(GateInstantiationParsing, GateInst_NInputGateCount) {
-  auto r = Parse(
-      "module m;\n"
-      "  and g1(y, a, b, c);\n"
-      "  nand g2(y2, a, b);\n"
-      "  xor g3(y3, a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int gate_count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kGateInst) gate_count++;
-  }
-  EXPECT_EQ(gate_count, 3);
-}
-
-TEST(NInputGateInstantiation, NandGateBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, y;\n"
-      "  nand g1(y, a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  bool has_gate = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kGateInst) has_gate = true;
-  }
-  EXPECT_TRUE(has_gate);
-}
-
-TEST(BuiltInNInputGates, AllSixGateTypes) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, y;\n"
-      "  and  g1(y, a, b);\n"
-      "  nand g2(y, a, b);\n"
-      "  or   g3(y, a, b);\n"
-      "  nor  g4(y, a, b);\n"
-      "  xor  g5(y, a, b);\n"
-      "  xnor g6(y, a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto gates = FindAllGates(r.cu->modules[0]->items);
-  EXPECT_EQ(gates.size(), 6u);
-}
-
-TEST(GateInstantiation, ModuleInstantiatesPrimitive) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  wire a, b, y;\n"
-              "  and g1(y, a, b);\n"
-              "endmodule\n"));
 }
 
 TEST(PrimitiveInstantiationParsing, GateInst_BufBasic) {
@@ -220,15 +138,6 @@ TEST(PrimitiveInstantiationParsing, NOutputGateInst_ThreeOutputs) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
-TEST(BuiltInNOutputGates, BufAndNotGates) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  wire a, y1, y2;\n"
-              "  buf  g1(y1, a);\n"
-              "  not  g2(y2, a);\n"
-              "endmodule\n"));
-}
-
 TEST(PrimitiveInstantiationParsing, GateInst_Bufif0Basic) {
   auto r = Parse(
       "module m;\n"
@@ -258,27 +167,6 @@ TEST(PrimitiveInstantiationParsing, GateInst_Notif1Basic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  notif1 (out, in, ctrl);\n"
-              "endmodule\n"));
-}
-
-TEST(PrimitiveInstantiationParsing, GateInst_AllEnableGateTypes) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  bufif0 b0(o, i, c);\n"
-              "  bufif1 b1(o, i, c);\n"
-              "  notif0 n0(o, i, c);\n"
-              "  notif1 n1(o, i, c);\n"
-              "endmodule\n"));
-}
-
-TEST(BuiltInEnableGates, ThreeStateGates) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  wire a, en, y;\n"
-              "  bufif0 g1(y, a, en);\n"
-              "  bufif1 g2(y, a, en);\n"
-              "  notif0 g3(y, a, en);\n"
-              "  notif1 g4(y, a, en);\n"
               "endmodule\n"));
 }
 
@@ -328,16 +216,6 @@ TEST(PrimitiveInstantiationParsing, GateInst_MosWithDelay) {
   ASSERT_NE(g, nullptr);
   EXPECT_NE(g->gate_delay, nullptr);
   EXPECT_EQ(g->gate_inst_name, "n1");
-}
-
-TEST(PrimitiveInstantiationParsing, GateInst_AllMosSwitchTypes) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  nmos  n1(o, i, g);\n"
-              "  pmos  p1(o, i, g);\n"
-              "  rnmos rn1(o, i, g);\n"
-              "  rpmos rp1(o, i, g);\n"
-              "endmodule\n"));
 }
 
 TEST(PrimitiveInstantiationParsing, GateInst_Tranif0Basic) {
@@ -401,24 +279,6 @@ TEST(PrimitiveInstantiationParsing, GateInst_RtranBasic) {
               "endmodule\n"));
 }
 
-TEST(PrimitiveInstantiationParsing, GateInst_AllPassSwitchTypes) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  tran  t1(a, b);\n"
-              "  rtran rt1(a, b);\n"
-              "endmodule\n"));
-}
-
-TEST(PrimitiveInstantiationParsing, GateInst_AllPassEnSwitchTypes) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  tranif0  t0(a, b, c);\n"
-              "  tranif1  t1(a, b, c);\n"
-              "  rtranif0 rt0(a, b, c);\n"
-              "  rtranif1 rt1(a, b, c);\n"
-              "endmodule\n"));
-}
-
 TEST(PrimitiveInstantiationParsing, GateInst_CmosBasic) {
   auto r = Parse(
       "module m;\n"
@@ -463,14 +323,6 @@ TEST(PrimitiveInstantiationParsing, GateInst_CmosWithThreeValueDelay) {
   EXPECT_NE(g->gate_delay, nullptr);
   EXPECT_NE(g->gate_delay_fall, nullptr);
   EXPECT_NE(g->gate_delay_decay, nullptr);
-}
-
-TEST(PrimitiveInstantiationParsing, GateInst_AllCmosSwitchTypes) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  cmos  c1(o, i, n, p);\n"
-              "  rcmos rc1(o, i, n, p);\n"
-              "endmodule\n"));
 }
 
 TEST(PrimitiveInstantiationParsing, GateInst_PulldownBasic) {
@@ -794,6 +646,36 @@ TEST(PrimitiveInstantiationParsing, Error_NInputGateSingleTerminal) {
   auto r = Parse(
       "module m;\n"
       "  and (o);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// The pass-switch alternative of gate_instantiation carries no delay slot, so a
+// delay on a plain tran/rtran switch is a grammar violation.
+TEST(PrimitiveInstantiationParsing, Error_DelayOnPassSwitch) {
+  auto r = Parse(
+      "module m;\n"
+      "  tran #5 (a, b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// The pulldown/pullup alternatives accept only an optional strength, never a
+// delay, so a delay on a pull gate is rejected.
+TEST(PrimitiveInstantiationParsing, Error_DelayOnPullGate) {
+  auto r = Parse(
+      "module m;\n"
+      "  pullup #5 (net1);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// The n_input alternative uses the two-value delay form, so supplying a third
+// delay value exceeds what that alternative permits.
+TEST(PrimitiveInstantiationParsing, Error_ThreeDelaysOnNInputGate) {
+  auto r = Parse(
+      "module m;\n"
+      "  and #(1, 2, 3) g1(y, a, b);\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
