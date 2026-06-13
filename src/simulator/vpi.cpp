@@ -3630,6 +3630,29 @@ int VpiContext::PutUserData(VpiHandle obj, void* userdata) {
   return 1;
 }
 
+void* VpiContext::GetUserData(VpiHandle obj) {
+  // §38.14: only a user-defined system task or system function call instance has
+  // a user-data storage location to read. A null handle, or a handle to any
+  // other kind of object, has none: that is a detected error (§38.2) and the
+  // routine returns null.
+  if (obj == nullptr ||
+      (obj->type != vpiSysTaskCall && obj->type != vpiSysFuncCall)) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_get_userdata() requires a system task or system function call "
+        "handle";
+    return nullptr;
+  }
+
+  // §38.14: return whatever vpi_put_userdata() (§38.33) last associated with the
+  // call instance. When nothing was ever associated the field is null, which is
+  // exactly the NULL the routine must return for "no user data". A restart or a
+  // reset clears the field (§38.33), so a read here returns null afterwards
+  // until the application sets it again.
+  return obj->user_data;
+}
+
 void VpiContext::ClearUserDataForRestartOrReset() {
   // §38.33: a restart or a reset drops every call instance's user-data
   // association, so that afterwards vpi_get_userdata() returns null until the
@@ -6961,6 +6984,11 @@ PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes) {
 PLI_INT32 vpi_put_userdata(vpiHandle obj, void* userdata) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().PutUserData(obj, userdata);
+}
+
+void* vpi_get_userdata(vpiHandle obj) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  return delta::GetGlobalVpiContext().GetUserData(obj);
 }
 
 vpiHandle VpiHandleC(int type, vpiHandle ref) {

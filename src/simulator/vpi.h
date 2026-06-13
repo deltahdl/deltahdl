@@ -3006,6 +3006,13 @@ class VpiContext {
   // returns 0, leaving no association made.
   int PutUserData(VpiHandle obj, void* userdata);
 
+  // §38.14: read back the user-data value a prior vpi_put_userdata() (§38.33)
+  // associated with `obj`, a system task or system function call instance. When
+  // nothing was ever associated, or the handle is null or not such a call, the
+  // routine yields null. A restart or a reset clears the field (§38.33), so a
+  // read afterwards returns null until the application re-establishes it.
+  void* GetUserData(VpiHandle obj);
+
   // §38.33: drop every system task/function call instance's user-data
   // association. Run when the simulation restarts or resets, so that after
   // either event a vpi_get_userdata() returns null until the application sets
@@ -4030,6 +4037,7 @@ void vpi_put_delays(vpiHandle obj, p_vpi_delay delay_p);
 PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes);
 PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes);
 PLI_INT32 vpi_put_userdata(vpiHandle obj, void* userdata);
+void* vpi_get_userdata(vpiHandle obj);
 vpiHandle VpiHandleC(int type, vpiHandle ref);
 vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope);
 vpiHandle VpiHandleByIndexC(vpiHandle parent, int index);
