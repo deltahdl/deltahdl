@@ -3118,7 +3118,19 @@ class VpiContext {
   int Control(int operation, int arg0 = 0, int arg1 = 0, int arg2 = 0,
               VpiHandle scope = nullptr);
   bool ChkError(VpiErrorInfo* info);
-  void GetVlogInfo(VpiVlogInfo* info);
+
+  // §38.17: capture the simulator's invocation command line. Following the
+  // standard argv convention, entry zero is the tool's own name and the
+  // remaining entries are the invocation options; GetVlogInfo() reports these
+  // back through the s_vpi_vlog_info structure. Placing the tool name at entry
+  // zero here is what makes that requirement hold for every later query.
+  void SetInvocationArguments(const std::string& tool_name,
+                              const std::vector<std::string>& options);
+
+  // §38.17: fill the result structure with the invocation option count (argc),
+  // the option values (argv), and the product and version strings. Returns true
+  // on success and false when the information cannot be supplied.
+  bool GetVlogInfo(VpiVlogInfo* info);
 
   // §38.5: flush the output buffers for the simulator's output channel and the
   // current log file. Each channel accumulates written text in an in-memory
@@ -3462,6 +3474,13 @@ class VpiContext {
 
   std::string product_ = "DeltaHDL";
   std::string version_ = "0.1.0";
+
+  // §38.17: the invocation command line reported by vpi_get_vlog_info(). The
+  // owning strings live in invocation_args_ (entry zero is the tool name); the
+  // pointer array handed back as argv is rebuilt into invocation_argv_ on each
+  // query so every entry references a NUL-terminated copy of one token.
+  std::vector<std::string> invocation_args_;
+  std::vector<const char*> invocation_argv_;
 
   std::vector<std::string> str_pool_;
 
@@ -4083,5 +4102,5 @@ const char* vpi_get_str(int property, vpiHandle obj);
 int vpi_free_object(vpiHandle obj);
 int VpiControlC(int operation, ...);
 int VpiChkErrorC(SVpiErrorInfo* info);
-void vpi_get_vlog_info(SVpiVlogInfo* info);
+PLI_INT32 vpi_get_vlog_info(SVpiVlogInfo* info);
 PLI_INT32 vpi_flush();

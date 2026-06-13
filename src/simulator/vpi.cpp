@@ -6701,12 +6701,36 @@ bool VpiContext::ChkError(VpiErrorInfo* info) {
   return last_error_.level != 0;
 }
 
-void VpiContext::GetVlogInfo(VpiVlogInfo* info) {
-  if (!info) return;
-  info->argc = 0;
-  info->argv = nullptr;
+void VpiContext::SetInvocationArguments(
+    const std::string& tool_name, const std::vector<std::string>& options) {
+  // §38.17: entry zero of the command line is the tool's own name; the
+  // invocation options follow it in order.
+  invocation_args_.clear();
+  invocation_args_.reserve(options.size() + 1);
+  invocation_args_.push_back(tool_name);
+  for (const std::string& option : options) invocation_args_.push_back(option);
+}
+
+bool VpiContext::GetVlogInfo(VpiVlogInfo* info) {
+  // §38.17: a null result structure cannot receive the information, so the
+  // routine fails.
+  if (!info) return false;
+
+  // §38.17: rebuild the argv pointer array so each entry references a
+  // NUL-terminated copy of one command-line token (std::string guarantees the
+  // terminator). There are argc entries, and entry zero is the tool name -
+  // both guaranteed by how invocation_args_ was populated.
+  invocation_argv_.clear();
+  invocation_argv_.reserve(invocation_args_.size());
+  for (const std::string& arg : invocation_args_) {
+    invocation_argv_.push_back(arg.c_str());
+  }
+
+  info->argc = static_cast<int>(invocation_argv_.size());
+  info->argv = invocation_argv_.empty() ? nullptr : invocation_argv_.data();
   info->product = product_.c_str();
   info->version = version_.c_str();
+  return true;
 }
 
 VpiHandle VpiContext::HandleMulti(int type, VpiHandle ref1, VpiHandle ref2) {
@@ -7341,9 +7365,11 @@ int VpiChkErrorC(SVpiErrorInfo* info) {
   return ctx.LastError().level;
 }
 
-void vpi_get_vlog_info(SVpiVlogInfo* info) {
+PLI_INT32 vpi_get_vlog_info(SVpiVlogInfo* info) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
-  delta::GetGlobalVpiContext().GetVlogInfo(info);
+  // §38.17: return 1 (true) on success and 0 (false) when the information
+  // cannot be supplied.
+  return delta::GetGlobalVpiContext().GetVlogInfo(info) ? 1 : 0;
 }
 
 namespace delta {
