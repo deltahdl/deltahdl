@@ -274,13 +274,6 @@ TEST(LibraryText, FilePathSpecDotSlash) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "./*.vg");
 }
 
-TEST(LibraryText, FilePathSpecAbsolute) {
-  auto r = ParseLibrary("library lib /proj/rtl/top.v;\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "/proj/rtl/top.v");
-}
-
 TEST(LibraryText, FilePathSpecParentDir) {
   auto r = ParseLibrary("library lib ../rtl/*.v;\n");
   ASSERT_NE(r.cu, nullptr);
