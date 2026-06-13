@@ -55,6 +55,22 @@ class Lexer {
     return fsm_part_select_pragmas_;
   }
 
+  // §40.4.3 — an FSM "tool" pragma whose current state is held by a
+  // concatenation of signals. Like the part-select form it carries an explicit
+  // FSM name (distinct from the enumeration name) for the coverage tool. The
+  // concatenation is composed of every signal listed in the braces; bit-selects
+  // and part-selects of those signals are not permitted as members.
+  struct FsmConcatPragma {
+    std::vector<std::string_view> signal_names;  // members of the concatenation
+    std::string_view fsm_name;   // required name the FSM is reported under
+    std::string_view enum_name;  // enumeration name bound by the `enum` keyword
+    SourceLoc loc;
+  };
+
+  const std::vector<FsmConcatPragma>& FsmConcatPragmas() const {
+    return fsm_concat_pragmas_;
+  }
+
   struct SavedPos {
     uint32_t pos;
     uint32_t line;
@@ -80,6 +96,8 @@ class Lexer {
   uint32_t SkipBlockComment(SourceLoc start_loc);
   void TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc);
   void TryRecognizeFsmPartSelectPragma(
+      const std::vector<std::string_view>& words, SourceLoc loc);
+  void TryRecognizeFsmConcatPragma(
       const std::vector<std::string_view>& words, SourceLoc loc);
   static bool IsSimplePragmaIdentifier(std::string_view word);
   static bool ParsePartSelect(std::string_view word, std::string_view& base,
@@ -138,6 +156,7 @@ class Lexer {
   KeywordVersion keyword_version_ = KeywordVersion::kVer18002023;
   std::vector<FsmStatePragma> fsm_state_pragmas_;
   std::vector<FsmPartSelectPragma> fsm_part_select_pragmas_;
+  std::vector<FsmConcatPragma> fsm_concat_pragmas_;
 };
 
 }
