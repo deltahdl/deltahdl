@@ -1018,6 +1018,37 @@ static Logic4Vec EvalCoverageMerge(const Expr* expr, SimContext& ctx,
       ctx.GetCoverageControlState().CoverageMerge(coverage_type, name)));
 }
 
+// §40.3.2.5: $coverage_save(coverage_type, "name") saves the current coverage of
+// the given type to the tool's coverage database under `name`, so a later
+// $coverage_merge() (§40.3.2.4) with the same name can load it. Saving never
+// affects the coverage state of this simulation. The integer result is one of the
+// §40.3.1 status values: `SV_COV_OK when the data are saved, `SV_COV_NOCOV when
+// no such coverage is available in this design (nothing is saved), and
+// `SV_COV_ERROR when an error occurs during the save — in which case the entry
+// for `name` is removed to preserve coverage-database integrity.
+static Logic4Vec EvalCoverageSave(const Expr* expr, SimContext& ctx,
+                                  Arena& arena) {
+  auto int_vec = [&](int value) {
+    return MakeLogic4VecVal(arena, 32, static_cast<uint32_t>(value));
+  };
+  // The first argument selects the coverage type; without it the arguments are
+  // incorrect, reported as `SV_COV_ERROR.
+  if (expr->args.empty()) {
+    return int_vec(static_cast<int>(CoverageStatus::Error));
+  }
+  int coverage_type =
+      static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+  // The second argument names the coverage database to write. A missing or
+  // non-literal name leaves the destination empty.
+  std::string name;
+  if (expr->args.size() > 1 &&
+      expr->args[1]->kind == ExprKind::kStringLiteral) {
+    name = ExtractStrArg(expr->args[1]);
+  }
+  return int_vec(static_cast<int>(
+      ctx.GetCoverageControlState().CoverageSave(coverage_type, name)));
+}
+
 Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            std::string_view name) {
 
@@ -1058,6 +1089,8 @@ Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$coverage_get") return EvalCoverageGet(expr, ctx, arena);
 
   if (name == "$coverage_merge") return EvalCoverageMerge(expr, ctx, arena);
+
+  if (name == "$coverage_save") return EvalCoverageSave(expr, ctx, arena);
 
   if (name.starts_with("$coverage")) return MakeLogic4VecVal(arena, 32, 0);
 

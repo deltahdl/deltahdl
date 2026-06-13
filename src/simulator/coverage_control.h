@@ -215,6 +215,69 @@ class CoverageControlState {
     return it == databases_.end() ? 0 : it->second.merges;
   }
 
+  // §40.3.2.5: records which §40.3.1 coverage types are currently available to be
+  // saved from this design, mirroring what a real coverage engine has collected.
+  // $coverage_save reports `SV_COV_NOCOV (and saves nothing) for a type that is
+  // not available here.
+  void SetCoverageAvailableForSave(int coverage_type, bool available) {
+    if (available) {
+      savable_coverage_types_.insert(coverage_type);
+    } else {
+      savable_coverage_types_.erase(coverage_type);
+    }
+  }
+
+  // §40.3.2.5: forces the next save to report an error, mirroring a tool-side
+  // failure while writing the coverage database. This exercises the error path,
+  // including the required removal of the entry being written.
+  void SetCoverageSaveShouldFail(bool fail) { coverage_save_should_fail_ = fail; }
+
+  // Number of successful saves recorded under a named database. A save only
+  // records data on the `SV_COV_OK path, so this makes the "saved" effect of
+  // $coverage_save observable rather than just the returned status.
+  std::uint64_t SaveCount(const std::string &name) const {
+    auto it = databases_.find(name);
+    return it == databases_.end() ? 0 : it->second.saves;
+  }
+
+  // §40.3.2.5 ($coverage_save): saves the current coverage of `coverage_type` to
+  // the tool's coverage database under `name` and returns the resulting §40.3.1
+  // status. Saving never touches the simulation's coverage-collection state, so
+  // this method only writes the database side.
+  //
+  //   `SV_COV_OK    — the coverage data are saved. The entry records that it
+  //                   belongs to this design and holds the saved type, so a later
+  //                   $coverage_merge() with the same name can load it
+  //                   (§40.3.2.4). Overwriting an entry left by a previous save
+  //                   is not an error.
+  //   `SV_COV_NOCOV — no coverage of the requested type is available in this
+  //                   design, so there is nothing to save and no entry is
+  //                   written.
+  //   `SV_COV_ERROR — an error occurred during the save. The entry for `name` is
+  //                   removed so a partial write cannot corrupt the database.
+  CoverageStatus CoverageSave(int coverage_type, const std::string &name) {
+    // An error during the save: remove the entry being written for `name` to
+    // preserve database integrity. This also discards any entry a previous
+    // successful save left under the same name.
+    if (coverage_save_should_fail_) {
+      databases_.erase(name);
+      return CoverageStatus::Error;
+    }
+    // No coverage of the requested type is available in this design: nothing is
+    // saved and no entry is written.
+    if (savable_coverage_types_.find(coverage_type) ==
+        savable_coverage_types_.end()) {
+      return CoverageStatus::NoCoverage;
+    }
+    // Write (or overwrite) the entry to reflect the current state: it belongs to
+    // this design and holds the saved coverage type.
+    CoverageDatabase &db = databases_[name];
+    db.from_this_design = true;
+    db.coverage_types = {coverage_type};
+    ++db.saves;
+    return CoverageStatus::Ok;
+  }
+
   bool IsCollecting(const std::string &scope) const {
     auto it = scopes_.find(scope);
     return it != scopes_.end() && it->second.collecting;
@@ -316,6 +379,8 @@ class CoverageControlState {
     std::unordered_set<int> coverage_types;
     // Successful merges performed against this database.
     std::uint64_t merges = 0;
+    // §40.3.2.5: successful saves recorded under this database.
+    std::uint64_t saves = 0;
   };
 
   // Begins collection on a scope that is not already collecting. A scope already
@@ -335,8 +400,13 @@ class CoverageControlState {
   }
 
   std::unordered_map<std::string, ScopeState> scopes_;
-  // §40.3.2.4: named coverage databases available to $coverage_merge.
+  // §40.3.2.4: named coverage databases available to $coverage_merge, and
+  // §40.3.2.5: written by $coverage_save.
   std::unordered_map<std::string, CoverageDatabase> databases_;
+  // §40.3.2.5: coverage types currently available to save from this design.
+  std::unordered_set<int> savable_coverage_types_;
+  // §40.3.2.5: when set, the next save reports an error.
+  bool coverage_save_should_fail_ = false;
 };
 
 }  // namespace delta
