@@ -2883,6 +2883,11 @@ bool VpiIsSimulationTimeCallbackReason(int reason);
 // reference object.
 bool VpiHasAccessByIndex(int type);
 
+// §37.85 detail 1: the size of a gen scope array - the number of gen scope
+// elements it holds - reported through vpi_get(vpiSize). It is counted from the
+// array's element children rather than read from a stored width.
+int VpiGenScopeArraySize(VpiHandle gen_scope_array);
+
 // §37.81: one entry of the simulation time queue - a simulation time, expressed
 // in ticks of the simulation time unit, at which events are still scheduled.
 // `is_current` marks the entry at the current simulation time; detail 3 admits

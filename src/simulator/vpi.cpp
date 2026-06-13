@@ -3710,10 +3710,23 @@ bool VpiHasAccessByIndex(int type) {
     case vpiNetArray:        // an array net indexes its elements
     case vpiRegArray:        // a reg array indexes its elements
     case vpiPackedArrayVar:  // a packed array indexes its elements
+    case vpiGenScopeArray:   // §37.85: a gen scope array indexes its gen scopes
       return true;
     default:
       return false;
   }
+}
+
+int VpiGenScopeArraySize(VpiHandle gen_scope_array) {
+  // §37.85 detail 1: the size of a gen scope array is the number of elements in
+  // the array, i.e. the gen scope objects it holds. It is counted from the
+  // array's gen scope element children rather than read from any stored width.
+  if (!gen_scope_array) return 0;
+  int count = 0;
+  for (auto* child : gen_scope_array->children) {
+    if (child->type == vpiGenScope) ++count;
+  }
+  return count;
 }
 
 VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
@@ -4168,6 +4181,15 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // module array reports NULL here rather than letting the generic walk find
   // some other expr child.
   if (type == vpiIndex && ref->type == kVpiModule) {
+    return ref->array_member ? ref->index_expr : nullptr;
+  }
+
+  // §37.85 (figure): vpiIndex from a gen scope reaches the index expression that
+  // locates the gen scope within its gen scope array. As with an array-member
+  // module, program, interface, or primitive, a gen scope that is not an element
+  // of a gen scope array reports NULL here rather than letting the generic walk
+  // find some other expr child.
+  if (type == vpiIndex && ref->type == vpiGenScope) {
     return ref->array_member ? ref->index_expr : nullptr;
   }
 
@@ -5847,6 +5869,9 @@ int VpiContext::Get(int property, VpiHandle obj) {
       }
       return static_cast<int>(obj->obj_id);
     case kVpiSize:
+      // §37.85 detail 1: a gen scope array reports the number of elements in the
+      // array - the gen scopes it holds - rather than any stored width.
+      if (obj->type == vpiGenScopeArray) return VpiGenScopeArraySize(obj);
       // §37.47 detail 1: a cont assign bit models a single bit of a continuous
       // assignment, so its size is always scalar (one) regardless of any stored
       // width.
