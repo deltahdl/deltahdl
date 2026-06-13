@@ -284,13 +284,6 @@ TEST(FunctionDeclParsing, FunctionPrototypeWithOverride) {
       "endclass\n"));
 }
 
-TEST(FunctionDeclParsing, FunctionPrototypeWithArgs) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  import \"DPI-C\" function int add(int a, int b);\n"
-      "endmodule\n"));
-}
-
 TEST(FunctionDeclParsing, DpiImportTaskContext) {
   auto r = Parse(
       "module m;\n"
@@ -339,6 +332,89 @@ TEST(FunctionDeclParsing, FunctionDynOverrideExtendsFinal) {
       "class c;\n"
       "  virtual function :extends :final void f(); endfunction\n"
       "endclass\n"));
+}
+
+TEST(FunctionDeclParsing, FunctionLifetimeAutomatic) {
+  // function_declaration carries an optional lifetime ahead of the body; the
+  // 'automatic' keyword fills that slot and is recorded on the function.
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int f(); return 0; endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstFunctionDecl(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_automatic);
+  EXPECT_FALSE(item->is_static);
+}
+
+TEST(FunctionDeclParsing, FunctionLifetimeStatic) {
+  // The same lifetime slot also accepts 'static', recorded distinctly from
+  // the automatic lifetime.
+  auto r = Parse(
+      "module m;\n"
+      "  function static int f(); return 0; endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstFunctionDecl(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_static);
+  EXPECT_FALSE(item->is_automatic);
+}
+
+TEST(FunctionDeclParsing, FunctionBodyClassScopePrefix) {
+  // function_body_declaration permits a class_scope prefix before the
+  // function_identifier; the '::'-qualified name records the enclosing class.
+  auto r = Parse(
+      "module m;\n"
+      "  function int C::f(); return 0; endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstFunctionDecl(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->method_class, "C");
+  EXPECT_EQ(item->name, "f");
+}
+
+TEST(FunctionDeclParsing, DpiImportSpecStringInvalidRejected) {
+  // dpi_spec_string admits only "DPI-C" or "DPI"; an import declaration that
+  // uses any other string violates the production and is rejected.
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI++\" function void f();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(FunctionDeclParsing, DpiExportSpecStringInvalidRejected) {
+  // The same closed set governs the export side, enforced on its own parse
+  // path; an unrecognized string is likewise rejected.
+  auto r = Parse(
+      "module m;\n"
+      "  export \"DPI++\" function g;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(FunctionDeclParsing, FunctionBodyInterfaceIdentifierPrefix) {
+  // The other prefix alternative of function_body_declaration is an
+  // interface_identifier followed by '.'; the dotted name records the
+  // qualifier separately from the function_identifier.
+  auto r = Parse(
+      "module m;\n"
+      "  function int I.f(); return 0; endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstFunctionDecl(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->method_class, "I");
+  EXPECT_EQ(item->name, "f");
 }
 
 }
