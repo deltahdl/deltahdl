@@ -92,7 +92,7 @@ class Lexer {
 
   void SkipWhitespaceAndComments();
   void ConsumeKeywordMarker();
-  void SkipLineComment();
+  uint32_t SkipLineComment();
   uint32_t SkipBlockComment(SourceLoc start_loc);
   void TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc);
   void TryRecognizeFsmPartSelectPragma(

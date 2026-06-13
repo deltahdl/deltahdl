@@ -40,11 +40,12 @@ bool Lexer::AtEnd() const { return pos_ >= source_.size(); }
 
 SourceLoc Lexer::MakeLoc() const { return {file_id_, line_, column_}; }
 
-void Lexer::SkipLineComment() {
+uint32_t Lexer::SkipLineComment() {
 
   while (!AtEnd() && Current() != '\n') {
     Advance();
   }
+  return pos_;
 }
 
 uint32_t Lexer::SkipBlockComment(SourceLoc start_loc) {
@@ -337,7 +338,16 @@ void Lexer::SkipWhitespaceAndComments() {
     }
 
     if (Current() == '/' && PeekChar() == '/') {
-      SkipLineComment();
+      // §40.4.7 — the FSM recognition pragmas work in one-line comments that
+      // follow `//` just as they do in `/* */` block comments. Skip the comment
+      // and hand its body to the same recognizer the block-comment path uses.
+      auto comment_loc = MakeLoc();
+      Advance();
+      Advance();
+      uint32_t body_start = pos_;
+      uint32_t body_end = SkipLineComment();
+      TryRecognizeFsmStatePragma(
+          source_.substr(body_start, body_end - body_start), comment_loc);
       continue;
     }
     if (Current() == '/' && PeekChar() == '*') {
