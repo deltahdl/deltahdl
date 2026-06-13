@@ -7462,6 +7462,29 @@ PLI_UINT32 VpiContext::McdClose(PLI_UINT32 mcd) {
   return unclosed;
 }
 
+PLI_INT32 VpiContext::McdFlush(PLI_UINT32 mcd) {
+  // §38.25: a forced flush that cannot complete reports failure and leaves the
+  // pending text intact so nothing buffered is lost.
+  if (mcd_flush_should_fail_) return 1;
+
+  // §38.25: walk the descriptor bit by bit. Each channel is a discrete bit, so a
+  // single mcd can name several files; the buffered output of every named channel
+  // is committed in one call. Flushing a channel appends its pending buffer to
+  // its committed stream and empties the buffer - the observable effect of
+  // forcing the buffered text out to the file.
+  for (int bit = 0; bit < 32; ++bit) {
+    PLI_UINT32 channel = PLI_UINT32{1} << bit;
+    if ((mcd & channel) == 0) continue;
+    auto it = mcd_channel_buffers_.find(channel);
+    if (it == mcd_channel_buffers_.end()) continue;
+    mcd_channel_flushed_[channel].append(it->second);
+    it->second.clear();
+  }
+
+  // §38.25: every named output buffer was flushed, so report success.
+  return 0;
+}
+
 }  // namespace delta
 
 PLI_INT32 vpi_flush() {
@@ -7489,4 +7512,12 @@ PLI_UINT32 vpi_mcd_close(PLI_UINT32 mcd) {
   // channels.
   delta::GetGlobalVpiContext().ResetErrorStatus();
   return delta::GetGlobalVpiContext().McdClose(mcd);
+}
+
+PLI_INT32 vpi_mcd_flush(PLI_UINT32 mcd) {
+  // §38.25: flush the output buffers for the file(s) named by a multichannel
+  // descriptor. Clears the pending error status (§38.2) like the other entry
+  // points. Returns 0 when the named buffers were flushed, nonzero on failure.
+  delta::GetGlobalVpiContext().ResetErrorStatus();
+  return delta::GetGlobalVpiContext().McdFlush(mcd);
 }
