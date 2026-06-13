@@ -18,22 +18,6 @@ TEST(CommentLexing, LineCommentSkippedBetweenTokens) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
 }
 
-TEST(CommentLexing, LineCommentTerminatedByNewline) {
-  auto tokens = Lex("a //ignored\nb");
-  ASSERT_GE(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].text, "a");
-
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
-TEST(CommentLexing, LineCommentBodyDoesNotAppearAsToken) {
-  auto tokens = Lex("// not_a_token\nx");
-  ASSERT_GE(tokens.size(), 2u);
-
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[0].text, "x");
-}
-
 TEST(CommentLexing, LineCommentAtEndOfFile) {
 
   auto [tokens, errors] = LexWithDiag("x // no newline before eof");
@@ -173,6 +157,25 @@ TEST(CommentLexing, CommentPreservesSurroundingTokenKinds) {
   for (size_t i = 0; i < plain.size(); ++i) {
     EXPECT_EQ(plain[i].kind, with_comments[i].kind) << "index " << i;
   }
+}
+
+// one_line_comment ::= // comment_text \n with comment_text containing block
+// delimiters: a "/*" or "*/" inside a line comment is ordinary comment_text, so
+// it neither opens a block nor produces tokens; the comment still ends at \n.
+TEST(CommentLexing, LineCommentCanContainBlockDelimiters) {
+  auto tokens = Lex("a // /* not a block */ still line\nb");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+// block_comment ::= /* comment_text */: only the "*/" pair terminates the
+// comment, so a lone '*' that is not followed by '/' is ordinary comment_text.
+TEST(CommentLexing, BlockCommentLoneAsteriskDoesNotClose) {
+  auto tokens = Lex("a /* x * y * z */ b");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
 }
 
 }
