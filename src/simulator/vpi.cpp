@@ -7015,3 +7015,30 @@ void vpi_get_vlog_info(SVpiVlogInfo* info) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   delta::GetGlobalVpiContext().GetVlogInfo(info);
 }
+
+namespace delta {
+
+int VpiContext::Flush() {
+  // §38.5: flush the buffered output of both the simulator's output channel and
+  // the current log file. Committing each buffer into its committed stream and
+  // clearing it is the observable effect of forcing the buffered text out. If
+  // the underlying flush cannot complete, report failure and leave the buffers
+  // intact so nothing is lost.
+  if (flush_should_fail_) return 1;
+  output_channel_flushed_.append(output_channel_buffer_);
+  output_channel_buffer_.clear();
+  log_file_flushed_.append(log_file_buffer_);
+  log_file_buffer_.clear();
+  return 0;
+}
+
+}  // namespace delta
+
+PLI_INT32 vpi_flush() {
+  // §38.5: vpi_flush() flushes the output buffers for the simulator's output
+  // channel and current log file. Like the other VPI entry points it clears the
+  // pending error status (§38.2) before doing its work. Returns 0 on success
+  // and nonzero on failure.
+  delta::GetGlobalVpiContext().ResetErrorStatus();
+  return delta::GetGlobalVpiContext().Flush();
+}

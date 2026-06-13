@@ -3080,6 +3080,33 @@ class VpiContext {
               VpiHandle scope = nullptr);
   bool ChkError(VpiErrorInfo* info);
   void GetVlogInfo(VpiVlogInfo* info);
+
+  // §38.5: flush the output buffers for the simulator's output channel and the
+  // current log file. Each channel accumulates written text in an in-memory
+  // buffer until it is flushed; flushing commits any pending text into the
+  // channel's committed stream and empties the buffer. Returns 0 on success and
+  // nonzero on failure, in which case the buffers are left untouched.
+  int Flush();
+
+  // Support hooks for the flush model. Writes feed buffered text into either
+  // channel; the buffer accessors report what is still pending and the flushed
+  // accessors report what a flush has committed.
+  void WriteOutputChannel(std::string_view text) {
+    output_channel_buffer_.append(text);
+  }
+  void WriteLogFile(std::string_view text) { log_file_buffer_.append(text); }
+  const std::string& OutputChannelBuffer() const {
+    return output_channel_buffer_;
+  }
+  const std::string& LogFileBuffer() const { return log_file_buffer_; }
+  const std::string& OutputChannelFlushed() const {
+    return output_channel_flushed_;
+  }
+  const std::string& LogFileFlushed() const { return log_file_flushed_; }
+  // Forces the next Flush() down the failure path so the nonzero return can be
+  // exercised.
+  void SetFlushShouldFail(bool fail) { flush_should_fail_ = fail; }
+
   VpiHandle HandleMulti(int type, VpiHandle ref1, VpiHandle ref2);
 
   // §38.3: report whether two handles reference the same underlying simulation
@@ -3350,6 +3377,16 @@ class VpiContext {
   // simulation run once made, so only one default mode is selectable per run.
   int default_compat_mode_ = 0;
   bool default_compat_mode_selected_ = false;
+
+  // §38.5: the simulator's output channel and current log file each hold
+  // written text in an in-memory buffer until vpi_flush() commits it. A flush
+  // appends each buffer to its committed stream and clears the buffer.
+  std::string output_channel_buffer_;
+  std::string output_channel_flushed_;
+  std::string log_file_buffer_;
+  std::string log_file_flushed_;
+  // Test hook that drives vpi_flush() down its failure return.
+  bool flush_should_fail_ = false;
 
   VpiErrorInfo last_error_ = {};
 
@@ -3987,3 +4024,4 @@ int vpi_free_object(vpiHandle obj);
 int VpiControlC(int operation, ...);
 int VpiChkErrorC(SVpiErrorInfo* info);
 void vpi_get_vlog_info(SVpiVlogInfo* info);
+PLI_INT32 vpi_flush();
