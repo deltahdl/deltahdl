@@ -569,6 +569,23 @@ class AssertionApi {
   // attempts in progress have observable state to act on.
   void NoteAttemptStarted() { ++attempts_in_progress_; }
 
+  // §39.5.3 deferred and procedural concurrent assertions. A deferred assertion
+  // (see §16.4) that has executed may sit in a report queue, and a procedural
+  // concurrent assertion (see §16.14.6) may have an instance waiting in a
+  // procedural assertion queue to mature. These model that pending, not-yet-
+  // matured state per assertion: an instance is enqueued for an assertion and
+  // counted. A control that discards the assertion's current evaluation attempts
+  // in progress also flushes its pending instances (e.g. vpiAssertionReset); a
+  // control that does not interfere with current attempts leaves them queued so
+  // they may still mature and be reported (e.g. vpiAssertionDisable).
+
+  // Enqueue a pending, not-yet-matured instance for the named assertion.
+  void QueuePendingAssertionReport(std::string_view assertion);
+
+  // The number of pending instances queued for the assertion that have not yet
+  // matured or been flushed.
+  uint32_t PendingAssertionReportCount(std::string_view assertion) const;
+
  private:
   struct CbEntry {
     int reason = 0;
@@ -639,6 +656,14 @@ class AssertionApi {
   std::unordered_map<std::string, AssertionControlState> assertion_state_;
   AssertionControlState& StateFor(std::string_view assertion);
   const AssertionControlState* FindState(std::string_view assertion) const;
+
+  // §39.5.3 pending deferred/procedural-concurrent instances per assertion that
+  // have executed (or are queued) but not yet matured and been reported.
+  std::unordered_map<std::string, uint32_t> pending_assertion_reports_;
+  // Discard the pending instances queued for one assertion, or for every
+  // assertion, when a control discards the corresponding current attempts.
+  void FlushPendingAssertionReports(std::string_view assertion);
+  void FlushAllPendingAssertionReports();
 };
 
 enum class CoverageControl : uint8_t {

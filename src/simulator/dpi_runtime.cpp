@@ -846,6 +846,10 @@ bool AssertionApi::SysControl(int control, std::string_view scope) {
         return e.reason == cbAssertionStepSuccess ||
                e.reason == cbAssertionStepFailure;
       });
+      // §39.5.3: discarding all attempts in progress also flushes the
+      // not-yet-matured deferred/procedural-concurrent instances of every
+      // assertion.
+      FlushAllPendingAssertionReports();
       return true;
     case vpiAssertionSysOff:
       // Disable further starts; attempts already executing are not affected.
@@ -855,6 +859,9 @@ bool AssertionApi::SysControl(int control, std::string_view scope) {
       // Discard attempts in progress and disable further starts.
       attempts_in_progress_ = 0;
       started_ = false;
+      // §39.5.3: the discarded attempts' pending deferred/procedural-concurrent
+      // instances are flushed along with them.
+      FlushAllPendingAssertionReports();
       return true;
     case vpiAssertionSysLock:
       locked_ = true;
@@ -873,6 +880,9 @@ bool AssertionApi::SysControl(int control, std::string_view scope) {
       started_ = false;
       ended_ = true;
       callbacks_.clear();
+      // §39.5.3: discarding all attempts in progress also flushes their pending
+      // deferred/procedural-concurrent instances.
+      FlushAllPendingAssertionReports();
       return true;
     case vpiAssertionSysDisablePassAction:
       vacuous_action_enabled_ = false;
@@ -927,6 +937,24 @@ const AssertionApi::AssertionControlState* AssertionApi::FindState(
   return it == assertion_state_.end() ? nullptr : &it->second;
 }
 
+void AssertionApi::QueuePendingAssertionReport(std::string_view assertion) {
+  ++pending_assertion_reports_[std::string(assertion)];
+}
+
+uint32_t AssertionApi::PendingAssertionReportCount(
+    std::string_view assertion) const {
+  auto it = pending_assertion_reports_.find(std::string(assertion));
+  return it == pending_assertion_reports_.end() ? 0u : it->second;
+}
+
+void AssertionApi::FlushPendingAssertionReports(std::string_view assertion) {
+  pending_assertion_reports_.erase(std::string(assertion));
+}
+
+void AssertionApi::FlushAllPendingAssertionReports() {
+  pending_assertion_reports_.clear();
+}
+
 bool AssertionApi::Control(int control, std::string_view assertion) {
   // The second argument shall be a valid assertion handle.
   if (assertion.empty()) return false;
@@ -944,6 +972,9 @@ bool AssertionApi::Control(int control, std::string_view assertion) {
       s.fail_action_enabled = true;
       s.vacuous_action_enabled = true;
       s.nonvacuous_action_enabled = true;
+      // §39.5.3: discarding current attempts also flushes any not-yet-matured
+      // deferred/procedural-concurrent instances queued for this assertion.
+      FlushPendingAssertionReports(assertion);
       return true;
     case vpiAssertionLock:
       s.locked = true;
