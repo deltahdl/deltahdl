@@ -3222,6 +3222,13 @@ class VpiContext {
   // flushes). Returns the number of characters written.
   PLI_INT32 McdPrintf(PLI_UINT32 mcd, std::string_view text);
 
+  // §38.30: write already-formatted text to both the output channel of the tool
+  // that invoked the PLI application and the current tool log file. Unlike
+  // McdPrintf() there is no descriptor: the destination is always the tool's own
+  // output channel and log file (the §38.5 buffers), so the same text is appended
+  // to each. Returns the number of characters written.
+  PLI_INT32 Printf(std::string_view text);
+
   // Support hooks for the mcd-flush model. The writer feeds buffered text onto a
   // single channel (the one set bit naming the file); the accessors report what
   // is still pending on a channel and what a flush has committed; the failure
@@ -4218,3 +4225,4 @@ PLI_INT32 vpi_mcd_flush(PLI_UINT32 mcd);
 PLI_BYTE8* vpi_mcd_name(PLI_UINT32 cd);
 PLI_INT32 vpi_mcd_printf(PLI_UINT32 mcd, PLI_BYTE8* format, ...);
 PLI_INT32 vpi_mcd_vprintf(PLI_UINT32 mcd, PLI_BYTE8* format, va_list ap);
+PLI_INT32 vpi_printf(PLI_BYTE8* format, ...);

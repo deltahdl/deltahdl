@@ -7529,6 +7529,20 @@ PLI_INT32 VpiContext::McdPrintf(PLI_UINT32 mcd, std::string_view text) {
   return static_cast<PLI_INT32>(text.size());
 }
 
+PLI_INT32 VpiContext::Printf(std::string_view text) {
+  // §38.30: write the formatted text to both the output channel of the tool that
+  // invoked the PLI application and the current tool log file. There is no
+  // descriptor here, so the destination is fixed: the same text is appended to
+  // the tool's output channel buffer and to the log file buffer (the §38.5
+  // buffers a later flush commits).
+  WriteOutputChannel(text);
+  WriteLogFile(text);
+
+  // §38.30: return the number of characters printed - the length of the
+  // formatted text - mirroring C printf().
+  return static_cast<PLI_INT32>(text.size());
+}
+
 }  // namespace delta
 
 PLI_INT32 vpi_flush() {
@@ -7641,4 +7655,41 @@ PLI_INT32 vpi_mcd_vprintf(PLI_UINT32 mcd, PLI_BYTE8* format, va_list ap) {
   // §38.29: write the expanded text to every named channel (reusing the §38.28
   // writer) and return the number of characters printed.
   return delta::GetGlobalVpiContext().McdPrintf(mcd, text);
+}
+
+PLI_INT32 vpi_printf(PLI_BYTE8* format, ...) {
+  // §38.30: write to both the output channel of the tool that invoked the PLI
+  // application and the current tool log file. Clears the pending error status
+  // (§38.2) like the other entry points.
+  delta::GetGlobalVpiContext().ResetErrorStatus();
+
+  // §38.30: the text is controlled by a format string using the same format as
+  // the C printf() routine; a missing format string names nothing to print, so
+  // the routine reports the error by returning EOF.
+  if (format == nullptr) return EOF;
+
+  // §38.30: expand the format string with its variable arguments exactly as
+  // C printf() would. Measure the result first, then format it into a buffer of
+  // the right size.
+  va_list args;
+  va_start(args, format);
+  va_list measure;
+  va_copy(measure, args);
+  int needed = std::vsnprintf(nullptr, 0, format, measure);
+  va_end(measure);
+  if (needed < 0) {
+    // §38.30: the format expansion failed, so report the error with EOF.
+    va_end(args);
+    return EOF;
+  }
+  std::string text(static_cast<std::size_t>(needed), '\0');
+  if (needed > 0) {
+    std::vsnprintf(text.data(), static_cast<std::size_t>(needed) + 1, format,
+                   args);
+  }
+  va_end(args);
+
+  // §38.30: write the expanded text to the tool's output channel and log file
+  // and return the number of characters printed.
+  return delta::GetGlobalVpiContext().Printf(text);
 }
