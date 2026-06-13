@@ -344,14 +344,14 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
   ParsePathDelays(item->path.delays);
   Expect(TokenKind::kSemicolon);
 
+  // Every parallel ('=>') form — plain, edge-sensitive, or with a data-source
+  // expression — is described with a single input and a single output terminal
+  // descriptor. Only the full ('*>') forms accept terminal lists.
   if (item->path.path_kind == SpecifyPathKind::kParallel &&
-      item->path.edge == SpecifyEdge::kNone &&
-      item->path.data_source == nullptr) {
-    if (item->path.src_ports.size() != 1 || item->path.dst_ports.size() != 1) {
-      diag_.Error(item->loc,
-                  "parallel path '=>' requires a single source and "
-                  "destination terminal");
-    }
+      (item->path.src_ports.size() != 1 || item->path.dst_ports.size() != 1)) {
+    diag_.Error(item->loc,
+                "parallel path '=>' requires a single source and "
+                "destination terminal");
   }
 
   return item;
