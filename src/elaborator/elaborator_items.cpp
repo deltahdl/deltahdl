@@ -1912,6 +1912,19 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
                               decl->name));
     }
 
+    // Annex C.2.7: the general-purpose always procedure in checkers is
+    // deprecated and removed in this version of the standard. The specialized
+    // always_comb, always_latch, and always_ff procedures have been added for
+    // checkers and cover every case a general always could express, so a plain
+    // always inside a checker body is rejected.
+    if (parent_is_checker && item->kind == ModuleItemKind::kAlwaysBlock) {
+      diag_.Error(item->loc,
+                  std::format("a general 'always' procedure cannot be used "
+                              "inside checker '{}'; use always_comb, "
+                              "always_latch, or always_ff instead",
+                              decl->name));
+    }
+
     // §17.2: modules, interfaces, and programs shall not be declared inside a
     // checker. Only further checker declarations are permitted here.
     if (parent_is_checker && item->kind == ModuleItemKind::kNestedModuleDecl &&
