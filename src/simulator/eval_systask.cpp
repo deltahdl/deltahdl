@@ -925,6 +925,36 @@ static Logic4Vec EvalCoverageControl(const Expr* expr, SimContext& ctx,
   return status_vec(ctx.GetCoverageControlState().Control(control, scope));
 }
 
+// §40.3.2.2: $coverage_get_max(coverage_type, scope_def, modules_or_instance)
+// returns the value representing 100% coverage for the given coverage type over
+// the named hierarchy — the sum of all coverable items of that type. The value
+// is a property of the design and stays constant for the whole simulation. The
+// integer result is one of the §40.3.1 status values (`SV_COV_ERROR for bad
+// arguments, `SV_COV_NOCOV when no coverage is available, `SV_COV_OVERFLOW when
+// the count is too large to represent) or a positive maximum coverage number.
+static Logic4Vec EvalCoverageGetMax(const Expr* expr, SimContext& ctx,
+                                    Arena& arena) {
+  auto int_vec = [&](int value) {
+    return MakeLogic4VecVal(arena, 32, static_cast<uint32_t>(value));
+  };
+  // The first argument selects the coverage type; without it the arguments are
+  // incorrect, reported as `SV_COV_ERROR.
+  if (expr->args.empty()) {
+    return int_vec(static_cast<int>(CoverageStatus::Error));
+  }
+  int coverage_type =
+      static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+  // The third argument names the module definition or instance, as the scope is
+  // specified per $coverage_control() (§40.3.2.1). A string literal is used
+  // directly; otherwise the scope is left empty.
+  std::string scope;
+  if (expr->args.size() > 2 &&
+      expr->args[2]->kind == ExprKind::kStringLiteral) {
+    scope = ExtractStrArg(expr->args[2]);
+  }
+  return int_vec(ctx.GetCoverageControlState().CoverageMax(scope, coverage_type));
+}
+
 Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            std::string_view name) {
 
@@ -959,6 +989,8 @@ Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name.starts_with("$assert")) return MakeLogic4VecVal(arena, 1, 0);
 
   if (name == "$coverage_control") return EvalCoverageControl(expr, ctx, arena);
+
+  if (name == "$coverage_get_max") return EvalCoverageGetMax(expr, ctx, arena);
 
   if (name.starts_with("$coverage")) return MakeLogic4VecVal(arena, 32, 0);
 
