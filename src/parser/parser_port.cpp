@@ -620,6 +620,12 @@ void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
 
 PortDecl Parser::ParsePortDecl() {
   PortDecl port;
+
+  // §A.1.3: each ansi_port_declaration in a list_of_port_declarations may be
+  // preceded by attribute_instances. They carry no ANSI port semantics here,
+  // so consume and discard them before the port itself.
+  ParseAttributes();
+
   port.loc = CurrentLoc();
 
   Direction dir = TokenToDirection(CurrentToken().kind);
@@ -759,6 +765,18 @@ void Parser::ParseModuleBody(ModuleDecl& mod) {
     if (non_ansi && IsPortDirection(CurrentToken().kind)) {
       ParseNonAnsiPortDecls(mod);
       continue;
+    }
+    // §A.1.3: a non-ANSI body port_declaration may carry leading
+    // attribute_instances. Peek past them; if a port direction follows, this is
+    // a port declaration rather than a generic module item.
+    if (non_ansi && Check(TokenKind::kAttrStart)) {
+      auto saved = lexer_.SavePos();
+      ParseAttributes();
+      if (IsPortDirection(CurrentToken().kind)) {
+        ParseNonAnsiPortDecls(mod);
+        continue;
+      }
+      lexer_.RestorePos(saved);
     }
     ParseModuleItem(mod.items);
   }
