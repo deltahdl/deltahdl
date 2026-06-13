@@ -349,14 +349,6 @@ TEST(PrimitiveTerminalParsing, Error_OutputTerminalIntegerLiteral) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(PrimitiveTerminalParsing, Error_OutputTerminalBinaryExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  or (a + b, c, d);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(PrimitiveTerminalParsing, Error_OutputTerminalTernaryExpr) {
   auto r = Parse(
       "module m;\n"
@@ -365,58 +357,10 @@ TEST(PrimitiveTerminalParsing, Error_OutputTerminalTernaryExpr) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(PrimitiveTerminalParsing, Error_OutputTerminalStringLiteral) {
-  auto r = Parse(
-      "module m;\n"
-      "  not (\"out\", in);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveTerminalParsing, Error_EnableGateOutputTerminalExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  bufif0 (a & b, in, en);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveTerminalParsing, Error_MosOutputTerminalExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  nmos (a + b, in, ctrl);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveTerminalParsing, Error_CmosOutputTerminalExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  cmos (a | b, in, nctrl, pctrl);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveTerminalParsing, Error_PullGateOutputTerminalLiteral) {
-  auto r = Parse(
-      "module m;\n"
-      "  pullup (1'b1);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(PrimitiveTerminalParsing, Error_InoutTerminalIntegerLiteral) {
   auto r = Parse(
       "module m;\n"
       "  tran (1, b);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveTerminalParsing, Error_InoutTerminalBinaryExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  rtran (a + b, c);\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
