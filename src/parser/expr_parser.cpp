@@ -898,7 +898,14 @@ Expr* Parser::ParseSystemCall() {
     }
     while (Match(TokenKind::kComma)) {
       if (Check(TokenKind::kAt)) {
-
+        // Annex C.2.2: the clocking event argument to $sampled was removed.
+        // $sampled no longer depends on a clocking event, so the syntax that
+        // once supplied one is no longer accepted. Other sampled value
+        // functions still take a clocking event (see 16.9.3).
+        if (call->callee == "$sampled") {
+          diag_.Error(CurrentLoc(),
+                      "$sampled does not accept a clocking event argument");
+        }
         Consume();
         if (Match(TokenKind::kLParen)) {
           ParseEventList();
