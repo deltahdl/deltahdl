@@ -7388,6 +7388,35 @@ int VpiContext::Flush() {
   return 0;
 }
 
+PLI_UINT32 VpiContext::McdOpen(const std::string& filename) {
+  // §38.27: a file already open in the shared mcd namespace - whether a prior
+  // vpi_mcd_open() assigned it or $fopen seeded it - is reported on the very
+  // descriptor it already holds, rather than consuming a second channel.
+  auto existing = mcd_open_files_.find(filename);
+  if (existing != mcd_open_files_.end()) return existing->second;
+
+  // §38.27: an open that cannot be carried out returns 0.
+  if (mcd_open_should_fail_) return 0;
+
+  // §38.27: pick a free channel. Channel 1 (bit 0, the LSB) is reserved for the
+  // tool's output channel and log file, and channel 32 (bit 31, the MSB) is
+  // reserved to stand for an fd from $fopen, so a fresh descriptor is drawn only
+  // from channels 2..31 (bits 1..30). The chosen channel is the single bit set
+  // in the returned mcd.
+  for (int bit = 1; bit <= 30; ++bit) {
+    PLI_UINT32 channel = PLI_UINT32{1} << bit;
+    if ((mcd_allocated_channels_ & channel) != 0) continue;
+    // §38.27: open the file for writing and hand back its multichannel
+    // descriptor, recording it so a later open of the same file finds it.
+    mcd_allocated_channels_ |= channel;
+    mcd_open_files_.emplace(filename, channel);
+    return channel;
+  }
+
+  // §38.27: no channel was free, so the open fails and returns 0.
+  return 0;
+}
+
 }  // namespace delta
 
 PLI_INT32 vpi_flush() {
@@ -7397,4 +7426,13 @@ PLI_INT32 vpi_flush() {
   // and nonzero on failure.
   delta::GetGlobalVpiContext().ResetErrorStatus();
   return delta::GetGlobalVpiContext().Flush();
+}
+
+PLI_UINT32 vpi_mcd_open(PLI_BYTE8* file) {
+  // §38.27: open a file for writing and return its multichannel descriptor.
+  // Clears the pending error status (§38.2) like the other entry points. A
+  // missing file name names nothing to open, so the routine returns 0 on error.
+  delta::GetGlobalVpiContext().ResetErrorStatus();
+  if (file == nullptr) return 0;
+  return delta::GetGlobalVpiContext().McdOpen(file);
 }

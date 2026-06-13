@@ -3158,6 +3158,34 @@ class VpiContext {
   // exercised.
   void SetFlushShouldFail(bool fail) { flush_should_fail_ = fail; }
 
+  // §38.27: open a file for writing and return a multichannel descriptor (mcd)
+  // naming it. A fresh descriptor selects a single channel drawn from the bits
+  // that vpi_mcd_open() is allowed to use: channel 1 (the LSB) is reserved for
+  // the tool's own output channel and log file, and channel 32 (the MSB) is
+  // reserved for an fd from $fopen, so neither is ever handed out here. These
+  // mcds share one namespace with the mcds $fopen returns, so a file that is
+  // already open - whether opened by an earlier vpi_mcd_open() or by $fopen -
+  // yields its existing descriptor instead of a new one. Returns 0 on error,
+  // including when no channel is free.
+  PLI_UINT32 McdOpen(const std::string& filename);
+
+  // Support hooks for the mcd-open model. The fopen registrar records that a
+  // file is already open on a given descriptor in the shared namespace; the
+  // accessors let a test observe which descriptor names a file; the failure
+  // hook forces the next open down its error return.
+  void RegisterFopenMcdFile(const std::string& filename, PLI_UINT32 mcd) {
+    mcd_open_files_[filename] = mcd;
+    mcd_allocated_channels_ |= mcd;
+  }
+  PLI_UINT32 McdForFile(const std::string& filename) const {
+    auto it = mcd_open_files_.find(filename);
+    return it == mcd_open_files_.end() ? 0u : it->second;
+  }
+  bool IsMcdFileOpen(const std::string& filename) const {
+    return mcd_open_files_.find(filename) != mcd_open_files_.end();
+  }
+  void SetMcdOpenShouldFail(bool fail) { mcd_open_should_fail_ = fail; }
+
   VpiHandle HandleMulti(int type, VpiHandle ref1, VpiHandle ref2);
 
   // §38.3: report whether two handles reference the same underlying simulation
@@ -3448,6 +3476,17 @@ class VpiContext {
   std::string log_file_flushed_;
   // Test hook that drives vpi_flush() down its failure return.
   bool flush_should_fail_ = false;
+
+  // §38.27: descriptors handed out by vpi_mcd_open(), keyed by file name so a
+  // repeated open of the same file returns the descriptor it already holds.
+  // mcd_allocated_channels_ marks every channel bit currently in use - both the
+  // ones this routine assigned and any seeded from $fopen - so a fresh open can
+  // pick an unused channel. Channel 1 (LSB) and channel 32 (MSB) are reserved
+  // and never selected.
+  std::unordered_map<std::string, PLI_UINT32> mcd_open_files_;
+  PLI_UINT32 mcd_allocated_channels_ = 0;
+  // Test hook that drives vpi_mcd_open() down its error return.
+  bool mcd_open_should_fail_ = false;
 
   VpiErrorInfo last_error_ = {};
 
@@ -4104,3 +4143,4 @@ int VpiControlC(int operation, ...);
 int VpiChkErrorC(SVpiErrorInfo* info);
 PLI_INT32 vpi_get_vlog_info(SVpiVlogInfo* info);
 PLI_INT32 vpi_flush();
+PLI_UINT32 vpi_mcd_open(PLI_BYTE8* file);
