@@ -5897,6 +5897,19 @@ VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
     return nullptr;
   }
 
+  // §38.36.1.1: placing a cbStmt callback on a statement that resides in a
+  // protected portion of the code is not allowed. Such a statement is sealed
+  // behind encryption, so a per-statement callback cannot be placed on it;
+  // reject the registration with a null handle and a recorded error message.
+  if (data->reason == cbStmt && data->obj && data->obj->is_protected) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_register_cb(): a cbStmt callback may not be placed on a statement "
+        "in a protected portion of the code";
+    return nullptr;
+  }
+
   // §38.36.2: a simulation-time callback carries its timing in the s_cb_data
   // time structure, and the standard constrains how that structure - and a
   // delay of zero - may be used. These checks apply only to the time-related
@@ -6017,6 +6030,18 @@ int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
     }
     if (user_data != nullptr) {
       data.user_data = user_data;
+    }
+    // §38.36.1.1: the s_cb_data delivered for a cbStmt callback has fixed
+    // contents regardless of what was supplied at registration - the value
+    // field is always NULL and the index field is always 0. In addition, when
+    // the callback was registered with a vpiSuppressTime time type, no time is
+    // passed to the routine and the time pointer is set to NULL.
+    if (data.reason == cbStmt) {
+      data.value = nullptr;
+      data.index = 0;
+      if (data.time != nullptr && data.time->type == vpiSuppressTime) {
+        data.time = nullptr;
+      }
     }
     // §38.9: record the reason of the routine about to run so that a routine
     // gated on its callback reason (e.g. vpi_get_data, legal only under
