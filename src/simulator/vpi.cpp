@@ -3609,6 +3609,37 @@ int VpiContext::PutData(int id, const char* data_loc, int num_of_bytes) {
   return num_of_bytes;
 }
 
+int VpiContext::PutUserData(VpiHandle obj, void* userdata) {
+  // §38.33: the handle names the storage location of a user-defined system task
+  // or system function call instance. A null handle, or a handle to any other
+  // kind of object, has no such storage to write: that is a detected error
+  // (§38.2) and the routine returns 0 with no association made.
+  if (obj == nullptr ||
+      (obj->type != vpiSysTaskCall && obj->type != vpiSysFuncCall)) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_put_userdata() requires a system task or system function call "
+        "handle";
+    return 0;
+  }
+
+  // §38.33: associate the user-data value with the call instance so that a later
+  // vpi_get_userdata() reads it back. Returns 1 on success.
+  obj->user_data = userdata;
+  return 1;
+}
+
+void VpiContext::ClearUserDataForRestartOrReset() {
+  // §38.33: a restart or a reset drops every call instance's user-data
+  // association, so that afterwards vpi_get_userdata() returns null until the
+  // application re-establishes it (typically from a cbEndOfRestart or
+  // cbEndOfReset routine after restoring it with vpi_get_data()).
+  for (VpiObject* candidate : all_objects_) {
+    candidate->user_data = nullptr;
+  }
+}
+
 namespace {
 
 // §38.21: split a possibly hierarchical name into its dot-separated path
@@ -5770,6 +5801,10 @@ int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
 }
 
 int VpiContext::DispatchReset() {
+  // §38.33: a reset drops the user-data stored on every call instance before the
+  // reset callbacks run, so a vpi_get_userdata() during cbEndOfReset starts from
+  // null until the application sets the field again.
+  ClearUserDataForRestartOrReset();
   int fired = DispatchCallbacks(kCbStartOfReset);
   fired += DispatchCallbacks(kCbEndOfReset);
   return fired;
@@ -5781,6 +5816,11 @@ int VpiContext::DispatchRestart() {
   // before the callback reasons are cleared below, so the surviving restart
   // callbacks are still identifiable by their reason.
   ReleaseHandlesForRestart();
+
+  // §38.33: a restart drops the user-data stored on every call instance, so a
+  // vpi_get_userdata() after the restart returns null until the application
+  // re-establishes the field (e.g. from a cbEndOfRestart routine).
+  ClearUserDataForRestartOrReset();
 
   // §38.36.3: with the exception of the restart callbacks, every registered
   // callback is removed when a restart occurs. Clearing the reason marks a slot
@@ -6916,6 +6956,11 @@ PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes) {
 PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
   return delta::GetGlobalVpiContext().PutData(id, dataLoc, numOfBytes);
+}
+
+PLI_INT32 vpi_put_userdata(vpiHandle obj, void* userdata) {
+  delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
+  return delta::GetGlobalVpiContext().PutUserData(obj, userdata);
 }
 
 vpiHandle VpiHandleC(int type, vpiHandle ref) {

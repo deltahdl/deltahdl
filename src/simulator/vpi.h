@@ -235,6 +235,14 @@ struct VpiObject {
   // callback from a simulation callback, which is also a vpiCallback object.
   bool is_systf = false;
 
+  // §38.33: the implementation storage location vpi_put_userdata() writes for a
+  // system task or system function call instance. vpi_put_userdata() associates
+  // this user-data value with the call handle so a later vpi_get_userdata() can
+  // read it back. It is null until set, and is cleared on a simulation restart
+  // or reset (after either, a fresh vpi_get_userdata() yields null until the
+  // application sets it again).
+  void* user_data = nullptr;
+
   // §38.34: whether a vpiSchedEvent handle still names an event sitting in the
   // event queue. vpi_put_value() with vpiReturnEvent hands back such a handle
   // marked scheduled; vpi_get(vpiScheduled) reports this flag, and
@@ -2991,6 +2999,19 @@ class VpiContext {
   // vpi_get_data() (§38.9) can later read them back in chunks of any size.
   int PutData(int id, const char* data_loc, int num_of_bytes);
 
+  // §38.33: associate `userdata` with `obj`, the storage location of a
+  // user-defined system task or system function call instance, so a later
+  // vpi_get_userdata() can read it back. Returns 1 on success. A null handle or
+  // a handle that is not a system task/function call is an error (§38.2) and
+  // returns 0, leaving no association made.
+  int PutUserData(VpiHandle obj, void* userdata);
+
+  // §38.33: drop every system task/function call instance's user-data
+  // association. Run when the simulation restarts or resets, so that after
+  // either event a vpi_get_userdata() returns null until the application sets
+  // the field again (from a cbEndOfRestart or cbEndOfReset routine).
+  void ClearUserDataForRestartOrReset();
+
   // §38.13: set the simulation time unit, as a base-ten exponent of one second
   // (the unit the scheduler counts ticks in). vpi_get_time() uses it both as the
   // scaling reference for a scaled-real result and as the unit reported for a
@@ -4008,6 +4029,7 @@ void vpi_get_delays(vpiHandle obj, p_vpi_delay delay_p);
 void vpi_put_delays(vpiHandle obj, p_vpi_delay delay_p);
 PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes);
 PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes);
+PLI_INT32 vpi_put_userdata(vpiHandle obj, void* userdata);
 vpiHandle VpiHandleC(int type, vpiHandle ref);
 vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope);
 vpiHandle VpiHandleByIndexC(vpiHandle parent, int index);
