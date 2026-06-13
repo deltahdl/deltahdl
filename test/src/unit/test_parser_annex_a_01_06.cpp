@@ -46,6 +46,22 @@ TEST(InterfaceOrGenerateItem, ModuleCommonItemElaborationSeverityTask) {
   EXPECT_TRUE(HasItemOfKind(IfaceItems(r), ModuleItemKind::kElabSystemTask));
 }
 
+// interface_or_generate_item ::= { attribute_instance } module_common_item | ...
+// The production permits a leading run of attribute_instances; the shared
+// module-item parse path collects them and attaches them to the resulting item.
+TEST(InterfaceOrGenerateItem, AttributeInstancePrefixOnModuleCommonItem) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  (* keep *) assign w = a;\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(IfaceItems(r), ModuleItemKind::kContAssign);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->attrs.size(), 1u);
+  EXPECT_EQ(item->attrs[0].name, "keep");
+}
+
 // --- extern_tf_declaration ---
 // extern_tf_declaration ::= extern method_prototype ;
 //                         | extern forkjoin task_prototype ;

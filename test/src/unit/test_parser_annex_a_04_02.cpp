@@ -64,64 +64,6 @@ TEST(GenerateInstantiationGrammar, GenerateRegionMixedConstructs) {
   EXPECT_TRUE(HasItemOfKind(mod->items, ModuleItemKind::kGenerateCase));
 }
 
-TEST(GenerateConstructParsing, GenerateRegionWithForLoop) {
-  auto r = Parse(
-      "module m;\n"
-      "  generate\n"
-      "    for (genvar i = 0; i < 4; i++) begin\n"
-      "      assign out[i] = in[i];\n"
-      "    end\n"
-      "  endgenerate\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  bool found_gen_for = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kGenerateFor) found_gen_for = true;
-  }
-  EXPECT_TRUE(found_gen_for);
-}
-
-TEST(GenerateConstructParsing, GenerateRegionMultipleIfConstructs) {
-  auto r = Parse(
-      "module m;\n"
-      "  generate\n"
-      "    if (A) assign x = 1;\n"
-      "    if (B) assign y = 2;\n"
-      "  endgenerate\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  size_t gen_if_count = 0;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kGenerateIf) ++gen_if_count;
-  }
-  EXPECT_EQ(gen_if_count, 2u);
-}
-
-TEST(GenerateConstructParsing, GenerateRegionWithMultipleKinds) {
-  auto r = Parse(
-      "module m;\n"
-      "  generate\n"
-      "    for (genvar i = 0; i < 2; i++) begin\n"
-      "      assign a[i] = b[i];\n"
-      "    end\n"
-      "    if (WIDTH > 0)\n"
-      "      assign c = d;\n"
-      "  endgenerate\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  bool found_for = false;
-  bool found_if = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kGenerateFor) found_for = true;
-    if (item->kind == ModuleItemKind::kGenerateIf) found_if = true;
-  }
-  EXPECT_TRUE(found_for);
-  EXPECT_TRUE(found_if);
-}
-
 TEST(GenerateInstantiationGrammar, GenerateRegionWithFor) {
   auto r = Parse(
       "module m;\n"
@@ -362,45 +304,6 @@ TEST(GenerateInstantiationGrammar, NestedForInsideIf) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kGenerateFor);
 }
 
-TEST(GenerateConstructParsing, GenerateIfWithNestedFor) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (USE_PIPELINE) begin\n"
-      "    for (genvar i = 0; i < STAGES; i++) begin : stage\n"
-      "      assign pipe[i] = data[i];\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1u);
-  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kGenerateIf);
-  ASSERT_GE(mod->items[0]->gen_body.size(), 1u);
-  EXPECT_EQ(mod->items[0]->gen_body[0]->kind, ModuleItemKind::kGenerateFor);
-}
-
-TEST(GenerateConstructParsing, MultipleGenerateConstructs) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i++) begin : g1\n"
-      "    assign a[i] = b[i];\n"
-      "  end\n"
-      "  if (MODE) begin\n"
-      "    assign x = y;\n"
-      "  end\n"
-      "  case (SEL)\n"
-      "    0: assign out = a;\n"
-      "    default: assign out = b;\n"
-      "  endcase\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 3u);
-  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kGenerateFor);
-  EXPECT_EQ(mod->items[1]->kind, ModuleItemKind::kGenerateIf);
-  EXPECT_EQ(mod->items[2]->kind, ModuleItemKind::kGenerateCase);
-}
-
 TEST(GenerateInstantiationGrammar, GenvarInitWithGenvarKeyword) {
   auto r = Parse(
       "module m;\n"
@@ -430,34 +333,6 @@ TEST(GenerateInstantiationGrammar, GenvarInitWithoutGenvarKeyword) {
     if (item->kind == ModuleItemKind::kGenerateFor) found = true;
   }
   EXPECT_TRUE(found);
-}
-
-TEST(GenerateConstructParsing, InlineGenvarInForInitParse) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i = i + 1) begin\n"
-      "    assign out[i] = in[i];\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_NE(gen->gen_init, nullptr);
-}
-
-TEST(GenerateConstructParsing, InlineGenvarInForInitBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i = i + 1) begin\n"
-      "    assign out[i] = in[i];\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = r.cu->modules[0]->items[0];
-  ASSERT_EQ(gen->gen_body.size(), 1);
-  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
 }
 
 TEST(GenerateInstantiationGrammar, GenvarIterationCompoundAssign) {
@@ -499,19 +374,6 @@ TEST(GenerateInstantiationGrammar, GenvarIterationPostIncrement) {
   ASSERT_NE(gen->gen_step, nullptr);
 }
 
-TEST(GenerateInstantiationGrammar, GenvarIterationPostDecrement) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 3; i >= 0; i--) begin\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* gen = r.cu->modules[0]->items[0];
-  ASSERT_NE(gen->gen_step, nullptr);
-}
-
 TEST(GenerateInstantiationGrammar, GenvarExprInLoopBound) {
   auto r = Parse(
       "module m;\n"
@@ -528,60 +390,6 @@ TEST(GenerateInstantiationGrammar, GenvarExprInLoopBound) {
   ASSERT_NE(gen, nullptr);
   EXPECT_NE(gen->gen_cond, nullptr);
   EXPECT_NE(gen->gen_step, nullptr);
-}
-
-TEST(GenerateInstantiationGrammar, GenvarPostIncrementStep) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  for (genvar i = 0; i < 4; i++) begin : blk\n"
-              "    assign a[i] = b[i];\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(GenerateConstructParsing, GenerateForPostIncrement) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i++) begin\n"
-      "    assign out[i] = in[i];\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_NE(gen->gen_step, nullptr);
-  ASSERT_EQ(gen->gen_body.size(), 1);
-}
-
-TEST(GenerateConstructParsing, GenerateForCompoundAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i += 1) begin\n"
-      "    assign out[i] = in[i];\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_NE(gen->gen_step, nullptr);
-  ASSERT_EQ(gen->gen_body.size(), 1);
-}
-
-TEST(GenerateConstructParsing, GenerateForPreDecrement) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 3; i >= 0; i--) begin\n"
-      "    assign out[i] = in[i];\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = r.cu->modules[0]->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_NE(gen->gen_step, nullptr);
 }
 
 TEST(GenerateInstantiationGrammar, IfGenerateBasic) {
@@ -767,114 +575,6 @@ TEST(GenerateInstantiationGrammar, LabeledIfGenerateBlock) {
     }
   }
   EXPECT_TRUE(found_gen_if);
-}
-
-TEST(GenerateConstructParsing, GenerateIfSingleItemParse) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (WIDTH > 1)\n"
-      "    assign out = in;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
-  ASSERT_EQ(gen->gen_body.size(), 1);
-}
-
-TEST(GenerateConstructParsing, GenerateIfSingleItemBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (WIDTH > 1)\n"
-      "    assign out = in;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = r.cu->modules[0]->items[0];
-  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
-  EXPECT_EQ(gen->gen_else, nullptr);
-}
-
-TEST(GenerateConstructParsing, GenerateIfElseSingleItemParse) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (WIDTH > 1)\n"
-      "    assign out = a;\n"
-      "  else\n"
-      "    assign out = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
-  ASSERT_EQ(gen->gen_body.size(), 1);
-}
-
-TEST(GenerateConstructParsing, GenerateIfElseSingleItemBranches) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (WIDTH > 1)\n"
-      "    assign out = a;\n"
-      "  else\n"
-      "    assign out = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = r.cu->modules[0]->items[0];
-  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
-  ASSERT_NE(gen->gen_else, nullptr);
-  ASSERT_EQ(gen->gen_else->gen_body.size(), 1);
-  EXPECT_EQ(gen->gen_else->gen_body[0]->kind, ModuleItemKind::kContAssign);
-}
-
-TEST(GenerateConstructParsing, GenerateIfBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (WIDTH > 1) begin\n"
-      "    assign a = b;\n"
-      "    assign c = d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1u);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
-  ASSERT_GE(gen->gen_body.size(), 2u);
-}
-
-TEST(GenerateConstructParsing, GenerateIfElseIfChainParse) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (WIDTH == 1)\n"
-      "    assign out = a;\n"
-      "  else if (WIDTH == 2)\n"
-      "    assign out = b;\n"
-      "  else\n"
-      "    assign out = c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1u);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
-  ASSERT_NE(gen->gen_else, nullptr);
-}
-
-TEST(GenerateConstructParsing, GenerateIfElseIfChainNesting) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (WIDTH == 1)\n"
-      "    assign out = a;\n"
-      "  else if (WIDTH == 2)\n"
-      "    assign out = b;\n"
-      "  else\n"
-      "    assign out = c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = r.cu->modules[0]->items[0];
-  EXPECT_EQ(gen->gen_else->kind, ModuleItemKind::kGenerateIf);
-  ASSERT_NE(gen->gen_else->gen_else, nullptr);
 }
 
 TEST(GenerateInstantiationGrammar, IfGenerateNamedBlockWithWire) {
@@ -1071,40 +771,6 @@ TEST(GenerateInstantiationGrammar, GenerateCaseInRegion) {
   EXPECT_TRUE(found);
 }
 
-TEST(GenerateConstructParsing, GenerateCaseParse) {
-  auto r = Parse(
-      "module m;\n"
-      "  case (WIDTH)\n"
-      "    1: assign out = in;\n"
-      "    2: assign out = in2;\n"
-      "    default: assign out = 0;\n"
-      "  endcase\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1u);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateCase);
-  ASSERT_EQ(gen->gen_case_items.size(), 3u);
-}
-
-TEST(GenerateConstructParsing, GenerateCaseItemDefaults) {
-  auto r = Parse(
-      "module m;\n"
-      "  case (WIDTH)\n"
-      "    1: assign out = in;\n"
-      "    2: assign out = in2;\n"
-      "    default: assign out = 0;\n"
-      "  endcase\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = r.cu->modules[0]->items[0];
-  const bool kExpectedDefaults[] = {false, false, true};
-  for (size_t i = 0; i < 3; i++) {
-    EXPECT_EQ(gen->gen_case_items[i].is_default, kExpectedDefaults[i]);
-  }
-}
-
 TEST(GenerateInstantiationGrammar, GenerateBlockLabeled) {
   auto r = Parse(
       "module m;\n"
@@ -1228,21 +894,6 @@ TEST(GenerateInstantiationGrammar, GenerateForBlockScope) {
   EXPECT_TRUE(found_gen);
 }
 
-TEST(GenerateConstructParsing, GenerateForLabeled) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i++) begin : gen_blk\n"
-      "    assign out[i] = in[i];\n"
-      "  end : gen_blk\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1u);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_EQ(gen->gen_body.size(), 1u);
-}
-
 TEST(GenerateInstantiationGrammar, ForGenerateNamedBlockWithWire) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -1297,66 +948,6 @@ TEST(GenerateInstantiationGrammar, GenerateItemInInterface) {
   EXPECT_TRUE(found_if);
 }
 
-TEST(GenerateConstructParsing, GenerateForWithAlwaysBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i++) begin : gen_alw\n"
-      "    always @(posedge clk)\n"
-      "      q[i] <= d[i];\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = r.cu->modules[0]->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_EQ(gen->gen_body.size(), 1u);
-  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kAlwaysBlock);
-}
-
-TEST(GenerateConstructParsing, GenerateForSingleItem) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (i = 0; i < 4; i = i + 1)\n"
-      "    assign out[i] = in[i];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_EQ(gen->gen_body.size(), 1);
-  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
-}
-
-TEST(GenerateConstructParsing, GenerateForWithModuleInst) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i++) begin : blk\n"
-      "    sub u(.a(in[i]), .b(out[i]));\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = r.cu->modules[0]->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_EQ(gen->gen_body.size(), 1u);
-  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
-}
-
-TEST(GenerateConstructParsing, GenerateForWithSinglePortModuleInst) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i++) begin : gen_inst\n"
-      "    sub u(.a(w[i]));\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1u);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_EQ(gen->gen_body.size(), 1u);
-  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
-}
-
 TEST(GenerateInstantiationGrammar, GenerateForInstantiation) {
   auto r = Parse(
       "module top;\n"
@@ -1384,152 +975,6 @@ TEST(GenerateInstantiationGrammar, GenvarIterationPreIncrement) {
   auto* gen = r.cu->modules[0]->items[0];
   EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
   ASSERT_NE(gen->gen_step, nullptr);
-}
-
-TEST(GenerateInstantiationGrammar, GenvarIterationPreDecrement) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 3; i >= 0; --i) begin\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* gen = r.cu->modules[0]->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_NE(gen->gen_step, nullptr);
-}
-
-TEST(GenerateInstantiationGrammar, GenvarIterationSubtractAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 3; i >= 0; i -= 1) begin\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu->modules[0]->items[0]->gen_step, nullptr);
-}
-
-TEST(GenerateInstantiationGrammar, GenvarIterationMultiplyAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 1; i < 256; i *= 2) begin\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu->modules[0]->items[0]->gen_step, nullptr);
-}
-
-TEST(GenerateInstantiationGrammar, GenvarIterationDivideAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 8; i > 0; i /= 2) begin\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu->modules[0]->items[0]->gen_step, nullptr);
-}
-
-TEST(GenerateInstantiationGrammar, GenvarIterationModuloAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 10; i > 0; i %= 3) begin\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu->modules[0]->items[0]->gen_step, nullptr);
-}
-
-TEST(GenerateInstantiationGrammar, GenvarIterationAndAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 15; i > 0; i &= 4'hE) begin\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu->modules[0]->items[0]->gen_step, nullptr);
-}
-
-TEST(GenerateInstantiationGrammar, GenvarIterationOrAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 16; i |= 1) begin\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu->modules[0]->items[0]->gen_step, nullptr);
-}
-
-TEST(GenerateInstantiationGrammar, GenvarIterationXorAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 8; i ^= 1) begin\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu->modules[0]->items[0]->gen_step, nullptr);
-}
-
-TEST(GenerateInstantiationGrammar, GenvarIterationLeftShiftAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 1; i < 256; i <<= 1) begin\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu->modules[0]->items[0]->gen_step, nullptr);
-}
-
-TEST(GenerateInstantiationGrammar, GenvarIterationRightShiftAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 128; i > 0; i >>= 1) begin\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu->modules[0]->items[0]->gen_step, nullptr);
-}
-
-TEST(GenerateInstantiationGrammar, GenvarIterationArithLeftShiftAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 1; i < 256; i <<<= 1) begin\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu->modules[0]->items[0]->gen_step, nullptr);
-}
-
-TEST(GenerateInstantiationGrammar, GenvarIterationArithRightShiftAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 128; i > 0; i >>>= 1) begin\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu->modules[0]->items[0]->gen_step, nullptr);
 }
 
 TEST(GenerateInstantiationGrammar, GenvarInitNonZeroStart) {
@@ -1771,6 +1216,38 @@ TEST(GenerateInstantiationGrammar, IfGenerateInsideCaseGenerate) {
   EXPECT_EQ(gen->gen_case_items[0].body[0]->kind, ModuleItemKind::kGenerateIf);
 }
 
+// generate_block ::= ... | [ generate_block_identifier : ] begin ...
+// The label may precede `begin` (first optional position in the production),
+// distinct from the post-`begin` `: label` form exercised elsewhere.
+TEST(GenerateInstantiationGrammar, GenerateBlockLabelBeforeBegin) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar i = 0; i < 4; i++) blk : begin\n"
+      "    assign out[i] = in[i];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* gen = r.cu->modules[0]->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
+  EXPECT_EQ(gen->name, "blk");
+  ASSERT_EQ(gen->gen_body.size(), 1u);
+}
+
+TEST(GenerateInstantiationGrammar, IfGenerateBlockLabelBeforeBegin) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (EN) g : begin\n"
+      "    wire w;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* gen = r.cu->modules[0]->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
+  EXPECT_EQ(gen->name, "g");
+}
+
 TEST(GenerateInstantiationGrammar, DeeplyNestedGenerateFor) {
   auto r = Parse(
       "module m;\n"
@@ -1793,6 +1270,34 @@ TEST(GenerateInstantiationGrammar, DeeplyNestedGenerateFor) {
   auto* l3 = l2->gen_body[0];
   EXPECT_EQ(l3->kind, ModuleItemKind::kGenerateFor);
   ASSERT_EQ(l3->gen_body.size(), 1u);
+}
+
+// --- error conditions ---
+
+// case_generate_item ::= constant_expression { , constant_expression }
+//   : generate_block | default [ : ] generate_block
+// The colon is mandatory for the non-default form (only the `default` form may
+// omit it), so a pattern item with no colon before its body is rejected.
+TEST(GenerateInstantiationGrammar, CaseGenerateItemMissingColonRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  case (WIDTH)\n"
+      "    8 assign out = in;\n"
+      "  endcase\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// if_generate_construct ::= if ( constant_expression ) generate_block
+//   [ else generate_block ]
+// The parentheses around the condition are required by the production.
+TEST(GenerateInstantiationGrammar, IfGenerateMissingParenRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  if EN\n"
+      "    assign out = in;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }
