@@ -71,86 +71,6 @@ TEST(SwitchInstanceParsing, MosSwitchType_Rpmos) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(SwitchInstanceParsing, NInputGateType_Nand) {
-  auto r = Parse(
-      "module m;\n"
-      "  nand (y, a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNand);
-  ASSERT_NE(g, nullptr);
-}
-
-TEST(SwitchInstanceParsing, NInputGateType_Or) {
-  auto r = Parse(
-      "module m;\n"
-      "  or (y, a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kOr);
-  ASSERT_NE(g, nullptr);
-}
-
-TEST(SwitchInstanceParsing, NInputGateType_Nor) {
-  auto r = Parse(
-      "module m;\n"
-      "  nor (y, a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNor);
-  ASSERT_NE(g, nullptr);
-}
-
-TEST(SwitchInstanceParsing, NInputGateType_Xor) {
-  auto r = Parse(
-      "module m;\n"
-      "  xor (y, a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kXor);
-  ASSERT_NE(g, nullptr);
-}
-
-TEST(SwitchInstanceParsing, NInputGateType_Xnor) {
-  auto r = Parse(
-      "module m;\n"
-      "  xnor (y, a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kXnor);
-  ASSERT_NE(g, nullptr);
-}
-
-TEST(SwitchInstanceParsing, PassEnSwitchType_Tranif1) {
-  auto r = Parse(
-      "module m;\n"
-      "  tranif1 (a, b, ctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif1);
-  ASSERT_NE(g, nullptr);
-}
-
-TEST(SwitchInstanceParsing, PassEnSwitchType_Rtranif0) {
-  auto r = Parse(
-      "module m;\n"
-      "  rtranif0 (a, b, ctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRtranif0);
-  ASSERT_NE(g, nullptr);
-}
-
-TEST(SwitchInstanceParsing, PassEnSwitchType_Rtranif1) {
-  auto r = Parse(
-      "module m;\n"
-      "  rtranif1 (a, b, ctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRtranif1);
-  ASSERT_NE(g, nullptr);
-}
-
 TEST(SwitchInstanceParsing, PullGate_Pulldown) {
   auto r = Parse(
       "module m;\n"
@@ -361,28 +281,6 @@ TEST(PrimitiveGateTypeParsing, EnableGatetype_Notif1) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(PrimitiveGateTypeParsing, MosSwitchtype_Rnmos) {
-  auto r = Parse(
-      "module m;\n"
-      "  rnmos (out, in, ctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRnmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
-TEST(PrimitiveGateTypeParsing, MosSwitchtype_Rpmos) {
-  auto r = Parse(
-      "module m;\n"
-      "  rpmos (out, in, ctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRpmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
 TEST(PrimitiveGateTypeParsing, PassEnSwitchtype_Tranif0) {
   auto r = Parse(
       "module m;\n"
@@ -436,6 +334,87 @@ TEST(PrimitiveGateTypeParsing, PassSwitchtype_Rtran) {
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRtran);
   ASSERT_NE(g, nullptr);
   EXPECT_EQ(g->gate_terminals.size(), 2u);
+}
+
+// n_input_gatetype: the `and` alternative classifies to the AND gate kind.
+TEST(PrimitiveGateTypeParsing, NInputGatetype_And) {
+  auto r = Parse(
+      "module m;\n"
+      "  and (out, a, b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
+// enable_gatetype: the `bufif0` alternative classifies to the BUFIF0 gate kind.
+TEST(PrimitiveGateTypeParsing, EnableGatetype_Bufif0) {
+  auto r = Parse(
+      "module m;\n"
+      "  bufif0 (out, in, en);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBufif0);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
+// n_output_gatetype: the `buf` alternative classifies to the BUF gate kind.
+TEST(PrimitiveGateTypeParsing, NOutputGatetype_Buf) {
+  auto r = Parse(
+      "module m;\n"
+      "  buf (out, in);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBuf);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 2u);
+}
+
+// n_output_gatetype: the `not` alternative classifies to the NOT gate kind.
+TEST(PrimitiveGateTypeParsing, NOutputGatetype_Not) {
+  auto r = Parse(
+      "module m;\n"
+      "  not (out, in);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNot);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 2u);
+}
+
+// pass_switchtype: the `tran` alternative classifies to the TRAN gate kind.
+TEST(PrimitiveGateTypeParsing, PassSwitchtype_Tran) {
+  auto r = Parse(
+      "module m;\n"
+      "  tran (a, b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTran);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 2u);
+}
+
+// Edge case: the gate/switch type keywords are matched exactly. An uppercase
+// spelling is not one of the productions' alternatives, so it is not classified
+// as a primitive gate instance (it is taken as an ordinary instantiation type
+// identifier instead). Contrast the lowercase keyword, which does classify.
+TEST(PrimitiveGateTypeParsing, GateTypeKeywordIsExactMatch) {
+  auto lower = Parse(
+      "module m;\n"
+      "  and (out, a, b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(lower.has_errors);
+  EXPECT_NE(FindGateByKind(lower.cu->modules[0]->items, GateKind::kAnd),
+            nullptr);
+
+  auto upper = Parse(
+      "module m;\n"
+      "  AND g1(out, a, b);\n"
+      "endmodule\n");
+  EXPECT_EQ(FindGateByKind(upper.cu->modules[0]->items, GateKind::kAnd),
+            nullptr);
 }
 
 }
