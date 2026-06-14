@@ -40,6 +40,7 @@ add_library(deltahdl_lib STATIC
     elaborator/property_rewrite.cpp
     elaborator/rewrite_algorithm.cpp
     elaborator/checker_rewrite.cpp
+    elaborator/checker_rewrite_algorithm.cpp
     elaborator/checker_instantiation.cpp
     elaborator/checker_context_inference.cpp
     elaborator/covergroup_in_checker.cpp
