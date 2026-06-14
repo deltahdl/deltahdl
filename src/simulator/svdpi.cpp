@@ -332,6 +332,78 @@ void svGetLogicElem(svLogicVecVal* d, svOpenArrayHandle s, const int* idx,
   for (int w = 0; w < words; ++w) d[w] = src[w];
 }
 
+// Annex H.12.6 scalar element access support. When an open array's element is a
+// simple scalar (a single bit or logic), that element occupies one canonical
+// word whose bit 0 carries the value; the surrounding bits are not part of the
+// scalar. These helpers reuse the same element resolver as the wider copy
+// functions to locate that word from the per-call unpacked indices, then read or
+// write only bit 0. An unusable handle, a mismatched index count, or an index
+// outside its original range resolves no element, so a read returns sv_0/0 and a
+// write is a no-op, matching the guard the H.12.5 helpers apply.
+svBit svGetBitScalarElem(svOpenArrayHandle s, const int* idx, int n) {
+  int words;
+  void* base = svElemBase(s, idx, n, sizeof(svBitVecVal), &words);
+  (void)words;
+  if (base == nullptr) return 0;
+  return static_cast<const svBitVecVal*>(base)[0] & 1u;
+}
+
+void svPutBitScalarElem(svOpenArrayHandle d, svBit value, const int* idx,
+                        int n) {
+  int words;
+  void* base = svElemBase(d, idx, n, sizeof(svBitVecVal), &words);
+  (void)words;
+  if (base == nullptr) return;
+  svBitVecVal* dst = static_cast<svBitVecVal*>(base);
+  if (value & 1u) {
+    dst[0] |= 1u;
+  } else {
+    dst[0] &= ~1u;
+  }
+}
+
+svLogic svGetLogicScalarElem(svOpenArrayHandle s, const int* idx, int n) {
+  int words;
+  void* base = svElemBase(s, idx, n, sizeof(svLogicVecVal), &words);
+  (void)words;
+  if (base == nullptr) return 0;
+  const svLogicVecVal* src = static_cast<const svLogicVecVal*>(base);
+  uint32_t a_bit = src[0].aval & 1u;
+  uint32_t b_bit = src[0].bval & 1u;
+  // Decode bit 0 of the canonical aval/bval pair to a four-state scalar, the
+  // same encoding svGetBitselLogic uses: bval clear selects 0/1, bval set
+  // selects z/x.
+  if (b_bit == 0) return a_bit ? sv_1 : sv_0;
+  return a_bit ? sv_x : sv_z;
+}
+
+void svPutLogicScalarElem(svOpenArrayHandle d, svLogic value, const int* idx,
+                          int n) {
+  int words;
+  void* base = svElemBase(d, idx, n, sizeof(svLogicVecVal), &words);
+  (void)words;
+  if (base == nullptr) return;
+  svLogicVecVal* dst = static_cast<svLogicVecVal*>(base);
+  switch (value) {
+    case sv_0:
+      dst[0].aval &= ~1u;
+      dst[0].bval &= ~1u;
+      break;
+    case sv_1:
+      dst[0].aval |= 1u;
+      dst[0].bval &= ~1u;
+      break;
+    case sv_z:
+      dst[0].aval &= ~1u;
+      dst[0].bval |= 1u;
+      break;
+    default:
+      dst[0].aval |= 1u;
+      dst[0].bval |= 1u;
+      break;
+  }
+}
+
 }  // namespace
 
 // §H.12.4: the addresses of individual elements are always supported, regardless
@@ -430,81 +502,110 @@ void svGetLogicArrElem3VecVal(svLogicVecVal* d, svOpenArrayHandle s, int indx1,
   svGetLogicElem(d, s, idx, 3);
 }
 
+// Annex H.12.6: read or write a single scalar (bit or logic) element of an open
+// array, selected by one unpacked index per unpacked dimension. The specialized
+// 1-, 2-, and 3-index entry points forward to the shared scalar helpers; the
+// variadic forms gather svDimensions-1 indices (one per unpacked dimension, the
+// packed dimension 0 excepted) before forwarding, mirroring svGetArrElemPtr.
 svBit svGetBitArrElem1(svOpenArrayHandle s, int indx1) {
-  (void)s;
-  (void)indx1;
-  return 0;
+  int idx[1] = {indx1};
+  return svGetBitScalarElem(s, idx, 1);
 }
 svBit svGetBitArrElem2(svOpenArrayHandle s, int indx1, int indx2) {
-  (void)s;
-  (void)indx1;
-  (void)indx2;
-  return 0;
+  int idx[2] = {indx1, indx2};
+  return svGetBitScalarElem(s, idx, 2);
 }
 svBit svGetBitArrElem3(svOpenArrayHandle s, int indx1, int indx2, int indx3) {
-  (void)s;
-  (void)indx1;
-  (void)indx2;
-  (void)indx3;
-  return 0;
+  int idx[3] = {indx1, indx2, indx3};
+  return svGetBitScalarElem(s, idx, 3);
+}
+svBit svGetBitArrElem(svOpenArrayHandle s, int indx1, ...) {
+  int n = svDimensions(s) - 1;
+  if (n < 1) return 0;
+  std::vector<int> idx;
+  idx.reserve(n);
+  idx.push_back(indx1);
+  va_list ap;
+  va_start(ap, indx1);
+  for (int k = 1; k < n; ++k) idx.push_back(va_arg(ap, int));
+  va_end(ap);
+  return svGetBitScalarElem(s, idx.data(), n);
 }
 svLogic svGetLogicArrElem1(svOpenArrayHandle s, int indx1) {
-  (void)s;
-  (void)indx1;
-  return 0;
+  int idx[1] = {indx1};
+  return svGetLogicScalarElem(s, idx, 1);
 }
 svLogic svGetLogicArrElem2(svOpenArrayHandle s, int indx1, int indx2) {
-  (void)s;
-  (void)indx1;
-  (void)indx2;
-  return 0;
+  int idx[2] = {indx1, indx2};
+  return svGetLogicScalarElem(s, idx, 2);
 }
 svLogic svGetLogicArrElem3(svOpenArrayHandle s, int indx1, int indx2,
                            int indx3) {
-  (void)s;
-  (void)indx1;
-  (void)indx2;
-  (void)indx3;
-  return 0;
+  int idx[3] = {indx1, indx2, indx3};
+  return svGetLogicScalarElem(s, idx, 3);
+}
+svLogic svGetLogicArrElem(svOpenArrayHandle s, int indx1, ...) {
+  int n = svDimensions(s) - 1;
+  if (n < 1) return 0;
+  std::vector<int> idx;
+  idx.reserve(n);
+  idx.push_back(indx1);
+  va_list ap;
+  va_start(ap, indx1);
+  for (int k = 1; k < n; ++k) idx.push_back(va_arg(ap, int));
+  va_end(ap);
+  return svGetLogicScalarElem(s, idx.data(), n);
 }
 void svPutLogicArrElem1(svOpenArrayHandle d, svLogic value, int indx1) {
-  (void)d;
-  (void)value;
-  (void)indx1;
+  int idx[1] = {indx1};
+  svPutLogicScalarElem(d, value, idx, 1);
 }
 void svPutLogicArrElem2(svOpenArrayHandle d, svLogic value, int indx1,
                         int indx2) {
-  (void)d;
-  (void)value;
-  (void)indx1;
-  (void)indx2;
+  int idx[2] = {indx1, indx2};
+  svPutLogicScalarElem(d, value, idx, 2);
 }
 void svPutLogicArrElem3(svOpenArrayHandle d, svLogic value, int indx1,
                         int indx2, int indx3) {
-  (void)d;
-  (void)value;
-  (void)indx1;
-  (void)indx2;
-  (void)indx3;
+  int idx[3] = {indx1, indx2, indx3};
+  svPutLogicScalarElem(d, value, idx, 3);
+}
+void svPutLogicArrElem(svOpenArrayHandle d, svLogic value, int indx1, ...) {
+  int n = svDimensions(d) - 1;
+  if (n < 1) return;
+  std::vector<int> idx;
+  idx.reserve(n);
+  idx.push_back(indx1);
+  va_list ap;
+  va_start(ap, indx1);
+  for (int k = 1; k < n; ++k) idx.push_back(va_arg(ap, int));
+  va_end(ap);
+  svPutLogicScalarElem(d, value, idx.data(), n);
 }
 void svPutBitArrElem1(svOpenArrayHandle d, svBit value, int indx1) {
-  (void)d;
-  (void)value;
-  (void)indx1;
+  int idx[1] = {indx1};
+  svPutBitScalarElem(d, value, idx, 1);
 }
 void svPutBitArrElem2(svOpenArrayHandle d, svBit value, int indx1, int indx2) {
-  (void)d;
-  (void)value;
-  (void)indx1;
-  (void)indx2;
+  int idx[2] = {indx1, indx2};
+  svPutBitScalarElem(d, value, idx, 2);
 }
 void svPutBitArrElem3(svOpenArrayHandle d, svBit value, int indx1, int indx2,
                       int indx3) {
-  (void)d;
-  (void)value;
-  (void)indx1;
-  (void)indx2;
-  (void)indx3;
+  int idx[3] = {indx1, indx2, indx3};
+  svPutBitScalarElem(d, value, idx, 3);
+}
+void svPutBitArrElem(svOpenArrayHandle d, svBit value, int indx1, ...) {
+  int n = svDimensions(d) - 1;
+  if (n < 1) return;
+  std::vector<int> idx;
+  idx.reserve(n);
+  idx.push_back(indx1);
+  va_list ap;
+  va_start(ap, indx1);
+  for (int k = 1; k < n; ++k) idx.push_back(va_arg(ap, int));
+  va_end(ap);
+  svPutBitScalarElem(d, value, idx.data(), n);
 }
 
 svScope svGetScope(void) { return g_current_scope; }

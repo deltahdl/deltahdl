@@ -163,22 +163,27 @@ XXTERN void svGetLogicArrElem2VecVal(svLogicVecVal* d, svOpenArrayHandle s,
 XXTERN void svGetLogicArrElem3VecVal(svLogicVecVal* d, svOpenArrayHandle s,
                                      int indx1, int indx2, int indx3);
 
+XXTERN svBit svGetBitArrElem(svOpenArrayHandle s, int indx1, ...);
 XXTERN svBit svGetBitArrElem1(svOpenArrayHandle s, int indx1);
 XXTERN svBit svGetBitArrElem2(svOpenArrayHandle s, int indx1, int indx2);
 XXTERN svBit svGetBitArrElem3(svOpenArrayHandle s, int indx1, int indx2,
                               int indx3);
 
+XXTERN svLogic svGetLogicArrElem(svOpenArrayHandle s, int indx1, ...);
 XXTERN svLogic svGetLogicArrElem1(svOpenArrayHandle s, int indx1);
 XXTERN svLogic svGetLogicArrElem2(svOpenArrayHandle s, int indx1, int indx2);
 XXTERN svLogic svGetLogicArrElem3(svOpenArrayHandle s, int indx1, int indx2,
                                   int indx3);
 
+XXTERN void svPutLogicArrElem(svOpenArrayHandle d, svLogic value, int indx1,
+                              ...);
 XXTERN void svPutLogicArrElem1(svOpenArrayHandle d, svLogic value, int indx1);
 XXTERN void svPutLogicArrElem2(svOpenArrayHandle d, svLogic value, int indx1,
                                int indx2);
 XXTERN void svPutLogicArrElem3(svOpenArrayHandle d, svLogic value, int indx1,
                                int indx2, int indx3);
 
+XXTERN void svPutBitArrElem(svOpenArrayHandle d, svBit value, int indx1, ...);
 XXTERN void svPutBitArrElem1(svOpenArrayHandle d, svBit value, int indx1);
 XXTERN void svPutBitArrElem2(svOpenArrayHandle d, svBit value, int indx1,
                              int indx2);
