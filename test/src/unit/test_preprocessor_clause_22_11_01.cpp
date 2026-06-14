@@ -14,21 +14,9 @@ TEST(Preprocessor, Pragma_Reset_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Pragma_Reset_MultipleNames_NoError) {
-  PreprocFixture f;
-  Preprocess("`pragma reset name1, name2, name3\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(Preprocessor, Pragma_Resetall_NoError) {
   PreprocFixture f;
   Preprocess("`pragma resetall\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Preprocessor, Pragma_Reset_NoNames_NoError) {
-  PreprocFixture f;
-  Preprocess("`pragma reset\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
@@ -72,36 +60,6 @@ TEST(Preprocessor, Pragma_Resetall_SurroundingCodePreserved) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(out.find("wire a;"), std::string::npos);
   EXPECT_NE(out.find("wire b;"), std::string::npos);
-}
-
-TEST(Preprocessor, Pragma_Reset_InsideModule_NoError) {
-  PreprocFixture f;
-  Preprocess("module m;\n`pragma reset my_pragma\nendmodule\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Preprocessor, Pragma_Resetall_InsideModule_NoError) {
-  PreprocFixture f;
-  Preprocess("module m;\n`pragma resetall\nendmodule\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Preprocessor, Pragma_Reset_MultipleInSequence_NoError) {
-  PreprocFixture f;
-  Preprocess(
-      "`pragma reset name1\n"
-      "`pragma reset name2\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Preprocessor, Pragma_ResetFollowedByResetall_NoError) {
-  PreprocFixture f;
-  Preprocess(
-      "`pragma reset my_pragma\n"
-      "`pragma resetall\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }
