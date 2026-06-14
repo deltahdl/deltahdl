@@ -209,88 +209,161 @@ void* svGetArrElemPtr3(svOpenArrayHandle h, int indx1, int indx2, int indx3) {
   return nullptr;
 }
 
+// Annex H.12.5 element copy support. These functions copy a whole packed array
+// (a single canonical vector) between user space and one element of an open
+// array, in either direction. The actual argument's original SystemVerilog
+// ranges index the open array, and the canonical representation of each element
+// is the one defined in H.10.1.2. The helpers below turn the per-call unpacked
+// indices into a location inside the descriptor's backing store and report how
+// many canonical words an element spans.
+namespace {
+
+// Number of canonical 32-bit words occupied by one packed element. Dimension 0
+// of the descriptor describes the array's single packed part (H.12.2); its bit
+// width fixes the per-element word count for both bit and logic arrays.
+int svPackedElemWords(const svOpenArrayDesc* desc) {
+  const svOpenArrayDimRange& p = desc->ranges[0];
+  int width = (p.left > p.right ? p.left - p.right : p.right - p.left) + 1;
+  return (width + 31) / 32;
+}
+
+int svUnpackedExtent(const svOpenArrayDimRange& r) {
+  int low = r.left < r.right ? r.left : r.right;
+  int high = r.left > r.right ? r.left : r.right;
+  return high - low + 1;
+}
+
+// Map one unpacked index, expressed in the actual argument's original
+// SystemVerilog coordinates, to its zero-based position along that dimension.
+// The element at the left bound occupies position 0 and positions advance
+// toward the right bound, independent of range direction. Returns false when the
+// index falls outside the dimension's original range.
+bool svUnpackedPos(const svOpenArrayDimRange& r, int idx, int* pos) {
+  int low = r.left < r.right ? r.left : r.right;
+  int high = r.left > r.right ? r.left : r.right;
+  if (idx < low || idx > high) return false;
+  *pos = r.right >= r.left ? idx - r.left : r.left - idx;
+  return true;
+}
+
+// Resolve up to three unpacked indices to the address of the addressed element's
+// first canonical word, row-major over the unpacked dimensions
+// (ranges[1..n_dims-1]), and report the element's word count via *words. Returns
+// nullptr when the handle is unusable, the index count does not match the
+// unpacked dimensionality, or any index is out of its original range, so callers
+// leave both operands untouched in those cases.
+void* svElemBase(svOpenArrayHandle h, const int* idx, int n_idx,
+                 size_t word_size, int* words) {
+  if (h == nullptr) return nullptr;
+  const svOpenArrayDesc* desc = static_cast<const svOpenArrayDesc*>(h);
+  if (desc->data == nullptr || desc->ranges == nullptr) return nullptr;
+  if (n_idx != desc->n_dims - 1) return nullptr;
+  long linear = 0;
+  for (int k = 0; k < n_idx; ++k) {
+    const svOpenArrayDimRange& r = desc->ranges[k + 1];
+    int pos;
+    if (!svUnpackedPos(r, idx[k], &pos)) return nullptr;
+    linear = linear * svUnpackedExtent(r) + pos;
+  }
+  *words = svPackedElemWords(desc);
+  return static_cast<char*>(desc->data) + (linear * *words) * word_size;
+}
+
+void svPutBitElem(svOpenArrayHandle d, const svBitVecVal* s, const int* idx,
+                  int n) {
+  int words;
+  void* base = svElemBase(d, idx, n, sizeof(svBitVecVal), &words);
+  if (base == nullptr) return;
+  svBitVecVal* dst = static_cast<svBitVecVal*>(base);
+  for (int w = 0; w < words; ++w) dst[w] = s[w];
+}
+
+void svGetBitElem(svBitVecVal* d, svOpenArrayHandle s, const int* idx, int n) {
+  int words;
+  void* base = svElemBase(s, idx, n, sizeof(svBitVecVal), &words);
+  if (base == nullptr) return;
+  const svBitVecVal* src = static_cast<const svBitVecVal*>(base);
+  for (int w = 0; w < words; ++w) d[w] = src[w];
+}
+
+void svPutLogicElem(svOpenArrayHandle d, const svLogicVecVal* s, const int* idx,
+                    int n) {
+  int words;
+  void* base = svElemBase(d, idx, n, sizeof(svLogicVecVal), &words);
+  if (base == nullptr) return;
+  svLogicVecVal* dst = static_cast<svLogicVecVal*>(base);
+  for (int w = 0; w < words; ++w) dst[w] = s[w];
+}
+
+void svGetLogicElem(svLogicVecVal* d, svOpenArrayHandle s, const int* idx,
+                    int n) {
+  int words;
+  void* base = svElemBase(s, idx, n, sizeof(svLogicVecVal), &words);
+  if (base == nullptr) return;
+  const svLogicVecVal* src = static_cast<const svLogicVecVal*>(base);
+  for (int w = 0; w < words; ++w) d[w] = src[w];
+}
+
+}  // namespace
+
 void svPutBitArrElem1VecVal(svOpenArrayHandle d, const svBitVecVal* s,
                             int indx1) {
-  (void)d;
-  (void)s;
-  (void)indx1;
+  int idx[1] = {indx1};
+  svPutBitElem(d, s, idx, 1);
 }
 void svPutBitArrElem2VecVal(svOpenArrayHandle d, const svBitVecVal* s,
                             int indx1, int indx2) {
-  (void)d;
-  (void)s;
-  (void)indx1;
-  (void)indx2;
+  int idx[2] = {indx1, indx2};
+  svPutBitElem(d, s, idx, 2);
 }
 void svPutBitArrElem3VecVal(svOpenArrayHandle d, const svBitVecVal* s,
                             int indx1, int indx2, int indx3) {
-  (void)d;
-  (void)s;
-  (void)indx1;
-  (void)indx2;
-  (void)indx3;
+  int idx[3] = {indx1, indx2, indx3};
+  svPutBitElem(d, s, idx, 3);
 }
 void svPutLogicArrElem1VecVal(svOpenArrayHandle d, const svLogicVecVal* s,
                               int indx1) {
-  (void)d;
-  (void)s;
-  (void)indx1;
+  int idx[1] = {indx1};
+  svPutLogicElem(d, s, idx, 1);
 }
 void svPutLogicArrElem2VecVal(svOpenArrayHandle d, const svLogicVecVal* s,
                               int indx1, int indx2) {
-  (void)d;
-  (void)s;
-  (void)indx1;
-  (void)indx2;
+  int idx[2] = {indx1, indx2};
+  svPutLogicElem(d, s, idx, 2);
 }
 void svPutLogicArrElem3VecVal(svOpenArrayHandle d, const svLogicVecVal* s,
                               int indx1, int indx2, int indx3) {
-  (void)d;
-  (void)s;
-  (void)indx1;
-  (void)indx2;
-  (void)indx3;
+  int idx[3] = {indx1, indx2, indx3};
+  svPutLogicElem(d, s, idx, 3);
 }
 void svGetBitArrElem1VecVal(svBitVecVal* d, svOpenArrayHandle s, int indx1) {
-  (void)d;
-  (void)s;
-  (void)indx1;
+  int idx[1] = {indx1};
+  svGetBitElem(d, s, idx, 1);
 }
 void svGetBitArrElem2VecVal(svBitVecVal* d, svOpenArrayHandle s, int indx1,
                             int indx2) {
-  (void)d;
-  (void)s;
-  (void)indx1;
-  (void)indx2;
+  int idx[2] = {indx1, indx2};
+  svGetBitElem(d, s, idx, 2);
 }
 void svGetBitArrElem3VecVal(svBitVecVal* d, svOpenArrayHandle s, int indx1,
                             int indx2, int indx3) {
-  (void)d;
-  (void)s;
-  (void)indx1;
-  (void)indx2;
-  (void)indx3;
+  int idx[3] = {indx1, indx2, indx3};
+  svGetBitElem(d, s, idx, 3);
 }
 void svGetLogicArrElem1VecVal(svLogicVecVal* d, svOpenArrayHandle s,
                               int indx1) {
-  (void)d;
-  (void)s;
-  (void)indx1;
+  int idx[1] = {indx1};
+  svGetLogicElem(d, s, idx, 1);
 }
 void svGetLogicArrElem2VecVal(svLogicVecVal* d, svOpenArrayHandle s, int indx1,
                               int indx2) {
-  (void)d;
-  (void)s;
-  (void)indx1;
-  (void)indx2;
+  int idx[2] = {indx1, indx2};
+  svGetLogicElem(d, s, idx, 2);
 }
 void svGetLogicArrElem3VecVal(svLogicVecVal* d, svOpenArrayHandle s, int indx1,
                               int indx2, int indx3) {
-  (void)d;
-  (void)s;
-  (void)indx1;
-  (void)indx2;
-  (void)indx3;
+  int idx[3] = {indx1, indx2, indx3};
+  svGetLogicElem(d, s, idx, 3);
 }
 
 svBit svGetBitArrElem1(svOpenArrayHandle s, int indx1) {
