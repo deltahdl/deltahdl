@@ -38,6 +38,7 @@ add_library(deltahdl_lib STATIC
     elaborator/inline_constraint_scope_resolution.cpp
     elaborator/interface_syntax.cpp
     elaborator/property_rewrite.cpp
+    elaborator/rewrite_algorithm.cpp
     elaborator/checker_rewrite.cpp
     elaborator/checker_instantiation.cpp
     elaborator/checker_context_inference.cpp
