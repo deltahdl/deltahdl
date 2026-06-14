@@ -4,13 +4,6 @@
 
 namespace {
 
-TEST(SvDpi, HandleTypes) {
-  svScope scope = nullptr;
-  svOpenArrayHandle arr = nullptr;
-  EXPECT_EQ(scope, nullptr);
-  EXPECT_EQ(arr, nullptr);
-}
-
 // H.10.1.3 declares svScope (a scope instance) and svOpenArrayHandle (a generic
 // object) as opaque handles. Beyond holding null, each must be able to carry an
 // arbitrary object address and yield it back unchanged, since callers round-trip
