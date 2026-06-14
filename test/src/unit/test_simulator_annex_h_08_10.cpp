@@ -11,26 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §H.8.10: a SystemVerilog string passed to imported foreign code is accessed
-// by that code through a pointer the simulator provides (the input direction
-// mode). The DPI runtime carries the string as a DpiArgValue and the foreign
-// function reads it back, observing the value crossing the boundary intact.
-TEST(DpiStringArguments, ImportWithStringArg) {
-  DpiRuntime rt;
-  DpiRtFunction func;
-  func.c_name = "c_strlen";
-  func.sv_name = "sv_strlen";
-  func.return_type = DataTypeKind::kInt;
-  func.impl = [](const std::vector<DpiArgValue>& args) -> DpiArgValue {
-    return DpiArgValue::FromInt(
-        static_cast<int32_t>(args[0].AsString().size()));
-  };
-  rt.RegisterImport(func);
-
-  auto result = rt.CallImport("sv_strlen", {DpiArgValue::FromString("hello")});
-  EXPECT_EQ(result.AsInt(), 5);
-}
-
 // §H.8.10 (item 1): when a string value is passed from SystemVerilog to C, the
 // simulator lays the characters out per C-string conventions, including a
 // trailing null terminator. The foreign function inspects the value as a C
@@ -128,6 +108,31 @@ TEST(DpiStringArguments, ImportOutputStringWrittenBackToActual) {
   EXPECT_EQ(actuals[0].AsString(), "produced");
 }
 
+// §H.8.10 (item 4, imported output, edge case): an output mode string carries no
+// meaningful value on arrival, so the caller's actual is not handed in. When the
+// foreign code writes nothing, the actual is left holding the undetermined
+// (empty) seed rather than its prior value — the original contents are discarded
+// regardless of any foreign write.
+TEST(DpiStringArguments, ImportOutputStringDiscardsActualWhenForeignWritesNothing) {
+  DpiRuntime rt;
+  DpiRtFunction func;
+  func.c_name = "c_noop_out";
+  func.sv_name = "sv_noop_out";
+  func.return_type = DataTypeKind::kVoid;
+  func.args = {DpiArg{"s", DataTypeKind::kString, Direction::kOutput}};
+  func.arg_impl = [](std::vector<DpiArgValue>& args) -> DpiArgValue {
+    // The output arrives empty, not carrying the caller's prior value, and the
+    // foreign code deliberately leaves it untouched.
+    EXPECT_TRUE(args[0].AsString().empty());
+    return DpiArgValue::FromInt(0);
+  };
+  rt.RegisterImport(func);
+
+  std::vector<DpiArgValue> actuals = {DpiArgValue::FromString("stale")};
+  rt.CallImportWithArgs("sv_noop_out", actuals);
+  EXPECT_TRUE(actuals[0].AsString().empty());
+}
+
 // §H.8.10 (item 4, imported inout): an inout mode string arrives with a valid
 // value the foreign code may read; when the foreign code supplies new contents,
 // SystemVerilog copies them into its own space. The runtime copies the actual
@@ -150,6 +155,34 @@ TEST(DpiStringArguments, ImportInoutStringContentsCopiedBack) {
   std::vector<DpiArgValue> actuals = {DpiArgValue::FromString("before")};
   rt.CallImportWithArgs("sv_revise", actuals);
   EXPECT_EQ(actuals[0].AsString(), "after");
+}
+
+// §H.8.10 (item 1 + item 4, imported inout, edge case): an inout mode string is
+// also handed to C in the SystemVerilog-to-C direction, so it arrives as a
+// null-terminated C string. When the foreign code reads it but supplies no new
+// value, the copy-back leaves the actual carrying its original contents intact.
+TEST(DpiStringArguments, ImportInoutStringRoundTripsUnchangedWhenForeignLeavesItAlone) {
+  DpiRuntime rt;
+  DpiRtFunction func;
+  func.c_name = "c_peek_inout";
+  func.sv_name = "sv_peek_inout";
+  func.return_type = DataTypeKind::kVoid;
+  func.args = {DpiArg{"s", DataTypeKind::kString, Direction::kInout}};
+  func.arg_impl = [](std::vector<DpiArgValue>& args) -> DpiArgValue {
+    const std::string& sv = args[0].AsString();
+    const char* c = sv.c_str();
+    // The inbound inout value reads back as a null-terminated C string.
+    EXPECT_EQ(std::strlen(c), sv.size());
+    EXPECT_EQ(c[sv.size()], '\0');
+    EXPECT_EQ(std::memcmp(c, "keep-me", 7), 0);
+    // No new value is supplied; the actual must survive the call unchanged.
+    return DpiArgValue::FromInt(0);
+  };
+  rt.RegisterImport(func);
+
+  std::vector<DpiArgValue> actuals = {DpiArgValue::FromString("keep-me")};
+  rt.CallImportWithArgs("sv_peek_inout", actuals);
+  EXPECT_EQ(actuals[0].AsString(), "keep-me");
 }
 
 }
