@@ -3931,6 +3931,14 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return VpiInstanceArrayConnections(ref);
   }
 
+  // §37.3.4: vpiDelay of a net, primitive, module path, timing check, or
+  // continuous assignment reaches the source-specified delay expression - a
+  // designated expression, not a child whose own type is vpiDelay, so the shared
+  // traversal below cannot find it.
+  if (type == vpiDelay && VpiObjectCarriesSourceDelay(ref->type)) {
+    return VpiSourceDelayExpr(ref);
+  }
+
   // §37.13 detail 2: vpiExpr of an io decl reaches its designated connection -
   // a ref obj, virtual interface var, net, variable, or interface tf decl -
   // whose own type is not vpiExpr, so the shared traversal below cannot find it.
@@ -5162,6 +5170,50 @@ static void GetValueStringVal(VpiHandle obj, VpiValue* value,
   }
   pool.push_back(std::move(s));
   value->value.str = pool.back().c_str();
+}
+
+// ===========================================================================
+// §37.3.4 Delays and values.
+// ===========================================================================
+
+bool VpiObjectCarriesSourceDelay(int type) {
+  // §37.3.4: the object kinds that can carry a delay written within the
+  // SystemVerilog source - nets, primitives, module paths, timing checks, and
+  // continuous assignments. "Primitive" covers the gate, switch, and udp forms
+  // as well as the primitive supertype. Other delays (module input port delays,
+  // inter-module path delays) do not appear in the source and so are excluded.
+  switch (type) {
+    case vpiNet:
+    case vpiPrimitive:
+    case vpiGate:
+    case vpiSwitch:
+    case vpiUdp:
+    case vpiModPath:
+    case vpiTchk:
+    case vpiContAssign:
+      return true;
+    default:
+      return false;
+  }
+}
+
+VpiHandle VpiSourceDelayExpr(VpiHandle obj) {
+  // §37.3.4: the vpiDelay relation reaches the source-specified delay
+  // expression of a delay-carrying object. It is a designated expression, not a
+  // child found by type (a single delay is a plain constant-valued expression),
+  // so it is held on the object directly. Null when the handle is null, is not a
+  // delay-carrying kind, or carries no source delay.
+  if (!obj) return nullptr;
+  if (!VpiObjectCarriesSourceDelay(obj->type)) return nullptr;
+  return obj->delay_expr;
+}
+
+bool VpiSourceDelayExprIsListOp(VpiHandle expr) {
+  // §37.3.4: when more than one delay is specified the vpiDelay expression shall
+  // be an operation whose vpiOpType is vpiListOp; a single delay is a plain
+  // constant-valued expression instead. This holds iff the expression is that
+  // operation form.
+  return expr && expr->type == vpiOperation && expr->op_type == vpiListOp;
 }
 
 bool VpiExpressionHasSideEffects(const VpiObject* obj) {

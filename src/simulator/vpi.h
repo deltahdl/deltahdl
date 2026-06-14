@@ -374,6 +374,16 @@ struct VpiObject {
   // object that bears no delays.
   std::vector<VpiDelayInfo> delays;
 
+  // §37.3.4: the source-specified delay expression this object exposes through
+  // the vpiDelay relation. A net, primitive, module path, timing check, or
+  // continuous assignment can carry a delay written in the SystemVerilog source;
+  // vpiDelay reaches the expression standing for it - a single constant-valued
+  // expression when one delay is written, or a vpiListOp operation listing them
+  // when more than one is written. NULL when the object carries no source delay.
+  // Distinct from `delays` above, which holds the actual delay values the tool
+  // uses (reported by vpi_get_delays(), §38.10), not the source expression.
+  VpiObject* delay_expr = nullptr;
+
   // §37.14 / §37.15: a port (or a ref obj) carries two designated connections.
   // vpiHighConn reaches the hierarchically higher connection (closer to the top
   // module); vpiLowConn reaches the lower one. A null pointer is the natural
@@ -1346,6 +1356,25 @@ bool VpiIsExprType(int type);
 // question share this single predicate, so the notion of "expression with side
 // effects" is decided in one place.
 bool VpiExpressionHasSideEffects(const VpiObject* obj);
+
+// §37.3.4 (Delays and values): the object kinds whose delays are written within
+// the SystemVerilog source and are therefore reachable as an expression through
+// the vpiDelay relation - a net, a primitive, a module path, a timing check, or
+// a continuous assignment. Other objects carry no source-written delay.
+bool VpiObjectCarriesSourceDelay(int type);
+
+// §37.3.4 (Delays and values): traversing vpiDelay from such an object reaches
+// the expression that gives its source-specified delay. Modeled as the object's
+// designated delay-expression pointer. NULL when the handle is null, is not a
+// delay-carrying object kind, or carries no source delay.
+VpiHandle VpiSourceDelayExpr(VpiHandle obj);
+
+// §37.3.4 (Delays and values): the vpiDelay expression shall be either an
+// expression that evaluates to a constant, when one delay is specified, or an
+// operation, when more than one delay is specified; in the multiple-delay case
+// the operation's vpiOpType shall be vpiListOp. Returns true iff the given
+// expression is that multiple-delay vpiListOp operation form.
+bool VpiSourceDelayExprIsListOp(VpiHandle expr);
 
 // §37.60: the statement kinds the atomic stmt class groups in the object model
 // diagram - the procedural control statements (if, if-else, while, repeat, the
