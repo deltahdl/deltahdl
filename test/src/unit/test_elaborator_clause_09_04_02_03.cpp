@@ -4,18 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ConditionalEventIffElaboration, PosedgeIffElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic clk, en, q, d;\n"
-      "  always @(posedge clk iff en) q <= d;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(ConditionalEventIffElaboration, NegedgeIffElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

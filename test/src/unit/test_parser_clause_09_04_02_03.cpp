@@ -78,22 +78,6 @@ TEST(ConditionalEventIffParsing, IffGuardBeginEnd) {
   EXPECT_GE(item->body->stmts.size(), 2u);
 }
 
-TEST(ConditionalEventIffParsing, IffConditionFieldPosedge) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk iff reset == 0) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->sensitivity.size(), 1u);
-  const auto& ev = item->sensitivity[0];
-
-  ASSERT_NE(ev.iff_condition, nullptr);
-  EXPECT_EQ(ev.iff_condition->kind, ExprKind::kBinary);
-}
-
 TEST(ConditionalEventIffParsing, SignalFieldPopulated) {
   auto r = Parse(
       "module m;\n"
@@ -292,6 +276,9 @@ TEST(ConditionalEventIffParsing, IffGuardPosedgeBasic) {
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
   EXPECT_NE(item->sensitivity[0].signal, nullptr);
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+  // Folds in the former IffConditionFieldPosedge: the iff guard expression
+  // parses to a binary comparison node.
+  EXPECT_EQ(item->sensitivity[0].iff_condition->kind, ExprKind::kBinary);
 }
 
 TEST(ConditionalEventIffParsing, IffGuardNegedge) {
@@ -427,15 +414,6 @@ TEST(ConditionalEventIffParsing, IffGuardStmtLevel) {
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
 }
 
-TEST(ConditionalEventIffParsing, PosedgeIffSimpleParseOk) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk iff en) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ConditionalEventIffParsing, NoEdgeIffConditionPresent) {
   auto r = Parse(
       "module m;\n"
@@ -481,6 +459,37 @@ TEST(ConditionalEventIffParsing, TwoEventsOrBothWithIff) {
   ASSERT_EQ(stmt->events.size(), 2u);
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
   EXPECT_NE(stmt->events[1].iff_condition, nullptr);
+}
+
+// Error condition: an iff qualifier must be followed by a guard expression.
+// The parser consumes the iff keyword and then requires an expression, so a
+// missing one is reported as a parse error rather than silently accepted.
+TEST(ConditionalEventIffParsing, IffWithoutConditionIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff) q <= d;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// Edge case for iff-over-or precedence: wrapping a single guarded event in
+// parentheses (the spec's suggested way to make the binding explicit) yields
+// the same structure as the unparenthesized form -- two events with the iff
+// attached only to the first.
+TEST(ConditionalEventIffParsing, IffPrecedenceParenthesizedGroup) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @((posedge clk iff en) or negedge rst) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 2u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+  EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
+  EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
 }
 
 }

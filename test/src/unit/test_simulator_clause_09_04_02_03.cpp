@@ -910,6 +910,37 @@ TEST(ConditionalEventIffSim, EdgeKeywordIffFalseSuppresses) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
+// Edge case for the truth rule: a guard that evaluates to an unknown value is
+// not true (per the if-condition semantics the iff qualifier references), so
+// the edge does not trigger the process. Here enable is never assigned and so
+// holds x at the clock edge, and the body must not run.
+TEST(ConditionalEventIffSim, IffConditionUnknownSuppresses) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic enable;\n"
+      "  logic [31:0] count;\n"
+      "  initial begin\n"
+      "    clk = 0; count = 0;\n"
+      "    #1 clk = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  always @(posedge clk iff enable)\n"
+      "    count = count + 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("count");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
 TEST(ConditionalEventIffSim, LrmLatchExample) {
   SimFixture f;
   auto* design = ElaborateSrc(

@@ -60,4 +60,13 @@ TEST(ConditionalEventIffLexing, IffWithEdgeKeyword) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kKwIff);
 }
 
+// Edge case: the iff keyword is only recognized as a whole identifier. A
+// longer identifier that merely starts with "iff" lexes as an ordinary
+// identifier, so it cannot be mistaken for an event-control guard keyword.
+TEST(ConditionalEventIffLexing, IffPrefixIsIdentifier) {
+  auto tokens = Lex("iffy");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+}
+
 }
