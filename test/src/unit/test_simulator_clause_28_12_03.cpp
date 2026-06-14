@@ -180,27 +180,6 @@ TEST(StrengthCombineAmbigUnambig, HighZUnambigPreservesEntireAmbig) {
   EXPECT_EQ(result.strength1_lo, StrengthLevel::kSmall);
 }
 
-TEST(StrengthResolution, AmbigUnderStrongerUnambigYieldsUnambigValue) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-  net.Resolve(arena);
-
-  EXPECT_EQ(var->value.ToUint64(), 0u);
-}
-
 TEST(StrengthResolution, RuleAAndBTrimAmbigLoBoundsPerSide) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -383,12 +362,49 @@ TEST(StrengthResolution, RuleAAndBAtSmallestNonHighzSu) {
   EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
 }
 
-TEST(StrengthResolution, RuleAAndBApplyOnTriNet) {
+// Rule a) at the top of the strength scale: an opposite-value supply-strength
+// conflict yields an ambiguous range whose high end is supply; a weaker strong
+// unambiguous driver leaves the supply level in place (rule a) while trimming
+// the levels at or below strong (rule b). Exercises preservation of the maximum
+// strength level through net.Resolve.
+TEST(StrengthResolution, RuleAKeepsSupplyLevelAtTopOfScale) {
   Arena arena;
   auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kTri;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kSupply, Strength::kSupply});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kSupply, Strength::kSupply});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  // Unambiguous side (value 0) extends down to the unambiguous strong level;
+  // the opposite side keeps only the supply level above strong.
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kSupply);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kSupply);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kSupply);
+  EXPECT_TRUE(net.resolved_strength.IsAmbiguous());
+  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+}
+
+// Rule b) complete elimination on the value-1 branch: a stronger unambiguous
+// driver of value 1 removes every level of a wholly weaker ambiguous signal,
+// collapsing the result to an unambiguous value 1 at the driver's strength.
+TEST(StrengthResolution, RuleBCompleteEliminationYieldsUnambigOne) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
   net.resolved = var;
 
   net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
@@ -397,16 +413,16 @@ TEST(StrengthResolution, RuleAAndBApplyOnTriNet) {
   net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
   net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kWeak, Strength::kWeak});
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
   net.Resolve(arena);
 
-  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kPull);
-  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kWeak);
-  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
-  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kLarge);
-  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
-  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kHighz);
+  EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
+  EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 }
