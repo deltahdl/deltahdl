@@ -325,4 +325,29 @@ TEST(NeutralSatisfactionLocals,
                                             LocalContext{}));
 }
 
+// §F.5.6.1 (or) right disjunct: w, L_0 |= ( P1 or P2 ) holds when only the
+// second operand holds. The other or test observes the left disjunct (which
+// short-circuits) and the both-false case; this one exercises the right half of
+// the rule, where P1 fails and P2 alone carries the verdict.
+TEST(NeutralSatisfactionLocals, OrSatisfiedByRightOperandAlone) {
+  auto disj = LvOr(LvStrong(Bool("a")), LvStrong(Bool("b")));
+  // strong(a) fails on [b], strong(b) holds, so the disjunction holds.
+  EXPECT_TRUE(
+      NeutrallySatisfiesWithLocals(Word{A({"b"})}, *disj, LocalContext{}));
+}
+
+// §F.5.6.1 (top-level disable iff) no-guard edge: when no letter satisfies the
+// guard, T's verdict is exactly the guarded property's verdict. The other
+// disable iff tests cover the no-guard case with the property holding and the
+// guard-fires cases; here no letter satisfies the guard and the property fails,
+// so T does not pass, is not disabled, and therefore fails -- the failing leg of
+// the trichotomy reached through the no-guard branch.
+TEST(NeutralSatisfactionLocals, TopLevelDisableIffFailsWhenUnguardedPropertyFails) {
+  auto top = LvTopDisableIff(BoolAtom("g"), LvStrong(Bool("a")));
+  const Word word{A({"c"})};  // no 'g' guard letter, and strong(a) fails on [c]
+  EXPECT_FALSE(PassesTopLevelWithLocals(word, *top, LocalContext{}));
+  EXPECT_FALSE(IsDisabledTopLevelWithLocals(word, *top, LocalContext{}));
+  EXPECT_TRUE(FailsTopLevelWithLocals(word, *top, LocalContext{}));
+}
+
 }  // namespace
