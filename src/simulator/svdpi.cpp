@@ -663,3 +663,42 @@ int svIsDisabledState(void) { return delta::DpiCurrentDisabledState() ? 1 : 0; }
 // returning due to a disable. It records the acknowledgement for the current
 // disable episode so the simulator's protocol check can confirm it occurred.
 void svAckDisabledState(void) { delta::DpiAckCurrentDisable(); }
+
+// §H.13: retrieve the current simulation time. The caller sets time->type to
+// request the form it wants — sv_scaled_real_time for a real scaled to the time
+// unit, otherwise sv_sim_time for the 64-bit count — and this function honors
+// that selection, writing the result into the same svTimeVal. A NULL scope means
+// the time is scaled to the simulation time unit; this simulator binds no
+// per-scope timescale to an svScope, so a non-NULL scope reports the same
+// design-wide simulation time. The value comes from the shared time source the
+// VPI time routines read, so svGetTime and vpi_get_time() always agree. Returns
+// -1 when there is nowhere to write the result, 0 otherwise.
+int svGetTime(const svScope scope, svTimeVal* time) {
+  (void)scope;
+  if (time == nullptr) return -1;
+  bool want_scaled_real = (time->type == sv_scaled_real_time);
+  delta::DpiGetSimTime(want_scaled_real, &time->high, &time->low, &time->real);
+  return 0;
+}
+
+// §H.13: retrieve the time unit for the scope. A NULL scope retrieves the
+// simulation time unit; with no per-scope timescale binding a non-NULL scope
+// reports that same unit. The value matches vpi_get(vpiTimeUnit) for the design.
+// Returns -1 when there is nowhere to write the result, 0 otherwise.
+int svGetTimeUnit(const svScope scope, int32_t* time_unit) {
+  (void)scope;
+  if (time_unit == nullptr) return -1;
+  *time_unit = delta::DpiGetSimTimeUnit();
+  return 0;
+}
+
+// §H.13: retrieve the time precision for the scope, mirroring svGetTimeUnit. A
+// NULL scope retrieves the simulation time unit; the value matches
+// vpi_get(vpiTimePrecision) for the design. Returns -1 when there is nowhere to
+// write the result, 0 otherwise.
+int svGetTimePrecision(const svScope scope, int32_t* time_precision) {
+  (void)scope;
+  if (time_precision == nullptr) return -1;
+  *time_precision = delta::DpiGetSimTimePrecision();
+  return 0;
+}

@@ -200,6 +200,16 @@ XXTERN int svGetCallerInfo(const char** file_name, int* line_number);
 XXTERN int svIsDisabledState(void);
 XXTERN void svAckDisabledState(void);
 
+/* Annex H.13: time and timescale. svGetTime retrieves the current simulation
+ * time, scaled to the time unit of the scope (the simulation time unit for a
+ * NULL scope); the caller's svTimeVal.type selects a scaled real or the raw
+ * simulation-time count. svGetTimeUnit and svGetTimePrecision retrieve the time
+ * unit and precision of the scope (the simulation time unit for a NULL scope).
+ * Each returns 0 on success and -1 on error. */
+XXTERN int svGetTime(const svScope scope, svTimeVal* time);
+XXTERN int svGetTimeUnit(const svScope scope, int32_t* time_unit);
+XXTERN int svGetTimePrecision(const svScope scope, int32_t* time_precision);
+
 #undef DPI_EXTERN
 #ifdef DPI_PROTOTYPES
 #undef DPI_PROTOTYPES
