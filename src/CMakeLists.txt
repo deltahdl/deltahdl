@@ -85,6 +85,7 @@ add_library(deltahdl_lib STATIC
     elaborator/annex_f_tight_satisfaction.cpp
     elaborator/annex_f_local_variable_flow.cpp
     elaborator/annex_f_tight_satisfaction_local_variables.cpp
+    elaborator/annex_f_neutral_satisfaction.cpp
     elaborator/elaborator_defparam.cpp
     elaborator/elaborator_gates.cpp
     elaborator/elaborator_validate.cpp
