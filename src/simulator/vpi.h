@@ -2927,6 +2927,15 @@ class VpiContext {
 
   VpiHandle RegisterSystf(VpiSystfData* data);
 
+  // §36.3.2: resolve the effective registration for a system task/function name,
+  // honouring the override rule. A user-provided PLI application associated with
+  // the same name as a built-in overrides that built-in, replacing its
+  // functionality, so the registry is consulted first: a matching registration
+  // is the override to invoke, and only when none is present (a null result)
+  // does the built-in stand. When several registrations share the name the most
+  // recent one wins, so a later user application overrides an earlier one.
+  const VpiSystfData* ResolveSystf(const char* name) const;
+
   // §38.12: report the registration of the system task or system function
   // callback denoted by `obj` into the application-allocated structure
   // `systf_data_p`. The structure's memory belongs to the caller; this routine

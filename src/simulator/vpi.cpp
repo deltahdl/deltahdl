@@ -3224,6 +3224,27 @@ VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
   return systf_obj;
 }
 
+const VpiSystfData* VpiContext::ResolveSystf(const char* name) const {
+  // §36.3.2: Clause 20 and Clause 21 built-in system tasks/functions, and any
+  // tool-specific ones, share the same '$'-prefixed namespace as user-defined
+  // names. If a user-provided PLI application is associated (through the PLI
+  // mechanism) with the same name as a built-in, that application shall override
+  // the built-in, replacing its functionality. The lookup therefore searches the
+  // registry first; a matching entry is the overriding application to run. A
+  // null result means no registration claimed the name, so the built-in stands.
+  if (name == nullptr) return nullptr;
+
+  // Walk newest-first so that when more than one registration shares the name,
+  // the most recently registered one wins - a later user application overrides
+  // an earlier registration (including a built-in registered ahead of it).
+  for (auto it = systfs_.rbegin(); it != systfs_.rend(); ++it) {
+    if (it->tfname != nullptr && std::string_view(it->tfname) == name) {
+      return &*it;
+    }
+  }
+  return nullptr;
+}
+
 void VpiContext::GetSystfInfo(VpiHandle obj, VpiSystfData* systf_data_p) {
   // §38.12 / §38.1: the handle and the destination are both mandatory. With no
   // structure to fill, or no callback to read, there is nothing to report.
