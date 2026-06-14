@@ -5,28 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(AnonymousProgramParsing, InPackage) {
-  auto r = Parse(
-      "package p;\n"
-      "  program;\n"
-      "    task run();\n"
-      "    endtask\n"
-      "  endprogram\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(AnonymousProgramParsing, InCompilationUnit) {
-  auto r = Parse(
-      "program;\n"
-      "  function void f(); endfunction\n"
-      "  class C; endclass\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(AnonymousProgramNameSpaceSharing, PackageItemsIncludeAnonymousMembers) {
   auto r = Parse(
       "package p;\n"
@@ -55,6 +33,23 @@ TEST(AnonymousProgramNameSpaceSharing, CompilationUnitItemsIncludeAnonymousMembe
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(CountItemsByKind(r.cu->cu_items, ModuleItemKind::kTaskDecl), 2u);
   EXPECT_EQ(CountItemsByKind(r.cu->cu_items, ModuleItemKind::kFunctionDecl), 1u);
+}
+
+// §24.6 states that an anonymous program declares its items without
+// introducing a new scope. Beyond the members flattening into the surrounding
+// compilation-unit list, the parser must not record a program declaration for
+// the anonymous program itself: r.cu->programs holds only named programs and
+// stays empty here.
+TEST(AnonymousProgramNameSpaceSharing,
+     CompilationUnitAnonymousProgramDeclaresNoProgramScope) {
+  auto r = Parse(
+      "program;\n"
+      "  task inner_t(); endtask\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->programs.empty());
+  EXPECT_EQ(CountItemsByKind(r.cu->cu_items, ModuleItemKind::kTaskDecl), 1u);
 }
 
 }
