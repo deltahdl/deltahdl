@@ -84,6 +84,7 @@ add_library(deltahdl_lib STATIC
     elaborator/annex_f_notation.cpp
     elaborator/annex_f_grammar.cpp
     elaborator/annex_f_sequence_rewrite.cpp
+    elaborator/annex_f_property_rewrite.cpp
     elaborator/annex_f_tight_satisfaction.cpp
     elaborator/annex_f_local_variable_flow.cpp
     elaborator/annex_f_tight_satisfaction_local_variables.cpp
