@@ -70,16 +70,26 @@ void svGetPartselBit(svBitVecVal* d, const svBitVecVal* s, int i, int w) {
     result |= s[word + 1] << (32 - bit);
   }
   uint32_t wmask = (w == 32) ? 0xFFFFFFFFu : ((1u << w) - 1u);
-  *d = result & wmask;
+  // Per Annex H.11.5, a get part-select copies the source slice into
+  // destination bits [w-1:0]; when w < 32 the surrounding destination bits
+  // [31:w] shall be left unchanged, so merge instead of overwriting the word.
+  *d = (*d & ~wmask) | (result & wmask);
 }
 
 void svGetPartselLogic(svLogicVecVal* d, const svLogicVecVal* s, int i, int w) {
   if (w <= 0 || w > 32) return;
   int word = i / 32;
   int bit = i % 32;
+  uint32_t aval = s[word].aval >> bit;
+  uint32_t bval = s[word].bval >> bit;
+  if (bit + w > 32) {
+    aval |= s[word + 1].aval << (32 - bit);
+    bval |= s[word + 1].bval << (32 - bit);
+  }
   uint32_t wmask = (w == 32) ? 0xFFFFFFFFu : ((1u << w) - 1u);
-  d->aval = (s[word].aval >> bit) & wmask;
-  d->bval = (s[word].bval >> bit) & wmask;
+  // Per Annex H.11.5, preserve destination bits [31:w] for w < 32.
+  d->aval = (d->aval & ~wmask) | (aval & wmask);
+  d->bval = (d->bval & ~wmask) | (bval & wmask);
 }
 
 void svPutPartselBit(svBitVecVal* d, svBitVecVal s, int i, int w) {
@@ -101,12 +111,25 @@ void svPutPartselBit(svBitVecVal* d, svBitVecVal s, int i, int w) {
 void svPutPartselLogic(svLogicVecVal* d, svLogicVecVal s, int i, int w) {
   if (w <= 0 || w > 32) return;
   uint32_t wmask = (w == 32) ? 0xFFFFFFFFu : ((1u << w) - 1u);
+  uint32_t aval = s.aval & wmask;
+  uint32_t bval = s.bval & wmask;
   int word = i / 32;
   int bit = i % 32;
   d[word].aval &= ~(wmask << bit);
-  d[word].aval |= (s.aval & wmask) << bit;
+  d[word].aval |= aval << bit;
   d[word].bval &= ~(wmask << bit);
-  d[word].bval |= (s.bval & wmask) << bit;
+  d[word].bval |= bval << bit;
+  // Per Annex H.11.5, the destination range [(i+w-1):i] can straddle a 32-bit
+  // canonical word; write the spillover into the next word, mirroring the bit
+  // variant, while leaving the surrounding destination bits unchanged.
+  if (bit + w > 32) {
+    int overflow = bit + w - 32;
+    uint32_t hi_mask = (1u << overflow) - 1u;
+    d[word + 1].aval &= ~hi_mask;
+    d[word + 1].aval |= aval >> (32 - bit);
+    d[word + 1].bval &= ~hi_mask;
+    d[word + 1].bval |= bval >> (32 - bit);
+  }
 }
 
 // The Annex H.12.2 array querying functions are modeled on the SystemVerilog
