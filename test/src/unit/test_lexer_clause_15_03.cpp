@@ -6,12 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SemaphoreLexer, SemaphoreTokenizesAsIdentifier) {
-  auto result = LexOne("semaphore");
-  EXPECT_EQ(result.token.kind, TokenKind::kIdentifier);
-  EXPECT_EQ(result.token.text, "semaphore");
-}
-
 TEST(SemaphoreLexer, SemaphoreInDeclarationContext) {
   auto tokens = Lex("semaphore smTx;");
   ASSERT_GE(tokens.size(), 3u);

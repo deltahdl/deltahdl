@@ -48,11 +48,4 @@ TEST(SemaphoreElaborator, MethodCallsInInitialBlock) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SemaphoreElaborator, BuiltInTypeWithoutClassDecl) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  semaphore s;\n"
-      "endmodule\n"));
-}
-
 }

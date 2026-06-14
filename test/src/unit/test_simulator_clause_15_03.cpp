@@ -111,4 +111,45 @@ TEST(IpcSync, SemaphoreWaiterProceedsAfterKeysReturned) {
   EXPECT_EQ(sem.key_count, 0);
 }
 
+// §15.3: the requirement is that a waiter proceeds only once a *sufficient*
+// number of keys is back in the bucket. A return that is too small to cover the
+// outstanding request leaves the procure unsatisfiable; the procure succeeds
+// only after enough additional keys are returned to reach the requested amount.
+TEST(IpcSync, SemaphoreWaiterRemainsBlockedUntilEnoughKeysReturned) {
+  SemaphoreObject sem(0);
+  EXPECT_EQ(sem.Get(3), SemGetStatus::kBlock);
+
+  // A partial return below the requested count is still not enough to procure.
+  sem.Put(1);
+  EXPECT_EQ(sem.key_count, 1);
+  EXPECT_EQ(sem.Get(3), SemGetStatus::kBlock);
+
+  // Once the bucket finally holds the full requested amount, the procure wins.
+  sem.Put(2);
+  EXPECT_EQ(sem.key_count, 3);
+  EXPECT_EQ(sem.Get(3), SemGetStatus::kAcquired);
+  EXPECT_EQ(sem.key_count, 0);
+}
+
+// §15.3: only a fixed number of holders may hold keys at once — with N keys in
+// the bucket, N procurements of one key each succeed and the very next one must
+// block, modelling the cap on simultaneous progress. Returning a key lets one
+// more blocked procurement go through.
+TEST(IpcSync, SemaphoreLimitsConcurrentHoldersToKeyCount) {
+  SemaphoreObject sem(2);
+
+  EXPECT_EQ(sem.Get(1), SemGetStatus::kAcquired);
+  EXPECT_EQ(sem.Get(1), SemGetStatus::kAcquired);
+  EXPECT_EQ(sem.key_count, 0);
+
+  // The bucket is empty: a third holder cannot procure and must wait.
+  EXPECT_EQ(sem.Get(1), SemGetStatus::kBlock);
+
+  // One key returned admits exactly one more holder, then the cap binds again.
+  sem.Put(1);
+  EXPECT_EQ(sem.Get(1), SemGetStatus::kAcquired);
+  EXPECT_EQ(sem.key_count, 0);
+  EXPECT_EQ(sem.Get(1), SemGetStatus::kBlock);
+}
+
 }
