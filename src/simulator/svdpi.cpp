@@ -2,8 +2,10 @@
 
 #include "simulator/svdpi.h"
 
+#include <cstdarg>
 #include <map>
 #include <utility>
+#include <vector>
 
 #include "simulator/dpi_runtime.h"
 
@@ -193,6 +195,12 @@ int svDimensions(svOpenArrayHandle h) {
   if (h == nullptr) return 0;
   return static_cast<const svOpenArrayDesc*>(h)->n_dims;
 }
+// §H.12.4: svGetArrayPtr/svSizeOfArray expose the actual address and byte size
+// of an open array as a whole, but only when the SystemVerilog layout matches the
+// C layout. This simulator keeps open arrays in the canonical word form of
+// H.10.1.2 rather than a plain C array, so the whole-array layout never matches
+// C; H.12.4 then requires the address and size to be undefined, which it pins to
+// 0. Individual elements remain reachable through svGetArrElemPtr* below.
 void* svGetArrayPtr(svOpenArrayHandle h) {
   (void)h;
   return nullptr;
@@ -200,25 +208,6 @@ void* svGetArrayPtr(svOpenArrayHandle h) {
 int svSizeOfArray(svOpenArrayHandle h) {
   (void)h;
   return 0;
-}
-
-void* svGetArrElemPtr1(svOpenArrayHandle h, int indx1) {
-  (void)h;
-  (void)indx1;
-  return nullptr;
-}
-void* svGetArrElemPtr2(svOpenArrayHandle h, int indx1, int indx2) {
-  (void)h;
-  (void)indx1;
-  (void)indx2;
-  return nullptr;
-}
-void* svGetArrElemPtr3(svOpenArrayHandle h, int indx1, int indx2, int indx3) {
-  (void)h;
-  (void)indx1;
-  (void)indx2;
-  (void)indx3;
-  return nullptr;
 }
 
 // Annex H.12.5 element copy support. These functions copy a whole packed array
@@ -281,6 +270,33 @@ void* svElemBase(svOpenArrayHandle h, const int* idx, int n_idx,
   return static_cast<char*>(desc->data) + (linear * *words) * word_size;
 }
 
+// §H.12.4 element-address resolution shared by the svGetArrElemPtr family. The
+// element at the left bound of each unpacked dimension occupies position 0 and
+// positions advance toward the right bound, row-major over the unpacked
+// dimensions (ranges[1..n_dims-1]) — the same coordinate mapping the copy
+// helpers use. Consecutive elements are desc->elem_size bytes apart, the
+// representation stride recorded when the handle was built. Returns nullptr when
+// the handle or its storage is unusable, when the index count does not match the
+// unpacked dimensionality, or when any index is outside its original range — the
+// listing's "null if index outside the range or null pointer" contract. A zero
+// elem_size signals that an element's representation differs from that of an
+// individual value of the same type, for which H.12.4 also requires nullptr.
+void* svElemAddr(svOpenArrayHandle h, const int* idx, int n_idx) {
+  if (h == nullptr) return nullptr;
+  const svOpenArrayDesc* desc = static_cast<const svOpenArrayDesc*>(h);
+  if (desc->data == nullptr || desc->ranges == nullptr) return nullptr;
+  if (desc->elem_size == 0) return nullptr;
+  if (n_idx != desc->n_dims - 1) return nullptr;
+  long linear = 0;
+  for (int k = 0; k < n_idx; ++k) {
+    const svOpenArrayDimRange& r = desc->ranges[k + 1];
+    int pos;
+    if (!svUnpackedPos(r, idx[k], &pos)) return nullptr;
+    linear = linear * svUnpackedExtent(r) + pos;
+  }
+  return static_cast<char*>(desc->data) + linear * desc->elem_size;
+}
+
 void svPutBitElem(svOpenArrayHandle d, const svBitVecVal* s, const int* idx,
                   int n) {
   int words;
@@ -317,6 +333,42 @@ void svGetLogicElem(svLogicVecVal* d, svOpenArrayHandle s, const int* idx,
 }
 
 }  // namespace
+
+// §H.12.4: the addresses of individual elements are always supported, regardless
+// of whether the whole array exposes a C-compatible layout. The specialized 1-,
+// 2-, and 3-dimensional entry points forward to the shared resolver, which
+// returns a null pointer for an out-of-range index, an unusable handle, a
+// mismatched index count, or an element representation that differs from an
+// individual value of the same type.
+void* svGetArrElemPtr1(svOpenArrayHandle h, int indx1) {
+  int idx[1] = {indx1};
+  return svElemAddr(h, idx, 1);
+}
+void* svGetArrElemPtr2(svOpenArrayHandle h, int indx1, int indx2) {
+  int idx[2] = {indx1, indx2};
+  return svElemAddr(h, idx, 2);
+}
+void* svGetArrElemPtr3(svOpenArrayHandle h, int indx1, int indx2, int indx3) {
+  int idx[3] = {indx1, indx2, indx3};
+  return svElemAddr(h, idx, 3);
+}
+
+// General element-address function for an arbitrary number of unpacked indices.
+// One index is supplied per unpacked dimension, so the count is svDimensions
+// minus the single packed dimension; the indices are gathered and handed to the
+// same resolver the specialized versions use.
+void* svGetArrElemPtr(svOpenArrayHandle h, int indx1, ...) {
+  int n = svDimensions(h) - 1;
+  if (n < 1) return nullptr;
+  std::vector<int> idx;
+  idx.reserve(n);
+  idx.push_back(indx1);
+  va_list ap;
+  va_start(ap, indx1);
+  for (int k = 1; k < n; ++k) idx.push_back(va_arg(ap, int));
+  va_end(ap);
+  return svElemAddr(h, idx.data(), n);
+}
 
 void svPutBitArrElem1VecVal(svOpenArrayHandle d, const svBitVecVal* s,
                             int indx1) {

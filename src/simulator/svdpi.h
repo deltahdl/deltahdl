@@ -7,6 +7,7 @@
 extern "C" {
 #endif
 
+#include <stddef.h>
 #include <stdint.h>
 
 #if (defined(_MSC_VER) || defined(__MINGW32__) || defined(__CYGWIN__))
@@ -91,10 +92,16 @@ typedef struct svOpenArrayDimRange {
   int right;
 } svOpenArrayDimRange;
 
+// elem_size is the byte stride of one array element within the actual
+// representation that data points at. Annex H.12.4's element-address functions
+// use it to step between consecutive elements. A value of 0 marks an element
+// representation that differs from that of an individual value of the same type,
+// for which H.12.4 requires those functions to return a null pointer.
 typedef struct svOpenArrayDesc {
   void* data;
   int n_dims;
   const svOpenArrayDimRange* ranges;
+  size_t elem_size;
 } svOpenArrayDesc;
 
 XXTERN const char* svDpiVersion(void);
@@ -120,6 +127,7 @@ XXTERN int svDimensions(svOpenArrayHandle h);
 XXTERN void* svGetArrayPtr(svOpenArrayHandle h);
 XXTERN int svSizeOfArray(svOpenArrayHandle h);
 
+XXTERN void* svGetArrElemPtr(svOpenArrayHandle h, int indx1, ...);
 XXTERN void* svGetArrElemPtr1(svOpenArrayHandle h, int indx1);
 XXTERN void* svGetArrElemPtr2(svOpenArrayHandle h, int indx1, int indx2);
 XXTERN void* svGetArrElemPtr3(svOpenArrayHandle h, int indx1, int indx2,
