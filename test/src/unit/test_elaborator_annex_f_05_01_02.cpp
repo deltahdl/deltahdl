@@ -159,4 +159,50 @@ TEST(PropertyRewrite, BooleanPropertyIsUnchanged) {
   EXPECT_TRUE(ClockedPropertyEqual(*result, *ClkBoolean(BoolAtom("a"))));
 }
 
+// Edge case for §F.5.1.2: T^p((@(c2) p), c1) = T^p(p, c2). When two clock forms
+// nest, the rule fires at each level, so the innermost clock wins and both outer
+// clocks are discarded. This exercises the recursion the single-level test does
+// not reach.
+TEST(PropertyRewrite, NestedClocksSupersedeRecursively) {
+  auto input = ClkClock(
+      BoolAtom("c2"),
+      ClkClock(BoolAtom("c3"), ClkStrong(SeqBoolean(BoolAtom("a")))));
+  auto result = RewritePropertyUnderClock(*input, BoolAtom("c1"));
+  auto expected = ClkStrong(ClockedBoolean("c3", "a"));
+  EXPECT_TRUE(ClockedPropertyEqual(*result, *expected));
+}
+
+// Edge case combining §F.5.1.2's or rule with the nested-clock rule: when one
+// operand carries its own clock and the other does not, the incoming clock must
+// recurse into the bare operand while the nested clock overrides locally. This
+// confirms T^p descends through an operator before any inner clock takes over.
+TEST(PropertyRewrite, IncomingClockReachesBareOperandWhileNestedClockOverrides) {
+  auto clocked_left =
+      ClkClock(BoolAtom("c2"), ClkStrong(SeqBoolean(BoolAtom("a"))));
+  auto bare_right = ClkWeak(SeqBoolean(BoolAtom("b")));
+  auto input = ClkOr(clocked_left, bare_right);
+  auto result = RewritePropertyUnderClock(*input, BoolAtom("c1"));
+  auto expected = ClkOr(ClkStrong(ClockedBoolean("c2", "a")),
+                        ClkWeak(ClockedBoolean("c1", "b")));
+  EXPECT_TRUE(ClockedPropertyEqual(*result, *expected));
+}
+
+// Edge case for §F.5.1.2's nexttime rule: its body is itself a compound
+// property, so T^p must recurse into it before wrapping the result in the
+// clock-gated until/nexttime scaffold. Here the body is (not strong(a)).
+TEST(PropertyRewrite, NexttimeRecursesIntoCompoundBody) {
+  auto body = ClkNot(ClkStrong(SeqBoolean(BoolAtom("a"))));
+  auto input = ClkNexttime(body);
+  auto result = RewritePropertyUnderClock(*input, BoolAtom("clk"));
+
+  auto inner = ClkNot(ClkStrong(ClockedBoolean("clk", "a")));  // T^p(body, c)
+  auto not_clock = ClkBoolean(BoolNot(BoolAtom("clk")));
+  auto on_clock = ClkBoolean(BoolAtom("clk"));
+  auto wait_then_body = ClkUntil(not_clock, ClkAnd(on_clock, inner));
+  auto step = ClkNexttime(wait_then_body);
+  auto expected = ClkUntil(not_clock, ClkAnd(on_clock, step));
+
+  EXPECT_TRUE(ClockedPropertyEqual(*result, *expected));
+}
+
 }  // namespace
