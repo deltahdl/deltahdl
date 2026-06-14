@@ -95,6 +95,7 @@ add_library(deltahdl_lib STATIC
     elaborator/annex_f_vacuity_local_variables.cpp
     elaborator/annex_f_extended_booleans.cpp
     elaborator/annex_f_past.cpp
+    elaborator/annex_f_future.cpp
     elaborator/elaborator_defparam.cpp
     elaborator/elaborator_gates.cpp
     elaborator/elaborator_validate.cpp
