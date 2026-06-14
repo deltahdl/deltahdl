@@ -224,6 +224,17 @@ struct DataType {
   std::vector<DataType> type_params;
 };
 
+struct FunctionArg {
+  Direction direction = Direction::kNone;
+  bool is_const = false;
+  bool is_ref_static = false;
+  bool is_default = false;
+  DataType data_type;
+  std::string_view name;
+  Expr* default_value = nullptr;
+  std::vector<Expr*> unpacked_dims;
+};
+
 enum class StmtKind : uint8_t {
   kBlock,
   kIf,
@@ -339,8 +350,15 @@ struct RsRule {
 
 struct RsProduction {
   std::string_view name;
+  // §18.17.7: a production may carry a data_type_or_void return type and a
+  // tf_port_list of formal arguments. has_return_type records that a
+  // data_type_or_void was written (including an explicit 'void'); return_type
+  // holds the parsed type so the value-passing engine can size the production's
+  // return value. ports holds the parsed formal arguments (empty when none).
   bool has_return_type = false;
   bool has_ports = false;
+  DataType return_type;
+  std::vector<FunctionArg> ports;
   std::vector<RsRule> rules;
 };
 
@@ -520,17 +538,6 @@ struct ImportItem {
   std::string_view item_name;
   bool is_wildcard = false;
   bool is_header = false;
-};
-
-struct FunctionArg {
-  Direction direction = Direction::kNone;
-  bool is_const = false;
-  bool is_ref_static = false;
-  bool is_default = false;
-  DataType data_type;
-  std::string_view name;
-  Expr* default_value = nullptr;
-  std::vector<Expr*> unpacked_dims;
 };
 
 struct ModuleItem;

@@ -286,6 +286,20 @@ class SimContext {
   void PushScope();
   void PopScope();
 
+  // §18.17.7: while a randsequence production with a non-void return type is
+  // being generated, the engine points the return slot at the production's
+  // return-value storage. A 'return <expr>' executed anywhere in that
+  // production's code blocks evaluates its expression into this slot. The slot
+  // is null outside randsequence value generation, so an ordinary procedural
+  // return is unaffected. The setter returns the previous slot so nested
+  // production generation can save and restore it.
+  Logic4Vec* SetRsReturnSlot(Logic4Vec* slot) {
+    Logic4Vec* prev = rs_return_slot_;
+    rs_return_slot_ = slot;
+    return prev;
+  }
+  Logic4Vec* RsReturnSlot() const { return rs_return_slot_; }
+
   std::vector<std::unordered_map<std::string_view, Variable*>> SwapScopeStack(
       std::vector<std::unordered_map<std::string_view, Variable*>> new_stack);
   void PushStaticScope(std::string_view func_name);
@@ -659,6 +673,7 @@ class SimContext {
   std::unordered_map<std::string_view, ModuleItem*> let_decls_;
   std::unordered_map<std::string_view, ModuleItem*> sequence_decls_;
   std::vector<std::unordered_map<std::string_view, Variable*>> scope_stack_;
+  Logic4Vec* rs_return_slot_ = nullptr;
 
   std::unordered_map<std::string_view,
                      std::unordered_map<std::string_view, Variable*>>

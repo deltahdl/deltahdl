@@ -66,8 +66,9 @@ static ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-static ExecTask ExecRsProduction(const Stmt* stmt, std::string_view name,
-                                 SimContext& ctx, Arena& arena);
+static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
+                                 SimContext& ctx, Arena& arena,
+                                 Logic4Vec* out_value);
 
 static const RsProduction* FindProduction(const Stmt* stmt,
                                           std::string_view name) {
@@ -77,33 +78,46 @@ static const RsProduction* FindProduction(const Stmt* stmt,
   return nullptr;
 }
 
+// §18.17.7: a production yields a readable value only when it declares a
+// non-void return type. A production with no return type assumes a void return
+// type, so it contributes no implicit variable.
+static bool ProductionReturnsValue(const RsProduction* p) {
+  return p != nullptr && p->has_return_type &&
+         p->return_type.kind != DataTypeKind::kVoid;
+}
+
 static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
-                           SimContext& ctx, Arena& arena);
+                           SimContext& ctx, Arena& arena, Logic4Vec* out_value);
 
 static ExecTask ExecRsProdIf(const Stmt* stmt, const RsProd& prod,
-                             SimContext& ctx, Arena& arena) {
+                             SimContext& ctx, Arena& arena,
+                             Logic4Vec* out_value) {
   if (EvalExpr(prod.condition, ctx, arena).ToUint64() != 0) {
-    co_return co_await ExecRsProduction(stmt, prod.if_true.name, ctx, arena);
+    co_return co_await ExecRsProduction(stmt, prod.if_true, ctx, arena,
+                                        out_value);
   }
   if (prod.has_else) {
-    co_return co_await ExecRsProduction(stmt, prod.if_false.name, ctx, arena);
+    co_return co_await ExecRsProduction(stmt, prod.if_false, ctx, arena,
+                                        out_value);
   }
   co_return StmtResult::kDone;
 }
 
 static ExecTask ExecRsProdRepeat(const Stmt* stmt, const RsProd& prod,
-                                 SimContext& ctx, Arena& arena) {
+                                 SimContext& ctx, Arena& arena,
+                                 Logic4Vec* out_value) {
   auto count = EvalExpr(prod.repeat_count, ctx, arena).ToUint64();
   for (uint64_t i = 0; i < count; ++i) {
     auto result =
-        co_await ExecRsProduction(stmt, prod.repeat_item.name, ctx, arena);
+        co_await ExecRsProduction(stmt, prod.repeat_item, ctx, arena, out_value);
     if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
   }
   co_return StmtResult::kDone;
 }
 
 static ExecTask ExecRsProdCase(const Stmt* stmt, const RsProd& prod,
-                               SimContext& ctx, Arena& arena) {
+                               SimContext& ctx, Arena& arena,
+                               Logic4Vec* out_value) {
   // 18.17.3: evaluate the case expression once, then compare it against each
   // case item expression in the order written. Items separated by commas share
   // a production, so any pattern matching wins for that item. The first item
@@ -119,19 +133,21 @@ static ExecTask ExecRsProdCase(const Stmt* stmt, const RsProd& prod,
     }
     for (auto* pat : ci.patterns) {
       if (EvalExpr(pat, ctx, arena).ToUint64() == val) {
-        co_return co_await ExecRsProduction(stmt, ci.item.name, ctx, arena);
+        co_return co_await ExecRsProduction(stmt, ci.item, ctx, arena,
+                                            out_value);
       }
     }
   }
   if (default_item) {
-    co_return co_await ExecRsProduction(stmt, default_item->item.name, ctx,
-                                        arena);
+    co_return co_await ExecRsProduction(stmt, default_item->item, ctx, arena,
+                                        out_value);
   }
   co_return StmtResult::kDone;
 }
 
 static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
-                           SimContext& ctx, Arena& arena) {
+                           SimContext& ctx, Arena& arena,
+                           Logic4Vec* out_value) {
   switch (prod.kind) {
     case RsProdKind::kCodeBlock: {
       // 18.17: every code block inside a randsequence is its own anonymous
@@ -151,13 +167,14 @@ static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
       co_return block_result;
     }
     case RsProdKind::kItem:
-      co_return co_await ExecRsProduction(stmt, prod.item.name, ctx, arena);
+      co_return co_await ExecRsProduction(stmt, prod.item, ctx, arena,
+                                          out_value);
     case RsProdKind::kIf:
-      co_return co_await ExecRsProdIf(stmt, prod, ctx, arena);
+      co_return co_await ExecRsProdIf(stmt, prod, ctx, arena, out_value);
     case RsProdKind::kRepeat:
-      co_return co_await ExecRsProdRepeat(stmt, prod, ctx, arena);
+      co_return co_await ExecRsProdRepeat(stmt, prod, ctx, arena, out_value);
     case RsProdKind::kCase:
-      co_return co_await ExecRsProdCase(stmt, prod, ctx, arena);
+      co_return co_await ExecRsProdCase(stmt, prod, ctx, arena, out_value);
   }
   co_return StmtResult::kDone;
 }
@@ -301,7 +318,7 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
     }
 
     const RsProd* step = seqs[chosen].steps[seqs[chosen].cursor++];
-    auto result = co_await ExecRsProd(stmt, *step, ctx, arena);
+    auto result = co_await ExecRsProd(stmt, *step, ctx, arena, nullptr);
     if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
     if (result == StmtResult::kReturn) {
       // 18.17.6: return aborts the current production; drop the remainder of
@@ -314,8 +331,65 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
 
 static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
                               SimContext& ctx, Arena& arena) {
+  // §18.17.7: within a rule, a variable is implicitly declared for each
+  // value-returning production that appears. A production appearing once yields
+  // a scalar named after the production; a production appearing more than once
+  // yields an array indexed 1..N, with element i holding the value returned by
+  // the i-th appearance in syntactic order. Pre-scan the rule's production
+  // items to count each name's appearances so a multiply appearing
+  // value-returning production can be registered as an array before any code
+  // block reads it.
+  std::unordered_map<std::string_view, int> total_count;
   for (const auto& prod : selected.prods) {
-    auto result = co_await ExecRsProd(stmt, prod, ctx, arena);
+    if (prod.kind != RsProdKind::kItem) continue;
+    if (ProductionReturnsValue(FindProduction(stmt, prod.item.name)))
+      total_count[prod.item.name]++;
+  }
+  for (const auto& [name, n] : total_count) {
+    if (n <= 1) continue;
+    const auto* child = FindProduction(stmt, name);
+    ArrayInfo info;
+    info.lo = 1;
+    info.size = static_cast<uint32_t>(n);
+    uint32_t w = EvalTypeWidth(child->return_type);
+    info.elem_width = w ? w : 32;
+    ctx.RegisterArray(name, info);
+  }
+
+  // §18.17.7: only the return values of productions already generated (to the
+  // left of a code block) are available. Each generation stores its value into
+  // the implicit variable immediately, so later code blocks observe it while
+  // earlier ones do not.
+  std::unordered_map<std::string_view, int> seen_count;
+  for (const auto& prod : selected.prods) {
+    Logic4Vec ret_value;
+    const RsProduction* child = nullptr;
+    Logic4Vec* slot = nullptr;
+    if (prod.kind == RsProdKind::kItem) {
+      child = FindProduction(stmt, prod.item.name);
+      if (ProductionReturnsValue(child)) slot = &ret_value;
+    }
+
+    auto result = co_await ExecRsProd(stmt, prod, ctx, arena, slot);
+
+    if (slot != nullptr) {
+      uint32_t w = EvalTypeWidth(child->return_type);
+      if (w == 0) w = ret_value.width ? ret_value.width : 32;
+      int idx = ++seen_count[prod.item.name];
+      Variable* var;
+      if (total_count[prod.item.name] > 1) {
+        // Indexed element names are built at run time, so intern the name in the
+        // arena: the scope map keys on the string_view and needs stable storage.
+        auto name = std::string(prod.item.name) + "[" + std::to_string(idx) +
+                    "]";
+        var = ctx.CreateLocalVariable(*arena.Create<std::string>(std::move(name)),
+                                      w);
+      } else {
+        var = ctx.CreateLocalVariable(prod.item.name, w);
+      }
+      var->value = ret_value;
+    }
+
     if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
     if (result == StmtResult::kReturn) co_return StmtResult::kDone;
   }
@@ -336,12 +410,72 @@ static ExecTask ExecSelectedRule(const Stmt* stmt, const RsRule& selected,
   co_return co_await ExecRuleProds(stmt, selected, ctx, arena);
 }
 
-static ExecTask ExecRsProduction(const Stmt* stmt, std::string_view name,
-                                 SimContext& ctx, Arena& arena) {
-  const auto* production = FindProduction(stmt, name);
+static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
+                                 SimContext& ctx, Arena& arena,
+                                 Logic4Vec* out_value) {
+  const auto* production = FindProduction(stmt, call.name);
   if (!production) co_return StmtResult::kDone;
+
+  // §18.17.7: passing data to a production uses the same syntax as a task call.
+  // Evaluate the actual arguments in the caller's scope, before the production's
+  // own scope is entered, sizing each to its formal's declared width.
+  std::vector<Logic4Vec> actuals;
+  actuals.reserve(call.args.size());
+  for (size_t i = 0; i < call.args.size(); ++i) {
+    uint32_t w = i < production->ports.size()
+                     ? EvalTypeWidth(production->ports[i].data_type)
+                     : 0;
+    actuals.push_back(EvalExpr(call.args[i], ctx, arena, w));
+  }
+
+  // §18.17.7: a production creates a scope that encompasses all its rules and
+  // code blocks; formal arguments bound here are therefore available throughout
+  // the production. Bind each formal by position, falling back to its default
+  // value, then to zero, when no actual is supplied.
+  ctx.PushScope();
+  for (size_t i = 0; i < production->ports.size(); ++i) {
+    const auto& port = production->ports[i];
+    uint32_t w = EvalTypeWidth(port.data_type);
+    Logic4Vec val;
+    if (i < actuals.size()) {
+      val = actuals[i];
+    } else if (port.default_value != nullptr) {
+      val = EvalExpr(port.default_value, ctx, arena, w);
+    } else {
+      val = MakeLogic4VecVal(arena, w ? w : 32, 0);
+    }
+    uint32_t vw = val.width ? val.width : (w ? w : 32);
+    auto* var = ctx.CreateLocalVariable(port.name, vw);
+    var->value = val;
+  }
+
+  // §18.17.7: returning data requires a (non-void) return type. Provide storage
+  // for this production's return value and point the engine's return slot at it
+  // so a 'return <expr>' anywhere in the production writes here, saving and
+  // restoring any enclosing production's slot for correct nesting.
+  Logic4Vec ret_value;
+  bool returns_value = ProductionReturnsValue(production);
+  Logic4Vec* prev_slot = nullptr;
+  if (returns_value) {
+    uint32_t w = EvalTypeWidth(production->return_type);
+    if (w == 0) w = 32;
+    ret_value = MakeLogic4VecVal(arena, w, 0);
+    prev_slot = ctx.SetRsReturnSlot(&ret_value);
+  }
+
   const auto& selected = SelectRule(*production, ctx, arena);
-  co_return co_await ExecSelectedRule(stmt, selected, ctx, arena);
+  auto result = co_await ExecSelectedRule(stmt, selected, ctx, arena);
+
+  if (returns_value) ctx.SetRsReturnSlot(prev_slot);
+  ctx.PopScope();
+
+  if (out_value != nullptr && returns_value) *out_value = ret_value;
+
+  // §18.17.6: a return aborts only the current production. Once that production
+  // has finished generating, surface a normal completion so the enclosing rule
+  // continues with the next production.
+  if (result == StmtResult::kReturn) co_return StmtResult::kDone;
+  co_return result;
 }
 
 static ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx,
@@ -356,7 +490,9 @@ static ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx,
   // already resolved only within this statement, so the pushed scope provides
   // the enclosing automatic lifetime for the block.
   ctx.PushScope();
-  auto result = co_await ExecRsProduction(stmt, top, ctx, arena);
+  RsProductionItem top_call;
+  top_call.name = top;
+  auto result = co_await ExecRsProduction(stmt, top_call, ctx, arena, nullptr);
   ctx.PopScope();
 
   (void)result;
@@ -1837,6 +1973,15 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     case StmtKind::kContinue:
       return ExecTask::Immediate(StmtResult::kContinue);
     case StmtKind::kReturn:
+      // §18.17.7: inside a randsequence production with a non-void return type,
+      // a 'return <expr>' assigns its value to the production. The engine has
+      // pointed the return slot at the production's return storage, so evaluate
+      // the expression into it here. Outside that context the slot is null and
+      // the return simply unwinds.
+      if (stmt->expr && ctx.RsReturnSlot() != nullptr) {
+        *ctx.RsReturnSlot() =
+            EvalExpr(stmt->expr, ctx, arena, ctx.RsReturnSlot()->width);
+      }
       return ExecTask::Immediate(StmtResult::kReturn);
     case StmtKind::kAssertImmediate:
     case StmtKind::kAssumeImmediate:

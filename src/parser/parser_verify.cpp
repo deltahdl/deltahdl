@@ -2,8 +2,6 @@
 
 namespace delta {
 
-static void SkipParenContents(Lexer& lexer);
-
 ModuleDecl* Parser::ParseCheckerDecl() {
   auto* decl = arena_.Create<ModuleDecl>();
   decl->decl_kind = ModuleDeclKind::kChecker;
@@ -264,24 +262,30 @@ RsRule Parser::ParseRsRule() {
 RsProduction Parser::ParseRsProduction() {
   RsProduction prod;
 
+  // §18.17.7: a production may begin with a data_type_or_void return type. The
+  // return type is recognized from a leading 'void', a built-in type keyword,
+  // or a leading packed-dimension '['; the parsed type is retained so the
+  // value-passing engine can size the production's return value. A production
+  // without a return type assumes a void return type (handled downstream).
   if (Check(TokenKind::kKwVoid) || Check(TokenKind::kKwInt) ||
       Check(TokenKind::kKwBit) || Check(TokenKind::kKwLogic) ||
       Check(TokenKind::kKwByte) || Check(TokenKind::kKwShortint) ||
       Check(TokenKind::kKwLongint) || Check(TokenKind::kKwInteger) ||
       Check(TokenKind::kKwString) || Check(TokenKind::kKwReal) ||
       Check(TokenKind::kKwShortreal) || Check(TokenKind::kKwRealtime) ||
-      Check(TokenKind::kKwTime)) {
-    Consume();
+      Check(TokenKind::kKwTime) || Check(TokenKind::kLBracket)) {
+    prod.return_type = ParseFunctionReturnType();
     prod.has_return_type = true;
   }
 
   prod.name = ExpectIdentifier().text;
 
+  // §18.17.7: productions that accept data declare a tf_port_list of formal
+  // arguments, using the same syntax as a task prototype. Parse and retain the
+  // formals so the value-passing engine can bind actual arguments to them.
   if (Check(TokenKind::kLParen)) {
     prod.has_ports = true;
-    Consume();
-
-    SkipParenContents(lexer_);
+    prod.ports = ParseFunctionArgs(true);
   }
 
   Expect(TokenKind::kColon);
@@ -314,16 +318,6 @@ Stmt* Parser::ParseRandsequenceStmt() {
   Expect(TokenKind::kKwEndsequence);
   stmt->range.end = CurrentLoc();
   return stmt;
-}
-
-static void SkipParenContents(Lexer& lexer) {
-  int depth = 1;
-  while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
-    if (lexer.Peek().Is(TokenKind::kLParen)) ++depth;
-    if (lexer.Peek().Is(TokenKind::kRParen)) --depth;
-    if (depth > 0) lexer.Next();
-  }
-  if (lexer.Peek().Is(TokenKind::kRParen)) lexer.Next();
 }
 
 static void SkipCoverpointBody(Lexer& lexer) {
