@@ -2,9 +2,21 @@
 
 #include "simulator/svdpi.h"
 
+#include <map>
+#include <utility>
+
 #include "simulator/dpi_runtime.h"
 
 static thread_local svScope g_current_scope = nullptr;
+
+// §H.9.3 user data storage: a pointer the user associates with a (scope, key)
+// pair via svPutUserData and later retrieves with svGetUserData. The key is
+// chosen and kept unique by the user's C code; entries are kept distinct per
+// scope so the same key under different scopes never collides.
+static std::map<std::pair<svScope, void*>, void*>& DpiUserDataStore() {
+  static std::map<std::pair<svScope, void*>, void*> store;
+  return store;
+}
 
 // Per Annex H.10.1.3, the returned string names the canonical value
 // representation in use rather than the language revision. This simulator uses
@@ -462,16 +474,24 @@ svScope svGetScopeFromName(const char* scope_name) {
 }
 
 int svPutUserData(svScope scope, void* user_key, void* user_data) {
-  (void)scope;
-  (void)user_key;
-  (void)user_data;
+  // §H.9.3: a null scope or null payload is an error. Report failure (-1)
+  // without recording anything; success returns 0.
+  if (scope == nullptr || user_data == nullptr) {
+    return -1;
+  }
+  DpiUserDataStore()[std::make_pair(scope, user_key)] = user_data;
   return 0;
 }
 
 void* svGetUserData(svScope scope, void* user_key) {
-  (void)scope;
-  (void)user_key;
-  return nullptr;
+  // §H.9.3: error cases and lookups that were never stored both surface as a
+  // null pointer; a successful retrieval returns the previously stored pointer.
+  if (scope == nullptr) {
+    return nullptr;
+  }
+  auto& store = DpiUserDataStore();
+  auto it = store.find(std::make_pair(scope, user_key));
+  return it == store.end() ? nullptr : it->second;
 }
 
 int svGetCallerInfo(const char** file_name, int* line_number) {
