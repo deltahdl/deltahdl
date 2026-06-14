@@ -20,61 +20,6 @@ TEST(LoopSyntaxParsing, ForLoop) {
   EXPECT_NE(stmt->for_body, nullptr);
 }
 
-TEST(LoopSyntaxParsing, ForLoopNoInit) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (; i < 10; i++) a[i] = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-}
-
-TEST(LoopSyntaxParsing, ForLoopNoCondition) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; ; i++) begin\n"
-      "      if (i > 10) break;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(LoopSyntaxParsing, ForLoopPostIncrementStep) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_NE(stmt->for_step, nullptr);
-}
-
-TEST(LoopSyntaxParsing, ForLoopPostDecrementStep) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    for (int i = 255; i >= 0; i--) x = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_NE(stmt->for_step, nullptr);
-}
-
 TEST(LoopSyntaxParsing, ForLoopWithBlockBody) {
   auto r = Parse(
       "module t;\n"
@@ -111,34 +56,6 @@ TEST(LoopSyntaxParsing, ForBodyBlockingAssign) {
   EXPECT_EQ(stmt->for_body->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(LoopSyntaxParsing, PostfixIncrementInForStep) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++)\n"
-      "      x = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(LoopSyntaxParsing, ForWithIncrementStep) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++)\n"
-      "      x = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_NE(stmt->for_step, nullptr);
-  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
-}
-
 TEST(LoopSyntaxParsing, ForWithByteDecl) {
   auto r = Parse(
       "module t;\n"
@@ -151,25 +68,7 @@ TEST(LoopSyntaxParsing, ForWithByteDecl) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kByte);
-}
-
-TEST(LoopSyntaxParsing, ForWithBlockBody) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 4; i = i + 1) begin\n"
-      "      a[i] = i;\n"
-      "      b[i] = i * 2;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  ASSERT_NE(stmt->for_body, nullptr);
-  EXPECT_EQ(stmt->for_body->kind, StmtKind::kBlock);
+  EXPECT_EQ(stmt->for_init_types[0].kind, DataTypeKind::kByte);
 }
 
 TEST(LoopSyntaxParsing, IfElseInsideForBody) {
@@ -221,22 +120,6 @@ TEST(LoopSyntaxParsing, ForLoopInAlwaysLatch) {
   EXPECT_NE(item->body->stmts[0]->for_body, nullptr);
 }
 
-TEST(LoopSyntaxParsing, ForWithDecrement) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    for (int i = 9; i >= 0; i--)\n"
-      "      x = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
-  EXPECT_NE(stmt->for_step, nullptr);
-}
-
 TEST(LoopSyntaxParsing, ForIntDeclHasInitAndCond) {
   auto r = Parse(
       "module t;\n"
@@ -248,7 +131,7 @@ TEST(LoopSyntaxParsing, ForIntDeclHasInitAndCond) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_NE(stmt->for_init, nullptr);
+  EXPECT_FALSE(stmt->for_inits.empty());
   EXPECT_NE(stmt->for_cond, nullptr);
 }
 
@@ -261,9 +144,9 @@ TEST(LoopSyntaxParsing, ForIntDeclHasStepBodyType) {
       "endmodule\n");
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  EXPECT_NE(stmt->for_step, nullptr);
+  EXPECT_FALSE(stmt->for_steps.empty());
   EXPECT_NE(stmt->for_body, nullptr);
-  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(stmt->for_init_types[0].kind, DataTypeKind::kInt);
 }
 
 TEST(LoopSyntaxParsing, ForWithLogicDecl) {
@@ -277,7 +160,7 @@ TEST(LoopSyntaxParsing, ForWithLogicDecl) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kLogic);
+  EXPECT_EQ(stmt->for_init_types[0].kind, DataTypeKind::kLogic);
 }
 
 TEST(LoopSyntaxParsing, ForIntDeclWithBlockBody) {
@@ -294,7 +177,7 @@ TEST(LoopSyntaxParsing, ForIntDeclWithBlockBody) {
   auto* stmt = FirstInitialStmtT(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(stmt->for_init_types[0].kind, DataTypeKind::kInt);
 }
 
 TEST(LoopSyntaxParsing, ForWithoutDeclStillWorks) {
@@ -308,21 +191,7 @@ TEST(LoopSyntaxParsing, ForWithoutDeclStillWorks) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kImplicit);
-}
-
-TEST(LoopSyntaxParsing, ForIntDeclKindCheck) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  EXPECT_EQ(stmt->for_init_types[0].kind, DataTypeKind::kImplicit);
 }
 
 TEST(LoopSyntaxParsing, ForAllPartsNonNull) {
@@ -335,38 +204,10 @@ TEST(LoopSyntaxParsing, ForAllPartsNonNull) {
   ASSERT_NE(r.cu, nullptr);
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  EXPECT_NE(stmt->for_init, nullptr);
+  EXPECT_FALSE(stmt->for_inits.empty());
   EXPECT_NE(stmt->for_cond, nullptr);
-  EXPECT_NE(stmt->for_step, nullptr);
+  EXPECT_FALSE(stmt->for_steps.empty());
   EXPECT_NE(stmt->for_body, nullptr);
-}
-
-TEST(LoopSyntaxParsing, ForLoopTypedInit) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
-}
-
-TEST(LoopSyntaxParsing, ForLoopUntypedInit) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (i = 0; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kImplicit);
 }
 
 TEST(LoopSyntaxParsing, ForEmptyInit) {
@@ -381,7 +222,7 @@ TEST(LoopSyntaxParsing, ForEmptyInit) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_EQ(stmt->for_init, nullptr);
+  EXPECT_TRUE(stmt->for_inits.empty());
 }
 
 TEST(LoopSyntaxParsing, ForEmptyCond) {
@@ -415,7 +256,7 @@ TEST(LoopSyntaxParsing, ForEmptyStep) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_EQ(stmt->for_step, nullptr);
+  EXPECT_TRUE(stmt->for_steps.empty());
 }
 
 TEST(LoopSyntaxParsing, ForAllEmpty) {
@@ -430,9 +271,9 @@ TEST(LoopSyntaxParsing, ForAllEmpty) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_EQ(stmt->for_init, nullptr);
+  EXPECT_TRUE(stmt->for_inits.empty());
   EXPECT_EQ(stmt->for_cond, nullptr);
-  EXPECT_EQ(stmt->for_step, nullptr);
+  EXPECT_TRUE(stmt->for_steps.empty());
 }
 
 TEST(LoopSyntaxParsing, ForNullStmt) {
@@ -461,21 +302,7 @@ TEST(LoopSyntaxParsing, ForVarKeyword) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
-}
-
-TEST(LoopSyntaxParsing, ForLogicTypeInit) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (logic [7:0] i = 0; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kLogic);
+  EXPECT_EQ(stmt->for_init_types[0].kind, DataTypeKind::kInt);
 }
 
 TEST(LoopSyntaxParsing, ForStepCompoundAssign) {
@@ -490,7 +317,7 @@ TEST(LoopSyntaxParsing, ForStepCompoundAssign) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_NE(stmt->for_step, nullptr);
+  EXPECT_FALSE(stmt->for_steps.empty());
 }
 
 TEST(LoopSyntaxParsing, ForStepPostIncrement) {
@@ -504,7 +331,7 @@ TEST(LoopSyntaxParsing, ForStepPostIncrement) {
   EXPECT_FALSE(r.has_errors);
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  EXPECT_NE(stmt->for_step, nullptr);
+  EXPECT_FALSE(stmt->for_steps.empty());
 }
 
 TEST(LoopSyntaxParsing, ForStepPreIncrement) {
@@ -518,7 +345,7 @@ TEST(LoopSyntaxParsing, ForStepPreIncrement) {
   EXPECT_FALSE(r.has_errors);
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  EXPECT_NE(stmt->for_step, nullptr);
+  EXPECT_FALSE(stmt->for_steps.empty());
 }
 
 TEST(LoopSyntaxParsing, ForStepPostDecrement) {
@@ -532,7 +359,7 @@ TEST(LoopSyntaxParsing, ForStepPostDecrement) {
   EXPECT_FALSE(r.has_errors);
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  EXPECT_NE(stmt->for_step, nullptr);
+  EXPECT_FALSE(stmt->for_steps.empty());
 }
 TEST(LoopSyntaxParsing, ForWithArrayBody) {
   auto r = Parse(
@@ -586,7 +413,7 @@ TEST(LoopSyntaxParsing, ForLoopInitInStaticFunc) {
   EXPECT_TRUE(fn->is_static);
   auto* for_stmt = FindStmtByKind(fn, StmtKind::kFor);
   ASSERT_NE(for_stmt, nullptr);
-  EXPECT_EQ(for_stmt->for_init_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(for_stmt->for_init_types[0].kind, DataTypeKind::kInt);
 }
 
 TEST(LoopSyntaxParsing, ForLoopInitInAutoFunc) {
@@ -606,29 +433,7 @@ TEST(LoopSyntaxParsing, ForLoopInitInAutoFunc) {
   EXPECT_TRUE(fn->is_automatic);
   auto* for_stmt = FindStmtByKind(fn, StmtKind::kFor);
   ASSERT_NE(for_stmt, nullptr);
-  EXPECT_EQ(for_stmt->for_init_type.kind, DataTypeKind::kInt);
-}
-
-TEST(LoopSyntaxParsing, AutomaticFuncWithForLoop) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int sum_to_n(int n);\n"
-      "    int total;\n"
-      "    total = 0;\n"
-      "    for (int i = 0; i < n; i = i + 1)\n"
-      "      total = total + i;\n"
-      "    return total;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_automatic);
-  auto* for_stmt = FindStmtByKind(item, StmtKind::kFor);
-  ASSERT_NE(for_stmt, nullptr);
-  EXPECT_NE(for_stmt->for_cond, nullptr);
-  EXPECT_NE(for_stmt->for_body, nullptr);
+  EXPECT_EQ(for_stmt->for_init_types[0].kind, DataTypeKind::kInt);
 }
 
 TEST(LoopSyntaxParsing, ForStepPreDecrement) {
@@ -643,7 +448,7 @@ TEST(LoopSyntaxParsing, ForStepPreDecrement) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_NE(stmt->for_step, nullptr);
+  EXPECT_FALSE(stmt->for_steps.empty());
 }
 
 TEST(LoopSyntaxParsing, ForStepFunctionCall) {
@@ -658,7 +463,27 @@ TEST(LoopSyntaxParsing, ForStepFunctionCall) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_NE(stmt->for_step, nullptr);
+  EXPECT_FALSE(stmt->for_steps.empty());
+}
+
+// for_step_assignment ::= ... | function_subroutine_call — a bare call as the
+// step, distinct from an operator_assignment whose right side happens to call a
+// function. It parses to a plain expression statement.
+TEST(LoopSyntaxParsing, ForStepStandaloneSubroutineCall) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; advance(i)) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  ASSERT_EQ(stmt->for_steps.size(), 1u);
+  EXPECT_EQ(stmt->for_steps[0]->kind, StmtKind::kExprStmt);
+  EXPECT_NE(stmt->for_steps[0]->expr, nullptr);
 }
 
 TEST(LoopSyntaxParsing, ForVarLogicTypeDecl) {
@@ -673,7 +498,7 @@ TEST(LoopSyntaxParsing, ForVarLogicTypeDecl) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kLogic);
+  EXPECT_EQ(stmt->for_init_types[0].kind, DataTypeKind::kLogic);
 }
 
 TEST(LoopSyntaxParsing, ErrorForMissingSemicolonAfterInit) {
@@ -691,6 +516,228 @@ TEST(LoopSyntaxParsing, ErrorForMissingCloseParen) {
       "module m;\n"
       "  initial begin\n"
       "    for (int i = 0; i < 10; i++ x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// loop_statement ::= for ... — for_initialization may declare more than one
+// control variable (for_variable_declaration { , for_variable_declaration }).
+TEST(LoopSyntaxParsing, ForInitMultipleDeclarations) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0, j = 9; i < j; i++) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  EXPECT_EQ(stmt->for_inits.size(), 2u);
+}
+
+// for_initialization ::= list_of_variable_assignments — the comma-separated
+// form without local declarations.
+TEST(LoopSyntaxParsing, ForInitListOfVariableAssignments) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (i = 0, j = 9; i < j; i++) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  EXPECT_EQ(stmt->for_inits.size(), 2u);
+}
+
+// for_step ::= for_step_assignment { , for_step_assignment } — more than one
+// step assignment separated by commas.
+TEST(LoopSyntaxParsing, ForStepMultipleAssignments) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0, j = 9; i < j; i++, j--) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  EXPECT_EQ(stmt->for_steps.size(), 2u);
+}
+
+// loop_statement ::= forever statement_or_null
+TEST(LoopSyntaxParsing, ForeverLoop) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    forever x = x + 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForever);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+// loop_statement ::= repeat ( expression ) statement_or_null
+TEST(LoopSyntaxParsing, RepeatLoop) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    repeat (8) x = x + 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kRepeat);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+// loop_statement ::= while ( expression ) statement_or_null
+TEST(LoopSyntaxParsing, WhileLoop) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    while (x < 10) x = x + 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWhile);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+// loop_statement ::= do statement_or_null while ( expression ) ;
+TEST(LoopSyntaxParsing, DoWhileLoop) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    do x = x + 1; while (x < 10);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+// The do-while body must be followed by 'while ( expr ) ;'.
+TEST(LoopSyntaxParsing, ErrorDoWhileMissingWhile) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    do x = x + 1;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// loop_statement ::= foreach ( ps_or_hierarchical_array_identifier
+//                               [ loop_variables ] ) statement
+TEST(LoopSyntaxParsing, ForeachLoop) {
+  auto r = Parse(
+      "module m;\n"
+      "  int arr [0:7];\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) arr[i] = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
+  EXPECT_NE(stmt->expr, nullptr);
+  ASSERT_EQ(stmt->foreach_vars.size(), 1u);
+  EXPECT_EQ(stmt->foreach_vars[0], "i");
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+// foreach with more than one loop variable for a multidimensional array.
+TEST(LoopSyntaxParsing, ForeachMultipleLoopVars) {
+  auto r = Parse(
+      "module m;\n"
+      "  int mat [0:3][0:3];\n"
+      "  initial begin\n"
+      "    foreach (mat[i, j]) mat[i][j] = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
+  EXPECT_EQ(stmt->foreach_vars.size(), 2u);
+}
+
+// The foreach array reference may be a hierarchical (member) name, exercising
+// the ps_or_hierarchical_array_identifier slot of the foreach alternative.
+TEST(LoopSyntaxParsing, ForeachHierarchicalArrayId) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    foreach (pkt.data[i]) pkt.data[i] = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
+  ASSERT_NE(stmt->expr, nullptr);
+  EXPECT_EQ(stmt->expr->kind, ExprKind::kMemberAccess);
+  ASSERT_EQ(stmt->foreach_vars.size(), 1u);
+  EXPECT_EQ(stmt->foreach_vars[0], "i");
+}
+
+// repeat ( expression ) — the parentheses around the count are required.
+TEST(LoopSyntaxParsing, ErrorRepeatMissingParen) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    repeat 8 x = x + 1;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// while ( expression ) — the parentheses around the condition are required.
+TEST(LoopSyntaxParsing, ErrorWhileMissingParen) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    while x < 10 x = x + 1;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// foreach ( array [ loop_variables ] ) — the bracketed loop-variable list is
+// part of the syntax; omitting the brackets is an error.
+TEST(LoopSyntaxParsing, ErrorForeachMissingBrackets) {
+  auto r = Parse(
+      "module m;\n"
+      "  int arr [0:7];\n"
+      "  initial begin\n"
+      "    foreach (arr) arr[0] = 0;\n"
       "  end\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
