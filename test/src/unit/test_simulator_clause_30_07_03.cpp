@@ -14,15 +14,6 @@ PathDelay MakePathWithUniformDelay(uint64_t value) {
   return pd;
 }
 
-TEST(SdfPulseLimitAnnotation, BothLimitsAppliedAcrossAllSlots) {
-  PathDelay pd = MakePathWithUniformDelay(40);
-  ApplySdfPulseLimits(pd, 5, true, 12);
-  for (int i = 0; i < 12; ++i) {
-    EXPECT_EQ(pd.reject_limit[i], 5u);
-    EXPECT_EQ(pd.error_limit[i], 12u);
-  }
-}
-
 TEST(SdfPulseLimitAnnotation, RejectOnlyMirrorsToError) {
   PathDelay pd = MakePathWithUniformDelay(40);
   ApplySdfPulseLimits(pd, 6, false, 0);
@@ -55,6 +46,19 @@ TEST(SdfPulseLimitAnnotation, SdfOverridesGlobalInvocationLimits) {
   for (int i = 0; i < 12; ++i) {
     EXPECT_EQ(pd.reject_limit[i], 4u);
     EXPECT_EQ(pd.error_limit[i], 8u);
+  }
+}
+
+// SDF precedence is a full replacement, not a partial merge: an annotation
+// that carries only a reject value must mirror it onto the error limit and
+// overwrite the distinct error limit a prior PATHPULSE$ override had set.
+TEST(SdfPulseLimitAnnotation, SdfRejectOnlyFullyReplacesPriorPathpulseLimits) {
+  PathDelay pd = MakePathWithUniformDelay(40);
+  ApplyPulseControlOverride(pd, 9, true, 21);
+  ApplySdfPulseLimits(pd, 5, false, 0);
+  for (int i = 0; i < 12; ++i) {
+    EXPECT_EQ(pd.reject_limit[i], 5u);
+    EXPECT_EQ(pd.error_limit[i], 5u);
   }
 }
 
