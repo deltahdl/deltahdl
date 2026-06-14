@@ -5258,6 +5258,19 @@ void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
         "cannot be accessed";
     return;
   }
+  // §37.36 detail 1: only a string value (the decompiled symbol row) and a
+  // vector value (the row's ASCII symbol codes) shall be obtained for a table
+  // entry object through vpi_get_value(). Any other requested format is refused,
+  // an error is recorded, and the caller's value buffer is left untouched.
+  if (obj->type == vpiTableEntry && value->format != kVpiStringVal &&
+      value->format != kVpiVectorVal) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_get_value(): a table entry value is available only as a string or "
+        "a vector";
+    return;
+  }
   if (!obj->var) return;
   switch (value->format) {
     case kVpiIntVal: {
@@ -6297,6 +6310,12 @@ int VpiContext::Get(int property, VpiHandle obj) {
       // returns the input count through this same path.
       if (obj->type == vpiPort) return VpiPortSize(obj->null_port, obj->size);
       return obj->size;
+    // §37.36 detail 2: a UDP reports its primitive type - vpiSeqPrim for a
+    // sequential UDP, vpiCombPrim for a combinational one - through vpiPrimType.
+    // The udp defn carries the type code; the property hands it straight back
+    // (zero for an object that bears no primitive type).
+    case vpiPrimType:
+      return obj->prim_type;
     // §37.35 detail 3: a prim term reports its terminal index through
     // vpiTermIndex, which fixes the terminal order; the first terminal carries
     // index zero.
@@ -6785,6 +6804,9 @@ const char* VpiContext::GetStrRaw(int property, VpiHandle obj) {
       if (obj->type == vpiInterfaceTypespec) {
         return VpiInterfaceTypespecDefName(obj);
       }
+      // §37.36: a udp defn reports its definition name - the UDP declaration's
+      // identifier - through vpiDefName.
+      if (obj->type == vpiUdpDefn) return obj->name.data();
       return nullptr;
 
     case kVpiLibrary:

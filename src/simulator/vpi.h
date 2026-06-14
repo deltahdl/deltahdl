@@ -212,6 +212,12 @@ struct VpiObject {
   int size = 0;
   int index = 0;
 
+  // §37.36 detail 2: the primitive type a UDP reports through vpi_get(vpiPrimType)
+  // - vpiSeqPrim for a sequential UDP, vpiCombPrim for a combinational one. The
+  // same property labels a primitive in §37.35; both read it from here. Zero when
+  // the object reports no primitive type.
+  int prim_type = 0;
+
   // §6.9.2: the advisory accessibility keyword a vector net was declared with.
   // At most one is set. They drive how the PLI reports the net's expansion
   // through vpi_get(vpiExplicitScalared/vpiExplicitVectored/vpiExpanded): a
