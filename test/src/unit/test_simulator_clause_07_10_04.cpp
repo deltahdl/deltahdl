@@ -133,25 +133,6 @@ TEST(QueueAssign, ConcatInsertAtPosEquivInsert) {
   EXPECT_EQ(q->elements[4].ToUint64(), 40u);
 }
 
-TEST(QueueAssign, ConcatInsertAfterPosEquivInsertPlus1) {
-  SimFixture f;
-  MakeQueue(f, "q", {10, 20, 30, 40});
-
-  auto* left = MakeSlice(f.arena, "q", MakeInt(f.arena, 0), MakeInt(f.arena, 1));
-  auto* right = MakeSlice(f.arena, "q", MakeInt(f.arena, 2), MakeDollar(f.arena));
-  auto* rhs = MakeConcat(f.arena, {left, MakeInt(f.arena, 99), right});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
-
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_EQ(q->elements.size(), 5u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 99u);
-  EXPECT_EQ(q->elements[3].ToUint64(), 30u);
-  EXPECT_EQ(q->elements[4].ToUint64(), 40u);
-}
-
 TEST(QueueAssign, EmptyConcatEquivDelete) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
@@ -298,6 +279,94 @@ TEST(QueueAssign, AssignEmptyClears) {
   q->elements.clear();
   q->element_ids.clear();
   EXPECT_EQ(q->elements.size(), 0u);
+}
+
+// The LRM writes the pop_front-equivalent form as a bare slice assigned
+// directly to the queue (q = q[1:$]), not wrapped in a concatenation. This
+// drives the top-level slice branch of the assignment collector.
+TEST(QueueAssign, BareSliceFromOneEquivPopFront) {
+  SimFixture f;
+  MakeQueue(f, "q", {10, 20, 30});
+
+  auto* rhs = MakeSlice(f.arena, "q", MakeInt(f.arena, 1), MakeDollar(f.arena));
+  auto* stmt = MakeAssign(f.arena, "q", rhs);
+  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_EQ(q->elements.size(), 2u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 20u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 30u);
+}
+
+// Bare slice form of the pop_back equivalent: q = q[0:$-1].
+TEST(QueueAssign, BareSliceToLastMinus1EquivPopBack) {
+  SimFixture f;
+  MakeQueue(f, "q", {10, 20, 30});
+
+  auto* rhs =
+      MakeSlice(f.arena, "q", MakeInt(f.arena, 0), MakeDollarMinus1(f.arena));
+  auto* stmt = MakeAssign(f.arena, "q", rhs);
+  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_EQ(q->elements.size(), 2u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+}
+
+// Bare slice form yielding a new queue lacking the first two items: q = q[2:$].
+TEST(QueueAssign, BareSliceDropFirstTwo) {
+  SimFixture f;
+  MakeQueue(f, "q", {10, 20, 30, 40, 50});
+
+  auto* rhs = MakeSlice(f.arena, "q", MakeInt(f.arena, 2), MakeDollar(f.arena));
+  auto* stmt = MakeAssign(f.arena, "q", rhs);
+  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_EQ(q->elements.size(), 3u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 30u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 40u);
+  EXPECT_EQ(q->elements[2].ToUint64(), 50u);
+}
+
+// Bare slice form yielding a new queue lacking first and last: q = q[1:$-1].
+TEST(QueueAssign, BareSliceDropFirstAndLast) {
+  SimFixture f;
+  MakeQueue(f, "q", {10, 20, 30, 40, 50});
+
+  auto* rhs =
+      MakeSlice(f.arena, "q", MakeInt(f.arena, 1), MakeDollarMinus1(f.arena));
+  auto* stmt = MakeAssign(f.arena, "q", rhs);
+  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_EQ(q->elements.size(), 3u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 20u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 30u);
+  EXPECT_EQ(q->elements[2].ToUint64(), 40u);
+}
+
+// Second insert example: q = {q[0:pos], e, q[pos+1:$]} mirrors insert(pos+1, e).
+// With pos = 2 the new element lands after index 2, distinct from the
+// q[0:pos-1]/q[pos:$] form above.
+TEST(QueueAssign, ConcatInsertAfterPosEquivInsertPlus1) {
+  SimFixture f;
+  MakeQueue(f, "q", {10, 20, 30, 40});
+
+  auto* left = MakeSlice(f.arena, "q", MakeInt(f.arena, 0), MakeInt(f.arena, 2));
+  auto* right = MakeSlice(f.arena, "q", MakeInt(f.arena, 3), MakeDollar(f.arena));
+  auto* rhs = MakeConcat(f.arena, {left, MakeInt(f.arena, 99), right});
+  auto* stmt = MakeAssign(f.arena, "q", rhs);
+  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_EQ(q->elements.size(), 5u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+  EXPECT_EQ(q->elements[2].ToUint64(), 30u);
+  EXPECT_EQ(q->elements[3].ToUint64(), 99u);
+  EXPECT_EQ(q->elements[4].ToUint64(), 40u);
 }
 
 }
