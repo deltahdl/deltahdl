@@ -13,6 +13,8 @@ TEST(SvDpi, LogicVecValLayout) {
 }
 
 TEST(SvDpi, PackedDataNelems) {
+  // Degenerate zero-width packed array needs no 32-bit chunks at all.
+  EXPECT_EQ(SV_PACKED_DATA_NELEMS(0), 0);
   EXPECT_EQ(SV_PACKED_DATA_NELEMS(1), 1);
   EXPECT_EQ(SV_PACKED_DATA_NELEMS(32), 1);
   EXPECT_EQ(SV_PACKED_DATA_NELEMS(33), 2);
