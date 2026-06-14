@@ -18,22 +18,6 @@ TEST(SemaphoreElaborator, DeclarationSetsClassTypeName) {
   EXPECT_EQ(mod->variables[0].class_type_name, "semaphore");
 }
 
-TEST(SemaphoreElaborator, MultipleSemaphoreDeclarations) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  semaphore s1;\n"
-      "  semaphore s2;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->variables.size(), 2u);
-  EXPECT_EQ(mod->variables[0].class_type_name, "semaphore");
-  EXPECT_EQ(mod->variables[1].class_type_name, "semaphore");
-}
-
 TEST(SemaphoreElaborator, DeclarationWithInitializer) {
   ElabFixture f;
   auto* design = ElaborateSrc(

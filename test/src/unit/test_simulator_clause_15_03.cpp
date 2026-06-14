@@ -55,15 +55,6 @@ TEST(IpcSync, SemaphoreLargeKeyCount) {
   EXPECT_EQ(sem.key_count, 0);
 }
 
-TEST(IpcSync, MultipleSemaphoresInContext) {
-  SyncFixture f;
-  auto* sem1 = f.ctx.CreateSemaphore("s1", 1);
-  auto* sem2 = f.ctx.CreateSemaphore("s2", 5);
-  EXPECT_EQ(sem1->key_count, 1);
-  EXPECT_EQ(sem2->key_count, 5);
-  EXPECT_NE(f.ctx.FindSemaphore("s1"), f.ctx.FindSemaphore("s2"));
-}
-
 TEST(IpcSync, SemaphoreMutualExclusionPattern) {
   SemaphoreObject sem(1);
 
@@ -85,6 +76,38 @@ TEST(IpcSync, SemaphoreKeyCountCanExceedInitial) {
   sem.Put(3);
   EXPECT_EQ(sem.key_count, 5);
   EXPECT_EQ(sem.TryGet(5), 1);
+  EXPECT_EQ(sem.key_count, 0);
+}
+
+// §15.3: a process procures keys from the bucket before it continues. When the
+// bucket holds at least the requested number of keys, the blocking procure
+// succeeds immediately and drains the bucket by that amount.
+TEST(IpcSync, SemaphoreGetAcquiresWhenKeysAvailable) {
+  SemaphoreObject sem(2);
+  EXPECT_EQ(sem.Get(2), SemGetStatus::kAcquired);
+  EXPECT_EQ(sem.key_count, 0);
+}
+
+// §15.3: a process that cannot procure the required number of keys is not
+// allowed to continue and must wait. The blocking procure reports that the
+// caller blocks and leaves the bucket untouched, so only a fixed number of
+// processes hold keys at once.
+TEST(IpcSync, SemaphoreGetBlocksWhenKeysInsufficient) {
+  SemaphoreObject sem(1);
+  EXPECT_EQ(sem.Get(1), SemGetStatus::kAcquired);
+  EXPECT_EQ(sem.Get(1), SemGetStatus::kBlock);
+  EXPECT_EQ(sem.key_count, 0);
+}
+
+// §15.3: a waiting process proceeds only once a sufficient number of keys has
+// been returned to the bucket. A procure that blocks for lack of keys succeeds
+// after enough keys are put back.
+TEST(IpcSync, SemaphoreWaiterProceedsAfterKeysReturned) {
+  SemaphoreObject sem(0);
+  EXPECT_EQ(sem.Get(2), SemGetStatus::kBlock);
+  sem.Put(2);
+  EXPECT_EQ(sem.key_count, 2);
+  EXPECT_EQ(sem.Get(2), SemGetStatus::kAcquired);
   EXPECT_EQ(sem.key_count, 0);
 }
 

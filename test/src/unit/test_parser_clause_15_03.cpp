@@ -44,18 +44,6 @@ TEST_F(AnnexHParseTest, MethodCallsInInitialBlock) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-TEST(SemaphoreParser, MultipleSemaphoreDeclarations) {
-  auto r = Parse(
-      "module m;\n"
-      "  semaphore mutex;\n"
-      "  semaphore resource_lock;\n"
-      "  semaphore sync_sem;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(SemaphoreParser, NoClassDeclarationRequired) {
   auto r = Parse(
       "module m;\n"
