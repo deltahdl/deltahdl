@@ -43,15 +43,6 @@ class VpiErrorHandling : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §36.10.1 (C1/C2): vpi_chk_error() is the routine provided to determine
-// whether an error occurred; it returns a nonzero value when the previously
-// called VPI routine resulted in an error.
-TEST_F(VpiErrorHandling, ChkErrorReturnsNonzeroWhenErrorOccurred) {
-  CallVpiRoutineThatErrors();
-
-  EXPECT_NE(VpiChkErrorC(nullptr), 0);
-}
-
 // §36.10.1 (C2): the nonzero result genuinely distinguishes an error from
 // success - when the previously called routine did not error, the same query
 // returns zero, so a nonzero return is what signals an error occurred.
