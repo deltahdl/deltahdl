@@ -54,6 +54,27 @@ TEST_F(VpiMcdVprintfSim, ConsumesAnAlreadyStartedVarargsListAndWritesFormattedTe
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd), "42-ok");
 }
 
+// §38.29: the routine writes to one or more files named by the multichannel
+// descriptor, exactly as vpi_mcd_printf() does. A descriptor that ORs together
+// two open channels delivers the same expanded text to both files in a single
+// call, while the returned count is the length of the formatted text and is
+// independent of how many channels received it.
+TEST_F(VpiMcdVprintfSim, WritesToEveryChannelNamedByTheDescriptor) {
+  char first[] = "v1.log";
+  char second[] = "v2.log";
+  PLI_UINT32 mcd1 = vpi_mcd_open(first);
+  PLI_UINT32 mcd2 = vpi_mcd_open(second);
+  ASSERT_NE(mcd1, 0u);
+  ASSERT_NE(mcd2, 0u);
+  ASSERT_NE(mcd1, mcd2);
+
+  PLI_INT32 written = CallWithStartedVarargs(mcd1 | mcd2, "x=%d", 7);
+
+  EXPECT_EQ(written, 3);
+  EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd1), "x=7");
+  EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd2), "x=7");
+}
+
 // §38.29: an error returns EOF. With no format string there is nothing to
 // print, so the routine reports the error and writes nothing - exercising the
 // error branch of the va_list-taking entry point itself.
