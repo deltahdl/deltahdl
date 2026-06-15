@@ -48,4 +48,16 @@ TEST(SampledClockingEventArgDeprecated, ClockingEventArgStillAllowedForRose) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// The rejection is gated solely on the callee being $sampled, independent of
+// how the clocking event is written. A bare (unparenthesized) clocking event
+// argument supplied to a non-$sampled sampled value function such as $fell
+// must still parse, confirming the gate does not fire on the event syntax
+// itself.
+TEST(SampledClockingEventArgDeprecated, BareClockingEventArgStillAllowedForFell) {
+  auto r = Parse(
+      "module m; logic a, b, clk; "
+      "assign b = $fell(a, @clk); endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
