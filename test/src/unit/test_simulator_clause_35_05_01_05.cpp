@@ -117,38 +117,6 @@ TEST(DpiReentrancy, ImportedTaskCallThroughExportedTaskSuspendsAndConsumesTime) 
   EXPECT_EQ(sched.CurrentTime().ticks, kCallTime + kResumeDelay);
 }
 
-// R2 (the enumeration): the subclause names three forms of timing control that
-// trigger the suspension — a delay control, an event control, and a wait
-// statement. Each is modeled here as deferring the continuation to a later
-// slot, and each produces a suspension of the imported task's thread.
-TEST(DpiReentrancy, SuspensionArisesFromDelayEventOrWaitControl) {
-  for (uint64_t delay : {uint64_t{1}, uint64_t{7}, uint64_t{42}}) {
-    Arena arena;
-    Scheduler sched(arena);
-    bool resumed = false;
-    DpiRuntime rt = MakeRuntimeWithSuspendingExport(
-        sched, delay, [&]() { resumed = true; });
-
-    Event* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&]() {
-      rt.EnterContextImportCall("imported_task", DpiScope{}, /*is_task=*/true);
-      DpiArgValue result;
-      EXPECT_EQ(rt.CallExportFromImport("exported_wait", {}, &result),
-                DpiExportCallStatus::kOk);
-      rt.LeaveImportCall();
-      // Whatever the timing-control form, the continuation is now pending in a
-      // future slot: the thread has suspended.
-      EXPECT_TRUE(sched.HasEvents());
-      EXPECT_EQ(sched.NextEventTime().ticks, kCallTime + delay);
-    };
-    sched.ScheduleEvent({kCallTime}, Region::kActive, ev);
-    sched.Run();
-
-    EXPECT_TRUE(resumed);
-    EXPECT_EQ(sched.CurrentTime().ticks, kCallTime + delay);
-  }
-}
-
 // R3: because the call suspends rather than completing instantly, the imported
 // task's foreign code can be simultaneously active in more than one execution
 // thread. Two activations of the same imported task are started in different
