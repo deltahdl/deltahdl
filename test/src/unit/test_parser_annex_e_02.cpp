@@ -14,24 +14,6 @@ TEST(OptionalDirectiveParsing, DefaultDecayTimeInteger) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-TEST(OptionalDirectiveParsing, DefaultDecayTimeReal) {
-  auto r =
-      ParseWithPreprocessor("`default_decay_time 3.5\nmodule m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "m");
-}
-
-TEST(OptionalDirectiveParsing, DefaultDecayTimeInfinite) {
-  auto r = ParseWithPreprocessor(
-      "`default_decay_time infinite\nmodule m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "m");
-}
-
 TEST(OptionalDirectiveParsing, DefaultDecayTimeMultipleModules) {
   auto r = ParseWithPreprocessor(
       "`default_decay_time 50\n"

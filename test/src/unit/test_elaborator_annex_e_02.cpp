@@ -130,6 +130,30 @@ TEST(Elaborator, DefaultDecayTime_LaterOverridesAtElabLevel) {
   EXPECT_TRUE(found);
 }
 
+// C1 (real_constant) x C3: a real-valued directive still drives the decay time
+// applied to a trireg. The elaborator consumes the integer-valued default, so a
+// real argument reaches the net as its truncated integer count.
+TEST(Elaborator, DefaultDecayTime_RealArgumentAppliesToTrireg) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "`default_decay_time 3.5\n"
+      "module t;\n"
+      "  trireg cap;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (const auto& net : mod->nets) {
+    if (net.name == "cap") {
+      EXPECT_EQ(net.decay_ticks, 3u);
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
 TEST(Elaborator, DefaultDecayTime_AppliesToAllTriregNets) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
