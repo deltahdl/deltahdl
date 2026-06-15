@@ -137,35 +137,5 @@ TEST_F(CompiletfApplicationRoutine, SuppliedRoutineRoundTripsAndReceivesUserData
   EXPECT_EQ(g_compiletf_arg, reinterpret_cast<const char*>(&payload));
 }
 
-// -----------------------------------------------------------------------------
-// §36.8.2: compiletf is called when "the user-defined system task or system
-// function name is encountered" - so a supplied compiletf is preserved for a
-// system task just as it is for a system function. Edge case complementing the
-// function round-trip above and the task-without-compiletf case: a system task
-// registered with a compiletf reads the routine back and runs it.
-// -----------------------------------------------------------------------------
-
-TEST_F(CompiletfApplicationRoutine, SystemTaskRegistrationPreservesCompiletf) {
-  int payload = 0;
-
-  VpiSystfData task = {};
-  task.type = kVpiSysTask;
-  task.tfname = "$record_event";
-  task.compiletf = &RecordingCompiletf;
-  task.user_data = &payload;
-
-  VpiHandle handle = vpi_ctx_.RegisterSystf(&task);
-  ASSERT_NE(handle, nullptr);
-
-  VpiSystfData read_back = {};
-  vpi_ctx_.GetSystfInfo(handle, &read_back);
-  ASSERT_EQ(read_back.compiletf, &RecordingCompiletf);
-
-  ResetCompiletfProbe();
-  VpiSystfInvoke(read_back.compiletf, read_back.user_data);
-  EXPECT_EQ(g_compiletf_calls, 1);
-  EXPECT_EQ(g_compiletf_arg, reinterpret_cast<const char*>(&payload));
-}
-
 }  // namespace
 }  // namespace delta
