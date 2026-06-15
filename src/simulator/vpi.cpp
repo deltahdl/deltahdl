@@ -4095,6 +4095,21 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return VpiLoopConditionExpr(ref);
   }
 
+  // §37.67: vpiCondition of a wait or ordered wait statement reaches its
+  // controlling condition, which the diagram draws to either an expression or a
+  // sequence instance. As with the loop statements of §37.66 above, the
+  // condition's own type is an expression kind (or a sequence instance) rather
+  // than the vpiCondition relation tag, so the generic traversal below cannot find
+  // it. The relation is gated on the wait statement kinds so it does not also
+  // serve the vpiCondition edge other diagrams draw. A wait fork draws no
+  // condition edge, so the helper reports null for it. The body statement (the
+  // diagram's unlabeled edge) and a wait fork's else action (vpiElseStmt) each
+  // carry their relation as their own child type and are reached by the generic
+  // traversal below.
+  if (type == vpiCondition && VpiIsWaitType(ref->type)) {
+    return VpiWaitConditionExpr(ref);
+  }
+
   // §37.71: vpiCondition of an if or if-else statement reaches its controlling
   // condition expression. As with the loop statements above, the condition's own
   // type is an expression kind rather than the vpiCondition relation tag, so the

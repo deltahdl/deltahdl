@@ -25,11 +25,12 @@ class Waits : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// vpiCondition edge: a wait statement reaches an expression condition through the
-// dedicated helper. The public vpiCondition dispatch is scoped to the loop
-// statements of §37.66 and reports nothing for a wait, which is exactly why the
-// helper carries this edge - both halves of that split are observed here.
-TEST_F(Waits, WaitReachesExpressionConditionThroughHelper) {
+// vpiCondition edge: a wait statement reaches an expression condition. The public
+// vpiCondition dispatch serves the wait through the dedicated helper, because the
+// condition's own type is an expression kind rather than the vpiCondition relation
+// tag and so the generic child walk cannot find it. Both the helper and the public
+// entry point reach the same condition.
+TEST_F(Waits, WaitReachesExpressionCondition) {
   VpiObject condition;
   condition.type = vpiOperation;  // an expression kind
 
@@ -41,8 +42,7 @@ TEST_F(Waits, WaitReachesExpressionConditionThroughHelper) {
   wait_stmt.children = {&condition, &body};
 
   EXPECT_EQ(VpiWaitConditionExpr(&wait_stmt), &condition);
-  // The loop-statement dispatch of §37.66 deliberately does not serve a wait.
-  EXPECT_EQ(VpiHandleC(vpiCondition, &wait_stmt), nullptr);
+  EXPECT_EQ(VpiHandleC(vpiCondition, &wait_stmt), &condition);
 }
 
 // vpiCondition edge: an ordered wait reaches a sequence-instance condition. This
@@ -57,6 +57,7 @@ TEST_F(Waits, OrderedWaitReachesSequenceInstanceCondition) {
   ordered_wait.children = {&condition};
 
   EXPECT_EQ(VpiWaitConditionExpr(&ordered_wait), &condition);
+  EXPECT_EQ(VpiHandleC(vpiCondition, &ordered_wait), &condition);
 }
 
 // vpiCondition edge: the condition is found even when a non-condition child (the
@@ -89,6 +90,9 @@ TEST_F(Waits, ConditionNullWhenAbsentOrHandleNull) {
   wait_fork.type = vpiWaitFork;
   wait_fork.children = {&body};  // only a body, no condition
   EXPECT_EQ(VpiWaitConditionExpr(&wait_fork), nullptr);
+  // The wait-statement gate admits a wait fork, but it draws no condition edge, so
+  // the public dispatch reports null rather than mistaking the body for one.
+  EXPECT_EQ(VpiHandleC(vpiCondition, &wait_fork), nullptr);
 }
 
 // The "waits" grouping: the predicate admits the three wait kinds the diagram
