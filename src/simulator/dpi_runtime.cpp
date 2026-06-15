@@ -1143,27 +1143,13 @@ double CoverageApi::GetValue(std::string_view key) const {
   return it->second;
 }
 
-// Annex C.2.5: record that the Data Read API has been deprecated. The message
-// names the last standard that specified it and notes there is no replacement,
-// distinguishing this full removal from a routine that was merely renamed.
-void DataReadApi::ReportDeprecation() const {
-  deprecation_reported_ = true;
-  deprecation_message_ =
-      "the Data Read API is deprecated and no longer appears in this standard; "
-      "it was last specified in IEEE 1800-2005 (Clause 30 and Annex I) and has "
-      "no replacement";
-  ++deprecation_count_;
-}
-
 void DataReadApi::StoreVariable(std::string_view name,
                                 const DataReadValue& val) {
-  ReportDeprecation();
   variables_[std::string(name)] = val;
 }
 
 DataReadValue DataReadApi::GetValue(std::string_view name,
                                     DataReadFormat fmt) const {
-  ReportDeprecation();
   auto it = variables_.find(std::string(name));
   if (it == variables_.end()) return DataReadValue{fmt, 0, 0.0, "", 0, {}};
   DataReadValue result = it->second;
@@ -1172,14 +1158,12 @@ DataReadValue DataReadApi::GetValue(std::string_view name,
 }
 
 void DataReadApi::PutValue(std::string_view name, const DataReadValue& val) {
-  ReportDeprecation();
   variables_[std::string(name)] = val;
   NotifyValueChange(name, val);
 }
 
 void DataReadApi::RegisterValueChangeCb(std::string_view name,
                                         ValueChangeCb cb) {
-  ReportDeprecation();
   change_cbs_[std::string(name)].push_back(std::move(cb));
 }
 

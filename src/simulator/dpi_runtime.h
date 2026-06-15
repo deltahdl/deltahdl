@@ -730,24 +730,9 @@ class DataReadApi {
 
   void StoreVariable(std::string_view name, const DataReadValue& val);
 
-  // Annex C.2.5: the Data Read API was removed from the language. It was last
-  // specified in IEEE 1800-2005 (Clause 30 and Annex I) and, unlike a renamed
-  // routine, has no replacement in this standard. The runtime keeps the API
-  // operational for existing callers but records a deprecation diagnostic each
-  // time a public entry point is reached, so a program still using it is told
-  // the interface no longer appears in the standard.
-  bool DeprecationReported() const { return deprecation_reported_; }
-  const std::string& LastDeprecation() const { return deprecation_message_; }
-  uint32_t DeprecationCount() const { return deprecation_count_; }
-
  private:
-  void ReportDeprecation() const;
-
   std::unordered_map<std::string, DataReadValue> variables_;
   std::unordered_map<std::string, std::vector<ValueChangeCb>> change_cbs_;
-  mutable bool deprecation_reported_ = false;
-  mutable std::string deprecation_message_;
-  mutable uint32_t deprecation_count_ = 0;
 };
 
 }  // namespace delta
