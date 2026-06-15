@@ -97,18 +97,29 @@ TEST(DeferredAssertionQueue, SystemDiscardControlsFlushAllAssertions) {
   }
 }
 
-// §39.5.3: the system-wide controls that do not discard attempts in progress
-// (e.g. vpiAssertionSysOff disables further starts but does not affect executing
-// attempts) do not flush the pending queues.
+// §39.5.3: none of the system-wide controls that leave attempts in progress
+// alone (e.g. vpiAssertionSysOff disables further starts but does not affect
+// executing attempts; lock/unlock/on and the action toggles likewise do not
+// discard) interfere with current attempts, so none of them flush the pending
+// queues of any assertion.
 TEST(DeferredAssertionQueue, SystemNonDiscardControlsDoNotFlush) {
-  AssertionApi api;
-  api.QueuePendingAssertionReport(kA);
-  api.QueuePendingAssertionReport(kB);
+  for (int control :
+       {vpiAssertionSysOff, vpiAssertionSysOn, vpiAssertionSysLock,
+        vpiAssertionSysUnlock, vpiAssertionSysDisablePassAction,
+        vpiAssertionSysEnablePassAction, vpiAssertionSysDisableFailAction,
+        vpiAssertionSysEnableFailAction, vpiAssertionSysDisableVacuousAction,
+        vpiAssertionSysEnableNonvacuousAction}) {
+    // A fresh instance per control keeps each case independent — in particular
+    // a prior SysLock must not bleed into the next control's case.
+    AssertionApi api;
+    api.QueuePendingAssertionReport(kA);
+    api.QueuePendingAssertionReport(kB);
 
-  EXPECT_TRUE(api.SysControl(vpiAssertionSysOff));
+    EXPECT_TRUE(api.SysControl(control));
 
-  EXPECT_EQ(api.PendingAssertionReportCount(kA), 1u);
-  EXPECT_EQ(api.PendingAssertionReportCount(kB), 1u);
+    EXPECT_EQ(api.PendingAssertionReportCount(kA), 1u);
+    EXPECT_EQ(api.PendingAssertionReportCount(kB), 1u);
+  }
 }
 
 // §39.5.3 edge: a discard control applied to an assertion that has no pending
