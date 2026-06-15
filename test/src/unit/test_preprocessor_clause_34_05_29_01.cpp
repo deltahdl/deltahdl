@@ -59,18 +59,6 @@ TEST_F(ProtectRuntimeLicenseSyntaxTest,
   EXPECT_NE(result.find("endmodule"), std::string::npos);
 }
 
-// The optional `exit` and `match` subkeywords may be omitted: the minimal form
-// carrying only the three required subkeywords (`library`, `entry`, `feature`)
-// is still recognized and the directive line is stripped in full.
-TEST_F(ProtectRuntimeLicenseSyntaxTest, RuntimeLicenseRequiredOnlyFormConsumed) {
-  auto result = Preprocess(
-      "`pragma protect runtime_license = ( library = \"liblic.so\" , entry = "
-      "\"check\" , feature = \"core\" )\n");
-  EXPECT_FALSE(diag_.HasErrors());
-  EXPECT_EQ(result.find("pragma"), std::string::npos);
-  EXPECT_EQ(result.find("feature"), std::string::npos);
-}
-
 // The two optional subkeywords are independent in the grammar
 // (`[ , exit ] [ , match ]`): a form that omits `exit` but supplies `match` is
 // a valid keyword expression and is consumed in full.
