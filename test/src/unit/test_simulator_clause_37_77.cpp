@@ -52,6 +52,20 @@ TEST_F(Disables, DisableReachesFunctionTargetThroughVpiExpr) {
   EXPECT_EQ(VpiHandleC(vpiExpr, &disable), &function);
 }
 
+// vpiExpr edge, named begin target: the edge reaches a disabled named begin
+// block, observed directly as the sole operand (the kind-directed selection among
+// several children is covered separately below).
+TEST_F(Disables, DisableReachesNamedBeginTargetThroughVpiExpr) {
+  VpiObject named_begin;
+  named_begin.type = vpiNamedBegin;
+
+  VpiObject disable;
+  disable.type = vpiDisable;
+  disable.children = {&named_begin};
+
+  EXPECT_EQ(VpiHandleC(vpiExpr, &disable), &named_begin);
+}
+
 // vpiExpr edge, named fork target: the edge reaches a disabled named fork block,
 // the fourth and last target kind the diagram groups.
 TEST_F(Disables, DisableReachesNamedForkTargetThroughVpiExpr) {
