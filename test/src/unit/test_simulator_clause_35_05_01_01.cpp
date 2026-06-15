@@ -106,31 +106,6 @@ TEST(DpiInstantCompletion, ImportedFunctionCallSchedulesNoFutureSimulationWork) 
   EXPECT_EQ(sched.CurrentTime().ticks, kCallTime);
 }
 
-// Instant completion: the imported function's result is available within the
-// same time slot in which it was called — the simulation never has to advance
-// to a later time to collect it.
-TEST(DpiInstantCompletion, ImportedFunctionResultDeliveredInSameTimeSlot) {
-  Arena arena;
-  Scheduler sched(arena);
-  DpiRuntime rt = MakeDoublingImport();
-
-  bool produced_in_slot = false;
-  int32_t result = 0;
-
-  Event* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&]() {
-    std::vector<DpiArgValue> actuals = {DpiArgValue::FromInt(9)};
-    result = rt.CallImportWithArgs("twice", actuals).AsInt();
-    // The result exists while this time slot is still executing.
-    produced_in_slot = (sched.CurrentTime().ticks == kCallTime);
-  };
-  sched.ScheduleEvent({kCallTime}, Region::kActive, ev);
-  sched.Run();
-
-  EXPECT_TRUE(produced_in_slot);
-  EXPECT_EQ(result, 18);
-}
-
 // Edge case: several imported function calls made back-to-back within a single
 // time slot still consume zero simulation time in aggregate. Instant completion
 // is per call, so no number of calls advances the clock or defers work.
@@ -206,6 +181,62 @@ TEST(DpiInstantCompletion, ImportedFunctionWithOutputArgConsumesZeroTime) {
   // ...instantly, with zero simulation time consumed.
   EXPECT_EQ(time_before, kCallTime);
   EXPECT_EQ(time_after, kCallTime);
+}
+
+// Edge case: the heaviest import entry point — the one that copies back an
+// inout actual and then detects the resulting value change — still completes
+// within the same time slot. Detecting and reporting the change happens after
+// the foreign function returns but as part of the very same synchronous call:
+// the change is delivered into the caller's vector, never scheduled onto the
+// simulator's calendar, so no number of value changes lets an imported
+// function consume simulation time or defer work to a later slot.
+TEST(DpiInstantCompletion, ChangeDetectingImportCallConsumesZeroTime) {
+  Arena arena;
+  Scheduler sched(arena);
+  DpiRuntime rt;
+  DpiRtFunction func;
+  func.c_name = "c_bump";
+  func.sv_name = "bump";
+  func.return_type = DataTypeKind::kVoid;
+  func.args = {DpiArg{"io", DataTypeKind::kInt, Direction::kInout}};
+  func.arg_impl = [](std::vector<DpiArgValue>& a) {
+    a[0] = DpiArgValue::FromInt(a[0].AsInt() + 1);
+    return DpiArgValue::FromInt(0);
+  };
+  rt.RegisterImport(std::move(func));
+
+  uint64_t time_before = 0;
+  uint64_t time_after = 0;
+  size_t scheduled_before = 0;
+  size_t scheduled_after = 0;
+  size_t change_count = 0;
+  int32_t new_value = 0;
+
+  Event* ev = sched.GetEventPool().Acquire();
+  ev->callback = [&]() {
+    time_before = sched.CurrentTime().ticks;
+    scheduled_before = sched.EvaluationEventScheduledCount();
+    std::vector<DpiArgValue> actuals = {DpiArgValue::FromInt(41)};
+    std::vector<DpiArgValueChange> changes;
+    rt.CallImportDetectingChanges("bump", actuals, changes);
+    change_count = changes.size();
+    if (!changes.empty()) new_value = changes[0].new_value.AsInt();
+    time_after = sched.CurrentTime().ticks;
+    scheduled_after = sched.EvaluationEventScheduledCount();
+  };
+  sched.ScheduleEvent({kCallTime}, Region::kActive, ev);
+  sched.Run();
+
+  // The change-detecting path actually ran and observed the inout change...
+  EXPECT_EQ(change_count, 1u);
+  EXPECT_EQ(new_value, 42);
+  // ...all within the call's own time slot: the clock never moved and nothing
+  // was deferred onto the calendar.
+  EXPECT_EQ(time_before, kCallTime);
+  EXPECT_EQ(time_after, kCallTime);
+  EXPECT_EQ(scheduled_after, scheduled_before);
+  EXPECT_FALSE(sched.HasEvents());
+  EXPECT_EQ(sched.CurrentTime().ticks, kCallTime);
 }
 
 }  // namespace
