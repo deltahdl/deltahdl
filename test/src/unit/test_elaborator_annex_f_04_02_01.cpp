@@ -98,6 +98,16 @@ TEST(CheckerRewriteAlgorithm, TypedNonMatchingIgnoresMethodOperandForm) {
             ReferenceReplacement::kItemCastTypeOfFormal);
 }
 
+// §F.4.2.1 step 4 (edge): the typed-non-matching branch is likewise undiverted
+// by a `$`/variable_lvalue actual — step 3's distinguishing form, which matters
+// only for an untyped formal. Step 4 keys solely on casting_type, so it still
+// casts through type(t) here.
+TEST(CheckerRewriteAlgorithm, TypedNonMatchingIgnoresDollarOrLvalueForm) {
+  EXPECT_EQ(ReplaceCheckerFormalReference(FormalKind::kTypedNonMatching,
+                                          ActualNature::kDollarOrLvalue),
+            ReferenceReplacement::kItemCastTypeOfFormal);
+}
+
 // §F.4.2.1 step 5 (edge): the typed-matching branch item-wraps only when the
 // reference is a sequence_method_call operand. A casting_type or
 // `$`/variable_lvalue actual — irrelevant to a matching formal — leaves the
