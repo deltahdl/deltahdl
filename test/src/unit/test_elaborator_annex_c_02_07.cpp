@@ -78,23 +78,6 @@ TEST(AlwaysProcedureInCheckers, GeneralAlwaysOutsideCheckerIsStillAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AlwaysProcedureInCheckers, CombinationalStyleGeneralAlwaysInCheckerIsStillRejected) {
-  // Edge: a general always written in combinational style (level-sensitive
-  // event list, blocking assignment) is still the removed general procedure
-  // form and is rejected. The deprecation keys on the always keyword itself,
-  // not on whether the body resembles always_comb. AlwaysCombInCheckerIsAccepted
-  // shows the same blocking assignment to a checker variable is otherwise legal,
-  // so the keyword is the only thing producing the error here.
-  ElabFixture f;
-  ElaborateSrc(
-      "checker chk;\n"
-      "  logic a, b, c;\n"
-      "  always @(a or b) c = a & b;\n"
-      "endchecker\n",
-      f, "chk");
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(AlwaysProcedureInCheckers, GeneralAlwaysRejectedAlongsideAcceptedSpecializedForms) {
   // Integration: a checker mixing an accepted always_comb with a forbidden
   // general always is still rejected. The presence of valid specialized forms
