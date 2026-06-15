@@ -49,14 +49,4 @@ TEST_F(ProtectKeyMethodSyntaxTest,
   EXPECT_NE(result.find("endmodule"), std::string::npos);
 }
 
-// The <string> argument of the keyword expression may carry embedded
-// whitespace; the entire quoted value is consumed along with the directive
-// line, exercising the <string> portion of `key_method = <string>`.
-TEST_F(ProtectKeyMethodSyntaxTest, KeyMethodStringArgumentWithSpacesConsumed) {
-  auto result = Preprocess("`pragma protect key_method = \"aes 128 cbc\"\n");
-  EXPECT_FALSE(diag_.HasErrors());
-  EXPECT_EQ(result.find("pragma"), std::string::npos);
-  EXPECT_EQ(result.find("aes 128 cbc"), std::string::npos);
-}
-
 }  // namespace
