@@ -1265,6 +1265,11 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // any part of it so the scheduler sees an empty event calendar.
   if (design->simulation_blocked) return;
   design_ = design;
+  // Annex D.11: the interactive scope consulted by the optional $scope system
+  // task starts at the first top-level module. A later $scope call retargets it.
+  if (!design->top_modules.empty()) {
+    ctx_.SetInteractiveScope(design->top_modules.front()->name);
+  }
   for (const auto& [name, width] : design->type_widths) {
     ctx_.RegisterTypeWidth(name, width);
   }

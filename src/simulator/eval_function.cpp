@@ -1081,6 +1081,30 @@ static Logic4Vec EvalSeveritySysCall(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// Annex D.11: the argument to $scope is a complete hierarchical name. Rebuild
+// that name as a string from its expression form (a bare or scoped identifier,
+// or a dotted member-access chain) without evaluating it, since it names a
+// level of hierarchy rather than a readable object.
+static std::string HierarchicalScopeName(const Expr* e) {
+  if (!e) return {};
+  switch (e->kind) {
+    case ExprKind::kIdentifier: {
+      std::string s;
+      if (!e->scope_prefix.empty()) {
+        s += std::string(e->scope_prefix);
+        s += (e->scope_prefix == "$unit") ? "::" : ".";
+      }
+      s += std::string(e->text);
+      return s;
+    }
+    case ExprKind::kMemberAccess:
+      return HierarchicalScopeName(e->lhs) + "." +
+             (e->rhs ? std::string(e->rhs->text) : std::string());
+    default:
+      return std::string(e->text);
+  }
+}
+
 // §20.2 / Table 20-1: $stop and $finish accept an optional diagnostic level
 // argument (0, 1, or 2) that selects how much information accompanies the
 // control action. Level 0 prints nothing; level 1 reports the simulation time
@@ -1143,6 +1167,16 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (name == "$reset_value") {
     return MakeLogic4VecVal(arena, 32,
                             static_cast<uint64_t>(ctx.ResetValue()));
+  }
+  // Optional $scope system task (Annex D.11). It selects a level of hierarchy as
+  // the interactive scope used to identify objects. Its single argument is the
+  // complete hierarchical name of a module, task, function, or named block;
+  // record that name as the new interactive scope.
+  if (name == "$scope") {
+    if (!expr->args.empty() && expr->args[0]) {
+      ctx.SetInteractiveScope(HierarchicalScopeName(expr->args[0]));
+    }
+    return MakeLogic4VecVal(arena, 1, 0);
   }
   if (name == "$exit") {
 

@@ -212,6 +212,18 @@ class SimContext {
   uint32_t ResetCount() const { return reset_count_; }
   int64_t ResetValue() const { return reset_value_; }
 
+  // Optional $scope system task (Annex D.11). The interactive scope names the
+  // level of hierarchy used when identifying objects interactively. Its initial
+  // setting is the first top-level module (established at lowering); a $scope
+  // call retargets it to the complete hierarchical name supplied as its single
+  // argument (a module, task, function, or named block). This mirrors, on the
+  // system-task side, the interactive scope that vpi_control reaches through
+  // vpiSetInteractiveScope (§38.4).
+  void SetInteractiveScope(std::string_view name) {
+    interactive_scope_ = std::string(name);
+  }
+  const std::string& InteractiveScope() const { return interactive_scope_; }
+
   // §40.3.2.1 coverage-collection state driven by $coverage_control.
   CoverageControlState& GetCoverageControlState() { return coverage_control_; }
 
@@ -694,6 +706,7 @@ class SimContext {
   bool stop_requested_ = false;
   uint32_t reset_count_ = 0;
   int64_t reset_value_ = 0;
+  std::string interactive_scope_;
   CoverageControlState coverage_control_;
 
   std::unordered_map<const Expr*, Logic4Vec> deferred_arg_snapshots_;
