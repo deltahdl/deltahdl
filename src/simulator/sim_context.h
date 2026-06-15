@@ -250,6 +250,24 @@ class SimContext {
   const std::string& LastShownScope() const { return last_shown_scope_; }
   bool ShowScopesRecursive() const { return show_scopes_recursive_; }
 
+  // Optional $showvars system task (Annex D.13). $showvars produces status
+  // information for the reg and net variables, scalar and vector, in the current
+  // scope (the interactive scope above). With no argument it reports every
+  // variable in that scope; with a list of variables it reports only the named
+  // ones. A bit-select or part-select of a vector reports the status of every
+  // bit of that vector, so such a selection is recorded by the name of its
+  // underlying vector. Remember the scope the request applied to and the list of
+  // variables named (empty when none were given) so the selection can be
+  // observed.
+  void RecordShowVars(std::string_view scope, std::vector<std::string> vars) {
+    last_showvars_scope_ = std::string(scope);
+    showvars_variables_ = std::move(vars);
+  }
+  const std::string& LastShowVarsScope() const { return last_showvars_scope_; }
+  const std::vector<std::string>& ShowVarsVariables() const {
+    return showvars_variables_;
+  }
+
   // Optional $log and $nolog system tasks (Annex D.7). A log file holds a copy
   // of everything printed to standard output. $nolog disables that copy and
   // $log reenables it; an optional filename argument to $log closes the current
@@ -752,6 +770,8 @@ class SimContext {
   std::string last_listed_scope_;
   std::string last_shown_scope_;
   bool show_scopes_recursive_ = false;
+  std::string last_showvars_scope_;
+  std::vector<std::string> showvars_variables_;
   bool logging_enabled_ = true;
   std::string log_file_;
   CoverageControlState coverage_control_;

@@ -1105,6 +1105,19 @@ static std::string HierarchicalScopeName(const Expr* e) {
   }
 }
 
+// Annex D.13: each entry in the $showvars variable list names a variable, or a
+// bit-select or part-select of one. Because the status of every bit of a
+// selected vector is displayed, a selection is reduced to the name of the
+// vector it selects from; a plain reference keeps its own name. Either way the
+// name is rebuilt from the expression without evaluating it.
+static std::string ShowVarsVariableName(const Expr* e) {
+  if (!e) return {};
+  if (e->kind == ExprKind::kSelect) {
+    return ShowVarsVariableName(e->base);
+  }
+  return HierarchicalScopeName(e);
+}
+
 // Annex D.10: $scale converts a time value held in one module into the time
 // unit of the module that invokes $scale. The argument is the complete
 // hierarchical name of the source value: the hierarchy above the final
@@ -1242,6 +1255,22 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
       recursive = EvalExpr(expr->args[0], ctx, arena).ToUint64() != 0;
     }
     ctx.RecordShowScopes(ctx.InteractiveScope(), recursive);
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  // Optional $showvars system task (Annex D.13). It produces status information
+  // for the reg and net variables, scalar and vector, in the current scope (the
+  // interactive scope established by $scope). With no argument every variable in
+  // that scope is reported; with a list of variables only the named ones are. A
+  // bit-select or part-select of a vector reports the status of all bits of that
+  // vector, so such a selection is reduced to the name of its underlying vector.
+  // Collect the requested variable names and record the request against the
+  // current scope.
+  if (name == "$showvars") {
+    std::vector<std::string> vars;
+    for (const Expr* arg : expr->args) {
+      if (arg) vars.push_back(ShowVarsVariableName(arg));
+    }
+    ctx.RecordShowVars(ctx.InteractiveScope(), std::move(vars));
     return MakeLogic4VecVal(arena, 1, 0);
   }
   // Optional $nolog and $log system tasks (Annex D.7). The log file holds a
