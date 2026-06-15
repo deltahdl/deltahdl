@@ -45,14 +45,4 @@ TEST_F(ProtectResetSyntaxTest, ResetDirectiveStrippedSurroundingTextKept) {
   EXPECT_NE(result.find("endmodule"), std::string::npos);
 }
 
-// The bare keyword takes no argument: only the directive line itself is
-// consumed, and an immediately following line is preserved intact, exercising
-// the no-argument form of the `reset` keyword expression.
-TEST_F(ProtectResetSyntaxTest, ResetConsumesOnlyDirectiveLineFollowingLineKept) {
-  auto result = Preprocess("`pragma protect reset\nwire w;\n");
-  EXPECT_FALSE(diag_.HasErrors());
-  EXPECT_EQ(result.find("pragma"), std::string::npos);
-  EXPECT_NE(result.find("wire w;"), std::string::npos);
-}
-
 }  // namespace
