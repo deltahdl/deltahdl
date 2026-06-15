@@ -880,6 +880,8 @@ static bool IsIOSysCall(std::string_view n) {
       n == "$sscanf") {
     return true;
   }
+  // §D.14: $sreadmemh / $sreadmemb load a memory from string arguments.
+  if (n == "$sreadmemh" || n == "$sreadmemb") return true;
   // §21.3.3: the variable-targeted output tasks share the IO syscall path
   // with their $fwrite / $fdisplay counterparts.
   if (n == "$swrite" || n == "$swriteb" || n == "$swriteh" || n == "$swriteo" ||

@@ -1485,22 +1485,18 @@ static void ScanMemFile(const std::string& content, AddrFn on_addr,
 // optional start_addr / finish_addr arguments fix the initial cursor, the load
 // direction, and (with no file address) the expected word count.
 template <class StoreFn>
-static void EvalReadmemIndexed(const Expr* expr, SimContext& ctx, Arena& arena,
-                               bool is_hex, const std::string& content,
-                               int64_t low_addr, int64_t high_addr,
-                               bool is_slice, uint32_t elem_width,
-                               bool two_state, const EnumTypeInfo* enum_info,
-                               StoreFn store) {
-  bool has_start = expr->args.size() >= 3;
-  bool has_finish = expr->args.size() >= 4;
-  int64_t start_addr =
-      has_start
-          ? static_cast<int64_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64())
-          : low_addr;
-  int64_t finish_addr =
-      has_finish
-          ? static_cast<int64_t>(EvalExpr(expr->args[3], ctx, arena).ToUint64())
-          : high_addr;
+static void EvalReadmemIndexed(SimContext& ctx, Arena& arena, bool is_hex,
+                               const std::string& content, int64_t low_addr,
+                               int64_t high_addr, bool is_slice,
+                               uint32_t elem_width, bool two_state,
+                               const EnumTypeInfo* enum_info, bool has_start,
+                               bool has_finish, int64_t start_arg,
+                               int64_t finish_arg, StoreFn store) {
+  // The window arguments are resolved by the caller because $readmem and
+  // $sreadmem (§D.14) carry them at different argument positions; an absent
+  // start/finish falls back to the memory's own bounds.
+  int64_t start_addr = has_start ? start_arg : low_addr;
+  int64_t finish_addr = has_finish ? finish_arg : high_addr;
 
   // §21.4: the direction of the highest dimension's entries follows the
   // relative magnitudes of start_addr and finish_addr. Loading runs downward
@@ -1589,10 +1585,11 @@ static void EvalReadmemIndexed(const Expr* expr, SimContext& ctx, Arena& arena,
 // exist. The pattern file addresses elements numerically; when the index is an
 // enumerated type, that number is the underlying numeric value of the
 // enumeration element (see 6.19).
-static void EvalReadmemAssoc(const Expr* expr, SimContext& ctx, Arena& arena,
-                             bool is_hex, const std::string& content,
-                             AssocArrayObject* aa, bool two_state,
-                             const EnumTypeInfo* enum_info) {
+static void EvalReadmemAssoc(SimContext& ctx, Arena& arena, bool is_hex,
+                             const std::string& content, AssocArrayObject* aa,
+                             bool two_state, const EnumTypeInfo* enum_info,
+                             bool has_start, bool has_finish, int64_t start_arg,
+                             int64_t finish_arg) {
   // §21.4.1: the index of an associative array loaded this way shall be of an
   // integral type. A string-keyed array has no numeric address form, so it
   // cannot be loaded.
@@ -1603,16 +1600,10 @@ static void EvalReadmemAssoc(const Expr* expr, SimContext& ctx, Arena& arena,
     return;
   }
 
-  bool has_start = expr->args.size() >= 3;
-  bool has_finish = expr->args.size() >= 4;
-  int64_t start_addr =
-      has_start
-          ? static_cast<int64_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64())
-          : 0;
-  int64_t finish_addr =
-      has_finish
-          ? static_cast<int64_t>(EvalExpr(expr->args[3], ctx, arena).ToUint64())
-          : 0;
+  // The window arguments are resolved by the caller (their position differs
+  // between $readmem and the §D.14 $sreadmem forms).
+  int64_t start_addr = has_start ? start_arg : 0;
+  int64_t finish_addr = has_finish ? finish_arg : 0;
   bool descending = has_start && has_finish && start_addr > finish_addr;
   int64_t cursor = start_addr;
 
@@ -1651,8 +1642,8 @@ static void EvalReadmemAssoc(const Expr* expr, SimContext& ctx, Arena& arena,
 // repositions the load to the first subword of that word. With or without
 // addresses, when the file runs out of data the load stops and any array words
 // or subwords not yet reached are left unchanged.
-static void EvalReadmemMultiDim(const Expr* expr, SimContext& ctx, Arena& arena,
-                                bool is_hex, const std::string& content,
+static void EvalReadmemMultiDim(SimContext& ctx, Arena& arena, bool is_hex,
+                                const std::string& content,
                                 const std::string& mem_name, const ArrayInfo* ai,
                                 bool two_state,
                                 const EnumTypeInfo* enum_info) {
@@ -1724,6 +1715,102 @@ static void EvalReadmemMultiDim(const Expr* expr, SimContext& ctx, Arena& arena,
       });
 }
 
+// §21.4: deposits a block of load text into a memory, sharing the addressing
+// rules across $readmemb / $readmemh and the §D.14 $sreadmemb / $sreadmemh
+// string forms. `mn` is the destination memory_name expression (a bare unpacked
+// array or a slice of one); `content` is the text whose tokens are parsed with
+// the §21.4 grammar. The optional start/finish window arguments are resolved by
+// the caller, since the two task families place them at different argument
+// positions.
+static void DoMemLoad(SimContext& ctx, Arena& arena, bool is_hex,
+                      const std::string& content, const Expr* mn,
+                      bool has_start, bool has_finish, int64_t start_arg,
+                      int64_t finish_arg) {
+  // §21.4: memory_name is a bare unpacked array or a slice of one (the lowest
+  // dimension may be written with slice syntax, see 7.4.5). The selected index
+  // range is the address space the load works over.
+  const Expr* base_id = nullptr;
+  bool is_slice = false;
+  int64_t slice_lo = 0;
+  int64_t slice_hi = 0;
+  if (mn->kind == ExprKind::kIdentifier) {
+    base_id = mn;
+  } else if (mn->kind == ExprKind::kSelect && mn->index_end != nullptr &&
+             !mn->is_part_select_plus && !mn->is_part_select_minus &&
+             mn->base != nullptr && mn->base->kind == ExprKind::kIdentifier) {
+    base_id = mn->base;
+    is_slice = true;
+    int64_t a = static_cast<int64_t>(EvalExpr(mn->index, ctx, arena).ToUint64());
+    int64_t b =
+        static_cast<int64_t>(EvalExpr(mn->index_end, ctx, arena).ToUint64());
+    slice_lo = std::min(a, b);
+    slice_hi = std::max(a, b);
+  } else {
+    return;
+  }
+  std::string mem_name(base_id->text);
+
+  // §21.4.2: when the memory's element type is enumerated, the file numbers are
+  // the underlying numeric values of the type's elements and each must name a
+  // valid element. A null result means the destination is not enum-typed.
+  const EnumTypeInfo* enum_info = ctx.GetVariableEnumType(mem_name);
+
+  // §21.4.1: an associative array is addressed by an integral key; addresses
+  // create their elements on demand rather than indexing a fixed window.
+  if (AssocArrayObject* aa = ctx.FindAssocArray(mem_name)) {
+    EvalReadmemAssoc(ctx, arena, is_hex, content, aa, !aa->is_4state, enum_info,
+                     has_start, has_finish, start_arg, finish_arg);
+    return;
+  }
+
+  // §21.4.1: a dynamic array or queue loads into its existing elements. The
+  // current size is fixed for the load, so an address beyond the last element
+  // is simply dropped — the array is never resized to make room.
+  if (QueueObject* q = ctx.FindQueue(mem_name)) {
+    int64_t low_addr = 0;
+    int64_t high_addr = static_cast<int64_t>(q->elements.size()) - 1;
+    if (is_slice) {
+      low_addr = std::max(slice_lo, low_addr);
+      high_addr = std::min(slice_hi, high_addr);
+    }
+    EvalReadmemIndexed(ctx, arena, is_hex, content, low_addr, high_addr,
+                       is_slice, q->elem_width, !q->is_4state, enum_info,
+                       has_start, has_finish, start_arg, finish_arg,
+                       [&](int64_t addr, const Logic4Vec& v) {
+                         q->elements[static_cast<size_t>(addr)] = v;
+                       });
+    return;
+  }
+
+  const ArrayInfo* ai = ctx.FindArrayInfo(mem_name);
+  if (!ai) return;
+
+  // §21.4.3: a memory with more than one unpacked dimension is filled in
+  // row-major order, with @-addresses naming highest-dimension words. (A slice
+  // memory_name resolves to a single lower dimension, see §7.4.5, and is handled
+  // by the single-dimension path below.)
+  if (!is_slice && ai->dim_sizes.size() >= 2) {
+    EvalReadmemMultiDim(ctx, arena, is_hex, content, mem_name, ai,
+                        !ai->is_4state, enum_info);
+    return;
+  }
+
+  int64_t arr_lo = ai->lo;
+  int64_t arr_hi = ai->lo + static_cast<int64_t>(ai->size) - 1;
+  // A slice narrows the load window to its own bounds (clamped to the array).
+  int64_t low_addr = is_slice ? std::max(slice_lo, arr_lo) : arr_lo;
+  int64_t high_addr = is_slice ? std::min(slice_hi, arr_hi) : arr_hi;
+
+  EvalReadmemIndexed(ctx, arena, is_hex, content, low_addr, high_addr, is_slice,
+                     ai->elem_width, !ai->is_4state, enum_info, has_start,
+                     has_finish, start_arg, finish_arg,
+                     [&](int64_t addr, const Logic4Vec& v) {
+                       std::string elem =
+                           mem_name + "[" + std::to_string(addr) + "]";
+                       if (auto* var = ctx.FindVariable(elem)) var->value = v;
+                     });
+}
+
 // §21.4: $readmemb / $readmemh read a text file of white space, comments, and
 // unsized numbers into the word elements of an unpacked array. §21.4.1 extends
 // the same tasks to dynamic arrays and queues (whose size is fixed for the
@@ -1745,88 +1832,48 @@ static Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
   std::string content((std::istreambuf_iterator<char>(ifs)),
                       std::istreambuf_iterator<char>());
 
-  // §21.4: memory_name is a bare unpacked array or a slice of one (the lowest
-  // dimension may be written with slice syntax, see 7.4.5). The selected index
-  // range is the address space the load works over.
-  const Expr* mn = expr->args[1];
-  const Expr* base_id = nullptr;
-  bool is_slice = false;
-  int64_t slice_lo = 0;
-  int64_t slice_hi = 0;
-  if (mn->kind == ExprKind::kIdentifier) {
-    base_id = mn;
-  } else if (mn->kind == ExprKind::kSelect && mn->index_end != nullptr &&
-             !mn->is_part_select_plus && !mn->is_part_select_minus &&
-             mn->base != nullptr && mn->base->kind == ExprKind::kIdentifier) {
-    base_id = mn->base;
-    is_slice = true;
-    int64_t a = static_cast<int64_t>(EvalExpr(mn->index, ctx, arena).ToUint64());
-    int64_t b =
-        static_cast<int64_t>(EvalExpr(mn->index_end, ctx, arena).ToUint64());
-    slice_lo = std::min(a, b);
-    slice_hi = std::max(a, b);
-  } else {
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  std::string mem_name(base_id->text);
+  // §21.4: the optional start_addr (arg 2) and finish_addr (arg 3) follow the
+  // memory_name.
+  bool has_start = expr->args.size() >= 3;
+  bool has_finish = expr->args.size() >= 4;
+  int64_t start_arg =
+      has_start
+          ? static_cast<int64_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64())
+          : 0;
+  int64_t finish_arg =
+      has_finish
+          ? static_cast<int64_t>(EvalExpr(expr->args[3], ctx, arena).ToUint64())
+          : 0;
 
-  // §21.4.2: when the memory's element type is enumerated, the file numbers are
-  // the underlying numeric values of the type's elements and each must name a
-  // valid element. A null result means the destination is not enum-typed.
-  const EnumTypeInfo* enum_info = ctx.GetVariableEnumType(mem_name);
+  DoMemLoad(ctx, arena, is_hex, content, expr->args[1], has_start, has_finish,
+            start_arg, finish_arg);
+  return MakeLogic4VecVal(arena, 1, 0);
+}
 
-  // §21.4.1: an associative array is addressed by an integral key; addresses
-  // create their elements on demand rather than indexing a fixed window.
-  if (AssocArrayObject* aa = ctx.FindAssocArray(mem_name)) {
-    EvalReadmemAssoc(expr, ctx, arena, is_hex, content, aa, !aa->is_4state,
-                     enum_info);
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
+// §D.14: $sreadmemb / $sreadmemh mirror $readmemb / $readmemh but take their
+// load data from string arguments rather than a file. The argument order
+// differs: the destination memory_name comes first, followed by the start and
+// finish addresses that bound where the data is stored, then one or more
+// strings. The strings carry the same token format as a $readmem load file, so
+// the data is concatenated and handed to the shared loader; a newline between
+// adjacent strings keeps their tokens separated.
+static Logic4Vec EvalSreadmem(const Expr* expr, SimContext& ctx, Arena& arena,
+                              bool is_hex) {
+  // mem_name, start_address, finish_address, and at least one data string.
+  if (expr->args.size() < 4) return MakeLogic4VecVal(arena, 1, 0);
+  int64_t start_arg =
+      static_cast<int64_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
+  int64_t finish_arg =
+      static_cast<int64_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64());
 
-  // §21.4.1: a dynamic array or queue loads into its existing elements. The
-  // current size is fixed for the load, so an address beyond the last element
-  // is simply dropped — the array is never resized to make room.
-  if (QueueObject* q = ctx.FindQueue(mem_name)) {
-    int64_t low_addr = 0;
-    int64_t high_addr = static_cast<int64_t>(q->elements.size()) - 1;
-    if (is_slice) {
-      low_addr = std::max(slice_lo, low_addr);
-      high_addr = std::min(slice_hi, high_addr);
-    }
-    EvalReadmemIndexed(expr, ctx, arena, is_hex, content, low_addr, high_addr,
-                       is_slice, q->elem_width, !q->is_4state, enum_info,
-                       [&](int64_t addr, const Logic4Vec& v) {
-                         q->elements[static_cast<size_t>(addr)] = v;
-                       });
-    return MakeLogic4VecVal(arena, 1, 0);
+  std::string content;
+  for (size_t i = 3; i < expr->args.size(); ++i) {
+    if (i > 3) content += '\n';
+    content += EvalStringArg(expr->args[i], ctx, arena);
   }
 
-  const ArrayInfo* ai = ctx.FindArrayInfo(mem_name);
-  if (!ai) return MakeLogic4VecVal(arena, 1, 0);
-
-  // §21.4.3: a memory with more than one unpacked dimension is filled in
-  // row-major order, with @-addresses naming highest-dimension words. (A slice
-  // memory_name resolves to a single lower dimension, see §7.4.5, and is handled
-  // by the single-dimension path below.)
-  if (!is_slice && ai->dim_sizes.size() >= 2) {
-    EvalReadmemMultiDim(expr, ctx, arena, is_hex, content, mem_name, ai,
-                        !ai->is_4state, enum_info);
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-
-  int64_t arr_lo = ai->lo;
-  int64_t arr_hi = ai->lo + static_cast<int64_t>(ai->size) - 1;
-  // A slice narrows the load window to its own bounds (clamped to the array).
-  int64_t low_addr = is_slice ? std::max(slice_lo, arr_lo) : arr_lo;
-  int64_t high_addr = is_slice ? std::min(slice_hi, arr_hi) : arr_hi;
-
-  EvalReadmemIndexed(expr, ctx, arena, is_hex, content, low_addr, high_addr,
-                     is_slice, ai->elem_width, !ai->is_4state, enum_info,
-                     [&](int64_t addr, const Logic4Vec& v) {
-                       std::string elem =
-                           mem_name + "[" + std::to_string(addr) + "]";
-                       if (auto* var = ctx.FindVariable(elem)) var->value = v;
-                     });
+  DoMemLoad(ctx, arena, is_hex, content, expr->args[0], /*has_start=*/true,
+            /*has_finish=*/true, start_arg, finish_arg);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
@@ -2438,6 +2485,9 @@ Logic4Vec EvalIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   }
   if (name == "$readmemh") return EvalReadmem(expr, ctx, arena, true);
   if (name == "$readmemb") return EvalReadmem(expr, ctx, arena, false);
+  // §D.14: the string-loading counterparts of $readmemh / $readmemb.
+  if (name == "$sreadmemh") return EvalSreadmem(expr, ctx, arena, true);
+  if (name == "$sreadmemb") return EvalSreadmem(expr, ctx, arena, false);
   if (name == "$writememh") return EvalWritemem(expr, ctx, arena, true);
   if (name == "$writememb") return EvalWritemem(expr, ctx, arena, false);
   if (name == "$sscanf") return EvalSscanf(expr, ctx, arena);
