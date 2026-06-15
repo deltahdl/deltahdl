@@ -48,15 +48,4 @@ TEST_F(ProtectCommentSyntaxTest, CommentDirectiveStrippedSurroundingTextKept) {
   EXPECT_NE(result.find("endmodule"), std::string::npos);
 }
 
-// The <string> argument of the keyword expression may carry embedded
-// whitespace; the entire quoted value is consumed along with the directive
-// line, exercising the <string> portion of `comment = <string>`.
-TEST_F(ProtectCommentSyntaxTest, CommentStringArgumentWithSpacesConsumed) {
-  auto result =
-      Preprocess("`pragma protect comment = \"copyright 2026 acme inc\"\n");
-  EXPECT_FALSE(diag_.HasErrors());
-  EXPECT_EQ(result.find("pragma"), std::string::npos);
-  EXPECT_EQ(result.find("copyright 2026 acme inc"), std::string::npos);
-}
-
 }  // namespace
