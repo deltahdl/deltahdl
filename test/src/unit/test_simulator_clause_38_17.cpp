@@ -63,5 +63,19 @@ TEST_F(VpiVlogInfoSim, GetVlogInfoReportsInvocationCommandLine) {
   EXPECT_STREQ(info.argv[3], "+define+FOO");
 }
 
+// §38.17: the minimal non-empty command line is the tool name alone with no
+// invocation options. There shall then be exactly one argv entry, and entry
+// zero shall hold the tool's name, with argv still a valid pointer array.
+TEST_F(VpiVlogInfoSim, GetVlogInfoReportsToolNameWhenNoOptions) {
+  vpi_ctx_.SetInvocationArguments("delta-sim", {});
+
+  SVpiVlogInfo info = {};
+  EXPECT_EQ(vpi_get_vlog_info(&info), 1);
+
+  ASSERT_EQ(info.argc, 1);
+  ASSERT_NE(info.argv, nullptr);
+  EXPECT_STREQ(info.argv[0], "delta-sim");
+}
+
 }
 }
