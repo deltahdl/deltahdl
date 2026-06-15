@@ -52,6 +52,25 @@ TEST_F(VpiReleaseHandleSim, FailsWhenTheHandleIsAlreadyInvalid) {
   EXPECT_EQ(vpi_release_handle(&obj), 0);
 }
 
+// Shall (not called on an invalid handle), null edge: a null handle names no
+// object and so is never a valid handle. Passing one leaves nothing to free, so
+// the routine fails with 0 rather than acting on it.
+TEST_F(VpiReleaseHandleSim, FailsOnANullHandle) {
+  EXPECT_EQ(vpi_release_handle(nullptr), 0);
+}
+
+// Shall (not called on an invalid handle), destroyed-object edge: a handle whose
+// underlying object has ceased to exist is invalid even though the handle was
+// never released. The routine has no live object to act on, so it fails with 0.
+TEST_F(VpiReleaseHandleSim, FailsWhenTheObjectNoLongerExists) {
+  VpiObject obj;
+  obj.type = vpiModule;
+  obj.object_exists = false;
+
+  ASSERT_FALSE(vpi_ctx_.HandleReleased(&obj));
+  EXPECT_EQ(vpi_release_handle(&obj), 0);
+}
+
 // Iterator paragraph: vpi_release_handle() may free the memory of an iterator
 // object. vpi_scan() reclaims an iterator only once a traversal runs to its end;
 // a program that breaks out early - here after a single vpi_scan() - releases
