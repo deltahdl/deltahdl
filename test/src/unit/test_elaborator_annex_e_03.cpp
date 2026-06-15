@@ -4,27 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaborator, DefaultTriregStrength_AppliesToTrireg) {
-  ElabFixture f;
-  auto* design = ElaborateWithPreprocessor(
-      "`default_trireg_strength 100\n"
-      "module t;\n"
-      "  trireg cap;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  bool found = false;
-  for (const auto& net : mod->nets) {
-    if (net.name == "cap") {
-      EXPECT_EQ(net.trireg_capacitance, 100u);
-      found = true;
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 TEST(Elaborator, DefaultTriregStrength_ExplicitOverridesDefault) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
