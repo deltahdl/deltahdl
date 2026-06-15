@@ -4782,6 +4782,15 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
       ref && type == vpiConstraintExpr &&
       VpiIsConstraintExprContainerType(ref->type);
 
+  // §37.80 (figure): the callback objects placed on a prim term, an expr, a time
+  // queue, or a stmt are reached from that object by iterating vpiCallback with
+  // the object as the reference. A callback is matched by the object it was
+  // registered on (its s_cb_data obj field), since the callback object is not a
+  // child of that object. (A NULL reference instead reaches the callbacks not
+  // related to such an object - detail 2 - handled by the general walk below,
+  // where a callback whose obj field is null answers the null reference.)
+  bool callback_object_iteration = ref && type == vpiCallback;
+
   // §38.23: unless otherwise specified, iterating the relationships of a
   // protected object is an error, so no iterator is produced. §37.42 detail 10
   // carves out one exception: a protected system task or function call shall
@@ -4998,6 +5007,16 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
     // the order they occur in the implication, if, if-else, or foreach.
     for (auto* expr : ref->constraint_exprs) {
       iter->children.push_back(expr);
+    }
+  } else if (callback_object_iteration) {
+    // §37.80 (figure): hand back the callback objects registered on this
+    // reference object - each registered callback whose s_cb_data obj field names
+    // this object. The callback object itself is not a child of the object, so it
+    // is found through the callback registry rather than the generic child walk.
+    for (auto* cb_obj : cb_handles_) {
+      int idx = cb_obj->index;
+      if (idx < 0 || idx >= static_cast<int>(callbacks_.size())) continue;
+      if (callbacks_[idx].obj == ref) iter->children.push_back(cb_obj);
     }
   } else if (ref) {
     for (auto* child : ref->children) {

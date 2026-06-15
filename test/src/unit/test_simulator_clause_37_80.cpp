@@ -70,5 +70,101 @@ TEST_F(Callback, CallbackInfoIsReadableFromIteratedCallback) {
   EXPECT_EQ(info.reason, cbStartOfSimulation);
 }
 
+// The diagram's four edges (prim term, expr, time queue, stmt -> callback): a
+// callback placed on one of these objects is reached from that object by
+// iterating vpiCallback with the object as the reference. The diagram depicts a
+// data-model relationship (the callback's obj linkage), independent of the
+// callback reason, so the kind of callback is immaterial here. Each helper
+// builds an object of the diagram's kind, places a callback on it, and confirms
+// the iteration hands that callback back.
+namespace {
+void ExpectCallbackReachedFromObject(int object_type) {
+  VpiObject object;
+  object.type = object_type;
+
+  s_cb_data cb = {};
+  cb.reason = cbValueChange;
+  cb.obj = &object;
+  vpiHandle registered = vpi_register_cb(&cb);
+  ASSERT_NE(registered, nullptr);
+
+  vpiHandle it = vpi_iterate(vpiCallback, &object);
+  ASSERT_NE(it, nullptr);
+  vpiHandle reached = vpi_scan(it);
+  ASSERT_NE(reached, nullptr);
+  EXPECT_EQ(reached->type, vpiCallback);
+  EXPECT_EQ(reached, registered);
+  EXPECT_EQ(vpi_scan(it), nullptr);
+}
+}  // namespace
+
+TEST_F(Callback, CallbackOnPrimTermIsReachedFromPrimTerm) {
+  ExpectCallbackReachedFromObject(vpiPrimTerm);
+}
+
+TEST_F(Callback, CallbackOnExprIsReachedFromExpr) {
+  ExpectCallbackReachedFromObject(vpiOperation);
+}
+
+TEST_F(Callback, CallbackOnTimeQueueIsReachedFromTimeQueue) {
+  ExpectCallbackReachedFromObject(vpiTimeQueue);
+}
+
+// The object-scoped iteration is limited to its reference object: a callback
+// placed on one object is not reached from a different object, and a callback
+// not related to any object (its obj field is null - detail 2) is not reached
+// from an object reference either. The reference objects are statements, so this
+// also observes the diagram's stmt -> callback edge on its positive path.
+TEST_F(Callback, CallbackIterationFromObjectIsScopedToThatObject) {
+  VpiObject target;
+  target.type = vpiAssignStmt;
+  VpiObject other;
+  other.type = vpiAssignStmt;
+
+  s_cb_data on_target = {};
+  on_target.reason = cbValueChange;
+  on_target.obj = &target;
+  vpiHandle target_cb = vpi_register_cb(&on_target);
+  ASSERT_NE(target_cb, nullptr);
+
+  s_cb_data on_other = {};
+  on_other.reason = cbValueChange;
+  on_other.obj = &other;
+  ASSERT_NE(vpi_register_cb(&on_other), nullptr);
+
+  // A callback unrelated to any object must not surface from an object ref.
+  s_cb_data unrelated = {};
+  unrelated.reason = cbEndOfSimulation;
+  ASSERT_NE(vpi_register_cb(&unrelated), nullptr);
+
+  vpiHandle it = vpi_iterate(vpiCallback, &target);
+  ASSERT_NE(it, nullptr);
+  vpiHandle reached = vpi_scan(it);
+  ASSERT_NE(reached, nullptr);
+  EXPECT_EQ(reached, target_cb);
+  // Only the callback on the target is reached; the other object's callback and
+  // the unrelated callback are not.
+  EXPECT_EQ(vpi_scan(it), nullptr);
+}
+
+// Edge case of the object -> callback edges: iterating vpiCallback from an
+// object that carries no callback yields no iterator at all, even when callbacks
+// are registered on other objects. The walk matches by the object a callback was
+// placed on, so an object none name produces an empty result, which the iterate
+// dispatch reports as a null handle rather than an empty iterator.
+TEST_F(Callback, IterationFromObjectWithoutCallbackYieldsNoIterator) {
+  VpiObject with_callback;
+  with_callback.type = vpiAssignStmt;
+  VpiObject without_callback;
+  without_callback.type = vpiAssignStmt;
+
+  s_cb_data cb = {};
+  cb.reason = cbValueChange;
+  cb.obj = &with_callback;
+  ASSERT_NE(vpi_register_cb(&cb), nullptr);
+
+  EXPECT_EQ(vpi_iterate(vpiCallback, &without_callback), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
