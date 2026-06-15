@@ -175,6 +175,31 @@ TEST(NetDriversAndLoads, ConcatenationOnInputPortIsNotLoad) {
   EXPECT_FALSE(Contains(loads, &port));
 }
 
+// Detail 1 (concatenation carve-out, replication form): a multiple concatenation
+// (replication, {n{...}}) is also a concatenation, so its grouped operand
+// connections drive/load their nets individually. A replication on an input port
+// therefore does not make the whole port a complex-expression load, and the port
+// is excluded from the net's load iteration just as a plain concatenation is.
+TEST(NetDriversAndLoads, MultipleConcatenationOnInputPortIsNotLoad) {
+  VpiContext ctx;
+
+  VpiObject multi_concat;
+  multi_concat.type = vpiOperation;
+  multi_concat.op_type = vpiMultiConcatOp;
+
+  VpiObject port;
+  port.type = vpiPort;
+  port.direction = vpiInput;
+  port.high_conn = &multi_concat;
+
+  VpiObject net;
+  net.type = vpiNet;
+  net.children = {&port};
+
+  std::vector<VpiHandle> loads = Collect(ctx, ctx.Iterate(vpiLoad, &net));
+  EXPECT_FALSE(Contains(loads, &port));
+}
+
 // Detail 1 (complex requirement): a simple reference on an input port is a
 // direct connection, not a complex expression, so it does not make the port a
 // load under detail 1's rule.
