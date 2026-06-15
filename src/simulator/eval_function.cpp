@@ -1178,6 +1178,18 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     }
     return MakeLogic4VecVal(arena, 1, 0);
   }
+  // Optional $list system task (Annex D.6). It produces a listing of a module,
+  // task, function, or named block. With no argument the object listed is the
+  // current scope setting (the interactive scope established by $scope); with an
+  // argument, the argument is the complete hierarchical name of the specific
+  // scope to list. Resolve which scope is selected and record it.
+  if (name == "$list") {
+    std::string target = (!expr->args.empty() && expr->args[0])
+                             ? HierarchicalScopeName(expr->args[0])
+                             : ctx.InteractiveScope();
+    ctx.RecordListing(target);
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
   if (name == "$exit") {
 
     auto* cur = ctx.CurrentProcess();

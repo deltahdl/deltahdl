@@ -224,6 +224,17 @@ class SimContext {
   }
   const std::string& InteractiveScope() const { return interactive_scope_; }
 
+  // Optional $list system task (Annex D.6). $list produces a listing of a
+  // module, task, function, or named block. With no argument it lists the
+  // object that is the current scope setting (the interactive scope above);
+  // with an argument it lists the specific named scope. RecordListing remembers
+  // the complete hierarchical name of the most recently listed scope so the
+  // selection can be observed.
+  void RecordListing(std::string_view name) {
+    last_listed_scope_ = std::string(name);
+  }
+  const std::string& LastListedScope() const { return last_listed_scope_; }
+
   // §40.3.2.1 coverage-collection state driven by $coverage_control.
   CoverageControlState& GetCoverageControlState() { return coverage_control_; }
 
@@ -707,6 +718,7 @@ class SimContext {
   uint32_t reset_count_ = 0;
   int64_t reset_value_ = 0;
   std::string interactive_scope_;
+  std::string last_listed_scope_;
   CoverageControlState coverage_control_;
 
   std::unordered_map<const Expr*, Logic4Vec> deferred_arg_snapshots_;
