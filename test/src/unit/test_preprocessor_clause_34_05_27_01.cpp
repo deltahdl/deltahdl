@@ -28,13 +28,6 @@ struct ProtectKeyBlockSyntaxTest : ::testing::Test {
 
 namespace {
 
-// The bare `key_block` keyword is accepted and the directive line is stripped.
-TEST_F(ProtectKeyBlockSyntaxTest, PragmaProtectKeyBlockConsumed) {
-  auto result = Preprocess("`pragma protect key_block\n");
-  EXPECT_FALSE(diag_.HasErrors());
-  EXPECT_EQ(result.find("pragma"), std::string::npos);
-}
-
 // Only the key_block directive line is removed; neighboring source text
 // survives, confirming it is the key_block keyword line that the pragma path
 // consumes.
@@ -57,6 +50,22 @@ TEST_F(ProtectKeyBlockSyntaxTest,
   EXPECT_FALSE(diag_.HasErrors());
   EXPECT_EQ(result.find("pragma"), std::string::npos);
   EXPECT_NE(result.find("ENCODEDKEYBLOCKDATA"), std::string::npos);
+}
+
+// The bare keyword has no same-line argument grammar (unlike sibling protect
+// keywords that take `= <string>` or a parenthesized list). Tokens trailing the
+// keyword on the directive line are therefore swallowed together with the line
+// rather than parsed as a structured argument, and the pragma path raises no
+// error over them. This is the same-line counterpart to the next-line case
+// above, and guards against key_block accidentally acquiring argument parsing.
+TEST_F(ProtectKeyBlockSyntaxTest, KeyBlockHasNoSameLineArgument) {
+  auto result = Preprocess(
+      "module m;\n`pragma protect key_block TRAILINGTOKEN\nendmodule\n");
+  EXPECT_FALSE(diag_.HasErrors());
+  EXPECT_EQ(result.find("pragma"), std::string::npos);
+  EXPECT_EQ(result.find("TRAILINGTOKEN"), std::string::npos);
+  EXPECT_NE(result.find("module m;"), std::string::npos);
+  EXPECT_NE(result.find("endmodule"), std::string::npos);
 }
 
 }  // namespace
