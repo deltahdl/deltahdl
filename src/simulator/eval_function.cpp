@@ -1229,6 +1229,21 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     ctx.RecordListing(target);
     return MakeLogic4VecVal(arena, 1, 0);
   }
+  // Optional $showscopes system task (Annex D.12). It produces a complete list
+  // of the modules, tasks, functions, and named blocks defined at the current
+  // scope level (the interactive scope established by $scope). An optional
+  // integer argument widens the listing: a nonzero value lists every such object
+  // in or below the current hierarchical scope, while no argument or a zero
+  // value lists only the objects at the current scope level itself. Evaluate the
+  // optional argument to decide the depth and record the request.
+  if (name == "$showscopes") {
+    bool recursive = false;
+    if (!expr->args.empty() && expr->args[0]) {
+      recursive = EvalExpr(expr->args[0], ctx, arena).ToUint64() != 0;
+    }
+    ctx.RecordShowScopes(ctx.InteractiveScope(), recursive);
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
   // Optional $nolog and $log system tasks (Annex D.7). The log file holds a
   // copy of everything printed to standard output. $nolog disables that copy;
   // $log reenables it. An optional filename argument to $log closes the current

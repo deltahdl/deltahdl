@@ -235,6 +235,21 @@ class SimContext {
   }
   const std::string& LastListedScope() const { return last_listed_scope_; }
 
+  // Optional $showscopes system task (Annex D.12). $showscopes produces a
+  // complete list of the modules, tasks, functions, and named blocks defined at
+  // the current scope level (the interactive scope above). Its optional integer
+  // argument widens the listing: a nonzero value lists every such object in or
+  // below the current hierarchical scope, while no argument or a zero value
+  // lists only the objects at the current scope level itself. Remember the scope
+  // whose contents were shown and whether the listing recursed so the selection
+  // can be observed.
+  void RecordShowScopes(std::string_view scope, bool recursive) {
+    last_shown_scope_ = std::string(scope);
+    show_scopes_recursive_ = recursive;
+  }
+  const std::string& LastShownScope() const { return last_shown_scope_; }
+  bool ShowScopesRecursive() const { return show_scopes_recursive_; }
+
   // Optional $log and $nolog system tasks (Annex D.7). A log file holds a copy
   // of everything printed to standard output. $nolog disables that copy and
   // $log reenables it; an optional filename argument to $log closes the current
@@ -735,6 +750,8 @@ class SimContext {
   int64_t reset_value_ = 0;
   std::string interactive_scope_;
   std::string last_listed_scope_;
+  std::string last_shown_scope_;
+  bool show_scopes_recursive_ = false;
   bool logging_enabled_ = true;
   std::string log_file_;
   CoverageControlState coverage_control_;
