@@ -1190,6 +1190,22 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     ctx.RecordListing(target);
     return MakeLogic4VecVal(arena, 1, 0);
   }
+  // Optional $nolog and $log system tasks (Annex D.7). The log file holds a
+  // copy of everything printed to standard output. $nolog disables that copy;
+  // $log reenables it. An optional filename argument to $log closes the current
+  // log file and starts a new one, directing subsequent output there.
+  if (name == "$nolog") {
+    ctx.DisableLogging();
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  if (name == "$log") {
+    if (!expr->args.empty() && expr->args[0]) {
+      ctx.SetLogFile(ExtractStringArg(expr->args[0]));
+    } else {
+      ctx.EnableLogging();
+    }
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
   if (name == "$exit") {
 
     auto* cur = ctx.CurrentProcess();
