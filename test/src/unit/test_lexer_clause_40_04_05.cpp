@@ -144,4 +144,91 @@ TEST(FsmSameDeclarationPragmaLexing, NothingIsAssumedAboutAdditionalSignals) {
   EXPECT_EQ(signal_bearing, 1);
 }
 
+// R1 + R2 at the minimal "declaration of multiple signals": exactly two
+// signals. The state_vector pragma names cs and the enum-only pragma binds the
+// FSM enumeration. With only cs and ns declared, the first following signal
+// (cs) is the current state and the second (ns) is the next state — there is no
+// trailing signal for the ignore rule to act on. The lexer still records one
+// signal-bearing pragma (cs) and surfaces both names in declaration order.
+TEST(FsmSameDeclarationPragmaLexing,
+     TwoSignalDeclarationAssignsCurrentThenNextState) {
+  const std::string src =
+      "module fsm;\n"
+      "  /* tool state_vector cs */\n"
+      "  logic [1:0] /* tool enum myFSM */ cs, ns;\n"
+      "endmodule\n";
+
+  auto pragmas = CollectFsmPragmas(src);
+  ASSERT_EQ(pragmas.size(), 2u);
+  EXPECT_EQ(pragmas[0].form, "state_vector");
+  EXPECT_EQ(pragmas[0].signal, "cs");
+  EXPECT_FALSE(pragmas[0].has_enum);
+  EXPECT_EQ(pragmas[1].form, "enum_only");
+  EXPECT_TRUE(pragmas[1].has_enum);
+  EXPECT_EQ(pragmas[1].enum_name, "myFSM");
+
+  auto idents = CollectIdentifiers(src);
+  std::vector<std::string> decl_order;
+  for (const auto& id : idents) {
+    if (id == "cs" || id == "ns") {
+      decl_order.push_back(id);
+    }
+  }
+  ASSERT_EQ(decl_order.size(), 2u);
+  EXPECT_EQ(decl_order[0], "cs");  // current state
+  EXPECT_EQ(decl_order[1], "ns");  // next state
+
+  int signal_bearing = 0;
+  for (const auto& p : pragmas) {
+    if (!p.signal.empty()) {
+      ++signal_bearing;
+      EXPECT_EQ(p.signal, "cs");
+    }
+  }
+  EXPECT_EQ(signal_bearing, 1);
+}
+
+// R3 generalized beyond the single `nonstate` of the LRM example: when more
+// than one signal trails the current/next pair, nothing is assumed about ANY of
+// them. cs holds the current state and ns the next state; both idle and extra
+// are trailing signals the lexer must not tie to the FSM. The lexer records a
+// single signal-bearing pragma (cs) and surfaces every declared signal in
+// order, leaving all trailing signals for downstream extraction to ignore.
+TEST(FsmSameDeclarationPragmaLexing, MultipleTrailingSignalsAreAllIgnored) {
+  const std::string src =
+      "module fsm;\n"
+      "  /* tool state_vector cs */\n"
+      "  logic [1:0] /* tool enum myFSM */ cs, ns, idle, extra;\n"
+      "endmodule\n";
+
+  auto pragmas = CollectFsmPragmas(src);
+  for (const auto& p : pragmas) {
+    EXPECT_NE(p.signal, "ns");
+    EXPECT_NE(p.signal, "idle");
+    EXPECT_NE(p.signal, "extra");
+  }
+
+  int signal_bearing = 0;
+  for (const auto& p : pragmas) {
+    if (!p.signal.empty()) {
+      ++signal_bearing;
+      EXPECT_EQ(p.signal, "cs");
+    }
+  }
+  EXPECT_EQ(signal_bearing, 1);
+
+  auto idents = CollectIdentifiers(src);
+  std::vector<std::string> decl_order;
+  for (const auto& id : idents) {
+    if (id == "cs" || id == "ns" || id == "idle" || id == "extra") {
+      decl_order.push_back(id);
+    }
+  }
+  ASSERT_EQ(decl_order.size(), 4u);
+  EXPECT_EQ(decl_order[0], "cs");    // current state
+  EXPECT_EQ(decl_order[1], "ns");    // next state
+  EXPECT_EQ(decl_order[2], "idle");  // ignored
+  EXPECT_EQ(decl_order[3], "extra");  // ignored
+}
+
 }  // namespace
