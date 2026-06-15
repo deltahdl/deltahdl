@@ -296,6 +296,45 @@ TEST_F(VpiGetValueArraySim, RealValReturnsDoublesPerElement) {
   EXPECT_DOUBLE_EQ(av.value.reals[1], 9.0);
 }
 
+// §38.16: index_p supplies the starting element's coordinate, one entry per
+// unpacked dimension. With no index array there is no element to start from, so
+// the routine records a VPI error and overwrites the value arm to NULL.
+TEST_F(VpiGetValueArraySim, MissingStartingIndexIsError) {
+  VpiHandle arr = MakeArray("ni", {{0, 1}}, 2, 32);
+  SetElem(0, 3);
+  SetElem(1, 4);
+
+  PLI_INT32 sentinel[2] = {0, 0};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.value.integers = sentinel;  // non-NULL going in
+  vpi_get_value_array(arr, &av, /*index_p=*/nullptr, 2);
+
+  SVpiErrorInfo info = {};
+  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(av.value.integers, nullptr);  // value arm overwritten to NULL
+}
+
+// §38.16: a starting coordinate must name a declared element of the array. An
+// index value outside the array's declared range is not a legal element
+// reference, so the routine errors and nulls the value arm.
+TEST_F(VpiGetValueArraySim, OutOfRangeStartingIndexIsError) {
+  VpiHandle arr = MakeArray("oor", {{0, 1}}, 2, 32);
+  SetElem(0, 3);
+  SetElem(1, 4);
+
+  PLI_INT32 sentinel[2] = {0, 0};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.value.integers = sentinel;  // non-NULL going in
+  PLI_INT32 index[1] = {5};  // no element with declared index 5 exists
+  vpi_get_value_array(arr, &av, index, 2);
+
+  SVpiErrorInfo info = {};
+  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(av.value.integers, nullptr);  // value arm overwritten to NULL
+}
+
 // §38.16: the vpiTimeVal format returns one time structure per element through
 // the *times arm; the element value splits into the high and low time words.
 TEST_F(VpiGetValueArraySim, TimeValReturnsTimeWordsPerElement) {
