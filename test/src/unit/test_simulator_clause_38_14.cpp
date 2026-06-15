@@ -81,5 +81,19 @@ TEST_F(VpiGetUserDataSim, ReturnsNullAfterRestart) {
   EXPECT_EQ(vpi_get_userdata(call), nullptr);
 }
 
+// §38.14 (the third 'shall', reset case): after a reset, a vpi_get_userdata()
+// returns NULL. As with a restart, the association placed before the reset is
+// dropped, so the reader yields null once the reset sequence has run.
+TEST_F(VpiGetUserDataSim, ReturnsNullAfterReset) {
+  VpiHandle call = MakeCall(vpiSysFuncCall);
+  int marker = 0;
+  ASSERT_EQ(vpi_put_userdata(call, &marker), 1);
+  ASSERT_EQ(vpi_get_userdata(call), &marker);
+
+  vpi_ctx_.DispatchReset();
+
+  EXPECT_EQ(vpi_get_userdata(call), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
