@@ -95,6 +95,22 @@ TEST_F(IfIfElse, VpiConditionIsScopedToConditionalStatements) {
   EXPECT_EQ(VpiHandleC(vpiCondition, &other), nullptr);
 }
 
+// vpiCondition edge, no-condition edge case: a conditional statement that
+// carries only body statements (no expression child) yields no condition. This
+// reaches the dedicated VpiIfConditionExpr scan - distinct from the scoped test
+// above, which is rejected at the type gate before the scan runs - and observes
+// the scan completing over the children without finding an expression.
+TEST_F(IfIfElse, ConditionIsNullWhenNoExpressionChild) {
+  VpiObject then_body;
+  then_body.type = vpiStmt;
+
+  VpiObject if_stmt;
+  if_stmt.type = vpiIf;
+  if_stmt.children = {&then_body};
+
+  EXPECT_EQ(VpiHandleC(vpiCondition, &if_stmt), nullptr);
+}
+
 // Then-branch edge (the diagram's unlabeled arrow to a statement): an if
 // statement reaches its then body through the generic vpiStmt traversal - the
 // first body statement child.
