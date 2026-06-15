@@ -44,5 +44,21 @@ TEST_F(ActiveTimeFormat, ReachesTheTimeformatCallThatSetTheFormat) {
   EXPECT_EQ(VpiHandleC(vpiActiveTimeFormat, nullptr), &timeformat_call);
 }
 
+// Diagram edge / detail 1 both spell the traversal with a NULL second argument:
+// the active-time-format relation originates only at the top-level reference. So
+// even with a $timeformat() call on record, asking for vpiActiveTimeFormat
+// relative to a concrete object must not reach that recorded call - the
+// dispatch's null-reference guard keeps the relation scoped to the top level.
+TEST_F(ActiveTimeFormat, DoesNotReachTheTimeformatCallFromANonNullReference) {
+  VpiObject timeformat_call;
+  timeformat_call.type = vpiSysTaskCall;
+  ctx_.SetActiveTimeFormatCall(&timeformat_call);
+
+  VpiObject some_object;
+  some_object.type = vpiSysTaskCall;
+
+  EXPECT_NE(VpiHandleC(vpiActiveTimeFormat, &some_object), &timeformat_call);
+}
+
 }  // namespace
 }  // namespace delta
