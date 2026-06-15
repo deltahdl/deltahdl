@@ -1105,6 +1105,45 @@ static std::string HierarchicalScopeName(const Expr* e) {
   }
 }
 
+// Annex D.10: $scale converts a time value held in one module into the time
+// unit of the module that invokes $scale. The argument is the complete
+// hierarchical name of the source value: the hierarchy above the final
+// component names the source module, whose time unit applies to the raw value,
+// and the final component names the value itself. The result is that value
+// rescaled by the ratio of the source time unit to the invoking module's time
+// unit, so a value expressed in a coarser unit grows and one expressed in a
+// finer unit shrinks. A bare name carries no enclosing module of its own, so
+// the invoking module's unit applies on both sides and the value passes through
+// unchanged.
+static Logic4Vec EvalScale(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (expr->args.empty() || expr->args[0] == nullptr) {
+    return MakeLogic4VecVal(arena, 64, 0);
+  }
+  const Expr* arg = expr->args[0];
+  uint64_t raw = EvalExpr(arg, ctx, arena).ToUint64();
+
+  const TimeScale& dst = ctx.CurrentTimeScale();
+  const TimeScale* src = &dst;
+  if (arg->kind == ExprKind::kMemberAccess) {
+    std::string source_scope = HierarchicalScopeName(arg->lhs);
+    if (const TimeScale* found = ctx.FindScopeTimeScale(source_scope)) {
+      src = found;
+    }
+  }
+
+  // EffectiveTimeOrder yields the base-10 order of each unit (Table 20-2), so
+  // their difference is the power of ten relating the two units.
+  int order_diff = EffectiveTimeOrder(src->unit, src->magnitude) -
+                   EffectiveTimeOrder(dst.unit, dst.magnitude);
+  uint64_t result = raw;
+  if (order_diff > 0) {
+    for (int i = 0; i < order_diff; ++i) result *= 10;
+  } else if (order_diff < 0) {
+    for (int i = 0; i < -order_diff; ++i) result /= 10;
+  }
+  return MakeLogic4VecVal(arena, 64, result);
+}
+
 // §20.2 / Table 20-1: $stop and $finish accept an optional diagnostic level
 // argument (0, 1, or 2) that selects how much information accompanies the
 // control action. Level 0 prints nothing; level 1 reports the simulation time
@@ -1205,6 +1244,12 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
       ctx.EnableLogging();
     }
     return MakeLogic4VecVal(arena, 1, 0);
+  }
+  // Optional $scale function (Annex D.10). It reads the time value named by a
+  // hierarchical reference and converts it from the time unit of the module
+  // that holds it to the time unit of the module that invokes $scale.
+  if (name == "$scale") {
+    return EvalScale(expr, ctx, arena);
   }
   if (name == "$exit") {
 
