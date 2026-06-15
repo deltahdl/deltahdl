@@ -158,4 +158,39 @@ TEST(GlobalClockingFutureCallback, EachDeferredEventKeepsItsOwnTickAndTime) {
   EXPECT_EQ(attempt_starts[1], 12u);
 }
 
+// §39.4.2.1 (Claim A, edge case — no qualifying tick): the callback executes at
+// the nearest global clock tick strictly following the event. When the event
+// has no tick after it, there is no instant at which the deferred callback may
+// run. The delivery machinery queues the callback but never matures it, however
+// far the clock is advanced — "strictly following" admits no tick here, so none
+// fires. This observes the no-tick sentinel propagating through the integrated
+// deferral path, not just the standalone NearestGlobalClockTickAfter helper.
+TEST(GlobalClockingFutureCallback, NoTickAfterEventNeverFires) {
+  AssertionApi api;
+  api.SetGlobalClockTicks({10, 11, 12});
+  api.MarkAssertionUsesGlobalClockingFuture(kA);
+
+  int fired = 0;
+  api.PlaceAssertionCallback(
+      cbAssertionStart, kA, vpiAssert,
+      [&](const AssertionCallbackArgs&) { ++fired; }, nullptr);
+
+  AssertionAttemptInfo info;
+  info.attempt_start_time = 12;
+
+  // The event coincides with the last tick (12); nothing strictly follows it, so
+  // the callback is deferred (returns 0) rather than delivered now.
+  EXPECT_EQ(
+      api.DeliverAssertionEventAtGlobalClock(kA, cbAssertionStart, 12, info), 0u);
+  EXPECT_EQ(fired, 0);
+  EXPECT_EQ(api.PendingGlobalClockingCallbackCount(), 1u);
+
+  // Advancing to the last scheduled tick and then well past it matures nothing:
+  // no tick strictly follows the event, so the deferred callback stays queued.
+  EXPECT_EQ(api.AdvanceGlobalClockTick(12), 0u);
+  EXPECT_EQ(api.AdvanceGlobalClockTick(1000), 0u);
+  EXPECT_EQ(fired, 0);
+  EXPECT_EQ(api.PendingGlobalClockingCallbackCount(), 1u);
+}
+
 }  // namespace
