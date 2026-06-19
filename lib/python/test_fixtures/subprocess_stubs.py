@@ -34,6 +34,16 @@ def stub_subprocess_success(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
     return captured
 
 
+def stub_subprocess_stdout(
+    monkeypatch: pytest.MonkeyPatch, stdout: str,
+) -> None:
+    """Stub subprocess.run to return a success result carrying *stdout*."""
+    result = make_stub_completed(stdout=stdout)
+    monkeypatch.setattr(
+        subprocess, "run", lambda *_a, **_kw: result,
+    )
+
+
 def stub_subprocess_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     """Stub subprocess.run to return a failure result."""
     mock_result = MagicMock()

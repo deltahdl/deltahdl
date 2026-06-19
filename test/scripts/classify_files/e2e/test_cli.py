@@ -1,5 +1,6 @@
 """End-to-end tests for the classify_files CLI."""
 
+import functools
 import subprocess
 from pathlib import Path
 
@@ -97,12 +98,7 @@ def _base_env(
     return build_base_env(tmp_path, fake_scripts_dir, fake_bin)
 
 
-def _invoke(
-        *args: str, cwd: str | None = None,
-        env: dict[str, str] | None = None,
-) -> subprocess.CompletedProcess[str]:
-    """Run classify_files in a child process."""
-    return invoke_module("classify_files", *args, cwd=cwd, env=env)
+_invoke = functools.partial(invoke_module, "classify_files")
 
 
 def _all_flags(tmp_path: Path) -> list[str]:

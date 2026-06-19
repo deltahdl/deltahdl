@@ -2,14 +2,23 @@
 
 import importlib.util
 import os
+import runpy
 import stat
 import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 _REPO_ROOT = str(Path(__file__).resolve().parents[3])
 _SCRIPTS_DIR = str(Path(_REPO_ROOT) / "scripts")
+
+
+def assert_runpy_main_guard(module_name: str) -> None:
+    """Assert that running *module_name* as ``__main__`` invokes its main()."""
+    with pytest.raises(SystemExit):
+        runpy.run_module(module_name, run_name="__main__")
 
 
 def load_module_from_path(module_name: str, path: Path) -> ModuleType:

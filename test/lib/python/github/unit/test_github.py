@@ -50,14 +50,18 @@ def test_fetch_issue_body_prints_action(
     assert "Fetching issue #42" in capsys.readouterr().out
 
 
-def test_fetch_issue_body_failure() -> None:
+@pytest.mark.parametrize(
+    "fetch_fn",
+    [fetch_issue_body, fetch_issue_title, fetch_issue_state],
+)
+def test_fetch_issue_failure(fetch_fn: Any) -> None:
     """SystemExit raised on fetch failure."""
     cp = subprocess.CompletedProcess(
         args=[], returncode=1, stdout="", stderr="err",
     )
     with patch("lib.python.github.subprocess.run", return_value=cp):
         with pytest.raises(SystemExit):
-            fetch_issue_body("org", "repo", 1)
+            fetch_fn("org", "repo", 1)
 
 
 # --- fetch_issue_title ---
@@ -80,16 +84,6 @@ def test_fetch_issue_title_prints_action(
     assert "Fetching title" in capsys.readouterr().out
 
 
-def test_fetch_issue_title_failure() -> None:
-    """SystemExit raised on fetch failure."""
-    cp = subprocess.CompletedProcess(
-        args=[], returncode=1, stdout="", stderr="err",
-    )
-    with patch("lib.python.github.subprocess.run", return_value=cp):
-        with pytest.raises(SystemExit):
-            fetch_issue_title("org", "repo", 1)
-
-
 # --- fetch_issue_state ---
 
 
@@ -98,16 +92,6 @@ def test_fetch_issue_state_returns_state() -> None:
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="open\n")
     with patch("lib.python.github.subprocess.run", return_value=cp):
         assert fetch_issue_state("org", "repo", 42) == "open"
-
-
-def test_fetch_issue_state_failure() -> None:
-    """SystemExit raised on fetch failure."""
-    cp = subprocess.CompletedProcess(
-        args=[], returncode=1, stdout="", stderr="err",
-    )
-    with patch("lib.python.github.subprocess.run", return_value=cp):
-        with pytest.raises(SystemExit):
-            fetch_issue_state("org", "repo", 1)
 
 
 # --- update_issue_body ---

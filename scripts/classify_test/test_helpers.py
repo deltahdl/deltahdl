@@ -8,6 +8,7 @@ import classify_test
 from classify_test._models import Classification, ParsedFile, TestBlock
 from lib.python.test_fixtures.subprocess_stubs import (
     stub_subprocess_failure,
+    stub_subprocess_stdout,
     stub_subprocess_success,
 )
 
@@ -18,6 +19,7 @@ __all__ = [
     "stub_classifier",
     "stub_side_effects",
     "stub_subprocess_failure",
+    "stub_subprocess_stdout",
     "stub_subprocess_success",
 ]
 

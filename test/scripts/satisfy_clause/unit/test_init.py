@@ -1,12 +1,12 @@
 """Unit tests for the satisfy_clause argparse wrapper."""
 
-import runpy
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 import satisfy_clause
+from lib.python.test_utils import assert_runpy_main_guard
 
 
 # --- parse_args ------------------------------------------------------------
@@ -147,5 +147,4 @@ def test_main_passes_labels_to_pipeline(make_lrm: Path) -> None:
 
 def test_main_guard_invokes_main() -> None:
     """Running as __main__ calls main()."""
-    with pytest.raises(SystemExit):
-        runpy.run_module("satisfy_clause", run_name="__main__")
+    assert_runpy_main_guard("satisfy_clause")

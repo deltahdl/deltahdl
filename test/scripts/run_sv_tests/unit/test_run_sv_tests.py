@@ -14,6 +14,21 @@ from xml.etree import ElementTree as ET
 import pytest
 
 
+def _capture_run_cmd(rst: ModuleType, call: Callable[[], Any]) -> list[str]:
+    """Run *call* with rst.subprocess.run stubbed; return the command invoked."""
+    mock_result = MagicMock(returncode=0, stderr="")
+    with patch.object(rst.subprocess, "run", return_value=mock_result) as mock_run:
+        call()
+    return mock_run.call_args[0][0]
+
+
+def _d_flag_values(cmd: list[str]) -> list[str]:
+    """Return the value following each ``-D`` token in *cmd*."""
+    return [
+        cmd[i + 1] for i, v in enumerate(cmd) if v == "-D" and i + 1 < len(cmd)
+    ]
+
+
 class TestCollectTests:
     """Tests for the collect_tests() function."""
 
@@ -96,14 +111,10 @@ class TestRunTest:
 
     def test_defines_passed_as_dash_d_flags(self, rst: ModuleType) -> None:
         """run_test(defines=...) should include -D flags in the command."""
-        mock_result = MagicMock(returncode=0, stderr="")
-        with patch.object(rst.subprocess, "run", return_value=mock_result) as mock_run:
-            rst.run_test("/fake/test.sv", defines=["FOO", "BAR=2"])
-        cmd = mock_run.call_args[0][0]
-        d_pairs = [
-            cmd[i + 1] for i, v in enumerate(cmd) if v == "-D" and i + 1 < len(cmd)
-        ]
-        assert d_pairs == ["FOO", "BAR=2"]
+        cmd = _capture_run_cmd(
+            rst, lambda: rst.run_test("/fake/test.sv", defines=["FOO", "BAR=2"]),
+        )
+        assert _d_flag_values(cmd) == ["FOO", "BAR=2"]
 
 
 class TestParseMetadata:
@@ -394,14 +405,8 @@ class TestBuildResult:
             "/*\n:name: defs\n:tags: 5.6.4\n"
             ":defines: TEST_VAR VAR_1=2\n*/\nmodule m; endmodule\n"
         )
-        mock_result = MagicMock(returncode=0, stderr="")
-        with patch.object(rst.subprocess, "run", return_value=mock_result) as mock_run:
-            rst.build_result(str(sv))
-        cmd = mock_run.call_args[0][0]
-        d_pairs = [
-            cmd[i + 1] for i, v in enumerate(cmd) if v == "-D" and i + 1 < len(cmd)
-        ]
-        assert d_pairs == ["TEST_VAR", "VAR_1=2"]
+        cmd = _capture_run_cmd(rst, lambda: rst.build_result(str(sv)))
+        assert _d_flag_values(cmd) == ["TEST_VAR", "VAR_1=2"]
 
     def test_simulation_mode_used_for_simulation_type(
         self, rst: ModuleType, tmp_path: Path,

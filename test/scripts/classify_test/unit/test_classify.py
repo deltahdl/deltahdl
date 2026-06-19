@@ -245,35 +245,31 @@ def test_extract_json_embedded_invalid(ct: ModuleType) -> None:
 # ---- _call_claude ----------------------------------------------------------
 
 
-def test_call_claude_success(ct: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_call_claude_success(
+    ct: ModuleType, ct_helpers: ModuleType, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Returns parsed JSON from --output-format json envelope."""
     _call_claude = getattr(ct, "_call_claude")
     inner = '{"clause": "6.1", "rationale": "r"}'
     envelope = json.dumps({"result": inner, "session_id": "x"})
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = envelope
-    mock_result.stderr = ""
-    monkeypatch.setattr(
-        subprocess, "run", lambda *_a, **_kw: mock_result,
-    )
+    ct_helpers.stub_subprocess_stdout(monkeypatch, envelope)
     assert _call_claude("prompt") == {"clause": "6.1", "rationale": "r"}
 
 
-def test_call_claude_raw_text_fallback(ct: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_call_claude_raw_text_fallback(
+    ct: ModuleType, ct_helpers: ModuleType, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Falls back to _extract_json when stdout is not valid JSON."""
     _call_claude = getattr(ct, "_call_claude")
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = 'Here is the answer: {"clause": "6.1"}'
-    mock_result.stderr = ""
-    monkeypatch.setattr(
-        subprocess, "run", lambda *_a, **_kw: mock_result,
+    ct_helpers.stub_subprocess_stdout(
+        monkeypatch, 'Here is the answer: {"clause": "6.1"}',
     )
     assert _call_claude("prompt") == {"clause": "6.1"}
 
 
-def test_call_claude_structured_output(ct: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_call_claude_structured_output(
+    ct: ModuleType, ct_helpers: ModuleType, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Returns structured_output directly when present in envelope."""
     _call_claude = getattr(ct, "_call_claude")
     envelope = json.dumps({
@@ -281,13 +277,7 @@ def test_call_claude_structured_output(ct: ModuleType, monkeypatch: pytest.Monke
         "structured_output": {"clause": "25.7", "rationale": "r"},
         "session_id": "x",
     })
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = envelope
-    mock_result.stderr = ""
-    monkeypatch.setattr(
-        subprocess, "run", lambda *_a, **_kw: mock_result,
-    )
+    ct_helpers.stub_subprocess_stdout(monkeypatch, envelope)
     assert _call_claude("prompt") == {"clause": "25.7", "rationale": "r"}
 
 
