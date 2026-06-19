@@ -3,6 +3,22 @@
 import json
 from typing import Any
 
+# Shared by both clause-classification templates: the suite/test naming
+# guidance plus the LRM/TEST trailer. Kept in one place so the two prompts
+# do not duplicate it (jscpd runs with a zero-duplication threshold).
+_NAMING_GUIDANCE_AND_TRAILER = """Also return a suite_name and test_name: \
+PascalCase names that intuitively describe what the test exercises. Both must \
+be valid C++ identifiers. The suite_name groups related tests (e.g., \
+BinaryOperators, SpecifyBlocks, AlwaysCombLatch). The test_name describes what \
+this specific test case verifies (e.g., AdditionOverflow, EmptyPattern, \
+NestedReplication). Do NOT include clause or annex numbers.
+
+LRM: {lrm_path}
+
+TEST({suite}, {test_name}):
+{test_body}
+"""
+
 CLAUSE_PROMPT_TEMPLATE = """What IEEE 1800-2023 clause does this test exercise?
 
 Return exactly one clause — the single most relevant subclause.
@@ -10,17 +26,7 @@ Use the most specific subclause possible (e.g., 9.2.2.2.2 not 9.2, or A.6.3 for 
 Read the LRM to verify — do not guess from titles.
 If no LRM clause applies, respond with "non-lrm".
 
-Also return a suite_name and test_name: PascalCase names that intuitively
-describe what the test exercises. Both must be valid C++ identifiers. The suite_name groups related tests (e.g.,
-BinaryOperators, SpecifyBlocks, AlwaysCombLatch). The test_name describes
-what this specific test case verifies (e.g., AdditionOverflow,
-EmptyPattern, NestedReplication). Do NOT include clause or annex numbers.
-
-LRM: {lrm_path}
-
-TEST({suite}, {test_name}):
-{test_body}
-"""
+""" + _NAMING_GUIDANCE_AND_TRAILER
 
 CLAUSE_AGAINST_PROMPT_TEMPLATE = \
     """Does this test exercise any of these IEEE 1800-2023 subclauses: {against}?
@@ -29,18 +35,7 @@ Read the LRM to verify — do not guess from titles.
 If the test exercises one of those subclauses, return that clause.
 If it does not exercise any of them, return "none".
 
-Also return a suite_name and test_name: PascalCase names that intuitively
-describe what the test exercises. Both must be valid C++ identifiers.
-The suite_name groups related tests (e.g., BinaryOperators,
-SpecifyBlocks, AlwaysCombLatch). The test_name describes what this
-specific test case verifies (e.g., AdditionOverflow, EmptyPattern,
-NestedReplication). Do NOT include clause or annex numbers.
-
-LRM: {lrm_path}
-
-TEST({suite}, {test_name}):
-{test_body}
-"""
+""" + _NAMING_GUIDANCE_AND_TRAILER
 
 TOPIC_PROMPT_TEMPLATE = """What non-LRM topic does this test belong to?
 
