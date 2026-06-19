@@ -23,7 +23,10 @@ jobs:
             assert-no-linter-config-files \
             assert-one-assert-per-pytest \
             mypy pylint pypdf pytest pytest-cov yamllint
-          npm install -g jscpd
+          # Pinned: jscpd 5.x lowered its default --min-tokens and now flags
+          # trivial test boilerplate and intentional parallel suites. The
+          # zero-duplication policy below is calibrated against 4.2.x.
+          npm install -g jscpd@4.2.5
       - name: Lint YAML
         run: |
           EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
