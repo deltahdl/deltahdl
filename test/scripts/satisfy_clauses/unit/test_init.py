@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 import satisfy_clauses
-from lib.python.test_utils import assert_runpy_main_guard
+from lib.python.test_utils import run_module_as_main
 
 
 # --- parse_args ------------------------------------------------------------
@@ -147,4 +147,4 @@ def test_main_passes_labels_to_pipeline(make_lrm: Path) -> None:
 
 def test_main_guard_invokes_main() -> None:
     """Running as __main__ calls main()."""
-    assert_runpy_main_guard("satisfy_clauses")
+    assert run_module_as_main("satisfy_clauses").type is SystemExit

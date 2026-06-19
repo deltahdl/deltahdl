@@ -15,10 +15,15 @@ _REPO_ROOT = str(Path(__file__).resolve().parents[3])
 _SCRIPTS_DIR = str(Path(_REPO_ROOT) / "scripts")
 
 
-def assert_runpy_main_guard(module_name: str) -> None:
-    """Assert that running *module_name* as ``__main__`` invokes its main()."""
-    with pytest.raises(SystemExit):
+def run_module_as_main(module_name: str) -> pytest.ExceptionInfo[SystemExit]:
+    """Run *module_name* as ``__main__``; return the captured SystemExit info.
+
+    The ``if __name__ == "__main__"`` guard calls ``main()``, which exits;
+    callers assert on the returned exception info.
+    """
+    with pytest.raises(SystemExit) as exc_info:
         runpy.run_module(module_name, run_name="__main__")
+    return exc_info
 
 
 def load_module_from_path(module_name: str, path: Path) -> ModuleType:
