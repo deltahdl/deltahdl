@@ -127,6 +127,57 @@ TEST_F(SvGetTimeSim, TimePrecisionMatchesVpiGetForNullScope) {
   EXPECT_EQ(prec, vpi_get(vpiTimePrecision, nullptr));
 }
 
+// §H.13: svGetTime is defined to scale to the time unit of the instance scope
+// associated with the supplied svScope; the null-scope case is the special form
+// that uses the simulation time unit. This simulator binds no per-scope timescale
+// to an svScope, so a non-null scope resolves to the same design-wide simulation
+// time. Driving the non-null-scope path confirms production accepts the scope
+// argument and routes it to the shared time source rather than rejecting it.
+TEST_F(SvGetTimeSim, NonNullScopeRetrievesCurrentSimulationTime) {
+  AdvanceTo(42);
+
+  int marker = 0;
+  const void* scope = &marker;  // non-null svScope; no per-scope timescale bound
+
+  VpiTime with_scope = {};
+  with_scope.type = kSvSimTime;
+  EXPECT_EQ(svGetTime(scope, &with_scope), 0);
+
+  VpiTime null_scope = {};
+  null_scope.type = kSvSimTime;
+  EXPECT_EQ(svGetTime(nullptr, &null_scope), 0);
+
+  EXPECT_EQ(with_scope.low, 42u);
+  EXPECT_EQ(with_scope.high, null_scope.high);
+  EXPECT_EQ(with_scope.low, null_scope.low);
+}
+
+// §H.13: svGetTimeUnit and svGetTimePrecision are likewise defined per the
+// instance scope associated with an svScope, with the null scope as the
+// simulation-time-unit special form. With no per-scope timescale binding a
+// non-null scope yields the same unit and precision the null scope does;
+// exercising the non-null path confirms both routines honor the scope argument.
+TEST_F(SvGetTimeSim, NonNullScopeUnitAndPrecisionMatchNullScope) {
+  vpiHandle top = vpi_ctx_.CreateModule("top", "top");
+  ASSERT_NE(top, nullptr);
+  top->time_precision = -9;
+
+  int marker = 0;
+  const void* scope = &marker;  // non-null svScope
+
+  int32_t unit_scoped = 0;
+  int32_t unit_null = 0;
+  EXPECT_EQ(svGetTimeUnit(scope, &unit_scoped), 0);
+  EXPECT_EQ(svGetTimeUnit(nullptr, &unit_null), 0);
+  EXPECT_EQ(unit_scoped, unit_null);
+
+  int32_t prec_scoped = 0;
+  int32_t prec_null = 0;
+  EXPECT_EQ(svGetTimePrecision(scope, &prec_scoped), 0);
+  EXPECT_EQ(svGetTimePrecision(nullptr, &prec_null), 0);
+  EXPECT_EQ(prec_scoped, prec_null);
+}
+
 // §H.13 / Annex I: each routine reports failure when there is nowhere to write
 // the result, returning -1 rather than touching unowned memory.
 TEST_F(SvGetTimeSim, NullDestinationReturnsError) {
