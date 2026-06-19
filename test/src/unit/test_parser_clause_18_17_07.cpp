@@ -147,33 +147,6 @@ TEST(RandseqValuePassingParse, FormalArgumentDefaultCaptured) {
   EXPECT_NE(gen->ports[0].default_value, nullptr);
 }
 
-// §18.17.7: a production call passes data using the same syntax as a task call.
-// The actual arguments at the call site are captured as the production item's
-// argument list.
-TEST(RandseqValuePassingParse, CallSiteArgumentsCaptured) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : compute(42) ;\n"
-      "      compute( int v ) : { ; } ;\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  const auto* stmt = RandseqStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  const auto* main = FindProd(stmt, "main");
-  ASSERT_NE(main, nullptr);
-  ASSERT_EQ(main->rules.size(), 1u);
-  ASSERT_EQ(main->rules[0].prods.size(), 1u);
-  const auto& item = main->rules[0].prods[0];
-  EXPECT_EQ(item.kind, RsProdKind::kItem);
-  EXPECT_EQ(item.item.name, "compute");
-  ASSERT_EQ(item.item.args.size(), 1u);
-}
-
 // §18.17.7: a production may carry both a non-void return type and a
 // tf_port_list at once (returning data requires a declared type; accepting data
 // requires formal arguments). Both are parsed and retained on the same
@@ -225,6 +198,33 @@ TEST(RandseqValuePassingParse, MultipleCallSiteArgumentsCaptured) {
   const auto& item = main->rules[0].prods[0];
   EXPECT_EQ(item.item.name, "combine");
   ASSERT_EQ(item.item.args.size(), 3u);
+}
+
+// §18.17.7: defaults follow the task-prototype shape, so they are recorded per
+// formal rather than all-or-nothing. With only the trailing formal defaulted,
+// the parser retains a default on that formal alone and leaves the earlier one
+// without one.
+TEST(RandseqValuePassingParse, FormalArgumentDefaultAmongMultiple) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : combine(3) ;\n"
+      "      combine( int a, int b = 5 ) : { ; } ;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto* stmt = RandseqStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  const auto* combine = FindProd(stmt, "combine");
+  ASSERT_NE(combine, nullptr);
+  ASSERT_EQ(combine->ports.size(), 2u);
+  EXPECT_EQ(combine->ports[0].name, "a");
+  EXPECT_EQ(combine->ports[0].default_value, nullptr);
+  EXPECT_EQ(combine->ports[1].name, "b");
+  EXPECT_NE(combine->ports[1].default_value, nullptr);
 }
 
 }  // namespace

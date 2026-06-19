@@ -26,27 +26,6 @@ uint64_t RunModule(SimFixture& f, const char* src, std::string_view var) {
   return v ? v->value.ToUint64() : 0;
 }
 
-// §18.17.7: an actual argument is passed to a production and bound to its formal
-// argument, where the production's code block reads it. Passing data uses the
-// same syntax as a task call.
-TEST(RandseqValuePassingSim, ArgumentBoundToFormal) {
-  SimFixture f;
-  uint64_t got = RunModule(f,
-      "module t;\n"
-      "  int got;\n"
-      "  initial begin\n"
-      "    got = 0;\n"
-      "    randsequence(main)\n"
-      "      main : use ;\n"
-      "      use  : compute(42) ;\n"
-      "      compute( int v ) : { got = v; } ;\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "got");
-  EXPECT_EQ(got, 42u);
-}
-
 // §18.17.7: a production creates a scope encompassing all its rules and code
 // blocks, so an argument passed down is available throughout the production —
 // here read from two separate code blocks of the same production.
@@ -292,6 +271,27 @@ TEST(RandseqValuePassingSim, SeparateCallsBindOwnArguments) {
       "endmodule\n",
       "sum");
   EXPECT_EQ(sum, 8u);
+}
+
+// §18.17.7: actuals bind by position as in a task call, and a formal left
+// unsupplied falls back to its declared default. Here only the first of two
+// formals is supplied, so the second takes its default — exercising the boundary
+// between positionally bound actuals and default-filled formals.
+TEST(RandseqValuePassingSim, OmittedTrailingArgumentUsesDefault) {
+  SimFixture f;
+  uint64_t got = RunModule(f,
+      "module t;\n"
+      "  int got;\n"
+      "  initial begin\n"
+      "    got = 0;\n"
+      "    randsequence(main)\n"
+      "      main : combine(3) ;\n"
+      "      combine( int a, int b = 5 ) : { got = a * 10 + b; } ;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      "got");
+  EXPECT_EQ(got, 35u);
 }
 
 // §18.17.7: return values compose across nesting. A value-returning production
