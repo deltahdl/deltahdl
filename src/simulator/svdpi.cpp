@@ -617,13 +617,18 @@ svScope svSetScope(svScope scope) {
 }
 
 const char* svGetNameFromScope(svScope scope) {
-  (void)scope;
-  return "";
+  // §H.9.3: report the fully qualified name of a scope handle. Handles come from
+  // svGetScopeFromName(); an unrecognized handle resolves to an empty name
+  // rather than dereferencing an unknown pointer.
+  return delta::DpiNameFromScope(static_cast<const delta::DpiScope*>(scope));
 }
 
 svScope svGetScopeFromName(const char* scope_name) {
-  (void)scope_name;
-  return nullptr;
+  // §H.9.3: retrieve the handle for a fully qualified instance-scope name (a
+  // module, program, interface, or generate scope). A null query or any name
+  // that is not a recognized scope resolves to NULL.
+  if (scope_name == nullptr) return nullptr;
+  return const_cast<delta::DpiScope*>(delta::DpiScopeFromName(scope_name));
 }
 
 int svPutUserData(svScope scope, void* user_key, void* user_data) {

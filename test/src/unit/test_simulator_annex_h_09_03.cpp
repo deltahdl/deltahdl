@@ -27,16 +27,6 @@ TEST(DpiRuntime, SetAndGetScope) {
   EXPECT_EQ(rt.GetScope(), saved);
 }
 
-TEST(SvDpi, ScopeGetSetRoundTrip) {
-  svScope old_scope = svGetScope();
-  int dummy = 42;
-  auto new_scope = reinterpret_cast<svScope>(&dummy);
-  svScope prev = svSetScope(new_scope);
-  EXPECT_EQ(prev, old_scope);
-  EXPECT_EQ(svGetScope(), new_scope);
-  svSetScope(old_scope);
-}
-
 // §H.9.3: every svSetScope call reports the scope that was active immediately
 // before it, and svGetScope keeps returning the most recently installed scope.
 // Walking several context transitions confirms the previous-scope handoff holds
@@ -132,6 +122,54 @@ TEST(SvDpi, UserDataRejectsNullScopeOrPayload) {
 
   // The rejected put left no entry behind.
   EXPECT_EQ(svGetUserData(scope, &key_obj), nullptr);
+}
+
+// §H.9.3: svGetScopeFromName shall return NULL for a name that is not a
+// recognized instance scope, and a null query is likewise NULL.
+TEST(SvDpi, GetScopeFromNameUnrecognizedIsNull) {
+  EXPECT_EQ(svGetScopeFromName("top.no_such_scope_h_09_03"), nullptr);
+  EXPECT_EQ(svGetScopeFromName(nullptr), nullptr);
+}
+
+// §H.9.3: once a fully qualified instance-scope name is recognized,
+// svGetScopeFromName hands back its handle and svGetNameFromScope reverses that
+// handle to the same fully qualified name.
+TEST(SvDpi, ScopeNameAndHandleRoundTrip) {
+  const char* kName = "top.dut_h_09_03.u_alu";
+  const DpiScope* registered = DpiRegisterScope(kName);
+  ASSERT_NE(registered, nullptr);
+
+  svScope handle = svGetScopeFromName(kName);
+  EXPECT_EQ(handle, static_cast<svScope>(const_cast<DpiScope*>(registered)));
+  ASSERT_NE(handle, nullptr);
+
+  EXPECT_STREQ(svGetNameFromScope(handle), kName);
+
+  // Registering the same name again is idempotent: the same recognized handle
+  // comes back, so the name resolves deterministically.
+  EXPECT_EQ(svGetScopeFromName(kName), handle);
+}
+
+// §H.9.3: an unrecognized handle (one this simulator never produced) and a null
+// handle map to an empty name rather than an out-of-bounds dereference.
+TEST(SvDpi, GetNameFromUnrecognizedScopeIsEmpty) {
+  int stray = 0;
+  EXPECT_STREQ(svGetNameFromScope(reinterpret_cast<svScope>(&stray)), "");
+  EXPECT_STREQ(svGetNameFromScope(nullptr), "");
+}
+
+// §H.9.3: whether caller file/line is available is implementation-specific. When
+// it is unavailable this simulator returns FALSE (0) and leaves the caller's
+// fileName and lineNumber untouched.
+TEST(SvDpi, GetCallerInfoUnavailableReturnsFalseAndLeavesArgsUnmodified) {
+  const char* file = reinterpret_cast<const char*>(0xDEADBEEF);
+  int line = 12345;
+
+  EXPECT_EQ(svGetCallerInfo(&file, &line), 0);
+
+  // FALSE result: the out-parameters are not modified.
+  EXPECT_EQ(file, reinterpret_cast<const char*>(0xDEADBEEF));
+  EXPECT_EQ(line, 12345);
 }
 
 }

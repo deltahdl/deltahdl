@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <list>
+#include <map>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -35,6 +37,47 @@ void DpiSetCurrentDisabledState(bool disabled) {
 void DpiAckCurrentDisable() { g_disable_acked = true; }
 
 bool DpiCurrentDisableAcknowledged() { return g_disable_acked; }
+
+namespace {
+// §H.9.3 scope-name registry storage. std::list keeps element addresses stable
+// as scopes are added, so a handle handed to C code stays valid for the life of
+// the simulation. The by-name index drives svGetScopeFromName().
+std::list<DpiScope>& DpiScopeRegistryStorage() {
+  static std::list<DpiScope> storage;
+  return storage;
+}
+std::map<std::string, DpiScope*, std::less<>>& DpiScopeRegistryByName() {
+  static std::map<std::string, DpiScope*, std::less<>> by_name;
+  return by_name;
+}
+}  // namespace
+
+const DpiScope* DpiRegisterScope(std::string_view name) {
+  auto& by_name = DpiScopeRegistryByName();
+  auto it = by_name.find(name);
+  if (it != by_name.end()) return it->second;
+  DpiScope& scope = DpiScopeRegistryStorage().emplace_back();
+  scope.name = std::string(name);
+  by_name.emplace(scope.name, &scope);
+  return &scope;
+}
+
+const DpiScope* DpiScopeFromName(std::string_view name) {
+  auto& by_name = DpiScopeRegistryByName();
+  auto it = by_name.find(name);
+  return it == by_name.end() ? nullptr : it->second;
+}
+
+const char* DpiNameFromScope(const DpiScope* scope) {
+  if (scope == nullptr) return "";
+  // Only handles this registry produced map back to a name; an unregistered
+  // pointer is not a recognized scope, so it yields an empty name rather than a
+  // dereference of an unknown address.
+  for (const DpiScope& s : DpiScopeRegistryStorage()) {
+    if (&s == scope) return s.name.c_str();
+  }
+  return "";
+}
 
 DpiArgValue DpiArgValue::FromInt(int32_t v) {
   DpiArgValue a;

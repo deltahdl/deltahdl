@@ -168,6 +168,22 @@ void DpiSetCurrentDisabledState(bool disabled);
 void DpiAckCurrentDisable();
 bool DpiCurrentDisableAcknowledged();
 
+// §H.9.3 scope-name registry. The svdpi entry points svGetScopeFromName() and
+// svGetNameFromScope() consult this registry to translate between an opaque
+// scope handle and the fully qualified name of an instance scope (a module,
+// program, interface, or generate scope). In a full elaboration each such scope
+// is registered here; the C API then hands out and reverses these handles.
+//
+// DpiRegisterScope is idempotent by name: registering the same name twice
+// returns the same stable handle. DpiScopeFromName returns nullptr for a name
+// that was never registered (the standard's "unrecognized scope name" → NULL).
+// DpiNameFromScope returns the fully qualified name of a handle that originated
+// here, or "" for a null or unrecognized handle (it never dereferences a
+// pointer it did not create).
+const DpiScope* DpiRegisterScope(std::string_view name);
+const DpiScope* DpiScopeFromName(std::string_view name);
+const char* DpiNameFromScope(const DpiScope* scope);
+
 class DpiRuntime {
  public:
   void RegisterImport(DpiRtFunction func);
