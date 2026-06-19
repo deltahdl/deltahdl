@@ -182,18 +182,23 @@ def fetch_issue_body(organization: str, repo: str, issue: int) -> str:
     return _gh_api_jq(organization, repo, issue, jq=".body", label="body")
 
 
-_SUBCLAUSE_RE = re.compile(r"§(\d+(?:\.\d+)*)|(\b[A-Z](?:\.\d+)+)")
+_SUBCLAUSE_RE = re.compile(
+    r"§(\d+(?:\.\d+)*)"
+    r"|(\b[A-Z](?:\.\d+)+)"
+    r"|\bAnnex\s+([A-Z])\b"
+)
 
 
 def extract_subclause_from_title(title: str) -> str:
     """Extract the subclause number from an issue title.
 
-    Handles both ``§3.1`` and ``A.1`` formats.
+    Handles ``§3.1`` numeric, ``A.1`` annex-subclause, and bare
+    ``Annex B`` (top-level annex, no numbered subclause) formats.
     """
     m = _SUBCLAUSE_RE.search(title)
     if not m:
         return ""
-    return m.group(1) or m.group(2)
+    return m.group(1) or m.group(2) or m.group(3)
 
 
 def fetch_issue_title(organization: str, repo: str, issue: int) -> str:

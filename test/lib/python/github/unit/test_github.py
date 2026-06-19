@@ -205,6 +205,18 @@ def test_extract_subclause_annex() -> None:
     assert extract_subclause_from_title("... A.1.1 ...") == "A.1.1"
 
 
+def test_extract_subclause_bare_annex() -> None:
+    """Extracts a top-level annex letter from an ``Annex B`` title."""
+    assert extract_subclause_from_title(
+        "Implement IEEE 1800-2023 Annex B — Keywords"
+    ) == "B"
+
+
+def test_extract_subclause_bare_annex_not_from_acronym() -> None:
+    """A stray capital (e.g. ``IEEE``) is not mistaken for an annex letter."""
+    assert extract_subclause_from_title("Implement IEEE spec") == ""
+
+
 def test_extract_subclause_not_found() -> None:
     """Returns empty string when no subclause found."""
     assert extract_subclause_from_title("Random title") == ""
