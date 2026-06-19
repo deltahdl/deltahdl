@@ -19,7 +19,8 @@ def _capture_run_cmd(rst: ModuleType, call: Callable[[], Any]) -> list[str]:
     mock_result = MagicMock(returncode=0, stderr="")
     with patch.object(rst.subprocess, "run", return_value=mock_result) as mock_run:
         call()
-    return mock_run.call_args[0][0]
+    cmd: list[str] = mock_run.call_args[0][0]
+    return cmd
 
 
 def _d_flag_values(cmd: list[str]) -> list[str]:
